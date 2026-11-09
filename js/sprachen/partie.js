@@ -7,9 +7,10 @@ registriereTexte('partie', {
   de: {
     // Zahlen
     prozent: '{wert} %',
+    kiGegner: 'KI-Gegner', // Abzeichen eines KI-Gegners aus der Gegnersuche (Etappe B)
     // Screen und Kopf
     'screen.label': 'Partie gegen {name}',
-    'kopf.zurueck': 'Zurück zur Arena',
+    'kopf.zurueck': 'Zurück zu den Bots',
     'kopf.brettfarbe': 'Brettfarbe',
     'kopf.brett': 'Brett {name}',
     'kopf.klang': 'Klang',
@@ -71,7 +72,7 @@ registriereTexte('partie', {
     'aufgeben.weiter': 'Weiterspielen',
     'aufgeben.ja': 'Aufgeben',
     'pause.titel': 'Partie unterbrechen?',
-    'pause.text': 'Pausieren: Die Partie bleibt gespeichert und du setzt sie später in der Arena fort.',
+    'pause.text': 'Pausieren: Die Partie bleibt gespeichert und du setzt sie später bei den Bots fort.',
     'pause.weiter': 'Weiterspielen',
     'pause.aufgeben': 'Aufgeben',
     'pause.ja': 'Pausieren',
@@ -150,7 +151,7 @@ registriereTexte('partie', {
     'erg.lichtblickZug': 'Zug {nr} {zug}: {klasse}',
     'erg.freigeschaltet': 'NEU FREIGESCHALTET · STUFE {stufe}',
     'erg.zurAnalyse': 'Zur Analyse',
-    'erg.lobby': 'Zur Lobby',
+    'erg.lobby': 'Zu den Bots',
     'erg.abHier': 'Nochmal ab hier',
     'erg.nochmal': 'Nochmal',
     'erg.naechster': 'Nächster Gegner',
@@ -160,11 +161,13 @@ registriereTexte('partie', {
     'chip.frei': 'FREI',
     'chip.spiel': 'SPIELHALLE',
     'chip.gast': 'GAST',
+    'kopf.zurueckStart': 'Zurück zum Start', // Kundenblick 09.11.: Zurueck fuehrt dorthin, woher man kam
   },
   en: {
     prozent: '{wert}%',
+    kiGegner: 'AI opponent',
     'screen.label': 'Game against {name}',
-    'kopf.zurueck': 'Back to the Arena',
+    'kopf.zurueck': 'Back to the bots',
     'kopf.brettfarbe': 'Board color',
     'kopf.brett': '{name} board',
     'kopf.klang': 'Sound',
@@ -221,7 +224,7 @@ registriereTexte('partie', {
     'aufgeben.weiter': 'Keep playing',
     'aufgeben.ja': 'Resign',
     'pause.titel': 'Pause the game?',
-    'pause.text': 'Pause: the game stays saved, and you can pick it up later in the Arena.',
+    'pause.text': 'Pause: the game stays saved, and you can pick it up later on the Bots page.',
     'pause.weiter': 'Keep playing',
     'pause.aufgeben': 'Resign',
     'pause.ja': 'Pause',
@@ -295,7 +298,7 @@ registriereTexte('partie', {
     'erg.lichtblickZug': 'Move {nr} {zug}: {klasse}',
     'erg.freigeschaltet': 'NEWLY UNLOCKED · LEVEL {stufe}',
     'erg.zurAnalyse': 'View analysis',
-    'erg.lobby': 'Back to the lobby',
+    'erg.lobby': 'To the bots',
     'erg.abHier': 'Retry from here',
     'erg.nochmal': 'Play again',
     'erg.naechster': 'Next opponent',
@@ -304,5 +307,6 @@ registriereTexte('partie', {
     'chip.frei': 'FREE PLAY',
     'chip.spiel': 'ARCADE',
     'chip.gast': 'GUEST',
+    'kopf.zurueckStart': 'Back to home',
   },
 });

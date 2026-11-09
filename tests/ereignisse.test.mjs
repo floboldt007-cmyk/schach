@@ -186,7 +186,7 @@ function el(name) {
 const namen = (c) => c.kinder.map((k) => k.name).join(',');
 
 const ORT_TABELLE = {
-  'arena:kopf': 'dom', 'arena:modus': 'dom', 'arena:panel-oben': 'dom', 'arena:panel-bot': 'dom', 'arena:start': 'aufruf',
+  'arena:kopf': 'dom', 'arena:modus': 'dom', 'arena:panel-oben': 'dom', 'arena:panel-bot': 'dom', 'arena:steckbrief': 'dom', 'arena:start': 'aufruf',
   'partie:begruessung?': 'wahl', 'ergebnis:karte': 'dom', 'analyse:coach': 'dom', 'analyse:oben': 'dom',
   'verlauf:seite': 'dom', 'einstellungen:gruppen': 'dom', 'einstellungen:klang': 'dom', 'app:erster-screen?': 'wahl',
   // W0+a (SPIELKONZEPT 6.2)
@@ -199,9 +199,11 @@ const ORT_TABELLE = {
   // Sammlung (Reiter Ich, Flo 30.10.2026): ein Bereich je Anbieter, Host js/ui/ich.js
   'sammlung:bereich': 'dom',
   // Profil (Flo 30.10.2026): Host js/ui/ich.js und js/ui/duell.js
-  'ich:kopf': 'dom', 'duell:profil?': 'wahl',
+  'ich:kopf': 'dom', 'duell:profil?': 'wahl', 'karte:eigene?': 'wahl', 'karte:fremde?': 'wahl',
   // Lobby-Musik in der Sammlung unter Klaenge (Flo 31.10.2026): Paket musik liefert, Paket sammlung zeigt
   'sammlung:musik?': 'wahl',
+  // Startseite "Als Naechstes" (Variante A, Flo 08.11.2026): Tagesziele unter den Wegen, Host js/ui/heim.js
+  'heim:naechstes': 'dom',
 };
 pruefe('ORTE: alle Orte der Tabelle (BAUPLAN 3.4) mit ihrer Art', JSON.stringify(Object.entries(ORTE).sort()) === JSON.stringify(Object.entries(ORT_TABELLE).sort()), ORTE);
 pruefe('ORTE: eingefroren', Object.isFrozen(ORTE));

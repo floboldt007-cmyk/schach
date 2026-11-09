@@ -3,7 +3,7 @@ import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim } from '../bewegung.js';
-import { klang } from '../sounds.js';
+import { klang, zugKlangName } from '../sounds.js';
 import { sanAnzeige } from '../review.js';
 import { sende } from '../ereignisse.js';
 import {
@@ -11,6 +11,8 @@ import {
   ladeLaufendePartie, speichereLaufendePartie, loescheLaufendePartie, speicherePartie,
 } from '../storage.js';
 import { t, sprache } from '../sprache.js';
+import { hauptKopf, verbindeKopf } from './seite.js';
+import { icon } from './icons.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 
@@ -50,26 +52,47 @@ export function zeige(root, params, app) {
   return partie(root, laufend?.modus === 'zuzweit' ? laufend : params, app, !!laufend);
 }
 
+// Startblatt im Stil der Startseite (Handy-Runde 08.11.2026, Befund 3): Kopf mit Zurueck-Symbol, dunkle Buehne mit
+// beiden Koenigen (Figurensatz der App), darunter Bedenkzeit als Pillen, "Brett drehen" als
+// Schalter und die Namen eingeklappt (freiwillig). Alle Ziele mindestens 44 px. Die Leiste unten gehoert zur
+// Navigation (js/app.js) und fehlt hier bewusst.
+const ZEITEN = [['ohne', null], ['5', '5+0'], ['10', '10+0'], ['15', '15+10']];
 function startblatt(root, app) {
   const alt = ladeModulEinstellungen('zuzweit');
   const namen = pruefeZuzweit(alt);
+  const pfad = new URL(figurenPfad(), WURZEL).href;
   const s = document.createElement('section');
-  s.className = 'screen partie zz-screen';
-  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.zurueck')}</button><h2>${Z('titel')}</h2></header>
-    <div class="zz-rumpf"><form class="zz-start flaeche">
-      <h3>${Z('amBrett')}</h3><p>${Z('einleitung')}</p>
-      <label>${Z('nameWeiss')}<input name="weiss" maxlength="20" value="${esc(anzeigeName(namen.weiss))}" autocomplete="off"></label>
-      <label>${Z('nameSchwarz')}<input name="schwarz" maxlength="20" value="${esc(anzeigeName(namen.schwarz))}" autocomplete="off"></label>
-      <label>${Z('bedenkzeit')}<select name="bedenkzeit"><option value="ohne">${Z('ohneUhr')}</option><option value="5">5+0</option><option value="10">10+0</option><option value="15">15+10</option></select></label>
-      <label class="zz-schalter"><input name="drehen" type="checkbox"${namen.drehen ? ' checked' : ''}>${Z('drehen')}</label>
-      <p class="zz-hinweis">${Z('hinweis')}</p>
-      <button class="knopf primaer" type="submit">${Z('los')}</button>
+  s.className = 'screen zz-screen zz-startblatt';
+  s.setAttribute('aria-label', Z('amBrett'));
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: Z('titel'), chips: '', klang: false })}
+    <div class="zz-rumpf"><form class="zz-start">
+      <div class="zz-buehne">
+        <div class="zz-paar" aria-hidden="true"><img src="${esc(pfad)}wK.svg" alt="" draggable="false"><img src="${esc(pfad)}bK.svg" alt="" draggable="false"></div>
+        <div class="zz-buehne-text">
+          <small class="zz-ueber">${esc(Z('ueber'))}</small>
+          <h2 class="zz-titel">${esc(Z('amBrett'))}</h2>
+          <p class="zz-einleitung">${esc(Z('einleitung'))}</p>
+        </div>
+      </div>
+      <fieldset class="zz-zeiten"><legend>${esc(Z('bedenkzeit'))}</legend>
+        ${ZEITEN.map(([wert, text]) => `<label class="zz-pille"><input type="radio" name="bedenkzeit" value="${wert}"><span>${esc(text || Z('ohneUhr'))}</span></label>`).join('')}
+      </fieldset>
+      <label class="zz-schalter"><span>${esc(Z('drehen'))}</span><input name="drehen" type="checkbox" role="switch"${namen.drehen ? ' checked' : ''}></label>
+      <details class="zz-namen">
+        <summary><span>${esc(Z('namen'))}</span><small>${esc(Z('namenFrei'))}</small></summary>
+        <div class="zz-namen-felder">
+          <label>${esc(Z('nameWeiss'))}<input name="weiss" maxlength="20" value="${esc(anzeigeName(namen.weiss))}" autocomplete="off"></label>
+          <label>${esc(Z('nameSchwarz'))}<input name="schwarz" maxlength="20" value="${esc(anzeigeName(namen.schwarz))}" autocomplete="off"></label>
+        </div>
+      </details>
+      <button class="zz-los dr" type="submit">${icon('play')}<span>${esc(Z('los'))}</span></button>
+      <p class="zz-hinweis">${esc(Z('hinweis'))}</p>
     </form></div>`;
   root.append(s);
   let weg = false, startet = false;
   const form = s.querySelector('form');
   form.elements.bedenkzeit.value = Object.hasOwn(TEMPI, alt.bedenkzeit) ? alt.bedenkzeit : 'ohne';
-  s.querySelector('[data-zz="zurueck"]').addEventListener('click', () => app.gehe('training'));
+  const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (startet) return;
@@ -84,7 +107,7 @@ function startblatt(root, app) {
     speichereModulEinstellungen('zuzweit', { ...zuzweit, bedenkzeit });
     app.gehe('partie', { modus: 'zuzweit', zuzweit, tempo: TEMPI[bedenkzeit] || null });
   });
-  return { verlasse() { weg = true; } };
+  return { verlasse() { weg = true; try { kopf.verlasse(); } catch (e) { /* egal */ } } };
 }
 
 function partie(root, quelle, app, fortgesetzt) {
@@ -117,13 +140,14 @@ function partie(root, quelle, app, fortgesetzt) {
   let seit = gespeichertUhr && Number.isFinite(gespeichertUhr.seit) ? Math.min(Date.now(), gespeichertUhr.seit) : Date.now();
   let weg = false, fragt = false, gespeichert = null, drehenAnimation = null;
   let uhrTimer;
+  const gewarnt = {};   // Uhr-Warnung schon gespielt je Farbe
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
   s.setAttribute('aria-label', Z('amBrett'));
   s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.training')}</button><h2>${Z('titel')}</h2></header>
     <div class="zz-rumpf"><div class="zz-spielbereich">
       <div class="zz-spieler zz-oben" role="group"></div>
-      <div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div>
+      <div class="zz-feld"><div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div></div>
       <div class="zz-spieler zz-unten" role="group"></div>
       <p class="zz-status" role="status"></p>
       <div class="zz-aktionen"><button class="knopf" type="button" data-zz="zugzurueck">${Z('zugZurueck')}</button><button class="knopf" type="button" data-zz="remis">${Z('remisAnbieten')}</button><button class="knopf" type="button" data-zz="aufgeben">${Z('aufgeben')}</button></div>
@@ -164,6 +188,8 @@ function partie(root, quelle, app, fortgesetzt) {
       el.classList.toggle('laeuft', !!tempo && chess.turn() === f);
       el.classList.toggle('warn', !!tempo && ms < 20000);
       el.setAttribute('aria-label', `${name(f)}: ${uhrText(ms)}`);
+      // einmal je Seite, wenn ihre laufende Uhr unter 20 s faellt
+      if (tempo && ms < 20000 && chess.turn() === f && !gewarnt[f]) { gewarnt[f] = true; try { klang.spiele('uhr-warnung'); } catch (e) { /* still */ } }
     }
   }
   function zeichne(animieren = true) {
@@ -199,7 +225,7 @@ function partie(root, quelle, app, fortgesetzt) {
     queueMicrotask(() => {
       if (weg) return;
       brett.loescheNutzerPfeile(); zeichne();
-      if (!pruefeEnde()) { try { klang.spiele(chess.inCheck() ? 'schach' : m.captured ? 'schlagen' : 'zug'); } catch (e) { /* still */ } }
+      if (!pruefeEnde()) { try { klang.spiele(zugKlangName(m, chess.inCheck())); } catch (e) { /* still */ } }
     });
     return true;
   }
@@ -217,6 +243,8 @@ function partie(root, quelle, app, fortgesetzt) {
     z.phase = 'ende'; clearInterval(uhrTimer); brett.erlaubeZuege(null);
     app.schliesseDialog?.();
     const ergebnis = gewinner === 'w' ? 'sieg' : gewinner === 'b' ? 'niederlage' : 'remis';
+    // beide sitzen am selben Geraet: ein Sieg klingt fuer den Gewinner (Sieg-Klang), ein Remis wie ein Remis
+    try { klang.ende(gewinner ? true : null); } catch (e) { /* still */ }
     gespeichert = speicherePartie({ modus: 'zuzweit', zuzweit: namen, botId: null, spielerFarbe: 'w',
       zuege: z.zuege.slice(), san: z.san.slice(), zeiten: z.zeiten.slice(), tempo, gestartet, ergebnis, grund,
       hinweise: 0, zuruecknahmen: 0, liveKlassen: [], genauigkeit: null, genauigkeitBot: null });

@@ -64,13 +64,18 @@
 /* Schmale Form (.fk-schmal, setzt ansicht.js nach Platz in der Chip-Reihe, auf dem Handy immer): nur die Level-Zahl im
    Emblem (SPIELKONZEPT 3.1 "kleine Zahl im Emblem", wie in Abrechnung, Verlauf und Spieler-Leiste; Wort und Titel stehen
    im aria-label). Die Tippflaeche bleibt ueber ::before mindestens 44 px breit. */
-.screen .haupt-kopf .chip.fk-chip.fk-schmal { gap: 0; padding: 0 6px; min-width: 41px; justify-content: center; }
-.fk-chip.fk-schmal .fk-ico, .fk-chip.fk-schmal .fk-chip-wort, .fk-chip.fk-schmal .fk-mini { display: none; }
+.screen .haupt-kopf .chip.fk-chip.fk-schmal { gap: 5px; padding: 0 6px 0 8px; min-width: 41px; justify-content: center; }
+/* das Funken-Symbol bleibt vor der Zahl, sonst stand dort eine unerklaerte "1" (Handy-Runde 08.11.2026, Befund 7);
+   dazu sichtbar "Lv" vor dem Emblem (Flo 08.11.2026: "Lv 1" statt nur "1") */
+.fk-chip.fk-schmal .fk-chip-wort, .fk-chip.fk-schmal .fk-mini { display: none; }
+.fk-chip-kurz { display: none; }
+.fk-chip.fk-schmal .fk-chip-kurz { display: inline; margin-right: 4px; }
 .fk-chip.fk-schmal .fk-chip-text b { display: inline-grid; place-items: center; box-sizing: border-box; min-width: 26px; height: 26px;
   padding: 0 5px; border-radius: var(--r-pille); background: var(--tinte); color: var(--auf-tinte); font-size: 14px; line-height: 1; }
-.fk-spieler { display: inline-grid; place-items: center; flex: none; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-pille);
-  background: var(--tinte); color: var(--auf-tinte); }
-.fk-spieler b { font-size: 12px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+/* Level an Flos Namen: das Wort steht dabei (Handy-Runde K, 08.11.2026: eine nackte "1" erklaerte sich nicht) */
+.fk-spieler { display: inline-block; flex: none; min-width: 20px; height: 18px; padding: 0 7px; border-radius: var(--r-pille);
+  background: var(--tinte); color: var(--auf-tinte); font-size: 12px; font-weight: 700; line-height: 18px; white-space: nowrap; }
+.fk-spieler b { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* ---------- Faktor vor der Partie (arena:panel-bot) ---------- */
 .chip.fk-faktor { align-self: flex-start; max-width: 100%; height: 30px; gap: 6px; padding: 0 12px; font-size: 13px; font-weight: 700; color: var(--text);
@@ -104,6 +109,10 @@
 .sheet-karte.fk-spiegel { text-align: left; max-height: min(86vh, 760px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .fk-spiegel h3 { text-align: center; }
 .fk-spiegel-inhalt { display: grid; gap: 12px; margin-top: 14px; }
+/* T-3: Rueckenwind/Wochenende und Faktor sichtbar im Spiegel, unter heute / als Naechstes */
+.fk-s-jetzt { display: grid; gap: 10px; padding: 12px 14px; border-radius: var(--r-m); background: var(--flaeche-2); }
+.fk-s-faktor { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.fk-s-gegner { font-size: 13.5px; font-weight: var(--gw-stark); color: var(--text-2); }
 .fk-s-liste { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 14px; }
 .fk-s-liste dt { font-weight: var(--gw-stark); color: var(--text-2); }
 .fk-s-liste dd { margin: 0; font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
@@ -136,6 +145,7 @@
 @media (min-width: 1100px) and (max-width: 1399px) {
   .screen .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .chip.fk-chip { gap: 0; padding: 0 6px; min-width: 41px; justify-content: center; }
   .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .fk-chip :is(.fk-ico, .fk-chip-wort, .fk-mini) { display: none; }
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .fk-chip .fk-chip-kurz { display: inline; margin-right: 4px; }
   .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .fk-chip .fk-chip-text b { display: inline-grid; place-items: center;
     box-sizing: border-box; min-width: 26px; height: 26px; padding: 0 5px; border-radius: var(--r-pille); background: var(--tinte);
     color: var(--auf-tinte); font-size: 14px; line-height: 1; }

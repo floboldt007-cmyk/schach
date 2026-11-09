@@ -8,15 +8,14 @@
 // - Erster Sieg: die Feier-Zeile "Dein erster Sieg" (Quelle erster-sieg, gross) beim ersten wertenden Sieg ueberhaupt.
 //
 // Orte:       app:erster-screen? (Reihenfolge 80, logik.WAHL_REIHENFOLGE: andere Pakete mit eigener Wahl gehen vor),
-//             arena:heute (70, Zeile .st-neu: Knopf .st-neu-los "Neu fuer dich: ..." fuehrt hin, .st-neu-weg blendet aus),
+//             arena:heute (70, Zeile .st-neu: Knopf .st-neu-los "Neu fuer dich: ..." fuehrt hin, .st-neu-weg blendet aus;
+//             seit Variante A ohne Host), heim:naechstes (8, Zeile "Neu fuer dich" auf der Startseite, T-3),
 //             einstellungen:gruppen (90, Gruppe "Erste Schritte": Schalter fuer die Hinweise, Stand der Einstufung,
 //             Willkommen, Regel-Hilfe)
 // Ereignisse: hoert app:bereit (Fahrplan beginnt, per setTimeout), app:screen (besuchte Screens: kein Hinweis mehr dafuer),
 //             partie:beendet (letzte Partie fuer den Hinweis zur Analyse; erster Sieg synchron vor den Feier-Zeilen des
 //             Overlays), training:stand (Stand des Trainings, z. B. der Kartei: der Hinweis "Das Training" kommt erst, wenn
 //             dort Karten liegen, nie fuer einen leeren Stapel). Sendet nichts.
-// Heute-Karte: die Zeile "Neu fuer dich" tritt zurueck, solange dort eine Zeile eines anderen Pakets steht
-//             (css/pakete/start.css, .heute-karte .st-neu:not(:only-child)): Spielen-Knopf auf dem iPad quer im Bild.
 // Register:   Raetsel-Quellen start-regeln und start-einstufung (dienst.js), Icon "neu-siegel".
 // Speicher:   Modul "start" (Budget 6.000, logik.js), Paket-Einstellungen "start" { hinweise: true }.
 // Test:       zustand() -> { modul, einstellungen, hinweis, training }   hinweis: der Hinweis des Tages (auch wenn die Zeile
@@ -66,7 +65,8 @@ function ziel(app, id) {
   else if (id === 'verlauf') app.gehe('verlauf');
 }
 
-function neuZeile(k) {
+// Hinweis des Tages (eine Entdeckung oder null), fuer die Heute-Zeile und die Startseite gleich gerechnet
+function entdeckungHeute(k) {
   if (!k || !k.app || !D.einstellungen().hinweise) return null;
   const m = D.stand();
   // Partien: wertende aus dem Fortschritt; eine Probepartie zaehlt dort nicht, aber sie ist die letzte Partie
@@ -77,7 +77,24 @@ function neuZeile(k) {
   });
   if (JSON.stringify(r.modul.fahrplan.heute) !== JSON.stringify(m.fahrplan.heute)) D.sichere(r.modul);
   letzterHinweis = r.id;
-  const e = L.entdeckung(r.id);
+  return L.entdeckung(r.id);
+}
+
+// Startseite "Als Naechstes" (T-3, Flo 09.11.2026): dieselbe Entdeckung als Zeile nach Klassen-Aufgabe und Boss;
+// Antippen erledigt den Hinweis und fuehrt hin (Ausblenden ohne Hinfuehren bleibt der Schalter in den Einstellungen)
+function neuHeim(k) {
+  if (!k || typeof k.zeile !== 'function') return null;
+  const e = entdeckungHeute(k);
+  if (!e) return null;
+  const kopf = t('p-start.neu.kopf').replace(/:\s*$/, '');   // der Kopf der Heute-Zeile endet mit Doppelpunkt
+  const z = k.zeile({ symbol: icon('neu-siegel'), titel: kopf, text: e.titel, label: `${kopf}: ${e.titel}. ${e.text}`, paket: L.PAKET,
+    beiTipp: () => sicher(() => { D.aendere((x) => L.erledige(x, e.id)); ziel(k.app, e.id); }, 'Hinweis') });
+  z.dataset.entdeckung = e.id;
+  return z;
+}
+
+function neuZeile(k) {
+  const e = entdeckungHeute(k);
   if (!e) return null;
   const el = document.createElement('div');
   el.className = 'st-neu';
@@ -169,6 +186,7 @@ function registriere() {
     partienZahl: Math.max(k && Number.isFinite(k.partienZahl) ? k.partienZahl : 1, partienAus(null)), laufend: !!ladeLaufendePartie(),
   }), 'Erster Screen'), { reihenfolge: L.WAHL_REIHENFOLGE, paket: L.PAKET });
   anbieten('arena:heute', (k) => sicher(() => neuZeile(k), 'Heute'), { reihenfolge: 70, paket: L.PAKET });
+  anbieten('heim:naechstes', (k) => sicher(() => neuHeim(k), 'Startseite'), { reihenfolge: 8, paket: L.PAKET });
   anbieten('einstellungen:gruppen', (k) => sicher(() => (k && k.app ? gruppe(k.app) : null), 'Einstellungen'), { reihenfolge: 90, paket: L.PAKET });
 
   // Fahrplan beginnt beim ersten Start mit dem Paket (ausserhalb des Hoerers: die Partienliste kann gross sein). Erfahren

@@ -1,15 +1,15 @@
 // Tests fuer js/online.js (Node, ohne Browser, mit gefaelschtem fetch): node tests/online.test.mjs
 // Prueft jeden Aufruf mit Pfad, Methode, Kopfzeilen (apikey, Bearer) und Body, die Abfrage (Start, Pause bei
 // verborgener Seite, Stopp, Fehler), die Fehlertexte, den Einladungslink und die Vertraege zu SQL und sw.js.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { setzeKontoFetch, sitzung, SITZUNG_SCHLUESSEL, SICHTBAR_SCHLUESSEL } from '../js/konto.js';
-import { SUPABASE_URL, SUPABASE_KEY } from '../js/konto-config.js';
+import { SUPABASE_URL, SUPABASE_KEY, FUNKTION_REGION, mitRegion } from '../js/konto-config.js';
 import {
   erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte, pruefeZeit, meldeStrittig,
   einladungsLink, codeAusLink, uebernimmEinladungsLink, gemerkteEinladung, vergissEinladung, meineFarbe, binAmZug,
-  zuegeListe, normalisiereCode, setzeOnlineFetch, FEHLER_TEXTE, LINK_BASIS, EINLADUNG_SCHLUESSEL, ZUG_PFAD,
+  zuegeListe, normalisiereCode, setzeOnlineFetch, FEHLER_TEXTE, LINK_BASIS, EINLADUNG_SCHLUESSEL, ZUG_PFAD, edgeFunktion,
 } from '../js/online.js';
 import { KENNUNGEN as FUNCTION_KENNUNGEN } from '../supabase/functions/_gemeinsam/online-zug.js';
 
@@ -147,10 +147,43 @@ anmelden();
   const p = await sendeZug(ID, { uci: 'e2e4' });
   const c = letzter();
   pruefe('sendeZug: POST an die Edge Function online-zug, nicht mehr an rpc/online_zug', ZUG_PFAD === '/functions/v1/online-zug'
-    && c.url === `${SUPABASE_URL}/functions/v1/online-zug` && c.methode === 'POST');
+    && c.url === `${SUPABASE_URL}/functions/v1/online-zug?forceFunctionRegion=eu-central-1` && c.methode === 'POST');
   pruefe('sendeZug: apikey, Bearer und JSON-Kopf wie bei den Datenbank-Aufrufen', c.headers.apikey === SUPABASE_KEY && c.headers.Authorization === `Bearer ${tokenFuer('u1')}`
     && c.headers['Content-Type'] === 'application/json');
   pruefe('sendeZug: Body ist genau { partie, zug }, die Antwort ist die Partie', JSON.stringify(bodyVon(c)) === JSON.stringify({ partie: ID, zug: 'e2e4' }) && p.zuege === 'e2e4');
+}
+
+// ---------- Region der Edge Functions: jeder Aufruf fest auf Frankfurt (Datenschutzerklaerung) ----------
+{
+  pruefe('Region: eu-central-1 als Query-Parameter forceFunctionRegion (wie supabase-js)', FUNKTION_REGION === 'eu-central-1'
+    && mitRegion('/functions/v1/x') === '/functions/v1/x?forceFunctionRegion=eu-central-1');
+  antworten.push({ status: 200, body: { richtig: true } });
+  await edgeFunktion('/functions/v1/raetsel-duell', { duell: ID, zug: 'e2e4' });
+  pruefe('edgeFunktion (Raetsel-Duell): Region gesetzt', letzter().url === `${SUPABASE_URL}/functions/v1/raetsel-duell?forceFunctionRegion=eu-central-1`);
+  // Jeder Aufruf einer Function in js/ laeuft ueber mitRegion: jede Zeile mit fetch/anfrage auf einen Function-Pfad
+  // (Konstante *_PFAD oder ein Literal /functions/v1/) muss mitRegion enthalten; edgeFunktion setzt sie selbst.
+  const dateien = [];
+  const sammle = (d) => { for (const e of readdirSync(path.join(WURZEL, d), { withFileTypes: true })) {
+    const p = d + '/' + e.name;
+    if (e.isDirectory()) sammle(p); else if (p.endsWith('.js')) dateien.push(p);
+  } };
+  sammle('js');
+  const ohne = [];
+  let aufrufe = 0;
+  for (const d of dateien) {
+    const text = quelle(d);
+    const pfade = [...text.matchAll(/export const (\w+) = '\/functions\/v1\/[a-z-]+'/g)].map((x) => x[1]);
+    for (const zeile of text.split('\n')) {
+      const ruft = /\b(fetchFn|fetch|anfrage)\(/.test(zeile)
+        && (pfade.some((k) => zeile.includes(k)) || zeile.includes("'/functions/v1/") || zeile.includes('`/functions/v1/'));
+      if (ruft) { aufrufe++; if (!zeile.includes('mitRegion(')) ohne.push(d + ': ' + zeile.trim()); }
+    }
+  }
+  pruefe('Quelltext: jeder direkte Function-Aufruf in js/ setzt die Region (online-zug, coach)', aufrufe >= 2 && ohne.length === 0, ohne);
+  pruefe('Quelltext: edgeFunktion setzt die Region fuer alle ihre Aufrufer (raetsel-duell)', /return anfrage\(mitRegion\(pfad\)/.test(quelle('js/online.js')));
+  pruefe('Quelltext: kein Header x-region (braeuchte neue CORS-Freigabe der Functions)', dateien.every((d) => !/['"`]x-region['"`]/i.test(quelle(d))));
+}
+{
   // Ein alter Aufrufer mit Stellung, Seite, Ergebnis und Grund: Diese Felder gehen nie mehr an den Server
   antworten.push({ status: 200, body: { ...partie, status: 'beendet', ergebnis: '0-1', grund: 'matt' } });
   await sendeZug(ID, { uci: 'd8h4', fenDanach: 'rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3', amZugDanach: 'w', ergebnis: '0-1', grund: 'matt' });
@@ -415,7 +448,7 @@ anmelden();
 {
   pruefe('einladungsLink: Basis plus #online/CODE', einladungsLink('abc234', 'https://floboldt007-cmyk.github.io/schach/') === 'https://floboldt007-cmyk.github.io/schach/#online/ABC234');
   pruefe('einladungsLink: alter Hash der Basis wird entfernt', einladungsLink('ABC234', 'https://floboldt007-cmyk.github.io/schach/#arena') === 'https://floboldt007-cmyk.github.io/schach/#online/ABC234');
-  pruefe('einladungsLink: ohne location die Live-Adresse', einladungsLink('ABC234') === `${LINK_BASIS}#online/ABC234` && LINK_BASIS === 'https://floboldt007-cmyk.github.io/schach/');
+  pruefe('einladungsLink: ohne location die Live-Adresse', einladungsLink('ABC234') === `${LINK_BASIS}#online/ABC234` && LINK_BASIS === 'https://crownmate.de/');
   globalThis.location = { origin: 'http://localhost:9400', pathname: '/schach/', hash: '#arena' };
   pruefe('einladungsLink: Basis aus location', einladungsLink('ABC234') === 'http://localhost:9400/schach/#online/ABC234');
   globalThis.location = { origin: 'null', pathname: '/x/index.html', hash: '' };
@@ -501,7 +534,7 @@ anmelden();
   pruefe('app.js uebernimmt Einladungen vor dem Routing und registriert den Online-Screen',
     /import \{ uebernimmEinladungsLink \} from '\.\/online\.js'/.test(quelle('js/app.js'))
     && /const einladung = uebernimmEinladungsLink\(\);\s*const ziel = einladung/.test(quelle('js/app.js'))
-    && /const SCREENS = \[[^\]]*'online'/.test(quelle('js/app.js')) && /online: 'Gegen Freunde'/.test(quelle('js/app.js')));
+    && /const SCREENS = \[[^\]]*'online'/.test(quelle('js/app.js')) && /online: 'Online'/.test(quelle('js/app.js')));
   const eigene = quelle('js/online.js');
   pruefe('online.js importiert nur Konfiguration, Konto und Sprache, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js,./sprache.js'
     && [...eigene.matchAll(/import '([^']+)'/g)].map((x) => x[1]).join(',') === './sprachen/online.js');

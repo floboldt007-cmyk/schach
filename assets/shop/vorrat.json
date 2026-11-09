@@ -1,0 +1,247 @@
+{
+  "stand": "2026-11-06",
+  "hinweis": "Nur Grafiken, noch nicht in die App eingebaut. Flo gibt jedes Stueck frei. Keine Preise: die stehen nur im Vault.",
+  "quelle": "werkzeuge/shop-vorrat.mjs",
+  "seltenheiten": [
+    "Häufig",
+    "Selten",
+    "Episch",
+    "Exklusiv"
+  ],
+  "stuecke": [
+    {
+      "id": "lampion",
+      "art": "figuren",
+      "name": "Lampion",
+      "seltenheit": "Episch",
+      "text": "Gedrechselte Laternen mit warmem Glimmen in der Mitte.",
+      "ordner": "assets/shop/figuren/lampion",
+      "figuren": 12
+    },
+    {
+      "id": "sternwarte",
+      "art": "figuren",
+      "name": "Sternwarte",
+      "seltenheit": "Episch",
+      "text": "Mondsilber gegen Nachthimmel, mit goldenen Funkelsternen.",
+      "ordner": "assets/shop/figuren/sternwarte",
+      "figuren": 12
+    },
+    {
+      "id": "uhrwerk",
+      "art": "figuren",
+      "name": "Uhrwerk",
+      "seltenheit": "Episch",
+      "text": "Kupfer und Bronze mit einem Zahnrad in jeder Figur.",
+      "ordner": "assets/shop/figuren/uhrwerk",
+      "figuren": 12
+    },
+    {
+      "id": "kristall",
+      "art": "figuren",
+      "name": "Kristall",
+      "seltenheit": "Episch",
+      "text": "Geschliffene Figuren aus Eis und Amethyst.",
+      "ordner": "assets/shop/figuren/kristall",
+      "figuren": 12
+    },
+    {
+      "id": "origami",
+      "art": "figuren",
+      "name": "Origami",
+      "seltenheit": "Episch",
+      "text": "Gefaltetes Papier, hell und kohlegrau, mit rotem Siegel.",
+      "ordner": "assets/shop/figuren/origami",
+      "figuren": 12
+    },
+    {
+      "id": "kronjuwel",
+      "art": "figuren",
+      "name": "Kronjuwel",
+      "seltenheit": "Exklusiv",
+      "text": "Sonder-Set: Gold mit Rubin, Onyx mit Smaragd. Im Shop mit Goldrahmen.",
+      "ordner": "assets/shop/figuren/kronjuwel",
+      "figuren": 12
+    },
+    {
+      "id": "sandstein",
+      "art": "brett",
+      "name": "Sandstein",
+      "seltenheit": "Selten",
+      "text": "Warmer Stein mit feiner Koernung.",
+      "datei": "assets/shop/bretter/sandstein.svg",
+      "hell": "#F1E1C2",
+      "dunkel": "#C4935E",
+      "rand": "#6E4A2A"
+    },
+    {
+      "id": "mitternacht",
+      "art": "brett",
+      "name": "Mitternacht",
+      "seltenheit": "Selten",
+      "text": "Tiefblau mit winzigen Sternen.",
+      "datei": "assets/shop/bretter/mitternacht.svg",
+      "hell": "#C9CFE6",
+      "dunkel": "#2E3766",
+      "rand": "#12152B"
+    },
+    {
+      "id": "kirschbluete",
+      "art": "brett",
+      "name": "Kirschblüte",
+      "seltenheit": "Selten",
+      "text": "Zartrosa mit kleinen Blueten.",
+      "datei": "assets/shop/bretter/kirschbluete.svg",
+      "hell": "#FBE8EC",
+      "dunkel": "#D98AA0",
+      "rand": "#6B2E3E"
+    },
+    {
+      "id": "lagune",
+      "art": "brett",
+      "name": "Lagune",
+      "seltenheit": "Selten",
+      "text": "Tuerkis mit sanften Wellen.",
+      "datei": "assets/shop/bretter/lagune.svg",
+      "hell": "#E6F4EF",
+      "dunkel": "#3E9C9A",
+      "rand": "#154747"
+    },
+    {
+      "id": "schiefer",
+      "art": "brett",
+      "name": "Schiefer",
+      "seltenheit": "Selten",
+      "text": "Kuehles Grau mit Schichtlinien.",
+      "datei": "assets/shop/bretter/schiefer.svg",
+      "hell": "#D7DADF",
+      "dunkel": "#59606B",
+      "rand": "#23262B"
+    },
+    {
+      "id": "ahorn",
+      "art": "brett",
+      "name": "Ahorn",
+      "seltenheit": "Selten",
+      "text": "Helles Holz mit Maserung.",
+      "datei": "assets/shop/bretter/ahorn.svg",
+      "hell": "#F3DDB4",
+      "dunkel": "#C98A4B",
+      "rand": "#5A3418"
+    },
+    {
+      "id": "kupfer",
+      "art": "brett",
+      "name": "Kupfer",
+      "seltenheit": "Selten",
+      "text": "Gehaemmertes Kupfer mit Nieten im Rahmen.",
+      "datei": "assets/shop/bretter/kupfer.svg",
+      "hell": "#F2D3B8",
+      "dunkel": "#B4643A",
+      "rand": "#4A2412"
+    },
+    {
+      "id": "aurora",
+      "art": "brett",
+      "name": "Aurora",
+      "seltenheit": "Episch",
+      "text": "Nordlicht zieht als Schleier um das Brett.",
+      "datei": "assets/shop/bretter/aurora.svg",
+      "hell": "#E8F1F7",
+      "dunkel": "#1E3050",
+      "rand": "#0D1626"
+    },
+    {
+      "id": "kronsaal",
+      "art": "brett",
+      "name": "Kronsaal",
+      "seltenheit": "Exklusiv",
+      "text": "Sonder-Brett: Weinrot und Gold mit Kronen im Feld.",
+      "datei": "assets/shop/bretter/kronsaal.svg",
+      "hell": "#F3E3B6",
+      "dunkel": "#7A1F2E",
+      "rand": "#B8862B"
+    },
+    {
+      "id": "wellenring",
+      "art": "effekt",
+      "anlass": "zug",
+      "name": "Wellenring",
+      "seltenheit": "Häufig",
+      "text": "Zwei Ringe laufen vom Zielfeld nach aussen.",
+      "datei": "assets/shop/effekte/wellenring.svg"
+    },
+    {
+      "id": "funkenspur",
+      "art": "effekt",
+      "anlass": "zug",
+      "name": "Funkenspur",
+      "seltenheit": "Häufig",
+      "text": "Funken folgen dem Weg der Figur.",
+      "datei": "assets/shop/effekte/funkenspur.svg"
+    },
+    {
+      "id": "blattwirbel",
+      "art": "effekt",
+      "anlass": "zug",
+      "name": "Blattwirbel",
+      "seltenheit": "Häufig",
+      "text": "Vier Blaetter drehen sich um das Zielfeld.",
+      "datei": "assets/shop/effekte/blattwirbel.svg"
+    },
+    {
+      "id": "pixelstaub",
+      "art": "effekt",
+      "anlass": "zug",
+      "name": "Pixelstaub",
+      "seltenheit": "Häufig",
+      "text": "Kleine Pixel stieben auseinander.",
+      "datei": "assets/shop/effekte/pixelstaub.svg"
+    },
+    {
+      "id": "konfetti",
+      "art": "effekt",
+      "anlass": "sieg",
+      "name": "Konfetti",
+      "seltenheit": "Selten",
+      "text": "Goldene Schnipsel regnen ueber das Brett.",
+      "datei": "assets/shop/effekte/konfetti.svg"
+    },
+    {
+      "id": "lichtsaeule",
+      "art": "effekt",
+      "anlass": "sieg",
+      "name": "Lichtsäule",
+      "seltenheit": "Selten",
+      "text": "Ein Lichtstrahl steigt ueber dem Koenig auf.",
+      "datei": "assets/shop/effekte/lichtsaeule.svg"
+    },
+    {
+      "id": "sternschnuppe",
+      "art": "effekt",
+      "anlass": "sieg",
+      "name": "Sternschnuppe",
+      "seltenheit": "Selten",
+      "text": "Ein Stern zieht mit Schweif ueber das Brett.",
+      "datei": "assets/shop/effekte/sternschnuppe.svg"
+    },
+    {
+      "id": "kronenregen",
+      "art": "effekt",
+      "anlass": "sieg",
+      "name": "Kronenregen",
+      "seltenheit": "Episch",
+      "text": "Goldene Kronen fallen nach dem Matt.",
+      "datei": "assets/shop/effekte/kronenregen.svg"
+    },
+    {
+      "id": "goldkranz",
+      "art": "effekt",
+      "anlass": "sieg",
+      "name": "Goldkranz",
+      "seltenheit": "Exklusiv",
+      "text": "Sonder-Effekt: ein Lorbeerkranz waechst Blatt fuer Blatt, oben die Krone.",
+      "datei": "assets/shop/effekte/goldkranz.svg"
+    }
+  ]
+}

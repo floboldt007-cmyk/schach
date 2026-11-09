@@ -584,8 +584,8 @@ async function testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id) {
   // Ganz neuer Start ohne Netz (neuer Tab, Startadresse wie vom Home-Bildschirm)
   const neu = await kontext.newPage();
   await neu.goto(START);
-  await neu.waitForSelector('.screen.arena .knoten', { timeout: 20000 });
-  pruefe('Offline: Start über ./ (wie vom Home-Bildschirm)', await neu.locator('.screen.arena .knoten').count() === 6);
+  await neu.waitForSelector('.heim-screen .heim-buehne', { timeout: 20000 });
+  pruefe('Offline: Start über ./ (wie vom Home-Bildschirm) auf der Startseite', await neu.locator('.heim-screen .heim-modus').count() === 3);
   await neu.close();
   // (die Update-Pruefung des Browsers auf sw.js laeuft an der Offline-Simulation vorbei: zaehlt nicht)
   const abrufe = serverLog.slice(vorher).filter((l) => l.pfad !== PRAEFIX + 'sw.js');

@@ -14,13 +14,7 @@
 }
 .haupt-kopf .kopf-links { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
 .haupt-kopf .rechts { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; }
-/* mit der Reiter-Pille in der Mitte: beide Seiten gleich breit, damit die Pille mittig steht */
-.haupt-kopf.mit-reiter .kopf-links { flex: 1 0 0; }
-.haupt-kopf.mit-reiter .rechts { flex: 1 1 0; }
-/* reicht es dafuer nicht (viele Reiter, viele Knoepfe): die Pille steht mittig im freien Platz zwischen beiden Seiten */
-.haupt-kopf.mit-reiter.reiter-frei .kopf-links { flex: 0 0 auto; }
-.haupt-kopf.mit-reiter.reiter-frei .rechts { flex: 0 1 auto; }
-.haupt-kopf.mit-reiter.reiter-frei .kopf-reiter-platz { flex: 1 1 auto; }
+/* der Platz fuer Reiter im Kopf bleibt leer (die Leiste sitzt unten oder links, Etappe A) */
 .haupt-kopf .kopf-reiter-platz { flex: none; display: flex; justify-content: center; }
 .haupt-kopf .kopf-reiter-platz:empty { display: none; }
 
@@ -58,8 +52,15 @@
    Kapsel mit feinen Trennstrichen statt als lose Einzel-Pillen; was nicht ganz passt, tritt zurueck (seite.js) */
 .screen .haupt-kopf .kopf-chips { gap: 0; padding: 3px 2px; border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
 .screen .haupt-kopf .kopf-chips > .chip { position: relative; background: transparent; box-shadow: none; }
-.screen .haupt-kopf .kopf-chips > .chip:not(:first-child)::after { content: ''; position: absolute; left: 0; top: 11px; bottom: 11px; width: 1px;
+/* G-001 (jeder Knopf mind. 44 px): die Chips der Kapsel sind selbst 44 hoch (der Level-Chip ist ein Knopf, alle bleiben
+   gleich hoch); der negative Rand haelt die Kapsel und die Trennstriche so hoch wie bisher (40 px, Handy 38 px) */
+.screen .haupt-kopf .kopf-chips > .chip { height: 44px; margin-block: -2px; }
+.screen .haupt-kopf .kopf-chips > .chip:not(:first-child)::after { content: ''; position: absolute; left: 0; top: 13px; bottom: 13px; width: 1px;
   background: var(--linie-2, var(--linie)); pointer-events: none; }
+@media (max-width: 700px) {
+  .screen .haupt-kopf .kopf-chips > .chip { margin-block: -3px; }
+  .screen .haupt-kopf .kopf-chips > .chip:not(:first-child)::after { top: 14px; bottom: 14px; }
+}
 .screen .haupt-kopf .kopf-chips > .chip:hover { background: var(--flaeche-2); }
 .screen .haupt-kopf .kopf-knopf { flex: none; width: 46px; height: 46px; border-radius: var(--r-m); border: 0; box-shadow: var(--s1), var(--kante); }
 .haupt-kopf .kopf-knopf .ico { width: 22px; height: 22px; }
@@ -71,8 +72,7 @@
 .knopf-klang[aria-pressed="false"] .klang-welle { opacity: 0; }
 .knopf-klang[aria-pressed="false"] .klang-strich { opacity: 1; }
 
-/* Verlauf ist ein Reiter (Flo D2): kein eigener Verlauf-Knopf; auf dem Screen eines Reiters kein Zurueck */
-html[data-reiter-liste~="verlauf"] .haupt-kopf [data-aktion="verlauf"] { display: none; }
+/* auf dem Screen eines Reiters kein Zurueck */
 html[data-reiter-wurzel="ja"] .haupt-kopf .kopf-zurueck { display: none; }
 
 /* Seitentitel unter dem Kopf (Training, spaeter Verlauf und Pakete) */
@@ -81,46 +81,51 @@ html[data-reiter-wurzel="ja"] .haupt-kopf .kopf-zurueck { display: none; }
 .seiten-kopf .ueberzeile { margin-bottom: 4px; }
 .seiten-kopf p { margin: 8px 0 0; color: var(--text-2); font-weight: 600; font-size: 15px; max-width: 60ch; }
 
-/* ---------- Reiter-Leiste: schwebende Glas-Pille ---------- */
+/* ---------- Reiter-Leiste: Glas-Leiste (Konzept 2026-11-06) ----------
+   unten: schwebende Glas-Kapsel ueber die Breite (Entwurf online-shop .dock), Symbol ueber dem Wort.
+   seite (Querformat ab 1021 px, app.js): Seitenleiste links mit Marke, Reiter untereinander (Entwurf ipad-pc-v2 .nav).
+   Der aktive Reiter traegt .an: Schrift in der lesbaren Goldfassung, dahinter die gleitende Pille in Gold weich. */
+:root { --dock-hoehe: 64px; --dock-abstand: max(16px, env(safe-area-inset-bottom, 0px)); --seite-breite: 216px; --seite-rand: 12px; }
 .reiter-leiste[hidden] { display: none; }
-.reiter-leiste { position: fixed; z-index: 40; left: 0; right: 0; bottom: max(14px, env(safe-area-inset-bottom, 0px)); margin: 0 auto;
-  width: max-content; max-width: calc(100% - 2 * var(--rand)); display: flex; padding: 5px; border-radius: var(--r-pille);
+.reiter-leiste { position: fixed; z-index: 40; left: 16px; right: 16px; bottom: var(--dock-abstand); margin: 0 auto; max-width: 560px;
+  height: var(--dock-hoehe); box-sizing: border-box; display: flex; align-items: stretch; padding: 6px; border-radius: 32px;
   background: var(--glas); -webkit-backdrop-filter: var(--glas-filter); backdrop-filter: var(--glas-filter);
   box-shadow: var(--s2), var(--kante); }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .reiter-leiste { background: var(--flaeche); }
 }
-.reiter-leiste .reiter { position: relative; z-index: 1; flex: none; height: var(--reiter-hoehe); min-width: var(--tipp); margin: 0; padding: 0 20px;
-  border: 0; border-radius: var(--r-pille); background: none; display: flex; align-items: center; justify-content: center; gap: 8px;
-  font: inherit; font-weight: var(--gw-stark); font-size: 14.5px; line-height: 1.1; color: var(--text-2); white-space: nowrap; cursor: pointer;
+.reiter-leiste .reiter-marke { display: none; }
+.reiter-leiste .reiter { position: relative; z-index: 1; flex: 1 1 0; min-width: var(--tipp); min-height: var(--tipp); margin: 0; padding: 0 4px;
+  border: 0; border-radius: 26px; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font: inherit; font-weight: var(--gw-stark); font-size: 12px; line-height: 1.1; color: var(--text-2); white-space: nowrap; cursor: pointer;
   transition: color var(--d-s) var(--sanft), transform var(--d-m) var(--feder); }
-.reiter-leiste .reiter .ico { width: 18px; height: 18px; }
-.reiter-leiste .reiter[aria-current="page"] { color: var(--text); }
+.reiter-leiste .reiter .ico { width: 22px; height: 22px; stroke-width: 1.7; }
+.reiter-leiste .reiter.an { color: var(--kt-stark); }
 .reiter-leiste .reiter:focus-visible { outline: var(--fokus); outline-offset: -2px; }
-.reiter-pille { position: absolute; z-index: 0; top: 5px; bottom: 5px; left: 0; width: 0; border-radius: var(--r-pille); pointer-events: none;
-  background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
-:root[data-modus="dunkel"] .reiter-pille { background: var(--flaeche-3); }
-@media (prefers-color-scheme: dark) {
-  :root[data-modus="system"] .reiter-pille { background: var(--flaeche-3); }
-}
-/* enger, wenn sie oben nicht passt (app.js misst): erst schmaler, dann ohne Symbole */
-.reiter-leiste.eng .reiter { padding: 0 14px; font-size: 14px; }
-.reiter-leiste.enger .reiter .ico { display: none; }
-/* unten zu breit (Handy mit vier Reitern): volle Breite, Symbol ueber dem Wort */
-.reiter-leiste.gestapelt { left: var(--rand); right: var(--rand); width: auto; max-width: none; }
-.reiter-leiste.gestapelt .reiter { flex: 1 1 0; min-width: 0; height: calc(var(--reiter-hoehe) + 8px); padding: 0 4px; flex-direction: column; gap: 2px;
-  font-size: 12px; }
-.reiter-leiste.gestapelt .reiter .ico { width: 20px; height: 20px; }
-/* oben: in der Kopfzeile (Platz aus js/ui/seite.js) */
-.reiter-leiste[data-lage="oben"] { position: relative; left: auto; right: auto; bottom: auto; margin: 0; max-width: none; z-index: 1; }
-/* weg (Partie, Analyse, Einstellungen): faehrt nach unten, solange nicht bedienbar */
+.reiter-pille { position: absolute; z-index: 0; top: 6px; bottom: 6px; left: 0; width: 0; border-radius: 26px; pointer-events: none;
+  background: var(--gold-weich); }
+
+/* Seitenleiste links (iPad quer, PC): schwebt mit kleinem Rand ueber die ganze Hoehe */
+.reiter-leiste[data-lage="seite"] { top: var(--seite-rand); bottom: var(--seite-rand); left: var(--seite-rand); right: auto; margin: 0;
+  width: var(--seite-breite); max-width: none; height: auto; flex-direction: column; align-items: stretch; gap: 4px; padding: 22px 14px;
+  border-radius: 28px; }
+.reiter-leiste[data-lage="seite"] .reiter-marke { display: block; padding: 0 12px 18px; font-family: var(--display); font-weight: var(--gw-titel);
+  font-size: 20px; letter-spacing: -.02em; color: var(--text); }
+.reiter-leiste[data-lage="seite"] .reiter { flex: none; height: 48px; flex-direction: row; justify-content: flex-start; gap: 12px; padding: 0 12px;
+  border-radius: 14px; font-size: 15px; }
+.reiter-leiste[data-lage="seite"] .reiter-pille { top: 0; bottom: auto; left: 14px; right: 14px; width: auto; height: 0; border-radius: 14px; }
+/* die Marke steht in der Seitenleiste: im Kopf tritt sie zurueck (bleibt fuer Vorleseprogramme im Dokument), damit
+   Sterne, Level und Serie neben der Leiste ganz Platz haben */
+html[data-reiter="seite"] .haupt-kopf .marke { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* weg (Partie, Analyse, Einstellungen): faehrt hinaus, solange nicht bedienbar */
 .reiter-leiste.weg { pointer-events: none; }
 
-/* Platz fuer die Leiste unten: die Screens werden um ihre Hoehe kuerzer (oben braucht es keinen zusaetzlichen Platz).
-   --reiter-h = Pille (Reiter + 2 x 5) + Abstand zum Rand (mindestens 14, sonst die sichere Zone) + 10 Luft */
-:root { --reiter-h: calc(var(--reiter-hoehe) + 10px + max(14px, env(safe-area-inset-bottom, 0px)) + 10px); }
-html[data-reiter-form="gestapelt"] { --reiter-h: calc(var(--reiter-hoehe) + 18px + max(14px, env(safe-area-inset-bottom, 0px)) + 10px); }
+/* Platz fuer die Leiste: unten werden die Screens um ihre Hoehe kuerzer, links ruecken sie nach rechts.
+   --reiter-h = Kapsel + Abstand zum Rand (mindestens 16, sonst die sichere Zone) + 8 Luft */
+:root { --reiter-h: calc(var(--dock-hoehe) + var(--dock-abstand) + 8px); --reiter-b: calc(var(--seite-breite) + 2 * var(--seite-rand)); }
 html[data-reiter="unten"] #app > .screen { height: calc(100vh - var(--reiter-h)); height: calc(100dvh - var(--reiter-h)); }
+html[data-reiter="seite"] #app > .screen { margin-left: var(--reiter-b); width: calc(100% - var(--reiter-b)); }
 /* Meldungen ueber der Leiste, nicht darauf */
 html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
 
@@ -136,14 +141,12 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   .haupt-kopf .rechts, .screen .haupt-kopf .kopf-chips { gap: 6px; }
   .screen .haupt-kopf .kopf-knopf { width: var(--tipp); height: var(--tipp); border-radius: 15px; }
   .seiten-kopf { padding-top: 22px; }
-  .reiter-leiste .reiter { padding: 0 16px; }
 }
 @media (max-width: 440px) {
   .screen .haupt-kopf .marke-titel { font-size: 18px; }
   .haupt-kopf .rechts, .screen .haupt-kopf .kopf-chips { gap: 4px; }
   /* drei Knoepfe: das Zeichen und der zweite Chip machen Platz (der Titel bleibt ganz) */
   .haupt-kopf.voll .marke-zeichen, .haupt-kopf.voll .chip-pokal { display: none; }
-  html[data-reiter-liste~="verlauf"] .haupt-kopf.voll-durch-verlauf .marke-zeichen { display: grid; }
   /* Zahlenruhe: drei Zahlen im Kopf (Sterne, Level, Serie) brauchen am Handy die ganze Breite; die Marke tritt zurueck,
      bleibt aber fuer Vorleseprogramme da (h1) */
   .haupt-kopf:has(.kopf-chips > :nth-child(4)) .marke { position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -168,11 +171,6 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   .seiten-kopf { padding-top: 8px; padding-bottom: 0; }
   .seiten-kopf h1 { font-size: 23px; letter-spacing: -.02em; }
   .seiten-kopf .ueberzeile { display: none; }
-  .reiter-leiste { bottom: max(8px, env(safe-area-inset-bottom, 0px)); padding: 4px; }
-  .reiter-pille { top: 4px; bottom: 4px; }
-  .reiter-leiste.gestapelt .reiter { height: calc(var(--reiter-hoehe) + 2px); gap: 1px; }
-  .reiter-leiste.gestapelt .reiter .ico { width: 18px; height: 18px; }
-  html[data-reiter-form="gestapelt"] { --reiter-h: calc(var(--reiter-hoehe) + 2px + 8px + max(8px, env(safe-area-inset-bottom, 0px)) + 6px); }
 }
 /* Handy: der Name der Seite steht im Kopf statt der Marke (hauptKopf({ seite }) in js/ui/seite.js), der grosse
    Seitentitel darunter entfaellt; beide bleiben fuer Vorleseprogramme im Dokument. Spart auf jeder Seite eine Zeile. */
@@ -199,24 +197,11 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
 .haupt-kopf .kopf-premium:active { transform: scale(.96); }
 .haupt-kopf .kopf-premium:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 
-/* Reiter oben in der Kopfzeile (iPad quer): die Krone ohne Wort, damit die Reiter dort weiter Platz haben (app.js setzt
-   .mit-reiter vor dem Messen; passt es nicht, faellt die Leiste wie bisher nach unten und das Wort kehrt zurueck) */
-@media (max-width: 1399px) {
-  .haupt-kopf.mit-reiter .kopf-premium { width: 46px; padding: 0; }
-  .haupt-kopf.mit-reiter .kopf-premium span { display: none; }
-}
 /* iPad und kleine Fenster (521 bis 1399 px): Krone und Shop brauchen Platz, dafuer tritt in der Arena der Klang-Knopf
    zurueck (er steht in den Einstellungen und in der Partie); so bleiben Sterne, Level und Serie ganz, auch in Safari */
 @media (min-width: 521px) and (max-width: 1399px) {
   /* nur wenn es eng wird: mit drei und mehr Zahlen der Pakete (Sterne, Level, Serie) */
   .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .knopf-klang { display: none; }
-  /* Reiter oben (iPad quer): die Pille steht wie vor der Krone eng und ohne Symbole (.eng.enger) mittig im freien Platz
-     (.reiter-frei), damit Sterne, Level und Serie ihren vollen Platz behalten */
-  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .kopf-links { flex: 0 0 auto; }
-  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .rechts { flex: 0 1 auto; }
-  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .kopf-reiter-platz { flex: 1 1 auto; }
-  .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .reiter-leiste[data-lage="oben"] .reiter { padding: 0 14px; font-size: 14px; }
-  .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .reiter-leiste[data-lage="oben"] .reiter .ico { display: none; }
 }
 /* iPad hoch und kleine Fenster (521 bis 1020 px): ebenfalls nur die Krone, damit Sterne, Level und Serie ganz bleiben */
 @media (min-width: 521px) and (max-width: 1020px) {

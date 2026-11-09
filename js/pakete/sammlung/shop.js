@@ -5,6 +5,8 @@
 // - Die Restzahl kommt nur vom Server und nur, solange verkauft wird; "9 von 10 verfuegbar" sieht bei 9 und bei 1 gleich
 //   aus (keine Farbe, keine Bewegung), nie "nur noch", kein Countdown.
 // - Anprobieren zeigt das Stueck nur in einer Vorschau; benutzen kann es erst, wer es besitzt.
+// - Ohne Konto (G-002, Flos Wahl 08.11.2026): unter dem Satz die Stuecke des Katalogs ausgegraut (.sh-karte[data-gast]),
+//   nur Bild und Name, ohne Stand, ohne Preis und ohne Knoepfe; kaufen geht nur mit Konto.
 //
 //   KATALOG                         Aussehen je produkt_id (der Name kommt vom Server, Preise nur aus der Datenbank)
 //   shopBereich({ app }) -> section.sa-bereich[data-bereich="shop"]   fuellt sich selbst (Anmeldung, Alter, Editionen)
@@ -64,6 +66,18 @@ function anprobieren(e, aussehen) {
     knoepfe: [{ text: t('allgemein.schliessen'), wert: true }], abbrechen: true }).catch(() => {});
 }
 
+// Stueck ohne Konto: nur Aussehen und Name aus dem Katalog, ausgegraut
+function gastKarte(id, aussehen) {
+  const k = document.createElement('article');
+  k.className = 'sh-karte';
+  k.dataset.produkt = id;
+  k.dataset.gast = '';
+  k.innerHTML = `<div class="sh-bild">${brettSvg(aussehen)}</div>
+    <div class="sh-text"><span class="sh-ueber">${esc(S('shop.gastUeber'))}</span><b class="sh-name"></b><span class="sh-klein">${esc(S('shop.gastKlein'))}</span></div>`;
+  k.querySelector('.sh-name').textContent = aussehen.name;
+  return k;
+}
+
 function karte(e) {
   const aussehen = KATALOG[e.produkt_id];
   if (!aussehen) return null;
@@ -108,6 +122,10 @@ export function shopBereich({ app } = {}) {
     if (!sitzung()) {
       // wie js/ui/online.js: die Konto-Gruppe ist je Geraet verborgen, bis jemand sie aufruft
       satz(S('shop.anmelden'), knopf(S('shop.zumKonto'), () => { kontoFreigeschaltet('#konto'); try { app?.gehe?.('einstellungen', { seite: 'konto' }); } catch (e) { /* egal */ } }));
+      const gast = document.createElement('div');
+      gast.className = 'sh-gast';
+      gast.append(...Object.entries(KATALOG).map(([id, a]) => gastKarte(id, a)));
+      inhalt.append(gast);
       return;
     }
     satz(S('shop.laedt'));

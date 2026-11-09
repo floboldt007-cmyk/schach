@@ -1,0 +1,56 @@
+// Sichtbare Texte der Etappe 4b: Erfolge in Stufen, Taler, Banner und die Visitenkarte (js/ui/visitenkarte.js).
+import { registriereTexte } from '../../sprache.js';
+
+registriereTexte('p-karte', {
+  de: {
+    'stufe.0': 'Noch offen', 'stufe.1': 'Bronze', 'stufe.2': 'Silber', 'stufe.3': 'Gold',
+    'fam.siege': 'Siegeszug', 'fam.bots': 'Bot-Leiter', 'fam.welten': 'Weltenbummler', 'fam.sterne': 'Sternensammler',
+    'fam.endgegner': 'Endgegner', 'fam.siegesfolge': 'Siegesfolge', 'fam.raetsel': 'Rätselfreund', 'fam.serie': 'Treue',
+    'fam.level': 'Erfahrung', 'fam.liga': 'Ligaaufstieg',
+    'was.siege': 'Siege gegen Bots', 'was.bots': 'verschiedene Bots besiegt', 'was.welten': 'Welten gemeistert',
+    'was.sterne': 'Sterne', 'was.endgegner': 'Endgegner besiegt', 'was.siegesfolge': 'Siege in Folge',
+    'was.raetsel': 'Rätsel gelöst', 'was.serie': 'Tage Serie', 'was.level': 'Level', 'was.liga': 'Kronen-Stufe',
+    'zeile.weiter': '{stufe} · {n} von {ziel} bis {naechste}', 'zeile.start': '{n} von {ziel} {was} bis Bronze',
+    'zeile.gold': 'Gold erreicht', 'zeile.liga': 'Läufer, Turm, dann König in der Liga',
+    'lohn.taler': '+{n} Taler', 'lohn.titel': 'Titel frei: {name}', 'lohn.banner': 'Banner frei: {name}',
+    'moment.titel': 'Erfolg freigeschaltet', 'moment.weiter': 'Weiter',
+    taler: 'Taler', 'taler.stand': '{n} Taler', banner: 'Banner', 'banner.hinweis': 'Banner gibt es für Gold-Erfolge und in der Liga. Erfolge kann man nie kaufen.',
+    'karte.ki': 'KI', 'karte.kiGegner': 'KI-Gegner', 'karte.gegner': 'Gegner', 'karte.du': 'Du',
+    'karte.keineErfolge': 'Noch keine Erfolge ausgestellt', 'karte.ohneLiga': 'Ohne Liga', 'karte.orden': 'Ausgestellte Erfolge',
+    'karte.banner': 'Banner wählen', 'karte.bannerFrei': 'Frei', 'karte.bannerAn': 'Getragen',
+    // Liga-Namen nach Konzept 5a; welche Kronen-Liga welchen Namen zeigt, steht in js/ui/visitenkarte.js LIGA_NAMEN
+    'liga.bauer': 'Bauer', 'liga.springer': 'Springer', 'liga.laeufer': 'Läufer', 'liga.turm': 'Turm', 'liga.dame': 'Dame', 'liga.koenig': 'König',
+    'gefunden.los': 'Gleich geht es los',
+    // Banner-Ids saison-* bleiben (Bilder aus dem Vorrat und Server); benannt nach der Liga-Stufe, je Stufe genau eines
+    // (G-002, Flos Wahl 08.11.2026; Zuordnung Farbe -> Stufe in js/ui/visitenkarte.js LIGA_NAMEN)
+    'b.start': 'Erster Zug', 'b.saison-holz': 'Bauern-Banner', 'b.saison-bronze': 'Springer-Banner', 'b.saison-silber': 'Läufer-Banner',
+    'b.saison-gold': 'Turm-Banner', 'b.saison-diamant': 'Damen-Banner', 'b.saison-krone': 'Königs-Banner',
+    'b.erfolg-raetselmeister': 'Rätselmeister', 'b.erfolg-seriensieger': 'Seriensieger', 'b.erfolg-turmbezwinger': 'Turmbezwinger',
+    'b.weg.saison': 'Aus der Liga: Platz 1 der Wochen-Gruppe oder erster Aufstieg',
+    'b.weg.stufe': 'Aus der Liga: Platz 1 in {stufe} oder Aufstieg nach {stufe}', 'b.weg.stufeUnten': 'Aus der Liga: Platz 1 einer Gruppe in {stufe}', 'b.weg.erfolg': 'Gold-Stufe: {name}',
+  },
+  en: {
+    'stufe.0': 'Not yet', 'stufe.1': 'Bronze', 'stufe.2': 'Silver', 'stufe.3': 'Gold',
+    'fam.siege': 'Winning ways', 'fam.bots': 'Bot ladder', 'fam.welten': 'World traveller', 'fam.sterne': 'Star collector',
+    'fam.endgegner': 'Bosses', 'fam.siegesfolge': 'Win streak', 'fam.raetsel': 'Puzzle friend', 'fam.serie': 'Loyalty',
+    'fam.level': 'Experience', 'fam.liga': 'League climb',
+    'was.siege': 'wins against bots', 'was.bots': 'different bots beaten', 'was.welten': 'worlds mastered',
+    'was.sterne': 'stars', 'was.endgegner': 'bosses beaten', 'was.siegesfolge': 'wins in a row',
+    'was.raetsel': 'puzzles solved', 'was.serie': 'day streak', 'was.level': 'level', 'was.liga': 'crown tier',
+    'zeile.weiter': '{stufe} · {n} of {ziel} to {naechste}', 'zeile.start': '{n} of {ziel} {was} to Bronze',
+    'zeile.gold': 'Gold reached', 'zeile.liga': 'Bishop, Rook, then King in the league',
+    'lohn.taler': '+{n} thalers', 'lohn.titel': 'Title unlocked: {name}', 'lohn.banner': 'Banner unlocked: {name}',
+    'moment.titel': 'Achievement unlocked', 'moment.weiter': 'Continue',
+    taler: 'Thalers', 'taler.stand': '{n} thalers', banner: 'Banners', 'banner.hinweis': 'Banners come from gold achievements and from the league. Achievements can never be bought.',
+    'karte.ki': 'AI', 'karte.kiGegner': 'AI opponent', 'karte.gegner': 'Opponent', 'karte.du': 'You',
+    'karte.keineErfolge': 'No achievements on show yet', 'karte.ohneLiga': 'No league', 'karte.orden': 'Achievements on show',
+    'karte.banner': 'Choose banner', 'karte.bannerFrei': 'Unlocked', 'karte.bannerAn': 'Worn',
+    'liga.bauer': 'Pawn', 'liga.springer': 'Knight', 'liga.laeufer': 'Bishop', 'liga.turm': 'Rook', 'liga.dame': 'Queen', 'liga.koenig': 'King',
+    'gefunden.los': 'Starting in a moment',
+    'b.start': 'First move', 'b.saison-holz': 'Pawn banner', 'b.saison-bronze': 'Knight banner', 'b.saison-silber': 'Bishop banner',
+    'b.saison-gold': 'Rook banner', 'b.saison-diamant': 'Queen banner', 'b.saison-krone': 'King banner',
+    'b.erfolg-raetselmeister': 'Puzzle master', 'b.erfolg-seriensieger': 'Streak winner', 'b.erfolg-turmbezwinger': 'Tower breaker',
+    'b.weg.saison': 'From the league: first place in the weekly group or a first promotion',
+    'b.weg.stufe': 'From the league: first place in {stufe} or promotion to {stufe}', 'b.weg.stufeUnten': 'From the league: first place in a {stufe} group', 'b.weg.erfolg': 'Gold tier: {name}',
+  },
+});

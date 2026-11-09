@@ -74,7 +74,8 @@ try {
   seite.on('pageerror', (e) => fehler.push(e.message));
   seite.on('console', (m) => { if (m.type() === 'error') fehler.push(m.text()); });
   await seite.goto(START);
-  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('.screen.arena'));
+  // Startseite ist seit Etappe A heim (vorher die Arena)
+  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('.screen.heim-screen'));
 
   const feld = async (f) => {
     const b = await seite.locator(`.screen.partie .brett-felder .feld[data-feld="${f}"]`).boundingBox();
@@ -319,7 +320,8 @@ try {
   seite.on('pageerror', (e) => fehler.push(e.message));
   seite.on('console', (m) => { if (m.type() === 'error') fehler.push(m.text()); });
   await seite.goto(START);
-  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('.screen.arena'));
+  // Startseite ist seit Etappe A heim (vorher die Arena)
+  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('.screen.heim-screen'));
   await seite.evaluate((m) => { localStorage.removeItem(m); window.__test.pfeilTipp = true; }, MERKER);
   await neuePartie();
   const t1 = await seite.evaluate((m) => ({ sichtbar: !document.querySelector('.screen.partie .pfeil-tipp').hidden, merker: localStorage.getItem(m) }), MERKER);

@@ -53,6 +53,9 @@ export const VORTEILE = Object.freeze([
   // KI-VO Art. 50). Die Zahl ist der Standard von COACH_TAGESLIMIT (supabase/functions/_gemeinsam/coach.js); wer das
   // Secret aendert, passt sie hier an (tests/server-coach.test.mjs vergleicht mit dem Standard).
   vorteil('frag-den-coach', 'Frag den Coach: Eine KI erklärt dir einzelne Züge in der Spielanalyse, bis zu 30 Fragen am Tag'),
+  // Meisterschule (07.11.2026): 31 = alle Lektionen ohne die leichten und ohne die vier Proben (js/pakete/lernen/zugang.js
+  // zahlen().abo, tests/lernen.test.mjs vergleicht)
+  vorteil('meisterschule', 'Meisterschule: alle 31 Lektionen der Mittel-, Schwer- und Meisterstufe'),
   vorteil('lernpfad-5-10', 'Lernpfad: Einheiten 5 bis 10'),
   vorteil('raetsel-auswahl', 'Rätsel mit Themen-Wahl, Rätsel-Pakete und Spezial-Training'),
   vorteil('formspiegel', 'Ausführlicher Formspiegel'),
@@ -64,6 +67,7 @@ export const GRATIS = Object.freeze([
   gratis('bots', true),
   gratis('analyse', true),
   gratis('training', true),
+  gratis('meisterschule-leicht', true),
   gratis('fortschritt', true),
   gratis('wochen-boss'),
   gratis('raetsel-ohne-limit'),

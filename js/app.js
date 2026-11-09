@@ -42,16 +42,15 @@
 //   starteDruck() (Druck-Rueckmeldung fuer .dr). Hell/Dunkel wechselt ueber app.setzeEinstellungen({ modus }) ohne Neuladen.
 //   Nach ladePakete() gilt die gespeicherte Ansicht noch einmal (Themes aus Paketen kennt thema.js erst dann).
 //
-// Premium-Umbau U2 (Navigation, PLAN 2.1, 2.10, Flo D2/D5):
-//   - Reiter-Leiste als schwebende Glas-Pille mit gleitender .reiter-pille unter dem aktiven Reiter (gemessen; ein
-//     ResizeObserver misst bei jeder Groessenaenderung neu). Lage nach D5: Querformat ab 1021 px oben in der Kopfzeile
-//     (in .kopf-reiter-platz des Hauptseiten-Kopfs aus js/ui/seite.js; passt sie dort nicht, zuerst enger, sonst
-//     unten), sonst unten schwebend. html[data-reiter="oben"|"unten"] (vorher "an"); nur "unten" kuerzt die Screens um
-//     --reiter-h. Auf Screens ohne Reiter (Partie, Analyse, Einstellungen) faehrt sie unten weg (bei Tempo 0 sofort).
+// Premium-Umbau U2 (Navigation, PLAN 2.1, 2.10, Flo D2/D5), seit Etappe A (Konzept 2026-11-06) als Glas-Leiste:
+//   - Reiter Start, Bots, Liga, Ich mit gleitender .reiter-pille hinter dem aktiven Reiter (.an, gemessen; ein
+//     ResizeObserver misst bei jeder Groessenaenderung neu). Lage: Querformat ab 1021 px als Seitenleiste links
+//     (html[data-reiter="seite"], die Screens ruecken nach rechts), sonst als schwebende Glas-Kapsel unten
+//     (html[data-reiter="unten"], die Screens werden um --reiter-h kuerzer). Auf Screens ohne Reiter (Partie, Analyse,
+//     Einstellungen) faehrt sie weg (bei Tempo 0 sofort).
 //     html[data-reiter-wurzel="ja"] auf dem Screen eines Reiters selbst (dort blendet der Kopf seinen Zurueck-Knopf
-//     aus), html[data-reiter-liste] nennt die Reiter (ein Reiter Verlauf ersetzt den Verlauf-Knopf im Kopf).
-//   - Zwischenreiter Verlauf (D2): REITER darf 'verlauf' nennen (Arena · Verlauf); steht 'ich' in REITER, verschwindet
-//     er, und der Verlauf gehoert zum Reiter Ich (reiterVon()).
+//     aus), html[data-reiter-liste] nennt die Reiter.
+//   - Training, Raetsel und Lobby gehoeren zu Start, Verlauf und Werkstatt zu Ich (reiterVon()).
 //   - 'training' ist Kern-Screen (js/ui/training.js, Huelle fuer training:karten), nicht mehr in PAKET_SCREENS.
 //   - app.meldung() benutzt toast() aus js/ui/bauteile.js; ein Screen-Wechsel schliesst auch ein offenes Blatt (sheet).
 //
@@ -94,13 +93,15 @@ export { icon };
 const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
-const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
-  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'lobby', 'schule'];
+const SCREENS = ['heim', 'arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'lobby',
+  'raetsel-duell', 'schule'];
 const TITEL = {
-  arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
-  training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
+  heim: 'Start', arena: 'Bots', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
+  training: 'Lernen', start: 'Willkommen', online: 'Online',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', premium: 'Premium', schule: 'Schulmodus', lobby: 'Online',
+  'raetsel-duell': 'Rätsel-Duell',
 };
 // Englische Version: TITEL bleibt die deutsche Quelle (gleich js/sprachen/rahmen.js 'titel.<screen>'); gezeigt wird
 // titelVon(name) = t('rahmen.titel.<screen>') beim Zeichnen, null fuer einen unbekannten Screen
@@ -110,7 +111,7 @@ function titelVon(name) {
 // Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena. Premium-Umbau U2: 'training' ist
 // Kern-Screen (Huelle fuer training:karten) und steht deshalb nicht mehr hier.
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
-  'werkstatt', 'lobby', 'schule']);
+  'werkstatt', 'lobby', 'raetsel-duell', 'schule']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 // Texte aus den Woerterbuechern in HTML einsetzen
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -376,41 +377,54 @@ function schliesseDialog() {
   offenerDialog = null;
 }
 
-// ---------- Reiter-Leiste (W0+a vorbereitet; Premium-Umbau U2: Glas-Pille aus Entwurf A, Lage nach Flo D5) ----------
-// Reiter -> Screen. Arena ist immer dabei, die anderen nur, wenn REITER (erweiterungen.js) sie nennt. 'verlauf' ist der
-// Zwischenreiter bis S1 (Flo D2: "Arena · Verlauf"); steht 'ich' dabei, verschwindet er (der Verlauf gehoert dann zu Ich).
-// Der Name je Reiter ist die deutsche Quelle; gezeigt wird t('rahmen.reiter.<reiter>') beim Bauen der Leiste.
-const REITER_ALLE = [['arena', 'Arena', 'pokal'], ['training', 'Training', 'ziel'], ['verlauf', 'Verlauf', 'verlauf'],
-  ['bestenliste', 'Bestenliste', 'podest'], ['ich', 'Ich', 'person']];
+// ---------- Reiter-Leiste (W0+a vorbereitet; Etappe A: Glas-Leiste nach Konzept 2026-11-06) ----------
+// Reiter -> Screen in der Reihenfolge Start, Bots, Liga, Ich. Start und Bots sind immer dabei, Liga und Ich nur, wenn
+// REITER (erweiterungen.js) sie nennt. Training und Verlauf sind keine Reiter mehr: Training erreicht man ueber die
+// Startseite, der Verlauf gehoert zu Ich. Der Name je Reiter ist die deutsche Quelle; gezeigt wird
+// t('rahmen.reiter.<reiter>') beim Bauen der Leiste.
+const REITER_ALLE = [['heim', 'Start', 'haus'], ['arena', 'Bots', 'pokal'], ['bestenliste', 'Liga', 'liga'], ['ich', 'Ich', 'person']];
+const REITER_FEST = new Set(['heim', 'arena']);
+// fruehere Reiter: im Testmodus (?reiter=training oder verlauf) schalten sie nur die Leiste ein, ohne eigenen Reiter
+const REITER_FRUEHER = new Set(['training', 'verlauf']);
 // Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt); verlauf: reiterVon()
-const REITER_VON = { arena: 'arena', training: 'training', raetsel: 'training', lernen: 'training', bestenliste: 'bestenliste', ich: 'ich',
-  werkstatt: 'ich', lobby: 'arena' };
-// Querformat ab 1021 px (iPad quer): die Leiste sitzt oben in der Kopfzeile, sonst schwebt sie unten (D5)
+const REITER_VON = { heim: 'heim', arena: 'arena', lobby: 'heim', 'raetsel-duell': 'heim', training: 'heim', raetsel: 'heim', lernen: 'heim', bestenliste: 'bestenliste',
+  ich: 'ich', werkstatt: 'ich' };
+// Querformat ab 1021 px (iPad quer, PC): Seitenleiste links (Entwurf ipad-pc-v2 .nav), sonst schwebt sie unten (.dock)
 const OBEN_MQ = '(min-width: 1021px) and (orientation: landscape)';
 
 export function reiterListe(suche = typeof location !== 'undefined' ? location.search : '') {
-  const erlaubt = new Set(REITER_ALLE.map(([n]) => n).filter((n) => n !== 'arena'));
+  const erlaubt = new Set(REITER_ALLE.map(([n]) => n).filter((n) => !REITER_FEST.has(n)));
   // ?test&kern: nur der Kern, also auch ohne die fest eingetragenen REITER (wie ohne PAKETE); ?reiter gilt weiter
   let kern = false;
   try { kern = TEST && new URLSearchParams(suche || '').has('kern'); } catch (e) { kern = false; }
   const aus = new Set((!kern && Array.isArray(REITER) ? REITER : []).filter((n) => erlaubt.has(n)));
+  let an = aus.size > 0;
   if (TEST) {
     let test = null;
     try { test = new URLSearchParams(suche || '').get('reiter'); } catch (e) { test = null; }
-    if (test) for (const n of test.split(',')) if (erlaubt.has(n.trim())) aus.add(n.trim());
+    if (test) {
+      for (const roh of test.split(',')) {
+        const n = roh.trim();
+        if (erlaubt.has(n)) { aus.add(n); an = true; } else if (REITER_FRUEHER.has(n)) an = true;
+      }
+    }
   }
-  if (aus.has('ich')) aus.delete('verlauf');
-  return aus.size ? REITER_ALLE.filter(([n]) => n === 'arena' || aus.has(n)).map(([n]) => n) : [];
+  return an ? REITER_ALLE.filter(([n]) => REITER_FEST.has(n) || aus.has(n)).map(([n]) => n) : [];
 }
 
-// Reiter, zu dem ein Screen gehoert (null: keiner, dort ist die Leiste weg)
-export function reiterVon(screen, liste = reiterListe()) {
-  if (screen === 'verlauf') return liste.includes('verlauf') ? 'verlauf' : liste.includes('ich') ? 'ich' : null;
+// Reiter, zu dem ein Screen gehoert (null: keiner, dort ist die Leiste weg). Handy-Runde 08.11.: Online (ohne laufende
+// Partie) und das Zu-zweit-Startblatt (Partie mit modus zuzweit, ohne Partie und ohne Fortsetzen) gehoeren zu Start;
+// sobald eine Partie laeuft (partieId, zuzweit, fortsetzen), ist die Leiste weg.
+export function reiterVon(screen, liste = reiterListe(), params = {}) {
+  const p = params && typeof params === 'object' ? params : {};
+  if (screen === 'verlauf') return liste.includes('ich') ? 'ich' : null;
+  if (screen === 'online') return p.partieId ? null : 'heim';
+  if (screen === 'partie') return p.modus === 'zuzweit' && !p.zuzweit && !p.fortsetzen ? 'heim' : null;
   return Object.prototype.hasOwnProperty.call(REITER_VON, screen) ? REITER_VON[screen] : null;
 }
 
-const leiste = { el: null, pille: null, lage: null, sichtbar: false, gezeigt: false, wegAnim: null, pilleX: null, pilleB: null,
-  ro: null, mo: null, rahmen: 0, fokusFolgt: false };
+const leiste = { el: null, pille: null, lage: null, sichtbar: false, gezeigt: false, wegAnim: null, pilleLage: null, pilleV: null, pilleB: null,
+  ro: null, rahmen: 0, fokusFolgt: false };
 
 function baueReiter(liste) {
   if (leiste.el) return;
@@ -418,7 +432,9 @@ function baueReiter(liste) {
   nav.className = 'reiter-leiste';
   nav.setAttribute('aria-label', t('rahmen.reiter.label'));
   nav.hidden = true;
-  nav.innerHTML = '<span class="reiter-pille" aria-hidden="true"></span>' + REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, , ic]) =>
+  // die Marke zeigt nur die Seitenleiste (css/navigation.css), wie im Entwurf ipad-pc-v2
+  nav.innerHTML = '<span class="reiter-marke" aria-hidden="true">Crownmate</span><span class="reiter-pille" aria-hidden="true"></span>'
+    + REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, , ic]) =>
     `<button type="button" class="reiter dr" data-reiter="${n}">${icon(ic)}<span>${t('rahmen.reiter.' + n)}</span></button>`).join('');
   nav.addEventListener('click', (e) => {
     const k = e.target.closest('[data-reiter]');
@@ -426,7 +442,7 @@ function baueReiter(liste) {
     const ziel = k.dataset.reiter;
     if (aktuell && aktuell.name === ziel && reiterVon(aktuell.name) === ziel) return;
     try { klang.spiele('wechsel'); } catch (f) { /* still */ }
-    // Tastatur (Klick ohne Zeiger): der Fokus folgt auf den neuen Reiter (oben zieht die Leiste in einen neuen Kopf um)
+    // Tastatur (Klick ohne Zeiger): der Fokus folgt auf den neuen Reiter
     leiste.fokusFolgt = e.detail === 0;
     gehe(ziel, {}, { ersetzen: true });
   });
@@ -451,118 +467,63 @@ function baueReiter(liste) {
     if (mq.addEventListener) mq.addEventListener('change', spaeter);
     else if (mq.addListener) mq.addListener(spaeter);
   } catch (e) { /* egal */ }
-  // Oben: zeichnet ein Screen seinen Kopf neu (z. B. der Verlauf nach dem Loeschen), kommt die Leiste wieder hinein
-  if (typeof MutationObserver === 'function') {
-    leiste.mo = new MutationObserver(() => {
-      if (leiste.sichtbar && leiste.lage === 'oben' && !nav.isConnected) platziereReiter();
-    });
-  }
 }
 
-// Laeuft der Kopf ueber (Leiste und rechte Seite passen nicht) oder werden die Chips gequetscht?
-// Gequetscht heisst: die ersten zwei Chips (Sterne, besiegte Bots) passen nicht ganz; weitere Chips der Pakete duerfen
-// waagrecht scrollen. Gemessen mit sichtbaren Chips (.ohne-chips setzt js/ui/seite.js danach selbst neu).
-function kopfZuEng(kopf) {
-  if (!kopf) return true;
-  const ohne = kopf.classList.contains('ohne-chips');
-  if (ohne) kopf.classList.remove('ohne-chips');
-  let eng = kopf.scrollWidth > kopf.clientWidth + 1;
-  const chips = kopf.querySelector('.kopf-chips');
-  if (!eng && chips) {
-    const kinder = [...chips.children].filter((c) => c.offsetWidth > 0).slice(0, 2);
-    const bedarf = kinder.length ? kinder[kinder.length - 1].offsetLeft + kinder[kinder.length - 1].offsetWidth - kinder[0].offsetLeft : 0;
-    eng = chips.clientWidth + 1 < bedarf;
-  }
-  if (ohne) kopf.classList.add('ohne-chips');
-  return eng;
-}
-
+// unten (schwebende Glas-Kapsel) oder seite (Seitenleiste links im Querformat ab 1021 px); die Leiste haengt immer am body
 function platziereReiter() {
   const nav = leiste.el;
   if (!nav) return;
-  const screenEl = document.querySelector('#app > .screen');
-  const platz = screenEl ? screenEl.querySelector('.kopf-reiter-platz') : null;
-  let oben = false;
-  try { oben = !!platz && matchMedia(OBEN_MQ).matches; } catch (e) { oben = false; }
-  nav.classList.remove('eng', 'enger');
-  for (const k of document.querySelectorAll('.haupt-kopf.mit-reiter')) {
-    if (!platz || k !== platz.closest('.haupt-kopf')) k.classList.remove('mit-reiter', 'reiter-frei');
-  }
-  if (oben) {
-    const kopf = platz.closest('.kopf');
-    if (nav.parentNode !== platz) platz.append(nav);
-    nav.dataset.lage = 'oben';
-    if (kopf) { kopf.classList.add('mit-reiter'); kopf.classList.remove('reiter-frei'); }
-    // passt sie nicht: erst engere Reiter, dann ohne Symbole, dann nicht mehr genau mittig, sonst unten
-    const stufen = [() => nav.classList.add('eng'), () => nav.classList.add('enger'), () => kopf && kopf.classList.add('reiter-frei')];
-    let i = 0;
-    while (kopfZuEng(kopf) && i < stufen.length) stufen[i++]();
-    if (kopfZuEng(kopf)) oben = false;
-    if (!oben) {
-      nav.classList.remove('eng', 'enger');
-      if (kopf) kopf.classList.remove('mit-reiter', 'reiter-frei');
-    }
-  }
-  let gestapelt = false;
-  if (!oben) {
-    if (nav.parentNode !== document.body) document.body.append(nav);
-    nav.dataset.lage = 'unten';
-    nav.classList.remove('gestapelt');
-    // zu breit fuer eine Zeile (Handy mit vielen Reitern): volle Breite, Symbol ueber dem Wort
-    if (nav.scrollWidth > nav.clientWidth + 1) { nav.classList.add('gestapelt'); gestapelt = true; }
-  } else {
-    nav.classList.remove('gestapelt');
-  }
-  leiste.lage = oben ? 'oben' : 'unten';
-  const html = document.documentElement;
-  html.dataset.reiter = leiste.lage;
-  if (gestapelt) html.dataset.reiterForm = 'gestapelt';
-  else delete html.dataset.reiterForm;
-  if (leiste.mo) {
-    leiste.mo.disconnect();
-    const app0 = document.getElementById('app');
-    if (oben && app0) leiste.mo.observe(app0, { childList: true, subtree: true });
-  }
+  let seite = false;
+  try { seite = matchMedia(OBEN_MQ).matches; } catch (e) { seite = false; }
+  if (nav.parentNode !== document.body) document.body.append(nav);
+  leiste.lage = seite ? 'seite' : 'unten';
+  nav.dataset.lage = leiste.lage;
+  document.documentElement.dataset.reiter = leiste.lage;
   setzePille();
 }
 
-// Pille unter den aktiven Reiter; gleitet mit der weichen Feder vom alten Platz (auch nach einem Screen-Wechsel, bei dem
-// die Leiste in einen neuen Kopf umzieht und CSS-Uebergaenge nicht greifen)
+// Pille hinter den aktiven Reiter; gleitet mit der weichen Feder vom alten Platz, unten waagrecht, in der Seitenleiste
+// senkrecht (nach einem Wechsel der Lage springt sie ohne Gleiten)
 function setzePille() {
   const nav = leiste.el;
   const p = leiste.pille;
   if (!nav || !p || !nav.isConnected || nav.hidden) return;
   const k = nav.querySelector('[aria-current="page"]');
   if (!k || !k.offsetWidth) { p.style.opacity = '0'; return; }
-  const x = k.offsetLeft;
-  const b = k.offsetWidth;
+  const senkrecht = leiste.lage === 'seite';
+  const v = senkrecht ? k.offsetTop : k.offsetLeft;
+  const b = senkrecht ? k.offsetHeight : k.offsetWidth;
+  const achse = senkrecht ? 'translateY' : 'translateX';
+  const mass = senkrecht ? 'height' : 'width';
   p.style.opacity = '';
-  if (leiste.pilleX != null && (leiste.pilleX !== x || leiste.pilleB !== b) && tempo() > 0) {
-    anim(p, [{ transform: `translateX(${leiste.pilleX}px)`, width: `${leiste.pilleB}px` }, { transform: `translateX(${x}px)`, width: `${b}px` }],
+  if (leiste.pilleLage === leiste.lage && leiste.pilleV != null && (leiste.pilleV !== v || leiste.pilleB !== b) && tempo() > 0) {
+    anim(p, [{ transform: `${achse}(${leiste.pilleV}px)`, [mass]: `${leiste.pilleB}px` }, { transform: `${achse}(${v}px)`, [mass]: `${b}px` }],
       { d: 520, k: 'weich' });
   }
-  p.style.transform = `translateX(${x}px)`;
-  p.style.width = `${b}px`;
-  leiste.pilleX = x;
+  p.style.transform = `${achse}(${v}px)`;
+  p.style.width = senkrecht ? '' : `${b}px`;
+  p.style.height = senkrecht ? `${b}px` : '';
+  leiste.pilleLage = leiste.lage;
+  leiste.pilleV = v;
   leiste.pilleB = b;
 }
+
+// Wegfahren und Einfahren: unten nach unten, die Seitenleiste nach links
+const wegNach = () => (leiste.lage === 'seite' ? 'translateX(-115%)' : 'translateY(160%)');
 
 function versteckeReiter() {
   const html = document.documentElement;
   delete html.dataset.reiter;
   delete html.dataset.reiterWurzel;
   delete html.dataset.reiterListe;
-  delete html.dataset.reiterForm;
-  if (leiste.mo) leiste.mo.disconnect();
   const nav = leiste.el;
   if (!nav) return;
   const war = leiste.sichtbar;
   leiste.sichtbar = false;
-  for (const k of document.querySelectorAll('.haupt-kopf.mit-reiter')) k.classList.remove('mit-reiter', 'reiter-frei');
-  // oben ging die Leiste mit dem alten Kopf; unten faehrt sie weg (Partie, Analyse, Einstellungen)
-  if (war && leiste.lage === 'unten' && nav.isConnected && !nav.hidden && tempo() > 0) {
+  // faehrt weg (Partie, Analyse, Einstellungen)
+  if (war && nav.isConnected && !nav.hidden && tempo() > 0) {
     nav.classList.add('weg');
-    const a = anim(nav, [{ transform: 'none', opacity: 1 }, { transform: 'translateY(160%)', opacity: 0 }], { d: 420, k: 'gleiten', fill: 'forwards' });
+    const a = anim(nav, [{ transform: 'none', opacity: 1 }, { transform: wegNach(), opacity: 0 }], { d: 420, k: 'gleiten', fill: 'forwards' });
     leiste.wegAnim = a;
     Promise.resolve(a.finished).catch(() => {}).then(() => {
       if (leiste.wegAnim !== a) return;
@@ -578,9 +539,9 @@ function versteckeReiter() {
   if (nav.parentNode !== document.body) document.body.append(nav);
 }
 
-function zeigeReiter(screen) {
+function zeigeReiter(screen, params = {}) {
   const liste = reiterListe();
-  const aktiv = screen ? reiterVon(screen, liste) : null;
+  const aktiv = screen ? reiterVon(screen, liste, params) : null;
   if (!liste.length || !aktiv) {
     versteckeReiter();
     return;
@@ -589,8 +550,10 @@ function zeigeReiter(screen) {
   const nav = leiste.el;
   const html = document.documentElement;
   for (const k of nav.querySelectorAll('[data-reiter]')) {
-    if (k.dataset.reiter === aktiv) k.setAttribute('aria-current', 'page');
+    const an = k.dataset.reiter === aktiv;
+    if (an) k.setAttribute('aria-current', 'page');
     else k.removeAttribute('aria-current');
+    k.classList.toggle('an', an);
   }
   html.dataset.reiterWurzel = aktiv === screen ? 'ja' : 'nein';
   html.dataset.reiterListe = liste.join(' ');
@@ -600,9 +563,9 @@ function zeigeReiter(screen) {
   nav.hidden = false;
   leiste.sichtbar = true;
   platziereReiter();
-  // zurueck aus Partie, Analyse oder Einstellungen: unten wieder einfahren
-  if (warWeg && leiste.lage === 'unten') {
-    anim(nav, [{ transform: 'translateY(160%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { d: 520, k: 'gleiten' });
+  // zurueck aus Partie, Analyse oder Einstellungen: wieder einfahren
+  if (warWeg) {
+    anim(nav, [{ transform: wegNach(), opacity: 0 }, { transform: 'none', opacity: 1 }], { d: 520, k: 'gleiten' });
   }
   leiste.gezeigt = true;
   if (leiste.fokusFolgt) {
@@ -617,9 +580,15 @@ function zeigeReiter(screen) {
 let aktuell = null;    // { name, params, hash, handle }
 let ladeNr = 0;
 let tiefe = 0;         // Anzahl eigener Eintraege im Browser-Verlauf vor dem aktuellen
+// Kundenblick 09.11. (Befund 9): der zuletzt gezeigte Hauptort. Zurueck aus der Partie fuehrt dorthin, woher man kam
+// (Start oder Bots), nicht immer zu den Bots.
+const HEIM_ORTE = new Set(['heim', 'arena', 'lernen', 'bestenliste', 'ich']);
+let herkunft = 'arena';
 
 function hashFuer(name, params) {
   if (name === 'online' && params?.partieId) return '#online/partie/' + encodeURIComponent(params.partieId);
+  // Raetsel-Duell per Freundes-Link: #raetsel-duell/CODE (Etappe 5)
+  if (name === 'raetsel-duell' && typeof params?.code === 'string' && /^[A-Z0-9]{6}$/.test(params.code)) return '#raetsel-duell/' + params.code;
   if (name === 'analyse' && params && params.partieId) return '#analyse/' + encodeURIComponent(params.partieId);
   // Einstellungen auf dem Handy: ein Bereich als eigene Seite (js/ui/einstellungen.js), Zurueck fuehrt zur Liste
   if (name === 'einstellungen' && params && typeof params.seite === 'string' && /^[a-z0-9-]{1,24}$/.test(params.seite)) return '#einstellungen/' + params.seite;
@@ -630,10 +599,12 @@ function ausHash(hash) {
   const h = String(hash || '').replace(/^#\/?/, '');
   const [name, rest] = h.split('/');
   if (name === 'online' && rest === 'partie') return { name, params: { partieId: decodeURIComponent(h.split('/')[2] || '') } };
+  if (name === 'raetsel-duell' && rest && /^[A-Za-z0-9]{6}$/.test(rest)) return { name, params: { code: rest.toUpperCase() } };
   if (name === 'analyse') return rest ? { name, params: { partieId: decodeURIComponent(rest) } } : { name: 'verlauf', params: {} };
   if (name === 'einstellungen' && rest && /^[a-z0-9-]{1,24}$/.test(rest)) return { name, params: { seite: rest } };
   if (SCREENS.includes(name)) return { name, params: {} };
-  return { name: 'arena', params: {} };
+  // ohne Hash (frisches Oeffnen nach dem Willkommen): die Startseite heim; ein unbekannter Hash bleibt bei der Arena
+  return { name: name ? 'arena' : 'heim', params: {} };
 }
 
 // Nur einfache Werte in den Verlauf (structured clone)
@@ -749,9 +720,10 @@ async function zeigeScreen(name, params, hash) {
   const root = document.getElementById('app');
   root.replaceChildren();
   aktuell = { name, params, hash, handle: null };
+  if (HEIM_ORTE.has(name)) herkunft = name;
   ladeFertig = nr;
   document.documentElement.dataset.screen = name;
-  document.title = name === 'arena' ? 'Crownmate' : `${titelVon(name)} · Crownmate`;
+  document.title = name === 'arena' || name === 'heim' ? 'Crownmate' : `${titelVon(name)} · Crownmate`;
   window.scrollTo(0, 0);
   if (!modul) {
     if (TEST) console.info('Screen nicht geladen: ' + name, ladeFehler && ladeFehler.message);
@@ -796,7 +768,7 @@ async function zeigeScreen(name, params, hash) {
     return;
   }
   richteSprunglinkEin(root);
-  zeigeReiter(name);
+  zeigeReiter(name, params || {});
   sende('app:screen', { name, params: params || {} });
 }
 
@@ -861,6 +833,7 @@ function zeigePlatzhalter(root, name, kaputt = false) {
 export const app = {
   gehe,
   zurueck,
+  herkunft: () => herkunft,
   engine,
   einstellungen: () => ladeEinstellungen(),
   setzeEinstellungen(teil) {

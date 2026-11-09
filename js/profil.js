@@ -13,7 +13,9 @@
 //   profilWahl() -> { figur, grund, rahmen, vitrine: [id|null x3], titel }   figur: Motiv-Id (Figur oder Kreatur); titel:
 //                                      Id des gewaehlten Titels (Flo 01.11.2026: Titel auch fuer Errungenschaften) oder null
 //                                      (dann gilt der Level-Titel); ob er frei ist, weiss das Paket sammlung (titel.js)
-//   setzeProfilWahl(teil)              merkt figur, grund, rahmen, vitrine oder titel (unbekannte Werte fallen auf den Standard)
+//                                      banner: Banner der Visitenkarte (Etappe 4b), Standard 'start'; ob es dem Spieler gehoert,
+//                                      weiss js/besitz.js (eigeneBanner)
+//   setzeProfilWahl(teil)              merkt figur, grund, rahmen, vitrine, titel oder banner (unbekannte Werte fallen auf den Standard)
 //   erspielteTitel() -> [id], merkeErspielteTitel(ids)   Koennen-Titel, die einmal erspielt bleiben
 //   erspielteErfolge() -> [id], merkeErspielteErfolge(ids) Erfolge aus dem Partien-Archiv, die einmal erspielt bleiben
 //   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
@@ -68,6 +70,7 @@ export function profilWahl() {
     rahmen: RAHMEN[e.rahmen] ? e.rahmen : 'ohne',
     vitrine: vitrine.map((x) => (typeof x === 'string' && ID.test(x) ? x : null)),
     titel: typeof e.titel === 'string' && ID.test(e.titel) ? e.titel : null,
+    banner: typeof e.banner === 'string' && ID.test(e.banner) ? e.banner : 'start',
   };
 }
 
@@ -84,6 +87,7 @@ export function setzeProfilWahl(teil = {}) {
     rahmen: RAHMEN[neu.rahmen] ? neu.rahmen : 'ohne',
     vitrine: (Array.isArray(neu.vitrine) ? neu.vitrine : []).slice(0, 3).map((x) => (typeof x === 'string' && ID.test(x) ? x : null)) };
   if (typeof neu.titel === 'string' && ID.test(neu.titel)) sauber.titel = neu.titel;
+  if (typeof neu.banner === 'string' && ID.test(neu.banner) && neu.banner !== 'start') sauber.banner = neu.banner;
   if (TAG.test(roh.dabeiSeit)) sauber.dabeiSeit = roh.dabeiSeit;
   return speichereModulEinstellungen(MODUL, { ...alt, profil: sauber });
 }

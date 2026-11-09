@@ -42,7 +42,7 @@ import { figurenPfad } from '../figurensatz.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
-import { klang } from '../sounds.js';
+import { klang, zugKlangName } from '../sounds.js';
 import { anim, staffel, tempo, takt } from '../bewegung.js';
 import { ladeEinstellungen } from '../storage.js';
 import { t } from '../sprache.js';
@@ -281,9 +281,7 @@ export function zeige(root, params, app) {
   }
 
   function zugKlang(m) {
-    if (st.chess.isCheckmate() || st.chess.inCheck()) spielKlang('schach');
-    else if (m && m.captured) spielKlang('schlagen');
-    else spielKlang('zug');
+    spielKlang(zugKlangName(m, st.chess.inCheck()));
   }
 
   function zeigeAufgabe(i, { erste = false } = {}) {

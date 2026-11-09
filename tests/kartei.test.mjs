@@ -10,7 +10,7 @@
 // Nachbesserung (Pruefer-Befunde): Zugwiederholung (dieselbe Stellung nur einmal je Partie), Rueckfall am selben Tag,
 // "fuer immer geloest" zaehlt jede Karte einmal, Vorschau statt voller Rechnung im Hoerer (Zeit), Modul einer neueren App
 // (keine Feier-Zeile), versuch 0 bei sofort gezeigter Loesung, Mini-Bretter gedreht, Statuszeile nach dem Loesen,
-// Fokus-Rahmen nur fuer die Tastatur, Einstieg ueber den Reiter Training (mit REITER per Route).
+// Fokus-Rahmen nur fuer die Tastatur, Einstieg ueber den Reiter Start und die Karte Raetsel (mit REITER per Route).
 //
 //   node tests/kartei.test.mjs                 alles
 //   node tests/kartei.test.mjs --nur-node      ohne Browser
@@ -423,7 +423,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -649,20 +649,22 @@ async function browserTeil(browser) {
   const leer = await seite.evaluate(() => ({ h2: document.querySelector('.kt-karte h2').textContent, knopf: !!document.querySelector('.kt-karte .kt-los') }));
   pruefe('ohne Karten: freundlicher Leer-Zustand "Noch keine Karten", kein Knopf', leer.h2 === 'Noch keine Karten' && !leer.knopf, JSON.stringify(leer));
   await bild(seite, 'training-leer-ipad');
-  await seite.evaluate(() => window.__app.gehe('arena'));
-  await seite.waitForSelector('.screen.arena');
-  pruefe('ohne faellige Karten keine Zeile in der Heute-Karte', await seite.locator('.kt-heute').count() === 0);
+  // Variante A (08.11.2026): die Zeile steht auf der Startseite unter "Als Naechstes" (Ort heim:naechstes)
+  await seite.evaluate(() => window.__app.gehe('heim'));
+  await seite.waitForSelector('.heim-screen');
+  pruefe('ohne faellige Karten keine Zeile unter "Als Nächstes"', await seite.locator('.heim-naechstes [data-paket="kartei"]').count() === 0);
 
   // Karte 1 ist schwarz (gedreht) und am laengsten faellig, sie kommt zuerst; Karte 0 als zweite
   const zwoelf = Array.from({ length: 12 }, (_, i) => karte(i, heute, i === 1
     ? { farbe: 'b', fen: R_SCHWARZ.fen, besterZug: 'a8a1', san: 'h6', faellig: '2026-01-01', erstellt: '2026-01-01' }
     : i === 0 ? { faellig: '2026-01-02', erstellt: '2026-01-02' } : {}));
-  await bereite(seite, { modul: modulMit(zwoelf) });
-  await seite.waitForSelector('.screen.arena .heute-karte:not([hidden]) .kt-heute');
-  const hz = await seite.evaluate(() => document.querySelector('.kt-heute').textContent.replace(/\s+/g, ' ').trim());
-  pruefe('Heute-Karte: "Fehler wiederholen · 10 fällig" (Deckel 10 von 12) mit Knopf Üben', hz === 'Fehler wiederholen · 10 fällig Üben', hz);
+  await bereite(seite, { modul: modulMit(zwoelf) }, '#heim');
+  await seite.waitForSelector('.heim-naechstes:not([hidden]) [data-paket="kartei"]');
+  const hz = await seite.evaluate(() => { const z = document.querySelector('.heim-naechstes [data-paket="kartei"]');
+    return [...z.querySelectorAll('.heim-zeile-text > *')].map((e) => e.textContent.trim()).join(' | ') + ' / ' + z.getAttribute('aria-label'); });
+  pruefe('Startseite: "Fehler wiederholen | 10 fällig" (Deckel 10 von 12), Beschriftung mit Üben', hz === 'Fehler wiederholen | 10 fällig / Fehler wiederholen · 10 fällig · Üben', hz);
   await warte(600);
-  await bild(seite, 'arena-heute-ipad');
+  await bild(seite, 'heim-kartei-ipad');
   await seite.evaluate(() => window.__app.gehe('training'));
   await seite.waitForSelector('.training-gitter .kt-karte .kt-los');
   const tk = await seite.evaluate(() => ({ h2: document.querySelector('.kt-karte h2').textContent, stapel: document.querySelectorAll('.kt-karte .kartei-stapel .kk .mini').length,
@@ -918,7 +920,7 @@ async function browserTeil(browser) {
   gruppe = 'PAKETE';
   const pr = await neueSeite(browser);
   await pr.seite.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
-    body: `export const PAKETE = Object.freeze(['sicherung', '${ERW}']);\nexport const REITER = Object.freeze(['training']);\n` }));
+    body: `export const PAKETE = Object.freeze(['sicherung', '${ERW}']);\nexport const REITER = Object.freeze(['bestenliste', 'ich']);\n` }));
   await pr.seite.goto(`http://127.0.0.1:${PORT}/index.html#training`);
   await pr.seite.waitForSelector('.training-gitter .kt-karte', { timeout: 20000 });
   const prod = await pr.seite.evaluate(async () => {
@@ -926,12 +928,13 @@ async function browserTeil(browser) {
     return { training: o.angeboten('training:karten'), css: !!document.querySelector('link[data-paket="kartei"]'), h2: document.querySelector('.kt-karte h2').textContent };
   });
   pruefe('ohne ?test aus PAKETE geladen: Karte im Training ("Noch keine Karten"), eigenes CSS', prod.training === 1 && prod.css && prod.h2 === 'Noch keine Karten', JSON.stringify(prod));
-  // Einstieg ueber die Leiste: erst mit 'training' in REITER (Entscheidung der Integration, hier per Route gesetzt)
+  // Einstieg ueber die Leiste: Reiter Start, dort die Karte Raetsel (seit Etappe A ist Training kein Reiter mehr)
   await pr.seite.evaluate(() => { location.hash = '#arena'; });
   await pr.seite.waitForSelector('.screen.arena', { timeout: 20000 });
-  await pr.seite.locator('.reiter-leiste:not([hidden]) [data-reiter="training"]').click({ timeout: 10000 });
+  await pr.seite.locator('.reiter-leiste:not([hidden]) [data-reiter="heim"]').click({ timeout: 10000 });
+  await pr.seite.locator('.heim-screen [data-aktion="heim-raetsel"]').click({ timeout: 10000 });
   const ueberLeiste = await pr.seite.waitForSelector('.training-gitter .kt-karte', { timeout: 10000 }).then(() => true, () => false);
-  pruefe('mit REITER ["training"]: Arena, Reiter Training, dort die Karte der Kartei', ueberLeiste && await pr.seite.evaluate(() => location.hash === '#training'));
+  pruefe('mit REITER: Arena, Reiter Start, Karte Raetsel, dort die Karte der Kartei', ueberLeiste && await pr.seite.evaluate(() => location.hash === '#training'));
   pruefe('keine Konsolenfehler (Produktion)', pr.fehler.length === 0, pr.fehler.join(' | '));
   await pr.kontext.close();
 }

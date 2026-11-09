@@ -106,7 +106,7 @@ const json = (e) => { try { return JSON.parse(e.koerper); } catch (x) { return n
     && p.get('customer_email') === MAIL && !p.has('customer'));
   pruefe('AGB-Zustimmung ist Pflicht, mit dem Widerrufs-Hinweis am Haekchen', p.get('consent_collection[terms_of_service]') === 'required'
     && p.get('custom_text[terms_of_service_acceptance][message]') === ZUSTIMMUNG_TEXT && /357a Abs\. 2 BGB/.test(ZUSTIMMUNG_TEXT) && !/verliere/.test(ZUSTIMMUNG_TEXT) && ZUSTIMMUNG_TEXT.length <= 1200);
-  pruefe('Rueckkehr in die Einstellungen der Live-Seite (Standard)', p.get('success_url') === 'https://floboldt007-cmyk.github.io/schach/#einstellungen'
+  pruefe('Rueckkehr in die Einstellungen der Live-Seite (Standard)', p.get('success_url') === 'https://crownmate.de/#einstellungen'
     && p.get('cancel_url') === p.get('success_url'));
   // Ende-zu-Ende: Was Stripe aus dieser Sitzung meldet, ordnet der Webhook genau diesem Konto zu
   const metadaten = {};
@@ -147,8 +147,9 @@ const json = (e) => { try { return JSON.parse(e.koerper); } catch (x) { return n
   pruefe('unbestaetigte E-Mail geht nicht an Stripe', !parameterVon(stripeAufrufe(unbestaetigt)[0]).has('customer_email')
     && !stripeAufrufe(unbestaetigt)[0].body.includes('example.invalid'));
   const eigene = netz();
-  await lauf(eigene, { umgebung: { ...UMGEBUNG, ABO_RUECKKEHR: 'https://crownmate.de/' } });
-  pruefe('eigene Rueckkehr-Adresse (ABO_RUECKKEHR)', parameterVon(stripeAufrufe(eigene)[0]).get('success_url') === 'https://crownmate.de/#einstellungen');
+  await lauf(eigene, { umgebung: { ...UMGEBUNG, ABO_RUECKKEHR: 'https://floboldt007-cmyk.github.io/schach/' } });
+  // seit dem Umzug (PR #149) ist crownmate.de der Standard; die eigene Adresse muss sich davon unterscheiden
+  pruefe('eigene Rueckkehr-Adresse (ABO_RUECKKEHR)', parameterVon(stripeAufrufe(eigene)[0]).get('success_url') === 'https://floboldt007-cmyk.github.io/schach/#einstellungen');
 }
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 //   Ohne geladenen Paket-Einstieg (dienst.paketGeladen) geht es still zur Arena, wie bei einem fehlenden Paket-Screen.
 //   Ohne Angabe w1. Kommt Flo aus dem Raetsel-Bildschirm zurueck (Zurueck oder "Fertig"), gilt die Seite, die das Paket
 //   dafuer gemerkt hat (dienst.nimmRueck). Die aktuelle Seite steht in params.seite des eigenen Verlaufseintrags
-//   (merkeSeite): Neuladen bleibt auf ihr. "Ich kenne mich aus" steht auf jeder Seite im Kopf und fuehrt zur Arena.
+//   (merkeSeite): Neuladen bleibt auf ihr. "Ich kenne mich aus" steht auf jeder Seite im Kopf und fuehrt zur Startseite heim.
 //   Liegt ein eigener Verlaufseintrag davor (history.state.tiefe > 0, z. B. aus den Einstellungen oder vom Hinweis in
 //   der Heute-Karte geoeffnet), hat der Kopf zusaetzlich "Zurueck" (app.zurueck); beim allerersten Start nicht.
 //   Das Willkommen gilt als gesehen, sobald es einmal da war (Modul start, gesehen), auch wenn Flo die App gleich schliesst.
@@ -91,12 +91,13 @@ function bisZu(name) {
 function seite(name) {
   if (name === 'w1') {
     return {
-      bild: `<div class="st-sockel">${miniBrett(FEN_WILLKOMMEN, { zuletzt: ['f8', 'c5'] })}
-          <span class="st-klasse"><i></i>${esc(KLASSEN_NAME.bester || T('praezise'))}</span></div>`,
+      // das Schild steht unter dem Brett, nicht darauf (Handy-Runde K, 08.11.2026: es verdeckte schwarze Bauern)
+      bild: `<div class="st-sockel">${miniBrett(FEN_WILLKOMMEN, { zuletzt: ['f8', 'c5'] })}</div>
+          <span class="st-klasse"><i></i>${esc(KLASSEN_NAME.bester || T('praezise'))}</span>`,
       text: `<div class="ueberzeile">${T('w1.ueber')}</div>
         <h1 class="disp st-titel" tabindex="-1">${T('w1.titel')}</h1>
         <p>${T('w1.text')}</p>
-        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}${knopf('ueberspringen', T('ueberspringen'), { art: 'leise' })}</div>`,
+        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}</div>`,
     };
   }
   if (name === 'w2') {
@@ -107,11 +108,11 @@ function seite(name) {
       // Welten: je Welt ihr Endgegner mit der Nummer der Welt (dreissig Portraets passten nicht in eine Reihe)
       bild: `<div class="st-leiter">${WELTEN.map((w) => { const b = endgegnerDerWelt(w.nr) || erster; return `<span class="st-bot${w.nr === 1 ? ' st-erster' : ''}" style="${farben(b)}" title="${esc(w.name)}">
           <img src="${esc(avatarVon(b))}" alt="" draggable="false"><b class="zahl">${w.nr}</b></span>`; }).join('')}</div>
-        <div class="st-leiter-fuss"><span>${T('w2.start', { name: esc(erster.name) })}</span><span>${T('w2.ziel', { name: esc(letzter.name) })}</span></div>`,
+        <div class="st-leiter-fuss"><span>${T('w2.fuss', { welten: esc(zahlWort(WELTEN.length)) })}</span></div>`,
       text: `<div class="ueberzeile">${T('w2.ueber')}</div>
         <h1 class="disp st-titel" tabindex="-1">${T('w2.titel', { bots: esc(zahlWort(BOTS.length)), welten: esc(zahlWort(WELTEN.length).toLowerCase()) })}</h1>
         <p>${T('w2.text', { erster: esc(erster.name), bis: esc(bisZu(letzter.name)) })}</p>
-        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}${knopf('ueberspringen', T('ueberspringen'), { art: 'leise' })}</div>`,
+        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}</div>`,
     };
   }
   if (name === 'w3') {
@@ -302,7 +303,9 @@ export function zeige(root, params, app) {
     else if (was === 'ja' || was === 'einstufung-seite' || was === 'wiederholen') geheZu('einstufung');
     else if (was === 'nein') { D.setzeRueck('frage'); app.gehe('raetsel', { quelle: D.QUELLE_REGELN }); }
     else if (was === 'einstufung-start') { D.setzeRueck('einstufung'); app.gehe('raetsel', { quelle: D.QUELLE_EINSTUFUNG }); }
-    else if (was === 'raus' || was === 'arena') app.gehe('arena', {}, { ersetzen: true });
+    // Etappe A: "Ich kenne mich aus" fuehrt zur Startseite heim, der Knopf zur Arena bleibt bei der Arena
+    else if (was === 'raus') app.gehe('heim', {}, { ersetzen: true });
+    else if (was === 'arena') app.gehe('arena', {}, { ersetzen: true });
     else if (was === 'benno') spiele(D.ersterGegner().id);
     else if (was === 'leiter') spiele(naechsterGegner(ladeFortschritt()).id);
     else if (was === 'probe' || was === 'spielen') {

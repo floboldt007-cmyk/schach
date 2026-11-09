@@ -290,12 +290,12 @@
 .arena .knoten.gewaehlt .k-schild { background: var(--tinte); color: var(--auf-tinte); box-shadow: var(--s2); }
 .arena .knoten.gewaehlt .k-meta { color: var(--auf-tinte); opacity: .72; }
 /* Fahne "Naechster Gegner" ueber der aktuellen Station */
-.arena .knoten .fahne { position: absolute; left: 50%; bottom: calc(100% + 13px); transform: translateX(-50%); white-space: nowrap; padding: 5px 11px 6px;
+.arena .knoten .fahne { position: absolute; left: 50%; bottom: calc(100% + 13px); transform: translateX(calc(-50% + var(--krone-dx, 0px))); white-space: nowrap; padding: 5px 11px 6px;
   border-radius: 10px; font-size: 12px; font-weight: var(--gw-titel); letter-spacing: .1em; color: var(--auf-akzent); background: var(--akzent);
   box-shadow: var(--s2); z-index: 4; pointer-events: none; }
-.arena .knoten .fahne::after { content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: var(--akzent); }
+.arena .knoten .fahne::after { content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: calc(-5px - var(--krone-dx, 0px)); border: 5px solid transparent; border-bottom: 0; border-top-color: var(--akzent); }
 /* Endgegner: Krone ueber der Station (ueber der Fahne, wenn er der naechste ist) */
-.arena .knoten .boss-krone { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap; padding: 2px 9px 3px;
+.arena .knoten .boss-krone { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(calc(-50% + var(--krone-dx, 0px))); white-space: nowrap; padding: 2px 9px 3px;
   border-radius: var(--r-pille); font-size: 12px; font-weight: var(--gw-titel); letter-spacing: .2em; color: var(--akzent-text); background: var(--flaeche);
   box-shadow: var(--kante); z-index: 3; pointer-events: none; }
 .arena .knoten.besiegt .boss-krone { bottom: calc(100% + 30px); }
@@ -312,6 +312,7 @@
 .arena .flo-figur { position: absolute; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; overflow: hidden; z-index: 4; pointer-events: none;
   box-shadow: 0 0 0 2.5px var(--flaeche), 0 0 0 4px var(--flo-grund), var(--s2); }
 .arena .flo-figur svg { width: 100%; height: 100%; display: block; }
+.arena .flo-figur.verdeckt { visibility: hidden; }
 /* Plaetze auf der Karte fuer spaeter (Orte arena:karte-boss am Zelt, arena:karte-event an der Fahne) */
 .arena .ort-karte-boss, .arena .ort-karte-event { position: absolute; transform: translate(-50%, -50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .arena .ort-karte-boss[hidden], .arena .ort-karte-event[hidden] { display: none; }
@@ -340,23 +341,36 @@
   color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.4; animation: none; transform-origin: 32px 0; }
 .arena .detail .sprechblase::before { top: -7px; left: 32px; width: 14px; height: 14px; border: 0; border-radius: 3px 0 0 0; background: var(--flaeche-2);
   box-shadow: -1px -1px 0 0 var(--linie); transform: rotate(45deg); }
+/* Gegnerbild als Knopf zum Steckbrief (T-3) */
+.arena .detail-kopf button.av { padding: 0; border: 0; cursor: pointer; font: inherit; color: inherit; }
+.arena .detail-kopf button.av:focus-visible { outline: var(--fokus); outline-offset: 3px; }
+/* Steckbrief-Blatt (js/ui/arena.js zeigeSteckbrief, .sheet-karte.steckbrief): Kopf, Kacheln, Ort arena:steckbrief */
+.steckbrief .sb-rumpf { display: grid; gap: 12px; margin: 14px 0 16px; }
+.steckbrief .sb-kopf { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.steckbrief .sb-bild { flex: none; width: 56px; height: 56px; border-radius: 18px; overflow: hidden; background: var(--flaeche-2); box-shadow: var(--kante); }
+.steckbrief .sb-bild img { display: block; width: 100%; height: 100%; }
+.steckbrief .sb-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.steckbrief .sb-name b { font-size: 17px; font-weight: var(--gw-stark); color: var(--text); }
+.steckbrief .sb-name span { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.steckbrief .ort-steckbrief { display: grid; gap: 8px; }
+.steckbrief .ort-steckbrief[hidden] { display: none; }
 /* Steckbrief: drei Kacheln. Kein Text ragt aus seiner Kachel: in schmalen Panels (Container unter 330 px: iPad 1024 quer,
    Handy, Handy quer) werden die Kacheln kompakter, und reicht es dann noch nicht, rutscht der Wert unter das Figurzeichen */
-.arena .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; container-type: inline-size; }
-.arena .merkmal { padding: 10px 12px; border-radius: 14px; background: var(--flaeche-2); box-shadow: var(--kante); min-width: 0; }
+.steckbrief .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; container-type: inline-size; }
+.steckbrief .merkmal { padding: 10px 12px; border-radius: 14px; background: var(--flaeche-2); box-shadow: var(--kante); min-width: 0; }
 /* nie abgeschnitten (Ansicht, Flo 30.10.): passt ein Wort wie "Lieblingsfigur" nicht, trennt es mit Bindestrich */
-.arena .m-label { display: block; font-size: 12px; font-weight: var(--gw-stark); letter-spacing: 0; color: var(--text-2);
+.steckbrief .m-label { display: block; font-size: 12px; font-weight: var(--gw-stark); letter-spacing: 0; color: var(--text-2);
   -webkit-hyphens: auto; hyphens: auto; overflow-wrap: normal; }
-.arena .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text);
+.steckbrief .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text);
   hyphens: auto; overflow-wrap: break-word; }
-.arena .m-figur { flex: none; width: 22px; height: 22px; display: grid; place-items: center; }
-.arena .m-figur img { width: 20px; height: 20px; }
+.steckbrief .m-figur { flex: none; width: 22px; height: 22px; display: grid; place-items: center; }
+.steckbrief .m-figur img { width: 20px; height: 20px; }
 @container (max-width: 330px) {
-  .arena .merkmal { padding: 8px; }
-  .arena .m-label { font-size: 12px; letter-spacing: 0; }
-  .arena .m-wert { font-size: 12.5px; gap: 2px 3px; }
-  .arena .m-figur { width: 15px; height: 15px; }
-  .arena .m-figur img { width: 15px; height: 15px; }
+  .steckbrief .merkmal { padding: 8px; }
+  .steckbrief .m-label { font-size: 12px; letter-spacing: 0; }
+  .steckbrief .m-wert { font-size: 12.5px; gap: 2px 3px; }
+  .steckbrief .m-figur { width: 15px; height: 15px; }
+  .steckbrief .m-figur img { width: 15px; height: 15px; }
 }
 /* Bedingungen: drei Sterne (Hook .ziel-sterne > div, .an) */
 .arena .ziel-sterne { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -384,11 +398,6 @@
 .arena .spielen .sp-name { white-space: nowrap; }
 .arena .spielen .pf { flex: none; width: 36px; height: 36px; border-radius: 12px; background: var(--akzent-tief); display: grid; place-items: center; }
 .arena .spielen .pf .ico { width: 20px; height: 20px; }
-/* Bilanz */
-.arena .bilanz { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 12px 0 18px; border-top: 1px solid var(--linie); }
-.arena .bilanz div { text-align: center; min-width: 0; }
-.arena .bilanz b { display: block; font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text); }
-.arena .bilanz span { font-size: 12px; font-weight: 600; color: var(--text-2); letter-spacing: .02em; white-space: nowrap; }
 /* Offene Partie: Bild, Text, Knopf in einer Zeile; reicht der Platz nicht (Handy, schmales Panel), steht der Knopf in
    voller Breite darunter (nichts wird abgeschnitten oder ueberdeckt) */
 .arena .fortsetzen { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px; border-radius: 16px;
@@ -411,10 +420,9 @@
   /* iPad hoch: Panel zweispaltig, damit die Karte viel Platz behaelt; unten etwas Luft unter dem Panel */
   .arena.karte-hoch .inhalt { padding-bottom: 20px; }
   .arena.karte-hoch .detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; align-items: start; padding-bottom: 0; }
-  .arena.karte-hoch .detail > .ort-panel-oben, .arena.karte-hoch .detail > .heute-karte, .arena.karte-hoch .detail > .fortsetzen { grid-column: 1 / -1; }
+  .arena.karte-hoch .detail > .ort-panel-oben, .arena.karte-hoch .detail > .fortsetzen { grid-column: 1 / -1; }
   .arena.karte-hoch .detail-links, .arena.karte-hoch .detail-rechts { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .arena.karte-hoch .cta-platz { margin: 0 -22px 0; }
-  .arena.karte-hoch .bilanz { border-top: 0; padding-top: 0; }
 }
 /* Meldungen (app.meldung) stehen im Hochformat ueber dem klebenden Spielen-Knopf, nicht darauf (sonst wie gehabt
    ueber der Reiter-Pille bzw. dem Rand, css/app.css und css/navigation.css) */
@@ -431,13 +439,9 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
   .arena .detail h2 { font-size: 24px; }
   .arena .detail .elo { font-size: 13px; }
   .arena .detail .sprechblase { font-size: 14.5px; }
-  .arena .merkmale { gap: 6px; }
-  .arena .merkmal { padding: 8px 10px; }
-  .arena .m-wert { font-size: 13px; }
   .arena .ziel-sterne > div { font-size: 12px; }
   .arena .cta-platz { margin: auto -16px 0; padding: 8px 16px 14px; border-radius: 0 0 var(--r-l) var(--r-l); }
   .arena .spielen { min-height: 60px; font-size: 17px; }
-  .arena .bilanz { display: none; }
   .arena .knoten .k-schild { font-size: 12px; padding: 2px 9px 3px; }
   .arena .knoten .fahne { font-size: 12px; letter-spacing: .08em; padding: 4px 9px 5px; bottom: calc(100% + 10px); }
   .arena .knoten .boss-krone { font-size: 12px; letter-spacing: .16em; }
@@ -464,6 +468,11 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt { --panel-kompakt: 236px; }
 .arena.karte-kompakt .inhalt { gap: 10px; }
 .arena.karte-kompakt .karte { flex: 0 0 auto; height: max(300px, calc(100% - var(--panel-kompakt))); min-height: 0; overflow: hidden; }
+/* Design-Durchsicht 09.11. (Bots, iPhone SE mit Safari-Leiste): der Spielen-Knopf klebt nur so hoch, wie sein Panel
+   beginnt. Mit der 300-px-Karte begann das Panel bei 416 px, der Knopf lag halb unter der Reiter-Leiste (432 bis 488,
+   Leiste ab 468). Auf kurzen Handys laesst die Karte deshalb immer Platz fuer den Knopf (92 px); hoehere Handys behalten
+   die 300 px. */
+.arena.karte-kompakt .karte { height: max(min(300px, calc(100% - 92px)), calc(100% - var(--panel-kompakt))); }
 .arena.karte-kompakt .knoten .fahne { display: none; }
 .arena.karte-kompakt .detail { gap: 10px; padding: 10px 14px 0; }
 .arena.karte-kompakt .detail .elo, .arena.karte-kompakt .detail .mini-sterne { display: inline-flex; vertical-align: middle; }
@@ -473,7 +482,7 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt .detail-kopf { gap: 12px; }
 .arena.karte-kompakt .detail-kopf .av { width: 52px; height: 52px; border-radius: 16px; }
 .arena.karte-kompakt .detail h2 { font-size: 20px; }
-.arena.karte-kompakt .detail-welt, .arena.karte-kompakt .merkmale,
+.arena.karte-kompakt .detail-welt,
 .arena.karte-kompakt .ziel-sterne, .arena.karte-kompakt .wahl-titel { display: none; }
 /* Die gewoehnliche Begruessung entfaellt kompakt (Karte, Gegner, Farbe und Knopf passen so ohne Scrollen). Ein besonderer
    Satz (Mutmacher nach Niederlagen, Erzfeind) bleibt, knapp in hoechstens zwei Zeilen */
@@ -488,8 +497,6 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt .cta-platz { order: 10; margin-top: 0; }
 .arena.karte-kompakt .ort-panel-bot { order: 6; }
 .arena.karte-kompakt .ort-panel-oben { order: 7; }
-.arena.karte-kompakt .heute-karte { order: 8; }
-.arena.karte-kompakt .bilanz { order: 9; }
 
 /* ---------- Kurzes Querformat (Handy quer, flache Fenster) ----------
    js/ui/arena.js layout() zeichnet hier die hohe Karte (.karte-hoch, unter 420 px Kartenhoehe). Untereinander gestellt
@@ -505,7 +512,6 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
     border-radius: var(--r-l); overflow-y: auto; overflow-x: hidden; }
   .arena.karte-hoch .detail-links, .arena.karte-hoch .detail-rechts { display: contents; }
   .arena.karte-hoch .cta-platz { margin: auto -14px 0; padding: 8px 14px 12px; border-radius: 0; }
-  .arena.karte-hoch .bilanz { display: none; }
   /* Meldungen bleiben wie im Hochformat ueber dem Spielen-Knopf (Regel oben) */
 }
 

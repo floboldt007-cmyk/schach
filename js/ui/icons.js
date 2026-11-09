@@ -1,5 +1,6 @@
 // Gemeinsame Strich-Icons der Schach-Arena (24er Raster). Seit dem Premium-Umbau (U2, PLAN 2.1) die Strich-Icons aus
-// Entwurf A unter den bisherigen Namen, dazu mond, sonne, laut, leise, klang, regler, haken, bauer, podest, person.
+// Entwurf A unter den bisherigen Namen, dazu mond, sonne, laut, leise, klang, regler, haken, bauer, podest, person,
+// personen.
 // Rein, ohne DOM. Aus js/app.js hierher verschoben (Runde 4), damit Pakete Icons nutzen und eigene anmelden koennen,
 // ohne app.js zu importieren (kein Import-Kreis). app.js exportiert icon weiter.
 // Die Strichstaerke kommt aus dem Theme (--ic-strich, css/bauteile.css); das Attribut stroke-width="2" ist der Rueckfall.
@@ -48,9 +49,13 @@ const ICONS = {
   haus: '<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9.5h11V10"/><path d="M10 19.5v-5h4v5"/>',
   podest: '<path d="M3.5 20.5h17M4.5 20.5v-6h5v6M9.5 20.5V9h5v11.5M14.5 20.5v-4h5v4"/>',
   person: '<circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20.2a7.2 7.2 0 0 1 14.4 0"/>',
+  // zwei Personen (Startseite "Zu zweit", Handy-Runde 08.11.2026)
+  personen: '<circle cx="9" cy="8.5" r="3.2"/><path d="M2.8 19.5a6.2 6.2 0 0 1 12.4 0"/><circle cx="16.2" cy="9.3" r="2.7"/><path d="M15.4 13.9a5.3 5.3 0 0 1 5.8 5.6"/>',
   // Startseite neu (Flo 01.11.2026: "oben muss die Shop-Funktion sein ... die Premium-Version"): Krone (gefuellt) und Tasche
   krone: '<path d="M4 8.2l4.1 3.5L12 5.3l3.9 6.4L20 8.2l-1.5 9.3h-13z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.5 20h13" stroke-width="2.2"/>',
   laden: '<path d="M5.5 8.5h13l-1 11.5h-11z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/>',
+  // Glas-Leiste (Konzept 2026-11-06, Entwurf online-shop .dock): Reiter Liga als Kronen-Umriss
+  liga: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" stroke-linejoin="round"/>',
 };
 
 const NAME = /^[a-z][a-z0-9-]{0,39}$/;

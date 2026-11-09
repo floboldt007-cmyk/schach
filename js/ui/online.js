@@ -18,6 +18,20 @@ import { figurenPfad } from '../figurensatz.js';
 import { sanAnzeige } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
+import { karteDerPartie } from '../karte.js';
+import { fremdeKarte, bannerUrl } from './visitenkarte.js';
+import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
+import { holeStand, suche as kronenSuche, BOT_ERSATZ_MS } from '../kronen.js';
+import { stufenName } from '../pakete/liga/texte.js';
+import { floAvatar } from '../thema.js';
+import { klang, zugKlangName } from '../sounds.js';
+
+// Bedenkzeiten der Gegnersuche (dieselben Kennungen wie die Lobby, js/pakete/lobby/index.js ZEITEN)
+const SUCH_ZEITEN = Object.freeze([
+  { id: '3+2', art: 'blitz', grund: 180, zuschlag: 2 },
+  { id: '10+0', art: 'schnell', grund: 600, zuschlag: 0 },
+  { id: '15+10', art: 'lang', grund: 900, zuschlag: 10 },
+]);
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -53,9 +67,13 @@ export function zeige(root, params, app) {
     link.dataset.online = ''; document.head.append(link);
   }
   const s = document.createElement('section'); s.className = 'screen online-screen'; s.setAttribute('aria-label', O('titel'));
-  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-online="training">${esc(O('training'))}</button><h2>${esc(O('titel'))}</h2></header>`
+  // Handy-Runde 08.11.: Kopf wie Lernen und Ich (Zurueck = woher man kam, Titel "Online"); ohne laufende Partie bleibt
+  // die Leiste unten stehen (js/app.js reiterVon)
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', chips: '', seite: O('titel') })}`
     + `<div class="on-rumpf"><p class="on-meldung" role="status" hidden></p><div class="on-inhalt"></div></div>`;
   root.append(s);
+  const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  let suche = null;
   const inhalt = s.querySelector('.on-inhalt'), status = s.querySelector('.on-meldung');
   // blockiert: abgemeldet oder fremde Partie (nichts mehr senden). widerspruch: die Serverstellung passt nicht zu den
   // Zuegen; keine Zuege und keine Zeit-Reklamation mehr, aber "Strittig melden" und "Aufgeben" bleiben bedienbar.
@@ -63,6 +81,10 @@ export function zeige(root, params, app) {
   let weg = false, busy = false, blockiert = false, widerspruch = false, beobachter = null, brett = null, p = null, chess = null, wartend = null;
   let strittigFaellig = false;
   let profil = null, uhrTimer = null, zeitPruefung = 0;
+  let kartenDaten = null, kartenPartie = null;
+  // Klang: gehoert = Halbzuege, die schon geklungen haben; uhrGewarnt = Uhr-Warnung dieser Partie gespielt
+  let gehoert = 0, uhrGewarnt = false;
+  const ton = name => { try { klang.spiele(name); } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ } };
   const melde = text => { if (!weg) { status.textContent = text; status.hidden = !text; } };
   const fehler = e => { melde(e?.message || O('fehler')); };
   const oeffne = partie => { if (!weg) { online.vergissEinladung(); app.gehe('online', { partieId: partie.id }); } };
@@ -104,11 +126,27 @@ export function zeige(root, params, app) {
       e => melde(e?.kennung === 'ONLINE_PARTIE_BEENDET' ? e.message : `${e?.message || O('fehler')} ${O('strittigVonHand')}`));
     melde(O('stellungFehler')); // aktion leert die Zeile beim Start; waehrend der Meldung bleibt der Grund sichtbar
   }
+  // Online-Seite "Zwei Tueren" (Flo 08.11.2026, Konzept 1 A mit den Woertern von B): oben der Liga-Streifen, darunter
+  // zwei gleich gebaute Karten Partie und Raetsel-Duell (jeder Suchen-Knopf traegt "gewertet"), unten die Zeile
+  // "Freund einladen oder Code eingeben" als lockerer Weg (klappt Einladen, Code und Meine Partien auf). Passt ohne
+  // Scrollen auf das iPhone 13 (tests/online-ui.test.mjs). Ohne Konto sind die Karten nur Erklaerung, ohne Knopf und
+  // ohne Schatten, damit nichts tippbar aussieht; der einzige Knopf ist "Zum Konto" (wie ueberall in der App).
+  const FIGUREN = { partie: 'bKe8 bQd8 bPd7 bPe5 bPf7 bNc6 wPd2 wPe4 wNf3 wQd1 wKe1', duell: 'bKg8 bPf7 bPg7 bPh7 wRa1 wKg1 wPf2 wPg2 wPh2' };
+  const bild = art => `<span class="on-bild" aria-hidden="true">${FIGUREN[art].split(' ').map(x =>
+    `<img src="${new URL(`assets/pieces/${x[0]}${x[1]}.svg`, WURZEL).href}" alt="" style="grid-area:${9 - Number(x[3])}/${x.charCodeAt(2) - 96}">`).join('')}`
+    + `${art === 'duell' ? '<b class="on-bild-uhr zahl">3:00</b>' : ''}</span>`;
+  const tuer = (art, rumpf) => `<section class="on-art on-tuer" data-art="${art}" aria-labelledby="on-${art}-t">
+      <div class="on-tuer-kopf">${bild(art)}<div class="on-tuer-text"><span class="on-tuer-ueber">${esc(O(`tuer.${art}.ueber`))}</span>
+        <h2 id="on-${art}-t">${esc(O(`tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
+  const RING = 2 * Math.PI * 44;
   function start() {
+    const kopfHtml = seitenKopf({ titel: O('titel'), text: O('kurz') });
     if (!sitzung()?.access_token) {
-      inhalt.innerHTML = `<section class="on-karte flaeche"><h3>${esc(O('zusammen'))}</h3><p>${esc(O('konto'))}</p>`
+      const hinweis = `<p class="on-tuer-hinweis">${esc(O('tuer.ohneKonto'))}</p>`;
+      inhalt.innerHTML = `${kopfHtml}<div class="on-tueren" data-zustand="ohne">${tuer('partie', hinweis)}${tuer('duell', hinweis)}</div>
+        <section class="t-karte on-konto"><h2>${esc(O('konto.titel'))}</h2><p>${esc(O('konto.erklaert'))} ${esc(O('konto'))}</p>`
         + (online.gemerkteEinladung() ? `<p>${esc(O('merker'))}</p>` : '')
-        + `<button class="knopf primaer" type="button" data-online="konto">${esc(O('einstellungen'))}</button></section>`;
+        + `<div class="t-fuss"><button class="knopf primaer dr" type="button" data-online="konto">${esc(O('konto.knopf'))} ${icon('vor')}</button></div></section>`;
       return;
     }
     if (params.partieId) {
@@ -125,15 +163,123 @@ export function zeige(root, params, app) {
       return;
     }
     const code = online.gemerkteEinladung() || '';
-    inhalt.innerHTML = `<div class="on-start"><form class="on-karte flaeche" data-form="einladen"><h3>${esc(O('einladen'))}</h3>
-      <label>${esc(O('farbe'))}<select name="farbe"><option value="w">${esc(O('weiss'))}</option><option value="b">${esc(O('schwarz'))}</option><option value="zufall" selected>${esc(O('zufall'))}</option></select></label>
-      <label>${esc(O('bedenkzeit'))}<select name="tempo"><option value="ohne">${esc(O('ohneUhr'))}</option><option value="5">5+0</option><option value="10">10+0</option><option value="15">15+10</option></select></label>
-      <button class="knopf primaer" type="submit">${esc(O('erstellen'))}</button></form>
-      <form class="on-karte flaeche" data-form="beitreten"><h3>${esc(O('codeEingeben'))}</h3><label>${esc(O('code'))}<input name="code" value="${esc(code)}" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" required></label>
-      <button class="knopf primaer" type="submit">${esc(O('beitreten'))}</button></form></div>
-      <section class="on-karte flaeche"><h3>${esc(O('meine'))}</h3><p class="on-liste">${esc(O('ladeListe'))}</p><button class="knopf" type="button" data-online="liste">${esc(O('aktualisieren'))}</button></section>`;
+    // Gegnersuche fuer die Liga (dieselbe Suche wie die Lobby, js/kronen.js): erst zeigen, wenn der Server die Liga kennt
+    // (kronen_mein_stand antwortet); sonst ein ruhiger Hinweis "kommt bald", kein Fehler
+    inhalt.innerHTML = `${kopfHtml}
+      <button class="on-liga dr" type="button" data-online="liga" hidden></button>
+      <div class="on-tueren" data-zustand="konto">
+      ${tuer('partie', `<p class="on-suche-text">${esc(O('suche.pruefen'))}</p>
+        <div class="segment on-zeiten" role="radiogroup" aria-label="${esc(O('bedenkzeit'))}" hidden>${SUCH_ZEITEN.map((z, i) =>
+          `<button class="seg" type="button" role="radio" data-zeit="${z.id}" aria-checked="${i === 0}">${esc(z.id.replace('+', ' + '))}<small>${esc(O('zeit.' + z.art))}</small></button>`).join('')}</div>
+        <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="suchen" hidden>${esc(O('tuer.partie.knopf'))}</button>
+        <div class="on-suche" hidden>
+          <div class="on-ring" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="on-ring-spur" cx="50" cy="50" r="44"/>
+            <circle class="on-ring-rest" cx="50" cy="50" r="44" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="0"/></svg>
+            <span class="on-ring-ich">${floAvatar('w')}</span></div>
+          <h3>${esc(O('suche.ring'))}</h3><p class="on-rest" role="status"></p>
+          <button class="knopf primaer dr" type="button" data-online="ki-jetzt">${esc(O('suche.kiJetzt'))}</button>
+          <small class="on-ki-hinweis">${esc(O('suche.kiHinweis'))}</small>
+          <button class="knopf dr" type="button" data-online="suche-stopp">${esc(O('suche.abbrechen'))}</button>
+        </div>`)}
+      ${tuer('duell', `<button class="knopf primaer dr on-tuer-knopf" type="button" data-online="duell">${esc(O('tuer.duell.knopf'))}</button>`)}
+      </div>
+      <details class="on-freunde"${code || params.freunde ? ' open' : ''}>
+        <summary class="on-freunde-zeile dr"><span class="on-freunde-symbol" aria-hidden="true">${icon('person')}</span>
+          <span><b>${esc(O('freunde.zeile'))}</b><small>${esc(O('freunde.zeileText'))}</small></span></summary>
+        <div class="on-start"><form class="on-karte flaeche" data-form="einladen"><h3>${esc(O('einladen'))}</h3>
+        <label>${esc(O('farbe'))}<select name="farbe"><option value="w">${esc(O('weiss'))}</option><option value="b">${esc(O('schwarz'))}</option><option value="zufall" selected>${esc(O('zufall'))}</option></select></label>
+        <label>${esc(O('bedenkzeit'))}<select name="tempo"><option value="ohne">${esc(O('ohneUhr'))}</option><option value="5">5+0</option><option value="10">10+0</option><option value="15">15+10</option></select></label>
+        <button class="knopf primaer" type="submit">${esc(O('erstellen'))}</button></form>
+        <form class="on-karte flaeche" data-form="beitreten"><h3>${esc(O('codeEingeben'))}</h3><label>${esc(O('code'))}<input name="code" value="${esc(code)}" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" required></label>
+        <button class="knopf primaer" type="submit">${esc(O('beitreten'))}</button></form></div>
+        <section class="on-karte flaeche"><h3>${esc(O('meine'))}</h3><p class="on-liste">${esc(O('ladeListe'))}</p><button class="knopf" type="button" data-online="liste">${esc(O('aktualisieren'))}</button></section>
+      </details>`;
     inhalt.querySelector('[name="code"]').addEventListener('input', e => { e.target.value = online.normalisiereCode(e.target.value).slice(0, 6); });
     ladeListe();
+    pruefeSuche();
+  }
+  const sucheKarte = () => inhalt.querySelector('.on-art[data-art="partie"]');
+  let restUhr = null, suchStart = 0, suchDauer = BOT_ERSATZ_MS;
+  function sucheZustand(zustand, text) {
+    const k = sucheKarte(); if (!k || weg) return;
+    k.dataset.zustand = zustand;
+    const zeile = k.querySelector('.on-suche-text');
+    zeile.textContent = text; zeile.hidden = zustand === 'bereit' || zustand === 'sucht';
+    k.querySelector('.on-tuer-kopf').hidden = zustand === 'sucht';
+    k.querySelector('.on-zeiten').hidden = zustand !== 'bereit';
+    k.querySelector('[data-online="suchen"]').hidden = zustand !== 'bereit';
+    k.querySelector('.on-suche').hidden = zustand !== 'sucht';
+    if (zustand !== 'sucht') { clearInterval(restUhr); restUhr = null; }
+  }
+  // Restzeit bis zum KI-Gegner als Ring und Satz (Konzept 3 A); die Uhr selbst fuehrt js/kronen.js
+  function zeigeRest() {
+    const k = sucheKarte(); if (!k || weg) return;
+    const rest = Math.max(0, suchDauer - (Date.now() - suchStart));
+    k.querySelector('.on-rest').textContent = O('suche.rest', { s: Math.ceil(rest / 1000) });
+    k.querySelector('.on-ring-rest').setAttribute('stroke-dashoffset', (RING * (1 - rest / suchDauer)).toFixed(2));
+  }
+  // Liga-Streifen: Stufe, Platz in der Wochen-Gruppe und Kronen (kronen_mein_stand); unbrauchbare Antwort: kein Streifen
+  function zeigeLiga(d) {
+    const st = Array.isArray(d) ? d[0] : d;
+    const el = inhalt.querySelector('.on-liga');
+    if (!el || !st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) return;
+    const stufe = stufenName(Math.min(17, Math.max(0, Math.trunc(Number(st.stufe)) || 0)));
+    const n = Number.isInteger(st.n) && st.n > 0 ? st.n : 30;
+    const zeile = Number.isInteger(st.platz) && st.platz > 0 ? O('liga.platz', { platz: st.platz, n }) : O('liga.ohneGruppe');
+    const zahlKronen = Math.max(0, Math.trunc(Number(st.kronen)));
+    el.innerHTML = `<span class="on-liga-schild" aria-hidden="true">${icon('liga')}</span><span class="on-liga-text"><b>${esc(stufe)}</b><span>${esc(zeile)}</span></span>`
+      + `<span class="on-liga-kronen zahl" aria-hidden="true">${icon('krone')}${esc(String(zahlKronen))}</span>`;
+    el.setAttribute('aria-label', O('liga.label', { stufe, zeile, kronen: O('liga.kronen', { n: zahlKronen }) }));
+    el.hidden = false;
+  }
+  async function pruefeSuche() {
+    try { const d = await holeStand(); if (weg) return; zeigeLiga(d); sucheZustand('bereit', O('suche.erklaert')); }
+    catch (e) { sucheZustand('bald', O('suche.bald')); }
+  }
+  const gewaehlteZeit = () => SUCH_ZEITEN.find(z => z.id === sucheKarte()?.querySelector('.on-zeiten [aria-checked="true"]')?.dataset.zeit) || SUCH_ZEITEN[0];
+  async function botFuerMich() {
+    try { const l = await import('../pakete/lobby/index.js'); return l.passenderBot(l.schaetzeWertung()); } catch (e) { return null; }
+  }
+  function starteSuche() {
+    const k = sucheKarte(); if (!k || suche) return;
+    const zeit = gewaehlteZeit();
+    const tempoWahl = { grund: zeit.grund, zuschlag: zeit.zuschlag };
+    const warteMs = typeof window !== 'undefined' && Number.isFinite(window.__onlineBotMs) ? window.__onlineBotMs : BOT_ERSATZ_MS;
+    suchStart = Date.now(); suchDauer = Math.max(1, warteMs);
+    sucheZustand('sucht', O('suche.laeuft'));
+    zeigeRest(); restUhr = setInterval(zeigeRest, 250);
+    k.querySelector('[data-online="ki-jetzt"]').focus();
+    suche = kronenSuche(zeit.id, {
+      warteMs,
+      beiTreffer: (partieId) => { suche = null; if (!weg) { ton('start'); app.gehe('online', { partieId }); } },
+      // nach 10 s ohne Menschen ein KI-Gegner in passender Staerke, wie in der Lobby (dort steht die Wahl des Bots)
+      beiBot: async ({ kiRef }) => {
+        suche = null;
+        if (weg) return;
+        const bot = await botFuerMich();
+        if (weg) return;
+        if (!bot) { sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); return; }
+        app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl, ki: true, ...(kiRef ? { kiRef } : {}) });
+      },
+      beiFehler: (e) => { suche = null; sucheZustand('bereit', O('suche.erklaert')); melde(e?.message || O('fehler')); },
+    });
+  }
+  function stoppeSuche() {
+    if (!suche) return;
+    try { suche.stopp(); } catch (e) { /* egal */ }
+    suche = null;
+    sucheZustand('bereit', O('suche.erklaert'));
+  }
+  // "Gleich gegen die KI" (Konzept 3 A, ohne Server): Suche beenden und eine Uebungspartie gegen den passenden Bot mit
+  // derselben Uhr starten. Uebung wertet nie (storage.wertet), also keine Kronen und kein Liga-Punkt, wie der Knopf sagt.
+  async function kiJetzt() {
+    if (!suche) return;
+    const zeit = gewaehlteZeit();
+    stoppeSuche();
+    const bot = await botFuerMich();
+    if (weg) return;
+    if (!bot) { melde(O('fehler')); return; }
+    app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: { grund: zeit.grund, zuschlag: zeit.zuschlag }, modus: 'uebung' });
   }
   async function ladeListe() {
     await aktion(() => online.meinePartien({ beendete: true }), liste => {
@@ -166,7 +312,9 @@ export function zeige(root, params, app) {
       sperre(); return;
     }
     const neuerWiderspruch = !r.passt && !widerspruch;
+    const alt = p;
     p = neu; chess = r.chess; widerspruch = !r.passt;
+    klingt(alt);
     if (neuerWiderspruch && p.status === 'laeuft') { melde(O('stellungFehler')); strittigFaellig = true; }
     if (p.status === 'offen') {
       inhalt.innerHTML = `<section class="on-karte on-einladung flaeche"><h3>${esc(O('einladungTitel'))}</h3><p class="on-code zahl">${esc(p.code)}</p>
@@ -190,12 +338,42 @@ export function zeige(root, params, app) {
     sperre();
     meldeStrittigVonSelbst();
   }
+  // Klaenge wie in der Partie (js/sounds.js zugKlangName): der Zug des Freundes, sobald er ankommt (der eigene klang
+  // schon in beiZug); das Ende einmal beim Wechsel von "laeuft" auf "beendet" (Sieg, Niederlage, Remis; strittig und
+  // nicht nachvollziehbar bleiben still); Start, wenn der Freund der offenen Einladung beitritt. Beim Laden still.
+  function klingt(alt) {
+    const n = chess.history().length;
+    if (!alt || alt.id !== p.id) { gehoert = n; return; }
+    if (alt.status === 'offen' && p.status === 'laeuft') ton('start');
+    if (n > gehoert && p.status === 'laeuft' && !widerspruch) {
+      const m = chess.history({ verbose: true }).at(-1);
+      ton(zugKlangName(m, chess.inCheck()));
+    }
+    gehoert = n;
+    if (alt.status !== 'laeuft' || p.status !== 'beendet' || !p.ergebnis || p.grund === 'strittig') return;
+    if (widerspruch || !endePasst(p, chess)) return;
+    try { klang.ende(p.ergebnis === '1/2-1/2' ? null : (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p)); } catch (e) { /* still */ }
+  }
+  // Etappe 4b: die Visitenkarten beider Spieler (js/karte.js, nur fuer die Teilnehmer dieser Partie) bringen Banner, Name
+  // und Titel in die Spielerleisten; bis sie da sind (oder ohne Antwort) bleibt es bei "Ich" und "Freund"
   function karten() {
     if (!brett) return;
+    if (p.id && kartenPartie !== p.id) {
+      kartenPartie = p.id;
+      kartenDaten = null;
+      const id = p.id;
+      karteDerPartie(id, { frist: 8000 }).then((d) => { if (d && !weg && p && p.id === id) { kartenDaten = d; karten(); } });
+    }
     const eigen = online.meineFarbe(p);
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
-      const name = f === eigen ? profil?.benutzername || O('ich') : O('freund');
-      inhalt.querySelector('.on-' + ort).innerHTML = `<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div><b>${esc(name)}</b><span>${f === 'w' ? O('weiss') : O('schwarz')}</span></div>
+      const roh = kartenDaten && (f === 'w' ? kartenDaten.w : kartenDaten.s);
+      const k = roh ? fremdeKarte(roh) : null;
+      const name = k && roh.name ? k.name : f === eigen ? profil?.benutzername || O('ich') : O('freund');
+      const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
+      const titel = k && k.titel ? `<small class="on-titel">${esc(k.titel.name)}</small>` : '';
+      const el = inhalt.querySelector('.on-' + ort);
+      el.classList.toggle('mit-banner', !!banner);
+      el.innerHTML = `${banner}<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div><b>${esc(name)}</b>${titel}<span>${f === 'w' ? O('weiss') : O('schwarz')}</span></div>
         <span class="uhr zahl" data-farbe="${f}"${p.bedenkzeit_s == null ? ' hidden' : ''}></span>`;
     }
     tick();
@@ -210,6 +388,10 @@ export function zeige(root, params, app) {
     for (const el of inhalt.querySelectorAll('.uhr')) {
       const f = el.dataset.farbe;
       el.textContent = uhrText(rest(f)); el.classList.toggle('laeuft', p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2);
+    }
+    // Uhr-Warnung einmal je Partie, sobald die eigene laufende Uhr unter 20 s faellt (wie in der Partie)
+    if (!uhrGewarnt && p.status === 'laeuft' && online.binAmZug(p) && online.zuegeListe(p).length >= 2 && rest(online.meineFarbe(p)) < 20000) {
+      uhrGewarnt = true; ton('uhr-warnung');
     }
     if (blockiert || busy || widerspruch || p.status !== 'laeuft' || Date.now() < zeitPruefung) return;
     const halbzuege = online.zuegeListe(p).length;
@@ -263,6 +445,9 @@ export function zeige(root, params, app) {
     try { m = chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { return false; }
     // Nur der Zug geht an den Server; ob er gilt und wie die Partie danach steht, entscheidet er (Etappe 1a)
     const daten = { uci: m.lan };
+    // der eigene Zug klingt sofort; endet die Partie mit ihm, kommt nur der Ende-Klang, sobald der Server bestaetigt
+    gehoert = chess.history().length;
+    if (!chess.isGameOver()) ton(zugKlangName(m, chess.inCheck()));
     queueMicrotask(() => { if (!weg) { zeichne(); aktion(() => online.sendeZug(p.id, daten)); } });
     // Sofort sperren, damit auch im selben Ereignis kein zweiter Zug durchkommt.
     brett.erlaubeZuege(null);
@@ -279,8 +464,17 @@ export function zeige(root, params, app) {
     const knopf = e.target.closest('button'); if (!knopf || weg) return;
     if (knopf.dataset.partie) { app.gehe('online', { partieId: knopf.dataset.partie }); return; }
     const a = knopf.dataset.online;
-    if (a === 'training') { app.gehe('training'); return; }
-    if (a === 'liste-zurueck') { app.gehe('online'); return; }
+    if (knopf.dataset.zeit) {
+      for (const z of knopf.parentNode.querySelectorAll('[data-zeit]')) z.setAttribute('aria-checked', String(z === knopf));
+      return;
+    }
+    if (a === 'suchen') { starteSuche(); return; }
+    if (a === 'suche-stopp') { stoppeSuche(); return; }
+    if (a === 'ki-jetzt') { kiJetzt(); return; }
+    // Raetsel-Duell fuer alle (Flo 08.11.2026): die Tuer startet die gewertete Duell-Suche direkt
+    if (a === 'duell') { app.gehe('raetsel-duell', { suchen: true }); return; }
+    if (a === 'liga') { app.gehe('bestenliste'); return; }
+    if (a === 'liste-zurueck') { app.gehe('online', { freunde: true }); return; }
     if (a === 'konto') { kontoFreigeschaltet('#konto'); app.gehe('einstellungen', { seite: 'konto' }); return; }
     if (a === 'liste') { ladeListe(); return; }
     if (a === 'teilen' && p) {
@@ -312,5 +506,5 @@ export function zeige(root, params, app) {
   });
   if (app.test) window.__online = { partie: () => p, chess: () => chess, brett: () => brett, blockiert: () => blockiert, widerspruch: () => widerspruch, busy: () => busy, rest };
   start();
-  return { verlasse() { weg = true; beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
+  return { verlasse() { weg = true; clearInterval(restUhr); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
 }

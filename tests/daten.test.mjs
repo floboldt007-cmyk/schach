@@ -361,7 +361,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -526,15 +526,26 @@ async function browserAblauf(browser) {
     return !!kg.querySelector('.konto-email') && !/Angemeldet als/.test(kg.textContent);
   }));
 
-  // Datenschutzerklaerung und Impressum: erreichbar, Entwurf-Kasten, nur Platzhalter
-  for (const [datei, muss] of [['datenschutz.html', ['Entwurf', 'fachkundigen Person', 'Frankfurt', 'GitHub', 'Google', 'Art. 6 Abs. 1 lit. a', 'Art. 6 Abs. 1 lit. b', 'Eltern', 'Werbung', 'Beschwerde']],
-    ['impressum.html', ['Entwurf', '§ 5 DDG', '[Vor- und Nachname]']]]) {
+  // Datenschutzerklaerung und Impressum: erreichbar, Anbieter-Angaben (Name, Anschrift, E-Mail), keine Telefonnummer,
+  // keine fremde E-Mail-Adresse. Das Impressum ist fertig (keine Platzhalter), die Datenschutzerklaerung bleibt Entwurf.
+  const ANBIETER = ['Florian Boldt', '51379 Leverkusen', 'kontakt@anfrageprofi.de'];
+  const nurAnbieterKontakt = (t) => (t.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[a-z]{2,}/g) || []).every((m) => m === 'kontakt@anfrageprofi.de')
+    && !/\+49|\b0\d{2,5}[\s/-]*\d{4,}/.test(t);
+  for (const [datei, muss, entwurf] of [['datenschutz.html', ['Entwurf', 'fachkundigen Person', 'Frankfurt', 'GitHub', 'Google', 'Art. 6 Abs. 1 lit. a', 'Art. 6 Abs. 1 lit. b', 'Eltern', 'Werbung', 'Beschwerde', 'LDI NRW', ...ANBIETER], true],
+    ['impressum.html', ['§ 5 DDG', '§ 18 Abs. 2 MStV', 'Verbraucherschlichtungsstelle', ...ANBIETER], false]]) {
     const s2 = await kontext.newPage();
     const r = await s2.goto(BASIS + datei);
     const t = await s2.evaluate(() => document.body.innerText);
     const css = await s2.evaluate(() => ({ grund: getComputedStyle(document.body).backgroundColor, text: getComputedStyle(document.body).color }));
-    pruefe(`Browser: ${datei} erreichbar, Entwurf-Hinweis und Pflichtinhalte`, r.status() === 200 && muss.every((w) => t.includes(w)), muss.filter((w) => !t.includes(w)).join(', '));
-    pruefe(`Browser: ${datei} ohne echte persönliche Daten (nur Platzhalter in eckigen Klammern)`, !/[A-Za-z0-9._%+-]+@(?!example\b)[A-Za-z0-9-]+\.[a-z]{2,}|\+49|\b\d{5}\s+[A-ZÄÖÜ][a-zäöü]+/.test(t) && /\[[^\]]+\]/.test(t));
+    pruefe(`Browser: ${datei} erreichbar, Anbieter-Angaben und Pflichtinhalte`, r.status() === 200 && muss.every((w) => t.includes(w)), muss.filter((w) => !t.includes(w)).join(', '));
+    pruefe(`Browser: ${datei} nur die Anbieter-E-Mail, keine Telefonnummer`, nurAnbieterKontakt(t));
+    pruefe(`Browser: ${datei} ${entwurf ? 'bleibt Entwurf mit offenen Platzhaltern' : 'fertig, ohne Entwurf und ohne Platzhalter'}`,
+      entwurf ? /\[[^\]]+\]/.test(t) : !/\[[^\]]+\]/.test(t) && !/Entwurf/.test(t));
+    // G-002 AC-05 (U, 09.11.2026): in der Datenschutzerklaerung sind nur noch die Anbieter-Angaben offen
+    if (datei === 'datenschutz.html') {
+      const platz = await s2.evaluate(() => [...document.querySelectorAll('.platz')].map((s) => s.textContent));
+      pruefe('Browser: datenschutz.html offen sind nur noch Anbieter-Angaben', platz.length > 0 && platz.every((p) => /^\[Anbieter/.test(p)), platz);
+    }
     pruefe(`Browser: ${datei} nutzt die Farben der App (Tokens)`, css.grund !== 'rgba(0, 0, 0, 0)' && css.grund !== css.text, css);
     await s2.close();
   }
@@ -554,8 +565,8 @@ async function browserAblauf(browser) {
     pruefe(`Browser: ${name} Sprachlink oeffnet englische Fassung mit Hinweis`, recht.url().endsWith(name + '-en.html') && en.lang === 'en'
       && en.text.includes('This is a courtesy translation.') && en.text.includes('The German version is legally binding.'));
     pruefe(`Browser: ${name} gleiche Abschnitte, Unterabschnitte und Gestaltung`, en.h2 === de.h2 && en.h3 === de.h3 && en.css === de.css && en.h2 > 0);
-    pruefe(`Browser: ${name} alle Platzhalter bleiben, keine echten Kontaktdaten`, en.platz.length === de.platz && en.platz.every((p) => /^\[[\s\S]+\]$/.test(p))
-      && !/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[a-z]{2,}|\+49/.test(en.text), en.platz);
+    pruefe(`Browser: ${name} gleiche Platzhalter und dieselben Anbieter-Angaben wie Deutsch`, en.platz.length === de.platz && en.platz.every((p) => /^\[[\s\S]+\]$/.test(p))
+      && ANBIETER.every((w) => en.text.includes(w)) && nurAnbieterKontakt(en.text), en.platz);
     pruefe(`Browser: ${name} Englisch ohne deutsche Umlaute und lange Gedankenstriche`, !/[äöüÄÖÜß\u2013\u2014]/.test(en.text));
     pruefe(`Browser: ${name} Fusszeile bleibt in derselben Sprache`, en.fuss === (name === 'datenschutz' ? 'impressum-en.html' : 'datenschutz-en.html'));
     await recht.locator('a[hreflang="de"]').click();

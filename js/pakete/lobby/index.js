@@ -2,8 +2,8 @@
 // Online-Modi ... Startseite Blitz, Schnell, Ligen"): die Online-Lobby als Vorschau, nur im Labor (js/labor.js laborFrei),
 // bis der Server fuer Online-Partien steht. Andere Spieler sehen nichts davon.
 // Die Startseite (Arena) bekommt oben den Umschalter Welten | Online (Ort arena:modus); der Screen "lobby"
-// (js/ui/lobby.js) zeigt Bedenkzeiten, Wertungen, die Online-Liga, Turniere und Gegen Freunde.
-// Ehrlich bleibt es trotzdem: Liga-Tabelle und Wertungen sind als Beispiel bzw. Schaetzung markiert, die Gegnersuche endet
+// (js/ui/lobby.js) zeigt Bedenkzeiten, Wertungen, Turniere und Gegen Freunde (die Beispiel-Liga mit erfundenen Namen
+// ist seit Flo 08.11.2026 weg). Ehrlich bleibt es trotzdem: Wertungen sind als Schaetzung markiert, die Gegnersuche endet
 // mit einem Bot in passender Staerke und derselben Uhr (eine echte Partie), "Gegen Freunde" oeffnet den echten Screen.
 // Rein bis auf modusLeiste und ladeLobbyCss (DOM), in Node testbar.
 //
@@ -13,8 +13,6 @@
 //   zeitText(z) -> '3 + 2'
 //   schaetzeWertung(fortschritt, bots?) -> Zahl    aus dem staerksten besiegten Bot (gerundet, 400 bis 2800)
 //   passenderBot(wertung, fortschritt, bots?) -> Bot   freier Bot (kein Endgegner) mit der naechsten Staerke
-//   LIGA_BEISPIEL [{ name, punkte }]                 erfundene Namen fuer die Vorschau der Liga-Tabelle
-//   ligaTabelle(eigeneZeile) -> [{ platz, name, punkte, du, zone }]   zone: auf | '' (kein Abstieg)
 //   modusLeiste(app, aktiv) -> HTMLElement | null  Umschalter Welten | Online (null ohne Labor)
 import { anbieten } from '../../orte.js';
 import { laborFrei } from '../../labor.js';
@@ -59,18 +57,6 @@ export function passenderBot(wertung, f = ladeFortschritt(), bots = BOTS) {
   });
 }
 
-// Liga-Vorschau: erfundene Spielernamen (keine echten Personen), Punkte absteigend; du stehst auf dem eigenen Platz
-export const LIGA_BEISPIEL = Object.freeze([
-  { name: 'Turmfalke', punkte: 14 }, { name: 'Rochade77', punkte: 12 }, { name: 'Nachteule', punkte: 11 },
-  { name: 'Bauernsturm', punkte: 9 }, { name: 'Springinsfeld', punkte: 7 }, { name: 'Damenflügel', punkte: 4 },
-  { name: 'Läuferpaar', punkte: 2 },
-].map((x) => Object.freeze(x)));
-export function ligaTabelle(du = { name: '', punkte: 0 }, beispiel = LIGA_BEISPIEL) {
-  const zeilen = [...beispiel.map((x) => ({ ...x, du: false })), { name: du.name, punkte: Number(du.punkte) || 0, du: true }]
-    .sort((a, b) => b.punkte - a.punkte || (a.du ? 1 : 0) - (b.du ? 1 : 0));
-  // nur Aufstieg, nie Abstieg (tests/fairness.test.mjs Regel 9 und 10: keine Druck-Texte)
-  return zeilen.map((z, i) => ({ ...z, platz: i + 1, zone: i < 3 ? 'auf' : '' }));
-}
 
 export function ladeLobbyCss() {
   try {

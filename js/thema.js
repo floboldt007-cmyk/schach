@@ -21,7 +21,7 @@
 //
 // Ereignis: window 'schach:thema' { thema, modus, aufgeloest } nach jedem Wechsel und wenn das System den
 // Modus wechselt (nur bei modus 'system').
-import { profilWahl, RAHMEN, KREATUR_MOTIVE } from './profil.js';
+import { profilWahl, RAHMEN, KREATUR_MOTIVE, MOTIVE, GRUENDE, STANDARD_FIGUR } from './profil.js';
 import { rahmenKunst } from './rahmen-kunst.js';
 import { profilGrund } from './sammlung-kunst.js';
 import { kreaturSvg } from './kreaturen-kunst.js';
@@ -135,9 +135,16 @@ export function botFarbe(bot) {
 
 // Profil (js/profil.js, Flo 30.10.2026): gewaehlte Figur und Rahmen; ohne Wahl wie bisher der Koenig ohne Ring
 export function floAvatar(farbe = 'w') {
+  return profilAvatar(profilWahl(), farbe);
+}
+
+// Dasselbe Bild aus einer fremden Wahl { figur, grund, rahmen } (Etappe 4b: der Gegner auf der Visitenkarte, Werte vom
+// Server). Unbekannte Werte fallen auf den Standard, damit nichts Fremdes in Pfad oder Bild gelangt.
+export function profilAvatar(wahl = {}, farbe = 'w') {
   const w = farbe !== 'b';
   const t = themaVon(aktuell.thema) || MODERN;
-  const p = profilWahl();
+  const p = { figur: MOTIVE.includes(wahl.figur) ? wahl.figur : STANDARD_FIGUR, grund: GRUENDE.includes(wahl.grund) ? wahl.grund : 'standard',
+    rahmen: Object.prototype.hasOwnProperty.call(RAHMEN, wahl.rahmen) ? wahl.rahmen : 'ohne' };
   const r = RAHMEN[p.rahmen] || RAHMEN.ohne;
   // Pfad vom Projekt aus, damit das Bild auch auf Seiten unter tests/ und in Unterordnern laedt
   const datei = new URL(`${t.figuren || 'assets/pieces/'}${w ? 'w' : 'b'}${p.figur}.svg`, new URL('../', import.meta.url)).href;

@@ -1,3 +1,84 @@
+# Supabase-Rutsch Etappe B (Liga, Banner, Rätsel-Duell)
+
+Stand 07.11.2026. Diese Liste bringt alles aus Etappe B in einem Rutsch auf den Server: die Liga mit Wochen-Gruppen,
+die Visitenkarte mit Bannern und Erfolgen und das Rätsel-Duell. Die ausführlichen Erklärungen stehen weiter unten in den
+Abschnitten „Liga mit Kronen“, „Visitenkarte, Erfolge und Taler“ und „Rätsel-Duell“; hier steht nur die Reihenfolge.
+
+**So läuft jeder SQL-Schritt:** Im Supabase-Dashboard links **SQL Editor** → **New query** → den **ganzen** Inhalt der
+genannten Datei aus dem Ordner `supabase/` einfügen → **Run**. Jede Schema-Datei darf mehrfach laufen. Eine Prüf-Datei
+(`…-rls-test.sql`) räumt am Ende selbst auf (`ROLLBACK`). Jeder Fehler aus einer Prüf-Datei beginnt mit `FEHLER:`.
+Kommt einer, **anhalten** und nicht weitermachen, sondern Claude die Meldung zeigen.
+
+**Vorher:** Die Grundeinrichtung ist schon da (`schema.sql`, Online-Schema mit der Edge Function `online-zug`, siehe
+die Abschnitte darunter). Diesen Stand erst dann einspielen, wenn die App mit diesem Stand live gehen soll: Die alte App
+ruft die neuen Funktionen nicht auf, das schadet also nicht, aber die neue App braucht sie.
+
+| Nr. | Was | Datei oder Ort | Prüfen (Erwartung) |
+| --- | --- | --- | --- |
+| 1 | Zeitplaner einschalten | Dashboard → **Integrations** → **Cron** → die Erweiterung `pg_cron` einschalten (ältere Dashboards: **Database** → **Extensions** → `pg_cron`) | `select extname from pg_extension where extname = 'pg_cron';` ergibt eine Zeile. Geht es im Tarif nicht: weiter, das Duell wertet dann bei der nächsten Suche aus |
+| 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300`. Mit Cron zeigt `select jobname, schedule from cron.job;` auch `liga-alte-wochen-loeschen` mit `17 3 * * *` |
+| 3 | Tageszähler (bleiben aus) | `zaehler-schema.sql` | `zaehler-rls-test.sql`: kein `FEHLER:`, `ROLLBACK` |
+| 4 | Visitenkarte, Erfolge, Banner | `karte-schema.sql` | `karte-rls-test.sql`: kein `FEHLER:`, der Editor meldet „Success“ |
+| 5 | Rätsel-Duell, Teil 1 | `raetsel-duell-schema.sql` | Mit Cron: `select jobname, schedule from cron.job;` zeigt jetzt zusätzlich `raetsel-duell-auswerten` mit `*/10 * * * *` (ohne Cron meldet diese Abfrage, dass es `cron.job` nicht gibt; das ist dann richtig) |
+| 6 | Rätsel-Duell, Rätsel | `raetsel-duell-daten.sql` (464.528 Byte, 7 Blöcke) | `select count(*) from public.duell_raetsel;` ergibt `3040` |
+| 7 | Rätsel-Duell, Edge Function | im Terminal, drei Befehle (siehe „Schritt 7 im Terminal“ unten) | Unter **Edge Functions** steht `raetsel-duell` |
+| 8 | Rätsel-Duell prüfen | `raetsel-duell-rls-test.sql` | kein `FEHLER:`, `ROLLBACK` |
+| 9 | Datenauskunft auf den neuen Stand | `daten-schema.sql` (noch einmal) | `daten-rls-test.sql`: unten `Daten-RLS-Test erfolgreich` |
+| 10 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
+
+**Warum genau diese Reihenfolge:** Cron muss vor Schritt 2 und 5 an sein, sonst planen Liga und Duell keinen
+Server-Lauf ein (wer Cron später einschaltet, führt Schritt 2 und 5 einfach noch einmal aus). Die Karte (4) liest Stufen und Wochen-Gruppen der
+Liga (2), das Duell (5) bucht seine Kronen über die Liga (2). Die Datenauskunft (9) kommt zuletzt, weil sie alle drei
+Teile mit ausgibt.
+
+**Tipps:**
+- Meldungen aus `raise notice` zeigt der SQL Editor meist nicht an. Darum prüft diese Liste nie über solche Meldungen,
+  sondern über eine Abfrage oder darüber, dass kein Fehler kommt (ein `FEHLER:` erscheint immer rot).
+- Lehnt der SQL Editor in Schritt 6 die große Datei ab: Sie besteht aus 7 Blöcken, jeder beginnt mit
+  `insert into public.duell_raetsel` und endet mit `on conflict (id) do nothing;`. Dann die Blöcke einzeln einfügen
+  und ausführen (je etwa 75 KB). Doppelt ausgeführte Blöcke schaden nicht.
+- Sagt die App danach „noch nicht eingerichtet“: Schritt 10 noch einmal.
+
+**Schritt 7 im Terminal** (Stand geprüft am 07.11.2026: Node 24.19, npx 11.17, Supabase CLI 3.0.0 liegt am PC im
+npm-Speicher, Docker ist nicht installiert, angemeldet und verknüpft ist die CLI noch nicht):
+1. Ordner: Die Function `raetsel-duell` gibt es erst ab dem Stand `etappe-b`, im Ordner `C:\Users\Flo\Documents\KI\schach`
+   auf `main` fehlt sie noch. Claude öffnet am PC dafür einen Ordner mit diesem Stand und sagt den Pfad.
+2. Im Terminal in diesem Ordner nacheinander:
+   ```
+   npx supabase@3.0.0 login
+   npx supabase@3.0.0 functions deploy raetsel-duell --remote=usaamcqypmvgqmsbfecb --use-api
+   ```
+   `login` öffnet den Browser, dort mit dem Supabase-Konto bestätigen (kein Token abtippen, nichts in eine Datei
+   schreiben). `--remote=…` nennt das Projekt direkt, ein `supabase link` ist damit nicht nötig. `--use-api` packt die
+   Function bei Supabase statt mit Docker. Fragt die CLI „Deploy … ?“, mit `y` bestätigen.
+3. Weist das Gateway beim Test das Token ab, denselben Befehl mit `--no-verify-jwt` dahinter noch einmal (die Function
+   prüft die Anmeldung selbst).
+
+**Danach in der App testen:**
+- Mit einem Konto eine Bot-Partie spielen: Auf der Startseite erscheint der Ring „Bauer III · Platz … von 30“. In der
+  Liga steht der Reiter „Gruppe“ mit 30 Plätzen, freie Plätze tragen „KI“.
+- Im Labor ein Rätsel-Duell gegen den KI-Gegner spielen: Nach 10 Sekunden Suche kommt der Gegner.
+- Im Profil „Ich“ erscheint die Visitenkarte mit Start-Banner.
+
+**Rückweg (nur nach einer Sicherung, die Befehle stehen oben in jeder Datei):**
+1. Rätsel-Duell: `raetsel-duell-zurueck.sql`, danach unter **Edge Functions** `raetsel-duell` löschen.
+2. Karte: `karte-zurueck.sql`.
+3. Zähler: `zaehler-zurueck.sql`.
+4. Liga: `kronen-zurueck.sql`.
+5. `daten-schema.sql` noch einmal ausführen (die Datenauskunft lässt die fehlenden Teile dann leer).
+
+Immer in dieser umgekehrten Reihenfolge. Wichtig: Alle Kronen, Gruppen, Banner, Taler und Duelle sind danach weg.
+
+**Datenauskunft vollständig (09.11.2026, vorbereitet, noch nicht eingespielt):** `daten-schema.sql` gibt jetzt auch
+Frag den Coach (Fragen je Tag), den Schulmodus (geleitete Klassen mit Aufgaben, eigene Mitgliedschaften mit Fortschritt,
+Beitrittsversuche), die Stripe-Ereignisse zum eigenen Abo und die Editions-Ereignisse zu eigenen Reservierungen aus.
+Einspielen: `daten-schema.sql` noch einmal ausführen, dann `daten-rls-test.sql` (unten `Daten-RLS-Test erfolgreich`),
+dann `notify pgrst, 'reload schema';`. Rückweg: `daten-auskunft-zurueck.sql` stellt nur die Funktion `meine_daten()`
+auf den alten Stand, Daten gehen dabei keine verloren. Dass keine Tabelle fehlt, prüft `tests/server-daten.test.mjs`
+im CI-Job `sql`: Eine neue Tabelle macht ihn rot, bis sie in der Auskunft oder mit Grund in `KEIN_KONTOBEZUG` steht.
+
+---
+
 # Supabase für „Konto light“ einrichten
 
 Diese Schritte passieren im Supabase-Dashboard. Menübezeichnungen können nach einem Dashboard-Update leicht anders
@@ -211,8 +292,9 @@ ihre Daten herunterladen und ihr Konto selbst löschen.
      Archiv, Nutzung, Widerruf, Online-Partien falls eingespielt, Anmeldeprotokoll), als JSON. Daraus baut die App die
      Datei „Meine Daten herunterladen“. Seit dem 29.10. auch die eigene Zeile aus `abos` (falls `abo-schema.sql`
      eingespielt ist) und die Werkstatt-Daten (Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstücke, falls
-     `werkstatt-schema.sql` eingespielt ist). Wer `daten-schema.sql` schon früher eingespielt hat, führt die Datei dafür
-     einmal neu aus.
+     `werkstatt-schema.sql` eingespielt ist). Seit dem 06.11. auch die Liga mit Kronen (Stand, Buchungen, Saison-Archiv,
+     Gegnersuche, KI-Belege, falls `kronen-schema.sql` eingespielt ist). Wer `daten-schema.sql` schon früher eingespielt
+     hat, führt die Datei dafür einmal neu aus.
    - Funktion `freigabe_widerrufen()`: Die App ruft sie beim Ausschalten des Schalters. Sie löscht Archiv und Nutzung des
      Aufrufers und merkt sich den Zeitpunkt in `freigabe_widerrufe` (für Nutzer nicht direkt lesbar).
    - Mengenbremse: Ein Konto kann höchstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden schreiben (Trigger,
@@ -245,6 +327,183 @@ sehen nur Benutzername, Wochenpunkte und Partienzahl, nie die E-Mail. Eine abgel
 (auch nach Zurückziehen), höchstens 100 Freunde und offene Anfragen je Konto, höchstens 20 neue Anfragen am Tag. Ein
 Einladungslink gilt 7 Tage, ein neuer ersetzt den alten. Die Wochenwertung sinkt nie und hat grobe Grenzen (höchstens
 1000 Partien, je Partie höchstens 100.000 Punkte). Mit dem Konto verschwindet alles.
+
+## Liga mit Kronen (Stand 07.11.2026, Wochen-Gruppen)
+
+Die Liga mit Kronen (Ring auf der Startseite, Reiter „Gruppe“ in der Liga, gewertete Gegnersuche in der Lobby, Kronen
+für Online-, KI- und Bot-Partien, Start-Liga aus der vorhandenen Elo) braucht `supabase/kronen-schema.sql`. Ohne die
+Datei zeigt die App mit Konto keinen Kronen-Stand und keine Gruppe vom Server, und „Gewertet“ in der Lobby endet mit
+einer Fehlermeldung. Alles andere läuft weiter, die lokale Liga ebenso.
+
+**So funktioniert die Liga seit dem 07.11.2026:** 18 Stufen, die Ligen heißen wie Figuren (Bauer, Springer, Läufer,
+Turm, Dame, König, je III, II, I). Jede Woche (Montag bis Sonntag 24 Uhr, Europe/Berlin) spielt man in einer Gruppe mit
+30 Plätzen derselben Stufe. In die Gruppe kommt man mit der ersten Partie der Woche, die Kronen bringt. Freie Plätze
+füllen Computer-Gegner, in der App mit „KI“ gekennzeichnet; sie stehen nicht als Zeilen in der Datenbank, sondern
+werden aus einer Zufallszahl der Gruppe berechnet. Nach der Woche steigen Platz 1 bis 5 eine Stufe auf (höchstens
+König I), die letzten 5 eine ab (nie unter Bauer III). Jeder Platz bis 20 bekommt eine Belohnung (Platz 1 ein Banner,
+danach Taler); der Server merkt sie sich, ausgezahlt wird später mit dem Shop. Eine Saison über vier Wochen gibt es
+nicht mehr.
+
+**Abrechnung ohne Zeitplan:** Die Woche rechnet sich beim nächsten Aufruf selbst ab (`liga_abrechnen()`, bei jeder
+Buchung und jedem Blick auf Stand oder Gruppe). Es braucht kein `pg_cron`, keinen Zeitplan und keine Edge Function.
+
+**Aufbewahrung (Flo 08.11.2026):** Am Ende jeder Wochen-Abrechnung löscht `liga_alte_wochen_loeschen()` die
+Wochen-Gruppen, Plätze und Belohnungen von Wochen, die mehr als 52 Wochen zurückliegen (auch nicht ausgezahlte Taler).
+Vorher bekommt jedes betroffene Konto seine Liga-Erfolge und noch offenen Banner aus diesen Wochen gutgeschrieben (wenn
+`karte-schema.sql` eingespielt ist). Stufe, Kronen-Summe, Elo und die Buchungen bleiben bis zur Kontolöschung. Ist
+`pg_cron` eingeschaltet, läuft das zusätzlich jeden Tag um 03:17 Uhr (UTC) als Job `liga-alte-wochen-loeschen`; ohne
+`pg_cron` reicht die Abrechnung. Wer Cron erst später einschaltet, führt `kronen-schema.sql` danach noch einmal aus.
+
+1. Vorher muss das Online-Schema eingerichtet sein, in der Reihenfolge aus „Online gegen Freunde“ und „Anti-Cheat
+   Etappe 1a“ (zuerst die Edge Function, dann das SQL). Die Kronen-Datei hängt an die Tabelle `partien_online` die
+   Spalte `gewertet` und einen Trigger an. Für die Namen in der Gruppe sollte auch `supabase/schema.sql` (Tabelle `profile` mit den Benutzernamen)
+   eingespielt sein; ohne es zeigt die App „Spieler“.
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/kronen-schema.sql` einfügen
+   und **Run** drücken. Die Datei darf mehrfach laufen.
+3. Prüfen: den ganzen Inhalt von `supabase/kronen-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler beginnt
+   mit `FEHLER:`), der Lauf endet mit `ROLLBACK`, es bleibt nichts zurück.
+4. Tageszähler (gebaut, aber aus): danach `supabase/zaehler-schema.sql` einspielen und mit
+   `supabase/zaehler-rls-test.sql` prüfen (ebenfalls Rollback am Ende).
+5. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch den
+   Kronen-Stand, alle Kronen-Buchungen, die eigenen Wochen-Gruppen (Woche, Stufe, eigene Kronen, ohne die anderen
+   Mitglieder), die gemerkten Belohnungen, eine laufende Gegnersuche und die KI-Belege. Die Tageszähler haben keinen
+   Personenbezug und stehen dort nicht.
+
+Einen Saisonstart muss niemand mehr setzen: Die erste Woche beginnt mit der ersten Partie nach dem Einspielen.
+
+**Was der Server sicherstellt:** Die Tabellen sind nur über die Funktionen erreichbar (keine direkten Rechte, kein
+Zugang für anon). Kronen gibt nur der Server, je Partie und Beleg höchstens einmal; jede Gruppe wird genau einmal
+abgerechnet, jede Belohnung genau einmal gemerkt. Eine Gruppe hat nie mehr als 30 Menschen. Die Wochen-Kronen fallen
+nie unter 0. Online zählen nur gewertete Partien aus der Gegnersuche (Freundes-Partien über Einladungscode nicht),
+nicht unter 4 Halbzügen und höchstens 3 am Tag gegen denselben Gegner. Bot-Leiter höchstens 10, KI-Gegner höchstens 20
+Ergebnisse am Tag (Europe/Berlin); ein KI-Ergebnis zählt nur mit einem eigenen Suchbeleg, frühestens 60 Sekunden nach
+der Ausgabe. **Schummel-Schutz:** Bot- und KI-Ergebnisse meldet das Gerät selbst, deshalb bringen sie zusammen
+höchstens 300 Kronen je Woche und Konto (`bot_ki_wochen_max`, KI-Rätsel-Duelle zählen mit); ab Montag ist der Deckel
+wieder frei, Online-Kronen und Rätsel-Duelle gegen Menschen zählen nie dagegen. Die Start-Liga (Stufe III der Liga zur Elo, höchstens Läufer III, egal welche Elo das Gerät
+meldet) gilt einmal je Konto und nur vor der
+ersten Partie mit Kronen. Andere sehen in der Gruppe nur Benutzername und Kronen, nie eine Kennung oder E-Mail. Mit dem
+Konto verschwindet alles.
+
+**Zähler:** `kronen_schalter.zaehler_an` bleibt `false`. Erst einschalten nach der Rechtsprüfung (§ 25 TDDDG, DSGVO)
+und mit einem Absatz in der Datenschutzerklärung.
+
+**Rückweg:** `supabase/kronen-zurueck.sql` entfernt alles wieder, auch die Zähler und die Wochen-Gruppen. Achtung: Alle
+Kronen-Stände, Buchungen, Gruppen und gemerkten Belohnungen sind danach weg. Nur nach einer Sicherung ausführen (die
+Befehle dafür stehen oben in der Datei).
+
+## Visitenkarte, Erfolge und Taler (Stand 07.11.2026)
+
+Die Visitenkarte (Banner, Profilbild, Name, Titel, Kronen-Stufe, drei ausgestellte Erfolge) steht im Profil „Ich“, im
+Moment „Gegner gefunden“ der Lobby und in den Spielerleisten. Die Erfolge haben jetzt je drei Stufen (Bronze, Silber,
+Gold); jede Stufe zahlt Taler, Gold schaltet einen Titel oder ein Banner frei. Ohne Konto bleibt alles auf dem Gerät.
+Mit Konto braucht es `supabase/karte-schema.sql`. Fehlt die Datei, läuft die App wie bisher, nur sieht der Gegner in einer
+Online-Partie keine Karte (dann steht dort „Gegner“ mit dem Start-Banner).
+
+1. Vorher müssen `schema.sql` (Profil mit Benutzername), das Online-Schema und `kronen-schema.sql` eingespielt sein
+   (Abschnitt „Liga mit Kronen“ oben). Die Karte liest den Benutzernamen, die Online-Partien und die Kronen.
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/karte-schema.sql` einfügen und
+   **Run** drücken. Die Datei darf mehrfach laufen.
+3. Prüfen: den ganzen Inhalt von `supabase/karte-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler beginnt
+   mit `FEHLER:`), unten steht die Meldung `Karte-RLS-Test erfolgreich`, der Lauf endet mit `ROLLBACK`, es bleibt nichts
+   zurück.
+4. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch die
+   Erfolgs-Stufen, alle Taler-Buchungen, die eigenen Banner und die gewählte Karte (Schlüssel `karte`).
+5. **Vor dem Live-Gang nach main:** die Datenschutzerklärung prüfen. Im selben Stand steht ein markierter Entwurf
+   (`datenschutz.html`, `datenschutz-en.html`, Abschnitt „Visitenkarte“): Benutzername, Titel, Banner, Profilbild,
+   Kronen-Stufe und die ausgestellten Erfolge sieht der Gegner einer gemeinsamen Online-Partie.
+
+**Was der Server sicherstellt:** Die vier Tabellen sind nur über die Funktionen erreichbar (keine direkten Rechte, kein
+Zugang für anon). Das Gerät meldet nur, welche Stufe es erreicht hat; der Server bucht jede Stufe genau einmal und der
+Reihe nach (Silber nur nach Bronze), zahlt die Taler dabei aus und schreibt bei Gold das Gold-Banner gut. Die Liga-Erfolge
+meldet niemand: die leitet der Server selbst aus der Liga-Stufe und den Wochen-Gruppen ab. Liga-Banner (Platz 1 der
+Wochen-Gruppe, erster Aufstieg in eine Liga, Konzept 5a) schreibt nur der Server gut: die Wochen-Abrechnung ruft
+`karte_liga_banner_nachtragen` auf, die über `karte_banner_gutschreiben` das Banner der Liga bucht (Bauer bis König =
+Holz bis Krone). Banner aus Wochen, die vor dem Einspielen dieser Datei abgerechnet wurden, kommen beim nächsten Blick auf
+die Karte nach. Das Gerät darf keine dieser Funktionen aufrufen. Titel, Profilbild,
+Hintergrund und Rahmen kommen nur aus festen Listen (kein Freitext, keine Stücke des Erfinders, keine Labor-Rahmen), ein
+Banner nur aus dem eigenen Besitz. Die Karte eines Spielers bekommt nur, wer mit ihm in derselben Online-Partie sitzt.
+Erfolge, Titel und Banner kann man nie kaufen: kein Kauf und kein Abo führt dorthin. Mit dem Konto verschwindet alles.
+
+**Bekannte Grenze:** Die Stufen aus Bot-Partien, Rätseln, Serie und Level rechnet das Gerät. Ein Spieler, der seinen
+Spielstand von Hand fälscht, kann sich diese Stufen also melden. Der Schaden bleibt klein: Taler kaufen später nur
+Erspielbares, und Liga-Stufen und Liga-Banner bucht allein der Server. Eine Tagesgrenze gibt es bewusst nicht, weil es
+insgesamt nur 30 Stufen gibt. Dasselbe gilt für Titel: der Server prüft nur, dass der Titel aus der festen Liste stammt,
+nicht ob der Spieler ihn erspielt hat (Titel hängen an Level und Erfolgen, die das Gerät rechnet). Ein Schummler kann
+also einen Titel aus der Liste zeigen, den er nicht hat; Freitext ist ausgeschlossen.
+
+**Rückweg:** `supabase/karte-zurueck.sql` entfernt alles wieder. Achtung: gebuchte Stufen, Taler, Banner und die
+gewählten Karten sind danach weg (die Liga-Stufen leitet der Server beim nächsten Aufruf neu ab, die übrigen Stufen
+meldet das Gerät neu, gutgeschriebene Liga-Banner sind ohne Sicherung weg). Nur nach einer Sicherung ausführen (die Befehle dafür stehen oben in der Datei).
+
+## Rätsel-Duell (Stand 07.11.2026)
+
+Das Rätsel-Duell (Lobby-Karte „Rätsel-Duell“, vorerst nur im Labor) braucht drei SQL-Dateien und die Edge Function
+`raetsel-duell`. Ohne sie sagt die App beim Suchen oder Beitreten „Das ging gerade nicht …“ bzw. „Das Rätsel-Duell ist
+auf dem Server noch nicht eingerichtet.“; alles andere läuft weiter.
+
+**Für Flo, genau in dieser Reihenfolge:**
+
+1. Vorher muss die Liga mit Kronen eingerichtet sein (Abschnitt oben). **`supabase/kronen-schema.sql` noch einmal
+   ausführen:** Die Datei lässt jetzt auch die Kronen-Quellen `duell` und `duell_ki` zu und kennt deren Werte.
+2. **Zeitplaner einschalten (pg_cron), VOR Schritt 3:** Im Supabase-Dashboard links auf **Integrations** → **Cron** →
+   einschalten (englisch „Enable“). Ältere Dashboards haben das unter **Database** → **Extensions**: dort nach
+   `pg_cron` suchen und den Schalter umlegen. Wozu: Alle 10 Minuten wertet der Server dann jedes Duell aus, dessen
+   Zeit um ist. So entgeht niemand einer Niederlage, nur weil er die App zumacht.
+   - **Verfügbar im kostenlosen Tarif?** Nicht amtlich belegt. Die Supabase-Doku (https://supabase.com/docs/guides/cron
+     und https://supabase.com/docs/guides/cron/install, abgerufen 07.11.2026, 22 Uhr) beschreibt nur den Weg „Cron
+     Postgres Module unter Integrations, dann die Erweiterung `pg_cron` einschalten“ und nennt keinen Tarif, weder
+     als Grenze noch als Zusage. Sie empfiehlt höchstens 8 gleichzeitige Jobs und höchstens 10 Minuten je Lauf; das
+     Duell braucht einen Job mit einem kurzen Lauf. Prüfen: Lässt sich der Schalter umlegen, geht es. Achtung: Ein
+     kostenloses Projekt, das Supabase wegen Inaktivität pausiert, pausiert auch seine Cron-Läufe.
+   - **Geht es nicht:** einfach weitermachen. Dann werten weiterhin Abfrage, Suche, Einladung und Beitritt aus; nur wer
+     nie wieder ein Duell anfängt, behält eine vermiedene Niederlage. Ausweg ohne pg_cron (nicht gebaut): ein
+     geplanter GitHub-Actions-Lauf, der eine kleine Edge Function aufruft.
+   - Wer Cron erst nach Schritt 3 einschaltet, führt Schritt 3 danach einfach noch einmal aus.
+3. **SQL Editor** → **New query** → den ganzen Inhalt von `supabase/raetsel-duell-schema.sql` → **Run**. Die Datei darf
+   mehrfach laufen. Die Datei meldet per `raise notice`, ob sie den Server-Lauf eingeplant hat; der SQL Editor zeigt
+   solche Meldungen aber meist nicht an. Darum prüfen mit Cron: `select jobname, schedule from cron.job;` zeigt
+   `raetsel-duell-auswerten` mit `*/10 * * * *`. Ob die Läufe klappen, zeigt
+   `select status, start_time from cron.job_run_details order by start_time desc limit 5;` (Status `succeeded`).
+4. Den ganzen Inhalt von `supabase/raetsel-duell-daten.sql` ausführen: rund 3.000 Rätsel aus der Lichess-Datenbank
+   (CC0, Quelle und Abrufdatum stehen oben in der Datei). Wiederholbar, doppelte Rätsel werden übersprungen. Die Datei
+   ist 464.528 Byte groß. Eine amtliche Grenze für den SQL Editor nennt die Supabase-Doku nicht; ein Supabase-Mitarbeiter
+   nannte 2022 eine Grenze von 1 MB je Anfrage (https://github.com/supabase/cli/issues/274), die Datei liegt darunter.
+   Lehnt der Editor sie trotzdem ab: Sie besteht aus 7 eigenständigen Blöcken (je 500 Rätsel, der letzte 40), jeder
+   beginnt mit `insert into public.duell_raetsel` und endet mit `on conflict (id) do nothing;`. Dann die Blöcke einzeln
+   einfügen und ausführen; ein doppelt ausgeführter Block schadet nicht.
+   Prüfen: `select count(*) from public.duell_raetsel;` muss 3040 ergeben.
+5. **Edge Function hochladen:** die Befehle unter „Schritt 7 im Terminal“ ganz oben (wie `online-zug`: keine Secrets
+   nötig, chess.js 1.4.0 holt Supabase selbst; weist schon das Gateway das Token ab, mit `--no-verify-jwt` neu
+   hochladen, die Function prüft die Anmeldung selbst).
+6. Prüfen: den ganzen Inhalt von `supabase/raetsel-duell-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler
+   beginnt mit `FEHLER:`), der Lauf endet mit `ROLLBACK`, es bleibt nichts zurück. Der Test prüft die Function nicht:
+   Unter **Edge Functions** muss `raetsel-duell` stehen.
+7. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch die
+   eigenen Duelle und eine laufende Duell-Suche (ohne die Rätsel-Folge eines laufenden Duells).
+8. Falls die App danach „noch nicht eingerichtet“ sagt: im SQL Editor einmal `notify pgrst, 'reload schema';`.
+9. **Testen:** im Labor mit zwei Konten „Mit einem Freund“ (Einladung und Code), dann „Gegner suchen“ allein: nach
+   10 Sekunden kommt der KI-Gegner. Unter **Edge Functions > raetsel-duell > Logs** stehen nur kurze Zeilen ohne Namen
+   oder Züge.
+
+**Was der Server sicherstellt:** Das Gerät schickt nur „Duell und Zug“. Rätsel-Folge, Zeit, 5 Sekunden Abzug je
+falschem Zug, die Ergebnisse des KI-Gegners und die Wertung rechnet der Server; die Lösungen verlassen ihn nie, das Gerät
+sieht nur das aktuelle Rätsel. Ein Zug nach dem eigenen Ende zählt nicht, zwei gleichzeitige Züge laufen nacheinander.
+Ausgewertet wird 3 Sekunden nach dem Ende, damit ein rechtzeitig abgeschickter Zug noch ankommt. Wer ein verlorenes
+Duell liegen lässt und nicht mehr abfragt, wird mit eingeschaltetem Cron nach spätestens gut 10 Minuten gewertet,
+sonst spätestens bei seiner nächsten Suche, Einladung oder seinem nächsten Beitritt.
+Kronen: gegen einen Menschen +30 / +10 / −15, gegen den KI-Gegner +20 / +5 / −10, je Duell und Konto höchstens einmal,
+höchstens 20 KI-Duelle am Tag und 3 gewertete Duelle am Tag gegen dieselbe Person, ohne einen eigenen Zug keine Kronen.
+Gewinne aus KI-Duellen zählen zum Wochen-Deckel von 300 Kronen für Bot und KI (Abschnitt „Liga mit Kronen“), Duelle
+gegen Menschen nicht.
+Freundschaft per Code bringt keine Kronen; höchstens 5 offene Einladungen, höchstens 20 falsche Codes am Tag. Den
+KI-Gegner legt nur der Server an, und erst nach 10 Sekunden echter Suche. Mit dem Konto verschwindet alles.
+
+**Ehrliche Grenze:** Wer nebenher eine Engine oder die öffentliche Lichess-Datenbank befragt, findet die Lösungen. Das
+kann kein Server verhindern; die Regeln oben begrenzen nur, wie viele Kronen so jemand holen kann.
+
+**Rückweg:** `supabase/raetsel-duell-zurueck.sql` plant zuerst den Server-Lauf aus (falls Cron an ist) und entfernt
+dann alle Duelle, Duell-Rätsel und Duell-Funktionen. Cron selbst bleibt eingeschaltet, das stört nicht. Schon
+gebuchte Kronen aus Duellen bleiben stehen. Die Function danach im Dashboard unter **Edge Functions** löschen.
 
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 

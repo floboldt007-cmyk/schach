@@ -37,7 +37,7 @@ export const GROESSEN = [['handy-klein', 375, 667], ['handy', 390, 844], ['handy
   // iPad quer im Browser mit Leisten (Flos Foto 30.10.: 1000 x 590 nutzbar)
   ['ipad-browser', 1000, 590], ['pc', 1440, 900]];
 export const ZIELE = [
-  ['arena', 'arena', {}], ['partie', 'partie', { botId: 'benno' }], ['zuzweit', 'partie', { modus: 'zuzweit' }],
+  ['heim', 'heim', {}], ['arena', 'arena', {}], ['partie', 'partie', { botId: 'benno' }], ['zuzweit', 'partie', { modus: 'zuzweit' }],
   ['verlauf', 'verlauf', {}], ['einstellungen', 'einstellungen', {}], ['training', 'training', {}],
   ['bestenliste-ich', 'bestenliste', { reiter: 'ich' }], ['bestenliste-bots', 'bestenliste', { reiter: 'bots' }],
   ['bestenliste-freunde', 'bestenliste', { reiter: 'freunde' }], ['ich', 'ich', {}], ['start', 'start', {}],
@@ -52,7 +52,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { if ((await fetch(url)).ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);

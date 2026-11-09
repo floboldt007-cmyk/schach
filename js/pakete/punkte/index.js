@@ -13,7 +13,7 @@
 //          speicher:zurueckgesetzt.
 // Sendet:  punkte:geaendert { punkte, platz, tafel, rekord } je bewerteter Partie; rekord:neu { tafel, wert, vorher, platz,
 //          fenster: 'allzeit', partieId } bei einem neuen eigenen Allzeit-Rekord auf einer Tafel.
-// Orte:    ergebnis:abrechnung 10 (Zeile PUNKTE), bestenliste:reiter Ich 10, Bots 20, Freunde 50, arena:panel-bot 40
+// Orte:    ergebnis:abrechnung 10 (Zeile PUNKTE), bestenliste:reiter Freunde 8, Ich 10, Bots 20 (Gruppe 5 aus dem Paket liga), arena:panel-bot 40
 //          (Tafel des gewaehlten Bots mit Bestwert, Antippen oeffnet sie).
 // Feier:   bot-rekord (gross 78) "Platz 1 auf ... Tafel", wenn dabei Gaeste hinter dir landen (stand vorher ein Bot-Lauf
 //          vorn, sagt dieser Bot einen Satz, 3.13); tafel-rekord (gross 70, eigene Quelle wie "Eigener Allzeit-Rekord" in
@@ -421,8 +421,9 @@ function registriere() {
   anbieten('arena:panel-bot', (k) => sicher(() => anbieterPanel(k), 'Panel'), { reihenfolge: 40, paket: PAKET });
   anbieten('bestenliste:reiter', anbieterReiter('ich', B.reiterIch), { reihenfolge: 10, paket: PAKET });
   anbieten('bestenliste:reiter', anbieterReiter('bots', B.reiterBots), { reihenfolge: 20, paket: PAKET });
-  // Freunde mit Konto (Entwurf "Bestenliste", 30.10.2026): Rangliste nach Wochenwertung, darunter die Codes ohne Konto
-  anbieten('bestenliste:reiter', anbieterReiter('freunde', FK.reiterFreunde), { reihenfolge: 50, paket: PAKET });
+  // Freunde mit Konto (Entwurf "Bestenliste", 30.10.2026): Rangliste nach Wochenwertung, darunter die Codes ohne Konto;
+  // seit 07.11.2026 zweiter Reiter direkt hinter der Gruppe (Paket liga, 5)
+  anbieten('bestenliste:reiter', anbieterReiter('freunde', FK.reiterFreunde), { reihenfolge: 8, paket: PAKET });
 
   if (TEST && typeof window !== 'undefined') {
     window.__punkte = { stand: () => S.lade(), speichere: (st) => S.speichere(st), umzug, ladeBotLaeufe, fastZeigen, S, T, C, F };

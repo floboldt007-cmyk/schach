@@ -663,6 +663,8 @@ export class Brett {
     el.removeEventListener('contextmenu', this._h.kontext);
     el.removeEventListener('pointerleave', this._h.verlassen);
     document.removeEventListener('keydown', this._h.taste);
+    window.removeEventListener('resize', this._h.verwerfeRechteck);
+    window.removeEventListener('scroll', this._h.verwerfeRechteck, { capture: true });
     el.innerHTML = '';
     el.style.removeProperty('--brett-dauer');
     el.classList.remove('brett', 'zieht', 'greifbar', 'ohne-koordinaten', 'koord-rand', 'malt');
@@ -730,7 +732,10 @@ export class Brett {
       wahlRunter: (e) => this._wahlRunter(e),
       wahlHoch: (e) => this._wahlHoch(e),
       wahlKlick: (e) => this._wahlKlick(e),
+      verwerfeRechteck: () => { this._rechteck = null; },
     };
+    window.addEventListener('resize', this._h.verwerfeRechteck);
+    window.addEventListener('scroll', this._h.verwerfeRechteck, { capture: true, passive: true });
     el.addEventListener('pointerdown', this._h.runter);
     el.addEventListener('pointermove', this._h.bewege);
     el.addEventListener('pointerup', this._h.hoch);
@@ -784,8 +789,19 @@ export class Brett {
     return this.ausrichtung === 'w' ? DATEIEN[spalte] + (8 - zeile) : DATEIEN[7 - spalte] + (zeile + 1);
   }
 
-  _feldAusPunkt(x, y) {
+  // Lage des Bretts auf dem Bildschirm. Waehrend eine Figur gezogen wird, gilt das beim Anheben gemessene Rechteck:
+  // jede Fingerbewegung (iPad bis 120 pro Sekunde) neu zu messen, zwingt den Browser nach jedem transform zu einer
+  // Stil-Neuberechnung. Groessenaenderung und Scrollen verwerfen das gemerkte Rechteck.
+  _brettRechteck() {
+    if (this._rechteck && this._geste && this._geste.zieht) return this._rechteck;
+    this._rechteck = null;
     const r = this._felderEl.getBoundingClientRect();
+    if (this._geste && this._geste.zieht) this._rechteck = r;
+    return r;
+  }
+
+  _feldAusPunkt(x, y) {
+    const r = this._brettRechteck();
     if (!r.width) return null;
     return this._feldAus(Math.floor((x - r.left) / r.width * 8), Math.floor((y - r.top) / r.height * 8));
   }
@@ -1397,19 +1413,16 @@ export class Brett {
       g.skala = Number.isFinite(wunsch) && wunsch > 0 ? wunsch : (g.typ === 'mouse' ? 1 : 1.35);
     }
     e.preventDefault();
-    const r = this._felderEl.getBoundingClientRect();
+    const r = this._brettRechteck();
     const s = r.width / 8;
     const f = this._feldAusPunkt(e.clientX, e.clientY);
     const ueber = f && f !== g.von && this._zieleVon(g.von).has(f) ? f : null;
-    // Touchmove-Ereignisse koennen auf iPadOS bei schneller Bewegung einen Frame hinterherhinken.
-    // Ueber einem gueltigen Ziel bleibt die Vorschau deshalb mittig unter diesem Feld statt sichtbar nachzulaufen.
-    const [spalte, zeile] = ueber && g.typ !== 'mouse' ? this._spalteZeile(ueber) : [null, null];
-    const x = spalte == null ? e.clientX : r.left + (spalte + 0.5) * s;
-    const y = zeile == null ? e.clientY : r.top + (zeile + 0.5) * s;
+    // Die Figur folgt immer dem Finger; ein erlaubtes Ziel zeigt nur die Markierung "ueber". Frueher rastete die Figur
+    // ueber jedem Ziel mittig ein und huepfte beim Ziehen ueber mehrere Felder von Feld zu Feld (wirkte wie Ruckeln).
     // Versatz zur Ruhelage der Figur (ihr Startfeld); Vergroesserung im selben transform (die CSS-Eigenschaft
     // scale wuerde den Versatz mitskalieren)
-    const tx = x - r.left - s / 2 - g.ursprung[0] * s;
-    const ty = y - r.top - s / 2 - g.ursprung[1] * s;
+    const tx = e.clientX - r.left - s / 2 - g.ursprung[0] * s;
+    const ty = e.clientY - r.top - s / 2 - g.ursprung[1] * s;
     g.el.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${g.skala})`;
     if (ueber !== this._ueber) {
       this._ueber = ueber;

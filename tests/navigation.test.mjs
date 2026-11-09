@@ -51,8 +51,11 @@ function nodeTeil() {
   const app = lies('js/app.js');
   const paketScreens = (app.match(/const PAKET_SCREENS = new Set\(\[([^\]]*)\]\)/) || [])[1] || '';
   pruefe('training ist Kern-Screen (nicht mehr in PAKET_SCREENS), start bleibt Paket-Screen', !/'training'/.test(paketScreens) && /'start'/.test(paketScreens), paketScreens);
-  pruefe('Zwischenreiter Verlauf in REITER_ALLE, verschwindet mit ich', /\['verlauf', 'Verlauf', 'verlauf'\]/.test(app) && /if \(aus\.has\('ich'\)\) aus\.delete\('verlauf'\)/.test(app));
-  pruefe('Lage nach D5: Querformat ab 1021 px oben', /min-width: 1021px\) and \(orientation: landscape\)/.test(app));
+  pruefe('Reiter nach Konzept 2026-11-06: Start, Bots, Liga, Ich (Training und Verlauf sind keine Reiter mehr)',
+    /const REITER_ALLE = \[\['heim', 'Start', 'haus'\], \['arena', 'Bots', 'pokal'\], \['bestenliste', 'Liga', 'liga'\], \['ich', 'Ich', 'person'\]\]/.test(app));
+  pruefe('Seitenleiste im Querformat ab 1021 px', /min-width: 1021px\) and \(orientation: landscape\)/.test(app) && /'seite'/.test(app));
+  pruefe('Icon liga (Kronen-Umriss) fuer den Liga-Reiter', iconNamen().includes('liga') && !/fill="currentColor"/.test(icon('liga')));
+  pruefe('erweiterungen.js: REITER bestenliste und ich', /export const REITER = Object\.freeze\(\['bestenliste', 'ich'\]\)/.test(lies('js/erweiterungen.js')));
   pruefe('Pille misst ueber einen ResizeObserver', /new ResizeObserver/.test(app));
 
   gruppe = 'CSS';
@@ -67,6 +70,8 @@ function nodeTeil() {
   const nav = lies('css/navigation.css');
   pruefe('Glas nur fuer die Reiter-Pille, mit -webkit- und Ersatz ohne backdrop-filter', /-webkit-backdrop-filter: var\(--glas-filter\)/.test(nav)
     && /@supports not/.test(nav) && (lies('css/bauteile.css') + lies('css/training.css')).indexOf('backdrop-filter') < 0);
+  const ersatz = (nav.match(/@supports not \(\(backdrop-filter[^{]*\{([\s\S]*?\}\s*)\}/) || [])[1] || '';
+  pruefe('ohne backdrop-filter: Leiste deckend (--flaeche)', /\.reiter-leiste[^{]*\{[^}]*background(-color)?: var\(--flaeche\)/.test(ersatz), ersatz.slice(0, 160));
   pruefe('Titel im Kopf ohne Auslassungszeichen', /\.marke-titel \{[^}]*text-overflow: clip/.test(nav) && /\.marke-titel \{[^}]*white-space: nowrap/.test(nav));
 }
 
@@ -86,6 +91,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await warte(150);
@@ -113,28 +119,61 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
   return { kontext, seite, fehler };
 }
 
-// Lage und Masse der Leiste, des Kopfs und der Pille
+// Lage und Masse der Leiste, des Kopfs und der Pille; Farben fuer Kontrast und Akzent (Etappe A: Glas-Leiste)
 const lageMessen = (seite) => seite.evaluate(() => {
   const r = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
   const nav = document.querySelector('.reiter-leiste');
   const aktiv = nav && nav.querySelector('[aria-current="page"]');
   const screen = document.querySelector('#app > .screen');
   const kopf = document.querySelector('#app > .screen .haupt-kopf');
+  const st = nav ? getComputedStyle(nav) : null;
+  // Akzent: die lesbare Goldfassung des Themes (--kt-stark), aufgeloest ueber ein Probe-Element
+  const probe = document.createElement('span');
+  probe.style.color = 'var(--kt-stark)';
+  document.body.append(probe);
+  const akzent = getComputedStyle(probe).color;
+  probe.remove();
   return {
     html: document.documentElement.dataset.reiter || null,
     wurzel: document.documentElement.dataset.reiterWurzel || null,
-    form: document.documentElement.dataset.reiterForm || null,
     sichtbar: !!nav && !nav.hidden && getComputedStyle(nav).display !== 'none',
-    imKopf: !!nav && !!nav.closest('.haupt-kopf .kopf-reiter-platz'),
+    imKopf: !!nav && !!nav.closest('.haupt-kopf'),
     reiter: nav ? [...nav.querySelectorAll('[data-reiter]')].map((b) => b.dataset.reiter + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join() : '',
+    worte: nav ? [...nav.querySelectorAll('.reiter[data-reiter] > span')].map((s) => s.textContent.trim()).join() : '',
     nav: r(nav), aktiv: r(aktiv), pille: r(nav && nav.querySelector('.reiter-pille')), screen: r(screen), kopf: r(kopf),
+    aktivAn: !!aktiv && aktiv.classList.contains('an'), aktivFarbe: aktiv ? getComputedStyle(aktiv).color : null, akzent,
+    nurEinAn: nav ? nav.querySelectorAll('.reiter.an').length === 1 : false,
+    radius: st ? parseFloat(st.borderTopLeftRadius) : 0, filter: st ? (st.backdropFilter || st.webkitBackdropFilter || '') : '',
     kopfUeber: kopf ? kopf.scrollWidth - kopf.clientWidth : null, doc: document.scrollingElement.scrollWidth - innerWidth,
     iw: innerWidth, ih: innerHeight, klasse: nav ? nav.className : '',
     reiterKlein: nav ? [...nav.querySelectorAll('.reiter')].filter((b) => b.getBoundingClientRect().width < 44 || b.getBoundingClientRect().height < 44).length : 0,
   };
 });
 const nah = (a, b, tol = 1.5) => Math.abs(a - b) <= tol;
-const pilleUnterAktivem = (m) => !!m.pille && !!m.aktiv && nah(m.pille.l, m.aktiv.l) && nah(m.pille.w, m.aktiv.w);
+// waagrecht (unten) oder senkrecht (Seitenleiste): die Pille liegt genau hinter dem aktiven Reiter
+const pilleUnterAktivem = (m) => !!m.pille && !!m.aktiv && (m.html === 'seite'
+  ? nah(m.pille.t, m.aktiv.t) && nah(m.pille.h, m.aktiv.h)
+  : nah(m.pille.l, m.aktiv.l) && nah(m.pille.w, m.aktiv.w));
+
+// Kontrast jeder Reiter-Beschriftung gegen die Glasflaeche, wie sie auf dem Seitengrund liegt (Alpha gemischt)
+const kontrasteDerLeiste = (seite) => seite.evaluate(() => {
+  const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+  const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const ueber = (oben, unten) => { const a = oben[3] === undefined ? 1 : oben[3]; return [0, 1, 2].map((i) => oben[i] * a + unten[i] * (1 - a)); };
+  const grund = rgb(getComputedStyle(document.body).backgroundColor);
+  const nav = document.querySelector('.reiter-leiste');
+  let flaeche = ueber(rgb(getComputedStyle(nav).backgroundColor), grund.length >= 3 ? grund : [255, 255, 255]);
+  const pille = nav.querySelector('.reiter-pille');
+  const aus = [];
+  for (const b of nav.querySelectorAll('.reiter')) {
+    let hinten = flaeche;
+    if (b.classList.contains('an') && pille) hinten = ueber(rgb(getComputedStyle(pille).backgroundColor), flaeche);
+    const vorn = rgb(getComputedStyle(b).color);
+    const x = lum(vorn), y = lum(hinten);
+    aus.push({ reiter: b.dataset.reiter, k: Math.round(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)) * 100) / 100 });
+  }
+  return aus;
+});
 
 async function testeLeiste(browser) {
   // ---------- ohne REITER: keine Leiste, kein Abstand ----------
@@ -145,7 +184,7 @@ async function testeLeiste(browser) {
     await seite.waitForSelector('.screen.arena .knoten');
     const m = await lageMessen(seite);
     pruefe('keine Leiste, html ohne data-reiter', !m.sichtbar && !m.html, JSON.stringify({ s: m.sichtbar, h: m.html }));
-    pruefe('kein zusaetzlicher Abstand: Screen so hoch wie das Fenster, Platz im Kopf leer', m.screen.h === m.ih
+    pruefe('kein zusaetzlicher Abstand: Screen so hoch und breit wie das Fenster, Platz im Kopf leer', m.screen.h === m.ih && m.screen.l === 0
       && await seite.evaluate(() => { const p = document.querySelector('.kopf-reiter-platz'); return !!p && p.children.length === 0 && getComputedStyle(p).display === 'none'; }),
     JSON.stringify(m.screen));
     pruefe('Verlauf-Knopf im Kopf sichtbar (Verlauf ist kein Reiter)', await seite.locator('.haupt-kopf [data-aktion="verlauf"]').isVisible());
@@ -153,139 +192,188 @@ async function testeLeiste(browser) {
     await kontext.close();
   }
 
-  // ---------- iPad quer (D5): oben in der Kopfzeile, Arena · Verlauf (D2) ----------
-  gruppe = 'Leiste oben (1180 x 820)';
+  // ---------- Handy-Runde 08.11.: wo bin ich? Leiste und aktiver Reiter je Screen, Seitenname = Kachel- bzw. Reitername ----------
+  gruppe = 'Leiste je Screen (Handy 390)';
   {
-    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820 });
-    await seite.goto(`${BASIS}&reiter=verlauf#arena`);
-    await seite.waitForSelector('.screen.arena .knoten');
-    await warte(300);
-    let m = await lageMessen(seite);
-    pruefe('Lage oben: html[data-reiter="oben"], Leiste in .kopf-reiter-platz des Kopfs', m.html === 'oben' && m.imKopf && m.sichtbar, JSON.stringify({ h: m.html, k: m.imKopf }));
-    pruefe('Reiter Arena (aktiv) und Verlauf (Zwischenreiter, D2)', m.reiter === 'arena*,verlauf', m.reiter);
-    pruefe('Leiste mittig im Kopf wie im Entwurf (Abweichung < 2 px)', Math.abs((m.nav.l + m.nav.r) / 2 - m.iw / 2) < 2, JSON.stringify(m.nav));
-    pruefe('Leiste liegt ganz im Kopf', m.nav.t >= m.kopf.t && m.nav.b <= m.kopf.b + 1, JSON.stringify({ nav: m.nav, kopf: m.kopf }));
-    pruefe('oben: Screen bleibt so hoch wie das Fenster', m.screen.h === m.ih, String(m.screen.h));
-    pruefe('Pille unter dem aktiven Reiter', pilleUnterAktivem(m), JSON.stringify({ p: m.pille, a: m.aktiv }));
-    pruefe('Kopf passt (kein Ueberlauf), Seite ohne waagrechten Ueberlauf', m.kopfUeber <= 0 && m.doc <= 0, JSON.stringify({ k: m.kopfUeber, d: m.doc }));
-    pruefe('Reiter mindestens 44 x 44', m.reiterKlein === 0);
-    pruefe('Verlauf ist Reiter: kein Verlauf-Knopf im Kopf', !(await seite.locator('.haupt-kopf [data-aktion="verlauf"]').isVisible()));
-    // Wechsel: die Pille gleitet zum neuen Reiter. Die Lage unterwegs wird im Bild selbst abgetastet (jedes Bild von der
-    // Berührung bis zum Ende), nicht nur einmal von aussen gemessen: auf einem ausgelasteten Rechner kommt die Messung von
-    // aussen oft erst nach den 520 ms des Gleitens an
-    const vorher = m.pille.l;
-    await seite.evaluate(() => {
-      const s = window.__pilleAbtast = { links: [], an: true };
-      const f = () => { const p = document.querySelector('.reiter-leiste .reiter-pille'); if (p) s.links.push(p.getBoundingClientRect().left); if (s.an) requestAnimationFrame(f); };
-      f();
-    });
-    await seite.locator('.reiter-leiste [data-reiter="verlauf"]').click();
-    await seite.waitForSelector('.screen.vl-screen');
-    const mitten = await lageMessen(seite);
-    await warte(800);
-    m = await lageMessen(seite);
-    const abtast = await seite.evaluate(() => { window.__pilleAbtast.an = false; return window.__pilleAbtast.links; });
-    pruefe('Reiter Verlauf: #verlauf, aktiv, Leiste wieder oben im Kopf des Verlaufs', m.reiter === 'arena,verlauf*' && m.html === 'oben' && m.imKopf
-      && await seite.evaluate(() => location.hash) === '#verlauf', JSON.stringify({ r: m.reiter, h: m.html }));
-    const zwischen = (l) => l > vorher + 1 && l < m.pille.l - 1;
-    pruefe('Pille gleitet (unterwegs zwischen alt und neu, am Ende unter Verlauf)', pilleUnterAktivem(m) && m.pille.l > vorher
-      && (zwischen(mitten.pille.l) || abtast.some(zwischen)), JSON.stringify({ vorher, mitten: mitten.pille && mitten.pille.l, ende: m.pille.l, bilder: abtast.length }));
-    pruefe('auf dem Screen des Reiters: kein Zurueck-Knopf (html[data-reiter-wurzel="ja"])', m.wurzel === 'ja'
-      && !(await seite.locator('.vl-screen .kopf-zurueck').isVisible()));
-    // Drehen: hochkant faehrt die Leiste nach unten
-    await seite.setViewportSize({ width: 820, height: 1180 });
-    await seite.waitForFunction(() => document.documentElement.dataset.reiter === 'unten', null, { timeout: 3000 }).catch(() => {});
-    await warte(200);
-    m = await lageMessen(seite);
-    pruefe('Drehen auf hochkant: Lage unten, Leiste nicht mehr im Kopf, Pille unter Verlauf', m.html === 'unten' && !m.imKopf && pilleUnterAktivem(m),
-      JSON.stringify({ h: m.html, k: m.imKopf }));
-    // unten: eine Meldung steht ueber der Leiste, nicht darauf
-    await seite.evaluate(() => window.__app.meldung('Test-Meldung'));
-    const t = await seite.evaluate(() => ({ t: document.querySelector('.toast').getBoundingClientRect().bottom, n: document.querySelector('.reiter-leiste').getBoundingClientRect().top }));
-    pruefe('unten: Meldung ueber der Leiste', t.t <= t.n, JSON.stringify(t));
-    await seite.setViewportSize({ width: 1180, height: 820 });
-    await seite.waitForFunction(() => document.documentElement.dataset.reiter === 'oben', null, { timeout: 3000 }).catch(() => {});
-    pruefe('zurueck ins Querformat: wieder oben', (await lageMessen(seite)).html === 'oben');
-    // Tastatur: der Fokus folgt auf den neuen Reiter, obwohl die Leiste dabei in den Kopf des neuen Screens umzieht
-    await seite.locator('.reiter-leiste [data-reiter="arena"]').focus();
-    await seite.keyboard.press('Enter');
-    await seite.waitForSelector('.screen.arena .knoten');
-    await warte(100);
-    pruefe('Tastatur: Enter auf einem Reiter, der Fokus liegt danach auf dem neuen aktiven Reiter', await seite.evaluate(() => {
-      const a = document.activeElement;
-      return !!a && a.matches('.reiter-leiste [data-reiter="arena"][aria-current="page"]');
-    }));
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    const stand = async (name, params) => {
+      await seite.evaluate(([n, p]) => window.__app.gehe(n, p), [name, params || {}]);
+      await seite.waitForFunction((n) => document.documentElement.dataset.screen === n, name).catch(() => {});
+      await warte(300);
+      const m = await lageMessen(seite);
+      return { leiste: m.sichtbar && !m.klasse.split(' ').includes('weg'), reiter: m.reiter, h1: await seite.evaluate(() => document.querySelector('#app > .screen .seiten-kopf h1')?.textContent || '') };
+    };
+    let r = await stand('online');
+    pruefe('Online (ohne Partie): Leiste bleibt, Start aktiv, Seite heisst Online', r.leiste && r.reiter.includes('heim*') && r.h1 === 'Online', JSON.stringify(r));
+    r = await stand('online', { partieId: '00000000-0000-4000-8000-000000000001' });
+    pruefe('Online-Partie: keine Leiste (das Brett braucht den Platz)', !r.leiste, JSON.stringify(r));
+    r = await stand('partie', { modus: 'zuzweit' });
+    pruefe('Zu-zweit-Startblatt: Leiste bleibt, Start aktiv', r.leiste && r.reiter.includes('heim*'), JSON.stringify(r));
+    r = await stand('partie', { modus: 'zuzweit', zuzweit: { weiss: 'A', schwarz: 'B' } });
+    pruefe('Zu-zweit-Partie: keine Leiste', !r.leiste, JSON.stringify(r));
+    r = await stand('training');
+    pruefe('Lernen (Kachel auf Start): Seite heisst Lernen, Start aktiv', r.leiste && r.reiter.includes('heim*') && r.h1 === 'Lernen', JSON.stringify(r));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
 
-  // ---------- passt sie oben nicht: enger, ohne Symbole ----------
-  gruppe = 'Leiste oben, vier Reiter';
-  {
-    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820 });
-    await seite.goto(`${BASIS}&reiter=training,bestenliste,ich#arena`);
-    await seite.waitForSelector('.screen.arena .knoten');
-    await warte(300);
+  // ---------- Handy: schwebende Glas-Kapsel unten (Konzept 2026-11-06, Entwurf .dock) ----------
+  for (const schema of ['light', 'dark']) {
+    gruppe = `glas-leiste Handy 390 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true, schema });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen .heim-buehne');
+    await warte(400);
     const m = await lageMessen(seite);
-    pruefe('Arena, Training, Bestenliste, Ich (ohne Verlauf, der gehoert zu Ich)', m.reiter === 'arena*,training,bestenliste,ich', m.reiter);
-    pruefe('passt oben (notfalls enger oder nicht ganz mittig), Kopf ohne Ueberlauf, die zwei Chips ganz sichtbar', m.html === 'oben' && m.kopfUeber <= 0
-      && await seite.evaluate(() => { const c = document.querySelector('.haupt-kopf .kopf-chips'); return c.scrollWidth <= c.clientWidth + 1; }),
-    JSON.stringify({ h: m.html, k: m.klasse }));
+    pruefe('Lage unten, schwebend, nicht im Kopf', m.html === 'unten' && m.sichtbar && !m.imKopf, JSON.stringify({ h: m.html, k: m.imKopf }));
+    pruefe('vier Reiter in der Reihenfolge Start, Bots, Liga, Ich; Start aktiv auf heim', m.reiter === 'heim*,arena,bestenliste,ich' && m.worte === 'Start,Bots,Liga,Ich',
+      `${m.reiter} | ${m.worte}`);
+    pruefe('schwebt: mindestens 12 px ueber dem unteren Rand, seitlich im Bild', m.ih - m.nav.b >= 12 && m.nav.l >= 8 && m.nav.r <= m.iw - 8, JSON.stringify(m.nav));
+    pruefe('Kapsel: Radius mindestens 28 px, backdrop-filter mit Weichzeichner', m.radius >= 28 && /blur/.test(m.filter), JSON.stringify({ r: m.radius, f: m.filter }));
+    pruefe('aktiver Reiter: Klasse an (nur einer), Farbe = Akzent (--kt-stark)', m.aktivAn && m.nurEinAn && m.aktivFarbe === m.akzent, JSON.stringify({ an: m.aktivAn, f: m.aktivFarbe, a: m.akzent }));
+    pruefe('Pille hinter dem aktiven Reiter', pilleUnterAktivem(m), JSON.stringify({ p: m.pille, a: m.aktiv }));
     pruefe('Reiter mindestens 44 x 44', m.reiterKlein === 0);
-    // Verlauf gehoert zu Ich: Leiste sichtbar, Ich aktiv, Zurueck bleibt
+    pruefe('der Screen endet ueber der Leiste (nichts verdeckt)', m.screen.b <= m.nav.t + 0.5, JSON.stringify({ s: m.screen.b, n: m.nav.t }));
+    pruefe('kein waagrechter Ueberlauf, Kopf passt', m.doc <= 0 && m.kopfUeber <= 0, JSON.stringify({ d: m.doc, k: m.kopfUeber }));
+    const k = await kontrasteDerLeiste(seite);
+    pruefe('Beschriftungen lesbar (Kontrast ab 4,5:1 auf dem Glas)', k.every((x) => x.k >= 4.5), JSON.stringify(k));
+    if (schema === 'light') {
+      // Wechsel per Tippen: Bots oeffnet die Arena, dort ist Bots aktiv; die Pille gleitet mit
+      await seite.locator('.reiter-leiste [data-reiter="arena"]').click();
+      await seite.waitForSelector('.screen.arena .knoten');
+      await warte(700);
+      const a = await lageMessen(seite);
+      pruefe('Bots: #arena, Bots aktiv, Pille darunter', a.reiter === 'heim,arena*,bestenliste,ich' && pilleUnterAktivem(a)
+        && await seite.evaluate(() => location.hash) === '#arena', a.reiter);
+      // Schub 2: die Leiste kuerzt die Karte; der gewaehlte Gegner muss trotzdem ganz im Bild sein
+      const g = await seite.evaluate(() => {
+        const kk = document.querySelector('.screen.arena .karte').getBoundingClientRect();
+        const n = document.querySelector('.screen.arena .knoten.gewaehlt').getBoundingClientRect();
+        return { kt: Math.round(kk.top), kb: Math.round(kk.bottom), nt: Math.round(n.top), nb: Math.round(n.bottom) };
+      });
+      pruefe('Arena: gewaehlter Gegner ganz im sichtbaren Teil der Karte', g.nt >= g.kt - 1 && g.nb <= g.kb + 1, JSON.stringify(g));
+      await seite.evaluate(() => window.__app.meldung('Test-Meldung'));
+      const t = await seite.evaluate(() => ({ t: document.querySelector('.toast').getBoundingClientRect().bottom, n: document.querySelector('.reiter-leiste').getBoundingClientRect().top }));
+      pruefe('Meldung ueber der Leiste', t.t <= t.n, JSON.stringify(t));
+    }
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // ---------- kleines Handy: alles im Bild ----------
+  gruppe = 'glas-leiste Handy 375 x 667';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 375, h: 667, handy: true });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#arena`);
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(400);
+    const m = await lageMessen(seite);
+    pruefe('unten, ganz im Bild, Reiter mindestens 44 x 44', m.html === 'unten' && m.nav.l >= 0 && m.nav.r <= m.iw && m.ih - m.nav.b >= 12 && m.reiterKlein === 0, JSON.stringify(m.nav));
+    pruefe('Screen endet ueber der Leiste, kein Ueberlauf', m.screen.b <= m.nav.t + 0.5 && m.doc <= 0 && m.kopfUeber <= 0, JSON.stringify({ s: m.screen, d: m.doc }));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // ---------- ab 1021 px quer: Seitenleiste links (Entwurf ipad-pc-v2 .nav) ----------
+  for (const vp of [{ w: 1180, h: 820 }, { w: 1440, h: 900 }]) {
+    gruppe = `Seitenleiste (${vp.w} x ${vp.h})`;
+    const { kontext, seite, fehler } = await neueSeite(browser, vp);
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#arena`);
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(400);
+    let m = await lageMessen(seite);
+    pruefe('Lage seite: html[data-reiter="seite"], nicht im Kopf, Platz im Kopf leer', m.html === 'seite' && m.sichtbar && !m.imKopf
+      && await seite.evaluate(() => { const p = document.querySelector('.kopf-reiter-platz'); return !p || p.children.length === 0; }), JSON.stringify({ h: m.html, k: m.imKopf }));
+    pruefe('links, 200 bis 240 px breit, ueber die ganze Hoehe', m.nav.l >= 0 && m.nav.l <= 16 && m.nav.w >= 200 && m.nav.w <= 240 && m.nav.h >= m.ih - 40,
+      JSON.stringify(m.nav));
+    pruefe('Reiter untereinander: Start, Bots, Liga, Ich; Bots aktiv', m.reiter === 'heim,arena*,bestenliste,ich' && m.worte === 'Start,Bots,Liga,Ich', `${m.reiter} | ${m.worte}`);
+    pruefe('Screen beginnt rechts der Seitenleiste, volle Hoehe', m.screen.l >= m.nav.r - 0.5 && m.screen.h === m.ih, JSON.stringify({ s: m.screen, n: m.nav }));
+    pruefe('aktiver Reiter: Klasse an, Akzentfarbe, Pille dahinter', m.aktivAn && m.aktivFarbe === m.akzent && pilleUnterAktivem(m), JSON.stringify({ p: m.pille, a: m.aktiv }));
+    pruefe('Reiter mindestens 44 x 44, Kopf passt, kein waagrechter Ueberlauf', m.reiterKlein === 0 && m.kopfUeber <= 0 && m.doc <= 0, JSON.stringify({ k: m.kopfUeber, d: m.doc }));
+    if (vp.w === 1180) {
+      // Pille gleitet senkrecht zum neuen Reiter (im Bild abgetastet, nicht nur einmal von aussen gemessen)
+      const vorher = m.pille.t;
+      await seite.evaluate(() => {
+        const s = window.__pilleAbtast = { oben: [], an: true };
+        const f = () => { const p = document.querySelector('.reiter-leiste .reiter-pille'); if (p) s.oben.push(p.getBoundingClientRect().top); if (s.an) requestAnimationFrame(f); };
+        f();
+      });
+      await seite.locator('.reiter-leiste [data-reiter="heim"]').click();
+      await seite.waitForFunction(() => location.hash === '#heim' && !!document.querySelector('.heim-screen .heim-buehne'), null, { timeout: 10000 }).catch(() => {});
+      await warte(800);
+      m = await lageMessen(seite);
+      const abtast = await seite.evaluate(() => { window.__pilleAbtast.an = false; return window.__pilleAbtast.oben; });
+      const zwischen = (t) => t < vorher - 1 && t > m.pille.t + 1;
+      pruefe('Start: #heim aktiv, Pille gleitet nach oben (unterwegs dazwischen)', m.reiter.includes('heim*') && pilleUnterAktivem(m) && abtast.some(zwischen),
+        JSON.stringify({ vorher, ende: m.pille && m.pille.t, bilder: abtast.length }));
+      // Drehen auf hochkant: unten; zurueck: wieder Seitenleiste
+      await seite.setViewportSize({ width: 820, height: 1180 });
+      await seite.waitForFunction(() => document.documentElement.dataset.reiter === 'unten', null, { timeout: 3000 }).catch(() => {});
+      await warte(300);
+      m = await lageMessen(seite);
+      pruefe('Drehen auf hochkant: unten, Screen wieder volle Breite', m.html === 'unten' && m.screen.l === 0 && pilleUnterAktivem(m), JSON.stringify({ h: m.html, s: m.screen }));
+      await seite.setViewportSize({ width: 1180, height: 820 });
+      await seite.waitForFunction(() => document.documentElement.dataset.reiter === 'seite', null, { timeout: 3000 }).catch(() => {});
+      await warte(300);
+      pruefe('zurueck ins Querformat: wieder Seitenleiste', (await lageMessen(seite)).html === 'seite');
+      // Tastatur: der Fokus folgt auf den neuen Reiter
+      await seite.locator('.reiter-leiste [data-reiter="arena"]').focus();
+      await seite.keyboard.press('Enter');
+      await seite.waitForSelector('.screen.arena .knoten');
+      await warte(100);
+      pruefe('Tastatur: Enter auf Bots, der Fokus liegt danach auf dem neuen aktiven Reiter', await seite.evaluate(() => {
+        const a = document.activeElement;
+        return !!a && a.matches('.reiter-leiste [data-reiter="arena"][aria-current="page"]');
+      }));
+    }
+    for (const schema of ['dark']) {
+      await seite.emulateMedia({ colorScheme: schema });
+      await warte(1200);
+      const k = await kontrasteDerLeiste(seite);
+      pruefe('dunkel: Beschriftungen lesbar (Kontrast ab 4,5:1)', k.every((x) => x.k >= 4.5), JSON.stringify(k));
+    }
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // ---------- Zuordnung: Unterseiten der Startseite und von Ich ----------
+  gruppe = 'Reiter-Zuordnung';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180 });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#training`);
+    await seite.waitForSelector('.screen.training-screen');
+    let m = await lageMessen(seite);
+    pruefe('Training (ueber die Startseite erreichbar): Start aktiv, Zurueck-Knopf da', m.reiter.includes('heim*') && m.wurzel === 'nein'
+      && await seite.locator('.training-screen .kopf-zurueck').isVisible(), JSON.stringify({ r: m.reiter, w: m.wurzel }));
     await seite.evaluate(() => window.__app.gehe('verlauf'));
     await seite.waitForSelector('.screen.vl-screen');
-    const v = await lageMessen(seite);
-    pruefe('Verlauf mit Reiter Ich: Ich aktiv, Zurueck-Knopf da (Unterseite)', v.reiter.includes('ich*') && v.wurzel === 'nein'
-      && await seite.locator('.vl-screen .kopf-zurueck').isVisible(), JSON.stringify({ r: v.reiter, w: v.wurzel }));
+    m = await lageMessen(seite);
+    pruefe('Verlauf gehoert zu Ich: Ich aktiv, Zurueck-Knopf da', m.reiter.includes('ich*') && m.wurzel === 'nein'
+      && await seite.locator('.vl-screen .kopf-zurueck').isVisible(), JSON.stringify({ r: m.reiter, w: m.wurzel }));
+    await seite.evaluate(() => window.__app.gehe('heim'));
+    await seite.waitForSelector('.heim-screen .heim-buehne');
+    m = await lageMessen(seite);
+    pruefe('auf heim: Start aktiv, Wurzel (kein Zurueck)', m.reiter.includes('heim*') && m.wurzel === 'ja' && !(await seite.locator('.heim-screen .kopf-zurueck').isVisible()),
+      JSON.stringify({ r: m.reiter, w: m.wurzel }));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
 
-  // ---------- unten: iPad hoch, Handy, kleines Handy ----------
-  for (const vp of [{ name: 'iPad hoch', w: 820, h: 1180, reiter: 'verlauf' }, { name: 'iPad klein quer', w: 1024, h: 768, reiter: 'verlauf' },
-    { name: 'Handy 390', w: 390, h: 844, reiter: 'verlauf', handy: true }, { name: 'Handy 375 vier Reiter', w: 375, h: 667, reiter: 'training,bestenliste,ich', handy: true }]) {
-    gruppe = `Leiste unten (${vp.name})`;
-    const { kontext, seite, fehler } = await neueSeite(browser, vp);
-    await seite.goto(`${BASIS}&reiter=${vp.reiter}#arena`);
-    await seite.waitForSelector('.screen.arena .knoten');
-    await warte(300);
-    const m = await lageMessen(seite);
-    const oben = vp.w >= 1021 && vp.w > vp.h;
-    pruefe(oben ? 'quer ab 1021 px: oben' : 'Lage unten, schwebend (nicht im Kopf)', oben ? m.html === 'oben' : (m.html === 'unten' && !m.imKopf),
-      JSON.stringify({ h: m.html }));
-    if (!oben) {
-      // Handy (bis 520 px) seit 01.11.2026 naeher am Rand (8 px, Flo: "man muss alles sehen ohne viel scrollen"), sonst 14 px
-      const abstand = vp.w <= 520 ? 8 : 14;
-      pruefe(`schwebt ueber dem Rand (${abstand} px Abstand) und mittig`, nah(m.ih - m.nav.b, abstand, 1) && Math.abs((m.nav.l + m.nav.r) / 2 - m.iw / 2) < 2,
-        JSON.stringify(m.nav));
-      pruefe('der Screen endet ueber der Leiste', m.screen.b <= m.nav.t + 0.5, JSON.stringify({ s: m.screen.b, n: m.nav.t }));
-      // Schub 2: die Leiste kuerzt die Karte erst nach dem ersten Layout; der gewaehlte Gegner muss trotzdem ganz im Bild sein
-      await warte(300);
-      const g = await seite.evaluate(() => {
-        const k = document.querySelector('.screen.arena .karte').getBoundingClientRect();
-        const n = document.querySelector('.screen.arena .knoten.gewaehlt').getBoundingClientRect();
-        return { kt: Math.round(k.top), kb: Math.round(k.bottom), nt: Math.round(n.top), nb: Math.round(n.bottom) };
-      });
-      pruefe('gewaehlter Gegner ganz im sichtbaren Teil der Karte (nicht unter der gekuerzten Kante)', g.nt >= g.kt - 1 && g.nb <= g.kb + 1, JSON.stringify(g));
-    }
-    pruefe('Pille unter dem aktiven Reiter', pilleUnterAktivem(m), JSON.stringify({ p: m.pille, a: m.aktiv }));
-    pruefe('Reiter mindestens 44 x 44, Leiste im Bild', m.reiterKlein === 0 && m.nav.l >= 0 && m.nav.r <= m.iw, JSON.stringify(m.nav));
-    pruefe('kein waagrechter Ueberlauf, Kopf passt', m.doc <= 0 && m.kopfUeber <= 0, JSON.stringify({ d: m.doc, k: m.kopfUeber }));
-    if (vp.reiter.split(',').length > 2 && vp.w < 700) pruefe('vier Reiter auf dem Handy: gestapelt (Symbol ueber dem Wort), volle Breite', m.form === 'gestapelt' && /gestapelt/.test(m.klasse));
-    // Startseite neu (Flo 01.11.2026): auf dem Handy (bis 520 px) steht vorn die Premium-Krone, die Marke bleibt nur fuer
-    // Vorleseprogramme im Dokument; breiter steht der Titel ganz da
-    const titel = await seite.evaluate(() => { const t = document.querySelector('.haupt-kopf .marke-titel'); const b = t.getBoundingClientRect();
-      const k = document.querySelector('.haupt-kopf .kopf-premium').getBoundingClientRect();
-      return { ganz: t.scrollWidth <= t.clientWidth + 1, eineZeile: b.height < 34, ellipse: getComputedStyle(t).textOverflow, text: t.textContent, r: b.right, iw: innerWidth,
-        krone: { l: Math.round(k.left), r: Math.round(k.right), h: Math.round(k.height), w: Math.round(k.width) } }; });
-    if (vp.w <= 520) {
-      pruefe('Handy: Premium-Krone vorn ganz im Bild (mindestens 44 px), Titel „Crownmate“ fuer Vorleser im Dokument',
-        titel.krone.l >= 0 && titel.krone.r <= titel.iw && titel.krone.h >= 44 && titel.krone.w >= 44 && titel.text === 'Crownmate', JSON.stringify(titel));
-    } else {
-      pruefe('Titel „Crownmate“ ganz, einzeilig, ohne Auslassungszeichen, im Bild', titel.ganz && titel.eineZeile && titel.ellipse !== 'ellipsis' && titel.r <= titel.iw,
-        JSON.stringify(titel));
-    }
+  // ---------- ohne backdrop-filter: deckende Flaeche ----------
+  gruppe = 'Leiste ohne Glas';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
+    // Browser ohne backdrop-filter nachstellen: CSS.supports meldet ihn nicht, die @supports-Regel prueft der Node-Teil
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen .heim-buehne');
+    const ersatz = await seite.evaluate(() => {
+      const regeln = [];
+      for (const s of document.styleSheets) { try { for (const r of s.cssRules) if (r.conditionText && /not/.test(r.conditionText) && /backdrop-filter/.test(r.conditionText)) regeln.push(r.cssText); } catch (e) { /* fremd */ } }
+      return regeln.join(' ');
+    });
+    pruefe('@supports not (backdrop-filter): Leiste mit deckender Flaeche (--flaeche)', /\.reiter-leiste\s*\{[^}]*background(-color)?:\s*var\(--flaeche\)/.test(ersatz), ersatz.slice(0, 200));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -294,7 +382,7 @@ async function testeLeiste(browser) {
   gruppe = 'Leiste faehrt weg';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180 });
-    await seite.goto(`${BASIS}&reiter=verlauf#arena`);
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#arena`);
     await seite.waitForSelector('.screen.arena .knoten');
     for (const [ziel, sel] of [['einstellungen', '.screen.es-screen'], ['analyse', '.screen.an-screen'], ['partie', '.screen.partie']]) {
       await seite.evaluate(() => window.__app.gehe('arena', {}, { ersetzen: true }));
@@ -327,7 +415,7 @@ async function testeLeiste(browser) {
   gruppe = 'Leiste ohne Bewegung';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180, bewegung: 'reduce' });
-    await seite.goto(`${BASIS}&reiter=verlauf#arena`);
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#arena`);
     await seite.waitForSelector('.screen.arena .knoten');
     await seite.evaluate(() => window.__app.gehe('einstellungen'));
     await seite.waitForSelector('.screen.es-screen');
@@ -341,13 +429,33 @@ async function testeLeiste(browser) {
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
+  // Kundenblick 09.11. (Befund 9): Zurueck aus der Partie fuehrt dorthin, woher man kam, und der Knopf sagt es
+  gruppe = 'Partie zurueck zur Herkunft';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 664 });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    for (const [von, sel, wort] of [['heim', '.heim-screen', 'Zurück zum Start'], ['arena', '.screen.arena .knoten', 'Zurück zu den Bots']]) {
+      await seite.evaluate((v) => window.__app.gehe(v, {}, { ersetzen: true }), von);
+      await seite.waitForSelector(sel);
+      await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w' }); });
+      await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+      const label = await seite.evaluate(() => document.querySelector('.screen.partie .kopf [data-aktion="zurueck"]').getAttribute('aria-label'));
+      await seite.locator('.screen.partie .kopf [data-aktion="zurueck"]').click();
+      const da = await seite.waitForSelector(sel, { timeout: 5000 }).then(() => true, () => false);
+      pruefe(`von ${von}: der Knopf heisst „${wort}“ und fuehrt ohne Zug dorthin zurueck`, label === wort && da, JSON.stringify({ label, da, screen: await seite.evaluate(() => document.documentElement.dataset.screen) }));
+    }
+    pruefe('keine Konsolenfehler', fehler.filter((f) => !/stockfish|wasm|Engine/i.test(f)).length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
   gruppe = 'Leiste nur im Testmodus';
   {
     const { kontext, seite } = await neueSeite(browser, { w: 820, h: 1180 });
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=verlauf#arena`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=training#arena`);
     await seite.waitForSelector('.screen.arena .knoten');
-    // mit fest eingetragenen REITER gibt es die Leiste, aber ?reiter fuegt nichts hinzu (hier: kein Reiter Verlauf)
-    pruefe('?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste [data-reiter="verlauf"]')));
+    // mit fest eingetragenen REITER gibt es die Leiste mit Start, Bots, Liga, Ich; ?reiter fuegt ohne ?test nichts hinzu
+    pruefe('?reiter ohne ?test bleibt wirkungslos, Leiste aus REITER', await seite.evaluate(() =>
+      [...document.querySelectorAll('.reiter-leiste [data-reiter]')].map((b) => b.dataset.reiter).join()) === 'heim,arena,bestenliste,ich');
     await kontext.close();
   }
 }
@@ -478,13 +586,13 @@ async function testeTraining(browser) {
       leer: !document.querySelector('.training-leer').hidden, gitter: document.querySelector('.training-gitter').hidden,
       h1: document.querySelector('.seiten-kopf h1').textContent, ueber: document.querySelector('.seiten-kopf .ueberzeile').textContent,
       zurueck: !!document.querySelector('.kopf-zurueck') && getComputedStyle(document.querySelector('.kopf-zurueck')).display !== 'none' }));
-    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Training · Crownmate' && !r.platzhalter, JSON.stringify(r));
-    pruefe('Seitenkopf „Üben ohne Druck“ / „Training“, die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Training'
+    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Lernen · Crownmate' && !r.platzhalter, JSON.stringify(r));
+    pruefe('Seitenkopf „Üben ohne Druck“ / „Lernen“ (wie die Kachel auf Start), die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Lernen'
       && await seite.locator('.screen.training-screen h1').count() === 1, JSON.stringify(r));
     pruefe('ohne Anbieter: ruhige Karte, Gitter versteckt; ohne Reiter ein Zurueck-Knopf', r.leer && r.gitter && r.zurueck, JSON.stringify(r));
     await seite.locator('.training-leer [data-aktion="arena"]').click();
     await seite.waitForSelector('.screen.arena .knoten');
-    pruefe('„Zur Arena“ fuehrt in die Arena', await seite.evaluate(() => location.hash) === '#arena');
+    pruefe('„Zu den Bots“ fuehrt zu den Bots', await seite.evaluate(() => location.hash) === '#arena');
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -494,7 +602,7 @@ async function testeTraining(browser) {
     // Genau die drei Test-Anbieter liefern die Karten dieses Layout-Vertrags.
     await seite.route('**/js/erweiterungen.js', r => r.fulfill({ contentType: 'text/javascript', body: 'export const PAKETE = []; export const REITER = [];' }));
     await seite.route('**/js/pakete/nav-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_TRAINING }));
-    await seite.goto(`${BASIS}&erw=pakete/nav-test/index&reiter=training#training`);
+    await seite.goto(`${BASIS}&erw=pakete/nav-test/index&reiter=bestenliste#training`);
     await seite.waitForSelector('.training-gitter [data-karte="2"]');
     await warte(1200);
     const r = await seite.evaluate(() => {
@@ -515,7 +623,7 @@ async function testeTraining(browser) {
     } else {
       pruefe('Handy: eine Spalte, alle Karten gleich breit', r.k.every((x) => x.l === r.k[0].l && x.w === r.k[0].w) && r.k[1].t > r.k[0].t, JSON.stringify(r.k));
     }
-    pruefe('Reiter Training aktiv, ohne Zurueck (Screen des Reiters)', r.reiter === 'ja' && r.aktiv && r.aktiv.reiter === 'training', JSON.stringify(r.aktiv));
+    pruefe('Training haengt an der Startseite: Reiter Start aktiv, mit Zurueck', r.reiter === 'nein' && r.aktiv && r.aktiv.reiter === 'heim', JSON.stringify(r.aktiv));
     pruefe('kein waagrechter Ueberlauf', r.doc <= 0, String(r.doc));
     await seite.locator('.reiter-leiste [data-reiter="arena"]').click();
     await seite.waitForSelector('.screen.arena .knoten');
@@ -744,11 +852,14 @@ async function testePremium(browser) {
   await v.seite.goto(`http://127.0.0.1:${PORT}/index.html?test#arena`);
   await v.seite.waitForSelector('.screen.arena .knoten');
   await v.seite.click('.haupt-kopf [data-aktion="shop"]');
-  await v.seite.waitForSelector('.screen.sa-screen .sa-bereich[data-bereich="shop"]');
+  // G-002 (Sammlung B): der Shop oeffnet als Blatt ueber der Sammlung
+  await v.seite.waitForSelector('.sa-blatt .sa-bereich[data-bereich="shop"]');
   const sh = await v.seite.evaluate(() => ({ bereich: document.querySelector('.screen.sa-screen').dataset.bereich,
     sichtbar: !document.querySelector('.sa-bereich[data-bereich="shop"]').hidden,
     verlauf: getComputedStyle(document.querySelector('.sa-screen .haupt-kopf [data-aktion="verlauf"]')).display }));
   pruefe('Shop oeffnet die Sammlung beim Bereich Shop, Verlauf-Knopf im Kopf von Ich', sh.bereich === 'shop' && sh.sichtbar && sh.verlauf !== 'none', JSON.stringify(sh));
+  await v.seite.click('.sa-blatt .sheet-knoepfe button');
+  await v.seite.waitForSelector('.sa-blatt', { state: 'detached', timeout: 8000 }).catch(() => {});
   await v.seite.click('.sa-screen .haupt-kopf [data-aktion="verlauf"]');
   await v.seite.waitForSelector('.screen.vl-screen, .screen.verlauf', { timeout: 8000 }).catch(() => {});
   pruefe('Verlauf aus Ich erreichbar', await v.seite.evaluate(() => location.hash.startsWith('#verlauf')));

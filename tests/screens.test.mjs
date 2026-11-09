@@ -42,6 +42,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await new Promise((r) => setTimeout(r, 150));
@@ -411,8 +412,8 @@ async function testePruefrunde(browser, d) {
   const verlorenId = await verlorenVs(naechster, 9);
   await oeffne(seite, `screen=analyse&partieId=${verlorenId}`);
   const knoepfe = await kopfKnoepfe();
-  pruefe(`Niederlage gegen den nächsten Gegner (${naechster}): "Nochmal" primär, "Arena" statt "Nächster Gegner"`,
-    knoepfe.some((k) => k.a === 'nochmal' && k.primaer) && knoepfe.some((k) => k.a === 'weiter' && /Arena/.test(k.text))
+  pruefe(`Niederlage gegen den nächsten Gegner (${naechster}): "Nochmal" primär, "Bots" statt "Nächster Gegner"`,
+    knoepfe.some((k) => k.a === 'nochmal' && k.primaer) && knoepfe.some((k) => k.a === 'weiter' && /^(Zu den )?Bots$/.test(k.text))
     && !knoepfe.some((k) => /Nächster Gegner/.test(k.text)), JSON.stringify(knoepfe));
   // Niederlage gegen einen Bot, der nicht der nächste Gegner ist (Lukas, weit unter dem höchsten Sieg): "Nächster Gegner" bleibt der Hauptknopf
   pruefe('Lukas ist hier nicht der nächste Gegner', naechster !== 'benno', naechster);
@@ -514,17 +515,59 @@ async function testePruefrunde(browser, d) {
 }
 
 // ---------------------------------------------------------------------------
+// Kundenblick 09.11. (Befund 10): das Brett der Analyse steht beim Oeffnen ganz im Bild und endet ueber der festen
+// Knopfleiste (Handy). Gemessen wird die Ueberlappung der Rechtecke, nicht nur die Sichtbarkeit im Fenster.
+async function testeBrettFrei(browser, d) {
+  for (const [breite, hoehe, name] of [[390, 664, 'iPhone 13'], [375, 548, 'iPhone SE'], [820, 1106, 'iPad hoch'], [1280, 720, 'PC']]) {
+    for (const schema of ['light', 'dark']) {
+      gruppe = `Brett frei ${name} ${schema === 'dark' ? 'dunkel' : 'hell'}`;
+      const { kontext, seite, fehler } = await neueSeite(browser, { breite, hoehe, touch: breite < 900 });
+      await seite.emulateMedia({ colorScheme: schema });
+      await oeffne(seite, `screen=analyse&partieId=${d.oper}`);
+      await seite.waitForSelector('.an-brett .feld, .an-brett img', { timeout: 30000 }).catch(() => {});
+      await warte(1300);
+      const m = await seite.evaluate(() => {
+        const b = document.querySelector('.an-brett').getBoundingClientRect();
+        const l = document.querySelector('.an-aktionsleiste');
+        const lr = l && getComputedStyle(l).display !== 'none' ? l.getBoundingClientRect() : null;
+        const sec = document.querySelector('.an-screen');
+        return { b: [b.left, b.top, b.right, b.bottom].map(Math.round), l: lr && [lr.left, lr.top, lr.right, lr.bottom].map(Math.round),
+          iw: innerWidth, ih: innerHeight, scroll: sec.scrollTop, breite: Math.round(b.width) };
+      });
+      const [bl, bt, br, bb] = m.b;
+      const ueberlappt = !!m.l && bl < m.l[2] && br > m.l[0] && bt < m.l[3] && bb > m.l[1];
+      pruefe('Brett ganz im Fenster, ohne Scrollen', m.scroll === 0 && bt >= 0 && bl >= 0 && br <= m.iw + 0.5 && bb <= m.ih + 0.5, JSON.stringify(m));
+      pruefe('Brett und Knopfleiste ueberlappen nicht', !ueberlappt, JSON.stringify(m));
+      pruefe('Brett mindestens 280 px breit', m.breite >= 280, JSON.stringify(m));
+      pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+      await kontext.close();
+    }
+  }
+}
+
 async function testeTouch(browser, d) {
   gruppe = 'Touch (iPad)';
   const { kontext, seite, fehler } = await neueSeite(browser, { breite: 820, hoehe: 1180, touch: true });
   await oeffne(seite, `screen=analyse&partieId=${d.oper}`);
+  // seit dem Kundenblick 09.11. steht die Kurve im Hochformat unter dem Brett: erst hinscrollen, wie ein Finger
+  await seite.locator('.an-kurve-wrap').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await seite.waitForTimeout(300);
   const kb = await seite.locator('.an-kurve-wrap').boundingBox();
   await seite.touchscreen.tap(kb.x + kb.width * (11 / 33), kb.y + kb.height / 2);
   pruefe('Kurve antippen mit dem Finger', (await aktuellerPly(seite)) === 10, String(await aktuellerPly(seite)));
+  // Seit dem Kundenblick 09.11. stehen Brett und Coach im Hochformat ueber den Klassen: der Tipp auf die Kurve scrollt
+  // das Brett weich ins Bild, und der Coach waechst noch, wenn sein Text kommt. Erst tippen, wenn die Zeile ruhig steht
+  // (die Analyse scrollt in einem eigenen Behaelter, gemessen wird deshalb die Zeile selbst; in WebKit traf der Tipp sonst
+  // die Kopfzeile der Klassen, gemessen 68 px Versatz).
+  const stehtStill = () => seite.waitForFunction(() => new Promise((fertig) => {
+    const e = document.querySelector('.an-kl[data-klasse="brillant"]');
+    const y = e.getBoundingClientRect().top; setTimeout(() => fertig(e.getBoundingClientRect().top === y), 600);
+  }), null, { timeout: 8000 }).catch(() => {});
+  await stehtStill();
   // Zugklassen sind seit 30.10. abends gleich aufgeklappt
   await seite.locator('.an-kl[data-klasse="brillant"]').scrollIntoViewIfNeeded();
-  const kl = await seite.locator('.an-kl[data-klasse="brillant"]').boundingBox();
-  await seite.touchscreen.tap(kl.x + kl.width / 2, kl.y + kl.height / 2);
+  await stehtStill();
+  await seite.locator('.an-kl[data-klasse="brillant"]').tap();
   await warte(500);
   const z = await seite.locator('.an-coach').getAttribute('data-klasse');
   pruefe('Klassen-Zeile mit dem Finger: Genial', z === 'brillant', z);
@@ -841,6 +884,7 @@ try {
   await testeAnalyse(browser, d);
   await testePruefrunde(browser, d);
   await testeTouch(browser, d);
+  await testeBrettFrei(browser, d);
   await testeWenigerBewegung(browser, d);
   await testeVerlauf(browser, d);
   await testeEinstellungen(browser);

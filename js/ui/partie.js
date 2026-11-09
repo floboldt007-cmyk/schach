@@ -54,7 +54,8 @@
 //   zug:abgelehnt { laufId, von, nach, art, figur, fen }: aus board.js beiAbgelehnt, nur wenn Flo am Zug ist.
 //   ergebnis:karte-Kontext zusaetzlich boss; die Abrechnungs-Huelle (ergebnis:abrechnung) haengt sich dort mit
 //   Reihenfolge 3 ein (js/ui/abrechnung.js).
-//   Buehne zusaetzlich: boss (eingefroren oder null), seed, zeigt(name) -> boolean fuer die Anzeigen
+//   Buehne zusaetzlich: ki (true bei einem KI-Gegner der Liga, params.ki; Etappe 4b: Visitenkarten-Streifen in den
+//   Spielerleisten), boss (eingefroren oder null), seed, zeigt(name) -> boolean fuer die Anzeigen
 //   'zaehlwerk' | 'funkenlinie' | 'lebensleiste' | 'balken' (Einstellungen der App), platz(name) -> HTMLElement
 //   fuer 'zaehlwerk' (.p-zaehlwerk im Kopf) und 'funkenlinie' (.p-funkenlinie unten am Brett-Rahmen); der Platz
 //   ist versteckt, solange die Einstellung aus ist, und folgt ihr. Nach partie:verlassen: platz -> null.
@@ -131,7 +132,7 @@ import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
 import {
   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
-  ladePartien, GENAUIGKEIT_STERN, BESTWERT_MIN_ZUEGE, eigeneZuege, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
+  ladePartien, GENAUIGKEIT_STERN, BESTWERT_MIN_ZUEGE, eigeneZuege, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten, pruefeKiRef,
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle, waehle, angeboten } from '../orte.js';
@@ -330,6 +331,9 @@ export function zeige(root, params, app) {
     boss: modus === 'boss' ? pruefeBoss(quelle.boss) : null,
     liga: pruefeLiga(quelle.liga),
     tempo: pruefeTempo(quelle.tempo),
+    // Etappe B Task 4: Bot als Ersatz aus der Gegnersuche (KI-Gegner), mit Beleg fuer die Kronen (Task 5)
+    ki: quelle.ki === true,
+    kiRef: quelle.ki === true ? pruefeKiRef(quelle.kiRef) : null,
     zeiten: pruefeZeiten(laufend && laufend.zeiten),
     finisher: false,
     effektGemerkt: null,
@@ -428,12 +432,15 @@ export function zeige(root, params, app) {
   s.style.setProperty('--bf', themaBotFarbe(bot));
   const knopf = (aktion, ico, text, extra = '', label = '') =>
     `<button class="knopf aktion dr ${extra}" type="button" data-aktion="${aktion}"${label ? ` aria-label="${esc(label)}"` : ''}>${icon(ico)}<span>${esc(text)}</span></button>`;
+  // Zug zurueck/vor als schmale Spalten der Knopfreihe: nur sichtbar, wo der Zugstreifen unter den Knoepfen liegt (Handy
+  // unter 760 px Hoehe, iPad hoch; css/partie.css "Pfeile in der Knopfreihe"), sonst lag er unter dem Bildschirmrand
+  const pfeilKnopf = (aktion, ico, extra) => `<button class="knopf aktion dr sk-pfeil ${extra}" type="button" data-aktion="${aktion}" aria-label="${esc(t(aktion === 'zug-vor' ? 'partie.zuege.vor' : 'partie.zuege.zurueck'))}">${icon(ico)}</button>`;
   const brettwahl = BRETTER.map(([id, h, d]) => `<button class="dr" type="button" role="radio" data-brett="${id}" aria-label="${esc(t('partie.kopf.brett', { name: t('partie.brett.' + id) }))}" `
     + `aria-checked="${einst.brett === id}"><i style="--h:${h};--d:${d}"><b></b><b></b><b></b><b></b></i></button>`).join('');
   const uhrHtml = (wer) => `<div class="uhr zahl" data-wer="${wer}" hidden>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
   s.innerHTML = `
     <header class="kopf p-kopf">
-      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t('partie.kopf.zurueck'))}">${icon('zurueck')}</button>
+      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t(rueckZiel() === 'heim' ? 'partie.kopf.zurueckStart' : 'partie.kopf.zurueck'))}">${icon('zurueck')}</button>
       <div class="titel"><h2>${esc(kopfTitel())}</h2><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
     ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">${esc(t('partie.kopf.stufe', { stufe: bot.stufe }))}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">${esc(t('partie.kopf.duSpielst'))}</span>${esc(farbeName(farbe))}</span></div></div>
       <div class="brettwahl" role="radiogroup" aria-label="${esc(t('partie.kopf.brettfarbe'))}">${brettwahl}</div>
@@ -450,7 +457,7 @@ export function zeige(root, params, app) {
         <div class="spieler gegner botbox botleiste-hoch botkarte" role="group" aria-label="${esc(bot.name)}">
           <span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span>
           <div class="info"><div class="name bot-name">${esc(bot.name)}</div>
-            <div class="unter bot-meta"><span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
+            <div class="unter bot-meta">${z.ki ? `<span class="ki-abzeichen">${esc(t('partie.kiGegner'))}</span>` : ''}<span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
           ${uhrHtml('bot')}
           <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>
@@ -466,8 +473,10 @@ export function zeige(root, params, app) {
           ${uhrHtml('flo')}
         </div>
         <div class="spielknoepfe aktionen">
+          ${pfeilKnopf('zug-zurueck', 'zurueck', 'zl-zurueck')}
           ${knopf('hinweis', 'hinweis', t('partie.knopf.hinweis'), 'hinweis-k')}
           ${knopf('drehen', 'drehen', t('partie.knopf.drehen'))}${knopf('aufgeben', 'flagge', t('partie.knopf.aufgeben'), 'aufgeben')}
+          ${pfeilKnopf('zug-vor', 'vor', 'zl-vor')}
         </div>
       </div>
     </div>`;
@@ -654,8 +663,8 @@ export function zeige(root, params, app) {
     const n = z.verbose.length;
     // Pfeile im Zugstreifen (hoch) und ueber der Zugliste (quer, Flo 01.11.2026: "den letzten Zug ansehen ist auf dem iPad
     // noch nicht frei": quer gab es nur das Antippen in der Liste)
-    for (const b of $$('.zugleiste .zl-zurueck, .zugbox .zl-zurueck')) b.disabled = !n || ansehen.ply === -1;
-    for (const b of $$('.zugleiste .zl-vor, .zugbox .zl-vor')) b.disabled = ansehen.ply == null;
+    for (const b of $$('.zugleiste .zl-zurueck, .zugbox .zl-zurueck, .spielknoepfe .zl-zurueck')) b.disabled = !n || ansehen.ply === -1;
+    for (const b of $$('.zugleiste .zl-vor, .zugbox .zl-vor, .spielknoepfe .zl-vor')) b.disabled = ansehen.ply == null;
     // der angesehene Zug rollt in die Mitte des Streifens
     const an = $('.zugleiste .z.angesehen');
     if (an) { const zl = an.closest('.zugleiste'); zl.scrollLeft = an.offsetLeft - zl.clientWidth / 2 + an.offsetWidth / 2; }
@@ -780,6 +789,9 @@ export function zeige(root, params, app) {
     $('.spielknoepfe > [data-aktion="aufgeben"]').disabled = ende;
     const h = $('.spielknoepfe > [data-aktion="hinweis"]');
     h.classList.toggle('stufe-2', am && z.hinweisFen === z.chess.fen() && z.hinweisStufe >= 1);
+    // Uhr dessen am Zug hervorheben (dunkle Flaeche, helle Ziffern); jeder Phasenwechsel kommt hier vorbei
+    const amZug = ende ? null : z.chess.turn() === farbe ? floKarte : gegnerKarte;
+    for (const k of [gegnerKarte, floKarte]) k.querySelector('.uhr')?.classList.toggle('am-zug', k === amZug);
   }
 
   function setzeDenkt(an) {
@@ -895,6 +907,9 @@ export function zeige(root, params, app) {
     if (!ruhig.has(coachEl)) reserviereCoach();
     for (const el of [coachEl, s.querySelector('.spieler.gegner'), s.querySelector('.spielknoepfe')]) {
       if (!el || !el.isConnected || el.classList.contains('offen')) continue;
+      // Handy: der Coach hat feste Hoehen, die layout() je nach Platz waehlt (.coach-eng); gemerkt blieben 76 px aus dem
+      // ersten Bild, auf dem iPhone SE lagen die Knoepfe dann unter dem Rand (08.11.2026)
+      if (el === coachEl && istHandy()) continue;
       const h = el.offsetHeight;
       if (h > (ruhig.get(el) || 0)) { ruhig.set(el, h); el.style.minHeight = h + 'px'; }
     }
@@ -1296,7 +1311,10 @@ export function zeige(root, params, app) {
         const info = Object.freeze({ serie: serieBis(ply), serieVorher: serieBis(ply - 1), trivial: z.liveTrivial[ply] === true, ply });
         const w = klassenKlang(k, info);
         const lande = z.landung[ply] || null;
-        const verdraengt = !!(w && (w.name === 'bester' || w.name === 'combo') && lande && (lande.name === 'schach' || lande.name === 'umwandlung'));
+        // Am Partie-Ende hat die Landung keinen Zugklang (name null, siehe spieleKlang), dort fuehrt der Ende-Klang: auch
+        // er verdraengt Praezise/COMBO
+        const verdraengt = !!(w && (w.name === 'bester' || w.name === 'combo') && lande
+          && (lande.name === 'schach' || lande.name === 'umwandlung' || lande.name === null));
         const ms = Math.max(0, Math.round((lande ? lande.um : 0) + BEWERTUNG_NACH_MS - jetzt()));
         if (!verdraengt) spaeter(() => klang.klasse(k, info), ms);
         melde({ typ: 'bewertungsklang', ply, klasse: k, name: w ? w.name : null, ms, still: verdraengt });
@@ -1730,11 +1748,16 @@ export function zeige(root, params, app) {
     if (ok && !weg) ende('niederlage', 'aufgabe');
   }
 
+  // Kundenblick 09.11. (Befund 9): zurueck dorthin, woher man kam (Start oder Bots), nicht immer zu den Bots
+  function rueckZiel() {
+    const ort = typeof app.herkunft === 'function' ? app.herkunft() : null;
+    return ort === 'heim' ? 'heim' : 'arena';
+  }
   async function zurueckGedrueckt() {
-    if (z.phase === 'ende') { app.gehe('arena'); return; }
+    if (z.phase === 'ende') { app.gehe(rueckZiel()); return; }
     let floZuege = 0;
     for (let i = 0; i < z.zuege.length; i++) if (istFlo(i)) floZuege++;
-    if (floZuege === 0) { z.verworfen = true; loescheLaufendePartie(); app.gehe('arena'); return; }
+    if (floZuege === 0) { z.verworfen = true; loescheLaufendePartie(); app.gehe(rueckZiel()); return; }
     const w = await app.frage({
       titel: t('partie.pause.titel'),
       text: t('partie.pause.text'),
@@ -1742,7 +1765,7 @@ export function zeige(root, params, app) {
       abbrechen: null,
     });
     if (weg) return;
-    if (w === 'pause') { speichereLaufend(); app.gehe('arena'); }
+    if (w === 'pause') { speichereLaufend(); app.gehe(rueckZiel()); }
     else if (w === 'aufgeben') ende('niederlage', 'aufgabe');
   }
 
@@ -1764,6 +1787,8 @@ export function zeige(root, params, app) {
     if (z.liga) f.liga = { ...z.liga };
     if (z.tempo) f.tempo = { ...z.tempo };
     if (z.zeiten) f.zeiten = z.zeiten.slice();
+    if (z.ki) f.ki = true;
+    if (z.kiRef) f.kiRef = z.kiRef;
     return f;
   }
   function speichereLaufend() {
@@ -2332,7 +2357,7 @@ export function zeige(root, params, app) {
     return el;
   }
   const buehne = Object.freeze({
-    laufId, bot, farbe, modus: z.modus, ziel: z.ziel ? Object.freeze({ ...z.ziel }) : null,
+    laufId, bot, farbe, modus: z.modus, ki: z.ki === true, ziel: z.ziel ? Object.freeze({ ...z.ziel }) : null,
     boss: z.boss ? Object.freeze({ ...z.boss }) : null, seed: z.seed,
     zeigt, platz,
     el: s, effekte: effekteEl, rahmen, brett, get reduziert() { return reduziert(); },
@@ -2424,6 +2449,11 @@ export function zeige(root, params, app) {
         el.dataset.sek = String(sek);
         anim(el, [{ transform: 'scale(1.045)' }, { transform: 'none' }], { d: 380, k: 'sanft' });
       }
+      // Uhr-Warnung einmal je Partie, sobald Flos laufende Uhr unter 20 s faellt (die Bot-Uhr bleibt still)
+      if (warn && laeuft && wer === 'flo' && !el.dataset.gewarnt) {
+        el.dataset.gewarnt = '1';
+        try { klang.spiele('uhr-warnung'); } catch (e) { /* still */ }
+      }
     },
   });
 
@@ -2452,7 +2482,7 @@ export function zeige(root, params, app) {
     if (!handy) {
       inhaltEl.style.removeProperty('--brett');
       inhaltEl.style.removeProperty('--spalte');
-      s.classList.remove('coach-eng', 'streifen-unten');
+      s.classList.remove('coach-eng', 'sehr-eng', 'streifen-unten');
       passeNamen();
       pruefeCoachRest();
       pruefeSeite();
@@ -2493,12 +2523,19 @@ export function zeige(root, params, app) {
       const rest = untenVon(knoepfe) + 4 - rahmen.offsetHeight;
       return Math.floor((inhaltEl.clientHeight - rest - sockelY) / 8) * 8;
     };
-    s.classList.remove('coach-eng');
+    s.classList.remove('coach-eng', 'sehr-eng');
     let g = breit;
     if (!passt(g)) {
       // vorher schrumpft der Coach auf eine Zeile (Rest auf Antippen), erst dann das Brett (nie unter 280 px)
       s.classList.add('coach-eng');
       if (!passt(g)) g = Math.max(BRETT_MIN, Math.min(breit, hoehe(g)));
+      // U-Messrunde 09.11. (iPhone SE mit Safari-Leiste, 548 px): Brett und Coach stehen schon auf Minimum und die
+      // Knoepfe enden trotzdem unter dem Rand. Dann ruecken Abstaende und Spielerkarten zusammen; erst wenn auch das
+      // nicht reicht, scrollt die Spalte.
+      if (!passt(Math.max(BRETT_MIN, g))) {
+        s.classList.add('sehr-eng');
+        if (g <= BRETT_MIN || !passt(g)) g = Math.max(BRETT_MIN, Math.min(breit, hoehe(g)));
+      }
     }
     setze(Math.max(BRETT_MIN, g));
     passeNamen();
@@ -2523,9 +2560,9 @@ export function zeige(root, params, app) {
     // die Karten der Spalte wachsen mit ihrem Inhalt (Coach, Blase): dann neu pruefen, ob die Spalte passt
     if (seiteEl) for (const k of seiteEl.children) layoutRo.observe(k);
   }
-  // Handy: Zahl des waagrechten Balkens nur auf Antippen
+  // Hochformat (Handy und iPad): Zahl des waagrechten Balkens nur auf Antippen
   balken.addEventListener('click', () => {
-    if (!istHandy()) return;
+    if (lage() !== 'hoch') return;
     balken.classList.add('zeigt-zahl');
     clearTimeout(z.balkenUhr);
     z.balkenUhr = spaeter(() => balken.classList.remove('zeigt-zahl'), 2200);

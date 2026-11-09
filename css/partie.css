@@ -6,7 +6,7 @@
    Lagen:
      quer             Brett im Sockel links (Balken 18 px senkrecht), rechts eine Spalte (300 bis 420 px; in kleinen
                       Querfenstern ab 481 px Hoehe bis 248 px, unter 300 px kompakt per Container "seite")
-     hoch (iPad)      eine Spalte: Gegner, Brett, Flo, Coach, Zugstreifen, Aktionen (order)
+     hoch (iPad)      eine Spalte: Gegner, Balken (waagrecht), Brett, Flo, Coach, Aktionen, Zugstreifen (order)
      Handy (hoch, bis 600 px)  "Brett zuerst": js/ui/partie.js layout() setzt --brett und --spalte an .inhalt,
                       .coach-eng (Coach eine Zeile) und .streifen-unten (Zugstreifen nach den Knoepfen)
    ============================================================ */
@@ -58,6 +58,13 @@
 .partie .spieler.ich > .av { background: var(--flo-grund); }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
   .partie .spieler.gegner > .av { background: color-mix(in srgb, var(--bf, var(--flaeche-3)) 24%, var(--flaeche)); }
+  /* Flo 05.11.2026 ("sieht billig aus"): feiner Ring ums Bild in der Farbe des Bots; denkt der Bot, traegt seine Karte
+     einen Rand in dieser Farbe (wer am Zug ist, sieht man ohne zu lesen). Nur box-shadow, die Masse bleiben gleich. */
+  .partie .spieler.gegner > .av { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--bf, var(--linie-2)) 55%, transparent); }
+  .partie .spieler.ich > .av { box-shadow: inset 0 0 0 1.5px var(--linie-2); }
+  .partie .spieler.gegner { transition: box-shadow var(--d-m, .2s) ease; }
+  .partie.bot-denkt .spieler.gegner { box-shadow: var(--s1), var(--kante),
+    0 0 0 2px color-mix(in srgb, var(--bf, var(--akzent)) 70%, transparent); }
 }
 .partie .spieler.gegner > .info { grid-area: info; min-width: 0; }
 .partie .spieler .name { font-weight: 800; font-size: 16px; line-height: 1.25; color: var(--text); min-width: 0;
@@ -67,6 +74,9 @@
   white-space: nowrap; font-size: 13px; font-weight: 650; color: var(--text-2); }
 .partie .spieler.ich > .unter { grid-area: unter; }
 .partie .spieler .p-meta { flex: none; }
+/* Etappe B Task 4: Bot als Ersatz aus der Gegnersuche, ehrlich gekennzeichnet (Text in Schriftfarbe, nur ein Rahmen) */
+.partie .spieler .ki-abzeichen { flex: none; display: inline-block; margin-inline-end: .4em; padding: 0 .45em; border: 1px solid currentColor;
+  border-radius: 999px; font-size: .72em; font-weight: 600; line-height: 1.5; vertical-align: middle; white-space: nowrap; }
 .partie .spieler .denkt-ort { display: inline-flex; align-items: center; flex: none; }
 .partie .spieler .denkt { margin-left: 2px; }
 .partie .spieler > .ort-gegner-leiste { grid-area: leiste; margin-bottom: 8px; min-width: 0; }
@@ -88,10 +98,11 @@
   transition: background-color var(--d-m) var(--sanft), color var(--d-m) var(--sanft); }
 .partie .uhr[hidden] { display: none; }
 .partie .uhr .uhr-ic { display: none; width: 17px; height: 17px; flex: none; }
-.partie .uhr.laeuft { background: var(--tinte); color: var(--auf-tinte); }
+/* .am-zug: wer am Zug ist (js/ui/partie.js zeichneKnoepfe), .laeuft: die Uhr tickt (Zu zweit) */
+.partie .uhr.laeuft, .partie .uhr.am-zug { background: var(--tinte); color: var(--auf-tinte); }
 .partie .uhr.warn .uhr-ic { display: block; }
 .partie .uhr.warn { background: var(--warn-weich); color: var(--warn); box-shadow: inset 0 0 0 1.5px var(--warn); }
-.partie .uhr.warn.laeuft { background: var(--warn); color: var(--grund); box-shadow: none; }
+.partie .uhr.warn.laeuft, .partie .uhr.warn.am-zug { background: var(--warn); color: var(--grund); box-shadow: none; }
 
 /* ---------- Sprechblase des Bots: quer eine ruhige Zeile in der Karte, hoch haengt sie ueber dem Brett ---------- */
 .partie .spieler > .blase-ort { grid-area: blase; min-width: 0; margin-top: 10px; min-height: 44px; }
@@ -142,6 +153,11 @@
 /* Ring ragt ueber die Symbolhoehe hinaus, die Beschriftung bleibt auf einer Linie mit den Nachbarn */
 .partie .spielknoepfe .halte-symbol { width: 32px; height: 32px; margin: -4px 0; }
 .partie .spielknoepfe .halte-symbol > .ico { width: 20px; height: 20px; }
+/* Pfeile in der Knopfreihe (Handy-Runde K, 08.11.2026): Zug zurueck und vor als schmale Spalten links und rechts. Nur wo
+   der Zugstreifen unter den Knoepfen liegt (Handy unter 760 px Hoehe, iPad hoch, Regeln weiter unten); dort lag er mit
+   seinen Pfeilen unter dem Bildschirmrand. Sonst unsichtbar. */
+.partie .spielknoepfe > .knopf.sk-pfeil { display: none; }
+.partie .spielknoepfe > .knopf.sk-pfeil:disabled .ico { opacity: .4; }
 /* Halten zum Aufgeben: der Knopf faerbt sich wie im Bauteil (die Knopf-Regel oben ist sonst spezifischer) */
 .partie .spielknoepfe > .knopf.halte-knopf.haelt { background: var(--warn-weich); }
 .partie .spielknoepfe .hinweis-k.stufe-2 { box-shadow: inset 0 0 0 1.5px var(--text), var(--s1); }
@@ -221,7 +237,13 @@
    fuellt jetzt die Hoehe: 1080 x 810 von 633 auf rund 680 px, 1024 x 768 von 595 auf rund 640 px. */
 @media (orientation: landscape) and (min-width: 1000px) and (min-height: 700px) {
   .partie { --seite: clamp(300px, 29vw, 400px); --quer-rand: clamp(12px, 1.3vw, 24px); --quer-luecke: clamp(12px, 1.3vw, 20px); }
-  .partie .inhalt { padding-top: 12px; padding-bottom: 16px; }
+}
+/* Querformat ab 1000 px (Flo 06.11.2026: "das Schachbrett ist viel zu klein"): die Hoehe gehoert dem Brett. Kopf 60 statt
+   76 px (die Knoepfe darin bleiben 44 px), Sockel 4 px, oben und unten nur noch 6 und 8 px Luft. 1180 x 820 von 702 auf
+   738 px, iPad im Browser mit Leisten (1000 x 590) von 462 auf 508 px. */
+@media (orientation: landscape) and (min-width: 1000px) {
+  .partie { --rahmen: 4px; --kopf-hoehe-partie: 60px; }
+  .partie .inhalt { padding-top: 6px; padding-bottom: 8px; }
 }
 /* schmale Spalte (unter 300 px): Karten, Uhr und Knoepfe eine Stufe kompakter, Namen duerfen zweizeilig werden */
 @container seite (max-width: 299px) {
@@ -262,26 +284,32 @@
 }
 
 /* ============================================================
-   HOCH (iPad hoch): eine Spalte, Brett zuerst nach dem Gegner, Balken senkrecht links
+   HOCH (iPad hoch): eine Spalte, Brett zuerst nach dem Gegner, Balken waagrecht ueber dem Brett
+   Flo 06.11.2026 ("das Schachbrett ist viel zu klein"): das Brett nimmt die ganze Breite (820 x 1180 von 666 auf 788 px).
+   Dafuer liegt der Balken wie auf dem Handy waagrecht ueber dem Brett, der Sockel ist 4 px, der Coach zeigt eine Zeile
+   (Antippen zeigt den Rest), und der Zugstreifen steht nach den Knoepfen (die Spalte scrollt, wie auf dem Handy).
+   --reserve: zwei Karten 58, Coach 66, Knoepfe 60, vier Luecken 8 px, Balken und Sockel.
    ============================================================ */
 @media (orientation: portrait) and (min-width: 601px) {
-  .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 16px 16px; container: partie / size;
+  .partie { --rahmen: 4px; --balken: 6px; --spalt: 4px; }
+  .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 12px 12px; container: partie / size;
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
   .partie .seite { display: contents; }
   .partie .inhalt > *, .partie .seite > * {
-    --reserve: calc(66px + 66px + 116px + 40px + 62px + 5 * 10px + 2 * var(--rahmen));
-    --brett: min(calc(100cqw - var(--balken) - var(--spalt) - 2 * var(--rahmen)), calc(100cqh - var(--reserve)));
-    width: calc(var(--brett) + var(--balken) + var(--spalt) + 2 * var(--rahmen)); max-width: 100%; flex: none; }
+    --reserve: calc(58px + 58px + 66px + 60px + 4 * 8px + var(--balken) + var(--spalt) + 2 * var(--rahmen));
+    --brett: min(calc(100cqw - 2 * var(--rahmen)), calc(100cqh - var(--reserve)));
+    width: calc(var(--brett) + 2 * var(--rahmen)); max-width: 100%; flex: none; }
+  .partie .inhalt > .brettzone { flex-direction: column; }
   .partie .zugbox { display: none; }
   .partie .spieler.gegner { order: 0; } .partie .brettzone { order: 1; } .partie .spieler.ich { order: 2; }
-  .partie .coach { order: 3; height: 116px; align-content: start; overflow: hidden; }
-  .partie .coach > .c-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .partie .coach { order: 3; height: 66px; padding-top: 10px; padding-bottom: 10px; align-content: start; overflow: hidden; }
+  .partie .coach > .c-text { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   .partie .coach > .coach-knoepfe { display: none; }
   .partie .coach.offen { height: auto; }
   .partie .coach.offen > .c-text { display: block; }
   .partie .coach.offen > .coach-knoepfe { display: flex; }
-  .partie .zugleiste { order: 4; height: var(--tap); }
-  .partie .spielknoepfe { order: 5; }
+  .partie .spielknoepfe { order: 4; }
+  .partie .zugleiste { order: 5; height: var(--tap); flex: none; }
   .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 2; }
   .partie .spieler { min-height: 58px; padding: 6px 8px 6px 10px; }
   .partie .spieler { --av: 44px; }
@@ -297,6 +325,24 @@
   .partie .p-blase { min-height: 100%; display: flex; align-items: center; padding: 8px 12px; font-size: 14px; line-height: 1.3;
     box-shadow: var(--s1), var(--kante); transform-origin: 0 calc(var(--av) / 2); }
   .partie .p-blase::before { left: -5px; top: calc(var(--av) / 2 - 4px); transform: rotate(-45deg); }
+  /* Name und Unterzeile treten zurueck, solange die Blase spricht: an den runden Ecken der Blase schauten sonst Reste
+     des Namens heraus (Handy-Runde K, 08.11.2026) */
+  .partie .spieler.gegner > .info { transition: opacity calc(160ms * var(--tempo, 1)); }
+  .partie.hat-blase .spieler.gegner > .info { opacity: 0; }
+  /* Bewertungsbalken hoch (Handy und iPad) waagrecht ueber dem Brett (--balken hoch, volle Breite, Weiss von links,
+     gedreht von rechts), Zahl auf Antippen (js/ui/partie.js) */
+  .partie .evalbalken { width: 100%; height: var(--balken); border-radius: var(--r-pille); overflow: visible; cursor: pointer;
+    box-shadow: 0 0 0 1px var(--linie-2); }
+  .partie .evalbalken::after { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: -4px; }
+  .partie .evalbalken .weiss { border-radius: var(--r-pille) 0 0 var(--r-pille); transform-origin: 0 50%;
+    transform: scaleX(var(--anteil, .5)); }
+  .partie .evalbalken.gedreht .weiss { border-radius: 0 var(--r-pille) var(--r-pille) 0; transform-origin: 100% 50%; transform: scaleX(var(--anteil, .5)); }
+  .partie .evalbalken .weiss::before { display: none; }
+  .partie .evalbalken .mitte { left: 50%; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
+  .partie .evalbalken .wert, .partie .evalbalken[data-fuehrt] .wert, .partie .evalbalken.gedreht[data-fuehrt] .wert { display: none; top: auto; bottom: calc(100% + 6px);
+    left: 50%; right: auto; transform: translateX(-50%); writing-mode: horizontal-tb; padding: 3px 8px; border-radius: var(--r-pille);
+    font-size: 12px; color: var(--auf-tinte); background: var(--tinte); box-shadow: var(--s2); z-index: 25; }
+  .partie .evalbalken.zeigt-zahl .wert { display: block; }
 }
 
 /* ============================================================
@@ -309,6 +355,8 @@
   .partie .p-kopf h2 { font-size: 19px; }
   .partie .p-kopf .unter { margin-top: 2px; font-size: 12.5px; }
   .partie .p-kopf .p-eroeffnung, .partie .p-kopf .p-eroeffnung + .p-sep, .partie .p-kopf .p-lang { display: none; }
+  /* Kundenblick 09.11. (Befund 9): der Name steht nur einmal, im Kopf. Die Karte zeigt Bild, Elo und Sprechblase. */
+  .partie.handy .spieler.gegner .bot-name { display: none; }
   .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 4px;
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .partie .seite { display: contents; }
@@ -340,19 +388,9 @@
      Uhr drei Zeilen ueber Luecke und Balken, ohne die Figuren zu beruehren. */
   .partie .spieler.gegner > .blase-ort { top: -4px; bottom: -4px; }
   .partie .p-blase { padding: 5px 10px; font-size: 13px; line-height: 1.25; }
-  /* Bewertungsbalken waagrecht ueber dem Brett (6 px, volle Breite, Weiss von links, gedreht von rechts), Zahl auf Antippen */
-  .partie .evalbalken { width: 100%; height: 6px; border-radius: var(--r-pille); overflow: visible; cursor: pointer;
-    box-shadow: 0 0 0 1px var(--linie-2); }
-  .partie .evalbalken::after { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: -4px; }
-  .partie .evalbalken .weiss { border-radius: var(--r-pille) 0 0 var(--r-pille); transform-origin: 0 50%;
-    transform: scaleX(var(--anteil, .5)); }
-  .partie .evalbalken.gedreht .weiss { border-radius: 0 var(--r-pille) var(--r-pille) 0; transform-origin: 100% 50%; transform: scaleX(var(--anteil, .5)); }
-  .partie .evalbalken .weiss::before { display: none; }
-  .partie .evalbalken .mitte { left: 50%; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
-  .partie .evalbalken .wert, .partie .evalbalken[data-fuehrt] .wert, .partie .evalbalken.gedreht[data-fuehrt] .wert { display: none; top: auto; bottom: calc(100% + 6px);
-    left: 50%; right: auto; transform: translateX(-50%); writing-mode: horizontal-tb; padding: 3px 8px; border-radius: var(--r-pille);
-    font-size: 12px; color: var(--auf-tinte); background: var(--tinte); box-shadow: var(--s2); z-index: 25; }
-  .partie .evalbalken.zeigt-zahl .wert { display: block; }
+  /* schmale Handys (iPhone SE, 320 px): drei Zeilen passen nur dichter in die Karte, sonst lag die Blase ueber dem
+     Bewertungsbalken (Handy-Runde K, 08.11.2026) */
+  @media (max-width: 360px) { .partie .p-blase { padding: 3px 9px; font-size: 12px; line-height: 1.2; } }
   /* Coach: eine feste Hoehe (das Brett springt nie), Text eine Zeile, ab 760 px Hoehe zwei; bei Platznot nur die
      Kopfzeile (.coach-eng); Antippen zeigt den Rest (.offen, die Spalte scrollt dann) */
   .partie .coach { height: 58px; padding: 8px 12px; border-radius: 16px; align-content: start; overflow: hidden; column-gap: 8px; }
@@ -375,6 +413,12 @@
   .partie:not(.streifen-unten) .coach > .c-text { -webkit-line-clamp: 2; }
   .partie.coach-eng .coach { height: 44px; }
   .partie.coach-eng .coach > .c-text, .partie.coach-eng .coach > .c-zusatz { display: none; }
+  /* U-Messrunde 09.11. (iPhone SE mit Safari-Leiste, 548 px): reichen Coach-Zeile und Mindestbrett nicht, ruecken
+     Abstaende und Spielerkarten zusammen (.sehr-eng, layout() in partie.js); die Knoepfe behalten ihre 48 px */
+  .partie.sehr-eng .inhalt { gap: 3px; padding-top: 2px; }
+  .partie.sehr-eng .inhalt > .brettzone { gap: 2px; }
+  .partie.sehr-eng .spieler { min-height: 44px; padding-top: 2px; padding-bottom: 2px; }
+  .partie.sehr-eng .spieler > .ort-gegner-leiste { margin-bottom: 2px; }
   .partie .coach.offen { height: auto; }
   .partie .coach.offen > .c-text { display: block; -webkit-line-clamp: unset; }
   .partie .coach.offen > .coach-knoepfe { display: flex; margin-top: 8px; }
@@ -382,12 +426,34 @@
   /* Zugstreifen und Aktionen */
   .partie .zugleiste { height: var(--tap); min-height: var(--tap); padding: 0; }
   .partie .zugleiste .z { height: 32px; }
+  /* Flo 05.11.2026 ("Partie-Bildschirm schlecht"): Zugstreifen und Aktionen sitzen unten am Daumen; die freie Hoehe
+     liegt zwischen Coach und Streifen statt unter den Knoepfen */
+  .partie .inhalt { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+  .partie:not(.streifen-unten) .zugleiste { margin-top: auto; }
+  .partie.streifen-unten .spielknoepfe { margin-top: auto; }
   .partie .spielknoepfe { gap: 6px; }
   .partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { min-height: 48px; height: 48px; padding: 3px 2px; gap: 1px;
     border-radius: 14px; font-size: 12px; letter-spacing: -.01em; }
   .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
   .partie .spielknoepfe .halte-symbol { width: 26px; height: 26px; margin: -3px 0; }
   .partie .spielknoepfe .halte-symbol > .ico { width: 17px; height: 17px; }
+}
+
+/* Pfeile in der Knopfreihe einschalten (Abschnitt "Aktionen" oben): iPad hoch immer, Handy nur mit Streifen unten. Der
+   Zugstreifen behaelt seine Zuege (Antippen, die Spalte scrollt), seine eigenen Pfeile entfallen dort. */
+@media (orientation: portrait) and (min-width: 601px) {
+  .partie .spielknoepfe > .knopf.sk-pfeil { display: flex; }
+  .partie .spielknoepfe { grid-template-columns: var(--tap) repeat(3, minmax(0, 1fr)) var(--tap); }
+  .partie .spielknoepfe[data-aktionen="1"] { grid-template-columns: var(--tap) repeat(4, minmax(0, 1fr)) var(--tap); }
+  .partie .spielknoepfe[data-aktionen="2"] { grid-template-columns: var(--tap) repeat(5, minmax(0, 1fr)) var(--tap); }
+  .partie .zugleiste .zl-pfeil { display: none; }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .partie.streifen-unten .spielknoepfe > .knopf.sk-pfeil { display: flex; }
+  .partie.streifen-unten .spielknoepfe { grid-template-columns: var(--tap) repeat(3, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .spielknoepfe[data-aktionen="1"] { grid-template-columns: var(--tap) repeat(4, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .spielknoepfe[data-aktionen="2"] { grid-template-columns: var(--tap) repeat(5, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .zugleiste .zl-pfeil { display: none; }
 }
 
 /* ---------- Pfeil-Tipp (einmal je Geraet, js/ui/partie.js PFEIL_TIPP_MERKER): ruhige Zeile unter dem Brett ----------

@@ -1,7 +1,7 @@
 // Screen "lektion" (Paket lernen, Meisterschule): eine Lektion aus einem Bereich (Mattbilder, Endspiele). Flo spielt
 // Weiss, die Engine spielt die Gegenseite mit bestem Spiel (app.engine('bewertung'), volle Staerke). Ob das Ziel der
 // Lektion erreicht ist (Matt, neue Dame, Gewinn, Halten), entscheidet pruefeZiel in js/pakete/lernen/mattbilder.js, dort
-// auch Sterne und Grenze. Nur im Labor (js/labor.js laborFrei), sonst still zur Arena.
+// auch Sterne und Grenze. Nur offene Lektionen (js/pakete/lernen/zugang.js istOffen), sonst still zur Uebersicht.
 //
 //   zeige(root, params, app) -> { verlasse() }      params { id }  (unbekannte id: zur Uebersicht "lernen")
 //   zustand() -> { offen, id, phase, zuege, hinweise, sterne, grund, fen }   (Tests; mit ?test auch window.__lektion)
@@ -27,14 +27,15 @@ import { figurenPfad } from '../figurensatz.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
-import { klang } from '../sounds.js';
+import { klang, zugKlangName } from '../sounds.js';
 import { anim, staffel, tempo, takt } from '../bewegung.js';
 import { ladeEinstellungen, ladeModul, speichereModul } from '../storage.js';
 import { sende } from '../ereignisse.js';
-import { laborFrei } from '../labor.js';
+import { oeffneTrainer } from '../abo.js';
 import { t } from '../sprache.js';
 import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
+import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
 import { sterneHtml } from './lernen.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
@@ -59,16 +60,22 @@ export function zeige(root, params, app) {
   s.className = 'screen ls-screen';
   root.append(s);
   const l = lektion(params && params.id);
-  if (!laborFrei() || !l) {
+  // unbekannt oder im Trainer (Link, Lesezeichen ohne Abo): still zur Uebersicht, beim gesperrten im selben Bereich
+  if (!l || !istOffen(l)) {
     let weg = false;
-    setTimeout(() => { if (!weg) app.gehe(laborFrei() ? 'lernen' : 'arena', {}, { ersetzen: true }); }, 0);
+    setTimeout(() => { if (!weg) app.gehe('lernen', l ? { bereich: bereichVon(l).id } : {}, { ersetzen: true }); }, 0);
     return { verlasse() { weg = true; } };
   }
   ladeLernenCss();
   const ber = bereichVon(l);
   const art = artVon(l);
   const nr = ber.lektionen.indexOf(l) + 1;
-  const naechste = ber.lektionen[nr] || null;
+  // "Weiter" fuehrt zur naechsten offenen Lektion (nach der leichten Stufe zur Gratis-Probe); ist die direkt folgende im
+  // Trainer, steht dort zusaetzlich der Knopf "Naechste Lektion im Trainer" (Flo 07.11.2026: Knopf statt Werbung; der
+  // Trainer-Hinweis kommt nur auf Tipp, js/abo.js OHNE_HINWEIS_SCREENS bleibt)
+  const naechste = naechsteOffene(l);
+  // (auch nach der letzten offenen Lektion eines Bereichs, in dem noch etwas gesperrt ist, z. B. der Probe am Ende)
+  const folgtImTrainer = ber.lektionen[nr] ? !istOffen(ber.lektionen[nr]) : !naechste && ber.lektionen.some((x) => !istOffen(x));
   const folge = art === 'folge';
   const flo = folge && l.farbe === 'b' ? 'b' : 'w';
   const zielText = folge ? S('zielFolge', { n: l.ziel }) : art === 'umwandeln' ? S('zielUmwandeln', { n: l.ziel }) : art === 'gewinnen' ? S('zielGewinnen', { n: l.ziel })
@@ -145,9 +152,7 @@ export function zeige(root, params, app) {
   const leiseMeldung = () => { meldungEl.hidden = true; meldungEl.innerHTML = ''; };
 
   function zugKlang(m) {
-    if (st.chess.isCheckmate() || st.chess.inCheck()) spielKlang('schach');
-    else if (m && m.captured) spielKlang('schlagen');
-    else spielKlang('zug');
+    spielKlang(zugKlangName(m, st.chess.inCheck()));
   }
 
   // Engine-Zug fuer die Stellung (Verteidigung oder Hinweis); im Testmodus aus window.__test.lektionZug
@@ -377,6 +382,7 @@ export function zeige(root, params, app) {
     ] : [
       ...(naechste ? [{ a: 'weiter', text: S('weiter'), primaer: true, vor: true }] : []),
       { a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: !naechste },
+      ...(folgtImTrainer ? [{ a: 'trainer', text: S('naechsteImTrainer'), icon: 'schloss' }] : []),
       { a: 'uebersicht', text: S('uebersicht') },
     ]);
   }
@@ -401,6 +407,7 @@ export function zeige(root, params, app) {
     else if (a === 'neu' || a === 'nochmal') starte({ modus: st.modus });
     else if (a === 'weiter' && naechste) app.gehe('lektion', { id: naechste.id }, { ersetzen: true });
     else if (a === 'uebersicht') app.gehe('lernen', { bereich: ber.id }, { ersetzen: true });
+    else if (a === 'trainer') oeffneTrainer({ app });
   });
 
   starte({ intro: true });

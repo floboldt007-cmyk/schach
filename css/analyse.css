@@ -178,6 +178,8 @@
 .an-g-wert { font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .an-ich-wert { color: var(--text); }
 .an-g-leer { font-size: 16px; color: var(--text-2); }
+/* "zu kurz" bleibt klein, auch wo die schmalen Spalten unten die Zahl verkleinern (sonst 27 px, ragte ins Portraet) */
+.an-g-wert.an-g-leer { font-size: 16px; }
 /* Flo 30.10. abends ("sieht billig aus"): Genauigkeit in der Farbe ihrer Guete mit Messbalken, Ergebnis als farbige Pille,
    die Karte leicht in der Farbe des Ergebnisses getoent */
 .an-g-wert small { margin-left: 2px; font-size: .5em; font-weight: 750; letter-spacing: 0; color: var(--text-2); }
@@ -340,9 +342,13 @@
   .an-koerper { flex: none; display: block; }
   .an-inhalt { display: flex; flex-direction: column; gap: 12px; width: calc(var(--an-brett) + 8px + var(--an-balken)); max-width: 100%; padding: 0 0 18px; }
   .an-links, .an-rechts { display: contents; }
-  .an-genau { order: 1; } .an-banner, .an-ort-oben { order: 2; } .an-kurve-box { order: 3; }
-  .an-brettzone { order: 4; } .an-navi { order: 5; } .an-coach { order: 6; }
+  /* Kundenblick 09.11. (Befund 10): das Brett direkt unter die Genauigkeit, Freischaltung, Teilen und Verlauf danach.
+     Vorher stand es auf dem iPhone 13 nur zu 45 %, auf dem SE zu 16 % im Bild. */
+  .an-genau { order: 1; } .an-brettzone { order: 2; } .an-navi { order: 3; } .an-coach { order: 4; }
+  .an-banner, .an-ort-oben { order: 5; } .an-kurve-box { order: 6; }
   .an-momente-box, .an-momente-leer { order: 7; } .an-klassen { order: 8; }
+  /* passeBrett() in js/ui/analyse.js: reicht der Platz ueber der Knopfleiste nicht, steht das Brett vor der Genauigkeit */
+  .an-screen.brett-zuerst .an-brettzone, .an-screen.brett-zuerst .an-navi { order: 0; }
   .an-screen.ohne-balken { --an-brett: min(calc(100vw - 36px - 8px), 720px); }
 }
 @media (orientation: portrait) and (max-width: 520px) {
@@ -351,7 +357,7 @@
   .an-screen .kopf { height: 56px; padding: 0 10px; }
   .an-kopf-knoepfe { display: none; }
   .an-inhalt { gap: 10px; padding-bottom: 6px; }
-  .an-brettzone { gap: 6px; }
+  .an-brettzone { gap: 6px; align-self: center; } /* mittig, wenn passeBrett() es ueber der Knopfleiste kleiner macht */
   .an-evalbalken { width: 14px; }
   .an-brett-rahmen { width: calc(var(--an-brett) + 6px); padding: 3px; border-radius: 14px; }
   .an-brett-rahmen::after { inset: 2px; border-radius: 12px; }
@@ -452,4 +458,53 @@
 @container an-links (max-width: 291px) {
   .an-stand { display: none; }
   .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ============================================================
+   Etappe A (Flo 06.11.2026: "bei der Analyse ist das Schachbrett zu klein"), gemessen in tests/brettgroesse.test.mjs.
+   Querformat ab 561 px Hoehe: nur das Brett steht links und ist so hoch wie der Bildschirm; Navigation, Coach und die
+   rechte Spalte stehen rechts untereinander (vorher lagen Navigation und Coach unter dem Brett und kosteten 336 px Hoehe).
+   Hochformat: iPad mit schmalerem Rand, Handy von Rand zu Rand mit waagrechtem Bewertungsbalken ueber dem Brett.
+   Erst ab 920 px Breite: die rechte Spalte ist mindestens --an-rechts-min (32vw) breit, und die Navigation braucht dort
+   4 x 44 px + Zugstand 84 px + Luecken = 292 px (32vw >= 292 ab 913 px). Darunter (590 x 580) bleibt die alte Lage, dort
+   blendet @container an-links den Zugstand aus; mit .an-links als display: contents greift das nicht mehr.
+   Der Coach hat eine feste Hoehe und scrollt: wuchs er mit dem Text jedes Zuges, rutschte die Kurve darunter beim
+   Ziehen unter dem Finger weg.
+   ============================================================ */
+@media (orientation: landscape) and (min-height: 561px) and (min-width: 920px) {
+  .an-screen {
+    --an-brett: min(calc(100vh - var(--kopf-hoehe) - 32px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
+    --an-brett: min(calc(100dvh - var(--kopf-hoehe) - 32px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
+  }
+  .an-inhalt { grid-template-rows: auto auto minmax(0, 1fr); row-gap: 12px; }
+  .an-links { display: contents; }
+  .an-brettzone { grid-column: 1; grid-row: 1 / 4; align-self: start; }
+  .an-navi { grid-column: 2; grid-row: 1; }
+  .an-coach { grid-column: 2; grid-row: 2; height: clamp(120px, 24dvh, 220px); max-height: none; }
+  .an-rechts { grid-column: 2; grid-row: 3; }
+}
+/* Klassen zweispaltig erst ab 480 px Spaltenbreite: neben dem grossen Brett ist die Spalte auf dem iPad Pro (1366 x 1024)
+   426 px breit, und die zweite Spalte ragte rechts aus dem Fenster */
+@container an-rechts (max-width: 480px) {
+  .an-kl-raster { display: flex; flex-direction: column; }
+  .an-kl-kopf2, .an-kl-platz { display: none; }
+}
+@media (orientation: portrait) and (min-width: 521px) {
+  .an-screen { --an-brett: min(calc(100vw - 32px - var(--an-balken) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 880px); }
+  .an-screen.ohne-balken { --an-brett: min(calc(100vw - 32px), 880px); }
+}
+@media (orientation: portrait) and (max-width: 520px) {
+  .an-screen, .an-screen.ohne-balken { --an-balken: 0px; --an-brett: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)); }
+  .an-inhalt { width: 100%; padding-inline: 10px; }
+  .an-brettzone { flex-direction: column; gap: 6px; margin-inline: -10px; }
+  .an-brett-rahmen { width: var(--an-brett); padding: 0; border-radius: 0; box-shadow: none; }
+  .an-brett-rahmen::after { display: none; }
+  .an-brett-rahmen .brett { --brett-radius: 0px; }
+  /* Balken waagrecht: Weiss waechst von links (data-unten = Farbe auf der linken Seite) */
+  .an-evalbalken { width: auto; height: 12px; margin-inline: 10px; border-radius: 6px; }
+  .an-eb-unten { top: 0; bottom: 0; right: auto; width: var(--w, 50%); height: auto; }
+  .an-eb-unten::before { top: 0; bottom: 0; left: auto; right: -1px; width: 2px; height: auto; }
+  .an-eb-mitte { top: 0; bottom: 0; left: 50%; right: auto; width: 1px; height: auto; }
+  .an-eb-wert, .an-eb-wert[data-seite="oben"] { top: 1px; bottom: auto; left: 6px; right: auto; text-align: left; }
+  .an-eb-wert[data-seite="oben"] { left: auto; right: 6px; text-align: right; }
 }

@@ -157,6 +157,9 @@ registriereTexte('einstellungen', {
     'zz.ohneUhr': 'Ohne Uhr',
     'zz.drehen': 'Brett nach jedem Zug drehen',
     'zz.hinweis': 'Die Namen bleiben auf diesem Gerät. Mit Uhr läuft die Zeit auch im Hintergrund weiter.',
+    'zz.ueber': 'An einem Gerät',
+    'zz.namen': 'Namen eintragen',
+    'zz.namenFrei': 'freiwillig',
     'zz.los': 'Los',
     'zz.neuTitel': 'Neue Partie starten?',
     'zz.neuText': 'Die noch offene Partie wird verworfen.',
@@ -198,8 +201,7 @@ registriereTexte('einstellungen', {
     'start.w1.ueber': 'Willkommen bei Crownmate',
     'start.w1.titel': 'Schach, das mit dir wächst.',
     'start.w1.text': 'Du spielst gegen Gegner mit Charakter, siehst nach jedem Zug, wie gut er war, und lernst aus deinen eigenen Partien. Ohne Werbung, in deinem Tempo.',
-    'start.w2.start': 'Start: {name}',
-    'start.w2.ziel': 'Ziel: {name}',
+    'start.w2.fuss': '{welten} Welten, je ein Endgegner',
     'start.w2.ueber': 'Deine Gegner',
     'start.w2.titel': '{bots} Gegner, {welten} Welten.',
     'start.w2.text': 'Von {erster} {bis}: Jeder Sieg schaltet den nächsten frei, jede Welt endet mit einem Endgegner, und gegen jeden gibt es drei Sterne zu holen. Alle spielen ehrlich, keiner wird heimlich schwächer.',
@@ -256,7 +258,7 @@ registriereTexte('einstellungen', {
     'start.em.titel': 'Starte gegen {name}',
     'start.em.notiz': '{bot} ist auf der Leiter noch nicht frei. Eine Probepartie wertet nicht: keine Sterne, keine Freischaltung. Auf der Leiter ist {leiter} dein nächster Gegner.',
     'start.em.wiederholen': 'Einstufung wiederholen',
-    'start.zurArena': 'Zur Arena',
+    'start.zurArena': 'Zu den Bots',
     'start.regeln.geschafft': 'Regel-Hilfe geschafft',
     'start.regeln.ueber': 'Regel-Hilfe',
     'start.regeln.titel': 'Bereit für deine erste Partie?',
@@ -302,6 +304,7 @@ registriereTexte('einstellungen', {
     'daten.fehler.sonst': 'Das hat auf dem Server nicht geklappt ({status}). Bitte später noch einmal versuchen.',
     'daten.auskunftHinweis': 'server: was der Server von Crownmate zu deinem Konto liefert (Konto, Profil, Cloud-Spielstand-Daten, geteilte Partien und Nutzung, Online-Partien, Widerruf und '
       + 'Anmeldeprotokoll; anmeldeprotokoll null heißt: für diese Auskunft nicht lesbar, auf Anfrage beim Betreiber). '
+      + 'karte: deine Erfolgs-Stufen, Taler-Buchungen, Banner und die gewählte Visitenkarte. '
       + 'online_versuche: falsch eingegebene Einladungscodes je Tag. mengenzaehler: wie viele Zeilen dein Konto je Stunde geteilt hat '
       + '(nur Zahlen, für die Mengenbremse, nach 48 Stunden gelöscht). '
       + 'geraet: der Spielstand in diesem Browser. noch_nicht_gesendet: geteilte Daten, die noch auf diesem Gerät warten. '
@@ -549,6 +552,9 @@ registriereTexte('einstellungen', {
     'zz.ohneUhr': 'No clock',
     'zz.drehen': 'Turn the board after every move',
     'zz.hinweis': 'The names stay on this device. With a clock, time keeps running in the background too.',
+    'zz.ueber': 'On one device',
+    'zz.namen': 'Enter names',
+    'zz.namenFrei': 'optional',
     'zz.los': 'Start',
     'zz.neuTitel': 'Start a new game?',
     'zz.neuText': 'The unfinished game will be discarded.',
@@ -590,8 +596,7 @@ registriereTexte('einstellungen', {
     'start.w1.ueber': 'Welcome to Crownmate',
     'start.w1.titel': 'Chess that grows with you.',
     'start.w1.text': 'You play opponents with character, see right away how good each move was, and learn from your own games. No ads, at your own pace.',
-    'start.w2.start': 'Start: {name}',
-    'start.w2.ziel': 'Goal: {name}',
+    'start.w2.fuss': '{welten} worlds, one final boss each',
     'start.w2.ueber': 'Your opponents',
     'start.w2.titel': '{bots} opponents, {welten} worlds.',
     'start.w2.text': 'From {erster} {bis}: every win unlocks the next one, every world ends with a final boss, and each opponent has three stars to earn. They all play fair, and none of them secretly gets weaker.',
@@ -648,7 +653,7 @@ registriereTexte('einstellungen', {
     'start.em.titel': 'Start against {name}',
     'start.em.notiz': '{bot} is not unlocked on the ladder yet. A trial game does not count: no stars, no unlocks. On the ladder, {leiter} is your next opponent.',
     'start.em.wiederholen': 'Repeat placement',
-    'start.zurArena': 'Go to the Arena',
+    'start.zurArena': 'Go to the bots',
     'start.regeln.geschafft': 'Rules guide complete',
     'start.regeln.ueber': 'Rules guide',
     'start.regeln.titel': 'Ready for your first game?',
@@ -694,6 +699,7 @@ registriereTexte('einstellungen', {
     'daten.fehler.sonst': 'That did not work on the server ({status}). Please try again later.',
     'daten.auskunftHinweis': 'server: what the Crownmate server returns for your account (account, profile, cloud progress data, shared games and usage, online games, withdrawal of consent and '
       + 'sign-in log; anmeldeprotokoll null means: not readable for this report, available from the operator on request). '
+      + 'karte: your achievement tiers, thaler entries, banners and the business card you chose. '
       + 'online_versuche: wrong invitation codes entered per day. mengenzaehler: how many rows your account shared per hour '
       + '(numbers only, for the rate limit, deleted after 48 hours). '
       + 'geraet: the progress in this browser. noch_nicht_gesendet: shared data that is still waiting on this device. '
