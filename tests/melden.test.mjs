@@ -132,7 +132,7 @@ async function seite(browser, { melden = 'da', antwort = { ok: true, rest: 4 }, 
   page.setDefaultTimeout(15000);
   const fehler = [];
   const rufe = [];
-  const lage = { antwort };
+  const lage = { antwort, wartenMs: 0 };
   page.on('pageerror', (e) => fehler.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) fehler.push(m.text()); });
   await page.route(SUPA + '/**', (r) => {
@@ -143,7 +143,9 @@ async function seite(browser, { melden = 'da', antwort = { ok: true, rest: 4 }, 
       rufe.push({ name, body: r.request().postDataJSON() });
       if (melden === 'fehlt') return json({ code: 'PGRST202', message: 'Could not find the function public.' + name }, 404);
       if (melden === 'netz') return json({ message: 'kaputt' }, 500);
-      return json(name === 'melde_stand' ? { max: 5, rest: 5, notiz_max: 300 } : lage.antwort);
+      if (name === 'melde_stand') return json({ max: 5, rest: 5, notiz_max: 300 });
+      const a = lage.antwort;
+      return lage.wartenMs ? new Promise((fertig) => setTimeout(fertig, lage.wartenMs)).then(() => json(a)) : json(a);
     }
     return json([]);
   });
@@ -253,6 +255,29 @@ async function browserTeil(browser) {
         assert.ok(await page.locator('.melden-blatt [data-knopf="senden"]').isEnabled());
         await page.keyboard.press('Escape');
         await page.waitForSelector('.melden-blatt', { state: 'detached' });
+      });
+      // Codex-Befund PR #204: die Antwort kommt spaet, der Spieler hat laengst abgebrochen und ein anderes Blatt offen
+      await pruefe('Melden: spaete Antwort nach Abbrechen schliesst nicht ein anderes, inzwischen geoeffnetes Blatt', async () => {
+        s.lage.antwort = { ok: true, rest: 3 };
+        s.lage.wartenMs = 900;
+        const vorher = rufe.filter((x) => x.name === 'melde_spieler').length;
+        await page.evaluate(() => document.querySelector('.toast-ort')?.replaceChildren());
+        await s.oeffne(4);
+        await page.locator('.lg-mini-melden').click();
+        await page.locator('.melden-grund[data-grund="name"]').click();
+        await page.locator('.melden-blatt [data-knopf="senden"]').click();
+        await page.waitForFunction(() => /Wird gesendet/.test(document.querySelector('.melden-status')?.textContent || ''));
+        await page.locator('.melden-blatt [data-knopf="abbrechen"]').click();
+        await page.waitForSelector('.melden-blatt', { state: 'detached' });
+        await s.oeffne(2);
+        assert.equal(rufe.filter((x) => x.name === 'melde_spieler').length, vorher + 1);
+        // die Meldung ist angekommen: der Dank erscheint, die Mini-Karte von Platz 2 bleibt offen
+        await page.waitForFunction(() => /Danke, wir schauen es uns an\./.test(document.querySelector('.toast-ort')?.textContent || ''));
+        await page.waitForTimeout(400);
+        assert.equal(await page.locator('.lg-mini-blatt').count(), 1, 'das andere Blatt wurde geschlossen');
+        assert.equal((await page.locator('.lg-mini-blatt h3').innerText()).trim(), 'Lena_99');
+        s.lage.wartenMs = 0;
+        await s.zu();
       });
       await pruefe('Melden: keine Konsolenfehler', async () => assert.deepEqual(s.fehler, []));
     } finally { await s.kontext.close(); }

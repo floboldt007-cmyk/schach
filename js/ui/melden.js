@@ -101,6 +101,7 @@ export function oeffneMelden({ name, partie = null, fokusDanach = null } = {}) {
   let grund = null;
   let ergebnis = null;
   let laeuft = false;
+  let zu = false;   // dieses Blatt ist schon geschlossen (Abbrechen, Escape oder ein anderes Blatt kam)
 
   const el = document.createElement('div');
   el.className = 'melden';
@@ -139,11 +140,15 @@ export function oeffneMelden({ name, partie = null, fokusDanach = null } = {}) {
     const a = Array.isArray(d) ? d[0] : d;
     if (a && a.ok === true) {
       ergebnis = a.schon ? 'schon' : 'gesendet';
-      schliesseSheet();
+      // Nur DIESES Blatt schliessen: schliesseSheet() schliesst das gerade offene. Hat der Spieler waehrend der Anfrage
+      // abgebrochen und ein anderes Blatt geoeffnet, bliebe sonst das falsche zu (Codex-Befund PR #204). Die Meldung
+      // ist trotzdem angekommen, also dankt der Toast auch dann.
+      if (!zu) schliesseSheet();
       toast(a.schon ? M('schon', { name: zeigName }) : M('danke'), { dauer: 4200 });
       return;
     }
     laeuft = false;
+    if (zu) return;
     const kennung = a && typeof a.fehler === 'string' ? a.fehler : '';
     const bekannt = ['MELDEN_GRENZE', 'MELDEN_UNBEKANNT', 'MELDEN_SELBST', 'MELDEN_ANMELDEN'].includes(kennung);
     status.textContent = M(bekannt ? 'fehler.' + kennung : 'fehler.sonst');
@@ -158,6 +163,7 @@ export function oeffneMelden({ name, partie = null, fokusDanach = null } = {}) {
       { text: M('senden'), art: 'primaer', name: 'senden', aus: true, bleibt: true, beiKlick: schicke }] });
   senden = el.parentElement ? el.parentElement.querySelector('[data-knopf="senden"]') : null;
   return fertig.then(() => {
+    zu = true;
     if (fokusDanach && fokusDanach.isConnected && typeof fokusDanach.focus === 'function') {
       try { fokusDanach.focus({ preventScroll: true }); } catch (e) { /* egal */ }
     }
