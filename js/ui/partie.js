@@ -2065,6 +2065,7 @@ export function zeige(root, params, app) {
     o.innerHTML = `
       <div class="ergebnis-karte">
         <button class="icon-knopf erg-zu" type="button" aria-label="${esc(t('partie.erg.brettAnsehen'))}">${icon('auge')}</button>
+        <div class="erg-rumpf">
         ${wertend ? kopfWort : `<div class="erg-kopf">${kopfWort}<span class="chip uebung" data-modus="${esc(z.modus)}">${esc(chipText())}</span></div>`}
         <p class="erg-unter">${esc(unter)}</p>
         <div class="erg-mitte">
@@ -2074,6 +2075,7 @@ export function zeige(root, params, app) {
         <div class="erg-feier" hidden></div><div class="erg-karte-ort" hidden></div>
         <div class="erg-bot"><span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span><div class="sprechblase links"></div></div>
         <div class="erg-frei-ort"></div>
+        </div>
         <div class="erg-aktionen"><div class="erg-knoepfe"></div>
           <button class="erg-lobby" type="button" hidden>${icon('haus')}<span>${esc(t('partie.erg.lobby'))}</span></button></div>
       </div>`;
