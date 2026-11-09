@@ -441,7 +441,7 @@ export function zeige(root, params, app) {
   s.innerHTML = `
     <header class="kopf p-kopf">
       <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t(rueckZiel() === 'heim' ? 'partie.kopf.zurueckStart' : 'partie.kopf.zurueck'))}">${icon('zurueck')}</button>
-      <div class="titel"><h2>${esc(kopfTitel())}</h2><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
+      <div class="titel"><h1>${esc(kopfTitel())}</h1><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
     ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">${esc(t('partie.kopf.stufe', { stufe: bot.stufe }))}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">${esc(t('partie.kopf.duSpielst'))}</span>${esc(farbeName(farbe))}</span></div></div>
       <div class="brettwahl" role="radiogroup" aria-label="${esc(t('partie.kopf.brettfarbe'))}">${brettwahl}</div>
       <button class="icon-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(t('partie.kopf.klang'))}">${icon('klang')}</button>
@@ -463,8 +463,8 @@ export function zeige(root, params, app) {
         </div>
         <div class="coach coach-karte leer"></div>
         <div class="sr zugansage" role="status" aria-live="polite" aria-atomic="true"></div>
-        <div class="zugbox"><div class="zb-kopf"><button class="icon-knopf zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button><span class="zb-titel">${esc(t('partie.zuege.label'))}</span><button class="icon-knopf zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button></div><div class="zugliste" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
-        <div class="zugleiste" aria-label="${esc(t('partie.zuege.label'))}"></div>
+        <div class="zugbox"><div class="zb-kopf"><button class="icon-knopf zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button><span class="zb-titel">${esc(t('partie.zuege.label'))}</span><button class="icon-knopf zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button></div><div class="zugliste" role="region" tabindex="0" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
+        <div class="zugleiste" role="region" tabindex="0" aria-label="${esc(t('partie.zuege.label'))}"></div>
         <div class="pfeil-tipp" role="note" hidden><span class="pt-text"></span><button class="pt-ok dr" type="button" data-aktion="pfeil-tipp">${esc(t('partie.pfeil.ok'))}</button></div>
         <div class="spieler ich spielerleiste spieler-quer spieler-hoch" role="group" aria-label="${esc(meinName())}">
           <span class="av">${floAvatar(farbe)}</span>
@@ -748,7 +748,7 @@ export function zeige(root, params, app) {
       if (istFlo(i) && liveAn()) {
         const k = z.liveKlassen[i];
         const e = z.live[i];
-        if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_WORT[k])}: </span></span>`;
+        if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_NAME[k])}: </span></span>`;  // Vorlesen: Name ohne Satzzeichen (sonst "Solid.:")
         else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
       }
       return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}${i === ansehen.ply ? ' angesehen' : ''}" data-ply="${i}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
@@ -2520,7 +2520,7 @@ export function zeige(root, params, app) {
     loeseRuhe();
     const handy = istHandy();
     s.classList.toggle('handy', handy);
-    const h2 = $('.kopf h2');
+    const h2 = $('.kopf h1');
     const titel = handy ? kopfKurz() : kopfTitel();
     if (h2 && h2.textContent !== titel) h2.textContent = titel;
     if (!handy) {
@@ -2804,6 +2804,8 @@ export function zeige(root, params, app) {
       gegnerLeiste, spielerLeiste, aktionen, mattOrt: () => mattOrt, zugBot: () => zugBot,
       // U7: Uhr-Anzeige (W0+b), Groessenrechnung, Duell-Vertrag
       uhr, fmtUhr, layout, duellBereit, halte: () => halte,
+      // Punkt 33: Zugliste neu zeichnen (Vorlesetext je Klasse pruefen)
+      zeichneZugliste,
     };
   }
 
