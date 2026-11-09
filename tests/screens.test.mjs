@@ -525,10 +525,19 @@ async function testeTouch(browser, d) {
   const kb = await seite.locator('.an-kurve-wrap').boundingBox();
   await seite.touchscreen.tap(kb.x + kb.width * (11 / 33), kb.y + kb.height / 2);
   pruefe('Kurve antippen mit dem Finger', (await aktuellerPly(seite)) === 10, String(await aktuellerPly(seite)));
+  // Seit dem Kundenblick 09.11. stehen Brett und Coach im Hochformat ueber den Klassen: der Tipp auf die Kurve scrollt
+  // das Brett weich ins Bild, und der Coach waechst noch, wenn sein Text kommt. Erst tippen, wenn die Zeile ruhig steht
+  // (die Analyse scrollt in einem eigenen Behaelter, gemessen wird deshalb die Zeile selbst; in WebKit traf der Tipp sonst
+  // die Kopfzeile der Klassen, gemessen 68 px Versatz).
+  const stehtStill = () => seite.waitForFunction(() => new Promise((fertig) => {
+    const e = document.querySelector('.an-kl[data-klasse="brillant"]');
+    const y = e.getBoundingClientRect().top; setTimeout(() => fertig(e.getBoundingClientRect().top === y), 600);
+  }), null, { timeout: 8000 }).catch(() => {});
+  await stehtStill();
   // Zugklassen sind seit 30.10. abends gleich aufgeklappt
   await seite.locator('.an-kl[data-klasse="brillant"]').scrollIntoViewIfNeeded();
-  const kl = await seite.locator('.an-kl[data-klasse="brillant"]').boundingBox();
-  await seite.touchscreen.tap(kl.x + kl.width / 2, kl.y + kl.height / 2);
+  await stehtStill();
+  await seite.locator('.an-kl[data-klasse="brillant"]').tap();
   await warte(500);
   const z = await seite.locator('.an-coach').getAttribute('data-klasse');
   pruefe('Klassen-Zeile mit dem Finger: Genial', z === 'brillant', z);
