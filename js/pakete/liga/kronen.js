@@ -48,6 +48,14 @@ export const BOT_ZIEL_MAX = Object.freeze([150, 250, 350, 450, 600, 800]);
 // Schummel-Schutz (Flo 07.11.2026): Bot- und KI-Gewinne zusammen hoechstens so viele Kronen je Woche, der Server
 // erzwingt das (kronen_einfach_buchen); hier nur fuer die Anzeige "diese Woche voll"
 export const BOT_KI_WOCHEN_MAX = 300;
+// Platzhalter fuer die Regel-Erklaerung der Gruppe (p-liga.gruppe.regeln.*): die Texte nennen keine eigene Zahl
+export const kronenRegelWerte = () => ({
+  os: KRONEN.online.sieg, or: KRONEN.online.remis, on: -KRONEN.online.niederlage,
+  ks: KRONEN.ki.sieg, kr: KRONEN.ki.remis, kn: -KRONEN.ki.niederlage,
+  bs: KRONEN.bot.sieg, br: KRONEN.bot.remis,
+  gruppe: GRUPPE_GROESSE, auf: AUFSTIEG_PLAETZE, ab: ABSTIEG_PLAETZE, lohn: BELOHNUNG[BELOHNUNG.length - 1].bis,
+  botTag: BOT_TAGESGRENZE, kiTag: KI_TAGESGRENZE, woche: BOT_KI_WOCHEN_MAX,
+});
 
 const MAX_INDEX = STUFEN_ANZAHL - 1;
 const zahl = (v) => (Number.isFinite(v) ? v : 0);

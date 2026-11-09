@@ -23,7 +23,7 @@
 // beim Laden mit.
 import { icon } from '../../ui/icons.js';
 import { t, zahl, datum } from '../../sprache.js';
-import { stufeInfo, naechsteStufe, zoneVon, belohnungFuer, GRUPPE_GROESSE } from './kronen.js';
+import { stufeInfo, naechsteStufe, zoneVon, belohnungFuer, kronenRegelWerte, GRUPPE_GROESSE } from './kronen.js';
 import { stufenName } from './texte.js';
 
 // Bild, Banner und Blatt erst laden, wenn die Gruppe gezeichnet wird: statisch importiert zoegen sie ueber profil.js das
@@ -207,6 +207,12 @@ export function reiterGruppe({ app } = {}) {
     s.innerHTML = `<article class="lg-gr-karte" data-zustand="${zustand}"><span class="lg-gr-karte-symbol" aria-hidden="true">${icon('krone')}</span>
       <p>${esc(text)}</p>${link ? `<a class="knopf primaer lg-gr-konto" href="#einstellungen/konto">${esc(T('kontoLink'))}</a>` : ''}</article>`;
   };
+  // Wie Kronen zaehlen, eingeklappt unter der Liste; alle Zahlen kommen aus kronen.js
+  const regeln = () => {
+    const w = kronenRegelWerte();
+    return `<details class="lg-gr-regeln"><summary>${esc(T('regeln.titel'))}</summary>
+      <p>${esc(T('regeln.kronen', w))}</p><p>${esc(T('regeln.woche', w))}</p><p>${esc(T('keine'))}</p></details>`;
+  };
   function zeichne(lg) {
     lage = lg;
     const ende = endeText(lg);
@@ -214,7 +220,8 @@ export function reiterGruppe({ app } = {}) {
       ${ende ? `<p class="lg-gr-ende">${esc(ende)}</p>` : ''}
       ${lg.offen ? `<p class="lg-gr-offen">${esc(lg.offen === 1 ? T('offenEins') : T('offen', { n: zahl(lg.offen) }))}</p>` : ''}
       ${lg.botKiVoll ? `<p class="lg-gr-botvoll">${esc(T('botVoll'))}</p>` : ''}
-      ${lg.gruppe != null && lg.mitglieder.length ? `<div class="lg-gr-liste">${liste(lg)}</div>` : ''}`;
+      ${lg.gruppe != null && lg.mitglieder.length ? `<div class="lg-gr-liste">${liste(lg)}</div>` : ''}
+      ${regeln()}`;
     s.dataset.zustand = lg.gruppe != null ? 'gruppe' : 'leer';
   }
 

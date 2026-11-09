@@ -225,6 +225,13 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
     await warteBis(s, () => document.querySelector('.rd-meldung')?.dataset.art === 'richtig' && !!document.querySelector('.rd-brett img.figur[data-feld="g8"]'));
     pruefe('Raetsel 3: Zwischenzug richtig, Gegenantwort Kg8 steht, noch nicht geloest',
       /^2 /.test(await geloest(s, 'ich')) && await s.locator('.rd-meldung').innerText() === 'Gut, weiter so');
+    // Zwischenzug klingt wie im Raetsel-Bildschirm (zugKlangName: Tb7 ist ein stiller Zug, also "zug"); ein Fehler im
+    // Klang-Aufruf wuerde still verschluckt, darum muss der Eintrag im Protokoll stehen
+    const zwischenKlang = await s.evaluate(async () => {
+      const { klang } = await import('./js/sounds.js');
+      return klang.protokoll().filter((e) => e.name !== 'start').map((e) => e.name).slice(-1)[0] || null;
+    });
+    pruefe('Raetsel 3: der Zwischenzug klingt als Zug (Klang wie im Raetsel-Bildschirm)', zwischenKlang === 'zug', zwischenKlang);
     await bild(s, bildName(geraet, schema, '3-duell'));
     await zieh(s, 'a6a8');
     await warteBis(s, () => /^3 /.test(document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent));
