@@ -890,7 +890,10 @@ function hilfen(seite) {
         await h.warteFlo();
         if (hinweis && i === 1) {
           await h.tippe('.spielknoepfe [data-aktion="hinweis"]');
-          await warte(400);
+          // Der Hinweis zaehlt erst, wenn die Engine geantwortet hat (partie.js hinweis()); wer vorher zieht, aendert die
+          // Stellung und der Hinweis verfaellt. Darum warten, bis das Feld markiert ist, statt fest 400 ms (wackelte in CI).
+          await seite.waitForFunction(() => document.querySelector('.lage.mark-hinweis')
+            && !document.querySelector('.spielknoepfe [data-aktion="hinweis"].rechnet'), null, { timeout: 30000 });
         }
         await h.tippeFeld(zug.slice(0, 2));
         await h.tippeFeld(zug.slice(2, 4));
