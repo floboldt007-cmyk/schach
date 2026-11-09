@@ -53,6 +53,7 @@ registriereTexte('p-sammlung', {
     'shop.anprobeText': 'So sieht das Brett aus. Benutzen kannst du es, sobald es dir gehört.',
     'shop.verfuegbar': '{n} von {auflage} verfügbar', 'shop.erhaeltlich': 'Erhältlich', 'shop.angekuendigt': 'Verkauf ab {datum}',
     'shop.pausiert': 'Verkauf pausiert', 'shop.vergeben': 'Alle {auflage} vergeben', 'shop.beendet': 'Verkauf beendet',
+    'shop.produkt.brett-mitternacht': 'Mitternacht & Gold',
     // Erfinder-Profil (nur mit Sonderstuecken vom Server)
     'erfinder.name': 'Erfinder', 'erfinder.banner': 'Banner „Blatt 0“', 'erfinder.titel': 'Der Erfinder',
     // Titel (Flo 01.11.2026: "Titel auch zu Errungenschaften, nicht nur bei den Leveln"), js/pakete/sammlung/titel.js
@@ -140,6 +141,7 @@ registriereTexte('p-sammlung', {
     'shop.anprobeText': 'This is how the board looks. You can use it once it is yours.',
     'shop.verfuegbar': '{n} of {auflage} available', 'shop.erhaeltlich': 'Available', 'shop.angekuendigt': 'On sale from {datum}',
     'shop.pausiert': 'Sales paused', 'shop.vergeben': 'All {auflage} taken', 'shop.beendet': 'Sales ended',
+    'shop.produkt.brett-mitternacht': 'Midnight & Gold',
     'erfinder.name': 'Creator', 'erfinder.banner': 'Banner “Sheet 0”', 'erfinder.titel': 'The Creator',
     titel: 'Titles', 'titel.ab': 'From level {level}', 'titel.weg': 'With the achievement “{erfolg}”', 'titel.deiner': 'Your title',
     'titel.auto': 'Your title (automatic)', 'titel.frei': 'Unlocked, tap to wear',
