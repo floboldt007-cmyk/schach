@@ -245,12 +245,11 @@ try {
     await k.close();
   }
   { // 6. Bot-Schutz an (Test-Site-Key): Skript erst mit der Anmeldung, Token im Body, danach ein neues Token
-    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1' }, botschutz: 'ok' });
+    // Hinweis „Zum Home-Bildschirm“ (js/app.js, kommt 1,2 s nach dem Start) als schon gesehen, sonst verdeckt er die Anmeldung
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: 'ok' });
     const s = await seite(k, zustand, BASIS + '#arena');
     await s.waitForTimeout(1000);
     pruefe('Bot-Schutz: beim Start der App lädt nichts von Cloudflare', zustand.cf.length === 0, zustand.cf);
-    // Der Start zeigt einmal den Hinweis „Zum Home-Bildschirm“; schliessen, damit er die Anmeldung nicht verdeckt
-    for (let i = 0; i < 3 && await s.locator('.dialog-ort:not(.weg) .dialog').count(); i++) { await s.keyboard.press('Escape'); await s.waitForTimeout(400); }
     await s.evaluate(() => { location.hash = '#einstellungen'; });
     await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
     pruefe('Bot-Schutz: mit der Anmeldung genau ein Skript, nur von challenges.cloudflare.com (explizit gezeichnet)',
@@ -269,7 +268,7 @@ try {
     await k.close();
   }
   { // 7. Bot-Schutz schlaegt fehl: kein Code anfordern, eigener Text
-    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1' }, botschutz: 'fehler' });
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: 'fehler' });
     const s = await seite(k, zustand, BASIS + '#einstellungen');
     await s.waitForTimeout(1200);
     await s.locator('.konto-email').fill('flo@example.invalid');
