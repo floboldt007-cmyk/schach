@@ -611,10 +611,11 @@ setzeSpeicher(s);
   const FIX = { finisher: 10000, ausdruck: 6000, siegeslauf: 6000, werkstatt: 8000 };
   // Zu den 21 Modulen von w0plus-a-fix (536.000) kommen zuzweit (#26), Welle A (A1 teilen) und Welle C (S1-5
   // tagesraetsel), Etappe B (kronen: letzter Kronen-Stand und Start-Merker) und Etappe 4b (besitz: Stufen, Taler,
-  // Raetsel-Zaehler, Server-Stand); alle anderen Zahlen bleiben fest
-  const DAZU = { zuzweit: 2000, teilen: 2000, tagesraetsel: 4000, kronen: 1000, besitz: 12000 };
+  // Raetsel-Zaehler, Server-Stand) und der Feinschliff 09.11. (besuch: letzter Besuchstag, Willkommen zurueck);
+  // alle anderen Zahlen bleiben fest
+  const DAZU = { zuzweit: 2000, teilen: 2000, tagesraetsel: 4000, kronen: 1000, besitz: 12000, besuch: 200 };
   const summeNeu = Object.values(DAZU).reduce((a, b) => a + b, 0);
-  pruefe('MODUL_BUDGET: 21 Module (536.000) plus zuzweit, teilen, tagesraetsel, kronen und besitz, zusammen 26 Module, 557.000',
+  pruefe('MODUL_BUDGET: 21 Module (536.000) plus zuzweit, teilen, tagesraetsel, kronen, besitz und besuch, zusammen 27 Module, 557.200',
     Object.entries(FIX).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 21 + Object.keys(DAZU).length
     && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 536000 + summeNeu, MODUL_BUDGET);
   pruefe('MODUL_BUDGET neu: zuzweit 2.000 (Zu zweit), teilen 2.000 (A1 Siegesbild), tagesraetsel 4.000 (S1-5), kronen 1.000 (Etappe B)',Object.entries(DAZU).every(([k, v]) => MODUL_BUDGET[k] === v));
