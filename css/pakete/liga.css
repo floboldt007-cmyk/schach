@@ -194,6 +194,10 @@
 .lg-mini-werte dd img { width: 18px; height: auto; }
 .sheet-karte .lg-mini-satz { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.45; color: var(--text-2); }
 .lg-mini-werte .lg-mini-stufe dd { font-size: 15px; white-space: normal; justify-content: center; text-align: center; line-height: 1.15; }
+/* "Spieler melden" in der Mini-Karte eines anderen Menschen (js/ui/melden.js; nur wenn der Server das Melden kennt) */
+.lg-mini-melden { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); margin: -6px 0 -8px; padding: 0 4px;
+  border: 0; background: none; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.lg-mini-melden .ico { width: 16px; height: 16px; }
 /* So zaehlen Kronen: eingeklappte Regeln unter der Gruppenliste (Pruefung U 09.11.2026) */
 .lg-gr-regeln { margin: 0; padding: 0 4px; font-size: 13px; color: var(--text-2); }
 .lg-gr-regeln summary { min-height: 44px; display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; list-style: none; }

@@ -29,9 +29,9 @@ import { stufenName } from './texte.js';
 // Bild, Banner und Blatt erst laden, wenn die Gruppe gezeichnet wird: statisch importiert zoegen sie ueber profil.js das
 // Konto mit (setInterval nach app:bereit), und das Paket bliebe nicht leicht (tests/liga.test.mjs endete nie)
 let B = null;
-const ladeBild = () => Promise.all([import('../../ui/visitenkarte.js'), import('../../thema.js'), import('../../ui/bauteile.js')])
-  .then(([v, th, ui]) => { B = { bannerUrl: v.bannerUrl, botBanner: v.botBanner, eigeneKarte: v.eigeneKarte, MENSCHEN_BANNER: v.MENSCHEN_BANNER,
-    profilAvatar: th.profilAvatar, sheet: ui.sheet }; });
+const ladeBild = () => Promise.all([import('../../ui/visitenkarte.js'), import('../../thema.js'), import('../../ui/bauteile.js'), import('../../ui/melden.js')])
+  .then(([v, th, ui, me]) => { B = { bannerUrl: v.bannerUrl, botBanner: v.botBanner, eigeneKarte: v.eigeneKarte, MENSCHEN_BANNER: v.MENSCHEN_BANNER,
+    profilAvatar: th.profilAvatar, sheet: ui.sheet, schliesseSheet: ui.schliesseSheet, melden: me }; });
 
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const T = (k, w) => t('p-liga.gruppe.' + k, w);
@@ -121,8 +121,11 @@ function bildDaten(m) {
     banner: B && B.MENSCHEN_BANNER.includes(m.banner) ? m.banner : 'start' };
 }
 
-// Mini-Karte einer Zeile als Blatt: Banner, Bild, Name, dann Platz, Kronen und Stufe; ein Satz, was die Liga nicht zeigt
-function miniKarte(m, lg) {
+// Mini-Karte einer Zeile als Blatt: Banner, Bild, Name, dann Platz, Kronen und Stufe; ein Satz, was die Liga nicht zeigt.
+// Bei einem anderen Menschen mit Benutzernamen kommt "Spieler melden" dazu (button.lg-mini-melden), aber erst, wenn der
+// Server das Melden kennt (js/ui/melden.js meldenBereit; ohne supabase/melden-schema.sql bleibt die Karte wie bisher).
+// Nie in der eigenen Karte und nie bei einem KI-Mitspieler. zeile: der Knopf der Zeile (Fokus nach dem Melden).
+function miniKarte(m, lg, zeile) {
   const name = m.ich ? T('du') : (m.name || T('spieler'));
   const bild = bildVon(m, m.ich ? (m.name || name) : name);
   // zwei Teile um den Titel des Blatts (den Namen): oben Banner und Bild, unten Werte und Satz (Reihenfolge per CSS order)
@@ -136,7 +139,23 @@ function miniKarte(m, lg) {
       <div class="lg-mini-stufe"><dt>${esc(T('mini.stufe'))}</dt><dd><img src="${esc(wappenUrl(lg.stufe))}" alt="" width="20" height="24">${esc(stufenName(lg.stufe))}</dd></div>
     </dl>
     <p class="lg-mini-satz">${esc(m.ki ? T('mini.ki') : m.ich ? T('mini.ich') : T('mini.satz'))}</p></div>`;
-  return B.sheet({ titel: name, inhalt: el.content, klasse: 'lg-mini-blatt', knoepfe: [{ text: T('mini.zu'), wert: true }], abbrechen: false });
+  const mini = el.content.querySelector('.lg-mini');
+  const offen = B.sheet({ titel: name, inhalt: el.content, klasse: 'lg-mini-blatt', knoepfe: [{ text: T('mini.zu'), wert: true }], abbrechen: false });
+  if (!m.ich && !m.ki && B.melden.meldbarerName(m.name)) {
+    B.melden.meldenBereit().then((bereit) => {
+      if (!bereit || !mini.isConnected) return;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lg-mini-melden';
+      b.innerHTML = `${icon('flagge')}<span>${esc(t('melden.knopf'))}</span>`;
+      b.addEventListener('click', () => {
+        B.schliesseSheet();
+        B.melden.oeffneMelden({ name: m.name, fokusDanach: zeile });
+      });
+      mini.append(b);
+    });
+  }
+  return offen;
 }
 
 // Antwort des Servers pruefen; alles Unbrauchbare gilt als Fehler (nie NaN, nie eine fremde Kennung in der Anzeige)
@@ -231,7 +250,7 @@ export function reiterGruppe({ app } = {}) {
     if (wer && lage) {
       const platz = Number(wer.closest('.lg-gr-zeile').dataset.platz);
       const m = lage.mitglieder.find((x) => x.platz === platz);
-      if (m) miniKarte(m, lage);
+      if (m) miniKarte(m, lage, wer);
       return;
     }
     const mehr = e.target.closest('.lg-gr-mehr');

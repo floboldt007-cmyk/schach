@@ -65,6 +65,8 @@ jobs:
         run: node tests/server-liga-bild.test.mjs
       - name: Raetsel-Duell-SQL ausfuehren
         run: node tests/server-raetsel-duell.test.mjs
+      - name: Melden-SQL ausfuehren (Namensfilter und Melden, vorbereitet, nicht eingespielt)
+        run: node tests/server-melden.test.mjs
       - name: Datenauskunft-SQL ausfuehren (alle Schemata, Vollstaendigkeit)
         run: node tests/server-daten.test.mjs
 

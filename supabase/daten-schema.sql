@@ -330,6 +330,7 @@ declare
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
   duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
+  meldungen jsonb := '[]'::jsonb;
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -462,6 +463,14 @@ begin
                ''suche'', (select to_jsonb(q) - ''user_id'' from public.duell_warteschlange q where q.user_id = $1))'
       into duelle using uid;
   end if;
+  -- Melden (melden-schema.sql): die Meldungen, die der Aufrufer selbst abgegeben hat (Grund, eigener Text, gemeldeter
+  -- Name, Zeitpunkt). Meldungen UEBER den Aufrufer stehen nicht darin: sie wuerden verraten, wer gemeldet hat.
+  if to_regclass('public.meldungen') is not null then
+    execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', m.am, ''tag'', m.tag, ''grund'', m.grund, ''notiz'', m.notiz,
+               ''gemeldeter_name'', m.gemeldeter_name, ''partie'', m.partie) order by m.am, m.id), ''[]''::jsonb)
+             from public.meldungen m where m.melder = $1'
+      into meldungen using uid;
+  end if;
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
                ''ip'', e.ip_address) order by e.created_at), ''[]''::jsonb)
@@ -500,6 +509,8 @@ begin
     'karte', karte,
     -- Raetsel-Duell: eigene Duelle mit eigenem Stand, laufende Suche (leer ohne raetsel-duell-schema.sql)
     'raetsel_duell', duelle,
+    -- Melden: die selbst abgegebenen Meldungen (leer ohne melden-schema.sql)
+    'meldungen', meldungen,
     'partien_online', online,
     -- Fehlversuche beim Beitreten zu Online-Partien (Zahl je Tag; leer, wenn online-schema.sql fehlt)
     'online_versuche', versuche,

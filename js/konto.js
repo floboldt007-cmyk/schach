@@ -10,6 +10,7 @@
 // Abgleich ueberschrieb sonst beim Verlassen der Einstellungen den Cloud-Stand (Ultracode-Pruefung PR #76).
 import { SUPABASE_URL, SUPABASE_KEY, ANMELDEWEGE } from './konto-config.js';
 import { botschutz } from './botschutz.js';
+import { nameGesperrt } from './namen.js';
 import { aufgeloesterModus } from './thema.js';
 import { SPEICHER_VERSION, rohSpeicher } from './storage.js';
 import { hoere } from './ereignisse.js';
@@ -246,12 +247,18 @@ export async function speichereCloudStand(stand = cloudStand()) {
 export async function speichereBenutzername(benutzername) {
   benutzername = String(benutzername || '').trim();
   if (!NAME.test(benutzername)) throw new Error(K('nameRegel'));
+  // Namensfilter (js/namen.js, dieselbe Liste wie der Server in supabase/melden-schema.sql): freundlich vor dem Absenden
+  // Ein Name, den das Konto schon traegt, bleibt (bestehende Namen aendert der Filter nie, auch der Server nicht).
+  const sperre = String(eigenerName() || '').toLowerCase() === benutzername.toLowerCase() ? null : nameGesperrt(benutzername);
+  if (sperre) throw new Error(K(sperre === 'reserviert' ? 'nameReserviert' : 'nameGesperrt'));
   const s = await aktiveSitzung();
   try {
     await anfrage('/rest/v1/profile', { methode: 'POST', token: s.access_token,
       daten: { user_id: userId(s), benutzername }, prefer: 'resolution=merge-duplicates' });
   } catch (e) {
     if (e.status === 409 || e.code === '23505') throw new Error(K('nameVergeben'));
+    // der Server hat das letzte Wort (Trigger profile_name_pruefen): Kennung NAME_GESPERRT, im Hinweis der Grund
+    if (e.serverDetails?.message === 'NAME_GESPERRT') throw new Error(K(e.serverDetails.hint === 'reserviert' ? 'nameReserviert' : 'nameGesperrt'));
     throw e;
   }
   merkeName(benutzername, s);

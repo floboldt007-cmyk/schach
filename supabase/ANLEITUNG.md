@@ -435,6 +435,92 @@ also einen Titel aus der Liste zeigen, den er nicht hat; Freitext ist ausgeschlo
 gewählten Karten sind danach weg (die Liga-Stufen leitet der Server beim nächsten Aufruf neu ab, die übrigen Stufen
 meldet das Gerät neu, gutgeschriebene Liga-Banner sind ohne Sicherung weg). Nur nach einer Sicherung ausführen (die Befehle dafür stehen oben in der Datei).
 
+## Namensfilter und Melden (Stand 09.11.2026, vorbereitet, noch nicht eingespielt)
+
+Zwei Dinge in einer Datei, `supabase/melden-schema.sql`:
+
+- **Namensfilter:** Neue und geänderte Benutzernamen prüft der Server gegen eine kurze Sperrliste: Namen, die nach
+  Crownmate oder einem Hilfe-Team klingen (admin, support, moderator, crownmate …), und klar beleidigende Begriffe
+  (Deutsch und Englisch), auch mit Ziffern statt Buchstaben (`4dm1n`) und Unterstrichen dazwischen. **Bestehende Namen
+  bleiben, wie sie sind.** Die App prüft dieselbe Liste schon vor dem Absenden (`js/namen.js`) und sagt freundlich, dass
+  der Name nicht geht.
+- **Melden:** In der Liga-Gruppe steht in der Mini-Karte eines anderen Spielers „Spieler melden“ (Grund aus fester
+  Liste, freiwilliger kurzer Text). Höchstens 5 Meldungen je Konto und Tag, derselbe Spieler nur einmal je Tag (der Tag
+  wechselt um 4:00 Uhr deutscher Zeit, wie in der App). Niemand liest Meldungen über die App, auch der Gemeldete nicht.
+  **Es passiert nichts von selbst:** keine Sperre, kein Umbenennen. Du schaust im Dashboard nach.
+
+**Ohne diese Datei** läuft die App wie bisher: Die App fragt den Server, ob er das Melden kennt, und zeigt den Knopf
+nur dann. Die freundliche Namensprüfung der App greift schon vorher, hält aber nur ehrliche Nutzer auf; verbindlich
+wird der Filter erst mit dieser Datei.
+
+**Für Flo, in dieser Reihenfolge:**
+
+1. Vorher muss `supabase/schema.sql` eingespielt sein (Profil mit Benutzername). Das ist es längst.
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** → den ganzen Inhalt von `supabase/melden-schema.sql` einfügen
+   → **Run**. Die Datei darf mehrfach laufen.
+3. Prüfen: den ganzen Inhalt von `supabase/melden-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler beginnt
+   mit `FEHLER:`), unten steht `Melden-RLS-Test erfolgreich`, der Lauf endet mit `ROLLBACK`, es bleibt nichts zurück.
+4. Danach `supabase/daten-schema.sql` noch einmal ausführen: „Meine Daten“ zeigt dann auch die Meldungen, die jemand
+   selbst abgegeben hat (Schlüssel `meldungen`).
+5. **Vor dem Live-Gang nach main:** die Datenschutzerklärung prüfen. Im selben Stand steht ein markierter Entwurf
+   (`datenschutz.html`, `datenschutz-en.html`, Abschnitt „Benutzernamen und Melden“): Zweck, gespeicherte Daten,
+   Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO, Löschung nach 12 Monaten (Vorschlag). Bitte auch prüfen lassen, ob und
+   wie ein gemeldeter Spieler auf Anfrage Auskunft über Meldungen zu seinem Konto bekommt (die App zeigt sie ihm nicht,
+   damit niemand erfährt, wer gemeldet hat).
+
+**Meldungen ansehen** (SQL Editor, dort gelten die Sperren für Nutzer nicht):
+
+```sql
+-- offene Meldungen, die neuesten zuerst
+select m.id, m.am, m.grund, m.notiz, m.gemeldeter_name,
+       (select benutzername from public.profile p where p.user_id = m.gemeldet) as heisst_jetzt,
+       (select benutzername from public.profile p where p.user_id = m.melder) as gemeldet_von,
+       m.partie, m.gemeldet
+from public.meldungen m
+where m.stand = 'offen'
+order by m.am desc;
+
+-- wer von mehreren verschiedenen Spielern gemeldet wurde (letzte 30 Tage)
+select m.gemeldet, max(m.gemeldeter_name) as name, count(distinct m.melder) as melder, count(*) as meldungen
+from public.meldungen m
+where m.am > now() - interval '30 days'
+group by m.gemeldet
+order by melder desc, meldungen desc;
+```
+
+**Eine Meldung abhaken:** `update public.meldungen set stand = 'erledigt' where id = 123;` (oder `'abgelehnt'`).
+
+**Einen Namen von Hand ersetzen** (die Konto-Kennung steht in der Spalte `gemeldet`):
+
+```sql
+update public.profile
+set benutzername = 'Spieler_' || substr(md5(user_id::text), 1, 8)
+where user_id = 'HIER-DIE-KENNUNG';
+```
+
+Der Spieler kann sich danach in den Einstellungen selbst einen neuen Namen geben; der Filter prüft ihn. Auf seinem
+Gerät steht der alte Name noch, bis er die App neu öffnet.
+
+**Die Sperrliste ändern:** Die Wörter stehen an zwei Stellen, die gleich bleiben müssen: `namen_regeln()` in
+`supabase/melden-schema.sql` und `NAMEN_REGELN` in `js/namen.js`. Der Test `tests/server-melden.test.mjs` schlägt an,
+wenn sie auseinanderlaufen. Nach einer Änderung die SQL-Datei neu einspielen. Die Liste ist mit Absicht kurz: Ein Wort,
+das auch in harmlosen Namen steckt, sperrt Unschuldige aus (in „Scunthorpe“, „Dickens“ oder „Hassan“ stecken
+Schimpfwörter). Was die Liste nicht fängt, fängt das Melden.
+
+**Was der Server sicherstellt:** Die Tabelle `meldungen` hat keine Rechte für Nutzer und keine Policy; nur die beiden
+Funktionen `melde_stand` und `melde_spieler` sind für angemeldete Nutzer aufrufbar, für anonyme nichts. Wer meldet,
+kommt aus der Sitzung, nie aus der Anfrage. Sich selbst kann niemand melden. Mit dem Konto des Meldenden oder des
+Gemeldeten verschwinden die Meldungen.
+
+**Bekannte Grenzen:** Der Filter erkennt keine erfundenen Schreibweisen (`fvck`, verdoppelte Buchstaben) und keine
+anderen Sprachen. Das Aufräumen nach 12 Monaten läuft mit der nächsten Meldung, nicht nach der Uhr; von Hand geht es mit
+`delete from public.meldungen where am < now() - interval '12 months';`. Eine Meldung kann auch unberechtigt sein:
+deshalb entscheidet nie die Zahl der Meldungen allein.
+
+**Rückweg:** `supabase/melden-zurueck.sql` entfernt Filter, Funktionen und die Tabelle `meldungen`. Die Meldungen sind
+danach weg (Sicherungsbefehl steht oben in der Datei). Bestehende Benutzernamen bleiben unverändert, die App zeigt den
+Knopf „Spieler melden“ dann nicht mehr.
+
 ## Rätsel-Duell (Stand 07.11.2026)
 
 Das Rätsel-Duell (Lobby-Karte „Rätsel-Duell“, vorerst nur im Labor) braucht drei SQL-Dateien und die Edge Function
