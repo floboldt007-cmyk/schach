@@ -50,6 +50,9 @@ export const ORTE = Object.freeze({
   'karte:fremde?': 'wahl',
   'arena:panel-oben': 'dom',
   'arena:panel-bot': 'dom',
+  // Steckbrief eines Bots (T-3, Flo 09.11.2026): Blatt beim Antippen des Gegnerbilds, Host js/ui/arena.js, Kontext
+  // { app, bot, fortschritt }
+  'arena:steckbrief': 'dom',
   'arena:start': 'aufruf',
   'partie:begruessung?': 'wahl',
   'ergebnis:karte': 'dom',

@@ -23,6 +23,7 @@ import { BOTS, WELTEN, botNachId } from '../../bots.js';
 import { avatarVon } from '../../thema.js';
 import {
   ladePartie, ladeFortschritt, istFreigeschaltet, naechsterGegner, ladeModulEinstellungen, speichereModulEinstellungen, ladeEinstellungen,
+  statistik,
 } from '../../storage.js';
 import { analysierePartie } from '../../review.js';
 import { tagSchluessel } from '../../tag.js';
@@ -277,6 +278,21 @@ function alleTeile(st, app, fenster, jetzt, neu) {
   return { teile, gezeigt: beste };
 }
 
+// Bilanz aller wertenden Partien (T-3, Flo 09.11.2026; vorher unter dem Bots-Panel): Partien, Siege, Genauigkeit im
+// Schnitt, Spielstaerke. Erst ab der ersten Partie; jede dieser Zahlen steht in der Liga nur hier
+function bilanzKarte() {
+  const st = statistik();
+  if (!st.partien) return null;
+  const k = el('article', 'bl-karte bl-bilanz');
+  const prozent = Number.isFinite(st.schnittGenauigkeit)
+    ? t('p-punkte.ich.bilanz.prozent', { wert: zahl(st.schnittGenauigkeit, { maximumFractionDigits: 1, useGrouping: false }) }) : '–';
+  const werte = [['partien', zahlText(st.partien)], ['siege', zahlText(st.siege)], ['genauigkeit', prozent],
+    ['staerke', st.spielstaerke ? '≈ ' + zahlText(st.spielstaerke) : '–']];
+  k.innerHTML = `<span class="ueberzeile">${esc(t('p-punkte.ich.bilanz'))}</span>
+    <dl class="bl-bilanz-werte">${werte.map(([id, w]) => `<div><dt>${esc(t('p-punkte.ich.bilanz.' + id))}</dt><dd class="zahl">${esc(w)}</dd></div>`).join('')}</dl>`;
+  return k;
+}
+
 export function reiterIch({ app, fenster = 'woche', jetzt = new Date() } = {}) {
   const s = huelle('ich', t('p-punkte.reiter.ich'));
   s.hidden = false;
@@ -315,7 +331,7 @@ export function reiterIch({ app, fenster = 'woche', jetzt = new Date() } = {}) {
   knopf.addEventListener('click', () => { setzeOffen(!offen); merkeEinstellung({ ichAlle: offen }); });
   setzeOffen(offen);
 
-  s.append(kronenKarte(), besteKarte(app, woche, neu), knopf, bereich);
+  s.append(...[kronenKarte(), besteKarte(app, woche, neu), bilanzKarte(), knopf, bereich].filter(Boolean));
   bindeAnalyse(s, app);
   if (woche[0] && neu.has(woche[0].id)) merkeGesehen([woche[0].id]);
   return { el: s, verlasse() {} };
@@ -341,6 +357,16 @@ function chronikHtml(tf) {
   return `<div class="bl-chronik"><span class="ueberzeile">${esc(t('p-punkte.chronik.titel'))}</span><ol aria-label="${esc(t('p-punkte.chronik.label'))}">`
     + w.map(([wo, x]) => `<li title="${esc(t('p-punkte.chronik.woche', { datum: schluesselText(wo), wert: zahlText(x) }))}"><i style="--h:${(x / max).toFixed(3)}"></i>`
       + `<span class="sr">${esc(t('p-punkte.chronik.wocheSr', { datum: wo, wert: zahlText(x) }))}</span></li>`).join('') + '</ol></div>';
+}
+
+// Bilanz gegen den Bot der Tafel (T-3, vorher Zeile im Bots-Panel): nur Leiter-Bots, erst ab der ersten Partie
+function botBilanzHtml(z, bot) {
+  if (!z || z.art !== 'bot' || !bot || bot.stufe == null) return '';
+  const f = ladeFortschritt().bots[bot.id] || {};
+  const n = (x) => (Number.isFinite(x) && x > 0 ? x : 0);
+  if (!n(f.siege) && !n(f.remis) && !n(f.niederlagen)) return '';
+  return `<p class="bl-bot-bilanz">${esc(t('p-punkte.bots.bilanz', { name: kurzName(bot.id), siege: t('p-punkte.bots.siege', { n: n(f.siege) }),
+    remis: t('p-punkte.bots.remis', { n: n(f.remis) }), niederlagen: t('p-punkte.bots.niederlagen', { n: n(f.niederlagen) }) }))}</p>`;
 }
 
 export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) {
@@ -420,6 +446,7 @@ export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) 
       : t('p-punkte.bots.leer', { name: nameVon(id), gegner: bot ? bot.name : t('p-punkte.bots.diesenGegner') }));
     karte.innerHTML = `<header class="bl-k-kopf"><div><span class="ueberzeile">${esc(fensterText(fenster))}</span>
         <h2>${esc(nameVon(id))}</h2></div><span class="bl-k-hinweis">${esc(t('p-punkte.bots.zeilen'))}</span></header>
+      ${botBilanzHtml(z, bot)}
       ${zeilen.length ? `<ol class="bl-zeilen">${zeilen.map((r) => zeileHtml(r, { neu: r.eigen && neu.has(r.id) })).join('')}</ol>` : `<p class="bl-leer">${leerText}</p>`}
       ${chronikHtml(tf)}
       ${kannAngreifen ? `<div class="bl-fuss"><button class="knopf primaer bl-angriff dr" type="button">${icon('play')} `

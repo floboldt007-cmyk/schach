@@ -821,6 +821,23 @@ async function browserTeil(browser) {
   // erster Tag ohne Partie: nichts
   await bereite(n.seite, { modul: modulMit({}) }, '#arena');
   pruefe('erster Tag ohne Partie: kein Hinweis, Heute-Karte ohne Zeile', await zeile(n.seite) === null);
+  // T-3 (Flo 09.11.2026): derselbe Hinweis als Zeile unter "Als Naechstes" auf der Startseite, Antippen fuehrt hin
+  await bereite(n.seite, { modul: modulMit({}, { letzte: 'pprobe1' }) }, '#heim');
+  await n.seite.waitForSelector('.heim-naechstes [data-paket="start"]', { timeout: 8000 }).catch(() => {});
+  const heimNeu = await n.seite.evaluate(() => {
+    const z = document.querySelector('.heim-naechstes [data-paket="start"]');
+    const alle = [...document.querySelectorAll('.heim-naechstes .heim-zeile')].map((x) => x.dataset.paket || x.dataset.aktion);
+    return z && { id: z.dataset.entdeckung, text: [...z.querySelectorAll('.heim-zeile-text > *')].map((e) => e.textContent.trim()).join(' | '),
+      label: z.getAttribute('aria-label'), knopf: z.tagName === 'BUTTON' && z.getBoundingClientRect().height >= 44, vorTageswerk: alle.indexOf('start') < (alle.indexOf('serie') < 0 ? 99 : alle.indexOf('serie')),
+      sichtbar: !document.querySelector('.heim-naechstes').hidden };
+  });
+  pruefe('Startseite: Zeile "Neu für dich | Die Spielanalyse" unter "Als Nächstes", ein Knopf ab 44 px, vor dem Tageswerk', heimNeu && heimNeu.id === 'analyse'
+    && heimNeu.text === 'Neu für dich | Die Spielanalyse' && heimNeu.label === 'Neu für dich: Die Spielanalyse. Wo deine letzte Partie kippte.' && heimNeu.knopf
+    && heimNeu.vorTageswerk && heimNeu.sichtbar, JSON.stringify(heimNeu));
+  await n.seite.locator('.heim-naechstes [data-paket="start"]').click();
+  await n.seite.waitForSelector('.screen.vl-screen', { timeout: 15000 });
+  pruefe('Startseite: Antippen führt hin (Verlauf) und erledigt den Hinweis', await n.seite.evaluate(() => location.hash) === '#verlauf'
+    && (await modulImBrowser(n.seite)).fahrplan.erledigt.includes('analyse'));
   // nach der ersten Partie (hier eine Probepartie: letzte gesetzt)
   await bereite(n.seite, { modul: modulMit({}, { letzte: 'pprobe1' }) }, '#arena');
   let zl = await zeile(n.seite);
@@ -969,9 +986,10 @@ async function browserTeil(browser) {
   // Fall des Pruefers: Tag 1 nach dem ersten Start, die Einstufung waere dran, und die Kartei meldet eine faellige Karte
   await bereiteK(mk.seite, { modul: startK({}), kartei: karteiModul(tm) });
   let mK = await messeK(mk.seite);
-  pruefe('Kartei-Zeile und "Neu für dich" zugleich: die Kartei-Zeile steht, "Die Einstufung" tritt zurueck (unsichtbar, nicht erledigt, bleibt der Hinweis des Tages)',
-    mK.karte && mK.kartei && mK.neu === 'einstufung' && !mK.neuSichtbar && mK.hinweis === 'einstufung' && mK.heute === 'einstufung' && !mK.erledigt.includes('einstufung'), JSON.stringify(mK));
-  pruefe('...und der Spielen-Knopf bleibt auf dem iPad quer 1024 x 768 ganz im Bild', mK.unten <= mK.innerHeight, JSON.stringify({ unten: mK.unten, innerHeight: mK.innerHeight }));
+  // T-3: die Heute-Karte hat keinen Host mehr (die Zeilen stehen auf der Startseite), das Zuruecktreten (css/pakete/start.css)
+  // ist mit ihr entfallen; beide Zeilen stehen, der Hinweis bleibt der des Tages und gilt nicht als erledigt
+  pruefe('Kartei-Zeile und "Neu für dich" zugleich: beide stehen, "Die Einstufung" bleibt der Hinweis des Tages (nicht erledigt)',
+    mK.karte && mK.kartei && mK.neu === 'einstufung' && mK.neuSichtbar && mK.hinweis === 'einstufung' && mK.heute === 'einstufung' && !mK.erledigt.includes('einstufung'), JSON.stringify(mK));
   await bild(mk.seite, 'heute-kartei-ipad-1024');
   // dieselbe Lage, die Karte ist erst morgen faellig: keine Kartei-Zeile, "Neu fuer dich" steht wieder allein
   await bereiteK(mk.seite, { modul: startK({}), kartei: karteiModul(morgenK) });
