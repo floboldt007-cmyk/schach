@@ -474,7 +474,7 @@ Die Blöcke 1 und 3 hängen nicht voneinander ab. `daten-schema.sql` muss nicht 
 
 - Die Stufen selbst (Siege, Bots, Welten, Sterne, Endgegner, Siegesfolge, Rätsel, Serie, Level) meldet weiter das Gerät.
   Der Server hat dazu keine eigenen Daten. Ein Schummler kommt also weiter an Gold, aber nur noch langsam: frühestens
-  nach 5 Tagen ist alles Gold, nicht mehr in einem Aufruf.
+  nach 4 Tagen ist alles Gold (Serie erst ab 23.01.2027), nicht mehr in einem Aufruf.
 - Diese Titel bleiben aus der festen Liste für jeden wählbar, weil ihre Grundlage nur auf dem Gerät liegt: Schattenkönig,
   Goldene Feder, Sternenschüler, Blitzschlag, Langer Atem, Gleichgewicht, Feinschliff, Eigene Kraft, Stammgast,
   Tafelkönig, Rekordjäger, Fehlerjäger, Musterschüler, Erzfeind.
