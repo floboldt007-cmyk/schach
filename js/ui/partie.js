@@ -2082,10 +2082,28 @@ export function zeige(root, params, app) {
     o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
     // U7: Bot-Sprueche aus: auch kein Spruch im Ergebnis
     o.querySelector('.erg-bot').hidden = app.einstellungen().sprueche === 'aus';
-    o.querySelector('.erg-zu').addEventListener('click', () => {
+    const zeigeBrett = () => {
       o.hidden = true;
       s.classList.remove('mit-ergebnis');
-      $('.ergebnis-zeigen').hidden = false;
+      sperreHintergrund(o, false);
+      const zeigen = $('.ergebnis-zeigen');
+      zeigen.hidden = false;
+      zeigen.focus({ preventScroll: true });
+    };
+    o.querySelector('.erg-zu').addEventListener('click', zeigeBrett);
+    // Punkt 30 (Barrierefreiheit 09.11.): das Blatt haelt den Fokus wie ein Dialog. Tab kreist im Blatt, Escape zeigt
+    // das Brett (wie das Auge oben rechts); der Bildschirm dahinter ist inert (sperreHintergrund).
+    o.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); zeigeBrett(); return; }
+      if (e.key !== 'Tab') return;
+      const ziele = [...o.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')]
+        .filter((x) => !x.disabled && x.getClientRects().length);
+      if (!ziele.length) return;
+      const erst = ziele[0];
+      const letzt = ziele[ziele.length - 1];
+      const jetzt = document.activeElement;
+      if (e.shiftKey && (jetzt === erst || !ziele.includes(jetzt))) { e.preventDefault(); letzt.focus(); }
+      else if (!e.shiftKey && (jetzt === letzt || !ziele.includes(jetzt))) { e.preventDefault(); erst.focus(); }
     });
     // Sieg-Blatt (Flo 09.11., Variante C): Sterne und darunter der Level-Fortschritt; Punkte und Wertung
     // blendet css/ergebnis.css aus, ein Verweis fuehrt in die Liga. Nur bei wertenden Partien, sonst gibt es dort nichts.
@@ -2103,6 +2121,7 @@ export function zeige(root, params, app) {
       o.querySelector('.erg-karte-ort').after(verweis);
     }
     s.append(o);
+    sperreHintergrund(o, true);
     // U7: der Screen dahinter tritt zurueck (scale .975, nur transform), die Karte federt auf
     s.classList.add('mit-ergebnis');
     const karte = o.querySelector('.ergebnis-karte');
@@ -2337,7 +2356,15 @@ export function zeige(root, params, app) {
     if (!overlay) return;
     overlay.el.hidden = false;
     s.classList.add('mit-ergebnis');
+    sperreHintergrund(overlay.el, true);
     $('.ergebnis-zeigen').hidden = true;
+    const karte = overlay.el.querySelector('.ergebnis-karte');
+    if (karte) karte.focus({ preventScroll: true });
+  }
+  // Alles im Bildschirm ausser dem Ergebnis-Blatt ist inert, solange das Blatt offen ist (Tab und Screenreader
+  // bleiben im Blatt, wie im Shop seit U4)
+  function sperreHintergrund(blatt, an) {
+    for (const e of s.children) if (e !== blatt) e.inert = an;
   }
 
   // ---------- Begruessung (Wahl-Ort partie:begruessung? -> { anlass, werte }) ----------

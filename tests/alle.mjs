@@ -69,6 +69,7 @@ const SUITEN = [
   { name: 'vorzuege', datei: 'vorzuege.test.mjs', args: [], was: 'Vorzug-Kette mit Nummern, Pfeil-Tipp' },
   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
   { name: 'sw-update', datei: 'sw-update.test.mjs', args: [], was: 'SW-Update laedt nur geaenderte Dateien (ETag/304)' },
+  { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
   { name: 'klang', datei: 'klang.test.mjs', args: [], was: 'Klangpakete: Katalog, Dateien, Pegel, Abspielen' },
   { name: 'musik', datei: 'musik.test.mjs', args: [], was: 'Lobby-Musik: Standard, Beruehrung, Welten und Freischaltung' },

@@ -354,7 +354,7 @@ export function profilKarte({ app } = {}) {
         <small class="pr-seit">${esc(seitText())}${partienZahl ? ' · ' + esc(S(partienZahl === 1 ? 'profil.partieEine' : 'profil.partien', { zahl: partienZahl })) : ''}</small></div></div>
     <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
       <button type="button" class="knopf pr-banner-wahl">${esc(KT('karte.banner'))}</button></div>
-    <h4 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h4>
+    <h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>
     <div class="pr-vitrine">${vitrine.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"${e && e.stufe ? ` data-stufe="${e.stufe}"` : ''}
       aria-label="${esc(e ? (e.stufe ? `${e.name}, ${KT('stufe.' + e.stufe)}` : e.name) : S('profil.leer'))}">${e ? `<span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b>${e.stufe ? `<small class="pr-orden-stufe">${esc(KT('stufe.' + e.stufe))}</small>` : ''}`
       : `<span class="pr-plus" aria-hidden="true">+</span><small>${esc(S('profil.leer'))}</small>`}</button>`).join('')}</div>
