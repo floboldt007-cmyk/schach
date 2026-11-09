@@ -11,7 +11,8 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { setzeSpeicher } from '../js/storage.js';
 import { teileBretter, teileKlaenge, teileErfolge, partienStand, schulStand, SIEGE_ZIELE } from '../js/pakete/sammlung/index.js';
-import { standText } from '../js/pakete/sammlung/shop.js';
+import { standText, produktName } from '../js/pakete/sammlung/shop.js';
+import { setzeSprache } from '../js/sprache.js';
 import { rahmenTeile, motivTeile, grundTeile, titelTeile, duellProfil } from '../js/pakete/sammlung/profil.js';
 import { titelListe, aktuellerTitel, ERFOLGS_TITEL, KOENNEN_TITEL, koennenFrei } from '../js/pakete/sammlung/titel.js';
 import { erspielteTitel, merkeErspielteTitel, erspielteErfolge } from '../js/profil.js';
@@ -212,6 +213,15 @@ pruefe('Shop: ohne Restzahl vom Server keine Zahl', standText({ status: 'erhaelt
 pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText({ status: 'angekuendigt', verkauf_ab: '2026-12-01T10:00:00Z', auflage: 10 }) === 'Verkauf ab 01.12.2026'
   && standText({ status: 'ausverkauft', auflage: 10 }) === 'Alle 10 vergeben' && standText({ status: 'pausiert' }) === 'Verkauf pausiert'
   && standText({ status: 'beendet' }) === 'Verkauf beendet');
+// Englisch-Durchsicht 09.11.: Name der Edition und Datum folgen der Sprache (Server kennt nur den deutschen Namen)
+pruefe('Shop: deutscher Name bleibt, Server-Name zaehlt', produktName('brett-mitternacht') === 'Mitternacht & Gold' && produktName('brett-mitternacht', 'Anders') === 'Anders');
+setzeSprache('en');
+{
+  const ab = standText({ status: 'angekuendigt', verkauf_ab: '2026-12-01T10:00:00Z', auflage: 10 });
+  pruefe('Shop englisch: Midnight & Gold statt des deutschen Server-Namens, Datum im US-Format',
+    produktName('brett-mitternacht', 'Mitternacht & Gold') === 'Midnight & Gold' && ab === 'On sale from 12/01/2026', ab);
+}
+setzeSprache('de');
 
 // Titel (Flo 01.11.2026: "bessere Designs, Titel auch zu Errungenschaften, nicht nur bei den Leveln")
 {
