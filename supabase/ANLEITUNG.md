@@ -69,6 +69,14 @@ npm-Speicher, Docker ist nicht installiert, angemeldet und verknüpft ist die CL
 
 Immer in dieser umgekehrten Reihenfolge. Wichtig: Alle Kronen, Gruppen, Banner, Taler und Duelle sind danach weg.
 
+**Datenauskunft vollständig (09.11.2026, vorbereitet, noch nicht eingespielt):** `daten-schema.sql` gibt jetzt auch
+Frag den Coach (Fragen je Tag), den Schulmodus (geleitete Klassen mit Aufgaben, eigene Mitgliedschaften mit Fortschritt,
+Beitrittsversuche), die Stripe-Ereignisse zum eigenen Abo und die Editions-Ereignisse zu eigenen Reservierungen aus.
+Einspielen: `daten-schema.sql` noch einmal ausführen, dann `daten-rls-test.sql` (unten `Daten-RLS-Test erfolgreich`),
+dann `notify pgrst, 'reload schema';`. Rückweg: `daten-auskunft-zurueck.sql` stellt nur die Funktion `meine_daten()`
+auf den alten Stand, Daten gehen dabei keine verloren. Dass keine Tabelle fehlt, prüft `tests/server-daten.test.mjs`
+im CI-Job `sql`: Eine neue Tabelle macht ihn rot, bis sie in der Auskunft oder mit Grund in `KEIN_KONTOBEZUG` steht.
+
 ---
 
 # Supabase für „Konto light“ einrichten

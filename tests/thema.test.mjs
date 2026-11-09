@@ -179,7 +179,7 @@ function nodeTeil() {
     ['Layout-Eigenschaft', probe.replace('--grund: #F4F1EC;', '--grund: #F4F1EC; width: 10px;')],
     ['Feldfarbe', probe.replace('--grund: #F4F1EC;', '--grund: #F4F1EC; --feld-hell: #fff;')],
     ['fester Token', probe.replace('--grund: #F4F1EC;', '--grund: #F4F1EC; --tipp: 40px;')],
-    ['fehlender Token', probe.replace('--text-2: #6E6A63; ', '')],
+    ['fehlender Token', probe.replace('--text-2: #6A665F; ', '')],
     ['Regel fuer Elemente', probe + '\n.knopf { color: red; }'],
     ['Selektor in die Seite', probe + '\n:root[data-thema="probe"] .knopf { --x: 1; }'],
     ['dunkel ungleich system', probe.replace('--grund: #15171B;', '--grund: #151719;')],
@@ -203,6 +203,28 @@ function nodeTeil() {
     }
   }
   pruefe('Kontrast >= 4,5:1 fuer --text, --text-2, --akzent-text, --kt-* auf --flaeche, --flaeche-2, --grund (hell und dunkel)', schwach.length === 0, schwach.join(', '));
+  // Messrunde U 09.11.2026: Segmente (Liga, Bots, Einstellungen) setzen --text-2 auf --grund-2, die dunkle Pille ist --flaeche-3
+  const segSchwach = [];
+  for (const [modus, w] of [['hell', hell], ['dunkel', dunkel]]) {
+    for (const k of ['--text', '--text-2']) {
+      for (const f of ['--grund-2', '--flaeche-3']) {
+        const r = kontrast(hexRgb(w[k]), hexRgb(w[f]));
+        if (!(r >= 4.5)) segSchwach.push(`${modus} ${k} auf ${f} ${r.toFixed(2)}`);
+      }
+    }
+  }
+  pruefe('Kontrast >= 4,5:1 fuer --text und --text-2 auch auf --grund-2 und --flaeche-3 (Segmente, hell und dunkel)', segSchwach.length === 0, segSchwach.join(', '));
+  // Fokusring (WCAG 2.4.7/1.4.11): >= 3:1 auf jeder Flaeche, auf der ein Bedienelement stehen kann
+  const ringSchwach = [];
+  for (const [modus, w] of [['hell', hell], ['dunkel', dunkel]]) {
+    const v = (w['--fokus'] || '').match(/var\((--[a-z0-9-]+)\)|#[0-9A-Fa-f]{6}/);
+    const farbe = v ? hexRgb(v[1] ? w[v[1]] : v[0]) : null;
+    for (const f of ['--grund', '--grund-2', '--flaeche', '--flaeche-2', '--flaeche-3']) {
+      const r = farbe ? kontrast(farbe, hexRgb(w[f])) : 0;
+      if (!(r >= 3)) ringSchwach.push(`${modus} auf ${f} ${r.toFixed(2)}`);
+    }
+  }
+  pruefe('Fokusring (--fokus) >= 3:1 auf --grund, --grund-2 und allen --flaeche (hell und dunkel)', ringSchwach.length === 0, ringSchwach.join(', '));
   const zeichen = [];
   for (const k of KLASSEN) {
     const f = hexRgb(hell[`--k-${k}`]);

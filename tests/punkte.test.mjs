@@ -890,7 +890,10 @@ function hilfen(seite) {
         await h.warteFlo();
         if (hinweis && i === 1) {
           await h.tippe('.spielknoepfe [data-aktion="hinweis"]');
-          await warte(400);
+          // Der Hinweis zaehlt erst, wenn die Engine geantwortet hat (partie.js hinweis()); wer vorher zieht, aendert die
+          // Stellung und der Hinweis verfaellt. Darum warten, bis das Feld markiert ist, statt fest 400 ms (wackelte in CI).
+          await seite.waitForFunction(() => document.querySelector('.lage.mark-hinweis')
+            && !document.querySelector('.spielknoepfe [data-aktion="hinweis"].rechnet'), null, { timeout: 30000 });
         }
         await h.tippeFeld(zug.slice(0, 2));
         await h.tippeFeld(zug.slice(2, 4));
@@ -1030,6 +1033,7 @@ async function testeBrowser(browser) {
     /Diese Woche noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste').innerText())
     && await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste .bl-spielen').count() === 1 && await seite.locator('.bl-rekordbuch').count() === 0
     && !/ganz ohne Server|Jede Zeile eine echte Partie|wie treu/.test(await seite.locator('.bl-screen').innerText()));
+  pruefe('Leer: keine Bilanz-Karte (T-3, erst ab der ersten Partie)', await seite.locator('.bl-reiter[data-reiter="ich"] .bl-bilanz').count() === 0);
   // G-002 (Flos Wahl "Ich A"): eine Zahl oben, der Rest hinter einem Knopf; der Zeitraum steht erst im aufgeklappten Teil
   pruefe('Ich eingeklappt: Knopf „Alle Partien, Rekorde und Zeiträume“, kein Zeitraum-Schalter, keine Zähler und keine Liste',
     (await seite.locator('.bl-ich-alle').innerText()).trim() === 'Alle Partien, Rekorde und Zeiträume'
@@ -1115,6 +1119,10 @@ async function testeBrowser(browser) {
   await warte(600);
   pruefe('„Zur Liga“ öffnet den Reiter Bots mit Lukas’ Tafel', /Lukas’ Tafel/.test(await seite.locator('.bl-tafel h2').innerText())
     && await seite.locator('.bl-tafel').getAttribute('data-tafel') === 'bot:benno');
+  // T-3: die Bilanz gegen den Bot steht ueber seiner Tafel (vorher Zeile im Bots-Panel)
+  const botBilanz = (await seite.locator('.bl-tafel .bl-bot-bilanz').textContent().catch(() => '') || '').trim();
+  pruefe('Tafel des Bots: Bilanz „Gegen Lukas: 1 Sieg · 0 Remis · 0 Niederlagen“ unter dem Kopf', botBilanz === 'Gegen Lukas: 1 Sieg · 0 Remis · 0 Niederlagen'
+    && await seite.evaluate(() => document.querySelector('.bl-tafel .bl-bot-bilanz')?.previousElementSibling?.classList.contains('bl-k-kopf')), botBilanz);
   // Pruefer-Befund (klein): der Platz der Abrechnung gilt Allzeit, also oeffnet "Zur Bestenliste" die Tafel in Allzeit
   // (nicht im gemerkten Fenster, Standard Woche); gemerkt wird dabei kein Fenster
   pruefe('„Zur Liga“ nach „Platz/Erster Eintrag“: Zeitraum Allzeit (wie der Platz der Abrechnung), das gemerkte Fenster bleibt unberührt',
@@ -1156,6 +1164,15 @@ async function testeBrowser(browser) {
   pruefe('Reiter Ich oben: „Deine beste Partie diese Woche“ mit Tafel-Punkten, der Rest eingeklappt',
     /Deine beste Partie diese Woche/i.test(beste) && new RegExp(zahlText(e1.w)).test(beste) && /Tafel-Punkte/.test(beste)
     && await seite.locator('.bl-ich-alle').getAttribute('aria-expanded') === 'false', beste);
+  // T-3: Bilanz aller wertenden Partien (vorher unter dem Bots-Panel), direkt nach der besten Partie, jede Zahl einmal
+  const bilanz = await seite.evaluate(() => {
+    const k = document.querySelector('.bl-reiter[data-reiter="ich"] .bl-bilanz');
+    return k && { nachBeste: !!k.previousElementSibling?.classList.contains('bl-ich-beste'), titel: k.querySelector('.ueberzeile').textContent.trim(),
+      werte: [...k.querySelectorAll('.bl-bilanz-werte > div')].map((d) => d.querySelector('dt').textContent.trim() + '=' + d.querySelector('dd').textContent.trim()) };
+  });
+  pruefe('Reiter Ich: Karte „Deine Bilanz“ nach der besten Partie mit Partien 1, Siege 1, Ø Genauigkeit in Prozent und Spielstärke',
+    bilanz && bilanz.nachBeste && bilanz.titel === 'Deine Bilanz' && bilanz.werte[0] === 'Partien=1' && bilanz.werte[1] === 'Siege=1'
+    && /^Ø Genauigkeit=([\d,]+ %|–)$/.test(bilanz.werte[2]) && /^Spielstärke=(≈ [\d.]+|–)$/.test(bilanz.werte[3]), bilanz);
   await h.ichAlle();
   const ich = await seite.locator('.bl-reiter[data-reiter="ich"]').innerText();
   pruefe('Reiter Ich: beste Partie groß („Punkte auf Lukas’ Tafel“), Rekorde, Platz 1, Tafeln und „Deine besten Partien“ über alle Tafeln', /0\s*Rekorde/.test(ich) && /1\s*Tafeln/.test(ich)

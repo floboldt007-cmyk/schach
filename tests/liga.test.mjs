@@ -696,6 +696,11 @@ async function gruppeTeil(browser, start) {
         assert.match(await page.locator('.lg-gr-karte p').innerText(), /Gruppe mit 30 Plätzen/);
         assert.equal(await page.locator('.lg-gr-konto').getAttribute('href'), '#einstellungen/konto');
       });
+      // Design-Durchsicht U 09.11.2026: auch ohne Konto soll man lesen koennen, wie Kronen zaehlen
+      await browserPruefe('Gruppe ohne Konto: Regeln eingeklappt unter der Karte', async () => {
+        assert.equal(await page.locator('.lg-gr details.lg-gr-regeln').count(), 1);
+        assert.equal(await page.locator('.lg-gr details.lg-gr-regeln').getAttribute('open'), null);
+      });
     } finally { await kontext.close(); }
   }
   {

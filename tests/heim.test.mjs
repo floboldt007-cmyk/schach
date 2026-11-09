@@ -252,7 +252,7 @@ const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
 const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
 const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID })).toString('base64url') + '.x', refresh_token: 'r1',
   expires_at: 9999999999, user: { id: UID, email: 'probe@example.invalid' } };
-async function kontoSeite(browser, { stand = null, speicher = {}, w = 390, h = 844, schema = 'light' } = {}) {
+async function kontoSeite(browser, { stand = null, speicher = {}, w = 390, h = 844, schema = 'light', erw = '' } = {}) {
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: schema, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block' });
   const seite = await kontext.newPage();
   const fehler = [];
@@ -276,7 +276,7 @@ async function kontoSeite(browser, { stand = null, speicher = {}, w = 390, h = 8
     localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
     for (const [k, v] of Object.entries(speicher)) localStorage.setItem(k, JSON.stringify(v));
   }, { sitzung: SITZUNG, speicher });
-  await seite.goto(BASIS + '#heim');
+  await seite.goto(BASIS + (erw ? '&erw=' + erw : '') + '#heim');
   return { kontext, seite, fehler };
 }
 const STAND = { stufe: 7, kronen: 64, platz: 9, ziel: 160, n: 30, woche: '2026-11-02' };
@@ -422,9 +422,56 @@ async function testeNaechstes(browser, heute) {
 
 // Variante A (Flo 08.11.2026): die Tagesziele stehen unter "Als Naechstes" (Ort heim:naechstes), unter den Wegen; das
 // Bots-Panel zeigt nur noch den Gegner (keine Merkmale, keine Bilanz, keine Heute-Karte, kein Bot-Ort)
+// Wochen-Boss (T-3, Flo 09.11.2026): eine Zeile vor dem Tageswerk, solange der Boss der Woche ansteht; Antippen startet die
+// Boss-Partie; mit seiner Trophaee entfaellt sie. Welcher Boss gilt, sagt der echte Spielplan (daten/boss/spielplan.json).
+// Das Paket boss ist in js/erweiterungen.js bewusst noch nicht eingeschaltet (Fairness, 30.10.): der Test laedt es per ?erw
+const ALLE_BOSSE_GESCHLAGEN = { [P + 'modul:boss']: { v: 1, trophäen: ['bergwirt', 'baron-gambit', 'springerzuechterin', 'festungsbauer'] } };
+async function testeBoss(browser, heute) {
+  gruppe = 'wochen-boss';
+  const { kontext, seite, fehler } = await kontoSeite(browser, { stand: STAND, speicher: gesehen(heute), erw: 'pakete/boss/index' });
+  await istScreen(seite, 'heim');
+  await warteZeile(seite, 'Platz 9 von 30');
+  const boss = await seite.evaluate(async () => {
+    const [L, I, B] = await Promise.all([import('/js/pakete/boss/logik.js'), import('/js/inhalte.js'), import('/js/bots.js')]);
+    const r = await I.ladeSpielplan();
+    const w = r.ok ? L.aktiveWoche(r.daten) : null;
+    const b = w && B.botNachId(w.boss);
+    return b ? { id: b.id, name: b.name, event: L.istFunkenWochenende(r.daten) } : null;
+  });
+  const z = await seite.evaluate(() => {
+    const zeilen = [...document.querySelectorAll('.heim-naechstes .heim-zeile')];
+    const k = zeilen.find((x) => x.dataset.paket === 'boss' && x.dataset.art !== 'event');
+    const e = zeilen.find((x) => x.dataset.art === 'event');
+    return { reihe: zeilen.map((x) => (x.dataset.art === 'event' ? 'event' : x.dataset.paket || x.dataset.aktion)),
+      titel: k ? k.querySelector('.heim-zeile-text b').textContent.trim() : null, bild: !!(k && k.querySelector('.heim-zeile-bild img')),
+      knopf: !!(k && k.tagName === 'BUTTON' && k.getBoundingClientRect().height >= 44), label: k ? k.getAttribute('aria-label') : null,
+      event: e ? e.querySelector('.heim-zeile-text b').textContent.trim() : null };
+  });
+  if (!boss) {
+    pruefe('ohne Boss in dieser Woche: keine Boss-Zeile', z.titel === null, JSON.stringify(z));
+    pruefe('Paket boss geladen (sonst prueft diese Gruppe nichts)', await seite.evaluate(() => !!document.querySelector('link[data-paket="boss"]')));
+  } else {
+    pruefe(`Boss der Woche (${boss.name}): Zeile "Wochen-Boss: ${boss.name}" mit Bild, ein Knopf ab 44 px, vor dem Tageswerk`, z.titel === `Wochen-Boss: ${boss.name}`
+      && z.bild && z.knopf && /Herausfordern$/.test(z.label || '') && z.reihe.indexOf('boss') < z.reihe.indexOf('serie'), JSON.stringify(z));
+    pruefe('Funken-Wochenende: eigene Zeile genau dann, wenn es laeuft, direkt nach dem Boss', boss.event
+      ? z.event === 'Funken-Wochenende' && z.reihe.indexOf('event') === z.reihe.indexOf('boss') + 1 : z.event === null, JSON.stringify(z));
+    await seite.locator('.heim-naechstes [data-paket="boss"]:not([data-art])').click();
+    const partie = await seite.waitForFunction(() => document.documentElement.dataset.screen === 'partie', null, { timeout: 15000 }).then(() => true, () => false);
+    pruefe('Antippen startet die Boss-Partie', partie && await seite.evaluate(() => location.hash.startsWith('#partie')), await seite.evaluate(() => location.hash));
+  }
+  await kontext.close();
+  // mit der Trophaee steht der Boss nicht mehr an
+  const zwei = await kontoSeite(browser, { stand: STAND, speicher: { ...gesehen(heute), ...ALLE_BOSSE_GESCHLAGEN }, erw: 'pakete/boss/index' });
+  await istScreen(zwei.seite, 'heim');
+  await warteZeile(zwei.seite, 'Platz 9 von 30');
+  pruefe('Trophaee erspielt: keine Boss-Zeile', await zwei.seite.evaluate(() => !document.querySelector('.heim-naechstes [data-paket="boss"]:not([data-art])')));
+  pruefe('keine Konsolenfehler', fehler.length === 0 && zwei.fehler.length === 0, [...fehler, ...zwei.fehler].join(' | '));
+  await zwei.kontext.close();
+}
+
 async function testeTagesziele(browser, heute) {
   gruppe = 'tagesziele';
-  const { kontext, seite, fehler } = await kontoSeite(browser, { stand: STAND, speicher: gesehen(heute) });
+  const { kontext, seite, fehler } = await kontoSeite(browser, { stand: STAND, speicher: { ...gesehen(heute), ...ALLE_BOSSE_GESCHLAGEN } });
   await istScreen(seite, 'heim');
   await warteZeile(seite, 'Platz 9 von 30');
   await seite.waitForSelector('.heim-naechstes [data-paket="tagesraetsel"]', { timeout: 8000 }).catch(() => {});
@@ -432,18 +479,18 @@ async function testeTagesziele(browser, heute) {
     const n = document.querySelector('.heim-naechstes');
     const zeilen = [...n.querySelectorAll('.heim-zeile')];
     return { sichtbar: !n.hidden, unterWegen: n.previousElementSibling?.classList.contains('heim-wege'),
-      reihe: zeilen.map((z) => z.dataset.paket || z.dataset.aktion), knoepfe: zeilen.every((z) => z.tagName === 'BUTTON' && z.getBoundingClientRect().height >= 44),
+      reihe: zeilen.filter((z) => z.dataset.art !== 'event').map((z) => z.dataset.paket || z.dataset.aktion), knoepfe: zeilen.every((z) => z.tagName === 'BUTTON' && z.getBoundingClientRect().height >= 44),
       marsch: [...(zeilen[0]?.querySelectorAll('.heim-zeile-text > *') || [])].map((e) => e.textContent.trim()).join(' | '),
       raetsel: [...n.querySelectorAll('[data-paket="tagesraetsel"] .heim-zeile-text > *')].map((e) => e.textContent.trim()).join(' | '),
       aria: zeilen.map((z) => z.getAttribute('aria-label')) };
   });
   pruefe('"Als Naechstes" steht unter den drei Wegen', r.sichtbar && r.unterWegen, JSON.stringify(r));
   pruefe('Reihenfolge: Bauernmarsch (Tageswerk), Tagesraetsel, dann die Liga', r.reihe.join() === 'serie,tagesraetsel,heim-liga', r.reihe.join());
-  pruefe('Bauernmarsch: "Heute noch offen · Tageswerk in 5 Minuten"', r.marsch === 'Bauernmarsch | Heute noch offen · Tageswerk in 5 Minuten', r.marsch);
+  pruefe('Bauernmarsch: "Heute: 1 Partie oder 3 Rätsel spielen"', r.marsch === 'Bauernmarsch | Heute: 1 Partie oder 3 Rätsel spielen', r.marsch);
   pruefe('Tagesraetsel: Nummer und Zuege', /^Tagesrätsel \| Rätsel \d+, in \d+ (Zug|Zügen)$/.test(r.raetsel || ''), r.raetsel);
   pruefe('jede Zeile ein Knopf ab 44 px mit Beschriftung', r.knoepfe && r.aria.every((a) => a && !/undefined|NaN/.test(a)), JSON.stringify(r.aria));
   await seite.locator('.heim-naechstes [data-paket="serie"]').click();
-  pruefe('Bauernmarsch oeffnet das Training (Tageswerk in 5 Minuten)', await istScreen(seite, 'training'));
+  pruefe('Bauernmarsch oeffnet das Training (Klartext: 1 Partie oder 3 Rätsel)', await istScreen(seite, 'training'));
   await seite.goBack();
   await istScreen(seite, 'heim');
   await seite.waitForSelector('.heim-naechstes [data-paket="tagesraetsel"]', { timeout: 8000 }).catch(() => {});
@@ -591,6 +638,7 @@ async function browserTeil(browser) {
   await testeBuehne(browser, heute);
   await testeKronenLage(browser);
   await testeNaechstes(browser, heute);
+  await testeBoss(browser, heute);
   await testeTagesziele(browser, heute);
   await testeWege(browser, heute);
   await testeGroessen(browser, heute);

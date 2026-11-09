@@ -491,6 +491,26 @@ async function testeKarteQuer(browser) {
   pruefe('Kein Steckbrief, Bedingungen 3 (keine erreicht), Spruch-Karte, keine Bilanz, Sterne als SVG', panel.merkmale === 0 && panel.ziele === 3 && panel.an === 0 && panel.blase > 5 && panel.bilanz === 0 && panel.miniSterne === 0 && panel.sternSvg, JSON.stringify(panel));
   pruefe('Farbe als Segment (bauteile.segment) mit w, zufall, b; Weiß vorgewaehlt', panel.segment && panel.farben === 'w,zufall,b' && panel.weiss === 1, panel.farben);
   pruefe('Spielen-Knopf im Panel: „Spielen gegen Paula“', panel.spielenDrin && panel.spielenText === 'Spielen gegen Paula', panel.spielenText);
+  // T-3 (Flo 09.11.2026): Antippen des Gegnerbilds oeffnet den Steckbrief (Merkmale, Ort arena:steckbrief) als Blatt
+  gruppe = 'Steckbrief';
+  const av = await seite.evaluate(() => { const b = document.querySelector('.detail-kopf [data-aktion="steckbrief"]'); const r = b && b.getBoundingClientRect();
+    return b && { tag: b.tagName, label: b.getAttribute('aria-label'), w: r.width, h: r.height }; });
+  pruefe('Gegnerbild ist ein Knopf „Steckbrief von Postbotin Paula“, mindestens 44 x 44', av && av.tag === 'BUTTON' && av.label === 'Steckbrief von Postbotin Paula'
+    && av.w >= 44 && av.h >= 44, JSON.stringify(av));
+  await tippe(seite, '.detail-kopf [data-aktion="steckbrief"]');
+  await seite.waitForSelector('.sheet-karte.steckbrief', { timeout: 5000 });
+  await warte(500);
+  const sb = await seite.evaluate(() => { const k = document.querySelector('.sheet-karte.steckbrief');
+    return { titel: k.querySelector('h3').textContent, name: k.querySelector('.sb-name b').textContent, merkmale: [...k.querySelectorAll('.merkmal')].map((m) => m.textContent.replace(/\s+/g, ' ').trim()),
+      ort: k.querySelector('.ort-steckbrief').hidden, ragt: [...k.querySelectorAll('.merkmal *')].some((e) => e.scrollWidth > e.parentElement.clientWidth + 1),
+      scroll: document.scrollingElement.scrollWidth <= innerWidth }; });
+  pruefe('Titel, Name, drei Merkmale (Lieblingsfigur Dame, Tempo Eilig, Schwäche), Ort ohne Zeilen versteckt, nichts ragt heraus',
+    sb.titel === 'Steckbrief' && sb.name === 'Postbotin Paula' && sb.merkmale.length === 3 && /Dame/.test(sb.merkmale[0]) && /Eilig/.test(sb.merkmale[1])
+    && /Holt die Dame zu früh/.test(sb.merkmale[2]) && sb.ort && !sb.ragt && sb.scroll, JSON.stringify(sb));
+  await seite.keyboard.press('Escape');
+  await seite.waitForFunction(() => !document.querySelector('.sheet-ort:not(.weg) .steckbrief'), null, { timeout: 5000 });
+  pruefe('Escape schließt den Steckbrief, der Fokus geht zurück aufs Gegnerbild', await seite.evaluate(() => document.activeElement && document.activeElement.dataset.aktion === 'steckbrief'));
+  gruppe = 'Panel';
   const waehleStation = async (id) => {
     await tippe(seite, `.knoten[data-bot="${id}"]`);
     await warte(700);
@@ -592,6 +612,27 @@ async function testeOrte(browser) {
   pruefe('arena:start wird beim Verlassen abgemeldet', await seite.evaluate(() => window.__u5.startVerlassen === 1 && document.querySelectorAll('.u5-test').length === 0));
   pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
+}
+
+// Design-Durchsicht 09.11. (Bots): auf dem iPhone SE mit Safari-Leiste lag der Spielen-Knopf halb unter der Reiterleiste.
+// Gemessen werden Rechtecke: Knopf ganz ueber der Leiste und ganz im Fenster, ohne zu scrollen.
+async function testeSpielenFrei(browser) {
+  gruppe = 'Spielen-Knopf frei';
+  for (const [w, h] of [[375, 548], [320, 480], [390, 664], [375, 667], [390, 844]]) {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w, h, handy: true });
+    await seite.goto(BASIS + '&reiter=verlauf#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(1400);
+    const m = await seite.evaluate(() => {
+      const r = (q) => { const e = document.querySelector(q); if (!e) return null; const b = e.getBoundingClientRect(); return { t: Math.round(b.top), b: Math.round(b.bottom) }; };
+      return { ih: innerHeight, spielen: r('.arena .spielen'), reiter: r('.reiter-leiste'), karte: r('.arena .karte') };
+    });
+    const frei = m.spielen && m.reiter && m.spielen.b <= m.reiter.t && m.spielen.t >= 0 && m.spielen.b <= m.ih;
+    pruefe(`${w} × ${h}: Spielen-Knopf ganz ueber der Reiterleiste und im Fenster, ohne Scrollen`, frei, JSON.stringify(m));
+    if (w >= 375) pruefe(`${w} × ${h}: die Karte bleibt mindestens 250 px hoch`, m.karte && m.karte.b - m.karte.t >= 250, JSON.stringify(m.karte));
+    pruefe(`${w} × ${h}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
 }
 
 async function testeHochformate(browser) {
@@ -1627,6 +1668,7 @@ async function browserTeil(browser) {
   await testeKarteQuer(browser);
   await testeOrte(browser);
   await testeHochformate(browser);
+  await testeSpielenFrei(browser);
   await testeHandyQuer(browser);
   await testeKnopftext(browser);
   await testeWelten(browser);

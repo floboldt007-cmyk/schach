@@ -183,6 +183,14 @@ begin
      or not (d -> 'raetsel_duell' ? 'suche') then
     raise exception 'FEHLER: meine_daten ohne raetsel_duell (duelle, suche): %', d;
   end if;
+  -- Coach, Schule, Abo- und Editions-Ereignisse (seit 09.11.2026) immer da, leer, wenn das Schema fehlt
+  if jsonb_typeof(d -> 'coach' -> 'nutzung') is distinct from 'array' or jsonb_typeof(d -> 'abo_ereignisse') is distinct from 'array'
+     or jsonb_typeof(d -> 'schule' -> 'geleitete_klassen') is distinct from 'array'
+     or jsonb_typeof(d -> 'schule' -> 'mitgliedschaften') is distinct from 'array'
+     or jsonb_typeof(d -> 'schule' -> 'beitrittsversuche') is distinct from 'array'
+     or jsonb_typeof(d -> 'edition_ereignisse') is distinct from 'array' then
+    raise exception 'FEHLER: meine_daten ohne coach, schule, abo_ereignisse oder edition_ereignisse: %', d;
+  end if;
   -- Zaehler der Mengenbremse (A hat eine Partie und ein Nutzungsereignis geteilt), Fehlversuche immer als Liste
   if jsonb_typeof(d -> 'mengenzaehler') <> 'array'
      or (select coalesce(sum((z ->> 'anzahl')::integer), 0) from jsonb_array_elements(d -> 'mengenzaehler') z

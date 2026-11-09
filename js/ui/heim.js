@@ -291,7 +291,8 @@ function merke(stand) {
 }
 
 // "Als Naechstes" (Variante A, Flo 08.11.2026: die Tagesziele ziehen aus dem Bots-Panel hierher, unter die Wege): zuerst
-// die Zeilen der Pakete am Ort heim:naechstes (Tageswerk 10, Tagesraetsel 20, Kartei 25, je nur solange heute offen), dann
+// die Zeilen der Pakete am Ort heim:naechstes (Klassen-Aufgabe 5, Wochen-Boss 6, Funken-Wochenende 7, Neu fuer dich 8,
+// Tageswerk 10, Tagesraetsel 20, Kartei 25, je nur solange etwas ansteht; die Reihenfolge ist die Prioritaet), dann
 // der Liga-Platz (Kronen der Wochen-Gruppe, Etappe B). Wie viele Zeilen sichtbar sind, entscheidet css/heim.css nach der
 // Fensterhoehe (auf dem Handy scrollt nichts). Ruhig: kein Countdown, kein roter Punkt. Ohne Zeile entfaellt der Abschnitt.
 function ligaZeile(lg) {

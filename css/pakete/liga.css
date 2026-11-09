@@ -194,3 +194,7 @@
 .lg-mini-werte dd img { width: 18px; height: auto; }
 .sheet-karte .lg-mini-satz { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.45; color: var(--text-2); }
 .lg-mini-werte .lg-mini-stufe dd { font-size: 15px; white-space: normal; justify-content: center; text-align: center; line-height: 1.15; }
+/* So zaehlen Kronen: eingeklappte Regeln unter der Gruppenliste (Pruefung U 09.11.2026) */
+.lg-gr-regeln { margin: 0; padding: 0 4px; font-size: 13px; color: var(--text-2); }
+.lg-gr-regeln summary { min-height: 44px; display: flex; align-items: center; font-weight: 600; cursor: pointer; }
+.lg-gr-regeln p { margin: 0 0 8px; line-height: 1.45; }

@@ -825,10 +825,10 @@ async function testeBrowser(browser) {
   const SZ = '.heim-naechstes:not([hidden]) [data-paket="serie"]';
   await seite.goto(MIT() + '#heim');
   await seite.waitForSelector(SZ, { timeout: 10000 });
-  pruefe('heim:naechstes: Zeile „Bauernmarsch · Heute noch offen · Tageswerk in 5 Minuten“ (als erste, ohne Klassen-Aufgabe)',
-    (await seite.locator(SZ).innerText()).replace(/\s+/g, ' ').includes('Bauernmarsch Heute noch offen · Tageswerk in 5 Minuten')
+  pruefe('heim:naechstes: Zeile „Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen“ (als erste, ohne Klassen-Aufgabe)',
+    (await seite.locator(SZ).innerText()).replace(/\s+/g, ' ').includes('Bauernmarsch Heute: 1 Partie oder 3 Rätsel spielen')
     && await seite.evaluate((s) => document.querySelector('.heim-liste').firstElementChild === document.querySelector(s), SZ)
-    && await seite.locator(SZ).getAttribute('aria-label') === 'Bauernmarsch · Heute noch offen · Tageswerk in 5 Minuten');
+    && await seite.locator(SZ).getAttribute('aria-label') === 'Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen');
   await seite.locator(SZ).click();
   pruefe('Ohne Trainings-Karten öffnet die Zeile das Serien-Blatt', await seite.waitForSelector('.se-blatt-ort .se-blatt', { timeout: 3000 }).then(() => true, () => false));
   await seite.keyboard.press('Escape');
@@ -838,8 +838,8 @@ async function testeBrowser(browser) {
   await warte(400);
   pruefe('arena:kopf: noch kein Chip (erst ab dem ersten gezählten Tag)', await seite.locator('.se-chip').count() === 0);
   const neuText = await seite.locator('.se-heute').innerText();
-  pruefe('arena:heute: Bauernmarsch mit Bauer am Start, „Heute noch offen · Tageswerk in 5 Minuten“, erklärt das Bild',
-    /Bauernmarsch/.test(neuText) && /Heute noch offen · Tageswerk in 5 Minuten/.test(neuText) && /Jeder Schachtag schiebt deinen Bauern ein Feld vor/.test(neuText)
+  pruefe('arena:heute: Bauernmarsch mit Bauer am Start, „Heute: 1 Partie oder 3 Rätsel spielen“, erklärt das Bild',
+    /Bauernmarsch/.test(neuText) && /Heute: 1 Partie oder 3 Rätsel spielen/.test(neuText) && /Jeder Schachtag schiebt deinen Bauern ein Feld vor/.test(neuText)
     && await seite.locator('.se-heute[data-art="neu"] .se-streifen .se-feld').count() === 7, neuText);
   const s0 = await h.streifen('.se-heute');
   pruefe('Streifen: Bauer auf dem Startfeld, das nächste Feld (heute) gestrichelt', s0.feld === 0 && s0.naechstes === 1 && s0.heute === -1, s0);

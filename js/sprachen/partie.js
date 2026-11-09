@@ -161,6 +161,7 @@ registriereTexte('partie', {
     'chip.frei': 'FREI',
     'chip.spiel': 'SPIELHALLE',
     'chip.gast': 'GAST',
+    'kopf.zurueckStart': 'Zurück zum Start', // Kundenblick 09.11.: Zurueck fuehrt dorthin, woher man kam
   },
   en: {
     prozent: '{wert}%',
@@ -306,5 +307,6 @@ registriereTexte('partie', {
     'chip.frei': 'FREE PLAY',
     'chip.spiel': 'ARCADE',
     'chip.gast': 'GUEST',
+    'kopf.zurueckStart': 'Back to home',
   },
 });

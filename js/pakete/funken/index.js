@@ -16,7 +16,7 @@
 // Sendet:  funken:gebucht { quelle, menge, gesamt, level } je Buchung, funken:geaendert { funken, level, delta,
 //          aufstieg } einmal je Ereignis mit Buchungen, level:aufstieg { level, titel, neu } beim Aufstieg.
 // Orte:    ergebnis:abrechnung 20 (Zeile FUNKEN), arena:kopf 5 (Chip Level), arena:heute 50 (Rueckenwind),
-//          arena:panel-bot 30 (Faktor vor der Partie), verlauf:seite 5 (Karte Level und Funken),
+//          (Faktor vor der Partie: seit T-3 im Funken-Spiegel), verlauf:seite 5 (Karte Level und Funken),
 //          partie:spieler-leiste 20 (Level-Emblem), spielplan:tage 20 (Funken-Wochenende), partie:begruessung? 40
 //          (der Bot gruesst einmal das neue Level). Funkenlinie: buehne.platz('funkenlinie'), nur mit Anzeige an.
 // Feier:   level (Zeile 55) bei jedem Aufstieg, level-titel (gross 75) bei jedem neuen Titel, Klang "level".
@@ -28,7 +28,7 @@ import { anbieten } from '../../orte.js';
 import { melde } from '../../feier.js';
 import { registriereSaetze, botNachId, staerkeFuerElo } from '../../bots.js';
 import { registriereIcon } from '../../ui/icons.js';
-import { ladePartien, wertet, eigeneZuege as eigeneZuegeVon } from '../../storage.js';
+import { ladePartien, wertet, eigeneZuege as eigeneZuegeVon, naechsterGegner } from '../../storage.js';
 import { ladeSpielplan, funkenWochenendeAktiv, spielplanWoche } from '../../inhalte.js';
 import { wochenSchluessel, wochentag, istSchluessel } from '../../tag.js';
 import { klang } from '../../sounds.js';
@@ -306,9 +306,15 @@ function lernEreignis(fn, d, { partieId = null } = {}) {
 }
 
 // ---------- Oberflaeche ----------
+// Faktor gegen den naechsten Gegner der Leiter (der Gegner, den die Bots-Seite zeigt); null ohne Leiter-Bot
+function faktorNaechster() {
+  const g = naechsterGegner();
+  return g && g.stufe != null ? { ...faktorFuer({ botId: g.id }), gegner: g.name } : null;
+}
+
 function zeigeSpiegel() {
   const st = ladeStand();
-  const inhalt = A.spiegelInhalt({ st, botName: listenName, wochenende: wochenende() });
+  const inhalt = A.spiegelInhalt({ st, botName: listenName, wochenende: wochenende(), beiZuenden: zuenden, faktor: faktorNaechster() });
   if (st.heute.wort > 0) {
     const dt = document.createElement('dt');
     dt.textContent = tx('lern.wort');
@@ -350,20 +356,24 @@ function anbieterAbrechnung(k) {
   };
 }
 
-function anbieterHeute() {
-  const st = ladeStand();
-  const we = wochenende();
-  const zuenden = (zeile) => sicher(() => {
+// Rueckenwind-Karte zuenden (Zeile aus A.heuteZeile, im Funken-Spiegel und an der Heute-Karte); gibt den neuen Stand
+// zurueck (null, wenn nichts zu zuenden war)
+function zuenden(zeile) {
+  return sicher(() => {
     const s2 = ladeStand();
-    if (!S.zuenden(s2)) return;
+    if (!S.zuenden(s2)) return null;
     S.speichere(s2);
     const neu = A.heuteZeile({ st: s2, wochenende: wochenende(), beiZuenden: zuenden });
     // die Zeile selbst bleibt (der Host raeumt sie beim Neuzeichnen ab), nur ihr Inhalt wechselt
     if (neu) zeile.replaceChildren(...neu.childNodes);
     A.zuendenAnimation(zeile);
     try { klang.spiele('feier', 2); } catch (x) { /* still */ }
+    return s2;
   }, 'Zuenden');
-  return A.heuteZeile({ st, wochenende: we, beiZuenden: zuenden });
+}
+
+function anbieterHeute() {
+  return A.heuteZeile({ st: ladeStand(), wochenende: wochenende(), beiZuenden: zuenden });
 }
 
 function anbieterSpielplan(k) {
@@ -474,10 +484,6 @@ function registriere() {
   anbieten('arena:heute', () => sicher(anbieterHeute, 'Heute'), { reihenfolge: 50, paket: PAKET });
   // Sammlung: den Bereich Titel fuehrt seit 01.11.2026 das Paket sammlung (Level- und Erfolgs-Titel mit Wappen, waehlbar,
   // js/pakete/sammlung/titel.js); es liest das Level aus dem Speicher dieses Pakets
-  anbieten('arena:panel-bot', (k) => sicher(() => {
-    if (!k || !k.bot || k.bot.stufe == null) return null;
-    return A.faktorChip(faktorFuer({ botId: k.bot.id }));
-  }, 'Panel'), { reihenfolge: 30, paket: PAKET });
   anbieten('verlauf:seite', () => sicher(() => A.verlaufKarte({ st: ladeStand(), botName: listenName, beiMehr: () => sicher(zeigeSpiegel, 'Spiegel') }), 'Verlauf'),
     { reihenfolge: 5, paket: PAKET });
   anbieten('partie:spieler-leiste', () => sicher(() => A.spielerEmblem({ st: ladeStand() }), 'Spieler-Leiste'), { reihenfolge: 20, paket: PAKET });

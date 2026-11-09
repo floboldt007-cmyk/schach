@@ -25,6 +25,8 @@
 // Runde 4 (Anzeige-Orte, js/orte.js): arena:kopf (in .kopf-chips nach den zwei Chips), arena:start (einmal nach dem ersten Layout, Kontext { app, s, karte, scrolleZu(botId, sanft), neuId }),
 // U5 neu: arena:karte-boss (.ort-karte-boss am Zelt des Wochen-Boss) und arena:karte-event (.ort-karte-event an der
 // Fahne) auf der Karte, Kontext { app, fortschritt, karte, scrolleZu }, ohne Anbieter unsichtbar.
+// T-3 (Flo 09.11.2026): Antippen des Gegnerbilds (button.av[data-aktion=steckbrief]) oeffnet den Steckbrief als Blatt
+// (.sheet-karte.steckbrief): Merkmale und der Ort arena:steckbrief (Kontext { app, bot, fortschritt }).
 // Die Begruessung im Panel waehlt wie in der Partie der Wahl-Ort partie:begruessung?.
 // w0c: Fehlt gespeicherten Partien die Analyse (App waehrend der Auswertung beendet), rechnet die Arena sie still nach
 // (js/nachholen.js, Start nach ARENA_NACHHOLEN_MS, Ende mit verlasse()) und zeichnet die Sterne danach ohne Animation neu.
@@ -41,13 +43,29 @@ import { starteNachholen } from '../nachholen.js';
 import { icon } from './icons.js';
 import { botFarbe, avatarVon, floAvatar } from '../thema.js';
 import { anim, staffel, tempo, reduziert } from '../bewegung.js';
-import { segment } from './bauteile.js';
+import { segment, sheet } from './bauteile.js';
 import { hauptKopf, standardChips, verbindeKopf, kopfEintritt } from './seite.js';
 import { spieleDuell } from './duell.js';
 import { t } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/arena.js';
 
+// Steckbrief (T-3, Flo 09.11.2026): Antippen des Gegnerbilds im Panel oeffnet ein Blatt mit den Merkmal-Kacheln
+// (Lieblingsfigur, Tempo, Schwaeche; aus der Bot-Bio abgeleitet) und dem Ort arena:steckbrief (Kontext { app, bot,
+// fortschritt }, z. B. die Erzfeind-Zeile des Pakets gedaechtnis). Hier nur die Figur der zehn ersten Bots; die Texte stehen
+// im Woerterbuch (arena.merkmal.<id>.lieblings | .tempo | .schwaeche), die anderen Bots bringen merkmale selbst mit
+const MERKMALE = {
+  benno: 'P', hilde: 'Q', kalle: 'Q', lisa: 'B', rudi: 'N', turm: 'R', delia: 'Q', koenig: 'K', greta: 'B', stockfisch: 'Q',
+};
+function merkmaleVon(id) {
+  const k = MERKMALE[id] ? id : 'benno';
+  return {
+    figur: MERKMALE[k],
+    lieblings: t(`arena.merkmal.${k}.lieblings`),
+    tempo: t(`arena.merkmal.${k}.tempo`),
+    schwaeche: t(`arena.merkmal.${k}.schwaeche`),
+  };
+}
 // Kurze Namen fuer die Schilder auf der Karte (nie abgeschnitten) und den Spielen-Knopf ("Spielen gegen Maxi"): der
 // Rufname aus js/bots.js; drei Bots haben im Spielen-Knopf eine eigene Form (arena.ruf.<id>: "den Stockfisch")
 const RUF = ['turm', 'koenig', 'stockfisch'];
@@ -653,7 +671,7 @@ export function zeige(root, params, app) {
       </div>` : ''}
       <div class="detail-links">
         <div class="detail-kopf">
-          <div class="av"><img src="${esc(avatarVon(b))}" alt=""></div>
+          <button class="av dr" type="button" data-aktion="steckbrief" aria-haspopup="dialog" aria-label="${esc(t('allgemein.steckbriefVon', { name: b.name }))}"><img src="${esc(avatarVon(b))}" alt=""></button>
           <div class="detail-name">
             <div class="ueberzeile detail-ueber${z === 'aktuell' ? ' akz' : ''}">${esc(t('arena.detail.ueber', { ...platzInWelt(b), status }))}</div>
             <div class="detail-welt">${esc(t('arena.detail.welt', { nr: b.welt, name: (WELTEN.find((w) => w.nr === b.welt) || {}).name || '' }))}</div>
@@ -689,6 +707,7 @@ export function zeige(root, params, app) {
       detail.querySelector('.farbwahl-ort').replaceWith(seg.el);
 
       detail.querySelector('[data-aktion="spielen"]').addEventListener('click', () => spielen(b));
+      detail.querySelector('[data-aktion="steckbrief"]').addEventListener('click', () => zeigeSteckbrief(b));
       const fort = detail.querySelector('[data-aktion="fortsetzen"]');
       if (fort) {
         fort.addEventListener('click', () => app.gehe('partie', { botId: laufend.botId, farbe: laufend.spielerFarbe, fortsetzen: true }));
@@ -707,6 +726,26 @@ export function zeige(root, params, app) {
     // Bot wechseln: das neue Panel steht sofort (Orte und Hooks gleich da, tests/app.test.mjs zaehlt direkt nach dem
     // Tipp) und kommt gestaffelt herein (bau() oben)
     bau();
+  }
+
+  // Steckbrief als Blatt (bauteile.js sheet): Kopf, Merkmale, darunter der Ort arena:steckbrief (ohne Zeilen versteckt)
+  function zeigeSteckbrief(b) {
+    const mm = b.merkmale || merkmaleVon(b.id);
+    const box = document.createElement('div');
+    box.className = 'sb-rumpf';
+    box.innerHTML = `<div class="sb-kopf"><span class="sb-bild" style="--bf:${botFarbe(b)}"><img src="${esc(avatarVon(b))}" alt=""></span>
+        <span class="sb-name"><b>${esc(b.name)}</b><span class="zahl">Elo ${b.elo} · ${esc(b.titel)}</span></span></div>
+      <div class="merkmale">
+        <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.lieblings'))}</span><span class="m-wert"><span class="m-figur"><img src="assets/pieces/w${mm.figur}.svg" alt=""></span>${esc(mm.lieblings)}</span></div>
+        <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.tempo'))}</span><span class="m-wert">${esc(mm.tempo)}</span></div>
+        <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.schwaeche'))}</span><span class="m-wert">${esc(mm.schwaeche)}</span></div>
+      </div>
+      <div class="ort-steckbrief" hidden></div>`;
+    const ort = box.querySelector('.ort-steckbrief');
+    const gefuellt = fuelle('arena:steckbrief', ort, { app, bot: b, fortschritt });
+    ort.hidden = gefuellt.anzahl === 0;
+    sheet({ titel: t('allgemein.steckbrief'), inhalt: box, klasse: 'steckbrief', knoepfe: [{ text: t('allgemein.schliessen'), wert: true }], abbrechen: false })
+      .then(() => gefuellt.verlasse());
   }
 
   // Nachgeholte Analyse (w0c): Sterne und Kopf-Chip still neu zeichnen, ohne Animation und ohne

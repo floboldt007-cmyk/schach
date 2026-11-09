@@ -12,7 +12,7 @@
 //   spielerEmblem({ st }) -> HTMLElement                 kleines Level-Emblem an Flos Namen (partie:spieler-leiste)
 //   verlaufKarte({ st, botName, beiMehr }) -> HTMLElement Karte "Level und Funken" (verlauf:seite)
 //   heuteZeile({ st, wochenende, beiZuenden }) -> HTMLElement | null   Rueckenwind in der Heute-Karte (arena:heute)
-//   faktorChip({ faktor, name }) -> HTMLElement          Herausforderungs-Faktor vor der Partie (arena:panel-bot)
+//   faktorChip({ faktor, name }) -> HTMLElement          Herausforderungs-Faktor gegen den naechsten Gegner (im Funken-Spiegel)
 //   funkenlinie(platz) -> { setze(anteil) }              duenne Linie am Brett, nur wenn die Anzeige an ist
 //   spiegelInhalt({ st, botName, wochenende }) -> HTMLElement   Funken-Spiegel (Level, heute nach Quellen, Tagesbogen,
 //       Rueckenwind, naechste Freischaltung, letzte Partien, "So entstehen Funken")
@@ -485,7 +485,7 @@ function soEntstehen() {
   return d;
 }
 
-export function spiegelInhalt({ st, botName = (id) => id, wochenende = false } = {}) {
+export function spiegelInhalt({ st, botName = (id) => id, wochenende = false, beiZuenden = null, faktor = null } = {}) {
   const fs = L.fortschritt(st.gesamt);
   const box = el('div', 'fk-spiegel-inhalt');
   box.innerHTML = `<div class="fk-s-kopf">${emblemHtml(fs.level, { gross: true })}<div class="fk-s-titel">
@@ -525,6 +525,23 @@ export function spiegelInhalt({ st, botName = (id) => id, wochenende = false } =
     ? tx('spiegel.bogenRest', { wert: zahlText(bogenRest) })
     : tx('abr.halb');
   box.querySelector('.fk-s-rw').textContent = rueckenwindText(st, wochenende);
+  // T-3 (Flo 09.11.2026, vorher Heute-Karte und Panel der Bots-Seite): sichtbar unter "heute / als Naechstes" der
+  // Rueckenwind mit "Zuenden" bzw. das Funken-Wochenende und der Faktor gegen den naechsten Gegner
+  const jetzt = el('div', 'fk-s-jetzt');
+  const zuenden = typeof beiZuenden === 'function' ? (z) => {
+    const neu = beiZuenden(z);
+    if (neu) box.querySelector('.fk-s-rw').textContent = rueckenwindText(neu, wochenende);
+  } : null;
+  const rw = heuteZeile({ st, wochenende, beiZuenden: zuenden });
+  if (rw) jetzt.append(rw);
+  if (faktor && faktor.gegner) {
+    const f = el('div', 'fk-s-faktor');
+    const n = el('span', 'fk-s-gegner');
+    n.textContent = tx('spiegel.faktor', { name: faktor.gegner });
+    f.append(n, faktorChip(faktor));
+    jetzt.append(f);
+  }
+  if (jetzt.childElementCount) box.querySelector('.fk-s-liste').after(jetzt);
   const n = naechsteFreischaltung(fs.level);
   box.querySelector('.fk-s-naechstes').textContent = n ? tx('spiegel.naechstesText', { level: n.level, text: n.text }) : '';
   if (st.verlauf.length) {
