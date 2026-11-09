@@ -101,7 +101,7 @@
   display: grid;
   place-items: center;
   font-size: 10.5px;
-  color: var(--text-2, #6E6A63);
+  color: var(--text-2, #6A665F);
 }
 .brett-koord-rand .koord.zahl { left: calc(-1 * var(--koord-rand)); width: var(--koord-rand); height: 12.5%; }
 .brett-koord-rand .koord.buchst { top: 100%; width: 12.5%; height: var(--koord-rand); }
