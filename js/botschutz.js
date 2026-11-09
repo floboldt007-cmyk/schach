@@ -4,14 +4,18 @@
 // (/authorize) prueft Supabase nicht (supabase/auth, internal/api: verifyCaptcha, isIgnoreCaptchaRoute).
 //
 //   botschutzAn() -> boolean          ist ein Site-Key gesetzt (js/konto-config.js TURNSTILE_SITEKEY)?
-//   botschutz(ort, { modus, sprache }) -> { token(), verbraucht(), entferne() } | null
-//       zeichnet das Widget in ort (div.konto-botschutz); null, wenn kein Site-Key gesetzt ist. Ohne Site-Key laedt die App
-//       nichts von Cloudflare und verhaelt sich wie vor dem Bot-Schutz. token() wartet hoechstens WARTEN_MS auf ein
+//   botschutz(ort, { modus, sprache }) -> { starte(), token(), verbraucht(), entferne() } | null
+//       bereitet das Widget fuer ort (div.konto-botschutz) vor; null, wenn kein Site-Key gesetzt ist. Ohne Site-Key laedt
+//       die App nichts von Cloudflare und verhaelt sich wie vor dem Bot-Schutz. Geladen und gezeichnet wird erst mit
+//       starte() (mehrfach erlaubt, laedt einmal). token() ruft starte() selbst, wartet hoechstens WARTEN_MS auf ein
 //       Token und liefert es oder ''; verbraucht() holt nach einer Anfrage ein neues (jedes Token gilt nur einmal und
 //       hoechstens 300 s, developers.cloudflare.com/turnstile/get-started/client-side-rendering).
 //
-// Datensparsamkeit: Das Skript kommt nur von challenges.cloudflare.com und erst, wenn die Anmeldung gezeichnet wird
-// (Konto-Gruppe ohne Sitzung), nie beim Start der App. sw.js laesst fremde Herkuenfte ohnehin am Cache vorbei.
+// Datensparsamkeit: Das Skript kommt nur von challenges.cloudflare.com und erst, wenn jemand die Anmeldung wirklich
+// benutzt: Fokus im E-Mail-Feld oder "Code senden" (js/konto.js ruft dann starte() bzw. token()). Das blosse Oeffnen
+// der Einstellungen laedt nichts (Nachbesserung Runde 5, 09.11.2026: der Datenschutztext stuetzt sich nach
+// § 25 Abs. 2 Nr. 2 TDDDG auf "die Anmeldung, die du selbst aufrufst"), der Start der App ohnehin nicht.
+// sw.js laesst fremde Herkuenfte am Cache vorbei.
 // Testmodus (?test): window.__botschutzTestKey ersetzt den Site-Key, damit die Browser-Tests ohne Konto bei Cloudflare
 // laufen; ausserhalb des Testmodus zaehlt nur TURNSTILE_SITEKEY.
 import { TURNSTILE_SITEKEY } from './konto-config.js';
@@ -46,20 +50,26 @@ export function botschutz(ort, { modus = 'hell', sprache = 'de' } = {}) {
   if (!key || !ort) return null;
   let id = null; let wert = ''; let wartende = []; let fehler = false; let weg = false;
   const gib = (t) => { wert = t || ''; const w = wartende; wartende = []; w.forEach((f) => f(wert)); };
-  ort.hidden = false;
-  const bereit = ladeSkript().then((ts) => {
-    if (weg) return;
-    id = ts.render(ort, {
-      sitekey: key, theme: modus === 'dunkel' ? 'dark' : 'light', language: sprache === 'en' ? 'en' : 'de',
-      size: 'flexible', appearance: 'interaction-only',
-      callback: (t) => { fehler = false; gib(t); },
-      'expired-callback': () => { wert = ''; },
-      'error-callback': () => { fehler = true; gib(''); },
-    });
-  }).catch(() => { fehler = true; gib(''); });
+  let bereit = null;
+  const starte = () => {
+    if (bereit || weg) return;
+    ort.hidden = false;
+    bereit = ladeSkript().then((ts) => {
+      if (weg) return;
+      id = ts.render(ort, {
+        sitekey: key, theme: modus === 'dunkel' ? 'dark' : 'light', language: sprache === 'en' ? 'en' : 'de',
+        size: 'flexible', appearance: 'interaction-only',
+        callback: (t) => { fehler = false; gib(t); },
+        'expired-callback': () => { wert = ''; },
+        'error-callback': () => { fehler = true; gib(''); },
+      });
+    }).catch(() => { fehler = true; gib(''); });
+  };
   return {
     get fehler() { return fehler; },
+    starte,
     token() {
+      starte();
       if (wert) return Promise.resolve(wert);
       if (fehler) return Promise.resolve('');
       return new Promise((ja) => {
@@ -69,7 +79,7 @@ export function botschutz(ort, { modus = 'hell', sprache = 'de' } = {}) {
     },
     verbraucht() {
       wert = ''; fehler = false;
-      bereit.then(() => { try { if (id != null) globalThis.turnstile?.reset(id); } catch (e) { /* egal */ } });
+      bereit?.then(() => { try { if (id != null) globalThis.turnstile?.reset(id); } catch (e) { /* egal */ } });
     },
     entferne() {
       weg = true; wert = '';

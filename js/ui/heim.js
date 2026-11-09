@@ -89,6 +89,9 @@ registriereTexte('heim', {
     'zuzweit.text': 'An einem Gerät',
     'zurueck.titel': 'Willkommen zurück',
     'zurueck.partie': '{ergebnis} gegen {name} vor {n} Tagen',
+    'zurueck.partieGestern': '{ergebnis} gegen {name} gestern',
+    'zurueck.partieHeute': '{ergebnis} gegen {name} heute',
+    'zurueck.partieOhne': '{ergebnis} gegen {name}',
     'zurueck.leer': 'Zuletzt vor {n} Tagen hier',
     'zurueck.sieg': 'Sieg',
     'zurueck.niederlage': 'Niederlage',
@@ -142,6 +145,9 @@ registriereTexte('heim', {
     'zuzweit.text': 'On one device',
     'zurueck.titel': 'Welcome back',
     'zurueck.partie': '{ergebnis} vs {name}, {n} days ago',
+    'zurueck.partieGestern': '{ergebnis} vs {name}, yesterday',
+    'zurueck.partieHeute': '{ergebnis} vs {name}, today',
+    'zurueck.partieOhne': '{ergebnis} vs {name}',
     'zurueck.leer': 'Last here {n} days ago',
     'zurueck.sieg': 'Win',
     'zurueck.niederlage': 'Loss',
@@ -217,12 +223,29 @@ function rueckkehrErledigt() {
 
 // Die Zeile selbst: zuletzt gespielte Partie (oder nur die Pause), rechts der Pfeil; der Knopf setzt die laufende
 // Partie fort oder startet den naechsten Gegner der Leiter (wie die Buehne)
-function rueckkehrZeile(z, partie, bot) {
+// Tage seit der Partie (Nachbesserung Runde 5): aus dem Datum der PARTIE, nicht aus der Pause seit dem letzten Besuch
+// (wer vor 3 Tagen nur hereingeschaut hat, hat die Partie vielleicht vor 20 Tagen gespielt). Tagesgrenze 4:00 ueber
+// js/tag.js. null, wenn das Datum fehlt, unlesbar ist oder in der Zukunft liegt: dann steht keine Zeitangabe da.
+export function tageSeitPartie(p, jetzt = new Date()) {
+  try {
+    if (!p || !p.datum) return null;
+    const d = new Date(p.datum);
+    if (Number.isNaN(d.getTime())) return null;
+    const n = tageZwischen(tagSchluessel(d), tagSchluessel(jetzt));
+    return n >= 0 ? n : null;
+  } catch (e) { return null; }
+}
+
+function rueckkehrZeile(z, partie, bot, jetzt = new Date()) {
   let text = t('heim.zurueck.leer', { n: zahl(z.pause) });
   try {
     const p = ladePartien().find((x) => x && x.botId && ['sieg', 'niederlage', 'remis'].includes(x.ergebnis));
     const b = p ? botNachId(p.botId) : null;
-    if (b) text = t('heim.zurueck.partie', { n: zahl(z.pause), ergebnis: t('heim.zurueck.' + p.ergebnis), name: rufname(b) });
+    if (b) {
+      const n = tageSeitPartie(p, jetzt);
+      const art = n == null ? 'partieOhne' : n === 0 ? 'partieHeute' : n === 1 ? 'partieGestern' : 'partie';
+      text = t('heim.zurueck.' + art, { n: zahl(n ?? 0), ergebnis: t('heim.zurueck.' + p.ergebnis), name: rufname(b) });
+    }
   } catch (e) { /* nur die Pause */ }
   const knopf = t(partie ? 'heim.weiter' : 'heim.spielen');
   const titel = t('heim.zurueck.titel');
@@ -431,7 +454,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
   let zurueck = null;
   try { zurueck = rueckkehr(jetzt); } catch (e) { zurueck = null; }
   if (zurueck) {
-    s.querySelector('.heim-liste').insertAdjacentHTML('afterbegin', rueckkehrZeile(zurueck, partie, bot));
+    s.querySelector('.heim-liste').insertAdjacentHTML('afterbegin', rueckkehrZeile(zurueck, partie, bot, jetzt));
     zeigeNaechstes(s);
   }
   s.querySelector('.heim-rumpf').addEventListener('click', (e) => {

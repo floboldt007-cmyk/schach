@@ -571,7 +571,7 @@ passiert nichts: kein Widget, nichts von Cloudflare, die Anmeldung läuft wie vo
 Auffrischen der Sitzung und die Code-Prüfung (`/verify`) prüft Supabase ohnehin nicht.
 
 **Die Reihenfolge ist wichtig.** Schaltest du CAPTCHA in Supabase ein, bevor die App den Site-Key hat, kann sich niemand
-mehr per Code anmelden (Fehler „Bot-Schutz hat nicht geklappt“). Darum erst Schritt 1 bis 3, dann 4.
+mehr per Code anmelden (Fehler „Bot-Schutz hat nicht geklappt“). Darum erst Schritt 1 bis 3, ein bis zwei Tage warten, dann 4.
 
 1. **Cloudflare-Konto** (kostenlos): dash.cloudflare.com → Konto anlegen mit deiner Projekt-Mail, Zwei-Faktor einschalten.
 2. **Widget anlegen:** links **Turnstile** → **Add widget**. Name `Crownmate Anmeldung`, Hostname **`crownmate.de`**. Widget-Modus **Managed**,
@@ -581,6 +581,11 @@ mehr per Code anmelden (Fehler „Bot-Schutz hat nicht geklappt“). Darum erst 
    - **Secret Key** (geheim): nie in einen Chat, nie ins Repo. Nur in Schritt 4 in Supabase einfügen.
 3. **Prüfen, dass der Live-Stand den Site-Key hat:** https://crownmate.de/ → Einstellungen → Konto. Unter dem E-Mail-Feld
    steht jetzt der Satz „Die Anmeldung schützt Cloudflare Turnstile vor Bots“. Fehlt er, Schritt 4 noch nicht machen.
+
+   **Danach ein bis zwei Tage warten, erst dann Schritt 4.** Viele Geräte haben noch eine ältere Fassung der App im
+   Zwischenspeicher (Service Worker) und bekommen die neue erst beim nächsten oder übernächsten Öffnen. Eine Fassung
+   ohne Site-Key schickt das Zeichen nicht mit; ist CAPTCHA dann schon an, bekommt sie keinen Code. Fassungen vor 280
+   kennen außerdem die Antwort `captcha_failed` nicht und zeigen dafür keinen passenden Hinweis.
 4. **CAPTCHA in Supabase einschalten:** supabase.com → Crownmate-Projekt → **Authentication** → **Attack Protection**
    (je nach Stand des Dashboards auch unter **Settings**) → **Enable Captcha protection** an, Anbieter
    **Turnstile by Cloudflare**, beim **Captcha secret** den Secret Key aus Schritt 2 einfügen → **Save**.
