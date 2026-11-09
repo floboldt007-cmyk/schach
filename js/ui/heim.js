@@ -25,7 +25,7 @@ import { icon } from './icons.js';
 import { Brett } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
-import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen } from '../storage.js';
+import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen, ladePartien } from '../storage.js';
 import { BOTS, botNachId } from '../bots.js';
 import { eigenerName, sitzung } from '../konto.js';
 import { holeStand, angemeldet } from '../kronen.js';
@@ -33,7 +33,7 @@ import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js'
 import { stufeInfo, kronenSpeicher, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../pakete/liga/kronen.js';
 import * as serieStand from '../pakete/serie/stand.js';
 import { lage as serieLage } from '../pakete/serie/tag.js';
-import { tagSchluessel } from '../tag.js';
+import { tagSchluessel, tageZwischen, istSchluessel } from '../tag.js';
 import { fuelle } from '../orte.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { t, zahl, registriereTexte } from '../sprache.js';
@@ -87,6 +87,13 @@ registriereTexte('heim', {
     'raetsel.text': 'Rätsel und Meisterschule',
     'zuzweit.titel': 'Zu zweit',
     'zuzweit.text': 'An einem Gerät',
+    'zurueck.titel': 'Willkommen zurück',
+    'zurueck.partie': 'Zuletzt vor {n} Tagen: {ergebnis} gegen {name}',
+    'zurueck.leer': 'Zuletzt vor {n} Tagen hier',
+    'zurueck.sieg': 'Sieg',
+    'zurueck.niederlage': 'Niederlage',
+    'zurueck.remis': 'Remis',
+    'zurueck.label': '{titel}. {text}. {knopf}',
   },
   en: {
     aria: 'Home',
@@ -133,6 +140,13 @@ registriereTexte('heim', {
     'raetsel.text': 'Puzzles and master school',
     'zuzweit.titel': 'Two players',
     'zuzweit.text': 'On one device',
+    'zurueck.titel': 'Welcome back',
+    'zurueck.partie': 'Last time, {n} days ago: {ergebnis} vs {name}',
+    'zurueck.leer': 'Last here {n} days ago',
+    'zurueck.sieg': 'Win',
+    'zurueck.niederlage': 'Loss',
+    'zurueck.remis': 'Draw',
+    'zurueck.label': '{titel}. {text}. {knopf}',
   },
 });
 
@@ -175,6 +189,49 @@ function gruss(jetzt) {
   let name = '';
   try { name = eigenerName() || ''; } catch (e) { name = ''; }
   return name ? t('heim.gruss.name', { gruss: g, name }) : g;
+}
+
+// "Willkommen zurueck" (Feinschliff 09.11., Kundenblick Befund 11): wer mindestens RUECKKEHR_TAGE Tage nicht da war
+// (Tagesgrenze 4:00, js/tag.js), bekommt am Tag der Rueckkehr EINE ruhige erste Zeile unter "Als Naechstes": wo er
+// stehen geblieben war und ein Knopf zum Weiterspielen. Wer taeglich kommt, sieht nichts davon. Nach dem Antippen
+// ist sie fuer diesen Tag weg. Gemerkt im Modul besuch: { tag, zurueck: { tag, pause, erledigt? } | null }.
+// Uhr zurueckgestellt (tageZwischen <= 0): keine Rueckkehr, der gemerkte Tag bleibt.
+export const RUECKKEHR_TAGE = 2;
+export function rueckkehr(jetzt = new Date()) {
+  const heute = tagSchluessel(jetzt);
+  const alt = ladeModul('besuch', {}) || {};
+  let zurueck = alt.zurueck && alt.zurueck.tag === heute ? alt.zurueck : null;
+  if (!zurueck && istSchluessel(alt.tag) && alt.tag !== heute) {
+    const pause = tageZwischen(alt.tag, heute);
+    if (pause >= RUECKKEHR_TAGE) zurueck = { tag: heute, pause };
+  }
+  const spaeter = !istSchluessel(alt.tag) || tageZwischen(alt.tag, heute) > 0;
+  if (spaeter || zurueck !== alt.zurueck) speichereModul('besuch', { tag: spaeter ? heute : alt.tag, zurueck });
+  return zurueck && !zurueck.erledigt ? zurueck : null;
+}
+
+function rueckkehrErledigt() {
+  const alt = ladeModul('besuch', {}) || {};
+  if (alt.zurueck) speichereModul('besuch', { ...alt, zurueck: { ...alt.zurueck, erledigt: true } });
+}
+
+// Die Zeile selbst: zuletzt gespielte Partie (oder nur die Pause), rechts der Pfeil; der Knopf setzt die laufende
+// Partie fort oder startet den naechsten Gegner der Leiter (wie die Buehne)
+function rueckkehrZeile(z, partie, bot) {
+  let text = t('heim.zurueck.leer', { n: zahl(z.pause) });
+  try {
+    const p = ladePartien().find((x) => x && x.botId && ['sieg', 'niederlage', 'remis'].includes(x.ergebnis));
+    const b = p ? botNachId(p.botId) : null;
+    if (b) text = t('heim.zurueck.partie', { n: zahl(z.pause), ergebnis: t('heim.zurueck.' + p.ergebnis), name: b.name });
+  } catch (e) { /* nur die Pause */ }
+  const knopf = t(partie ? 'heim.weiter' : 'heim.spielen');
+  const titel = t('heim.zurueck.titel');
+  return `<button class="heim-zeile dr heim-zurueck" type="button" data-aktion="heim-zurueck"${bot ? ` data-bot="${esc(bot.id)}"` : ''}
+        aria-label="${esc(t('heim.zurueck.label', { titel, text, knopf }))}">
+        <span class="heim-zeile-bild" aria-hidden="true">${icon('haus')}</span>
+        <span class="heim-zeile-text"><b>${esc(titel)}</b><span>${esc(text)}</span></span>
+        <span class="heim-zurueck-knopf" aria-hidden="true">${esc(knopf)}</span>
+      </button>`;
 }
 
 // Bewertung (cp/mate aus Sicht von Weiss) aus Sicht sicht ('w' | 'b'): art fuer den Satz, anteil 0..1 fuer den Balken
@@ -370,10 +427,21 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
     </div>`;
   s._orte = fuelle('heim:naechstes', s.querySelector('.heim-liste'), { app, tag: tagSchluessel(jetzt), zeile: paketZeile });
   zeichneLiga(s, ersteLage());
+  // Rueckkehr nach einer Pause: als erste Zeile (die Reihenfolge ist die Prioritaet, css/heim.css blendet von unten aus)
+  let zurueck = null;
+  try { zurueck = rueckkehr(jetzt); } catch (e) { zurueck = null; }
+  if (zurueck) {
+    s.querySelector('.heim-liste').insertAdjacentHTML('afterbegin', rueckkehrZeile(zurueck, partie, bot));
+    zeigeNaechstes(s);
+  }
   s.querySelector('.heim-rumpf').addEventListener('click', (e) => {
     const k = e.target.closest('[data-aktion]');
     if (!k) return;
-    const a = k.dataset.aktion;
+    let a = k.dataset.aktion;
+    if (a === 'heim-zurueck') {
+      rueckkehrErledigt();
+      a = partie ? 'heim-weiter' : 'heim-spielen';
+    }
     if (a === 'heim-weiter' && laufend) {
       if (laufend.modus === 'zuzweit') app.gehe('partie', { modus: 'zuzweit', fortsetzen: true });
       else app.gehe('partie', { botId: laufend.botId, farbe: laufend.spielerFarbe, fortsetzen: true });

@@ -17,6 +17,7 @@ import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
 import { neuerStand } from '../js/pakete/liga/wertung.js';
+import { addiereTage } from '../js/tag.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -558,14 +559,83 @@ async function testeWege(browser, heute) {
   await k2.close();
 }
 
+// "Willkommen zurueck" (Feinschliff 09.11.): nach mindestens 2 Tagen Pause (Tagesgrenze 4:00) die erste Zeile unter
+// "Als Naechstes" mit der letzten Partie und einem Knopf; taeglich und beim ersten Start nichts; nach dem Antippen weg
+const besuch = (tag, zurueck = null) => ({ [P + 'modul:besuch']: { tag, zurueck } });
+const PARTIE_WILLI = { id: 'pwilli1', datum: new Date(Date.now() - 3 * 864e5).toISOString(), botId: 'fridolin', spielerFarbe: 'w',
+  startFen: null, zuege: ['e2e4'], san: ['e4'], ergebnis: 'sieg', grund: 'matt', hinweise: 0, zuruecknahmen: 0, modus: 'normal' };
+async function testeRueckkehr(browser, heute) {
+  gruppe = 'willkommen-zurueck';
+  const zeile = (seite) => seite.evaluate(() => {
+    const z = document.querySelector('.heim-liste .heim-zurueck');
+    const erste = document.querySelector('.heim-liste > .heim-zeile');
+    const r = z && z.getBoundingClientRect();
+    return z ? { text: [...z.querySelectorAll('.heim-zeile-text > *')].map((e) => e.textContent).join(' | '), knopf: z.querySelector('.heim-zurueck-knopf').textContent,
+      label: z.getAttribute('aria-label'), erste: erste === z, sichtbar: getComputedStyle(z).display !== 'none', h: r.height } : null;
+  });
+  const gemerkt = (seite) => seite.evaluate((k) => JSON.parse(localStorage.getItem(k) || 'null'), P + 'modul:besuch');
+  // 3 Tage Pause, letzte Partie ein Sieg gegen Willi, keine laufende Partie
+  let { kontext, seite, fehler } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -3)), [P + 'partien']: [PARTIE_WILLI] } });
+  await istScreen(seite, 'heim');
+  let z = await zeile(seite);
+  pruefe('3 Tage Pause: erste Zeile "Willkommen zurück" mit der letzten Partie', z && z.erste && z.sichtbar
+    && z.text === 'Willkommen zurück | Zuletzt vor 3 Tagen: Sieg gegen Vogelscheuche Willi', JSON.stringify(z));
+  pruefe('Knopf "Spielen", ganze Zeile ab 44 px, Vorlese-Text vollständig', z && z.knopf === 'Spielen' && z.h >= 44
+    && z.label === 'Willkommen zurück. Zuletzt vor 3 Tagen: Sieg gegen Vogelscheuche Willi. Spielen', JSON.stringify(z));
+  pruefe('gemerkt: heute als Besuchstag, Rückkehr mit Pause 3', await gemerkt(seite).then((b) => b && b.tag === heute && b.zurueck && b.zurueck.pause === 3 && b.zurueck.tag === heute));
+  // zweiter Aufruf am selben Tag: die Zeile bleibt (der Tag der Rueckkehr zaehlt, nicht der erste Aufruf)
+  await seite.goto(BASIS + '#einstellungen');
+  await istScreen(seite, 'einstellungen');
+  await seite.goto(BASIS + '#heim');
+  await istScreen(seite, 'heim');
+  pruefe('zweiter Aufruf am selben Tag: Zeile noch da', !!(await zeile(seite)));
+  // Antippen: zur Partie gegen den naechsten Gegner, danach ist die Zeile fuer heute weg
+  await seite.locator('.heim-zurueck').click();
+  pruefe('Antippen startet die Partie gegen den nächsten Gegner', await seite.waitForFunction(() => location.hash.startsWith('#partie'), null, { timeout: 15000 }).then(() => true, () => false));
+  // zurueck ueber die App (ein Hash-Wechsel aus der laufenden Partie wird abgefangen), erst messen, wenn die Startseite steht
+  await seite.evaluate(() => window.__app.gehe('heim'));
+  await istScreen(seite, 'heim');
+  await seite.waitForFunction(() => !!document.querySelector('.heim-liste') && !document.querySelector('.screen.partie'), null, { timeout: 15000 });
+  pruefe('nach dem Antippen: heute keine Zeile mehr', !(await zeile(seite)), JSON.stringify(await gemerkt(seite)) + ' ' + await seite.evaluate(() => location.hash));
+  pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+  await kontext.close();
+  // laufende Partie: der Knopf heisst "Weiterspielen" und setzt sie fort
+  ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -5)), [P + 'laufend']: laufend() } }));
+  await istScreen(seite, 'heim');
+  z = await zeile(seite);
+  pruefe('laufende Partie, keine gespeicherte: "Zuletzt vor 5 Tagen hier", Knopf "Weiterspielen"',
+    z && z.text === 'Willkommen zurück | Zuletzt vor 5 Tagen hier' && z.knopf === 'Weiterspielen', JSON.stringify(z));
+  await seite.locator('.heim-zurueck').click();
+  pruefe('Antippen setzt die laufende Partie fort', await seite.waitForFunction(() => location.hash.startsWith('#partie') && window.__partie && window.__partie.z.zuege.length === 10, null, { timeout: 20000 }).then(() => true, () => false));
+  await kontext.close();
+  // taeglich (gestern da), heute schon da, erster Start, Uhr zurueckgestellt: keine Zeile
+  for (const [name, sp] of [['gestern da', besuch(addiereTage(heute, -1))], ['heute schon da', besuch(heute)], ['erster Start', {}],
+    ['Uhr zurückgestellt', besuch(addiereTage(heute, 2))]]) {
+    ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...sp } }));
+    await istScreen(seite, 'heim');
+    pruefe(`${name}: keine Willkommen-zurück-Zeile`, !(await zeile(seite)));
+    if (name === 'Uhr zurückgestellt') pruefe('Uhr zurückgestellt: der spätere gemerkte Tag bleibt', (await gemerkt(seite)).tag === addiereTage(heute, 2));
+    await kontext.close();
+  }
+  // Englisch
+  ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -2)), [P + 'partien']: [PARTIE_WILLI],
+    [P + 'einstellungen']: { sprache: 'en' } } }));
+  await istScreen(seite, 'heim');
+  z = await zeile(seite);
+  pruefe('Englisch: "Welcome back", Knopf "Play"', z && z.text.startsWith('Welcome back | Last time, 2 days ago: Win vs ') && z.knopf === 'Play', JSON.stringify(z));
+  await kontext.close();
+}
+
 async function testeGroessen(browser, heute) {
   gruppe = 'groessen';
   // iPad hoch und quer, PC und Handy: nichts scrollt, alle Knoepfe ueber der Leiste (Handy seit Flo 08.11.2026: "unten
   // abgeschnitten, man muss scrollen"; 390 x 664 ist das iPhone 13 in Safari mit Leisten, 320 x 568 das iPhone SE)
   for (const [w, h] of [[820, 1180], [1180, 820], [1024, 768], [1440, 900], [390, 844], [390, 664], [375, 667], [320, 568]]) {
     for (const schema of ['light', 'dark']) for (const partie of [true, false]) {
-      // mit Konto und Kronen-Stand: die Liga-Zeile unter "Als Naechstes" ist da (der volle Fall)
-      const speicher = { ...gesehen(heute), [P + 'einstellungen']: { modus: schema === 'dark' ? 'dunkel' : 'hell' } };
+      // mit Konto und Kronen-Stand: die Liga-Zeile unter "Als Naechstes" ist da (der volle Fall), dazu nach 3 Tagen Pause
+      // die Zeile "Willkommen zurueck" (Feinschliff 09.11.)
+      const speicher = { ...gesehen(heute), [P + 'einstellungen']: { modus: schema === 'dark' ? 'dunkel' : 'hell' },
+        ...besuch(addiereTage(heute, -3)), [P + 'partien']: [PARTIE_WILLI] };
       if (partie) speicher[P + 'laufend'] = laufend();
       const { kontext, seite } = await kontoSeite(browser, { w, h, schema, speicher, stand: STAND });
       await istScreen(seite, 'heim');
@@ -577,6 +647,21 @@ async function testeGroessen(browser, heute) {
       pruefe(`${name}: nichts scrollt, alle Knoepfe ganz sichtbar`, m.ueber <= 0 && m.knoepfe.every((x) => x.t >= 0 && x.b <= unten + 0.5 && x.r <= m.iw + 0.5),
         JSON.stringify({ ueber: m.ueber, unten, knoepfe: m.knoepfe }));
       pruefe(`${name}: nichts seitlich drueber`, await seite.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth));
+      // Willkommen zurueck steht als erste Zeile sichtbar da, und kein Block der Startseite ueberlappt einen anderen
+      const deck = await seite.evaluate(() => {
+        const z = document.querySelector('.heim-liste .heim-zurueck');
+        const sicht = (e) => e && !e.closest('[hidden]') && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0;
+        const bloecke = [...document.querySelectorAll('.heim-gruss, .heim-buehne, .heim-leiter, .heim-modus, .heim-naechstes h3, .heim-liste > .heim-zeile')].filter(sicht);
+        const box = bloecke.map((e) => { const b = e.getBoundingClientRect(); return { n: e.className.split(' ')[0] + (e.dataset.aktion ? ':' + e.dataset.aktion : ''), t: b.top, b: b.bottom, l: b.left, r: b.right }; });
+        const ueber = [];
+        for (let i = 0; i < box.length; i++) for (let j = i + 1; j < box.length; j++) {
+          const a = box[i], c = box[j];
+          if (a.l < c.r - 0.5 && c.l < a.r - 0.5 && a.t < c.b - 0.5 && c.t < a.b - 0.5) ueber.push(a.n + ' x ' + c.n);
+        }
+        return { zurueck: sicht(z) && z === document.querySelector('.heim-liste > .heim-zeile'), ueber };
+      });
+      pruefe(`${name}: "Willkommen zurück" als erste Zeile sichtbar`, deck.zurueck);
+      pruefe(`${name}: keine Überlappung der Blöcke`, deck.ueber.length === 0, deck.ueber.join(', '));
       if (partie) {
         // Handy: das Brett steht klein neben dem Satz zur Lage (seit 08.11.2026), damit alles auf einen Bildschirm passt
         const min = { 820: 520, 1180: 360, 1024: 300, 1440: 360, 390: 96, 375: 96, 320: 96 }[w];
@@ -596,7 +681,7 @@ async function testeGroessen(browser, heute) {
           if (g && g.length) return g.map(rgb).sort((a, b) => lum(b) - lum(a))[0];
           const c = rgb(cs.backgroundColor); if (c.length >= 3 && (c[3] === undefined || c[3] > 0.5)) return c; } return [255, 255, 255]; };
         const aus = [];
-        for (const el of document.querySelectorAll('.heim-screen .heim-gruss small, .heim-screen .heim-gruss h1, .heim-screen .heim-ueber, .heim-screen .heim-lage, .heim-screen .heim-gegner, .heim-screen .heim-elo, .heim-screen .heim-spielweise, .heim-screen .heim-balken-zahl, .heim-screen .heim-los span, .heim-screen .heim-naechstes h3, .heim-screen .heim-zeile-text b, .heim-screen .heim-zeile-text span, .heim-screen .heim-modus b, .heim-screen .heim-text span')) {
+        for (const el of document.querySelectorAll('.heim-screen .heim-gruss small, .heim-screen .heim-gruss h1, .heim-screen .heim-ueber, .heim-screen .heim-lage, .heim-screen .heim-gegner, .heim-screen .heim-elo, .heim-screen .heim-spielweise, .heim-screen .heim-balken-zahl, .heim-screen .heim-los span, .heim-screen .heim-naechstes h3, .heim-screen .heim-zeile-text b, .heim-screen .heim-zeile-text span, .heim-screen .heim-modus b, .heim-screen .heim-text span, .heim-screen .heim-zurueck-knopf')) {
           if (!el.textContent.trim() || el.closest('[hidden]')) continue;
           const a = lum(rgb(getComputedStyle(el).color)), b = lum(grund(el));
           const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
@@ -641,6 +726,7 @@ async function browserTeil(browser) {
   await testeBoss(browser, heute);
   await testeTagesziele(browser, heute);
   await testeWege(browser, heute);
+  await testeRueckkehr(browser, heute);
   await testeGroessen(browser, heute);
   await testeErsterStart(browser);
 }

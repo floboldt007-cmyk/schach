@@ -101,6 +101,19 @@ try {
   pruefe('Startblatt: alle Ziele mindestens 44 px hoch und breit (auch der Schalter: Feld 52x44, Spur 52x32)', blatt.ziele.length >= 7
     && blatt.ziele.every((z) => z.h >= 44 && z.w >= 44), JSON.stringify(blatt.ziele));
   pruefe('Startblatt: nichts seitlich drueber', blatt.quer);
+  // U6 (Flo 09.11.2026): "Los" orange wie jeder Hauptknopf; U11: der Uhr-Satz nur, wenn eine Uhr gewaehlt ist
+  const farbe = await seite.evaluate(() => {
+    const p = document.createElement('button'); p.className = 'knopf primaer'; document.body.append(p);
+    const soll = getComputedStyle(p).backgroundColor; p.remove();
+    return { los: getComputedStyle(document.querySelector('.zz-los')).backgroundColor, soll };
+  });
+  pruefe('Startblatt: "Los" hat die Farbe jedes Hauptknopfs (U6)', farbe.los === farbe.soll, farbe);
+  const uhrSatz = () => seite.evaluate(() => { const s = document.querySelector('.zz-hinweis-uhr'); return !!s && !s.hidden && s.offsetParent !== null; });
+  const ohneUhr = await uhrSatz();
+  await seite.locator('[name="bedenkzeit"][value="10"]').check();
+  const mitUhr = await uhrSatz();
+  await seite.locator('[name="bedenkzeit"][value="ohne"]').check();
+  pruefe('Startblatt: Uhr-Satz nur mit gewaehlter Uhr (U11)', !ohneUhr && mitUhr && !(await uhrSatz()), { ohneUhr, mitUhr });
   await start();
   const fortschritt = await seite.evaluate(() => localStorage.getItem('schach-arena:v1:fortschritt'));
   await zug('e2e4'); await zug('e7e5', true); await zug('g1f3'); await zug('b8c6', true);
