@@ -79,6 +79,9 @@ export const DE = {
   'gruppe.kontoLink': 'Konto anlegen',
   'gruppe.leer': 'Spiel eine Partie, dann kommst du in deine Gruppe für diese Woche.',
   'gruppe.fehler': 'Die Gruppe lädt gerade nicht. Später noch einmal versuchen.',
+  'gruppe.regeln.titel': 'So zählen Kronen',
+  'gruppe.regeln.kronen': 'Online und im Rätsel-Duell gegen Menschen: Sieg +{os}, Remis +{or}, Niederlage −{on}. Gegen den KI-Gegner: Sieg +{ks}, Remis +{kr}, Niederlage −{kn}. Bot-Leiter: Sieg +{bs}, Remis +{br}, eine Niederlage kostet nichts.',
+  'gruppe.regeln.woche': 'Jede Woche spielst du in einer Gruppe mit {gruppe} Plätzen. Am Sonntag steigen die besten {auf} eine Stufe auf, die letzten {ab} gehen eine Stufe tiefer. Belohnung gibt es bis Platz {lohn}. Gewertet werden je Tag {botTag} Bot-Partien und {kiTag} Partien gegen den KI-Gegner, zusammen höchstens {woche} Kronen je Woche.',
   ...stufenDe,
 };
 
@@ -142,8 +145,8 @@ export const EN = {
   'gruppe.mini.ki': 'A computer-controlled player. It fills a free place, no person is behind it.',
   'gruppe.banner': 'Banner',
   'gruppe.bannerText': 'A banner for your collection',
-  'gruppe.taler': '{n} coins',
-  'gruppe.talerText': '{n} coins for your collection',
+  'gruppe.taler': '{n} thalers',
+  'gruppe.talerText': '{n} thalers for your collection',
   'gruppe.belohnung': 'Reward for place {platz}',
   'gruppe.gemerkt': 'Saved and credited once the shop opens.',
   'gruppe.keine': 'No reward from place 21, your crowns still count.',
@@ -154,6 +157,9 @@ export const EN = {
   'gruppe.kontoLink': 'Create an account',
   'gruppe.leer': 'Play a game and you join your group for this week.',
   'gruppe.fehler': 'The group is not loading right now. Please try again later.',
+  'gruppe.regeln.titel': 'How crowns count',
+  'gruppe.regeln.kronen': 'Online and in the puzzle duel against people: win +{os}, draw +{or}, loss −{on}. Against the AI opponent: win +{ks}, draw +{kr}, loss −{kn}. Bot ladder: win +{bs}, draw +{br}, a loss costs nothing.',
+  'gruppe.regeln.woche': 'Every week you play in a group of {gruppe}. On Sunday the top {auf} move up a tier, the last {ab} move down a tier. Rewards go up to place {lohn}. Each day {botTag} bot games and {kiTag} games against the AI opponent count, together at most {woche} crowns a week.',
 };
 
 registriereTexte('p-liga', { de: DE, en: EN });

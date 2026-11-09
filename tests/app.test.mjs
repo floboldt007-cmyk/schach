@@ -3662,6 +3662,27 @@ async function testeU7(browser) {
     });
     pruefe('Ein führender Klang je Moment: Schach verdrängt Präzise, nicht Genial oder Weit daneben', JSON.stringify(vorrang) === JSON.stringify([
       ['bester', true, true, 'bester'], ['bester', false, false, 'bester'], ['brillant', true, false, 'brillant'], ['patzer', true, false, 'patzer']]), JSON.stringify(vorrang));
+    // Mattzug (Klang-Pruefung U, 09.11.2026): am Partie-Ende hat die Landung keinen Zugklang (der Ende-Klang kommt mit dem
+    // Ergebnis); auch dann verdraengt der Ende-Klang Praezise/COMBO, Genial bleibt
+    const amEnde = await seite.evaluate(() => {
+      const P = window.__partie;
+      const phase = P.z.phase;
+      P.z.phase = 'ende';
+      const r = [];
+      for (const k of ['bester', 'brillant']) {
+        P.z.zuege.length = 1; P.z.liveKlassen[0] = k; P.z.liveTrivial[0] = false;
+        P.z.landung[0] = { name: null, um: performance.now() };
+        P.z.live[0] = { status: 'fertig', erg: { klasse: k, uci: 'e2e4', besterZug: 'e2e4', evalVorher: { cp: 0, mate: null }, evalNachher: { cp: 0, mate: null },
+          analyseNachher: { lines: [{ eval: { cp: 0, mate: null }, pv: [] }] }, coach: 'Test.' } };
+        P.zeigeBewertung(0);
+        const e = P.protokoll.filter((x) => x.typ === 'bewertungsklang').pop();
+        r.push([k, e && e.still, e && e.name]);
+      }
+      P.z.phase = phase;
+      return r;
+    });
+    pruefe('Mattzug: der Ende-Klang verdrängt Präzise, Genial klingt trotzdem', JSON.stringify(amEnde) === JSON.stringify([
+      ['bester', true, 'bester'], ['brillant', false, 'brillant']]), JSON.stringify(amEnde));
     // Weit daneben ruhig: kein Effekt am Brett (kein Wackeln)
     const ruhig = await seite.evaluate(() => { const n = document.querySelectorAll('.partie .effekt-ort').length; window.__partie.effekt('e4', 'patzer'); return document.querySelectorAll('.partie .effekt-ort').length - n; });
     pruefe('Weit daneben bleibt ruhig (kein Brett-Effekt)', ruhig === 0, String(ruhig));

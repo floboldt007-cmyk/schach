@@ -1311,7 +1311,10 @@ export function zeige(root, params, app) {
         const info = Object.freeze({ serie: serieBis(ply), serieVorher: serieBis(ply - 1), trivial: z.liveTrivial[ply] === true, ply });
         const w = klassenKlang(k, info);
         const lande = z.landung[ply] || null;
-        const verdraengt = !!(w && (w.name === 'bester' || w.name === 'combo') && lande && (lande.name === 'schach' || lande.name === 'umwandlung'));
+        // Am Partie-Ende hat die Landung keinen Zugklang (name null, siehe spieleKlang), dort fuehrt der Ende-Klang: auch
+        // er verdraengt Praezise/COMBO
+        const verdraengt = !!(w && (w.name === 'bester' || w.name === 'combo') && lande
+          && (lande.name === 'schach' || lande.name === 'umwandlung' || lande.name === null));
         const ms = Math.max(0, Math.round((lande ? lande.um : 0) + BEWERTUNG_NACH_MS - jetzt()));
         if (!verdraengt) spaeter(() => klang.klasse(k, info), ms);
         melde({ typ: 'bewertungsklang', ply, klasse: k, name: w ? w.name : null, ms, still: verdraengt });

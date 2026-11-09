@@ -98,6 +98,7 @@ const SUITEN = [
   { name: 'bericht', datei: 'bericht.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster unter CPU-Last', was: 'Tester-Bericht: Fehlerprotokoll (nur lokal), Bericht ansehen, kopieren, teilen' },
   { name: 'native', datei: 'native.test.mjs', args: [], was: 'App-Store-Huelle (Capacitor): Konfiguration, Kopie der Web-App' },
   { name: 'einfuehrung-rand', datei: 'einfuehrung-rand.test.mjs', args: [], was: 'Einführung: jeder Knopf ohne Scrollen ganz sichtbar, mind. 44 px (SE, 13, iPad, PC), Klartext Bauernmarsch' },
+  { name: 'systeme-texte', datei: 'systeme-texte.test.mjs', args: [], was: 'Spielsysteme: Funken, Duell, Liga nennen in DE und EN dieselben Zahlen wie der Code' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
