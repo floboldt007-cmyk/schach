@@ -7,7 +7,8 @@ Codex ist der unabhängige Prüfer. Die beiden prüfen sich gegenseitig, damit F
 
 - Schach-Arena: Web-App (PWA) ohne Build-Schritt, Vanilla-JS mit ES-Modulen, Stockfish als WASM-Worker (`vendor/`),
   chess.js. Lizenz GPL-3.0.
-- Live über GitHub Pages aus `main`: https://floboldt007-cmyk.github.io/schach/
+- Live über GitHub Pages aus `main` unter der eigenen Domain (Datei `CNAME`): https://crownmate.de/
+  (die alte Adresse `https://floboldt007-cmyk.github.io/schach/` leitet dorthin um)
 - Aufbau und Schnittstellen: `ARCHITEKTUR.md`.
 - Verbindliche Entscheidungen des Besitzers: `design/runde4/ENTSCHEIDUNGEN.md` (gilt vor allen älteren Plänen).
   Spielkonzept mit Fairness-Regeln: `design/runde4/SPIELKONZEPT.md`.

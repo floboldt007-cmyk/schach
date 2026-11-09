@@ -94,7 +94,10 @@
   <h2>4. Storage on your device (without cookies)</h2>
   <p>Crownmate stores settings, progress, games, and analyses in your browser's local storage (localStorage) and caches
   the app files for offline use (Service Worker). This data stays on your device unless you create an account or turn on
-  sharing. The app does not set cookies. Fonts, images, and sounds are supplied with the app, not by external servers
+  sharing. In addition, the app keeps short-lived technical markers in the browser's session storage (sessionStorage):
+  when the app last reloaded or repaired itself (so that it does not do so in a loop) and whether, after reloading, it
+  should show once the notice that your progress was loaded from another device. They contain only a timestamp or a yes
+  and disappear when you close the tab or the app. The app does not set cookies. Fonts, images, and sounds are supplied with the app, not by external servers
   (for example, not by Google Fonts). Local storage is strictly necessary for the app to function
   (§ 25 Abs. 2 Nr. 2 TDDDG, Germany's law on data protection in telecommunications and digital services).
   “Reset progress” in the settings deletes your progress, games and analyses; your settings, your sign-in and the other
@@ -129,7 +132,9 @@
     <li>a username you choose,</li>
     <li>if you add friends: who is friends with whom or has sent a request (with the time), your invite code (valid for 7
     days) and your weekly score (points and number of scored games per week). Your friends only see your username, your
-    weekly score and your profile, never your email address. If you decline a request, it is kept for 30 days so the same
+    weekly score and your profile, never your email address. Technically, the app of your friends and of the people with
+    whom a request is pending also receives your account identifier (a random string without a name or email address) so
+    that friendships and requests can be matched. If you decline a request, it is kept for 30 days so the same
     person cannot ask you again during that time; after that it is deleted,</li>
     <li>your progress (settings, progress, games, and analyses as stored by the app),</li>
     <li>the browser family and operating system of the device used for the most recent backup (for example, “iPadOS Safari”),
@@ -271,6 +276,8 @@
   <h3>Online games with friends</h3>
   <p>When you play a friend online, we store both account IDs, the moves, current position, chess clock, invitation code,
   and game timestamps. Only the two players can read the game; an open invitation is initially visible only to its creator.
+  Along with the game, your opponent's app also receives your account identifier (a random string without a name or
+  email address), never your email address.
   This data is necessary to play together (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in Frankfurt,
   just like your account.</p>
   <p>The same applies to games from league matchmaking: there the server pairs you with a person of similar playing
@@ -399,7 +406,9 @@
   account from the age of 13. If you are under 16, ask your parents or legal guardians before creating an account. You
   can give consent yourself, for example to sharing games and usage data (section 6), only from the age of 16; before
   that, only with your parents' approval (Art. 8(1) DSGVO, GDPR). The switch is therefore off by default, and the app
-  explains this right beside it. Editions in the shop are available only from 18 (section "Shop: editions"). Parents can
+  explains this right beside it. The Trainer subscription on the web is available only from 18: before the first
+  purchase the app asks once and remembers only yes or no on your device (section 4). Playing and learning are not
+  affected. Editions in the shop are likewise available only from 18 (section "Shop: editions"). Parents can
   request information about an account or its deletion at
   <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a>.</p>
 
@@ -422,7 +431,8 @@
 
   <h2>14. Security</h2>
   <p>All connections are encrypted (TLS). On the server, row-level access rules (Row Level Security) ensure that each
-  account can create and read only its own data; an account can only create shared usage data, which can be read only
+  account can create and read only its own data, plus what the sections above expressly name as visible to friends,
+  opponents, the weekly group or the leader of a class; an account can only create shared usage data, which can be read only
   through the data access request. The app contains only a public key; secrets are held exclusively by the operator.</p>
 
   <h2>15. Changes</h2>

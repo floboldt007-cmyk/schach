@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="de" data-thema="modern" data-modus="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F4F1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171B" media="(prefers-color-scheme: dark)">
+<title>AGB · Crownmate</title>
+<script>
+  // Hell oder Dunkel wie in der App (gespeicherte Einstellung "modus"), sonst nach dem System.
+  try {
+    var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+    if (e && (e.modus === 'hell' || e.modus === 'dunkel')) document.documentElement.setAttribute('data-modus', e.modus);
+  } catch (f) { /* privater Modus: System */ }
+</script>
+<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/themes/modern.css">
+<style>
+  /* Schlichte Textseite mit den Tokens der App (hell und dunkel ueber css/themes/modern.css), keine festen Farben. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background-color: var(--grund); color: var(--text); font-family: var(--schrift); font-size: var(--fs-text); line-height: 1.55;
+    -webkit-text-size-adjust: 100%; }
+  main { max-width: 760px; margin: 0 auto; padding: var(--a6) var(--rand) var(--a7); padding-bottom: calc(var(--a7) + env(safe-area-inset-bottom)); }
+  h1 { margin: var(--a4) 0 var(--a2); font-family: var(--display); font-size: var(--fs-h1); font-weight: var(--gw-titel); letter-spacing: var(--lw-titel); line-height: 1.1; }
+  h2 { margin: var(--a6) 0 var(--a2); font-size: var(--fs-h2); font-weight: var(--gw-stark); line-height: 1.2; }
+  h3 { margin: var(--a5) 0 var(--a1); font-size: var(--fs-text); font-weight: var(--gw-stark); }
+  p, li { margin: 0 0 var(--a3); color: var(--text); }
+  ul { padding-left: 1.2em; }
+  a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .stand { color: var(--text-2); font-size: var(--fs-klein); }
+  .entwurf { margin: 0 0 var(--a5); padding: var(--a4); border: 2px solid var(--warn); border-radius: var(--r-l); background: var(--warn-weich); }
+  .entwurf p { margin: 0; }
+  .entwurf b { display: block; margin-bottom: var(--a1); }
+  .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
+  .kasten p:last-child, .kasten ul:last-child { margin-bottom: 0; }
+  .platz { padding: 0 .3em; border-radius: var(--r-s); background: var(--flaeche-2); border: 1px dashed var(--linie-2); color: var(--text-2);
+    -webkit-box-decoration-break: clone; box-decoration-break: clone; overflow-wrap: anywhere; }
+  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+    border: 1px solid var(--linie); text-decoration: none; font-weight: var(--gw-stark); }
+  .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
+  .fuss a { margin-right: var(--a3); }
+  dl { margin: 0; display: grid; grid-template-columns: minmax(0, 12em) minmax(0, 1fr); gap: var(--a2) var(--a4); }
+  dt { color: var(--text-2); }
+  dd { margin: 0; }
+  @media (max-width: 520px) { dl { grid-template-columns: minmax(0, 1fr); gap: 0; } dd { margin-bottom: var(--a3); } }
+</style>
+</head>
+<body>
+<main>
+  <p><a class="zurueck" href="./#einstellungen">Zurück zu Crownmate</a></p>
+  <p class="stand"><a href="agb-en.html" lang="en" hreflang="en">English version</a></p>
+  <h1>Allgemeine Geschäftsbedingungen</h1>
+  <p class="stand">Nutzungsbedingungen und Abo-Bedingungen mit Widerrufsbelehrung. Entwurf, Stand November 2026</p>
+
+  <div class="entwurf" role="note">
+    <p><b>Entwurf. Vor der Veröffentlichung von einer fachkundigen Person prüfen lassen.</b>
+    Diese Bedingungen sind noch nicht in Kraft und in der App noch nicht verlinkt. Das Abo „Crownmate Trainer“ ist noch
+    nicht kaufbar. Offen sind die Stellen in eckigen Klammern. Bis zur Prüfung gilt dieser Text nicht. Einzelkäufe im
+    Shop (Editionen) regelt dieser Entwurf noch nicht.</p>
+  </div>
+
+  <h2>1. Geltungsbereich und Anbieter</h2>
+  <p>Diese Bedingungen gelten für die Nutzung der Schach-App Crownmate (Web-App unter crownmate.de) und für das
+  kostenpflichtige Abo „Crownmate Trainer“. Anbieter und Vertragspartner ist der im <a href="impressum.html">Impressum</a>
+  genannte Anbieter; dort stehen Name, Anschrift und Kontaktweg. Welche Daten die App verarbeitet, beschreibt die
+  <a href="datenschutz.html">Datenschutzerklärung</a>.</p>
+  <p>Das Angebot richtet sich an Verbraucher. Abweichende Bedingungen von Nutzern gelten nicht. Vertragssprache ist
+  Deutsch; die englische Fassung ist eine Übersetzung zur Information.</p>
+
+  <h2>2. Vertragsschluss</h2>
+  <p><b>Kostenlose Nutzung:</b> Crownmate lässt sich ohne Konto und ohne Bezahlung nutzen. Legst du ein Konto an, kommt
+  ein unentgeltlicher Nutzungsvertrag über das Konto zustande. Du kannst das Konto jederzeit in der App löschen
+  (Einstellungen → Daten → „Konto löschen“).</p>
+  <p><b>Abo „Crownmate Trainer“:</b> Die Darstellung des Abos in der App ist noch kein bindendes Angebot. Für den Abschluss
+  brauchst du ein Konto. Die App leitet dich zur Kasse unseres Zahlungsdienstes Stripe weiter. Dort siehst du vor der
+  Bestellung die wesentlichen Angaben (Leistung, Preis, Abrechnungszeitraum, Laufzeit und Kündigung) und kannst deine
+  Eingaben prüfen und berichtigen. Mit dem Bestellknopf an der Kasse gibst du ein verbindliches Angebot ab. Der Vertrag
+  kommt zustande, wenn wir die Bestellung bestätigen, spätestens mit der Freischaltung des Abos in deinem Konto.
+  Du erhältst eine Bestätigung per E-Mail mit diesen Bedingungen und der Widerrufsbelehrung.
+  <span class="platz">[Ablauf, Bestellknopf-Beschriftung und Bestätigungs-E-Mail gegen die fertige Stripe-Kasse prüfen]</span></p>
+  <p>Den Vertragstext speichern wir nicht für dich abrufbar; die jeweils aktuelle Fassung dieser Bedingungen steht auf
+  dieser Seite, deine Bestelldaten stehen in der Bestätigung und im Kundenportal von Stripe („Abo verwalten“).</p>
+
+  <h2>3. Leistungen</h2>
+  <p><b>Kostenlose App:</b> Spielen gegen die Bots, die Analyse, das Tagesrätsel und die übrigen in der App als gratis
+  bezeichneten Funktionen bleiben kostenlos. Das Abo verkauft nie den Zugang zum Spiel.</p>
+  <p><b>Crownmate Trainer:</b> Das Abo schaltet zusätzliche Lern- und Trainingsfunktionen frei. Maßgeblich ist, was die
+  App beim Abschluss unter „Im Trainer“ als enthalten nennt. Funktionen, die dort als „In Arbeit“ bezeichnet
+  sind, sind noch nicht Teil der Leistung. Das Abo bringt keine Vorteile in Wertung, Liga oder Partien gegen
+  andere Menschen und enthält keine Käufe im Shop.</p>
+  <p>Für die Nutzung brauchst du ein Gerät mit einem aktuellen Browser und eine Internetverbindung; die Kosten dafür
+  trägst du selbst.</p>
+
+  <h2>4. Preise und Zahlung</h2>
+  <p>Den Preis und den Abrechnungszeitraum siehst du vor dem Abschluss in der App und an der Kasse von Stripe. Es gilt der
+  dort beim Abschluss genannte Preis. <span class="platz">[Angabe zur Umsatzsteuer nach steuerlicher Klärung]</span>
+  Der Betrag wird zu Beginn jedes Abrechnungszeitraums im Voraus fällig und über die bei Stripe gewählte Zahlungsart
+  eingezogen. Zahlungsdaten gibst du direkt bei Stripe ein.</p>
+  <p>Eine Preisänderung für laufende Abos kündigen wir mindestens 30 Tage vorher per E-Mail an. Sie gilt erst ab dem
+  nächsten Abrechnungszeitraum nach Ablauf dieser Frist und nur, wenn du ihr zustimmst; ohne Zustimmung endet das Abo zum
+  Ende des laufenden Abrechnungszeitraums. <span class="platz">[Preisänderungsklausel durch die Fachperson prüfen oder streichen]</span></p>
+
+  <h2>5. Laufzeit und Kündigung</h2>
+  <p>Das Abo läuft für den gewählten Abrechnungszeitraum (in der Regel einen Monat) und verlängert sich jeweils um
+  denselben Zeitraum, wenn du nicht kündigst. Du kannst jederzeit zum Ende des laufenden Abrechnungszeitraums kündigen;
+  bis dahin bleibt der Trainer nutzbar. Eine Mindestlaufzeit über den laufenden Abrechnungszeitraum hinaus gibt es nicht.</p>
+  <p>Kündigen kannst du</p>
+  <ul>
+    <li>in der App über „Abo verwalten“ (Kundenportal von Stripe),</li>
+    <li>über die Schaltfläche „Verträge hier kündigen“, ohne dich anzumelden
+    <span class="platz">[Ort der Schaltfläche eintragen, sobald sie eingebaut ist]</span>,</li>
+    <li>oder in Textform, zum Beispiel per E-Mail an die im Impressum genannte Adresse.</li>
+  </ul>
+  <p>Den Eingang deiner Kündigung bestätigen wir dir in Textform. Das Recht zur Kündigung aus wichtigem Grund bleibt für
+  beide Seiten bestehen. Das Löschen deines Kontos beendet das Abo nicht: kündige es vorher. Was du erspielt hast, bleibt
+  dir auch nach dem Ende des Abos.</p>
+
+  <h2>6. Jugendliche und Minderjährige</h2>
+  <p>Spielen ohne Konto ist in jedem Alter möglich. Ein Konto kannst du ab 13 Jahren anlegen; bist du jünger als 16, frag
+  vorher deine Eltern oder Erziehungsberechtigten. Das Abo „Crownmate Trainer“ gibt es im Web erst ab 18 Jahren: Vor dem
+  ersten Kauf fragt die App nach deinem Alter, und wer jünger ist, kann kein Abo abschließen. Alles andere bleibt frei.
+  Schließt eine minderjährige Person trotzdem ein Abo ab, ist der Vertrag ohne Zustimmung der Erziehungsberechtigten
+  nicht wirksam; Eltern wenden sich dann an die im Impressum genannte Adresse, wir beenden das Abo und erstatten die
+  Zahlungen.</p>
+
+  <h2>7. Widerrufsrecht</h2>
+  <p>Als Verbraucher hast du beim Abschluss des Abos ein gesetzliches Widerrufsrecht. Die folgende Belehrung folgt dem
+  gesetzlichen Muster und verwendet deshalb die Anrede „Sie“.
+  <span class="platz">[Fachperson: Einordnung des Abos als digitale Dienstleistung oder digitaler Inhalt festlegen und Belehrung und Abschnitt „Vorzeitiges Erlöschen“ danach anpassen]</span></p>
+  <h3>Widerrufsbelehrung</h3>
+  <div class="kasten">
+    <p><b>Widerrufsrecht</b></p>
+    <p>Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen.</p>
+    <p>Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses.</p>
+    <p>Um Ihr Widerrufsrecht auszuüben, müssen Sie uns
+    (<span class="platz">[Name, Anschrift und E-Mail-Adresse des Anbieters wie im Impressum; vor der Veröffentlichung hier einsetzen]</span>)
+    mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief oder E-Mail) über Ihren Entschluss, diesen
+    Vertrag zu widerrufen, informieren. Sie können dafür das beigefügte Muster-Widerrufsformular verwenden, das jedoch nicht
+    vorgeschrieben ist.</p>
+    <p>Zur Wahrung der Widerrufsfrist reicht es aus, dass Sie die Mitteilung über die Ausübung des Widerrufsrechts vor
+    Ablauf der Widerrufsfrist absenden.</p>
+    <p><b>Folgen des Widerrufs</b></p>
+    <p>Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, unverzüglich und
+    spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf dieses Vertrags
+    bei uns eingegangen ist. Für diese Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen
+    Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart; in keinem Fall werden
+    Ihnen wegen dieser Rückzahlung Entgelte berechnet.</p>
+    <p>Haben Sie verlangt, dass die Dienstleistungen während der Widerrufsfrist beginnen sollen, so haben Sie uns einen
+    angemessenen Betrag zu zahlen, der dem Anteil der bis zu dem Zeitpunkt, zu dem Sie uns von der Ausübung des
+    Widerrufsrechts hinsichtlich dieses Vertrags unterrichten, bereits erbrachten Dienstleistungen im Vergleich zum
+    Gesamtumfang der im Vertrag vorgesehenen Dienstleistungen entspricht.</p>
+  </div>
+  <h3>Vorzeitiges Erlöschen des Widerrufsrechts</h3>
+  <p>Der Trainer steht dir sofort nach dem Kauf zur Verfügung, wenn du das an der Kasse ausdrücklich verlangst. Soweit
+  das Abo als Vertrag über digitale Inhalte gilt, die nicht auf einem körperlichen Datenträger geliefert werden, erlischt
+  dein Widerrufsrecht vorzeitig, wenn wir mit der Ausführung des Vertrags begonnen haben, nachdem du ausdrücklich
+  zugestimmt hast, dass wir vor Ablauf der Widerrufsfrist damit beginnen, du deine Kenntnis davon bestätigt hast, dass
+  du dadurch dein Widerrufsrecht verlierst, und wir dir eine Bestätigung des Vertrags zur Verfügung gestellt haben
+  (§ 356 Abs. 5 BGB). Soweit das Abo als Vertrag über eine digitale Dienstleistung gilt, erlischt das Widerrufsrecht
+  erst, wenn die Leistung vollständig erbracht ist (§ 356 Abs. 4 BGB); bei einem Widerruf davor gilt die Regel zum
+  anteiligen Betrag aus der Belehrung oben. Beide Erklärungen holen wir an der Kasse mit eigenen, nicht vorausgewählten
+  Kästchen ein und speichern sie als Nachweis.
+  <span class="platz">[Wortlaut der Kästchen an der Stripe-Kasse und Widerrufsfunktion (elektronischer Widerruf) mit der Fachperson festlegen]</span></p>
+  <h3>Muster-Widerrufsformular</h3>
+  <div class="kasten">
+    <p>(Wenn Sie den Vertrag widerrufen wollen, dann füllen Sie bitte dieses Formular aus und senden Sie es zurück.)</p>
+    <ul>
+      <li>An <span class="platz">[Name, Anschrift und E-Mail-Adresse des Anbieters wie im Impressum]</span>:</li>
+      <li>Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über die Erbringung der folgenden
+      Dienstleistung (*): Abo „Crownmate Trainer“</li>
+      <li>Bestellt am (*)/erhalten am (*)</li>
+      <li>Name des/der Verbraucher(s)</li>
+      <li>Anschrift des/der Verbraucher(s)</li>
+      <li>Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier)</li>
+      <li>Datum</li>
+    </ul>
+    <p>(*) Unzutreffendes streichen.</p>
+  </div>
+
+  <h2>8. Konto und faires Verhalten</h2>
+  <p>Ein Konto ist für dich persönlich. Halte den Zugang zu deinem E-Mail-Postfach und deinem Konto geschützt. Benutzernamen
+  und alles, was andere von dir sehen, dürfen niemanden beleidigen, täuschen oder Rechte anderer verletzen. In Partien
+  gegen Menschen sind fremde Hilfe durch Schachprogramme und das absichtliche Hinhalten nicht erlaubt. Bei Verstößen
+  können wir Namen zurücksetzen, einzelne Funktionen sperren oder nach vorheriger Abmahnung das Konto kündigen; bei
+  schweren Verstößen auch ohne Abmahnung. Für ein dadurch vorzeitig beendetes Abo erstatten wir den Anteil für die nicht
+  genutzte Zeit, soweit du die Beendigung nicht zu vertreten hast.
+  <span class="platz">[Sperr- und Erstattungsregel durch die Fachperson prüfen]</span></p>
+
+  <h2>9. Verfügbarkeit und Änderungen der App</h2>
+  <p>Wir entwickeln Crownmate laufend weiter und halten die Funktionen des Abos während der Laufzeit vertragsgemäß bereit,
+  einschließlich der nötigen Aktualisierungen. Kurze Unterbrechungen für Wartung oder wegen Störungen bei unseren
+  Dienstleistern lassen sich nicht ganz ausschließen. Änderungen am Abo, die über das zur Vertragsmäßigkeit Nötige
+  hinausgehen, nehmen wir nur aus triftigem Grund vor (zum Beispiel Sicherheit, neue Technik, geänderte Rechtslage), ohne
+  zusätzliche Kosten für dich und mit klarer Information. Beeinträchtigt eine Änderung deine Nutzung mehr als nur
+  unerheblich, informieren wir dich vorher und du kannst das Abo innerhalb von 30 Tagen kostenlos beenden (§ 327r BGB).</p>
+  <p>Änderungen dieser Bedingungen für laufende Abos teilen wir dir mindestens 30 Tage vorher per E-Mail mit. Sie werden
+  nur mit deiner Zustimmung wirksam. <span class="platz">[Änderungsklausel durch die Fachperson prüfen]</span></p>
+
+  <h2>10. Mängelrechte</h2>
+  <p>Es gelten die gesetzlichen Rechte bei Mängeln digitaler Produkte (§§ 327 ff. BGB). Melde Fehler am besten über die
+  im Impressum genannte Adresse.</p>
+
+  <h2>11. Haftung</h2>
+  <p>Wir haften unbeschränkt bei Vorsatz und grober Fahrlässigkeit, bei Verletzung von Leben, Körper oder Gesundheit, nach
+  dem Produkthaftungsgesetz und soweit wir eine Garantie übernommen haben. Bei leichter Fahrlässigkeit haften wir nur
+  für die Verletzung wesentlicher Vertragspflichten, also solcher Pflichten, deren Erfüllung den Vertrag erst möglich
+  macht und auf deren Einhaltung du regelmäßig vertrauen darfst; in diesem Fall ist die Haftung auf den vertragstypischen,
+  vorhersehbaren Schaden begrenzt. Im Übrigen ist die Haftung ausgeschlossen. Dasselbe gilt für unsere Erfüllungsgehilfen.
+  <span class="platz">[Haftungsklausel durch die Fachperson prüfen]</span></p>
+
+  <h2>12. Streitbeilegung</h2>
+  <p>Wir sind nicht verpflichtet und nicht bereit, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle
+  teilzunehmen. <span class="platz">[Entscheidung des Anbieters: Teilnahme an der Verbraucherschlichtung ja oder nein; gleichlautend mit dem Impressum]</span></p>
+
+  <h2>13. Schlussbestimmungen</h2>
+  <p>Es gilt deutsches Recht. Hast du deinen gewöhnlichen Aufenthalt in einem anderen Staat der Europäischen Union, bleiben
+  die zwingenden Verbraucherschutzvorschriften dieses Staates anwendbar. Ist eine Bestimmung dieser Bedingungen
+  unwirksam, bleiben die übrigen wirksam.</p>
+
+  <p class="fuss"><a href="impressum.html">Impressum</a> <a href="datenschutz.html">Datenschutzerklärung</a> <a href="./#einstellungen">Zurück zu Crownmate</a></p>
+</main>
+</body>
+</html>

@@ -522,7 +522,7 @@ async function browserTeil(browser) {
     pruefe('kaufbar: "Trainer abschließen" zuerst, Preis aus der Tabelle', z.knoepfe[0] === 'Trainer abschließen' && z.preis === PRODUKT.preis_text, z);
     pruefe('kaufbar: nur der gemeldete Vorteil unter "Im Trainer", die anderen 8 "In Arbeit"', z.vorteile === 1 && /Coach-Erklärungen/.test(z.imAbo[0])
       && z.geplant === 8, z);
-    pruefe('kaufbar: ruhiger Satz zum Alter sichtbar (Web ab 18, Crownmate ab 16), kein Testmodus-Satz', /Web ab 18/.test(z.alter) && /ab 16/.test(z.alter)
+    pruefe('kaufbar: ruhiger Satz zum Alter sichtbar (Web ab 18, Spielen und Lernen für alle frei, kein „ab 16“), kein Testmodus-Satz', /Web ab 18/.test(z.alter) && /für alle frei/.test(z.alter) && !/ab 16/.test(z.alter)
       && z.test === '', z.alter);
     await warte(600);
     await bild(seite, 'abo-kaufbar-hell');
