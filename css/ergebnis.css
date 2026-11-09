@@ -181,19 +181,12 @@
   .erg-lobby { margin: 0 auto; }
 }
 
-/* ---------- Auswahl Sieg-Blatt (Flo waehlt; .ergebnis-overlay[data-siegblatt], js/ui/partie.js) ---------- */
-/* alle Varianten: die Wertungs-Zeile bekommt denselben Innenabstand wie Punkte und Funken (klebte am Rand) */
+/* ---------- Sieg-Blatt (Flo 09.11., Variante C; .erg-liga-verweis aus js/ui/partie.js) ---------- */
+/* die Wertungs-Zeile bekommt denselben Innenabstand wie Punkte und Funken (klebte am Rand; Niederlage, Remis) */
 .ergebnis-karte .abrechnung > .liga-abrechnung { padding: 10px 12px; text-align: left; color: var(--text-2); font-weight: 650; }
-/* A: wie heute, aufgeraeumt: Genauigkeit und Level-Zeile ruhiger, Abstaende gleichmaessig */
-[data-siegblatt="a"] .erg-f-zeile.zeile { padding-block: 2px; font-size: 13px; color: var(--text-2); }
-[data-siegblatt="a"] .erg-f-zeile.zeile b { font-weight: 600; color: var(--text-2); }
-/* B: die Sterne sind die eine Zahl, alles andere hinter "Details" */
-[data-siegblatt="b"].sieg:not(.details-offen) :is(.erg-genau, .erg-feier, .erg-karte-ort) { display: none; }
-[data-siegblatt="b"] .erg-stern .e-stern { width: 72px; height: 72px; }
-[data-siegblatt="b"] .erg-stern:nth-child(2) .e-stern { width: 88px; height: 88px; }
-/* C: gewinnen (Sterne, Genauigkeit im mittleren Stern) und wachsen (Funken-Balken); Punkte und Wertung in der Liga */
-[data-siegblatt="c"].sieg :is(.erg-genau, .erg-f-zeile[data-quelle="level"], .abrechnung > .pk-abr, .abrechnung > .liga-abrechnung) { display: none; }
-.erg-details, .erg-liga-verweis { justify-self: center; min-height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-pille);
-  background: var(--flaeche-2); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
-.erg-liga-verweis { background: none; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
-.erg-details:focus-visible, .erg-liga-verweis:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+/* Sieg: gewinnen (Sterne, Genauigkeit im mittleren Stern) und wachsen (Funken-Balken); Punkte und Wertung in der Liga */
+.ergebnis-overlay.sieg :is(.erg-genau, .erg-f-zeile[data-quelle="level"], .abrechnung > .pk-abr, .abrechnung > .liga-abrechnung) { display: none; }
+.erg-liga-verweis { justify-self: center; min-height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-pille);
+  background: none; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; }
+.erg-liga-verweis:focus-visible { outline: var(--fokus); outline-offset: 2px; }
