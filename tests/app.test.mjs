@@ -3202,17 +3202,28 @@ async function testeU7(browser) {
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
     await h.starte({ botId: 'kalle', farbe: 'w' });
     const ergebnis = [];
-    for (const hoehe of [655, 600, 540]) {
-      await seite.setViewportSize({ width: 390, height: hoehe });
+    for (const hoehe of [655, 600, 540, 548]) {
+      await seite.setViewportSize({ width: hoehe === 548 ? 375 : 390, height: hoehe });
       await warte(400);
       const m = await u7Masse(seite);
-      ergebnis.push({ hoehe, eng: m.eng, brett: Math.round(m.brett.w), unten: Math.round(m.unten), ih: m.ih, scrollt: m.scrollt });
+      // Rechtecke der Spalte (Karte, Brett, Karte, Coach, Knoepfe) duerfen sich nicht ueberlappen
+      const sp = m.spalte.filter((e) => e.s !== 'zugleiste' && e.s !== 'evalbalken');
+      const ueberlappt = sp.some((a, i) => sp.some((b, j) => j > i && a.t < b.b - 0.5 && b.t < a.b - 0.5));
+      const sehrEng = await seite.evaluate(() => document.querySelector('#app > .screen').classList.contains('sehr-eng'));
+      ergebnis.push({ hoehe, eng: m.eng, sehrEng, brett: Math.round(m.brett.w), unten: Math.round(m.unten), knoepfeUnten: Math.round(m.knoepfe.b), ih: m.ih,
+        scrollt: m.scrollt, ueberlappt, tipp: m.tipp });
     }
-    const [a, b, c] = ergebnis;
+    const [a, b, c, d] = ergebnis;
     pruefe('390 x 655: Coach auf eine Zeile (Rest auf Antippen), das Brett bleibt groß (mindestens 360 px, seit 31.10. ohne Sockel), alles im Bild', a.eng && a.brett >= 360 && a.brett % 8 === 0 && a.unten <= a.ih, JSON.stringify(a));
     pruefe('390 x 600: Coach eine Zeile, erst dann ein kleineres Brett (Vielfaches von 8, mindestens 280), alles im Bild', b.eng && b.brett < 360 && b.brett >= 280 && b.brett % 8 === 0
       && b.unten <= b.ih, JSON.stringify(b));
-    pruefe('390 x 540: das Brett nie unter 280 px (die Spalte scrollt)', c.brett === 280 && c.scrollt > 0, JSON.stringify(c));
+    pruefe('390 x 540: das Brett nie unter 280 px (reicht auch das Zusammenruecken nicht, scrollt die Spalte)', c.brett >= 280 && c.sehrEng
+      && (c.unten <= c.ih || c.scrollt > 0), JSON.stringify(c));
+    // U-Messrunde 09.11.: iPhone SE mit Safari-Leiste (375 x 548), die Knoepfe endeten bei 558 px
+    pruefe('375 x 548 (iPhone SE mit Safari-Leiste): Spielknoepfe ganz im Fenster, nichts ueberlappt, Brett mindestens 280, Knoepfe mindestens 44 px',
+      d.knoepfeUnten <= d.ih && !d.ueberlappt && d.brett >= 280 && d.tipp >= 44, JSON.stringify(d));
+    pruefe('Groessere Handys ruecken nicht zusammen (390 x 655 und 390 x 600 ohne .sehr-eng, nichts ueberlappt)', !a.sehrEng && !b.sehrEng && !a.ueberlappt && !b.ueberlappt,
+      JSON.stringify([a, b]));
     await seite.setViewportSize({ width: 390, height: 600 });
     await warte(300);
     await h.tippe('.partie .coach');

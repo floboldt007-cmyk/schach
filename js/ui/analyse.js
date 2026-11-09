@@ -464,6 +464,32 @@ export function zeige(root, params = {}, app) {
     lausche(window, 'resize', pruefeMehr);
     nach(50, pruefeMehr);
 
+    // Kundenblick 09.11. (Befund 10): auf dem Handy liegt unten die feste Knopfleiste. Das Brett endet beim Oeffnen ganz
+    // darueber: ragt es hinein, wird es kleiner; bliebe es dann unter BRETT_MIN, steht es vor der Genauigkeit (iPhone SE).
+    const BRETT_MIN = 280;
+    const passeBrett = () => {
+      sec.style.removeProperty('--an-brett');
+      sec.classList.remove('brett-zuerst');
+      const leiste = sec.querySelector('.an-aktionsleiste');
+      const brett = koerper.querySelector('.an-brett');
+      if (!leiste || !brett || getComputedStyle(leiste).display === 'none') return;
+      // Ueberlappung bei geschlossener Seite (scrollTop 0): die Leiste klebt unten, das Brett liegt im Inhalt
+      const ueber = () => brett.getBoundingClientRect().bottom + sec.scrollTop - (sec.getBoundingClientRect().bottom - leiste.offsetHeight) + 4;
+      let u = ueber();
+      if (u <= 0) return;
+      const breite = brett.getBoundingClientRect().width;
+      if (breite - u < BRETT_MIN) {
+        sec.classList.add('brett-zuerst');
+        u = ueber();
+        if (u <= 0) return;
+      }
+      sec.style.setProperty('--an-brett', Math.floor(brett.getBoundingClientRect().width - u) + 'px');
+    };
+    lausche(window, 'resize', passeBrett);
+    passeBrett();
+    nach(300, passeBrett);
+    nach(1000, passeBrett);
+
     verbindeKurve();
     verbindeWischen();
     lausche(document, 'keydown', taste);

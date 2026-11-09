@@ -580,6 +580,10 @@ function zeigeReiter(screen, params = {}) {
 let aktuell = null;    // { name, params, hash, handle }
 let ladeNr = 0;
 let tiefe = 0;         // Anzahl eigener Eintraege im Browser-Verlauf vor dem aktuellen
+// Kundenblick 09.11. (Befund 9): der zuletzt gezeigte Hauptort. Zurueck aus der Partie fuehrt dorthin, woher man kam
+// (Start oder Bots), nicht immer zu den Bots.
+const HEIM_ORTE = new Set(['heim', 'arena', 'lernen', 'bestenliste', 'ich']);
+let herkunft = 'arena';
 
 function hashFuer(name, params) {
   if (name === 'online' && params?.partieId) return '#online/partie/' + encodeURIComponent(params.partieId);
@@ -716,6 +720,7 @@ async function zeigeScreen(name, params, hash) {
   const root = document.getElementById('app');
   root.replaceChildren();
   aktuell = { name, params, hash, handle: null };
+  if (HEIM_ORTE.has(name)) herkunft = name;
   ladeFertig = nr;
   document.documentElement.dataset.screen = name;
   document.title = name === 'arena' || name === 'heim' ? 'Crownmate' : `${titelVon(name)} · Crownmate`;
@@ -828,6 +833,7 @@ function zeigePlatzhalter(root, name, kaputt = false) {
 export const app = {
   gehe,
   zurueck,
+  herkunft: () => herkunft,
   engine,
   einstellungen: () => ladeEinstellungen(),
   setzeEinstellungen(teil) {
