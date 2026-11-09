@@ -471,7 +471,7 @@ export function kontoGruppe({ app } = {}) {
   let email = sitzung()?.email || ''; let zuletzt = '';
   const melden = (t, fehler = false) => { const x = el.querySelector('.konto-status'); if (x) { x.textContent = t; x.dataset.fehler = fehler ? 'ja' : 'nein'; } };
   let gezeichnetMit = null;   // angemeldet beim letzten Zeichnen (die Gruppe "Daten" kann das Konto loeschen)
-  let schutz = null;          // Bot-Schutz (js/botschutz.js), nur ohne Sitzung und nur mit Site-Key
+  let schutz = null;          // Bot-Schutz (js/botschutz.js), nur ohne Sitzung und nur mit Site-Key; laedt erst bei Fokus/Code senden
   const render = () => {
     const s = sitzung();
     schutz?.entferne(); schutz = null;
@@ -538,6 +538,9 @@ export function kontoGruppe({ app } = {}) {
       if (a === 'apple') { melden(K('zuApple')); meldeMitAnbieterAn('apple'); }
     } catch (f) { if (f?.serverDetails) console.error('Konto-Serverfehler', f.serverDetails); melden(f.message || t('einstellungen.nichtGeklappt'), true); }
   });
+  // Bot-Schutz erst laden, wenn jemand die Anmeldung wirklich benutzt (Fokus im E-Mail-Feld; "Code senden" startet ihn
+  // ueber schutz.token() selbst). Das blosse Oeffnen der Einstellungen laedt nichts von Cloudflare.
+  el.addEventListener('focusin', (e) => { if (e.target.closest?.('.konto-email')) schutz?.starte(); });
   el.addEventListener('input', (e) => {
     const z = e.target.closest('.konto-ziffern input'); if (!z) return;
     z.value = z.value.replace(/\D/g, '').slice(-1);
