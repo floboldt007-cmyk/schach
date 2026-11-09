@@ -3850,10 +3850,51 @@ async function testeU7(browser) {
     if (g.handy) {
       const fest = await seite.evaluate(() => { const k = document.querySelector('.ergebnis-karte').getBoundingClientRect();
         const l = document.querySelector('.erg-lobby').getBoundingClientRect(); const a = document.querySelector('.erg-aktionen');
-        return { pos: getComputedStyle(a).position, lobbyImBild: l.height >= 44 && l.top >= k.top && l.bottom <= k.bottom + 1 && l.bottom <= innerHeight }; });
-      pruefe('Handy: Knopfleiste fest unten, „Zu den Bots“ ohne Scrollen zu sehen', fest.pos === 'sticky' && fest.lobbyImBild
+        return { aussen: !a.closest('.erg-rumpf'), lobbyImBild: l.height >= 44 && l.top >= k.top && l.bottom <= k.bottom + 1 && l.bottom <= innerHeight }; });
+      pruefe('Handy: Knopfleiste fest unten (unter dem Scrollbereich), „Zu den Bots“ ohne Scrollen zu sehen', fest.aussen && fest.lobbyImBild
         && (await seite.locator('.erg-lobby').innerText()).trim() === 'Zu den Bots', JSON.stringify(fest));
     }
+    // Punkt 19 (Messrunde 09.11.): die Knopfleiste verdeckt nichts. Vorher lag der Bot-Spruch auf iPhone 13 und SE halb unter
+    // ihr (sticky ueber dem Inhalt). Gemessen wird der SICHTBARE Teil jedes Inhaltselements (am Scrollbereich abgeschnitten)
+    // gegen die Leiste, in Ruhe und am Ende des Scrollbereichs; dazu: Zeilen ruecken nicht ineinander, die Leiste liegt im Fenster.
+    // einmal (im Handy-Durchgang) ueber vier Fenster: iPhone 13, SE, iPad quer, PC
+    for (const [w, hh] of g.handy ? [[390, 664], [375, 548], [1180, 746], [1280, 720]] : []) {
+      await seite.setViewportSize({ width: w, height: hh });
+      await warte(300);
+      const platz = async () => seite.evaluate(() => {
+        const o = document.querySelector('.ergebnis-overlay');
+        const rumpf = o.querySelector('.erg-rumpf');
+        const lr = o.querySelector('.erg-aktionen').getBoundingClientRect();
+        const rr = rumpf.getBoundingClientRect();
+        const sicht = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+        const verdeckt = [];
+        for (const e of rumpf.querySelectorAll('*')) {
+          if (e.children.length || !sicht(e)) continue;
+          const r = e.getBoundingClientRect();
+          const t = Math.max(r.top, rr.top, lr.top), u = Math.min(r.bottom, rr.bottom, lr.bottom);
+          const li = Math.max(r.left, lr.left), re = Math.min(r.right, lr.right);
+          if (u - t > 0.5 && re - li > 0.5) verdeckt.push((e.className || e.tagName).toString().split(' ')[0]);
+        }
+        const reihen = [...rumpf.children].filter(sicht).map((e) => {
+          let u = e.getBoundingClientRect().bottom;
+          for (const d of e.querySelectorAll('*')) if (sicht(d) && getComputedStyle(d).position !== 'absolute') u = Math.max(u, d.getBoundingClientRect().bottom);
+          return { top: e.getBoundingClientRect().top, u };
+        }).sort((x, y) => x.top - y.top);
+        const ineinander = reihen.filter((x, i) => i > 0 && x.top < reihen[i - 1].u - 0.5).length;
+        const blase = o.querySelector('.erg-bot .sprechblase').getBoundingClientRect();
+        return { verdeckt, ineinander, leisteImFenster: lr.top >= 0 && lr.bottom <= innerHeight + 0.5, blaseUnten: Math.round(blase.bottom), leisteOben: Math.round(lr.top) };
+      });
+      const ruhe = await platz();
+      await seite.evaluate(() => { const r = document.querySelector('.ergebnis-overlay .erg-rumpf'); r.scrollTop = r.scrollHeight; });
+      await warte(200);
+      const ende = await platz();
+      pruefe(`${w}x${hh}: Knopfleiste im Fenster, verdeckt nichts (Ruhe und Scroll-Ende), Zeilen nicht ineinander, Spruch am Ende über der Leiste`,
+        ruhe.leisteImFenster && ruhe.verdeckt.length === 0 && ende.verdeckt.length === 0 && ruhe.ineinander === 0 && ende.blaseUnten <= ende.leisteOben,
+        JSON.stringify({ ruhe, ende }));
+      await seite.evaluate(() => { document.querySelector('.ergebnis-overlay .erg-rumpf').scrollTop = 0; });
+    }
+    await seite.setViewportSize({ width: g.w, height: g.h });
+    await warte(300);
     await bild(seite, `u7-ergebnis-sieg-${g.w}x${g.h}`);
     await h.tippe('.ergebnis-overlay .erg-zu');
     pruefe('Brett ansehen: der Screen tritt wieder vor', await seite.evaluate(() => !document.querySelector('.screen.partie').classList.contains('mit-ergebnis')));
