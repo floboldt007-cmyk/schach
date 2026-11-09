@@ -519,6 +519,9 @@ async function testeTouch(browser, d) {
   gruppe = 'Touch (iPad)';
   const { kontext, seite, fehler } = await neueSeite(browser, { breite: 820, hoehe: 1180, touch: true });
   await oeffne(seite, `screen=analyse&partieId=${d.oper}`);
+  // seit dem Kundenblick 09.11. steht die Kurve im Hochformat unter dem Brett: erst hinscrollen, wie ein Finger
+  await seite.locator('.an-kurve-wrap').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await seite.waitForTimeout(300);
   const kb = await seite.locator('.an-kurve-wrap').boundingBox();
   await seite.touchscreen.tap(kb.x + kb.width * (11 / 33), kb.y + kb.height / 2);
   pruefe('Kurve antippen mit dem Finger', (await aktuellerPly(seite)) === 10, String(await aktuellerPly(seite)));

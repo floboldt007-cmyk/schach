@@ -355,6 +355,8 @@
   .partie .p-kopf h2 { font-size: 19px; }
   .partie .p-kopf .unter { margin-top: 2px; font-size: 12.5px; }
   .partie .p-kopf .p-eroeffnung, .partie .p-kopf .p-eroeffnung + .p-sep, .partie .p-kopf .p-lang { display: none; }
+  /* Kundenblick 09.11. (Befund 9): der Name steht nur einmal, im Kopf. Die Karte zeigt Bild, Elo und Sprechblase. */
+  .partie.handy .spieler.gegner .bot-name { display: none; }
   .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 4px;
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .partie .seite { display: contents; }

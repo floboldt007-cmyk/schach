@@ -440,7 +440,7 @@ export function zeige(root, params, app) {
   const uhrHtml = (wer) => `<div class="uhr zahl" data-wer="${wer}" hidden>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
   s.innerHTML = `
     <header class="kopf p-kopf">
-      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t('partie.kopf.zurueck'))}">${icon('zurueck')}</button>
+      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t(rueckZiel() === 'heim' ? 'partie.kopf.zurueckStart' : 'partie.kopf.zurueck'))}">${icon('zurueck')}</button>
       <div class="titel"><h2>${esc(kopfTitel())}</h2><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
     ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">${esc(t('partie.kopf.stufe', { stufe: bot.stufe }))}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">${esc(t('partie.kopf.duSpielst'))}</span>${esc(farbeName(farbe))}</span></div></div>
       <div class="brettwahl" role="radiogroup" aria-label="${esc(t('partie.kopf.brettfarbe'))}">${brettwahl}</div>
@@ -1745,11 +1745,16 @@ export function zeige(root, params, app) {
     if (ok && !weg) ende('niederlage', 'aufgabe');
   }
 
+  // Kundenblick 09.11. (Befund 9): zurueck dorthin, woher man kam (Start oder Bots), nicht immer zu den Bots
+  function rueckZiel() {
+    const ort = typeof app.herkunft === 'function' ? app.herkunft() : null;
+    return ort === 'heim' ? 'heim' : 'arena';
+  }
   async function zurueckGedrueckt() {
-    if (z.phase === 'ende') { app.gehe('arena'); return; }
+    if (z.phase === 'ende') { app.gehe(rueckZiel()); return; }
     let floZuege = 0;
     for (let i = 0; i < z.zuege.length; i++) if (istFlo(i)) floZuege++;
-    if (floZuege === 0) { z.verworfen = true; loescheLaufendePartie(); app.gehe('arena'); return; }
+    if (floZuege === 0) { z.verworfen = true; loescheLaufendePartie(); app.gehe(rueckZiel()); return; }
     const w = await app.frage({
       titel: t('partie.pause.titel'),
       text: t('partie.pause.text'),
@@ -1757,7 +1762,7 @@ export function zeige(root, params, app) {
       abbrechen: null,
     });
     if (weg) return;
-    if (w === 'pause') { speichereLaufend(); app.gehe('arena'); }
+    if (w === 'pause') { speichereLaufend(); app.gehe(rueckZiel()); }
     else if (w === 'aufgeben') ende('niederlage', 'aufgabe');
   }
 
