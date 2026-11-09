@@ -26,7 +26,7 @@ import { Brett } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
 import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen, ladePartien } from '../storage.js';
-import { BOTS, botNachId } from '../bots.js';
+import { BOTS, botNachId, rufname } from '../bots.js';
 import { eigenerName, sitzung } from '../konto.js';
 import { holeStand, angemeldet } from '../kronen.js';
 import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js';
@@ -88,7 +88,7 @@ registriereTexte('heim', {
     'zuzweit.titel': 'Zu zweit',
     'zuzweit.text': 'An einem Gerät',
     'zurueck.titel': 'Willkommen zurück',
-    'zurueck.partie': 'Zuletzt vor {n} Tagen: {ergebnis} gegen {name}',
+    'zurueck.partie': '{ergebnis} gegen {name} vor {n} Tagen',
     'zurueck.leer': 'Zuletzt vor {n} Tagen hier',
     'zurueck.sieg': 'Sieg',
     'zurueck.niederlage': 'Niederlage',
@@ -141,7 +141,7 @@ registriereTexte('heim', {
     'zuzweit.titel': 'Two players',
     'zuzweit.text': 'On one device',
     'zurueck.titel': 'Welcome back',
-    'zurueck.partie': 'Last time, {n} days ago: {ergebnis} vs {name}',
+    'zurueck.partie': '{ergebnis} vs {name}, {n} days ago',
     'zurueck.leer': 'Last here {n} days ago',
     'zurueck.sieg': 'Win',
     'zurueck.niederlage': 'Loss',
@@ -222,7 +222,7 @@ function rueckkehrZeile(z, partie, bot) {
   try {
     const p = ladePartien().find((x) => x && x.botId && ['sieg', 'niederlage', 'remis'].includes(x.ergebnis));
     const b = p ? botNachId(p.botId) : null;
-    if (b) text = t('heim.zurueck.partie', { n: zahl(z.pause), ergebnis: t('heim.zurueck.' + p.ergebnis), name: b.name });
+    if (b) text = t('heim.zurueck.partie', { n: zahl(z.pause), ergebnis: t('heim.zurueck.' + p.ergebnis), name: rufname(b) });
   } catch (e) { /* nur die Pause */ }
   const knopf = t(partie ? 'heim.weiter' : 'heim.spielen');
   const titel = t('heim.zurueck.titel');

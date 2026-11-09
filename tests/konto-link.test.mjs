@@ -40,9 +40,9 @@ function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`
 const browser = await browserTyp(pw).launch({ headless: true });
 
 // Ein Browser-Speicher (Kontext) mit simuliertem Supabase. lokal: Eintraege, die vor dem ersten Laden im Speicher stehen.
-async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, neuBereit = false } = {}) {
+async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, neuBereit = false, botschutz = null } = {}) {
   const k = await browser.newContext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'block' });
-  const zustand = { cloud, uploads: [], otp: [], fehler: [], neu: [] };
+  const zustand = { cloud, uploads: [], otp: [], otpBody: [], fehler: [], neu: [], cf: [] };
   await k.addInitScript((vorbelegt) => {
     try { Object.defineProperty(Navigator.prototype, 'standalone', { configurable: true, get: () => false }); } catch (e) { /* egal */ }
     // Meldungen (Toasts) mitschreiben: sie verschwinden nach gut 3 Sekunden wieder
@@ -54,9 +54,21 @@ async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, 
       localStorage.setItem('test:vorbelegt', '1');
     }
   }, lokal);
+  // Bot-Schutz (js/botschutz.js): ein Test-Site-Key und ein nachgebautes Turnstile statt Cloudflare. 'ok' liefert Tokens
+  // tok-1, tok-2 (neu nach reset), 'fehler' ruft den error-callback
+  if (botschutz) await k.addInitScript(() => { window.__botschutzTestKey = '1x00000000000000000000AA'; });
+  const turnstileNachbau = (art) => `window.turnstile = { n: 0, resets: 0, opt: null,
+    render(el, o) { this.opt = o; el.dataset.gerendert = o.theme + '|' + o.language; const t = this;
+      setTimeout(() => { ${art === 'fehler' ? "o['error-callback']('110200')" : "o.callback('tok-' + (++t.n))"}; }, 50); return 'w1'; },
+    reset() { this.resets++; const t = this; setTimeout(() => t.opt.callback('tok-' + (++t.n)), 50); }, remove() {} };`;
   await k.route('**/*', async (route) => {
     const req = route.request(); const url = new URL(req.url());
     if (url.hostname === '127.0.0.1') return route.continue();
+    if (url.hostname === 'challenges.cloudflare.com') {
+      zustand.cf.push(url.pathname + url.search);
+      if (!botschutz) return route.abort();
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: turnstileNachbau(botschutz) });
+    }
     // Umzug (js/umzug.js): crownmate.de liefert die App erst, wenn neuBereit gesetzt ist
     if (url.hostname === 'crownmate.de') {
       zustand.neu.push(url.pathname);
@@ -66,7 +78,7 @@ async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, 
     }
     if (!url.hostname.endsWith('.supabase.co')) return route.abort();
     const antwort = (d, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(d) });
-    if (url.pathname === '/auth/v1/otp') { zustand.otp.push(url.search); return antwort({}); }
+    if (url.pathname === '/auth/v1/otp') { zustand.otp.push(url.search); zustand.otpBody.push(req.postDataJSON()); return antwort({}); }
     if (url.pathname === '/rest/v1/spielstaende' && req.method() === 'GET') {
       await new Promise(r => setTimeout(r, verzoegerung)); return antwort(zustand.cloud ? [zustand.cloud] : []);
     }
@@ -226,6 +238,49 @@ try {
     await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
     pruefe('Code senden: redirect_to ist die App-Adresse ohne Hash (Suche bleibt)', zustand.otp[0] === '?redirect_to=' + encodeURIComponent(BASIS), zustand.otp);
     pruefe('Code senden: Hinweis, den Link im selben Browser zu öffnen', /selben Browser/.test((await status(s)).text), await status(s));
+    // Ohne Site-Key (Stand bis Flo das Cloudflare-Konto anlegt): nichts von Cloudflare, kein Widget, Body wie vorher
+    pruefe('Bot-Schutz aus (kein Site-Key): keine Anfrage an challenges.cloudflare.com, kein Widget, kein Hinweis, Body ohne Token',
+      zustand.cf.length === 0 && await s.locator('.konto-botschutz').isHidden() && await s.locator('.konto-botschutz-hinweis').count() === 0
+        && JSON.stringify(Object.keys(zustand.otpBody[0] || {})) === '["email","create_user"]', { cf: zustand.cf, body: zustand.otpBody });
+    await k.close();
+  }
+  { // 6. Bot-Schutz an (Test-Site-Key): Skript erst mit der Anmeldung, Token im Body, danach ein neues Token
+    // Hinweis „Zum Home-Bildschirm“ (js/app.js, kommt 1,2 s nach dem Start) als schon gesehen, sonst verdeckt er die Anmeldung
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: 'ok' });
+    const s = await seite(k, zustand, BASIS + '#arena');
+    await s.waitForTimeout(1000);
+    pruefe('Bot-Schutz: beim Start der App lädt nichts von Cloudflare', zustand.cf.length === 0, zustand.cf);
+    await s.evaluate(() => { location.hash = '#einstellungen'; });
+    await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
+    pruefe('Bot-Schutz: mit der Anmeldung genau ein Skript, nur von challenges.cloudflare.com (explizit gezeichnet)',
+      zustand.cf.length === 1 && zustand.cf[0] === '/turnstile/v0/api.js?render=explicit', zustand.cf);
+    pruefe('Bot-Schutz: Widget gezeichnet (hell, deutsch) und Hinweis auf den Bot-Schutz sichtbar',
+      await s.locator('.konto-botschutz').getAttribute('data-gerendert') === 'light|de' && await s.locator('.konto-botschutz-hinweis').isVisible(),
+      await s.locator('.konto-botschutz').getAttribute('data-gerendert'));
+    const mehr = await s.locator('.konto-botschutz-hinweis a').evaluateAll((a) => a.map((x) => ({ href: x.href, ziel: x.target })));
+    const absatz = readFileSync(path.join(root, 'datenschutz.html'), 'utf8');
+    pruefe('Bot-Schutz: Hinweis verlinkt den Absatz #botschutz der Datenschutzerklärung (neuer Tab), der Absatz nennt Speicher und § 25',
+      mehr.length === 1 && /\/datenschutz\.html#botschutz$/.test(mehr[0].href) && mehr[0].ziel === '_blank'
+      && absatz.includes('id="botschutz"') && absatz.includes('cf.turnstile.u') && absatz.includes('§ 25 Abs. 2 Nr. 2 TDDDG'), mehr);
+    await s.locator('.konto-email').fill('flo@example.invalid');
+    await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
+    pruefe('Bot-Schutz: Token geht als gotrue_meta_security.captcha_token mit', zustand.otpBody.length === 1
+      && zustand.otpBody[0].gotrue_meta_security?.captcha_token === 'tok-1' && zustand.otpBody[0].email === 'flo@example.invalid', zustand.otpBody);
+    await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
+    pruefe('Bot-Schutz: jedes Token nur einmal (nach dem Senden reset, zweites Senden mit tok-2)',
+      await s.evaluate(() => window.turnstile.resets) >= 1 && zustand.otpBody[1]?.gotrue_meta_security?.captcha_token === 'tok-2', zustand.otpBody);
+    pruefe('Bot-Schutz: keine Seitenfehler', zustand.fehler.length === 0, zustand.fehler);
+    await k.close();
+  }
+  { // 7. Bot-Schutz schlaegt fehl: kein Code anfordern, eigener Text
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: 'fehler' });
+    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    await s.waitForTimeout(1200);
+    await s.locator('.konto-email').fill('flo@example.invalid');
+    await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
+    const st = await status(s);
+    pruefe('Bot-Schutz fehlgeschlagen: keine Anfrage an /auth/v1/otp, Meldung „Bot-Schutz hat nicht geklappt“ als Fehler',
+      zustand.otp.length === 0 && /Bot-Schutz hat nicht geklappt/.test(st.text) && st.fehler === 'ja', { st, otp: zustand.otp });
     await k.close();
   }
 } finally {

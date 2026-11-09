@@ -190,7 +190,8 @@ function formelText(e) {
   if (e.fa !== 1) teile.push(faktorText(e.fa));
   if (e.rw) teile.push('2');
   let t = teile.length > 1 ? teile.join(' × ') : '';
-  if (e.m) t = (t || zahlText(e.p)) + ` + ${zahlText(e.m)}`;
+  // mit Meilensteinen zwei Zahlen: beschriftet, sonst weiss niemand, was "35 + 250" heisst (Details nennen die Posten)
+  if (e.m) t = `${tx('abr.formelPartie', { wert: t || zahlText(e.p) })} + ${tx('abr.formelBonus', { wert: zahlText(e.m) })}`;
   return t;
 }
 
