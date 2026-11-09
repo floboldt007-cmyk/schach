@@ -614,6 +614,27 @@ async function testeOrte(browser) {
   await kontext.close();
 }
 
+// Design-Durchsicht 09.11. (Bots): auf dem iPhone SE mit Safari-Leiste lag der Spielen-Knopf halb unter der Reiterleiste.
+// Gemessen werden Rechtecke: Knopf ganz ueber der Leiste und ganz im Fenster, ohne zu scrollen.
+async function testeSpielenFrei(browser) {
+  gruppe = 'Spielen-Knopf frei';
+  for (const [w, h] of [[375, 548], [320, 480], [390, 664], [375, 667], [390, 844]]) {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w, h, handy: true });
+    await seite.goto(BASIS + '&reiter=verlauf#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(1400);
+    const m = await seite.evaluate(() => {
+      const r = (q) => { const e = document.querySelector(q); if (!e) return null; const b = e.getBoundingClientRect(); return { t: Math.round(b.top), b: Math.round(b.bottom) }; };
+      return { ih: innerHeight, spielen: r('.arena .spielen'), reiter: r('.reiter-leiste'), karte: r('.arena .karte') };
+    });
+    const frei = m.spielen && m.reiter && m.spielen.b <= m.reiter.t && m.spielen.t >= 0 && m.spielen.b <= m.ih;
+    pruefe(`${w} × ${h}: Spielen-Knopf ganz ueber der Reiterleiste und im Fenster, ohne Scrollen`, frei, JSON.stringify(m));
+    if (w >= 375) pruefe(`${w} × ${h}: die Karte bleibt mindestens 250 px hoch`, m.karte && m.karte.b - m.karte.t >= 250, JSON.stringify(m.karte));
+    pruefe(`${w} × ${h}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+}
+
 async function testeHochformate(browser) {
   gruppe = 'iPad hoch';
   {
@@ -1647,6 +1668,7 @@ async function browserTeil(browser) {
   await testeKarteQuer(browser);
   await testeOrte(browser);
   await testeHochformate(browser);
+  await testeSpielenFrei(browser);
   await testeHandyQuer(browser);
   await testeKnopftext(browser);
   await testeWelten(browser);
