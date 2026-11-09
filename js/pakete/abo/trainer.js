@@ -26,7 +26,7 @@
 //     unter18      Antwort "jünger": kein Kauf im Web ("Angabe ändern" fuer einen Fehlklick)
 //     bestaetigen  nach der Rueckkehr von Stripe: die Nachfrage-Serie laeuft, kein Kauf-Knopf (kein zweites Abo)
 //     wartet       Kauf offen, Serie ohne Bestaetigung vorbei: "Zahlung prüfen", daneben "Neu abschließen"
-//     premium      "Abo verwalten"
+//     premium      "Abo verwalten" und "Verträge hier kündigen" (Kuendigungsbutton, oeffnet ./kuendigen.js)
 //     store        App-Store-Huelle: kein Kauf ausserhalb des Stores (inStoreHuelle in js/abo.js)
 //
 // Fairness (SPIELKONZEPT 5, AGENTS.md): kein Countdown, keine Knappheit, kein "nur heute", keine Streichpreise, kein
@@ -42,7 +42,7 @@ import { icon } from '../../ui/icons.js';
 import { kontoFreigeschaltet } from '../../konto.js';
 import {
   istPremium, premiumStand, ladeProdukt, kaufen, verwalten, stelleAboCssSicher, inStoreHuelle, kaufStand, bestaetigeKauf,
-  alterAngabe, setzeAlterAngabe, vorteilBereit, produktOffline, istTestLink,
+  alterAngabe, setzeAlterAngabe, vorteilBereit, produktOffline, istTestLink, oeffneKuendigen,
 } from '../../abo.js';
 
 const vorteil = (id, text) => Object.freeze({ id, get text() { return sprache() === 'de' ? text : A('vorteil.' + id); } });
@@ -210,6 +210,8 @@ export function zeigeTrainer({ app = null } = {}) {
     const knoepfe = [];
     if (zustand === 'premium') {
       if (p && p.portalLink && !huelle) knoepfe.push(knopf(A('verwalten'), 'primaer', 'verwalten'));
+      // Kuendigungsbutton (Paragraf 312k BGB): bei jedem laufenden Stripe-Abo, auch ohne Portal-Link und in der Huelle
+      if (st.quelle === 'stripe') knoepfe.push(knopf(A('k.knopf'), '', 'kuendigen'));
     } else if (zustand === 'kaufbar') {
       knoepfe.push(knopf(A('kaufen'), 'primaer', 'kaufen'));
     } else if (zustand === 'alter') {
@@ -251,6 +253,7 @@ export function zeigeTrainer({ app = null } = {}) {
     const a = e.target.closest('[data-trainer]')?.dataset.trainer;
     if (!a) return;
     if (a === 'schliessen') { ende(); return; }
+    if (a === 'kuendigen') { ende(); oeffneKuendigen({ app }); return; }
     if (a === 'konto') {
       ende();
       // zur Gruppe Konto (dort meldet man sich an); Handy: als eigene Seite (js/ui/einstellungen.js, seite)

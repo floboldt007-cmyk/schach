@@ -2180,6 +2180,19 @@ mehrere Ereignisse mit demselben `created` in zufälliger Reihenfolge); der Kauf
   Funktion `pg_advisory_xact_lock(hashtextextended('abo:' || kunde_id, 0))`, alle Ereignisse eines Kunden laufen also
   nacheinander (sonst blieb ein Abo-Ereignis, das parallel zum Kauf ankam, für immer auf 'wartet'; nachgestellt mit zwei
   psql-Sitzungen gegen Postgres 16).
+- **Kein Umhängen (Audit 09.11.2026, M4):** Ein Kauf für ein Konto, dessen Abo läuft (`aktiv`/`gekuendigt`,
+  `gueltig_bis` in der Zukunft) und an einem **anderen** `kunde_id` hängt, liefert `'konflikt'` und ändert `abos` nicht;
+  die Ereignisse des fremden Kunden bleiben `wartet`. Handzeilen ohne `kunde_id` und abgelaufene Abos übernimmt ein Kauf
+  wie bisher. **Produktprüfung:** `auswerten(ereignis, erlaubt)` verwirft Abo-Ereignisse und Rechnungen, deren Preis
+  nicht in `erlaubtePreise(umgebung)` steht (`ABO_STRIPE_PLAN` = Lookup-Keys, `ABO_STRIPE_PREIS` = Preis-ID; leer =
+  keine Prüfung), mit `{ ignoriert: 'fremdes_produkt' }`.
+- **Kündigungsbutton (§ 312k BGB, rechtlich ungeprüft):** `js/pakete/abo/kuendigen.js` (`zeigeKuendigen`, Zustände
+  `laedt | abgemeldet | kein | gekuendigt | formular | sendet | fertig`), geöffnet über „Verträge hier kündigen“ in der
+  Gruppe der Einstellungen und im Trainer-Blatt (`oeffneKuendigen` in `js/abo.js`). `kuendigen({ art, grund,
+  zeitpunkt })` ruft die Edge Function `abo-kuendigen` (`_gemeinsam/abo-kuendigen.js`): Nutzer nur aus dem JWT, Abo nur
+  aus der eigenen Zeile, bei Stripe `cancel_at_period_end` bzw. `cancel_at`, Eingang als Metadaten am Abo; den Stand
+  bringt der Webhook. Fehlt die Function (404), bietet das Blatt das Kundenportal an. Test:
+  `tests/server-abo-kuendigen.test.mjs`.
 - `abo_hole_nach(kunde, abo)` (nur Besitzer: der Kauf ruft es, Flo im SQL Editor nach einer Handzeile für einen Kauf
   `ohne_nutzer`) wendet wartende Ereignisse des Kunden an und liefert ihre Anzahl; Fehler `ABO_KUNDE_UNBEKANNT`, wenn
   keine Zeile in `abos` diese `kunde_id` trägt.

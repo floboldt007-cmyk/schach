@@ -60,6 +60,15 @@
 //   aufraeumen()   ohne Anmeldung: Stand und Altersangabe vom Geraet nehmen (nach dem Abmelden)
 //   aboHinweisZumLoeschen() -> string   Satz fuer den Dialog "Konto löschen", solange ein Stripe-Abo laeuft (sonst ''):
 //       Konto loeschen entfernt die Zeile in abos, kuendigt aber nicht bei Stripe. Fuer die Integration (js/daten.js).
+//   Kuendigungsbutton (Paragraf 312k BGB, rechtlich noch von einer Fachperson zu pruefen; Oberflaeche in
+//   js/pakete/abo/kuendigen.js, Server supabase/functions/_gemeinsam/abo-kuendigen.js):
+//   KUENDIGEN_PFAD = '/functions/v1/abo-kuendigen'
+//   kuendigen({ art = 'ordentlich', grund = '', zeitpunkt = 'naechster' } = {}) -> Promise<{ ok: true, art, eingegangenAm,
+//       wirksamZum, pruefung } | { ok: false, grund }>   art 'ordentlich' | 'ausserordentlich', zeitpunkt 'naechster' oder
+//       ein Kalendertag 'JJJJ-MM-TT'; eingegangenAm/wirksamZum in ms. Die Nutzer-ID geht nie mit: Der Server nimmt sie aus
+//       der Anmeldung. grund: 'abgemeldet' | 'kein_vertrag' | 'eingabe' | 'offline' | 'server' | 'nicht_bereit' (Function
+//       noch nicht hochgeladen oder nicht eingerichtet: die Oberflaeche bietet dann das Kundenportal von Stripe an).
+//       Gilt auch in der Store-Huelle: Kuendigen ist kein Kauf.
 //   oeffneTrainer({ app } = {}) -> Promise   oeffnet das Blatt "Crownmate Trainer" (laedt js/pakete/abo/trainer.js)
 //   premiumHinweis(el, was, { app } = {}) -> HTMLElement | null
 //       Ruhiger Hinweis fuer andere Pakete, dort wo eine Premium-Funktion gesperrt ist, z. B.
@@ -80,7 +89,7 @@
 //   schach-arena:abo:produkt  { id, produkt, geholtAm }
 //   schach-arena:abo:kauf     Zeitpunkt (ms) des letzten Kauf-Starts
 //   schach-arena:abo:alter    { uid, ab18 }   Antwort auf die Altersfrage (nur ja/nein, kein Geburtsdatum)
-import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { SUPABASE_URL, SUPABASE_KEY, mitRegion } from './konto-config.js';
 import { t } from './sprache.js';
 import './sprachen/abo.js';
 const A = (k, w) => t('abo.' + k, w);
@@ -344,6 +353,42 @@ export async function verwalten({ produkt, oeffne = oeffneAdresse } = {}) {
   if (!url) return { ok: false, grund: 'kein_link' };
   oeffne(url);
   return { ok: true, url };
+}
+
+// ---------- Kuendigen (Kuendigungsbutton, Paragraf 312k BGB) ----------
+export const KUENDIGEN_PFAD = '/functions/v1/abo-kuendigen';
+export async function kuendigen({ art = 'ordentlich', grund = '', zeitpunkt = 'naechster' } = {}) {
+  if (!nutzerId()) return { ok: false, grund: 'abgemeldet' };
+  let s = null;
+  try { s = await gueltigeSitzung(); } catch (e) { return { ok: false, grund: sitzung() ? (e && e.offline ? 'offline' : 'server') : 'abgemeldet' }; }
+  let r = null;
+  try {
+    r = await fetchFn(SUPABASE_URL + mitRegion(KUENDIGEN_PFAD), { method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+      body: JSON.stringify({ art, grund: String(grund || '').slice(0, 500), zeitpunkt }) });
+  } catch (e) {
+    return { ok: false, grund: 'offline' };
+  }
+  let d = null;
+  try { d = await r.json(); } catch (e) { /* leer */ }
+  if (r.ok) {
+    const ein = d && d.ok === true ? Date.parse(d.eingegangen_am) : NaN;
+    const bis = d ? Date.parse(d.wirksam_zum) : NaN;
+    // Ohne Eingangszeit vom Server keine Bestaetigung: lieber ein Fehler als eine erfundene Zeit
+    if (!Number.isFinite(ein)) return { ok: false, grund: 'server' };
+    return { ok: true, art: d.art === 'ausserordentlich' ? 'ausserordentlich' : 'ordentlich', eingegangenAm: ein,
+      wirksamZum: Number.isFinite(bis) ? bis : null, pruefung: d.pruefung === true };
+  }
+  const kennung = d && typeof d.fehler === 'string' ? d.fehler : '';
+  if (r.status === 401) return { ok: false, grund: 'abgemeldet' };
+  if (kennung === 'kein_vertrag') return { ok: false, grund: 'kein_vertrag' };
+  if (kennung === 'eingabe') return { ok: false, grund: 'eingabe' };
+  // 404 ohne Kennung: Die Function ist (noch) nicht hochgeladen. Die App funktioniert trotzdem: Kundenportal.
+  if (r.status === 404 || kennung === 'nicht_eingerichtet') return { ok: false, grund: 'nicht_bereit' };
+  return { ok: false, grund: 'server' };
+}
+export function oeffneKuendigen({ app = null } = {}) {
+  return import('./pakete/abo/kuendigen.js').then((m) => m.zeigeKuendigen({ app })).catch((e) => { console.error('Kündigen-Blatt nicht geladen', e); });
 }
 
 export function vergiss() {
