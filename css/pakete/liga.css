@@ -196,5 +196,10 @@
 .lg-mini-werte .lg-mini-stufe dd { font-size: 15px; white-space: normal; justify-content: center; text-align: center; line-height: 1.15; }
 /* So zaehlen Kronen: eingeklappte Regeln unter der Gruppenliste (Pruefung U 09.11.2026) */
 .lg-gr-regeln { margin: 0; padding: 0 4px; font-size: 13px; color: var(--text-2); }
-.lg-gr-regeln summary { min-height: 44px; display: flex; align-items: center; font-weight: 600; cursor: pointer; }
+.lg-gr-regeln summary { min-height: 44px; display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; list-style: none; }
+/* Kundenblick 09.11.2026: ohne Pfeil sah die Zeile wie ein Satz aus, nicht wie etwas zum Aufklappen (Muster wie .zz-namen) */
+.lg-gr-regeln summary::-webkit-details-marker { display: none; }
+.lg-gr-regeln summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px); }
+.lg-gr-regeln[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
 .lg-gr-regeln p { margin: 0 0 8px; line-height: 1.45; }
