@@ -541,6 +541,11 @@ async function browserAblauf(browser) {
     pruefe(`Browser: ${datei} nur die Anbieter-E-Mail, keine Telefonnummer`, nurAnbieterKontakt(t));
     pruefe(`Browser: ${datei} ${entwurf ? 'bleibt Entwurf mit offenen Platzhaltern' : 'fertig, ohne Entwurf und ohne Platzhalter'}`,
       entwurf ? /\[[^\]]+\]/.test(t) : !/\[[^\]]+\]/.test(t) && !/Entwurf/.test(t));
+    // G-002 AC-05 (U, 09.11.2026): in der Datenschutzerklaerung sind nur noch die Anbieter-Angaben offen
+    if (datei === 'datenschutz.html') {
+      const platz = await s2.evaluate(() => [...document.querySelectorAll('.platz')].map((s) => s.textContent));
+      pruefe('Browser: datenschutz.html offen sind nur noch Anbieter-Angaben', platz.length > 0 && platz.every((p) => /^\[Anbieter/.test(p)), platz);
+    }
     pruefe(`Browser: ${datei} nutzt die Farben der App (Tokens)`, css.grund !== 'rgba(0, 0, 0, 0)' && css.grund !== css.text, css);
     await s2.close();
   }
