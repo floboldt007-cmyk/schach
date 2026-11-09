@@ -2085,6 +2085,21 @@ export function zeige(root, params, app) {
       s.classList.remove('mit-ergebnis');
       $('.ergebnis-zeigen').hidden = false;
     });
+    // Sieg-Blatt (Flo 09.11., Variante C): Sterne und darunter der Level-Fortschritt; Punkte und Wertung
+    // blendet css/ergebnis.css aus, ein Verweis fuehrt in die Liga. Nur bei wertenden Partien, sonst gibt es dort nichts.
+    if (ergebnis === 'sieg' && wertend) {
+      const verweis = document.createElement('button');
+      verweis.type = 'button';
+      verweis.className = 'erg-liga-verweis';
+      verweis.textContent = t('partie.erg.ligaVerweis');
+      // fuehrt wie "Zur Liga" der (ausgeblendeten) Punkte-Aufschluesselung zur Tafel des Bots, ohne Punkte-Paket in die Liga
+      verweis.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const zurTafel = o.querySelector('.pk-zur-liste');
+        if (zurTafel) zurTafel.click(); else app.gehe('bestenliste');
+      });
+      o.querySelector('.erg-karte-ort').after(verweis);
+    }
     s.append(o);
     // U7: der Screen dahinter tritt zurueck (scale .975, nur transform), die Karte federt auf
     s.classList.add('mit-ergebnis');

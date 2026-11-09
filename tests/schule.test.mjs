@@ -749,8 +749,8 @@ async function browserTeil(browser) {
     await warte(tempoWarte);
     const start = await seite.evaluate(() => ({ titel: document.title, neu: !!document.querySelector('.sm-neu'), karten: document.querySelectorAll('.sm-klasse-karte').length,
       ueber: document.querySelector('.seiten-kopf .ueberzeile')?.textContent, satz: document.querySelector('.seiten-kopf p')?.textContent }));
-    pruefe('Screen schule: Titel, leere Liste mit "Klasse anlegen", Oberstufe und Verein ab 16', start.titel === 'Schulmodus · Crownmate' && start.neu && start.karten === 0
-      && start.ueber === 'Für Lehrkräfte und Vereine' && /ab 16/.test(start.satz), start);
+    pruefe('Screen schule: Titel, leere Liste mit "Klasse anlegen", Schule und Verein, Konto ab 13 (G-002 AC-05)', start.titel === 'Schulmodus · Crownmate' && start.neu && start.karten === 0
+      && start.ueber === 'Für Lehrkräfte und Vereine' && /ab 13/.test(start.satz) && !/ab 16/.test(start.satz), start);
     await bild(seite, 'lehrkraft-leer-ipad-hell');
     await seite.fill('.sm-neu-name', 'x');
     await seite.click('.sm-neu [type="submit"]');

@@ -90,6 +90,7 @@ registriereTexte('p-sammlung', {
     'erfinder.figurenAus': 'Standardfiguren benutzen', 'erfinder.ersterZug': 'ERSTER ZUG 16.10.2026',
     'erfinder.bannerBild': 'Banner Blatt 0: eine goldene Krone auf Bauplan-Papier',
     'erfinder.hinweis': 'Gibt es genau einmal. Nicht käuflich, nicht erspielbar, vergeben nur vom Server.',
+    'profil.partien': '{zahl} Partien', 'profil.partieEine': '1 Partie',
   },
   en: {
     an: 'Equipped', frei: 'Unlocked', geschafft: 'Done',
@@ -173,5 +174,6 @@ registriereTexte('p-sammlung', {
     'erfinder.figurenAus': 'Use standard pieces', 'erfinder.ersterZug': 'FIRST MOVE 16 OCT 2026',
     'erfinder.bannerBild': 'Banner Sheet 0: a golden crown on blueprint paper',
     'erfinder.hinweis': 'Exists exactly once. Not for sale, not earnable, granted only by the server.',
+    'profil.partien': '{zahl} games', 'profil.partieEine': '1 game',
   },
 });

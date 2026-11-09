@@ -76,6 +76,11 @@ const paketRang = (g) => {
   const i = PAKET_ORDNUNG.findIndex((k) => g.classList.contains(k));
   return i >= 0 ? i : PAKET_ORDNUNG.indexOf('st-gruppe') + 0.5;
 };
+// U10 (Flo 09.11.2026, Auswahlseite "Gruppen und umbenennen"): die Liste am Handy (14 Eintraege) bekommt Zwischentitel.
+// Abschnitt je Zeichen des Bereichs; was hier fehlt (neue Pakete), zaehlt zu den Extras.
+const ABSCHNITT = Object.freeze({ spiel: 'spielen', anzeige: 'spielen', klang: 'spielen', coach: 'spielen', bewegung: 'spielen',
+  konto: 'konto', daten: 'konto', abo: 'konto', schule: 'konto', sicherung: 'konto', fortschritt: 'konto', sprache: 'app', info: 'app' });
+const abschnitt = (zeichen) => ABSCHNITT[zeichen] || 'extras';
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
 // Handy: Liste der Bereiche statt aller Gruppen untereinander (gleiche Grenze wie css/einstellungen.css)
@@ -291,9 +296,16 @@ export function zeige(root, params = {}, app) {
       eintraege.push({ g, h, zeichen, titel, schluessel });
     }
     if (!nav.dataset.wischAn) { nav.dataset.wischAn = '1'; wischKanten(nav); }
-    nav.innerHTML = eintraege.map((x, i) => `<button type="button" class="es-nav-punkt" data-ziel="${x.h.id}" data-seite="${x.schluessel}"${i || handy() ? '' : ' aria-current="true"'}>`
-      + `<span class="es-nav-zeichen" aria-hidden="true">${icon(x.zeichen)}</span><span class="es-nav-text">${esc(x.titel)}</span>`
-      + `<span class="es-nav-pfeil" aria-hidden="true">${icon('weiter')}</span></button>`).join('');
+    let vorher = null;
+    nav.innerHTML = eintraege.map((x, i) => {
+      // Zwischentitel, sobald ein neuer Abschnitt beginnt (sichtbar nur in der Liste am Handy, css/einstellungen.css)
+      const ab = abschnitt(x.zeichen);
+      const titel = ab !== vorher ? `<h3 class="es-nav-abschnitt">${esc(E('abschnitt.' + ab))}</h3>` : '';
+      vorher = ab;
+      return titel + `<button type="button" class="es-nav-punkt" data-ziel="${x.h.id}" data-seite="${x.schluessel}"${i || handy() ? '' : ' aria-current="true"'}>`
+        + `<span class="es-nav-zeichen" aria-hidden="true">${icon(x.zeichen)}</span><span class="es-nav-text">${esc(x.titel)}</span>`
+        + `<span class="es-nav-pfeil" aria-hidden="true">${icon('weiter')}</span></button>`;
+    }).join('');
     wendeModusAn();
     const markiere = (id) => {
       for (const b of nav.querySelectorAll('.es-nav-punkt')) {

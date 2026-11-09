@@ -151,8 +151,10 @@ function zeigeIch(root, params = {}, app) {
     const nameVon = (y) => y.querySelector('.sa-text b')?.textContent || '';
     const anName = an ? nameVon(an) : freie.length ? freie.slice(0, 2).map(nameVon).join(', ') + (freie.length > 2 ? ' …' : '') : '';
     const name = x.dataset.name || x.dataset.bereich;
-    const zahl = `${frei} / ${teile.length}`;
-    const label = t('rahmen.sammlung.platzLabel', { name, an: anName || t('rahmen.sammlung.nichts'), zahl });
+    // Kundenblick 09.11.2026 (Befund 12): ohne Stuecke keine Zahl ("Shop 0 / 0"); der Shop zeigt trotzdem Hinweise
+    // (ab 18, Konto) und Editionen vom Server, darum bleibt der Knopf
+    const zahl = teile.length ? `${frei} / ${teile.length}` : '';
+    const label = zahl ? t('rahmen.sammlung.platzLabel', { name, an: anName || t('rahmen.sammlung.nichts'), zahl }) : name;
     if (gross) {
       return `<button type="button" class="sa-gross" data-bereich="${esc(x.dataset.bereich)}" aria-haspopup="dialog" aria-label="${esc(label)}">
         <span class="sa-gross-name">${esc(name)}</span><small class="zahl">${esc(zahl)}</small>${icon('pfeil')}</button>`;
