@@ -82,7 +82,7 @@
 //   schach-arena:abo:produkt  { id, produkt, geholtAm }
 //   schach-arena:abo:kauf     Zeitpunkt (ms) des letzten Kauf-Starts
 //   schach-arena:abo:alter    { uid, ab18 }   Antwort auf die Altersfrage (nur ja/nein, kein Geburtsdatum)
-import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { SUPABASE_URL, SUPABASE_KEY, mitRegion } from './konto-config.js';
 import { t } from './sprache.js';
 import './sprachen/abo.js';
 const A = (k, w) => t('abo.' + k, w);
@@ -351,7 +351,7 @@ export async function kaufen({ produkt, oeffne } = {}) {
   let d = null;
   try {
     const sg = await gueltigeSitzung();
-    d = await anfrage(KASSE_PFAD, { methode: 'POST', daten: {}, token: sg.access_token });
+    d = await anfrage(mitRegion(KASSE_PFAD), { methode: 'POST', daten: {}, token: sg.access_token });
   } catch (e) {
     if (e && e.status === 409) return abbruch(e.kennung === 'kauf_laeuft' ? 'kauf_laeuft' : 'schon_premium');
     if (e && e.status === 401) return abbruch('abgemeldet');

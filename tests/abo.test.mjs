@@ -22,6 +22,7 @@ import {
   registriereVorteil, vorteilBereit, produktOffline, istTestLink, aufraeumen, aboHinweisZumLoeschen, OHNE_HINWEIS_SCREENS,
 } from '../js/abo.js';
 import { COUNTDOWN_RE } from '../js/inhalte.js';
+import { mitRegion } from '../js/konto-config.js';
 import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
@@ -227,7 +228,7 @@ async function nodeTeil() {
   server.offline = false;
   const vorKauf = aufrufe.length;
   const k = await kaufen({ produkt: p, oeffne });
-  const kasse = aufrufe.slice(vorKauf).filter((a) => a.url.endsWith(KASSE_PFAD));
+  const kasse = aufrufe.slice(vorKauf).filter((a) => a.url.endsWith(mitRegion(KASSE_PFAD)));
   pruefe('kaufen: Bezahlseite vom Server (POST abo-kasse mit Anmelde-Token), geoeffnet, Kauf gemerkt', k.ok && k.url === KASSE_URL
     && geoeffnet.length === 1 && geoeffnet[0] === KASSE_URL && kasse.length === 1 && kasse[0].method === 'POST'
     && kasse[0].headers.Authorization === 'Bearer ' + SITZUNG.access_token && kasse[0].body === '{}'
@@ -573,7 +574,7 @@ async function browserTeil(browser) {
     await seite.click('.trainer-knoepfe [data-trainer="alter-ja"]');
     await seite.waitForFunction(() => window.__geoeffnet.length === 1);
     const u = new URL(await seite.evaluate(() => window.__geoeffnet[0]));
-    const kasse = anfragen.filter((a) => a.url === SUPA + '/functions/v1/abo-kasse');
+    const kasse = anfragen.filter((a) => a.url === SUPA + mitRegion('/functions/v1/abo-kasse'));
     pruefe('Kauf: Bezahlseite vom Server (abo-kasse, mit Anmelde-Token) im vorab geoeffneten Fenster, keine ID in einer Adresse',
       u.toString() === KASSE_URL && kasse.length === 1 && kasse[0].methode === 'POST' && kasse[0].kopf.authorization === 'Bearer ' + SITZUNG.access_token
       && !anfragen.some((a) => a.url.includes('client_reference_id')), u.toString());
