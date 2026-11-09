@@ -413,6 +413,12 @@
   .partie:not(.streifen-unten) .coach > .c-text { -webkit-line-clamp: 2; }
   .partie.coach-eng .coach { height: 44px; }
   .partie.coach-eng .coach > .c-text, .partie.coach-eng .coach > .c-zusatz { display: none; }
+  /* U-Messrunde 09.11. (iPhone SE mit Safari-Leiste, 548 px): reichen Coach-Zeile und Mindestbrett nicht, ruecken
+     Abstaende und Spielerkarten zusammen (.sehr-eng, layout() in partie.js); die Knoepfe behalten ihre 48 px */
+  .partie.sehr-eng .inhalt { gap: 3px; padding-top: 2px; }
+  .partie.sehr-eng .inhalt > .brettzone { gap: 2px; }
+  .partie.sehr-eng .spieler { min-height: 44px; padding-top: 2px; padding-bottom: 2px; }
+  .partie.sehr-eng .spieler > .ort-gegner-leiste { margin-bottom: 2px; }
   .partie .coach.offen { height: auto; }
   .partie .coach.offen > .c-text { display: block; -webkit-line-clamp: unset; }
   .partie .coach.offen > .coach-knoepfe { display: flex; margin-top: 8px; }

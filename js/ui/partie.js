@@ -2479,7 +2479,7 @@ export function zeige(root, params, app) {
     if (!handy) {
       inhaltEl.style.removeProperty('--brett');
       inhaltEl.style.removeProperty('--spalte');
-      s.classList.remove('coach-eng', 'streifen-unten');
+      s.classList.remove('coach-eng', 'sehr-eng', 'streifen-unten');
       passeNamen();
       pruefeCoachRest();
       pruefeSeite();
@@ -2520,12 +2520,19 @@ export function zeige(root, params, app) {
       const rest = untenVon(knoepfe) + 4 - rahmen.offsetHeight;
       return Math.floor((inhaltEl.clientHeight - rest - sockelY) / 8) * 8;
     };
-    s.classList.remove('coach-eng');
+    s.classList.remove('coach-eng', 'sehr-eng');
     let g = breit;
     if (!passt(g)) {
       // vorher schrumpft der Coach auf eine Zeile (Rest auf Antippen), erst dann das Brett (nie unter 280 px)
       s.classList.add('coach-eng');
       if (!passt(g)) g = Math.max(BRETT_MIN, Math.min(breit, hoehe(g)));
+      // U-Messrunde 09.11. (iPhone SE mit Safari-Leiste, 548 px): Brett und Coach stehen schon auf Minimum und die
+      // Knoepfe enden trotzdem unter dem Rand. Dann ruecken Abstaende und Spielerkarten zusammen; erst wenn auch das
+      // nicht reicht, scrollt die Spalte.
+      if (!passt(Math.max(BRETT_MIN, g))) {
+        s.classList.add('sehr-eng');
+        if (g <= BRETT_MIN || !passt(g)) g = Math.max(BRETT_MIN, Math.min(breit, hoehe(g)));
+      }
     }
     setze(Math.max(BRETT_MIN, g));
     passeNamen();
