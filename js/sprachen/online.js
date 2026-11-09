@@ -153,7 +153,7 @@ export const DE = {
   "warte": "Warten auf deinen Freund …",
   "revanche": "Revanche",
   "zuege": "Züge",
-  "konto.erklaert": "Gegen Menschen und im Rätsel-Duell spielst du um Kronen für die Liga. Mit Freunden spielst du per Link oder Code, ohne Kronen."
+  "konto.erklaert": "Mit Konto spielst du gegen Menschen und im Rätsel-Duell um Kronen für die Liga, mit Freunden per Link oder Code ohne Kronen."
 };
 
 export const EN = {
@@ -308,7 +308,7 @@ export const EN = {
   "warte": "Waiting for your friend …",
   "revanche": "Rematch",
   "zuege": "Moves",
-  "konto.erklaert": "Against people and in the puzzle duel you play for league crowns. With friends you play by link or code, without crowns."
+  "konto.erklaert": "With an account you play people and the puzzle duel for league crowns, and friends by link or code without crowns."
 };
 
 registriereTexte("online", { de: DE, en: EN });
