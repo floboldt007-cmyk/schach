@@ -130,7 +130,7 @@ export function zeige(root, params, app) {
   // zwei gleich gebaute Karten Partie und Raetsel-Duell (jeder Suchen-Knopf traegt "gewertet"), unten die Zeile
   // "Freund einladen oder Code eingeben" als lockerer Weg (klappt Einladen, Code und Meine Partien auf). Passt ohne
   // Scrollen auf das iPhone 13 (tests/online-ui.test.mjs). Ohne Konto sind die Karten nur Erklaerung, ohne Knopf und
-  // ohne Schatten, damit nichts tippbar aussieht; der einzige Knopf ist "Konto anlegen".
+  // ohne Schatten, damit nichts tippbar aussieht; der einzige Knopf ist "Zum Konto" (wie ueberall in der App).
   const FIGUREN = { partie: 'bKe8 bQd8 bPd7 bPe5 bPf7 bNc6 wPd2 wPe4 wNf3 wQd1 wKe1', duell: 'bKg8 bPf7 bPg7 bPh7 wRa1 wKg1 wPf2 wPg2 wPh2' };
   const bild = art => `<span class="on-bild" aria-hidden="true">${FIGUREN[art].split(' ').map(x =>
     `<img src="${new URL(`assets/pieces/${x[0]}${x[1]}.svg`, WURZEL).href}" alt="" style="grid-area:${9 - Number(x[3])}/${x.charCodeAt(2) - 96}">`).join('')}`
@@ -144,7 +144,7 @@ export function zeige(root, params, app) {
     if (!sitzung()?.access_token) {
       const hinweis = `<p class="on-tuer-hinweis">${esc(O('tuer.ohneKonto'))}</p>`;
       inhalt.innerHTML = `${kopfHtml}<div class="on-tueren" data-zustand="ohne">${tuer('partie', hinweis)}${tuer('duell', hinweis)}</div>
-        <section class="t-karte on-konto"><h2>${esc(O('konto.titel'))}</h2><p>${esc(O('freunde.erklaert'))} ${esc(O('konto'))}</p>`
+        <section class="t-karte on-konto"><h2>${esc(O('konto.titel'))}</h2><p>${esc(O('konto.erklaert'))} ${esc(O('konto'))}</p>`
         + (online.gemerkteEinladung() ? `<p>${esc(O('merker'))}</p>` : '')
         + `<div class="t-fuss"><button class="knopf primaer dr" type="button" data-online="konto">${esc(O('konto.knopf'))} ${icon('vor')}</button></div></section>`;
       return;

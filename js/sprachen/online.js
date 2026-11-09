@@ -112,7 +112,7 @@ export const DE = {
   "freunde.titel": "Freunde einladen",
   "freunde.erklaert": "Schick einem Freund einen Link oder Code. Ihr spielt mit oder ohne Uhr, ohne Kronen.",
   "konto.titel": "Dafür brauchst du ein Konto",
-  "konto.knopf": "Konto anlegen",
+  "konto.knopf": "Zum Konto",
   "merker": "Deine Einladung bleibt bis nach der Anmeldung gespeichert.",
   "kurz": "Gewertet gegen Menschen in deiner Stärke oder locker mit Freunden.",
   "tuer.partie.ueber": "Partie",
@@ -152,7 +152,8 @@ export const DE = {
   "gueltig": "Die Einladung gilt 24 Stunden.",
   "warte": "Warten auf deinen Freund …",
   "revanche": "Revanche",
-  "zuege": "Züge"
+  "zuege": "Züge",
+  "konto.erklaert": "Gegen Menschen und im Rätsel-Duell spielst du um Kronen für die Liga. Mit Freunden spielst du per Link oder Code, ohne Kronen."
 };
 
 export const EN = {
@@ -266,7 +267,7 @@ export const EN = {
   "freunde.titel": "Invite friends",
   "freunde.erklaert": "Send a friend a link or code. You play with or without a clock, without crowns.",
   "konto.titel": "You need an account for this",
-  "konto.knopf": "Create account",
+  "konto.knopf": "Go to account",
   "merker": "Your invitation is saved until after you sign in.",
   "kurz": "Rated against people at your level, or casual with friends.",
   "tuer.partie.ueber": "Game",
@@ -306,7 +307,8 @@ export const EN = {
   "gueltig": "The invitation lasts 24 hours.",
   "warte": "Waiting for your friend …",
   "revanche": "Rematch",
-  "zuege": "Moves"
+  "zuege": "Moves",
+  "konto.erklaert": "Against people and in the puzzle duel you play for league crowns. With friends you play by link or code, without crowns."
 };
 
 registriereTexte("online", { de: DE, en: EN });
