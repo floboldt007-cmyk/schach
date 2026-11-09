@@ -257,6 +257,11 @@ try {
     pruefe('Bot-Schutz: Widget gezeichnet (hell, deutsch) und Hinweis auf den Bot-Schutz sichtbar',
       await s.locator('.konto-botschutz').getAttribute('data-gerendert') === 'light|de' && await s.locator('.konto-botschutz-hinweis').isVisible(),
       await s.locator('.konto-botschutz').getAttribute('data-gerendert'));
+    const mehr = await s.locator('.konto-botschutz-hinweis a').evaluateAll((a) => a.map((x) => ({ href: x.href, ziel: x.target })));
+    const absatz = readFileSync(path.join(root, 'datenschutz.html'), 'utf8');
+    pruefe('Bot-Schutz: Hinweis verlinkt den Absatz #botschutz der Datenschutzerklärung (neuer Tab), der Absatz nennt Speicher und § 25',
+      mehr.length === 1 && /\/datenschutz\.html#botschutz$/.test(mehr[0].href) && mehr[0].ziel === '_blank'
+      && absatz.includes('id="botschutz"') && absatz.includes('cf.turnstile.u') && absatz.includes('§ 25 Abs. 2 Nr. 2 TDDDG'), mehr);
     await s.locator('.konto-email').fill('flo@example.invalid');
     await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
     pruefe('Bot-Schutz: Token geht als gotrue_meta_security.captcha_token mit', zustand.otpBody.length === 1

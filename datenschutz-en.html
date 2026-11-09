@@ -166,18 +166,24 @@
        Herkunft; Cloudflare Auftragsverarbeiter fuer den Bot-Schutz, Verantwortlicher fuer die Verbesserung der Erkennung);
        Cloudflare Privacy Policy, gueltig ab 04.11.2025, https://www.cloudflare.com/privacypolicy/ (Cloudflare, Inc.,
        101 Townsend St., San Francisco, CA 94107, USA; EU-U.S. Data Privacy Framework);
-       https://developers.cloudflare.com/turnstile/ (liest keine Formulareingaben). Pruefung durch eine fachkundige Person
+       https://developers.cloudflare.com/turnstile/ (liest keine Formulareingaben); § 25 TDDDG, Stand Art. 3 G v. 10.3.2026,
+       https://www.gesetze-im-internet.de/ttdsg/__25.html; DSK OH Digitale Dienste 1.2 (Nov. 2024) Rn. 24, 74, 83;
+       EDSA Guidelines 2/2023 v2.0 Rn. 33; localStorage cf.turnstile.u gemessen am 09.11.2026 (Beleg in
+       .code-guardian-rechtsbelege.md). Ob § 25 Abs. 2 Nr. 2 auch Cloudflares eigenen Zweck traegt, ist offen. Pruefung durch eine fachkundige Person
        steht aus (Entwurf, siehe Kasten oben). -->
   <p id="botschutz"><b>Bot protection at sign-in (Cloudflare Turnstile, once switched on):</b> To stop programs from creating
   accounts or triggering sign-in emails in bulk, a service from Cloudflare, Inc., 101 Townsend St., San Francisco,
   CA 94107, USA, checks whether a human is using the sign-in. The app loads the check only when you open the sign-in in
   the settings, never at start. Cloudflare processes your IP address, technical characteristics of your browser
-  (user agent, TLS characteristics) and the address of the app. Cloudflare does not see your email address or other
-  entries. Usually you will not notice anything; only in doubtful cases a box to tap appears. The result is a one-time
+  (user agent, TLS characteristics) and the address of the app. To do so, the check reads characteristics of your browser
+  and creates an entry <code>cf.turnstile.u</code> in the browser storage (localStorage) for challenges.cloudflare.com;
+  it sets no cookies. Cloudflare does not see your email address or other entries. Usually you will not notice anything; only in doubtful cases a box to tap appears. The result is a one-time
   token that is sent with the code request to Supabase and checked there. For bot protection Cloudflare acts on our
-  behalf; according to Cloudflare, it uses the same characteristics under its own responsibility to improve its bot
-  detection. The legal basis is our legitimate interest in protecting the sign-in and the servers from abuse (Art. 6(1)(f)
-  GDPR). Cloudflare is certified under the EU-U.S. Data Privacy Framework. More:
+  behalf. According to Cloudflare (Turnstile privacy addendum, last updated 18 June 2025), it also uses the same
+  characteristics under its own responsibility to improve its bot detection; Cloudflare itself is the controller for that.
+  We base reading and storing on your device on Section 25(2) no. 2 TDDDG: it is strictly necessary to protect the
+  sign-in that you open yourself. The legal basis for the processing is our legitimate interest in protecting the
+  sign-in and the servers from abuse (Art. 6(1)(f) GDPR). Cloudflare is certified under the EU-U.S. Data Privacy Framework. More:
   <a href="https://www.cloudflare.com/turnstile-privacy-policy/" target="_blank" rel="noopener">Turnstile privacy addendum</a>
   and <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare privacy policy</a>.
   Signing in with Google is not checked by Turnstile.</p>

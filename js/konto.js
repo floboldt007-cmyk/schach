@@ -44,6 +44,8 @@ const NAME = /^[A-Za-z0-9_]{3,20}$/;
 let fetchFn = (...a) => fetch(...a);
 let timer = null;
 function K(k, w) { return t('einstellungen.konto.' + k, w); }
+// Verweis aus dem Bot-Schutz-Hinweis auf den Absatz #botschutz der Datenschutzerklaerung (Sprache wie js/daten.js).
+function datenschutzBotschutz() { return new URL((sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html') + '#botschutz', new URL('../', import.meta.url)).href; }
 
 function lager() { return globalThis.localStorage; }
 function jsonLies(k) { try { return JSON.parse(lager().getItem(k)); } catch (e) { return null; } }
@@ -488,7 +490,7 @@ export function kontoGruppe({ app } = {}) {
     zeigeWege();
     if (!s) {
       schutz = botschutz(el.querySelector('.konto-botschutz'), { modus: aufgeloesterModus(), sprache: sprache() });
-      if (schutz) el.querySelector('.konto-status').insertAdjacentHTML('beforebegin', `<p class="es-hilfe konto-botschutz-hinweis">${K('botschutzHinweis')}</p>`);
+      if (schutz) el.querySelector('.konto-status').insertAdjacentHTML('beforebegin', `<p class="es-hilfe konto-botschutz-hinweis">${K('botschutzHinweis')} <a href="${datenschutzBotschutz()}" target="_blank" rel="noopener">${K('botschutzMehr')}</a></p>`);
     }
   };
   const verdraengtZeile = () => {
