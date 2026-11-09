@@ -790,6 +790,14 @@ async function testeEinstellungen(browser) {
   pruefe('Handy: Liste der Bereiche (Inhalt verborgen), jede Zeile mit Pfeil und mindestens 44 px, Spiel zuerst, Info zuletzt',
     /es-liste/.test(liste.klasse) && liste.inhalt === 'none' && liste.punkte.length >= 8 && liste.punkte.every((x) => x.pfeil && x.h >= 44)
     && liste.punkte[0].seite === 'spiel' && liste.punkte[liste.punkte.length - 1].seite === 'info' && liste.breit >= liste.iw - 40, liste);
+  // U10 (Flo 09.11.2026): Zwischentitel in der Liste, jeder Abschnitt nur einmal; "Bewegung" heisst "Animationen"
+  const abschnitte = await handy.seite.evaluate(() => ({
+    titel: [...document.querySelectorAll('.es-nav-abschnitt')].filter((h) => getComputedStyle(h).display !== 'none').map((h) => h.textContent),
+    erstes: document.querySelector('.es-nav').firstElementChild?.className,
+    animation: document.querySelector('.es-nav-punkt[data-seite="bewegung"]')?.textContent.trim() }));
+  pruefe('Handy: Liste in Abschnitten (Spielen zuerst, App zuletzt, keiner doppelt), "Animationen" statt "Bewegung" (U10)',
+    abschnitte.titel[0] === 'Spielen' && abschnitte.titel.at(-1) === 'App' && abschnitte.titel.includes('Konto und Daten')
+    && new Set(abschnitte.titel).size === abschnitte.titel.length && abschnitte.erstes === 'es-nav-abschnitt' && abschnitte.animation === 'Animationen', abschnitte);
   await handy.seite.click('.es-nav-punkt[data-seite="klang"]');
   await handy.seite.waitForSelector('.es-screen.es-seite');
   const unterseite = await handy.seite.evaluate(() => ({ gehe: testseite.protokoll.filter((x) => x.art === 'gehe').pop(),

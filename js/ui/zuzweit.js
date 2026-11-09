@@ -85,13 +85,18 @@ function startblatt(root, app) {
           <label>${esc(Z('nameSchwarz'))}<input name="schwarz" maxlength="20" value="${esc(anzeigeName(namen.schwarz))}" autocomplete="off"></label>
         </div>
       </details>
-      <button class="zz-los dr" type="submit">${icon('play')}<span>${esc(Z('los'))}</span></button>
-      <p class="zz-hinweis">${esc(Z('hinweis'))}</p>
+      <button class="zz-los knopf primaer dr" type="submit">${icon('play')}<span>${esc(Z('los'))}</span></button>
+      <p class="zz-hinweis">${esc(Z('hinweis'))}<span class="zz-hinweis-uhr" hidden> ${esc(Z('hinweisUhr'))}</span></p>
     </form></div>`;
   root.append(s);
   let weg = false, startet = false;
   const form = s.querySelector('form');
   form.elements.bedenkzeit.value = Object.hasOwn(TEMPI, alt.bedenkzeit) ? alt.bedenkzeit : 'ohne';
+  // U11 (Flo 09.11.2026): der Satz zur Uhr erst, wenn eine Bedenkzeit gewaehlt ist
+  const uhrSatz = s.querySelector('.zz-hinweis-uhr');
+  const zeigeUhrSatz = () => { uhrSatz.hidden = !TEMPI[form.elements.bedenkzeit.value]; };
+  zeigeUhrSatz();
+  form.addEventListener('change', zeigeUhrSatz);
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
