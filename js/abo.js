@@ -13,6 +13,9 @@
 //       nicht angemeldet: false (ohne Netz). Sonst hoechstens alle PRUEF_MS ein Abgleich mit dem Server (rpc
 //       ist_premium und die eigene Zeile aus abos), dazwischen der Zwischenspeicher. Offline oder bei einem
 //       Serverfehler gilt der letzte bekannte Stand, aber nur bis zu seinem gueltig_bis. neu: true fragt sofort.
+//   standUnsicher() -> boolean   true, wenn der LETZTE Abgleich mit dem Server scheiterte (offline, Serverfehler, Sitzung
+//       nicht erneuerbar). istPremium() liefert dann nur den Zwischenspeicher, auf einem frischen Geraet also false.
+//       Wer daraus eine verbindliche Aussage machen will ("kein Abo"), fragt vorher hier (Blatt "Vertrag kündigen").
 //   premiumStand() -> { angemeldet, premium, status, plan, gueltigBis, quelle, geprueftAm }   synchron, ohne Netz
 //       status 'aktiv' | 'gekuendigt' | 'abgelaufen' | null (nie geprueft), gueltigBis/geprueftAm in ms
 //   ladeProdukt({ neu = false, id = PRODUKT_ID } = {}) -> Promise<{ id, name, beschreibung, preisText, kaufLink,
@@ -115,6 +118,7 @@ let laufend = null;
 let nachfragen = NACHFRAGEN_MS;
 let bestaetigung = null;
 let produktFehlt = false;
+let abgleichFehler = false;
 const bereit = new Set();
 export function setzeAboFetch(fn) { fetchFn = fn || ((...a) => fetch(...a)); }
 export function setzeAboUhr(fn) { uhr = typeof fn === 'function' ? fn : () => Date.now(); }
@@ -189,8 +193,10 @@ export async function istPremium({ neu = false } = {}) {
       const stand = { uid, premium: premium === true, status: (z && z.status) || null, plan: (z && z.plan) || null,
         gueltigBis: Number.isFinite(bis) ? bis : null, quelle: (z && z.quelle) || null, geprueftAm: uhr() };
       jsonSchreib(STAND_SCHLUESSEL, stand);
+      abgleichFehler = false;
       return gilt(stand, uhr());
     } catch (e) {
+      abgleichFehler = true;
       // offline, Serverfehler oder Sitzung nicht erneuerbar: letzter bekannter Stand bis zu seinem Ablaufdatum
       return gilt(c, uhr());
     } finally {
@@ -200,6 +206,8 @@ export async function istPremium({ neu = false } = {}) {
   laufend = { uid, p };
   return p;
 }
+
+export function standUnsicher() { return abgleichFehler; }
 
 // ---------- Produkt ----------
 const LINK = /^https:\/\/[^\s<>"'`]+$/;

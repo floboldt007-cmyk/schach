@@ -751,7 +751,9 @@ und erstatten; ein Abo für ein fremdes Konto gibt es nicht. Nichts in `abos` vo
   genannten Zeitpunkt ein; ob der Vertrag früher endet und Geld zurückgeht, entscheidest du von Hand (der Grund steht
   in Stripe am Abo unter den Kündigungsdetails). Die App sagt der Person genau das.
 - Ein Wunschtermin vor dem Ende des bezahlten Zeitraums wird als Kündigung zum Ende dieses Zeitraums eingetragen
-  (nichts wird ohne Erstattung früher beendet). Ob das so in die AGB gehört, mitprüfen lassen.
+  (nichts wird ohne Erstattung früher beendet); der Wunschtermin steht in Stripe am Abo in der Notiz zur Kündigung
+  („Wunschtermin JJJJ-MM-TT“). Ob das so in die AGB gehört, mitprüfen lassen.
+- Wer schon ordentlich gekündigt hat, kann auf derselben Seite weiter eine außerordentliche Kündigung erklären.
 
 **Von Hand freischalten** (z. B. für Testerinnen): **Table Editor > abos > Insert row** mit `user_id` (aus
 **Authentication > Users**), `status` = `aktiv`, `gueltig_bis` = Datum, `quelle` = `manuell`. Ein späterer Kauf

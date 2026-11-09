@@ -14,11 +14,13 @@
 //   ARTEN = ['ordentlich', 'ausserordentlich']
 //   META_KUENDIGUNG, META_KUENDIGUNG_ART   Metadaten am Stripe-Abo: Eingang (ISO, auf die Minute) und Art. Das ist der
 //       Nachweis des Zugangs; eine eigene Tabelle gibt es dafuer nicht.
-//   pruefeEingabe(d, jetzt) -> { art, grund, zeitpunkt: 'naechster' | ms } | null
+//   pruefeEingabe(d, jetzt) -> { art, grund, zeitpunkt: 'naechster' | ms, tag: 'JJJJ-MM-TT' | null } | null
 //       d: { art, grund?, zeitpunkt? }   zeitpunkt 'naechster' (Standard) oder ein Kalendertag 'JJJJ-MM-TT' in der Zukunft
 //   kuendigungsParameter({ art, grund, zeitpunkt, laeuftBis, eingang }) -> URLSearchParams
 //       naechster (oder ein Tag, der nicht nach dem bezahlten Zeitraum liegt): cancel_at_period_end=true
 //       spaeterer Tag: cancel_at=<Ende dieses Tages>, Stripe rechnet den letzten Zeitraum anteilig ab
+//       Ein Wunschtermin VOR dem Ende des bezahlten Zeitraums (z. B. ausserordentlich, auch bei schon vorgemerkter
+//       ordentlicher Kuendigung) steht als "Wunschtermin JJJJ-MM-TT" in der Notiz an Stripe: Flo entscheidet von Hand.
 //   verarbeite({ methode, koerper, autorisierung }, umgebung, { fetch, jetzt, protokoll }) -> Promise<{ status, kopf, koerper }>
 //       umgebung: { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY?, ABO_STRIPE_RK }
 //       ABO_STRIPE_RK: eingeschraenkter Stripe-Schluessel (rk_test_ oder rk_live_) mit "Abonnements: Schreiben"
@@ -87,22 +89,26 @@ export function pruefeEingabe(d, jetzt = Date.now()) {
   // Steuerzeichen raus, Laenge begrenzt: Der Text geht als Notiz an Stripe und wird dort von Flo gelesen
   const grund = String(d.grund || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, MAX_GRUND);
   let zeitpunkt = 'naechster';
+  let tag = null;
   if (d.zeitpunkt !== undefined && d.zeitpunkt !== null && d.zeitpunkt !== 'naechster') {
     const ms = tagesEnde(d.zeitpunkt);
     if (ms === null || ms <= jetzt || ms > jetzt + MAX_VORAUS_TAGE * 86400000) return null;
     zeitpunkt = ms;
+    tag = String(d.zeitpunkt);
   }
-  return { art, grund, zeitpunkt };
+  return { art, grund, zeitpunkt, tag };
 }
 
-export function kuendigungsParameter({ art, grund, zeitpunkt, laeuftBis, eingang }) {
+export function kuendigungsParameter({ art, grund, zeitpunkt, tag = null, laeuftBis, eingang }) {
   const p = new URLSearchParams();
   const spaeter = Number.isFinite(zeitpunkt) && Number.isFinite(laeuftBis) && zeitpunkt > laeuftBis;
   if (spaeter) p.append('cancel_at', String(Math.floor(zeitpunkt / 1000)));
   else p.append('cancel_at_period_end', 'true');
   p.append(`metadata[${META_KUENDIGUNG}]`, eingang);
   p.append(`metadata[${META_KUENDIGUNG_ART}]`, art);
-  if (grund) p.append('cancellation_details[comment]', `${art}: ${grund}`);
+  // Der gewuenschte Tag geht nur verloren, wenn er nicht als cancel_at eingetragen wird: dann in die Notiz
+  const wunsch = !spaeter && tag ? `Wunschtermin ${tag}` : '';
+  if (grund || wunsch) p.append('cancellation_details[comment]', [grund ? `${art}: ${grund}` : art, wunsch].filter(Boolean).join('; '));
   return p;
 }
 

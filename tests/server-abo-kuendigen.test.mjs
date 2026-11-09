@@ -59,6 +59,7 @@ const json = (r) => JSON.parse(r.koerper);
   const tag = pruefeEingabe({ art: 'ausserordentlich', grund: '  Zeile 1\nZeile 2\u0000  ', zeitpunkt: '2026-12-24' }, T);
   pruefe('Kalendertag: Ende des Tages (23:00 UTC), Grund ohne Steuerzeichen', tag && tag.art === 'ausserordentlich' && tag.grund === 'Zeile 1 Zeile 2'
     && tag.zeitpunkt === Date.UTC(2026, 11, 24, 23), tag);
+  pruefe('pruefeEingabe gibt den eingetragenen Tag mit zurueck (null bei "naechster")', tag.tag === '2026-12-24' && std.tag === null);
   pruefe('Grund wird auf 500 Zeichen gekuerzt', pruefeEingabe({ grund: 'x'.repeat(900) }, T).grund.length === 500);
   pruefe('abgelehnt: unbekannte Art, Datum in der Vergangenheit, kein Kalendertag, 31.02., zu weit voraus, Grund kein Text, Liste',
     pruefeEingabe({ art: 'sofort' }, T) === null && pruefeEingabe({ zeitpunkt: '2026-11-08' }, T) === null && pruefeEingabe({ zeitpunkt: 'morgen' }, T) === null
@@ -74,6 +75,13 @@ const json = (r) => JSON.parse(r.koerper);
     frueh.get('cancel_at_period_end') === 'true' && !frueh.has('cancel_at')
     && spaet.get('cancel_at') === String(Math.floor((BIS + 20 * 86400000) / 1000)) && !spaet.has('cancel_at_period_end')
     && spaet.get('cancellation_details[comment]') === 'ausserordentlich: Umzug');
+  // Codex-Befund #203: ausserordentlich zu einem frueheren Tag (auch bei schon vorgemerkter ordentlicher Kuendigung)
+  const wunsch = kuendigungsParameter({ art: 'ausserordentlich', grund: 'Leistung fehlt', zeitpunkt: BIS - 5 * 86400000, tag: '2026-11-26', laeuftBis: BIS, eingang: 'E' });
+  const wunschOhne = kuendigungsParameter({ art: 'ordentlich', grund: '', zeitpunkt: BIS - 5 * 86400000, tag: '2026-11-26', laeuftBis: BIS, eingang: 'E' });
+  const wunschSpaet = kuendigungsParameter({ art: 'ordentlich', grund: '', zeitpunkt: BIS + 86400000, tag: '2026-12-02', laeuftBis: BIS, eingang: 'E' });
+  pruefe('Parameter: Wunschtermin vor dem Laufzeitende steht in der Notiz an Stripe (Flo entscheidet), ein eingetragener cancel_at braucht keine Notiz',
+    wunsch.get('cancellation_details[comment]') === 'ausserordentlich: Leistung fehlt; Wunschtermin 2026-11-26' && wunsch.get('cancel_at_period_end') === 'true'
+    && wunschOhne.get('cancellation_details[comment]') === 'ordentlich; Wunschtermin 2026-11-26' && !wunschSpaet.has('cancellation_details[comment]'));
   pruefe('Parameter: nie eine sofortige Loeschung, nie eine Erstattung, nie ein anderes Feld', [p1, frueh, spaet].every((p) => [...p.keys()].every((k) =>
     ['cancel_at', 'cancel_at_period_end', `metadata[${META_KUENDIGUNG}]`, `metadata[${META_KUENDIGUNG_ART}]`, 'cancellation_details[comment]'].includes(k))));
 }
@@ -125,6 +133,16 @@ const json = (r) => JSON.parse(r.koerper);
   const r2 = await verarbeite(anfrage({}), UMG, { fetch: f2, jetzt: T });
   pruefe('Vertragsende aus den Positionen (neue API-Form), sonst aus der eigenen Zeile', json(r2).wirksam_zum === new Date(BIS + 60000).toISOString()
     && json(await verarbeite(anfrage({}), UMG, { fetch: welt({ stripe: [{ status: 200, body: {} }] }), jetzt: T })).wirksam_zum === new Date(BIS).toISOString());
+}
+
+{
+  // Schon ordentlich gekuendigt (Zeile 'gekuendigt'), jetzt ausserordentlich zu einem frueheren Tag: geht durch
+  const f = welt({ zeilen: [{ ...ZEILE, status: 'gekuendigt' }] });
+  const r = await verarbeite(anfrage({ art: 'ausserordentlich', grund: 'Leistung fehlt', zeitpunkt: '2026-11-20' }), UMG, { fetch: f, jetzt: T });
+  const k = new URLSearchParams(f.stripe()[0].body);
+  pruefe('schon gekuendigt + ausserordentlich zu einem frueheren Tag: 200 mit pruefung, Wunschtermin und Grund bei Stripe', r.status === 200 && json(r).pruefung === true
+    && json(r).art === 'ausserordentlich' && k.get(`metadata[${META_KUENDIGUNG_ART}]`) === 'ausserordentlich'
+    && k.get('cancellation_details[comment]') === 'ausserordentlich: Leistung fehlt; Wunschtermin 2026-11-20', f.stripe()[0].body);
 }
 
 // ---------------------------------------------------------------------------

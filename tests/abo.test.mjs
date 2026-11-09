@@ -19,7 +19,7 @@ import {
   istPremium, premiumStand, ladeProdukt, kaufAdresse, kaufen, verwalten, vergiss, premiumHinweis, setzeAboFetch, setzeAboUhr,
   kaufGestartet, pruefeProdukt, inStoreHuelle, PRODUKT_ID, STAND_SCHLUESSEL, PRODUKT_SCHLUESSEL, KAUF_SCHLUESSEL, PRUEF_MS, PRODUKT_MS,
   ALTER_SCHLUESSEL, alterAngabe, setzeAlterAngabe, kaufOffen, kaufStand, bestaetigeKauf, setzeNachfragen, NACH_KAUF_MS, NACHFRAGEN_MS,
-  registriereVorteil, vorteilBereit, produktOffline, istTestLink, aufraeumen, aboHinweisZumLoeschen, OHNE_HINWEIS_SCREENS, kuendigen, KUENDIGEN_PFAD,
+  registriereVorteil, vorteilBereit, produktOffline, istTestLink, aufraeumen, aboHinweisZumLoeschen, OHNE_HINWEIS_SCREENS, kuendigen, KUENDIGEN_PFAD, standUnsicher,
 } from '../js/abo.js';
 import { mitRegion } from '../js/konto-config.js';
 import { COUNTDOWN_RE } from '../js/inhalte.js';
@@ -312,6 +312,30 @@ async function nodeTeil() {
     pruefe('kuendigen geht auch in der Store-Huelle (Kuendigen ist kein Kauf)', (await kuendigen()).ok === true);
     delete globalThis.Capacitor;
     server.kuendigung = null;
+    // Codex-Befund #203: Ein gescheiterter Abgleich ist kein "kein Abo". istPremium() sagt auf einem frischen Geraet
+    // dann false; standUnsicher() haelt fest, dass das keine Antwort des Servers war.
+    // die Uhr des Tests ist inzwischen weiter: ein Abo, das von jetzt an gilt
+    const premiumVorher = server.premium;
+    const aboVorher = server.abo;
+    server.premium = true;
+    server.abo = [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(jetzt + 30 * 86400000).toISOString(), quelle: 'stripe' }];
+    await istPremium({ neu: true });
+    const okVorher = standUnsicher();
+    localStorage.removeItem(STAND_SCHLUESSEL);
+    server.offline = true;
+    const ohneNetz = await istPremium({ neu: true });
+    const unsicherOffline = standUnsicher();
+    server.offline = false;
+    server.status = 500;
+    const beiFehler = await istPremium({ neu: true });
+    const unsicher500 = standUnsicher();
+    server.status = 200;
+    const wieder = await istPremium({ neu: true });
+    server.premium = premiumVorher;
+    server.abo = aboVorher;
+    pruefe('standUnsicher: frisches Geraet, Abgleich scheitert (offline, 500) -> istPremium false UND standUnsicher true; nach gelungenem Abgleich false',
+      okVorher === false && ohneNetz === false && unsicherOffline === true && beiFehler === false && unsicher500 === true
+      && wieder === true && standUnsicher() === false, { okVorher, ohneNetz, unsicherOffline, beiFehler, unsicher500, wieder });
   }
   globalThis.Capacitor = { isNativePlatform: () => true };
   geoeffnet = [];
@@ -388,6 +412,8 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
     const u = r.request().url();
     anfragen.push({ url: u, methode: r.request().method(), kopf: r.request().headers(), koerper: r.request().postData() });
     if (srv.offline) return r.abort('internetdisconnected');
+    // abosStatus: der Abruf der eigenen Zeile scheitert (Serverfehler), alles andere geht
+    if (u.includes('/rest/v1/abos?') && srv.abosStatus) return r.fulfill({ status: srv.abosStatus, contentType: 'application/json', body: '{"message":"kaputt"}' });
     if (u.includes('/functions/v1/abo-kuendigen')) {
       // Standard: die Function ist noch nicht hochgeladen (Stand vor dem Einspielen)
       const k = srv.kuendigung || { status: 404, body: 'Function not found' };
@@ -981,7 +1007,7 @@ async function browserTeil(browser) {
     pruefe('Bestaetigungsseite: Dialog mit Vertrag, Konto, Art (ordentlich vorgewaehlt) und Zeitpunkt (naechstmoeglich mit Datum)', z.dialog && z.form
       && z.titel === 'Vertrag kündigen' && z.angaben[0] === 'Vertrag Crownmate Trainer (Abo)' && z.angaben[1] === 'Konto ' + MAIL
       && JSON.stringify(z.wahl) === JSON.stringify(['Ordentliche Kündigung [x]', 'Außerordentliche Kündigung (aus wichtigem Grund)',
-        `Zum nächstmöglichen Zeitpunkt (voraussichtlich ${tag(bis)}) [x]`, 'Zu einem späteren Datum']) && !z.grund && !z.tag, z);
+        `Zum nächstmöglichen Zeitpunkt (voraussichtlich ${tag(bis)}) [x]`, 'Zu einem bestimmten Datum']) && !z.grund && !z.tag, z);
     pruefe('Bestaetigungsseite: "Jetzt kündigen" zuerst, daneben nur "Schließen" (kein Gegenangebot, keine Umfrage)',
       JSON.stringify(z.knoepfe) === JSON.stringify(['Jetzt kündigen', 'Schließen']) && z.fokusDrin && !(await seite.locator('.trainer-ort:not(.weg)').count()), z.knoepfe);
     pruefe('Handy: Blatt passt in die Breite, Knoepfe und Auswahl mind. 44 px', z.links >= 0 && z.rechts <= z.breite + 0.5 && z.ueber <= 0 && z.klein.length === 0, z.klein);
@@ -1043,8 +1069,24 @@ async function browserTeil(browser) {
     await seite.click('.abo-gruppe [data-abo="kuendigen"]');
     await seite.waitForFunction(() => document.querySelector('.kuend-karte')?.dataset.zustand === 'gekuendigt');
     const schon = await kuendZustand(seite);
-    pruefe('schon gekuendigt: Satz mit Datum, kein "Jetzt kündigen"', schon.text === `Dein Abo ist schon gekündigt. Der Trainer gilt bis ${tag(spaeter.getTime())}.`
-      && !schon.form && JSON.stringify(schon.knoepfe) === JSON.stringify(['Schließen']), schon);
+    // Codex-Befund #203: Die vorgemerkte Kuendigung sperrt keine weitere Erklaerung (frueher: nur "Schließen")
+    pruefe('schon gekuendigt: Satz mit Datum UND weiter die Bestaetigungsseite, ausserordentlich vorgewaehlt, Kundenportal daneben',
+      schon.text === `Dein Abo ist schon gekündigt. Der Trainer gilt bis ${tag(spaeter.getTime())}. Du kannst hier trotzdem eine weitere Kündigung erklären, zum Beispiel außerordentlich zu einem früheren Zeitpunkt.`
+      && schon.form && schon.wahl[1] === 'Außerordentliche Kündigung (aus wichtigem Grund) [x]' && schon.grund
+      && JSON.stringify(schon.knoepfe) === JSON.stringify(['Jetzt kündigen', 'Über Stripe kündigen', 'Schließen']), schon);
+    const frueher = new Date(Date.now() + 5 * 86400000);
+    const isoFrueh = `${frueher.getFullYear()}-${String(frueher.getMonth() + 1).padStart(2, '0')}-${String(frueher.getDate()).padStart(2, '0')}`;
+    const vorZweiter = anfragen.filter((a) => a.url.includes('abo-kuendigen')).length;
+    await seite.fill('.kuend-grund textarea', 'Leistung fehlt');
+    await seite.check('.kuend-wahl input[value="spaeter"]');
+    await seite.fill('.kuend-tag input', isoFrueh);
+    await seite.click('.kuend-knoepfe [data-kuend="jetzt"]');
+    await seite.waitForFunction(() => document.querySelector('.kuend-karte')?.dataset.zustand === 'fertig', null, { timeout: 5000 }).catch(() => {});
+    const zweite = anfragen.filter((a) => a.url.includes('abo-kuendigen'));
+    const nachZweiter = await kuendZustand(seite);
+    pruefe('schon gekuendigt: ausserordentliche Kuendigung zu einem frueheren Tag geht an den Server und wird bestaetigt', zweite.length === vorZweiter + 1
+      && zweite[zweite.length - 1].koerper === JSON.stringify({ art: 'ausserordentlich', grund: 'Leistung fehlt', zeitpunkt: isoFrueh })
+      && nachZweiter.zustand === 'fertig' && nachZweiter.titel === 'Kündigung eingegangen', { n: zweite.length - vorZweiter, nachZweiter });
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
@@ -1069,6 +1111,45 @@ async function browserTeil(browser) {
     await bild(seite, 'abo-kuendigen-bestaetigung-dunkel');
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
+  }
+  {
+    // Codex-Befund #203: frisches Geraet (kein Abo-Zwischenspeicher), der Abruf der eigenen Zeile scheitert. Ein echter
+    // Abonnent darf dann nie "kein Abo, nichts zu kündigen" lesen.
+    const bis = Date.now() + 15 * 86400000;
+    const { kontext, seite, fehler, srv } = await neueSeite(browser, { sitzung: SITZUNG,
+      server: { produkt: [PRODUKT], premium: true, abosStatus: 500, abo: [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(bis).toISOString(), quelle: 'stripe' }] } });
+    await zuEinstellungen(seite);
+    await seite.waitForSelector('.abo-gruppe');
+    await seite.click('.abo-gruppe [data-abo="kuendigen"]');
+    await seite.waitForFunction(() => ['unklar', 'kein', 'formular'].includes(document.querySelector('.kuend-karte')?.dataset.zustand)
+      && [...document.querySelectorAll('.kuend-knoepfe button')].length >= 3, null, { timeout: 5000 }).catch(() => {});
+    const u = await kuendZustand(seite);
+    pruefe('Stand nicht ladbar (500), nichts gespeichert: Zustand "unklar" mit "Erneut versuchen" und Kundenportal, KEIN "nichts zu kündigen"',
+      u.zustand === 'unklar' && /ließ sich gerade nicht laden/.test(u.text) && /Kundenverwaltung von Stripe/.test(u.text) && !/nichts zu kündigen|kein Abo/.test(u.text)
+      && !u.form && JSON.stringify(u.knoepfe) === JSON.stringify(['Erneut versuchen', 'Über Stripe kündigen', 'Schließen']), u);
+    await bild(seite, 'abo-kuendigen-unklar');
+    await seite.click('.kuend-knoepfe [data-kuend="portal"]');
+    await seite.waitForFunction(() => window.__geoeffnet.length === 1, null, { timeout: 3000 }).catch(() => {});
+    pruefe('unklar: "Über Stripe kündigen" oeffnet das Kundenportal', ((await seite.evaluate(() => window.__geoeffnet[0])) || '').startsWith(PRODUKT.portal_link));
+    srv.abosStatus = 0;
+    await seite.click('.kuend-knoepfe [data-kuend="nochmal"]').catch(() => {});
+    await seite.waitForFunction(() => document.querySelector('.kuend-karte')?.dataset.zustand === 'formular', null, { timeout: 5000 }).catch(() => {});
+    const d = await kuendZustand(seite);
+    pruefe('unklar: "Erneut versuchen" holt den Stand, danach die Bestaetigungsseite', d.zustand === 'formular' && d.form && d.knoepfe[0] === 'Jetzt kündigen', d);
+    // Die Meldung des Browsers zum bewusst gefaelschten 500 ist kein Fehler der App
+    const echte = fehler.filter((x) => !/status of 500/.test(x));
+    pruefe('keine Fehler (ausser der Browser-Meldung zum gefaelschten 500)', echte.length === 0, echte);
+    await kontext.close();
+    // offline: auch das Produkt fehlt, also kein Portal-Knopf; trotzdem keine Aussage "kein Abo"
+    const o = await neueSeite(browser, { sitzung: SITZUNG, server: { offline: true } });
+    await zuEinstellungen(o.seite);
+    await o.seite.waitForSelector('.abo-gruppe');
+    await o.seite.click('.abo-gruppe [data-abo="kuendigen"]');
+    await o.seite.waitForFunction(() => ['unklar', 'kein'].includes(document.querySelector('.kuend-karte')?.dataset.zustand), null, { timeout: 5000 }).catch(() => {});
+    const off = await kuendZustand(o.seite);
+    pruefe('offline, nichts gespeichert: "unklar" mit "Erneut versuchen", kein "nichts zu kündigen"', off.zustand === 'unklar'
+      && !/nichts zu kündigen/.test(off.text) && JSON.stringify(off.knoepfe) === JSON.stringify(['Erneut versuchen', 'Schließen']), off);
+    await o.kontext.close();
   }
   {
     // Ohne Anmeldung, ohne Abo, Handzeile: nie ein Formular, immer ein klarer Satz

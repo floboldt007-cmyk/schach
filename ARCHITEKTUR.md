@@ -2187,7 +2187,8 @@ mehrere Ereignisse mit demselben `created` in zufälliger Reihenfolge); der Kauf
   nicht in `erlaubtePreise(umgebung)` steht (`ABO_STRIPE_PLAN` = Lookup-Keys, `ABO_STRIPE_PREIS` = Preis-ID; leer =
   keine Prüfung), mit `{ ignoriert: 'fremdes_produkt' }`.
 - **Kündigungsbutton (§ 312k BGB, rechtlich ungeprüft):** `js/pakete/abo/kuendigen.js` (`zeigeKuendigen`, Zustände
-  `laedt | abgemeldet | kein | gekuendigt | formular | sendet | fertig`), geöffnet über „Verträge hier kündigen“ in der
+  `laedt | abgemeldet | unklar | kein | gekuendigt | formular | sendet | fertig`; `unklar` = Abgleich gescheitert
+  (`standUnsicher()` in `js/abo.js`), nie die Aussage „kein Abo“; `gekuendigt` zeigt weiter das Formular), geöffnet über „Verträge hier kündigen“ in der
   Gruppe der Einstellungen und im Trainer-Blatt (`oeffneKuendigen` in `js/abo.js`). `kuendigen({ art, grund,
   zeitpunkt })` ruft die Edge Function `abo-kuendigen` (`_gemeinsam/abo-kuendigen.js`): Nutzer nur aus dem JWT, Abo nur
   aus der eigenen Zeile, bei Stripe `cancel_at_period_end` bzw. `cancel_at`, Eingang als Metadaten am Abo; den Stand

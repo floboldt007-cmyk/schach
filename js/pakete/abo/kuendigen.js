@@ -19,8 +19,13 @@
 //   Zustaende (data-zustand an .kuend-karte):
 //     laedt        eigener Stand kommt noch
 //     abgemeldet   ohne Anmeldung: Hinweis, "Zum Konto" und (mit portal_link) "Über Stripe kündigen"
-//     kein         kein Stripe-Abo an diesem Konto (oder von Hand freigeschaltet: endet von selbst)
-//     gekuendigt   schon gekuendigt, gilt bis ...
+//     unklar       der Stand liess sich nicht laden (offline, Serverfehler) und nichts Gespeichertes zeigt ein Stripe-Abo:
+//                  KEINE Aussage "kein Abo", sondern "Erneut versuchen" und (mit portal_link) "Über Stripe kündigen"
+//     kein         kein Stripe-Abo an diesem Konto (oder von Hand freigeschaltet: endet von selbst); nur nach einem
+//                  gelungenen Abgleich mit dem Server
+//     gekuendigt   schon gekuendigt, gilt bis ...: Hinweis UND die Bestaetigungsseite. Eine vorgemerkte ordentliche
+//                  Kuendigung sperrt keine weitere Erklaerung (z. B. ausserordentlich zu einem frueheren Termin);
+//                  "ausserordentlich" ist dann vorgewaehlt, das Kundenportal steht daneben
 //     formular     die Bestaetigungsseite mit "Jetzt kündigen"
 //     sendet       Erklaerung unterwegs (Knopf aus, kein Doppelklick)
 //     fertig       Bestaetigung mit Eingang und Vertragsende, "Bestätigung speichern"
@@ -32,7 +37,7 @@ import { t, locale } from '../../sprache.js';
 import './texte.js';
 import { anim, tempo } from '../../bewegung.js';
 import { sitzung } from '../../konto.js';
-import { istPremium, premiumStand, ladeProdukt, kuendigen, verwalten, stelleAboCssSicher, inStoreHuelle } from '../../abo.js';
+import { istPremium, premiumStand, ladeProdukt, kuendigen, verwalten, stelleAboCssSicher, inStoreHuelle, standUnsicher } from '../../abo.js';
 
 const A = (k, w) => t('p-abo.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -108,7 +113,8 @@ export function zeigeKuendigen({ app = null } = {}) {
   const beleg = ort.querySelector('.kuend-beleg');
   const vorherFokus = document.activeElement;
   let produkt = null;
-  let geladen = false;    // eigener Stand einmal vom Server geholt (oder gescheitert)
+  let geladen = false;    // der Abgleich mit dem Server ist durch (gelungen oder gescheitert, siehe standUnsicher)
+  let beruehrt = false;   // die Person hat im Formular schon etwas gewaehlt (dann waehlt das Blatt nichts mehr vor)
   let sendet = false;
   let ergebnis = null;    // Antwort nach einer erfolgreichen Kuendigung
   let erklaert = null;    // was die Person erklaert hat (fuer die Bestaetigung)
@@ -129,8 +135,9 @@ export function zeigeKuendigen({ app = null } = {}) {
     if (ergebnis) return 'fertig';
     if (sendet) return 'sendet';
     if (!st.angemeldet) return 'abgemeldet';
-    if (st.status === null && !geladen) return 'laedt';
-    if (st.quelle !== 'stripe') return 'kein';
+    // Ohne Stripe-Abo im (gespeicherten) Stand entscheidet erst der Server: bis dahin "laedt", nach einem
+    // gescheiterten Abgleich "unklar". "kein" ist eine verbindliche Aussage und braucht einen gelungenen Abgleich.
+    if (st.quelle !== 'stripe') return !geladen ? 'laedt' : standUnsicher() ? 'unklar' : 'kein';
     if (st.premium && st.status === 'gekuendigt') return 'gekuendigt';
     // auch 'abgelaufen' mit Stripe als Quelle (z. B. offene Zahlung): Ob der Vertrag noch besteht, sagt der Server
     return 'formular';
@@ -143,7 +150,9 @@ export function zeigeKuendigen({ app = null } = {}) {
     karte.dataset.zustand = zustand;
     const portal = !!(produkt && produkt.portalLink) && !inStoreHuelle();
     titel.textContent = zustand === 'fertig' ? A('k.fertigTitel') : A('k.titel');
-    const zeigtForm = zustand === 'formular' || zustand === 'sendet';
+    const zeigtForm = zustand === 'formular' || zustand === 'sendet' || zustand === 'gekuendigt';
+    // Ordentlich ist schon vorgemerkt: Offen ist dann nur noch die ausserordentliche Kuendigung, also vorgewaehlt
+    if (zustand === 'gekuendigt' && !beruehrt) form.elements['kuend-art'].value = 'ausserordentlich';
     form.hidden = !zeigtForm;
     for (const f of form.querySelectorAll('input, textarea')) f.disabled = zustand === 'sendet';
     beleg.hidden = zustand !== 'fertig';
@@ -151,7 +160,8 @@ export function zeigeKuendigen({ app = null } = {}) {
     if (zustand === 'laedt') inhalt = A('k.laedt');
     else if (zustand === 'abgemeldet') inhalt = A('k.abgemeldet');
     else if (zustand === 'kein') inhalt = st.premium && st.gueltigBis ? A('k.manuell', { datum: datum(st.gueltigBis) }) : A('k.kein');
-    else if (zustand === 'gekuendigt') inhalt = A('k.schon', { datum: datum(st.gueltigBis) });
+    else if (zustand === 'unklar') inhalt = A('k.unklar');
+    else if (zustand === 'gekuendigt') inhalt = `${A('k.schon', { datum: datum(st.gueltigBis) })} ${A('k.schonWeiter')}`;
     else if (zeigtForm) inhalt = A('k.einleitung');
     else if (zustand === 'fertig') inhalt = A('k.fertig', { datum: datum(ergebnis.eingegangenAm), zeit: uhrzeit(ergebnis.eingegangenAm) });
     text.textContent = inhalt;
@@ -177,12 +187,13 @@ export function zeigeKuendigen({ app = null } = {}) {
     meldungEl.hidden = !fehler || zustand === 'fertig';
     meldungEl.textContent = fehler;
     const knoepfe = [];
-    if (zustand === 'formular') knoepfe.push(knopf(A('k.jetzt'), 'primaer', 'jetzt'));
+    if (zustand === 'formular' || zustand === 'gekuendigt') knoepfe.push(knopf(A('k.jetzt'), 'primaer', 'jetzt'));
+    else if (zustand === 'unklar') knoepfe.push(knopf(A('k.nochmal'), 'primaer', 'nochmal'));
     else if (zustand === 'sendet') knoepfe.push(knopf(A('k.sendet'), 'primaer', '', { aus: true }));
     else if (zustand === 'fertig') knoepfe.push(knopf(A('k.speichern'), 'primaer', 'speichern'));
     else if (zustand === 'abgemeldet' && app && typeof app.gehe === 'function') knoepfe.push(knopf(A('kontoKnopf'), 'primaer', 'konto'));
     // Zweiter Weg, immer wenn es ihn gibt und noch nichts eingegangen ist: das Kundenportal von Stripe
-    if (portal && ['abgemeldet', 'kein', 'formular'].includes(zustand) && (zustand !== 'formular' || fehler)) knoepfe.push(knopf(A('k.portal'), '', 'portal'));
+    if (portal && ['abgemeldet', 'kein', 'unklar', 'gekuendigt', 'formular'].includes(zustand) && (zustand !== 'formular' || fehler)) knoepfe.push(knopf(A('k.portal'), '', 'portal'));
     knoepfe.push(knopf(A('schliessen'), '', 'schliessen'));
     const hatteFokus = leiste.contains(document.activeElement) ? (document.activeElement.dataset.kuend || '') : null;
     leiste.replaceChildren(...knoepfe);
@@ -234,6 +245,14 @@ export function zeigeKuendigen({ app = null } = {}) {
     });
   }
 
+  // Eigenen Stand frisch vom Server holen. istPremium() faengt Netz- und Serverfehler selbst ab und liefert dann nur den
+  // Zwischenspeicher; ob der Abgleich gelang, sagt standUnsicher() (zustandVon macht daraus "unklar" statt "kein").
+  function ladeStand() {
+    geladen = false;
+    aktualisiere();
+    return istPremium({ neu: true }).catch(() => {}).then(() => { geladen = true; aktualisiere(); });
+  }
+
   function speichere() {
     if (!ergebnis) return;
     try {
@@ -252,7 +271,7 @@ export function zeigeKuendigen({ app = null } = {}) {
     }
   }
 
-  form.addEventListener('change', () => { fehler = ''; aktualisiere(); });
+  form.addEventListener('change', () => { beruehrt = true; fehler = ''; aktualisiere(); });
   form.addEventListener('submit', (e) => { e.preventDefault(); sende(); });
   leiste.addEventListener('click', (e) => {
     const a = e.target.closest('[data-kuend]')?.dataset.kuend;
@@ -260,6 +279,7 @@ export function zeigeKuendigen({ app = null } = {}) {
     if (a === 'schliessen') { ende(); return; }
     if (a === 'jetzt') { sende(); return; }
     if (a === 'speichern') { speichere(); return; }
+    if (a === 'nochmal') { ladeStand(); return; }
     if (a === 'portal') { verwalten({ produkt }).catch(() => {}); return; }
     if (a === 'konto') {
       ende();
@@ -314,6 +334,6 @@ export function zeigeKuendigen({ app = null } = {}) {
   titel.focus({ preventScroll: true });
 
   ladeProdukt().then((p) => { produkt = p; aktualisiere(); }).catch(() => {});
-  istPremium({ neu: true }).catch(() => {}).then(() => { geladen = true; aktualisiere(); });
+  ladeStand();
   return { el: ort, ende, aktualisiere };
 }
