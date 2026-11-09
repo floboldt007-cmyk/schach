@@ -161,6 +161,8 @@ try {
   // Design-Durchsicht U 09.11.2026: unter "Schach gegen einen Menschen" stand nur "ohne Kronen" (gilt nur unter Freunden)
   const kontoSatz = await seite.locator('.online-screen .on-konto p').first().innerText();
   pruefe('Ohne Anmeldung: Konto-Karte sagt, dass Partie und Duell um Kronen gehen und nur Freundes-Partien ohne', /um Kronen/.test(kontoSatz) && /Freund[^.]*ohne Kronen/.test(kontoSatz), kontoSatz);
+  // R5-1 (Kundenblick 09.11.2026): auch das Freundesspiel braucht ein Konto; der Satz darf es nicht wie einen Weg ohne Konto lesen lassen
+  pruefe('Ohne Anmeldung: Konto-Karte beginnt mit "Mit Konto" und nennt Freunde im selben Satz (R5-1)', /^Mit Konto [^.]*Freunden[^.]*ohne Kronen\./.test(kontoSatz), kontoSatz);
   pruefe('Ohne Anmeldung: Hinweis und gemerkter Link, keine Server-Anfrage', (await seite.locator('.online-screen').innerText()).includes('Anmelden geht mit einem Code per E-Mail')
     && await seite.evaluate(() => localStorage.getItem('schach-arena:online:einladung') === 'ABC234') && calls.length === 0);
   await knopf('konto').click(); await seite.locator('.konto-email').fill('spieler@example.invalid');
