@@ -343,6 +343,17 @@ async function testePartie(seite, h, fehler) {
   });
   pruefe('Zugliste vorlesen: "<Klasse>: " ohne Satzzeichen davor, alle Klassennamen (DE und EN) ohne Satzzeichen am Ende',
     vorlesen.sr.length >= 1 && vorlesen.sr.every((x) => /^[^.!:?]+: $/.test(x)) && vorlesen.anzahl >= 22 && vorlesen.namenMitZeichen.length === 0, vorlesen);
+  // Punkt 33, Barrierefreiheit (R8, axe): die scrollbare Zugliste ist per Tab erreichbar (scrollable-region-focusable) und die
+  // Partie hat genau eine h1, den Titel im Kopf (page-has-heading-one)
+  const zugang = await seite.evaluate(() => ({
+    liste: ['.zugliste', '.zugleiste'].map((s) => { const e = document.querySelector('.screen.partie ' + s); return e && e.tabIndex === 0 && e.getAttribute('role') === 'region' && !!e.getAttribute('aria-label'); }),
+    h1: [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => (e.closest('.p-kopf') ? 'kopf:' : 'anders:') + e.textContent),
+  }));
+  pruefe('Partie: Zugliste und Zugleiste per Tab erreichbar (Region mit Namen), genau eine h1 im Kopf',
+    zugang.liste.every(Boolean) && zugang.h1.length === 1 && zugang.h1[0].startsWith('kopf:'), JSON.stringify(zugang));
+  await seite.locator('.screen.partie .zugliste').focus();
+  pruefe('Zugliste nimmt den Fokus an', await seite.evaluate(() => document.activeElement && document.activeElement.classList.contains('zugliste')));
+  await seite.evaluate(() => document.activeElement && document.activeElement.blur());
 
   // Bot antwortet
   await h.warteFlo();
@@ -2479,7 +2490,7 @@ async function testeSpielFundament(browser) {
       tempo: { grund: 600, zuschlag: 5 }, liga: { saison: 'test-saison', runde: 3 } });
     await h.warteFlo();
     const k = await seite.evaluate(() => ({
-      h2: document.querySelector('.partie .kopf h2').textContent, unter: document.querySelector('.partie .kopf .unter').textContent,
+      h2: document.querySelector('.partie .kopf h1').textContent, unter: document.querySelector('.partie .kopf .unter').textContent,
       meta: document.querySelector('.partie .botkarte .bot-meta').textContent, gest: window.__wp.ereignisse.find((e) => e.name === 'partie:gestartet'),
       zuege: window.__partie.z.zuege.slice(), blase: (document.querySelector('.partie .blase-ort .sprechblase') || {}).textContent,
     }));
@@ -2506,7 +2517,7 @@ async function testeSpielFundament(browser) {
     await seite.evaluate(() => { window.__test = {}; });
     await seite.reload();
     await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
-    const fort = await seite.evaluate(() => ({ g: window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet'), h2: document.querySelector('.partie .kopf h2').textContent }));
+    const fort = await seite.evaluate(() => ({ g: window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet'), h2: document.querySelector('.partie .kopf h1').textContent }));
     pruefe('Boss: Fortsetzen nach Neuladen behält Boss, Stufe und Seed', fort.h2 === 'Testboss · Meister' && fort.g.length === 1 && fort.g[0].fortgesetzt === true
       && fort.g[0].modus === 'boss' && fort.g[0].seed === k.gest.seed && !!fort.g[0].boss && fort.g[0].boss.stufe === 'meister', JSON.stringify(fort));
     await h.warteFlo();
@@ -2563,7 +2574,7 @@ async function testeSpielFundament(browser) {
     const st = await seite.evaluate(async () => {
       const edda = (await import('./js/bots.js')).BOTS.find((b) => b.id === 'edda');
       const zb = window.__partie.zugBot();
-      return { h2: document.querySelector('.partie .kopf h2').textContent, meta: document.querySelector('.partie .botkarte .bot-meta').textContent,
+      return { h2: document.querySelector('.partie .kopf h1').textContent, meta: document.querySelector('.partie .botkarte .bot-meta').textContent,
         wieEdda: JSON.stringify(zb.staerke) === JSON.stringify(edda.staerke), id: zb.id, laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')).boss };
     });
     await seite.evaluate(() => { window.__test = {}; });
@@ -3096,7 +3107,7 @@ const u7Masse = (seite) => seite.evaluate(() => {
       lh: parseFloat(cs.lineHeight), label: document.querySelector('.partie .spieler.gegner').getAttribute('aria-label') },
     spalte: spalte.map((s) => ({ s: s.split(' ').pop(), ...r(s) })), tipp: Math.min(...tipp),
     unten: Math.max(...['.partie .kopf', '.partie .spieler.gegner', '.partie .evalbalken', '.partie .brett-rahmen', '.partie .spieler.ich', '.partie .coach', '.partie .spielknoepfe'].map((s) => r(s).b)),
-    streifen: r('.partie .zugleiste'), knoepfe: r('.partie .spielknoepfe'), coach: r('.partie .coach'), kopfTitel: document.querySelector('.partie .kopf h2').textContent,
+    streifen: r('.partie .zugleiste'), knoepfe: r('.partie .spielknoepfe'), coach: r('.partie .coach'), kopfTitel: document.querySelector('.partie .kopf h1').textContent,
     ueber: { seite: document.documentElement.scrollWidth - innerWidth, screen: sc.scrollWidth - sc.clientWidth, inhalt: inh.scrollWidth - inh.clientWidth },
     eng: sc.classList.contains('coach-eng'), streifenUnten: sc.classList.contains('streifen-unten'), handy: sc.classList.contains('handy'),
     brettwahl: sichtbar('.partie .brettwahl'), scrollt: inh.scrollHeight - inh.clientHeight,
@@ -3277,7 +3288,7 @@ async function testeU7(browser) {
     await warte(400);
     const k = await seite.evaluate(() => {
       const kopf = document.querySelector('.partie .kopf');
-      const h2 = kopf.querySelector('h2');
+      const h2 = kopf.querySelector('h1');
       const bw = document.querySelector('.partie .brettwahl');
       const knoepfe = [...bw.querySelectorAll('button')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); });
       return { brettwahl: getComputedStyle(bw).display !== 'none' && bw.getBoundingClientRect().width > 0, knoepfe, titel: h2.textContent, titelGanz: h2.scrollWidth <= h2.clientWidth + 1,
@@ -3320,7 +3331,7 @@ async function testeU7(browser) {
       const info = r(document.querySelector('.partie .spieler.gegner > .info'));
       const woerter = [...document.querySelectorAll('.partie .spielknoepfe .knopf > span:last-child')].filter((e) => e.getBoundingClientRect().width > 0)
         .map((e) => ({ t: e.textContent.trim(), ganz: e.scrollWidth <= e.clientWidth + 1 && e.getBoundingClientRect().right <= e.parentNode.getBoundingClientRect().right + 0.5 }));
-      const h2 = document.querySelector('.partie .kopf h2');
+      const h2 = document.querySelector('.partie .kopf h1');
       return { spalte: Math.round(seiteEl.getBoundingClientRect().width), teile, uhren, info, woerter, titel: h2.textContent, titelGanz: h2.scrollWidth <= h2.clientWidth + 1 };
     });
     pruefe('Brett mindestens 44 % der kleineren Seite (vorher 184 px)', m.brett.w >= Math.min(m.iw, m.ih) * 0.44, JSON.stringify(m.brett));
@@ -3419,7 +3430,7 @@ async function testeU7(browser) {
         klassen: ['botbox', 'botleiste-hoch', 'botkarte'].every((c) => g.classList.contains(c)), erstes: g.firstElementChild.classList.contains('ort-gegner-leiste'),
         av: !!g.querySelector(':scope > .av img') && !!ich.querySelector(':scope > .av svg'), name: g.querySelector('.bot-name').textContent, meta: g.querySelector('.bot-meta').textContent.trim(),
         uhren: [...document.querySelectorAll('.partie .uhr')].map((u) => u.hidden), leisteNachName: ich.querySelector('.ort-spieler-leiste').previousElementSibling === ich.querySelector(':scope > .name'),
-        ich: ['spielerleiste', 'spieler-quer', 'spieler-hoch'].every((c) => ich.classList.contains(c)), kopf: document.querySelector('.partie .kopf h2').textContent,
+        ich: ['spielerleiste', 'spieler-quer', 'spieler-hoch'].every((c) => ich.classList.contains(c)), kopf: document.querySelector('.partie .kopf h1').textContent,
         unter: document.querySelector('.partie .kopf .unter').textContent, brettwahl: document.querySelectorAll('.partie .brettwahl button').length,
         klang: document.querySelector('.partie .kopf [data-aktion="klang"]').getAttribute('aria-pressed'), lage: window.__partie.gegnerLeiste.dataset.lage,
         rollen: [g.getAttribute('role'), ich.getAttribute('role')], label: g.getAttribute('aria-label'),

@@ -101,6 +101,9 @@ try {
   pruefe('Startblatt: alle Ziele mindestens 44 px hoch und breit (auch der Schalter: Feld 52x44, Spur 52x32)', blatt.ziele.length >= 7
     && blatt.ziele.every((z) => z.h >= 44 && z.w >= 44), JSON.stringify(blatt.ziele));
   pruefe('Startblatt: nichts seitlich drueber', blatt.quer);
+  // Punkt 33 (Barrierefreiheit, axe page-has-heading-one): genau eine h1 auf der Seite, der Titel des Startblatts
+  const h1Start = await seite.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => e.className + ':' + e.textContent));
+  pruefe('Startblatt: genau eine h1 (Titel des Startblatts)', h1Start.length === 1 && h1Start[0].startsWith('zz-titel:'), JSON.stringify(h1Start));
   // U6 (Flo 09.11.2026): "Los" orange wie jeder Hauptknopf; U11: der Uhr-Satz nur, wenn eine Uhr gewaehlt ist
   const farbe = await seite.evaluate(() => {
     const p = document.createElement('button'); p.className = 'knopf primaer'; document.body.append(p);
@@ -121,6 +124,8 @@ try {
   pruefe('Tippen und Ziehen beider Seiten, keine Engine oder Bot-Antwort', await seite.evaluate(() => window.__partie.z.zuege.join(',') === 'e2e4,e7e5,g1f3,b8c6' && window.__workerZahl === 0));
   pruefe('Keine Hilfen, Weiss unten, obere Spielerkarte umgedreht', await seite.evaluate(() => !document.querySelector('.zz-screen .balken, .zz-screen .coach, .zz-screen [data-aktion="hinweis"], .zz-screen [data-aktion="zuruecknahme"]')
     && window.__partie.brett.ausrichtung === 'w' && document.querySelector('.zz-oben').classList.contains('zz-gegenueber')));
+  const h1Partie = await seite.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => e.textContent));
+  pruefe('Partie zu zweit: genau eine h1 im Kopf', h1Partie.length === 1 && await seite.locator('.zz-screen > .kopf h1').count() === 1, JSON.stringify(h1Partie));
   // Flo 30.10. abends: zu zweit darf man einen Zug zuruecknehmen (gegen Bots nicht)
   await zug('f1c4');
   await knopf('zugzurueck').click();
