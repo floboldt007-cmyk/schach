@@ -125,6 +125,12 @@ button.bl-ib-zeile:focus-visible, .bl-ich-alle:focus-visible { outline: var(--fo
 
 .bl-karte { display: grid; gap: 12px; min-width: 0; padding: 20px; border-radius: var(--r-xl); background-color: var(--flaeche);
   background-image: var(--textur-flaeche, none); box-shadow: var(--s2), var(--kante); color: var(--text); }
+/* T-3: Bilanz im Reiter Ich (vier Zahlen) und gegen den Bot der Tafel (eine Zeile) */
+.bl-bilanz-werte { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.bl-bilanz-werte div { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; text-align: center; }
+.bl-bilanz-werte dt { font-size: 12px; font-weight: 600; color: var(--text-2); overflow-wrap: anywhere; }
+.bl-bilanz-werte dd { margin: 0; font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); white-space: nowrap; color: var(--text); }
+.bl-bot-bilanz { margin: 0; font-size: 13.5px; font-weight: 650; color: var(--text-2); }
 .bl-k-kopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-width: 0; }
 .bl-k-kopf h2 { margin: 2px 0 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 24px; letter-spacing: -.025em; line-height: 1.1; }
 .bl-k-hinweis { font-size: 12.5px; font-weight: 650; color: var(--text-2); }

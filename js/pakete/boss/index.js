@@ -8,6 +8,7 @@ import { t, locale } from '../../sprache.js';
 import * as L from './logik.js';
 import './texte.js';
 import { protokolliere } from '../../protokoll.js';
+import { icon } from '../../ui/icons.js';
 
 const IDS = ['bergwirt', 'baron-gambit', 'springerzuechterin', 'festungsbauer'];
 const ELOS = [700, 1300, 1900, 2500]; // jeweils 100 ueber dem Endgegner der zugeordneten Welt
@@ -63,6 +64,23 @@ function eventKarte() {
   el.innerHTML = `<b>${esc(t('p-boss.eventKurz'))}</b><small>${esc(t('p-boss.event'))}</small>`;
   return el;
 }
+// Startseite "Als Naechstes" (T-3, Flo 09.11.2026): eine Zeile, solange der Wochen-Boss ansteht (Trophaee noch nicht
+// erspielt), Antippen startet die Boss-Partie wie der Knopf der Karte; am Funken-Wochenende eine zweite Zeile zum Spielplan
+function heimBoss(k) {
+  const w = woche(); const b = w && botNachId(w.boss);
+  if (!b || !k || !k.app || typeof k.zeile !== 'function' || (stand().trophäen || []).includes(b.id)) return null;
+  const titel = `${t('p-boss.name')}: ${b.name}`;
+  const rest = restText(w);
+  return k.zeile({ symbol: `<img src="${esc(b.avatar)}" alt="">`, titel, text: rest, label: [titel, rest, t('p-boss.spielen')].filter(Boolean).join(' · '),
+    paket: 'boss', beiTipp: () => oeffne(k.app, w) });
+}
+function heimEvent(k) {
+  if (!k || typeof k.zeile !== 'function' || !L.istFunkenWochenende(plan)) return null;
+  const z = k.zeile({ symbol: icon('blitz'), titel: t('p-boss.eventKurz'), text: t('p-boss.eventZeile'), label: t('p-boss.event'), paket: 'boss',
+    beiTipp: () => { if (k.app && typeof k.app.gehe === 'function') k.app.gehe('spielplan'); } });
+  z.dataset.art = 'event';
+  return z;
+}
 function ladeCss() {
   if (typeof document === 'undefined' || document.querySelector('link[data-paket="boss"]')) return;
   const l = document.createElement('link'); l.rel = 'stylesheet'; l.dataset.paket = 'boss';
@@ -75,6 +93,8 @@ function registriere() {
   anbieten('arena:heute', (k) => bossKarte(k, true), { reihenfolge: 15, paket: 'boss' });
   anbieten('arena:karte-event', () => eventKarte(), { reihenfolge: 10, paket: 'boss' });
   anbieten('arena:heute', () => eventKarte(), { reihenfolge: 16, paket: 'boss' });
+  anbieten('heim:naechstes', (k) => sicher(() => heimBoss(k), 'Startseite'), { reihenfolge: 6, paket: 'boss' });
+  anbieten('heim:naechstes', (k) => sicher(() => heimEvent(k), 'Startseite'), { reihenfolge: 7, paket: 'boss' });
   hoere('partie:beendet', (d) => sicher(() => {
     if (!d || d.modus !== 'boss' || d.ergebnis !== 'sieg' || !IDS.includes(d.botId)) return;
     const r = L.gibTrophaee(stand(), d.botId);

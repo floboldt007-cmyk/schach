@@ -109,6 +109,10 @@
 .sheet-karte.fk-spiegel { text-align: left; max-height: min(86vh, 760px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .fk-spiegel h3 { text-align: center; }
 .fk-spiegel-inhalt { display: grid; gap: 12px; margin-top: 14px; }
+/* T-3: Rueckenwind/Wochenende und Faktor sichtbar im Spiegel, unter heute / als Naechstes */
+.fk-s-jetzt { display: grid; gap: 10px; padding: 12px 14px; border-radius: var(--r-m); background: var(--flaeche-2); }
+.fk-s-faktor { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.fk-s-gegner { font-size: 13.5px; font-weight: var(--gw-stark); color: var(--text-2); }
 .fk-s-liste { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 14px; }
 .fk-s-liste dt { font-weight: var(--gw-stark); color: var(--text-2); }
 .fk-s-liste dd { margin: 0; font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }

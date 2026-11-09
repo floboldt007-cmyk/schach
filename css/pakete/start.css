@@ -101,11 +101,6 @@
 
 /* ---------- Heute-Karte: "Neu fuer dich" (Ort arena:heute) ---------- */
 .st-neu { display: flex; align-items: center; gap: 0; min-width: 0; min-height: 44px; }
-/* "Neu fuer dich" ist die leiseste Zeile der Heute-Karte: steht dort schon eine Zeile eines anderen Pakets (z. B. faellige
-   Karten der Kartei), tritt sie zurueck und kommt wieder, sobald sie allein ist (der Hinweis bleibt der des Tages, er
-   gilt nicht als erledigt). Zwei Zeilen schoben auf dem iPad quer 1024 x 768 den Spielen-Knopf 21 px unter den Rand.
-   Haelt die Arena den Spielen-Knopf einmal selbst im Bild (U5/U7), kann diese Regel fallen. */
-.heute-karte .st-neu:not(:only-child) { display: none; }
 .st-neu-los { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 5px; margin: 0; padding: 4px 2px 4px 0;
   border: 0; border-radius: var(--r-m); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .st-neu-los:focus-visible { outline: var(--fokus); outline-offset: 2px; }

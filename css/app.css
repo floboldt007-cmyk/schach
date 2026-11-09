@@ -384,14 +384,8 @@ html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-si
    W0+a "Spiel-Fundament": Behaelter der neuen Orte, Abrechnung, Plaetze der Buehne (die Leiste: css/navigation.css).
    Ohne Pakete bleibt alles versteckt (hidden) und erzeugt keinen Abstand. Die Optik kommt mit dem Premium-Umbau.
    ============================================================ */
-.heute-karte[hidden], .ort-gegner-leiste[hidden], .p-zaehlwerk[hidden], .p-funkenlinie[hidden],
+.ort-gegner-leiste[hidden], .p-zaehlwerk[hidden], .p-funkenlinie[hidden],
 .ort-spieler-leiste[hidden], .ort-aktionen[hidden] { display: none; }
-/* Heute-Karte im Arena-Panel (Ort arena:heute) */
-.heute-karte { display: grid; gap: 6px; padding: 10px 14px; border-radius: var(--r-l); background: var(--flaeche-2);
-  border: 1px solid var(--linie); min-width: 0; }
-.arena .detail > .heute-karte { grid-column: 1 / -1; }
-.heute-karte .hk-kopf { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
-.ort-heute { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 /* Gegner-Leiste (Ort partie:gegner-leiste) ueber der Bot-Karte bzw. im Hochformat als eigene Zeile oben in der Bot-Leiste
    (w0plus-a-fix: nicht mehr in .info, das auf dem Handy mit der Sprechblase verschwindet). Hoch hoechstens 16 px hoch. */
 .ort-gegner-leiste { display: block; min-width: 0; }

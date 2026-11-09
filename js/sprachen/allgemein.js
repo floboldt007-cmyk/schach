@@ -11,6 +11,8 @@ registriereTexte('allgemein', {
     arena: 'Bots', training: 'Training', bestenliste: 'Liga', analyse: 'Analyse', verlauf: 'Verlauf',
     // eigener Name ohne Benutzername (Partie, Duell-Intro, Profilkarte; js/konto.js meinName)
     du: 'Du',
+    // Steckbrief eines Bots (Antippen des Gegnerbilds auf der Bots-Seite, js/ui/arena.js)
+    steckbrief: 'Steckbrief', steckbriefVon: 'Steckbrief von {name}',
   },
   en: {
     zurueck: 'Back', weiter: 'Next', fertig: 'Done', abbrechen: 'Cancel', ok: 'OK', schliessen: 'Close',
@@ -19,5 +21,6 @@ registriereTexte('allgemein', {
     sieg: 'Win', niederlage: 'Loss', remis: 'Draw', einstellungen: 'Settings',
     arena: 'Bots', training: 'Training', bestenliste: 'League', analyse: 'Analysis', verlauf: 'History',
     du: 'You',
+    steckbrief: 'Profile', steckbriefVon: 'Profile of {name}',
   },
 });
