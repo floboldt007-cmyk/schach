@@ -625,10 +625,14 @@ async function testeSpielenFrei(browser) {
     await warte(1400);
     const m = await seite.evaluate(() => {
       const r = (q) => { const e = document.querySelector(q); if (!e) return null; const b = e.getBoundingClientRect(); return { t: Math.round(b.top), b: Math.round(b.bottom) }; };
-      return { ih: innerHeight, spielen: r('.arena .spielen'), reiter: r('.reiter-leiste'), karte: r('.arena .karte') };
+      const zs = document.querySelector('.arena .ziel-sterne');
+      return { ih: innerHeight, spielen: r('.arena .spielen'), reiter: r('.reiter-leiste'), karte: r('.arena .karte'),
+        ziele: zs ? { n: zs.children.length, h: Math.round(zs.getBoundingClientRect().height), zeilen: new Set([...zs.children].map((c) => Math.round(c.getBoundingClientRect().top))).size } : null };
     });
     const frei = m.spielen && m.reiter && m.spielen.b <= m.reiter.t && m.spielen.t >= 0 && m.spielen.b <= m.ih;
     pruefe(`${w} × ${h}: Spielen-Knopf ganz ueber der Reiterleiste und im Fenster, ohne Scrollen`, frei, JSON.stringify(m));
+    // Auswahl W2 B (Flo 09.11.2026): die drei Sterne-Ziele stehen auch kompakt da, als eine Zeile
+    pruefe(`${w} × ${h}: Sterne-Ziele sichtbar als eine Zeile`, m.ziele && m.ziele.n === 3 && m.ziele.h > 0 && m.ziele.zeilen === 1, JSON.stringify(m.ziele));
     if (w >= 375) pruefe(`${w} × ${h}: die Karte bleibt mindestens 250 px hoch`, m.karte && m.karte.b - m.karte.t >= 250, JSON.stringify(m.karte));
     pruefe(`${w} × ${h}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
     await kontext.close();

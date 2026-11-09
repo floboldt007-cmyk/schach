@@ -516,6 +516,21 @@ async function erfinderTeil(browser) {
   const q = await seite(browser, { groesse: { width: 390, height: 844 }, hash: '#lernen' });
   await q.s.waitForSelector('.ms-lektion', { timeout: 15000 }).catch(() => {});
   pruefe('Handy: Übersicht ohne waagrechtes Scrollen', await q.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // Auswahl W1 C (Flo 09.11.2026): Satz zum Bereich und Hauptknopf zur ersten offenen Lektion ohne Ergebnis, ueber der Liste
+  const w1 = await q.s.evaluate(() => {
+    const k = document.querySelector('.ms-weiter-knopf');
+    const satz = document.querySelector('.ms-kurz');
+    const erste = [...document.querySelectorAll('.ms-lektion')].find((b) => !b.hasAttribute('data-geschafft') && !b.hasAttribute('data-gesperrt'));
+    const liste = document.querySelector('.ms-gruppe');
+    if (!k || !satz || !erste || !liste) return { fehlt: true };
+    const r = k.getBoundingClientRect();
+    return { text: k.textContent, id: k.dataset.id, erste: erste.dataset.id, satz: satz.textContent, h: r.height, b: r.bottom, liste: liste.getBoundingClientRect().top, ih: innerHeight };
+  });
+  pruefe('Handy: Satz und „Weiter mit: …“ zur ersten offenen Lektion, über der Liste, mindestens 44 px hoch', !w1.fehlt && /^Weiter mit: \S/.test(w1.text)
+    && w1.id === w1.erste && w1.satz.length > 0 && w1.h >= 44 && w1.b <= w1.liste && w1.b <= w1.ih, w1);
+  await q.s.locator('.ms-weiter-knopf').click();
+  await q.s.waitForSelector('.ls-screen', { timeout: 10000 }).catch(() => {});
+  pruefe('Handy: „Weiter mit“ öffnet die Lektion', await q.s.evaluate((id) => !!document.querySelector('.ls-screen') && location.hash.includes('lektion'), w1.id));
   await q.s.evaluate(() => window.__app.gehe('lektion', { id: 'turm' }));
   await q.s.waitForSelector('.ls-screen .brett-felder .feld', { timeout: 15000 }).catch(() => {});
   pruefe('Handy: Lektion ohne waagrechtes Scrollen, Knöpfe mindestens 44 px hoch', await q.s.evaluate(() => {
@@ -525,6 +540,11 @@ async function erfinderTeil(browser) {
   await q.s.evaluate(() => window.__app.gehe('lektion', { id: 'gibtsnicht' }));
   await q.s.waitForSelector('.ms-screen', { timeout: 10000 }).catch(() => {});
   pruefe('Unbekannte Lektion führt zur Übersicht', await q.s.locator('.ms-screen').count() === 1);
+  await q.s.setViewportSize({ width: 1280, height: 800 });
+  pruefe('PC: kein „Weiter mit“, dort steht der Seitenkopf', await q.s.evaluate(() => {
+    const w = document.querySelector('.ms-weiter');
+    return !!w && getComputedStyle(w).display === 'none' && document.querySelector('.ms-bereich .seiten-kopf').getBoundingClientRect().width > 1;
+  }));
   pruefe('Handy: keine Seitenfehler', q.fehlerListe.length === 0, q.fehlerListe.join(' | '));
   await q.k.close();
 }
