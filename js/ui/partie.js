@@ -2092,7 +2092,12 @@ export function zeige(root, params, app) {
       verweis.type = 'button';
       verweis.className = 'erg-liga-verweis';
       verweis.textContent = t('partie.erg.ligaVerweis');
-      verweis.addEventListener('click', () => app.gehe('bestenliste'));
+      // fuehrt wie "Zur Liga" der (ausgeblendeten) Punkte-Aufschluesselung zur Tafel des Bots, ohne Punkte-Paket in die Liga
+      verweis.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const zurTafel = o.querySelector('.pk-zur-liste');
+        if (zurTafel) zurTafel.click(); else app.gehe('bestenliste');
+      });
       o.querySelector('.erg-karte-ort').after(verweis);
     }
     s.append(o);

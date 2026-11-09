@@ -898,9 +898,10 @@ function hilfen(seite) {
         await h.tippeFeld(zug.slice(0, 2));
         await h.tippeFeld(zug.slice(2, 4));
       }
-      await seite.waitForSelector('.ergebnis-overlay .erg-karte-ort .pk-abr', { timeout: 40000 });
+      // Sieg-Blatt C blendet die Punkte-Zeile nach Siegen aus (css/ergebnis.css), sie steht aber im DOM: darauf warten
+      await seite.waitForSelector('.ergebnis-overlay .erg-karte-ort .pk-abr', { state: 'attached', timeout: 40000 });
       await seite.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 60000 });
-      await seite.waitForSelector('.ergebnis-overlay .pk-abr[data-fertig="1"]:not(.pk-wartet)', { timeout: 15000 }).catch(() => {});
+      await seite.waitForSelector('.ergebnis-overlay .pk-abr[data-fertig="1"]:not(.pk-wartet)', { state: 'attached', timeout: 15000 }).catch(() => {});
       await seite.evaluate(() => { window.__test = {}; });
     },
     stand: () => seite.evaluate(() => window.__punkte.stand()),
@@ -1105,8 +1106,13 @@ async function testeBrowser(browser) {
     && (await seite.locator('.pk-abr .pk-satz').innerText()).trim() === 'Erster Eintrag auf Lukas’ Tafel' && e1.erster && e1.tafel === 'bot:benno' && e1.w > 0, e1);
   pruefe('Erster Eintrag: keine Feier-Zeile von punkte, kein Rekord-Klang', await seite.locator('.erg-feier [data-quelle="tafel-rekord"], .erg-feier [data-quelle="rekord"]').count() === 0
     && !(await h.klaenge()).includes('rekord'));
-  await h.tippe('.pk-abr-knopf');
-  const det = await seite.locator('.pk-details').innerText();
+  // Sieg-Blatt C (Flo 09.11.): nach dem Sieg steht die Punkte-Zeile nicht im Blatt, sondern ein Verweis in die Liga
+  pruefe('Sieg-Blatt C: Punkte-Zeile ausgeblendet (kein Überhol-Post), Verweis „Punkte und Wertung stehen in der Liga“ sichtbar',
+    !(await seite.locator('.erg-karte-ort .pk-abr').isVisible()) && await seite.locator('.erg-liga-verweis').isVisible()
+    && (await seite.locator('.erg-liga-verweis').innerText()).trim() === 'Punkte und Wertung stehen in der Liga');
+  // die Aufschluesselung bleibt im DOM und gilt unveraendert fuer Niederlage und Remis: hier per DOM-Klick geprueft
+  await seite.evaluate(() => document.querySelector('.pk-abr-knopf').click());
+  const det = await seite.locator('.pk-details').textContent();
   pruefe('Antippen zeigt die Aufschlüsselung (Züge, Theorie, kurzer Sieg ohne Ergebnis-Bonus, Verwertung) und „Zur Liga“',
     await seite.locator('.pk-details:not([hidden])').count() === 1 && /Züge \(\d+ offen\)/.test(det) && /Theorie/.test(det)
     && /Vor dem 10\. eigenen Zug beendet: kein Ergebnis-Bonus/.test(det) && /Verwertung/.test(det) && await seite.locator('.pk-zur-liste').count() === 1
@@ -1114,10 +1120,10 @@ async function testeBrowser(browser) {
   await bild(seite, 'ergebnis-erster-eintrag');
   const fensterGemerkt = () => seite.evaluate(() => (JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:punkte') || '{}') || {}).fenster ?? null);
   const fensterVorher = await fensterGemerkt();
-  await h.tippe('.pk-zur-liste');
+  await h.tippe('.erg-liga-verweis');
   await seite.waitForSelector('.bl-reiter[data-reiter="bots"]:not([hidden])');
   await warte(600);
-  pruefe('„Zur Liga“ öffnet den Reiter Bots mit Lukas’ Tafel', /Lukas’ Tafel/.test(await seite.locator('.bl-tafel h2').innerText())
+  pruefe('Der Verweis öffnet wie „Zur Liga“ den Reiter Bots mit Lukas’ Tafel', /Lukas’ Tafel/.test(await seite.locator('.bl-tafel h2').innerText())
     && await seite.locator('.bl-tafel').getAttribute('data-tafel') === 'bot:benno');
   // T-3: die Bilanz gegen den Bot steht ueber seiner Tafel (vorher Zeile im Bots-Panel)
   const botBilanz = (await seite.locator('.bl-tafel .bl-bot-bilanz').textContent().catch(() => '') || '').trim();
@@ -1252,6 +1258,18 @@ async function testeBrowser(browser) {
     && (await seite.locator('.pk-pfeil').innerText()).trim() === '▲ 1');
   await bild(seite, 'ergebnis-platz1');
   // Ueberhol-Post (3.13): einmal still in der Aufschluesselung angeboten, Vorschau mit Text und Code, nichts geht automatisch raus
+  // Sieg-Blatt C: mit Ueberhol-Post bleibt die Punkte-Zeile nach dem Sieg stehen (sonst waere der Post unerreichbar)
+  const abrPost = await seite.evaluate(() => {
+    const z = document.querySelector('.erg-karte-ort .pk-abr');
+    const k2 = z.closest('.ergebnis-karte').getBoundingClientRect();
+    const r = z.getBoundingClientRect();
+    const wert = z.querySelector('.pk-wert').getBoundingClientRect();
+    return { sichtbar: r.height > 0, innen: r.left >= k2.left - 1 && r.right <= k2.right + 1, wert: wert.right <= r.right + 1 && wert.width > 0 };
+  });
+  pruefe('Sieg-Blatt C: mit Überhol-Post bleibt die Punkte-Zeile sichtbar und passt in die Karte (Wert rechts sichtbar)', abrPost.sichtbar && abrPost.innen && abrPost.wert, abrPost);
+  const kwPost = await kontrast(seite, '.pk-wert', '.pk-abr');
+  const ktPost = await kontrast(seite, '.pk-satz', '.pk-abr');
+  pruefe(`Abrechnung lesbar (Wert ${kwPost.toFixed(1)}:1, Satz ${ktPost.toFixed(1)}:1, mindestens 4,5:1)`, kwPost >= 4.5 && ktPost >= 4.5);
   await h.tippe('.pk-abr-knopf');
   pruefe('Überhol-Post: in der Aufschlüsselung „Überhol-Post an Jule“', (await seite.locator('.pk-post').innerText()).trim() === 'Überhol-Post an Jule');
   await h.tippe('.pk-post');
@@ -1514,17 +1532,18 @@ async function testeBrowser(browser) {
     await s.waitForSelector('.screen.arena');
     await hs.schaefermatt();
     await warte(400);
+    // Sieg-Blatt C (Flo 09.11.): nach dem Sieg (ohne Ueberhol-Post) steht statt der Punkte-Zeile der Liga-Verweis im Blatt;
+    // Lage und Lesbarkeit der Punkte-Zeile misst der Ueberhol-Fall (Gruppe Überholen), nur dort bleibt sie nach Siegen stehen
     const abr = await s.evaluate(() => {
       const z = document.querySelector('.pk-abr');
-      const k2 = z.closest('.ergebnis-karte').getBoundingClientRect();
-      const r = z.getBoundingClientRect();
-      const wert = z.querySelector('.pk-wert').getBoundingClientRect();
-      return { innen: r.left >= k2.left - 1 && r.right <= k2.right + 1, wert: wert.right <= r.right + 1 && wert.width > 0 };
+      const v = document.querySelector('.erg-liga-verweis');
+      const k2 = v.closest('.ergebnis-karte').getBoundingClientRect();
+      const r = v.getBoundingClientRect();
+      return { zeileWeg: !!z && z.getClientRects().length === 0, innen: r.left >= k2.left - 1 && r.right <= k2.right + 1, hoch: r.height >= 43.5 };
     });
-    pruefe(`${name}: Abrechnungszeile passt in die Karte (Wert rechts sichtbar)`, abr.innen && abr.wert, abr);
-    const kw = await kontrast(s, '.pk-wert', '.pk-abr');
-    const kt = await kontrast(s, '.pk-satz', '.pk-abr');
-    pruefe(`${name}: Abrechnung lesbar (Wert ${kw.toFixed(1)}:1, Satz ${kt.toFixed(1)}:1, mindestens 4,5:1)`, kw >= 4.5 && kt >= 4.5);
+    pruefe(`${name}: Sieg-Blatt C: Punkte-Zeile ausgeblendet, Liga-Verweis in der Karte (mindestens 44 px hoch)`, abr.zeileWeg && abr.innen && abr.hoch, abr);
+    const kv = await kontrast(s, '.erg-liga-verweis', '.ergebnis-karte');
+    pruefe(`${name}: Liga-Verweis lesbar (${kv.toFixed(1)}:1, mindestens 4,5:1)`, kv >= 4.5);
     await bild(s, 'ergebnis-' + name);
     await hs.schliesseErgebnis();
     for (const r of ['bots', 'ich', 'freunde']) {

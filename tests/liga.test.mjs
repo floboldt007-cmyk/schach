@@ -506,11 +506,14 @@ async function browserTeil(browser, start) {
         await page.locator(`.screen.partie .brett-felder .feld[data-feld="${uci.slice(2, 4)}"]`).tap();
         if (await page.locator('.screen.partie .brett .lage.vorschau').count()) await page.locator(`.screen.partie .brett-felder .feld[data-feld="${uci.slice(2, 4)}"]`).tap();
       }
-      await page.waitForSelector('.ergebnis-overlay.gefuellt .liga-abrechnung', { timeout: 60000 });
+      // Sieg-Blatt C (Flo 09.11.): nach dem Sieg steht die Wertung nur im DOM, im Blatt ein Verweis in die Liga
+      await page.waitForSelector('.ergebnis-overlay.gefuellt .liga-abrechnung', { state: 'attached', timeout: 60000 });
       await page.waitForFunction(() => window.__ligaProbe.ereignisse.some((d) => d.wertung.n === 10), null, { timeout: 30000 });
       await browserPruefe(name + ': echte Partie: Abrechnung nur mit der Wertung, keine Liga-Punkte und keine Klassen-Feier', async () => {
         assert.match(await page.locator('.liga-abrechnung').innerText(), /^Arena-Wertung \+\d+$/);
         assert.equal(await page.locator('.liga-abrechnung .liga-erg-stand, .liga-abrechnung .liga-erg-wappen').count(), 0);
+        assert.equal(await page.locator('.liga-abrechnung').isVisible(), false);
+        assert.equal(await page.locator('.erg-liga-verweis').isVisible(), true);
         const feier = await page.locator('.erg-feier').count() ? await page.locator('.erg-feier').innerText() : '';
         assert.ok(!/klasse|Liga \+/i.test(feier), feier);
         const st = await page.evaluate(() => window.__ligaProbe.speicher.ladeModul('liga'));
