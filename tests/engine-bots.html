@@ -24,6 +24,7 @@
 import { Engine } from '../js/engine.js';
 import { BOTS, ANLAESSE, botZug, botSatz } from '../js/bots.js';
 import { Chess } from '../vendor/chess/chess.js';
+import { seedAus, zufallAus } from '../js/tag.js';
 
 const aus = document.getElementById('aus');
 function log(text, klasse) {
@@ -355,13 +356,15 @@ async function testBots() {
     }
   }
   pruefe('Ab Elo 1000 wird Matt in 1 nie uebersehen', ab4, mattStellungen.length + ' Stellungen x 3 je Bot (volle Staerke x 1)');
+  // Fester Zufall je Versuch (Bot, Stellung, Nummer): mit Math.random fand Lukas (mattInEins 0,12) in seltenen Laeufen
+  // in allen 48 Versuchen kein Matt, der Test war dann rot (CI 09.11., PR #179). So zieht jeder Lauf dieselben Wuerfel.
   const raten = [];
   for (const b of [bot('fridolin'), bot('benno'), bot('kalle')]) {
     let n = 0;
     let treffer = 0;
-    for (const f of mattStellungen) {
+    for (const [fi, f] of mattStellungen.entries()) {
       for (let i = 0; i < 12; i++) {
-        const r = await botZug(e, f, b, { ohnePause: true });
+        const r = await botZug(e, f, b, { ohnePause: true, zufall: zufallAus(seedAus(`matt1|${b.id}|${fi}|${i}`)) });
         n++;
         if (r.san.endsWith('#')) treffer++;
       }
