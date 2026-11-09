@@ -84,7 +84,7 @@ export const DE = {
   'gruppe.leicht': 'Leicht · gratis',
   'gruppe.mittel': 'Mittel',
   'gruppe.schwer': 'Schwer und Meister',
-  naechste: 'Als Nächstes in der Meisterschule: {liste}.',
+  naechste: 'Bald in der Meisterschule: {liste}.', // nicht "Als Nächstes": so heisst auf der Startseite die naechste Aufgabe
   bereiche: 'Strategie, Rechnen, Verteidigung und große Partien',
   lektionNr: 'Lektion {nr} von {gesamt}',
   'stufe.leicht': 'Leicht',
@@ -356,7 +356,7 @@ export const EN = {
   'gruppe.leicht': 'Easy · free',
   'gruppe.mittel': 'Medium',
   'gruppe.schwer': 'Hard and master',
-  naechste: 'Coming next in the master school: {liste}.',
+  naechste: 'Coming soon to the master school: {liste}.',
   bereiche: 'strategy, calculation, defence and great games',
   lektionNr: 'Lesson {nr} of {gesamt}',
   'stufe.leicht': 'Easy',

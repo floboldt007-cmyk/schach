@@ -342,9 +342,13 @@
   .an-koerper { flex: none; display: block; }
   .an-inhalt { display: flex; flex-direction: column; gap: 12px; width: calc(var(--an-brett) + 8px + var(--an-balken)); max-width: 100%; padding: 0 0 18px; }
   .an-links, .an-rechts { display: contents; }
-  .an-genau { order: 1; } .an-banner, .an-ort-oben { order: 2; } .an-kurve-box { order: 3; }
-  .an-brettzone { order: 4; } .an-navi { order: 5; } .an-coach { order: 6; }
+  /* Kundenblick 09.11. (Befund 10): das Brett direkt unter die Genauigkeit, Freischaltung, Teilen und Verlauf danach.
+     Vorher stand es auf dem iPhone 13 nur zu 45 %, auf dem SE zu 16 % im Bild. */
+  .an-genau { order: 1; } .an-brettzone { order: 2; } .an-navi { order: 3; } .an-coach { order: 4; }
+  .an-banner, .an-ort-oben { order: 5; } .an-kurve-box { order: 6; }
   .an-momente-box, .an-momente-leer { order: 7; } .an-klassen { order: 8; }
+  /* passeBrett() in js/ui/analyse.js: reicht der Platz ueber der Knopfleiste nicht, steht das Brett vor der Genauigkeit */
+  .an-screen.brett-zuerst .an-brettzone, .an-screen.brett-zuerst .an-navi { order: 0; }
   .an-screen.ohne-balken { --an-brett: min(calc(100vw - 36px - 8px), 720px); }
 }
 @media (orientation: portrait) and (max-width: 520px) {
@@ -353,7 +357,7 @@
   .an-screen .kopf { height: 56px; padding: 0 10px; }
   .an-kopf-knoepfe { display: none; }
   .an-inhalt { gap: 10px; padding-bottom: 6px; }
-  .an-brettzone { gap: 6px; }
+  .an-brettzone { gap: 6px; align-self: center; } /* mittig, wenn passeBrett() es ueber der Knopfleiste kleiner macht */
   .an-evalbalken { width: 14px; }
   .an-brett-rahmen { width: calc(var(--an-brett) + 6px); padding: 3px; border-radius: 14px; }
   .an-brett-rahmen::after { inset: 2px; border-radius: 12px; }

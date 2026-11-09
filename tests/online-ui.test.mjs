@@ -148,8 +148,8 @@ try {
   await seite.goto(start + '#online/abc234');
   await knopf('konto').waitFor();
   // Flo 08.11.2026 (Konzept 1 A): ohne Konto dieselben zwei Tueren, aber nur als Erklaerung: kein Knopf, kein Schatten
-  // (Befund V 6: vorher sahen die Karten tippbar aus); der einzige Knopf ist "Konto anlegen"
-  pruefe('Ohne Anmeldung: Titel Online, zwei erklaerende Tueren (Partie, Raetsel-Duell) ohne Knopf und Schatten, Konto anlegen', await seite.evaluate(() => ({
+  // (Befund V 6: vorher sahen die Karten tippbar aus); der einzige Knopf ist "Zum Konto" (wie ueberall in der App, Design-Durchsicht U 09.11.2026)
+  pruefe('Ohne Anmeldung: Titel Online, zwei erklaerende Tueren (Partie, Raetsel-Duell) ohne Knopf und Schatten, Zum Konto', await seite.evaluate(() => ({
     titel: document.querySelector('.online-screen .seiten-kopf h1')?.textContent,
     karten: [...document.querySelectorAll('.online-screen .on-art')].map((k) => k.dataset.art).join(),
     knoepfeInTueren: document.querySelectorAll('.online-screen .on-art button').length,
@@ -157,7 +157,10 @@ try {
     knopf: document.querySelector('[data-online="konto"]')?.textContent.trim(),
     zurueck: !!document.querySelector('.online-screen .kopf-zurueck'),
     alt: !!document.querySelector('[data-online="training"]') })).then((r) => r.titel === 'Online' && r.karten === 'partie,duell'
-      && r.knoepfeInTueren === 0 && r.schatten === 0 && r.knopf === 'Konto anlegen' && r.zurueck && !r.alt));
+      && r.knoepfeInTueren === 0 && r.schatten === 0 && r.knopf === 'Zum Konto' && r.zurueck && !r.alt));
+  // Design-Durchsicht U 09.11.2026: unter "Schach gegen einen Menschen" stand nur "ohne Kronen" (gilt nur unter Freunden)
+  const kontoSatz = await seite.locator('.online-screen .on-konto p').first().innerText();
+  pruefe('Ohne Anmeldung: Konto-Karte sagt, dass Partie und Duell um Kronen gehen und nur Freundes-Partien ohne', /um Kronen/.test(kontoSatz) && /Freund[^.]*ohne Kronen/.test(kontoSatz), kontoSatz);
   pruefe('Ohne Anmeldung: Hinweis und gemerkter Link, keine Server-Anfrage', (await seite.locator('.online-screen').innerText()).includes('Anmelden geht mit einem Code per E-Mail')
     && await seite.evaluate(() => localStorage.getItem('schach-arena:online:einladung') === 'ABC234') && calls.length === 0);
   await knopf('konto').click(); await seite.locator('.konto-email').fill('spieler@example.invalid');

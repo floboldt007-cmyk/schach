@@ -18,7 +18,7 @@ import { figurenPfad } from '../figurensatz.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
-import { klang } from '../sounds.js';
+import { klang, zugKlangName } from '../sounds.js';
 import { anim, tempo } from '../bewegung.js';
 import { ladeEinstellungen } from '../storage.js';
 import { kontoFreigeschaltet } from '../konto.js';
@@ -351,7 +351,8 @@ export function zeige(root, params, app) {
       d.st = { ...d.st, ich: { geloest: r.geloest, fehler: r.fehler, ende_am: r.ende_am }, raetsel: r.naechstes || null };
       zeichneLeiste();
       if (r.richtig) {
-        try { klang.spiele(r.fertig ? 'raetsel-richtig' : 'zug'); } catch (e) { /* ohne Klang */ }
+        // Zwischenzug wie im Raetsel-Bildschirm: Schlagen, Schach, Umwandlung klingen als solche
+        try { klang.spiele(r.fertig ? 'raetsel-richtig' : zugKlangName(m, d.chess.inCheck())); } catch (e) { /* ohne Klang */ }
         zeigeMeldung('richtig', r.fertig ? D('richtig') : D('weiter'));
         if (r.fertig) { d.reihe.push('g'); zeichneReihe(); }
         // die Antwort des Gegners bzw. das naechste Raetsel kurz nach dem eigenen Zug. Ohne neu: hat die Abfrage die

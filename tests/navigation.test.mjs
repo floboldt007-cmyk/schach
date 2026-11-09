@@ -429,6 +429,25 @@ async function testeLeiste(browser) {
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
+  // Kundenblick 09.11. (Befund 9): Zurueck aus der Partie fuehrt dorthin, woher man kam, und der Knopf sagt es
+  gruppe = 'Partie zurueck zur Herkunft';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 664 });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    for (const [von, sel, wort] of [['heim', '.heim-screen', 'Zurück zum Start'], ['arena', '.screen.arena .knoten', 'Zurück zu den Bots']]) {
+      await seite.evaluate((v) => window.__app.gehe(v, {}, { ersetzen: true }), von);
+      await seite.waitForSelector(sel);
+      await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w' }); });
+      await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+      const label = await seite.evaluate(() => document.querySelector('.screen.partie .kopf [data-aktion="zurueck"]').getAttribute('aria-label'));
+      await seite.locator('.screen.partie .kopf [data-aktion="zurueck"]').click();
+      const da = await seite.waitForSelector(sel, { timeout: 5000 }).then(() => true, () => false);
+      pruefe(`von ${von}: der Knopf heisst „${wort}“ und fuehrt ohne Zug dorthin zurueck`, label === wort && da, JSON.stringify({ label, da, screen: await seite.evaluate(() => document.documentElement.dataset.screen) }));
+    }
+    pruefe('keine Konsolenfehler', fehler.filter((f) => !/stockfish|wasm|Engine/i.test(f)).length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
   gruppe = 'Leiste nur im Testmodus';
   {
     const { kontext, seite } = await neueSeite(browser, { w: 820, h: 1180 });

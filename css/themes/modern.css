@@ -28,7 +28,7 @@
   --grund: #F4F1EC; --grund-2: #ECE8E1; --grund-0: rgba(244, 241, 236, 0);
   --flaeche: #FFFFFF; --flaeche-2: #F8F6F2; --flaeche-3: #F1EEE8;
   --linie: rgba(28, 25, 20, .08); --linie-2: rgba(28, 25, 20, .14);
-  --text: #1C1B19; --text-2: #6E6A63; --text-3: #7A746B;
+  --text: #1C1B19; --text-2: #6A665F; --text-3: #7A746B;
   --tinte: #1C1B19; --auf-tinte: #F4F1EC;
   /* Buehne der Startseite (heim): in beiden Modi dunkel, Schrift hell */
   --buehne: #24221F; --buehne-2: #171614; --auf-buehne: #F4F1EC; --auf-buehne-2: #C9C3B8; --buehne-kante: rgba(255, 255, 255, 0);
@@ -205,7 +205,7 @@
   --s-brett: 0 1px 2px rgba(0, 0, 0, .4), 0 14px 30px -8px rgba(0, 0, 0, .5), 0 48px 90px -30px rgba(0, 0, 0, .7);
   --kante: inset 0 0 0 1px var(--linie);
   --avatar-ring: 0 0 0 2px var(--grund), 0 0 0 3.5px var(--bf, var(--linie-2));
-  --fokus: 2.5px solid var(--akzent);
+  --fokus: 2.5px solid var(--akzent-text);
 }
 
 /* ---------- dunkel ueber das System (data-modus="system"): gleiche Werte wie oben ---------- */
@@ -277,6 +277,6 @@
     --s-brett: 0 1px 2px rgba(0, 0, 0, .4), 0 14px 30px -8px rgba(0, 0, 0, .5), 0 48px 90px -30px rgba(0, 0, 0, .7);
     --kante: inset 0 0 0 1px var(--linie);
     --avatar-ring: 0 0 0 2px var(--grund), 0 0 0 3.5px var(--bf, var(--linie-2));
-    --fokus: 2.5px solid var(--akzent);
+    --fokus: 2.5px solid var(--akzent-text);
   }
 }

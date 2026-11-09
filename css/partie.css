@@ -355,6 +355,8 @@
   .partie .p-kopf h2 { font-size: 19px; }
   .partie .p-kopf .unter { margin-top: 2px; font-size: 12.5px; }
   .partie .p-kopf .p-eroeffnung, .partie .p-kopf .p-eroeffnung + .p-sep, .partie .p-kopf .p-lang { display: none; }
+  /* Kundenblick 09.11. (Befund 9): der Name steht nur einmal, im Kopf. Die Karte zeigt Bild, Elo und Sprechblase. */
+  .partie.handy .spieler.gegner .bot-name { display: none; }
   .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 4px;
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .partie .seite { display: contents; }
@@ -411,6 +413,12 @@
   .partie:not(.streifen-unten) .coach > .c-text { -webkit-line-clamp: 2; }
   .partie.coach-eng .coach { height: 44px; }
   .partie.coach-eng .coach > .c-text, .partie.coach-eng .coach > .c-zusatz { display: none; }
+  /* U-Messrunde 09.11. (iPhone SE mit Safari-Leiste, 548 px): reichen Coach-Zeile und Mindestbrett nicht, ruecken
+     Abstaende und Spielerkarten zusammen (.sehr-eng, layout() in partie.js); die Knoepfe behalten ihre 48 px */
+  .partie.sehr-eng .inhalt { gap: 3px; padding-top: 2px; }
+  .partie.sehr-eng .inhalt > .brettzone { gap: 2px; }
+  .partie.sehr-eng .spieler { min-height: 44px; padding-top: 2px; padding-bottom: 2px; }
+  .partie.sehr-eng .spieler > .ort-gegner-leiste { margin-bottom: 2px; }
   .partie .coach.offen { height: auto; }
   .partie .coach.offen > .c-text { display: block; -webkit-line-clamp: unset; }
   .partie .coach.offen > .coach-knoepfe { display: flex; margin-top: 8px; }
