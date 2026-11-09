@@ -27,13 +27,6 @@ for (const basis of ['', 'capacitor://localhost/', 'javascript:alert(1)']) {
   antworten.push({ status: 200, body: {} }); await fordereCodeAn('a@b.de', basis);
   pruefe('Code anfordern ohne redirect_to bei Adresse "' + basis + '"', calls.at(-1).url === SUPABASE_URL + '/auth/v1/otp', calls.at(-1).url);
 }
-// Bot-Schutz (Cloudflare Turnstile, js/botschutz.js): mit Token geht es als gotrue_meta_security.captcha_token mit (so liest
-// Supabase Auth es in verifyCaptcha); ohne Token bleibt der Body genau wie vorher, damit nichts bricht, solange CAPTCHA aus ist
-antworten.push({ status: 200, body: {} }); await fordereCodeAn('a@b.de', '', 'tok-123');
-pruefe('Bot-Schutz: Token im Body als gotrue_meta_security.captcha_token', JSON.stringify(JSON.parse(calls.at(-1).body))
-  === JSON.stringify({ email: 'a@b.de', create_user: true, gotrue_meta_security: { captcha_token: 'tok-123' } }), calls.at(-1).body);
-antworten.push({ status: 200, body: {} }); await fordereCodeAn('a@b.de', '');
-pruefe('Bot-Schutz: ohne Token nur email und create_user (wie vor dem Bot-Schutz)', JSON.stringify(Object.keys(JSON.parse(calls.at(-1).body))) === '["email","create_user"]', calls.at(-1).body);
 antworten.push({ status: 200, body: session }); await pruefeCode('a@b.de', '123456');
 pruefe('Code prüfen und Sitzung speichern', sitzung().refresh_token === 'r' && calls.at(-1).url.endsWith('/auth/v1/verify'));
 localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); antworten.push({ status: 200, body: { ...session, refresh_token: 'r2' } }); await erneuereSitzung();
@@ -102,9 +95,6 @@ pruefe('Unbekannte Kennung erscheint im Sammeltext (fuer den Tester-Bericht), ni
 mitAntwort(500, { msg: 'Error sending magic link email to a@b.de' });
 serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
 pruefe('Ohne Kennung nur der Status', serverFehler === 'Serverfehler (500)', serverFehler);
-mitAntwort(400, { code: 400, error_code: 'captcha_failed', msg: 'captcha protection: request disallowed (no captcha_token found)' });
-serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
-pruefe('Bot-Schutz abgelehnt (captcha_failed): eigener Text statt Serverfehler', /Bot-Schutz/.test(serverFehler) && !/captcha/i.test(serverFehler), serverFehler);
 localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
 mitAntwort(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' });
 serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }

@@ -17,18 +17,11 @@
 .partie.mit-ergebnis > .kopf, .partie.mit-ergebnis > .inhalt { transform: scale(.975); }
 
 /* ---------- Karte ---------- */
-/* Messrunde 09.11. (Punkt 19): Inhalt (.erg-rumpf) und Knoepfe (.erg-aktionen) liegen uebereinander statt aufeinander.
-   Ist die Karte laenger als der Bildschirm, scrollt nur der Inhalt; die Knoepfe stehen darunter und verdecken nichts. */
-.ergebnis-karte { position: relative; width: min(100%, 540px); max-height: 100%; overflow: hidden;
-  display: flex; flex-direction: column; gap: 14px; padding: 22px 28px 26px; border-radius: 32px; text-align: center;
+.ergebnis-karte { position: relative; width: min(100%, 540px); max-height: 100%; overflow-y: auto; scrollbar-width: none;
+  display: grid; gap: 14px; padding: 22px 28px 26px; border-radius: 32px; text-align: center;
   background-color: var(--flaeche); background-image: var(--textur-flaeche, none); color: var(--text); box-shadow: var(--s3), var(--kante);
   animation: erg-karte calc(680ms * var(--tempo)) var(--feder-weich) both; }
-/* gap erbt die Abstaende der Karte (Handy kleiner); Rand innen, damit Fokusringe am Rand nicht abgeschnitten werden */
-/* Zeilen max-content: sonst schrumpft das Grid in der begrenzten Hoehe Zeilen mit overflow:hidden, und sie ruecken ineinander */
-.erg-rumpf { display: grid; gap: inherit; grid-auto-rows: max-content; align-content: start; flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none;
-  margin: -6px -8px; padding: 6px 8px; overscroll-behavior: contain; }
-.erg-rumpf::-webkit-scrollbar { display: none; }
-.erg-aktionen { flex: none; }
+.ergebnis-karte::-webkit-scrollbar { display: none; }
 .ergebnis-karte:focus { outline: none; }
 .remis .ergebnis-karte { box-shadow: 0 0 0 1.5px var(--gold), var(--s3); }
 /* Farbe je Ergebnis (Flo 30.10. abends: "muss bisschen farbiger sein"): Leuchten oben hinter dem Titel */
@@ -180,8 +173,7 @@
   .erg-genau.gross span { font-size: 13px; }
   .erg-bot .av { width: 36px; height: 36px; border-radius: 12px; }
   .erg-bot .sprechblase { font-size: 13.5px; }
-  /* fester Fuss der Karte (nicht mehr sticky ueber dem Inhalt, sondern unter dem Scrollbereich .erg-rumpf) */
-  .erg-aktionen { position: relative; z-index: 2; margin: 0 -16px -18px; padding: 10px 16px 8px;
+  .erg-aktionen { position: sticky; z-index: 2; bottom: -18px; margin: 0 -16px -18px; padding: 10px 16px 8px;
     background-color: var(--flaeche); border-top: 1px solid var(--linie); border-radius: 0 0 26px 26px; }
   .erg-aktionen:not(:has(.erg-knoepfe:not(:empty))):has(.erg-lobby[hidden]) { display: none; }
   .erg-knoepfe { grid-template-columns: 1fr 1fr; gap: 8px; }

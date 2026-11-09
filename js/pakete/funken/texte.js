@@ -61,9 +61,6 @@ export const DE = {
   'abr.ersterSieg': 'erster Sieg gegen {name}',
   'abr.stockfisch': 'erster Sieg gegen den Stockfisch',
   'abr.meilensteine': 'Meilensteine: {liste}',
-  // Kopf der Funken-Zeile: die zwei Zahlen beschriftet (Kundenblick 09.11.2026, vorher nur "35 + 250")
-  'abr.formelPartie': 'Partie {wert}',
-  'abr.formelBonus': 'Bonus {wert}',
   'abr.neuErreicht': 'neu erreicht',
   'abr.nachtrag': 'Nachtrag nach der Analyse',
   'abr.halb': 'Starker Tag: ab hier zählt jeder Funke halb, ab 4 Uhr wieder voll.',
@@ -213,8 +210,6 @@ export const EN = {
   'abr.ersterSieg': 'first win against {name}',
   'abr.stockfisch': 'first win against the Stockfish',
   'abr.meilensteine': 'Milestones: {liste}',
-  'abr.formelPartie': 'Game {wert}',
-  'abr.formelBonus': 'Bonus {wert}',
   'abr.neuErreicht': 'newly reached',
   'abr.nachtrag': 'Added after the analysis',
   'abr.halb': 'Strong day: from here on, each spark counts half. Back to full at 4 a.m.',

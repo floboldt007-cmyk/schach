@@ -559,46 +559,6 @@ Besitzer im Supabase-Dashboard ein, **nie** in App-Dateien, Git, Screenshots ode
 anbietet, muss nach Apples Regeln zusätzlich „Sign in with Apple“ anbieten (oder eine gleichwertige datensparsame
 Anmeldung). Das betrifft nur eine native App im App Store, nicht die Web-App.
 
-## Bot-Schutz für die Anmeldung (Cloudflare Turnstile, Stand 09.11.2026)
-
-Wozu: Supabase soll neue Konten wieder zulassen („Allow new users to sign up“), ohne dass Programme massenhaft Konten
-anlegen oder Anmelde-Mails auslösen (Regel aus `Konzept-Anti-Cheat`, Abschnitt 3). Dafür prüft Cloudflare Turnstile bei
-„Code senden“, ob ein Mensch da ist, und Supabase prüft das Ergebnis.
-
-Was schon gebaut ist: `js/botschutz.js` und `js/konto.js` schicken das Turnstile-Zeichen bei der Code-Anforderung mit
-(`gotrue_meta_security.captcha_token` an `/auth/v1/otp`). Solange in `js/konto-config.js` `TURNSTILE_SITEKEY = ''` steht,
-passiert nichts: kein Widget, nichts von Cloudflare, die Anmeldung läuft wie vorher. Die Google-Anmeldung, das
-Auffrischen der Sitzung und die Code-Prüfung (`/verify`) prüft Supabase ohnehin nicht.
-
-**Die Reihenfolge ist wichtig.** Schaltest du CAPTCHA in Supabase ein, bevor die App den Site-Key hat, kann sich niemand
-mehr per Code anmelden (Fehler „Bot-Schutz hat nicht geklappt“). Darum erst Schritt 1 bis 3, dann 4.
-
-1. **Cloudflare-Konto** (kostenlos): dash.cloudflare.com → Konto anlegen mit deiner Projekt-Mail, Zwei-Faktor einschalten.
-2. **Widget anlegen:** links **Turnstile** → **Add widget**. Name `Crownmate Anmeldung`, Hostname **`crownmate.de`**. Widget-Modus **Managed**,
-   Pre-Clearance **nein**. Speichern. Cloudflare zeigt zwei Schlüssel:
-   - **Site Key** (öffentlich): an Claude geben. Claude trägt ihn in `js/konto-config.js` als `TURNSTILE_SITEKEY` ein,
-     PR, CI, Live-Gang. Ohne Claude: diesen Schritt nicht selbst machen, sondern warten.
-   - **Secret Key** (geheim): nie in einen Chat, nie ins Repo. Nur in Schritt 4 in Supabase einfügen.
-3. **Prüfen, dass der Live-Stand den Site-Key hat:** https://crownmate.de/ → Einstellungen → Konto. Unter dem E-Mail-Feld
-   steht jetzt der Satz „Die Anmeldung schützt Cloudflare Turnstile vor Bots“. Fehlt er, Schritt 4 noch nicht machen.
-4. **CAPTCHA in Supabase einschalten:** supabase.com → Crownmate-Projekt → **Authentication** → **Attack Protection**
-   (je nach Stand des Dashboards auch unter **Settings**) → **Enable Captcha protection** an, Anbieter
-   **Turnstile by Cloudflare**, beim **Captcha secret** den Secret Key aus Schritt 2 einfügen → **Save**.
-5. **Probe:** In einem privaten Fenster https://crownmate.de/ öffnen → Einstellungen → Konto → eine eigene Adresse, die noch
-   kein Konto hat → **Code senden**. Der Code muss ankommen und die Anmeldung klappen. Danach mit deinem normalen Konto
-   ebenso (bestehende Konten).
-6. **Erst jetzt neue Konten zulassen:** **Authentication** → **Sign In / Providers** → **Allow new users to sign up** an →
-   **Save**. Noch einmal Schritt 5 mit einer weiteren fremden Adresse (zum Beispiel einer zweiten Mail von dir).
-
-**Rückweg** (wenn nach Schritt 4 niemand mehr einen Code bekommt): In Supabase bei **Attack Protection** die
-**Captcha protection** wieder ausschalten → **Save**. Sofort klappt die Anmeldung wie vorher, die App muss dafür nicht
-geändert werden. Den Site-Key in der App kann man stehen lassen, er stört ohne CAPTCHA nicht (die App schickt das Zeichen
-mit, Supabase ignoriert es dann). Ganz zurück: Claude setzt `TURNSTILE_SITEKEY` wieder auf `''`.
-
-Datenschutz: Der Abschnitt „Bot-Schutz bei der Anmeldung“ in `datenschutz.html` und `datenschutz-en.html` beschreibt den
-Dienst. Er gilt ab Schritt 4; die Datenschutzerklärung ist insgesamt noch ein Entwurf (Prüfung durch eine fachkundige
-Person steht aus).
-
 ## Abo „Crownmate Trainer“ mit Stripe
 
 Das Abo verkauft Lehrer und Lernstoff, nie den Zugang zum Spiel (`design/runde4/SPIELKONZEPT.md` 2b.5). Bezahlt wird im

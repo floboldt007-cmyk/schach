@@ -9,12 +9,10 @@
 // zweiten Tab oder Safari statt der App auf dem Home-Bildschirm; ein abgebrochener Konflikt-Dialog oder ein Tab ohne
 // Abgleich ueberschrieb sonst beim Verlassen der Einstellungen den Cloud-Stand (Ultracode-Pruefung PR #76).
 import { SUPABASE_URL, SUPABASE_KEY, ANMELDEWEGE } from './konto-config.js';
-import { botschutz } from './botschutz.js';
-import { aufgeloesterModus } from './thema.js';
 import { SPEICHER_VERSION, rohSpeicher } from './storage.js';
 import { hoere } from './ereignisse.js';
 import { anbieten } from './orte.js';
-import { t, locale, sprache } from './sprache.js';
+import { t, locale } from './sprache.js';
 import './sprachen/einstellungen.js';
 import './sprachen/allgemein.js';
 
@@ -44,8 +42,6 @@ const NAME = /^[A-Za-z0-9_]{3,20}$/;
 let fetchFn = (...a) => fetch(...a);
 let timer = null;
 function K(k, w) { return t('einstellungen.konto.' + k, w); }
-// Verweis aus dem Bot-Schutz-Hinweis auf den Absatz #botschutz der Datenschutzerklaerung (Sprache wie js/daten.js).
-function datenschutzBotschutz() { return new URL((sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html') + '#botschutz', new URL('../', import.meta.url)).href; }
 
 function lager() { return globalThis.localStorage; }
 function jsonLies(k) { try { return JSON.parse(lager().getItem(k)); } catch (e) { return null; } }
@@ -62,7 +58,7 @@ function fehlerText(d, status) {
   const bekannt = SITZUNG_TOT.has(code) ? 'sitzungAbgelaufen' : {
     email_address_invalid: 'emailUngueltig', otp_expired: 'codeUngueltig',
     over_email_send_rate_limit: 'codeZuOft', over_request_rate_limit: 'codeZuOft', user_banned: 'kontoGesperrt',
-    email_address_not_authorized: 'emailNichtFreigegeben', captcha_failed: 'botschutzFehler',
+    email_address_not_authorized: 'emailNichtFreigegeben',
   }[code];
   const kennung = /^[a-z0-9_]{1,60}$/.test(code) ? code : '';
   const e = new Error(bekannt ? K(bekannt) : K('serverfehler', { status: kennung ? `${status}, ${kennung}` : status }));
@@ -89,14 +85,11 @@ async function anfrage(pfad, { methode = 'GET', daten, token, prefer } = {}) {
 // basis: Adresse der App ohne Hash. Sie geht als redirect_to mit, damit der Anmelde-Link (Rueckfall ohne SMTP) hierher
 // zurueckfuehrt. Ohne redirect_to nimmt Supabase den Referer, und der Browser schickt quer zu supabase.co nur die
 // Herkunft (https://floboldt007-cmyk.github.io/ ohne /schach/): Der Link landete auf einer 404-Seite (29.10.2026).
-// captchaToken: Token des Bot-Schutzes (js/botschutz.js), nur wenn einer gesetzt ist; ohne Token bleibt der Body wie vorher.
-export async function fordereCodeAn(email, basis = basisAdresse(), captchaToken = '') {
+export async function fordereCodeAn(email, basis = basisAdresse()) {
   email = String(email || '').trim();
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error(K('emailUngueltig'));
   const ziel = /^https?:\/\//.test(basis) ? '?redirect_to=' + encodeURIComponent(basis) : '';
-  const daten = { email, create_user: true };
-  if (captchaToken) daten.gotrue_meta_security = { captcha_token: String(captchaToken) };
-  await anfrage('/auth/v1/otp' + ziel, { methode: 'POST', daten });
+  await anfrage('/auth/v1/otp' + ziel, { methode: 'POST', daten: { email, create_user: true } });
   return true;
 }
 export function userId(s) {
@@ -471,16 +464,14 @@ export function kontoGruppe({ app } = {}) {
   let email = sitzung()?.email || ''; let zuletzt = '';
   const melden = (t, fehler = false) => { const x = el.querySelector('.konto-status'); if (x) { x.textContent = t; x.dataset.fehler = fehler ? 'ja' : 'nein'; } };
   let gezeichnetMit = null;   // angemeldet beim letzten Zeichnen (die Gruppe "Daten" kann das Konto loeschen)
-  let schutz = null;          // Bot-Schutz (js/botschutz.js), nur ohne Sitzung und nur mit Site-Key
   const render = () => {
     const s = sitzung();
-    schutz?.entferne(); schutz = null;
     if (s) sitzungTot = false;
     gezeichnetMit = !!s;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
       <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
       <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>${verdraengtZeile()}` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
-      <div class="konto-botschutz" hidden></div><button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
+      <button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
       <p class="es-hilfe konto-oder">${K('oder')}</p><div class="es-knoepfe konto-anbieter"><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`
       + `<button class="knopf konto-apple" type="button" data-konto="apple" hidden>${K('apple')}</button></div>`
@@ -488,10 +479,6 @@ export function kontoGruppe({ app } = {}) {
       <p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>
       <p class="es-hilfe">${K('gespeichert')}${s ? ' ' + K('datenHinweis') : ''}</p>`;
     zeigeWege();
-    if (!s) {
-      schutz = botschutz(el.querySelector('.konto-botschutz'), { modus: aufgeloesterModus(), sprache: sprache() });
-      if (schutz) el.querySelector('.konto-status').insertAdjacentHTML('beforebegin', `<p class="es-hilfe konto-botschutz-hinweis">${K('botschutzHinweis')} <a href="${datenschutzBotschutz()}" target="_blank" rel="noopener">${K('botschutzMehr')}</a></p>`);
-    }
   };
   const verdraengtZeile = () => {
     const d = verdraengterStand(); if (!d) return '';
@@ -509,15 +496,7 @@ export function kontoGruppe({ app } = {}) {
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-konto]')?.dataset.konto; if (!a) return;
     try {
-      if (a === 'code') {
-        email = el.querySelector('.konto-email').value;
-        let token = '';
-        if (schutz) {
-          token = await schutz.token();
-          if (!token) { melden(K(schutz.fehler ? 'botschutzFehler' : 'botschutzWarten'), true); return; }
-        }
-        try { await fordereCodeAn(email, basisAdresse(), token); } finally { schutz?.verbraucht(); }
-        el.querySelector('.konto-code').hidden = false; melden(K('codeGesendet') + ' ' + K(alsApp() ? 'linkNichtInApp' : 'linkHier')); }
+      if (a === 'code') { email = el.querySelector('.konto-email').value; await fordereCodeAn(email); el.querySelector('.konto-code').hidden = false; melden(K('codeGesendet') + ' ' + K(alsApp() ? 'linkNichtInApp' : 'linkHier')); }
       if (a === 'pruefen') { const code = [...el.querySelectorAll('.konto-ziffern input')].map((x) => x.value).join(''); await pruefeCode(email, code); const abgleich = await gleicheNachAnmeldung(); render(); meldeAbgleich(abgleich); }
       if (a === 'sichern') {
         const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name);

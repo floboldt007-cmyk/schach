@@ -163,33 +163,6 @@
   die Anmeldung bei Apple gilt die <a href="https://www.apple.com/de/legal/privacy/" target="_blank" rel="noopener">Datenschutzrichtlinie
   von Apple</a>. Die Verknüpfung endet, wenn du dein Konto löschst; in den Einstellungen deiner Apple-ID kannst du sie
   zusätzlich entfernen.</p>
-  <!-- Quellen Bot-Schutz, abgerufen am 09.11.2026: Turnstile Privacy Addendum, Stand 18.06.2025,
-       https://www.cloudflare.com/turnstile-privacy-policy/ (Signale: IP-Adresse, TLS-Fingerabdruck, User-Agent, Sitekey und
-       Herkunft; Cloudflare Auftragsverarbeiter fuer den Bot-Schutz, Verantwortlicher fuer die Verbesserung der Erkennung);
-       Cloudflare Privacy Policy, gueltig ab 04.11.2025, https://www.cloudflare.com/privacypolicy/ (Cloudflare, Inc.,
-       101 Townsend St., San Francisco, CA 94107, USA; EU-U.S. Data Privacy Framework);
-       https://developers.cloudflare.com/turnstile/ (liest keine Formulareingaben); § 25 TDDDG, Stand Art. 3 G v. 10.3.2026,
-       https://www.gesetze-im-internet.de/ttdsg/__25.html; DSK OH Digitale Dienste 1.2 (Nov. 2024) Rn. 24, 74, 83;
-       EDSA Guidelines 2/2023 v2.0 Rn. 33; localStorage cf.turnstile.u gemessen am 09.11.2026 (Beleg in
-       .code-guardian-rechtsbelege.md). Ob § 25 Abs. 2 Nr. 2 auch Cloudflares eigenen Zweck traegt, ist offen. Pruefung durch eine fachkundige Person
-       steht aus (Entwurf, siehe Kasten oben). -->
-  <p id="botschutz"><b>Bot-Schutz bei der Anmeldung (Cloudflare Turnstile, sobald eingeschaltet):</b> Damit keine Programme massenhaft
-  Konten anlegen oder Anmelde-E-Mails auslösen, prüft ein Dienst von Cloudflare, Inc., 101 Townsend St., San Francisco,
-  CA 94107, USA, ob ein Mensch die Anmeldung nutzt. Das Prüfprogramm lädt die App erst, wenn du in den Einstellungen die
-  Anmeldung öffnest, nie beim Start. Dabei verarbeitet Cloudflare deine IP-Adresse, technische Merkmale deines Browsers
-  (User-Agent, TLS-Merkmale) und die Adresse der App. Dafür liest das Prüfprogramm Merkmale deines Browsers aus und legt
-  im Browserspeicher (localStorage) für challenges.cloudflare.com einen Eintrag <code>cf.turnstile.u</code> an; Cookies setzt
-  es nicht. Deine E-Mail-Adresse und andere Eingaben sieht Cloudflare nicht.
-  Meist merkst du davon nichts; nur in Zweifelsfällen erscheint ein Kästchen zum Antippen. Das Ergebnis ist ein
-  Einmal-Zeichen, das mit der Code-Anforderung an Supabase geht und dort geprüft wird. Für den Bot-Schutz handelt Cloudflare
-  in unserem Auftrag. Zur Verbesserung seiner Bot-Erkennung nutzt Cloudflare dieselben Merkmale nach eigenen Angaben
-  (Datenschutzhinweise zu Turnstile, Stand 18.06.2025) auch in eigener Verantwortung; dafür ist Cloudflare selbst
-  verantwortlich. Das Auslesen und Speichern auf deinem Gerät stützen wir auf § 25 Abs. 2 Nr. 2 TDDDG: Es ist unbedingt
-  erforderlich, um die Anmeldung zu schützen, die du selbst aufrufst. Rechtsgrundlage für die Verarbeitung ist unser
-  berechtigtes Interesse, die Anmeldung und die Server vor Missbrauch zu schützen (Art. 6 Abs. 1 lit. f DSGVO). Cloudflare ist unter dem EU-US-Datenschutzrahmen (Data Privacy Framework)
-  zertifiziert. Mehr: <a href="https://www.cloudflare.com/turnstile-privacy-policy/" target="_blank" rel="noopener">Datenschutzhinweise
-  zu Turnstile</a> und <a href="https://www.cloudflare.com/de-de/privacypolicy/" target="_blank" rel="noopener">Datenschutzrichtlinie
-  von Cloudflare</a>. Die Anmeldung mit Google prüft Turnstile nicht.</p>
   <h3>Rechtsgrundlage und Dauer</h3>
   <p>Die Verarbeitung ist zur Bereitstellung des Kontos erforderlich (Art. 6 Abs. 1 lit. b DSGVO). Die Daten bleiben
   gespeichert, bis du dein Konto löschst. Das geht jederzeit in der App unter Einstellungen → Daten → „Konto löschen“.
