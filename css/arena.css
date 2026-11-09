@@ -468,6 +468,11 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt { --panel-kompakt: 236px; }
 .arena.karte-kompakt .inhalt { gap: 10px; }
 .arena.karte-kompakt .karte { flex: 0 0 auto; height: max(300px, calc(100% - var(--panel-kompakt))); min-height: 0; overflow: hidden; }
+/* Design-Durchsicht 09.11. (Bots, iPhone SE mit Safari-Leiste): der Spielen-Knopf klebt nur so hoch, wie sein Panel
+   beginnt. Mit der 300-px-Karte begann das Panel bei 416 px, der Knopf lag halb unter der Reiter-Leiste (432 bis 488,
+   Leiste ab 468). Auf kurzen Handys laesst die Karte deshalb immer Platz fuer den Knopf (92 px); hoehere Handys behalten
+   die 300 px. */
+.arena.karte-kompakt .karte { height: max(min(300px, calc(100% - 92px)), calc(100% - var(--panel-kompakt))); }
 .arena.karte-kompakt .knoten .fahne { display: none; }
 .arena.karte-kompakt .detail { gap: 10px; padding: 10px 14px 0; }
 .arena.karte-kompakt .detail .elo, .arena.karte-kompakt .detail .mini-sterne { display: inline-flex; vertical-align: middle; }
