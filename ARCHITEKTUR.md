@@ -2942,3 +2942,24 @@ kommt. Andere Konten sehen keine Karte, `#lernen` und `#lektion` fuehren sie sti
 - Ort `training:karten` (reihenfolge 3); Speicher im Modul `lernen` (`{ lek: { <id>: { s, z } } }`); nach einem Matt
   `lektion:beendet { id: 'matt-<id>', ringe }` (1 Stern gelernt, 2 sicher, 3 gemeistert), daraus bucht funken Lern-Funken.
 - Test: `tests/lernen.test.mjs` (Daten, Sterne, Speicher; Browser als Erfinder und ohne Labor).
+
+## Namensfilter und Melden (09.11.2026)
+
+- `js/namen.js` (rein, in Node testbar): `NAMEN_REGELN`, `nameLesarten(name)`, `nameGesperrt(name) -> null | 'reserviert' |
+  'anstoessig'`. Dieselbe Liste und Rechnung wie `namen_regeln()` / `name_gesperrt()` in `supabase/melden-schema.sql`;
+  der Server entscheidet (Trigger `profile_name_pruefen` auf `public.profile`, Kennung `NAME_GESPERRT`, Grund im `hint`).
+  Normalisierung: klein, ohne `_`, Ersetzungen 0→o 1→i 3→e 4→a 5→s 7→t, i und l als ein Buchstabe; zweite Lesart ganz
+  ohne Ziffern. Arten je Wort: `ueberall`, `rand` (Anfang oder Ende), `genau`, `ganz` (Name besteht nur aus solchen
+  Woertern). Bestehende Namen bleiben (Server: gleicher Name beim Update und beim Upsert; Geraet: `eigenerName()`).
+  `js/konto.js speichereBenutzername` prueft vor dem Absenden und uebersetzt die Server-Kennung.
+- `js/ui/melden.js`: `meldenBereit()` (fragt `melde_stand`; ohne die SQL-Datei 404 und damit kein Knopf),
+  `meldbarerName(name)`, `oeffneMelden({ name, partie?, fokusDanach? })` (Blatt `.melden-blatt`, Texte unter `melden.*`).
+  Einsatz: Mini-Karte der Liga-Gruppe (`js/pakete/liga/gruppe.js`, `button.lg-mini-melden`, nie eigene Zeile, nie KI, nur
+  mit echtem Benutzernamen) und Ergebniskarte der Online-Partie (`js/ui/online.js`, `[data-online="melden"]`, die Meldung
+  nennt die Partie, den Gegner bestimmt der Server).
+- Server: Tabelle `meldungen` ohne Policy und ohne Tabellenrechte; `melde_spieler(name, grund, notiz, partie)` und
+  `melde_stand()` fuer `authenticated`. Grenzen in `melden_konstanten()` (5 je Tag, 300 Zeichen, 12 Monate), Tag ueber
+  `melden_tag()` (Europe/Berlin, Tagesgrenze 4:00 wie `js/tag.js`). Die Datenauskunft zeigt nur selbst abgegebene Meldungen.
+- Tests: `tests/server-melden.test.mjs` (SQL in PGlite, Vertrag Liste und Ergebnis Server gegen Geraet, Rechte, Rueckweg,
+  Gegenproben), `tests/melden.test.mjs` (Filter, Konto, Blatt im Browser), dazu `tests/online-ui.test.mjs` und
+  `tests/server-daten.test.mjs`.

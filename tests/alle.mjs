@@ -52,6 +52,7 @@ const SUITEN = [
   { name: 'kronen-vertrag', datei: 'kronen-vertrag.test.mjs', args: [], was: 'Liga mit Kronen: Schema-Vertrag mit js/pakete/liga/kronen.js, Rechte, Rueckweg (Server)' },
   { name: 'besitz', datei: 'besitz.test.mjs', args: [], was: 'Etappe 4b: Erfolge in Stufen, lokales Taler- und Banner-Buch (ohne Konto)' },
   { name: 'karte', datei: 'karte.test.mjs', args: [], was: 'Etappe 4b: js/karte.js gegen einen nachgebildeten Server (Stufen melden, Karte waehlen, Karte der Partie)' },
+  { name: 'melden', datei: 'melden.test.mjs', args: [], was: 'Namensfilter (js/namen.js, Konto) und Spieler melden in der Liga-Gruppe (Server abgefangen)' },
   { name: 'karte-vertrag', datei: 'karte-vertrag.test.mjs', args: [], was: 'Etappe 4b: Schema-Vertrag Visitenkarte (Zahlen, feste Listen, Rechte, Rueckweg, nie kaeuflich)' },
   { name: 'raetsel-duell', datei: 'raetsel-duell.test.mjs', args: [], was: 'Raetsel-Duell: reine Rechnung (Uhr, Phase, Stand) und Vertrag mit duell_konstanten' },
   { name: 'server-raetsel-duell-zug', datei: 'server-raetsel-duell-zug.test.mjs', args: [], was: 'Raetsel-Duell: Edge Function prueft Zuege (richtig, Matt, illegal, Kennungen; Server)' },

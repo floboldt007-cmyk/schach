@@ -124,6 +124,9 @@ try {
       const karte = (name, du) => ({ name, banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du });
       return antwort(p ? { w: karte(p.weiss === 'u1' ? 'Spieler_1' : 'Gegner_2', p.weiss === 'u1'), s: karte(p.schwarz === 'u1' ? 'Spieler_1' : 'Gegner_2', p.schwarz === 'u1') } : {});
     }
+    // Melden (js/ui/melden.js, supabase/melden-schema.sql): der Server kennt es; die Meldung nennt die Partie
+    if (rpc === 'melde_stand') return antwort({ max: 5, rest: 5, notiz_max: 300 });
+    if (rpc === 'melde_spieler') return antwort({ ok: true, rest: 4 });
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {
@@ -210,6 +213,20 @@ try {
   await knopf('annehmen').waitFor(); await knopf('annehmen').click();
   await seite.locator('.on-ergebnis:not([hidden])').waitFor();
   pruefe('Remis annehmen zeigt Ergebnis ohne Sterne', (await seite.locator('.on-ergebnis').innerText()).includes('Remis vereinbart') && !(await seite.locator('.on-ergebnis').innerText()).includes('Stern'));
+  // Melden: unter der Ergebniskarte "Gegner melden"; die Meldung nennt die Partie, den Gegner bestimmt der Server
+  await knopf('melden').waitFor();
+  pruefe('Nach der Partie: "Gegner melden" unter der Ergebniskarte, mind. 44 px hoch', (await knopf('melden').innerText()).trim() === 'Gegner melden'
+    && (await knopf('melden').boundingBox()).height >= 44);
+  await knopf('melden').click(); await seite.locator('.melden-blatt').waitFor();
+  const meldeTitel = (await seite.locator('.melden-blatt h3').innerText()).trim();
+  await seite.locator('.melden-grund[data-grund="verhalten"]').click();
+  await seite.locator('.melden-blatt [data-knopf="senden"]').click();
+  await seite.locator('.melden-blatt').waitFor({ state: 'detached' });
+  await seite.waitForFunction(() => /Danke, wir schauen es uns an\./.test(document.querySelector('.toast-ort')?.textContent || ''));
+  const meldung = calls.filter(c => c.pfad.endsWith('/melde_spieler'));
+  pruefe('Gegner melden: Blatt mit dem Namen des Gegners, der Server bekommt Partie und Grund, danach Danke',
+    meldeTitel === 'Gegner_2 melden' && meldung.length === 1 && meldung[0].body.partie === weiss.id && meldung[0].body.grund === 'verhalten'
+    && meldung[0].body.name === 'Gegner_2' && meldung[0].body.notiz === null, { meldeTitel, meldung });
   await knopf('revanche').click(); await seite.locator('.on-code').waitFor();
   pruefe('Revanche: neue Einladung mit getauschter Farbe', calls.filter(c => c.pfad.endsWith('online_erstelle')).at(-1)?.body.farbe === 'b');
   await knopf('teilen').click();

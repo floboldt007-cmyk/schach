@@ -20,6 +20,7 @@ import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
 import { fremdeKarte, bannerUrl } from './visitenkarte.js';
+import { meldenBereit, meldbarerName, oeffneMelden } from './melden.js';
 import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
 import { holeStand, suche as kronenSuche, BOT_ERSATZ_MS } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
@@ -82,6 +83,7 @@ export function zeige(root, params, app) {
   let strittigFaellig = false;
   let profil = null, uhrTimer = null, zeitPruefung = 0;
   let kartenDaten = null, kartenPartie = null;
+  let meldenDa = false;   // der Server kennt das Melden (einmal gefragt, js/ui/melden.js)
   // Klang: gehoert = Halbzuege, die schon geklungen haben; uhrGewarnt = Uhr-Warnung dieser Partie gespielt
   let gehoert = 0, uhrGewarnt = false;
   const ton = name => { try { klang.spiele(name); } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ } };
@@ -425,6 +427,17 @@ export function zeige(root, params, app) {
     if (!ergebnis.hidden) {
       const [titel, text] = endeTexte();
       ergebnis.innerHTML = `<h3>${esc(titel)}</h3><p>${esc(text)}</p><div class="on-aktionen"><button class="knopf primaer" type="button" data-online="revanche">${esc(O('revanche'))}</button><button class="knopf" type="button" data-online="liste-zurueck">${esc(O('meine'))}</button></div>`;
+      // "Gegner melden" unter der Ergebniskarte: nur wenn es einen Gegner gab und der Server das Melden kennt
+      // (js/ui/melden.js meldenBereit; ohne supabase/melden-schema.sql bleibt die Karte wie bisher)
+      if (p.weiss && p.schwarz) {
+        ergebnis.insertAdjacentHTML('beforeend', `<button class="on-melden" type="button" data-online="melden"${meldenDa ? '' : ' hidden'}>${icon('flagge')}<span>${esc(t('melden.knopfGegner'))}</span></button>`);
+        if (!meldenDa) meldenBereit().then((bereit) => {
+          if (!bereit || weg) return;
+          meldenDa = true;
+          const b = inhalt.querySelector('.on-melden');
+          if (b) b.hidden = false;
+        });
+      }
     }
     sperre();
   }
@@ -501,6 +514,11 @@ export function zeige(root, params, app) {
       if (wartend) { const neu = wartend; wartend = null; uebernehme(neu); }
       if (wahl === 'remis' && p.status === 'laeuft') aktion(() => online.bieteRemis(p.id));
       else if (wahl === true && p.status === 'laeuft') aktion(() => online.gibAuf(p.id)); else sperre();
+    }
+    if (a === 'melden' && p && p.status === 'beendet') {
+      // der Server nimmt den Gegner aus der Partie; der Name ist nur fuer die Ueberschrift des Blatts
+      const roh = kartenDaten && (online.meineFarbe(p) === 'w' ? kartenDaten.s : kartenDaten.w);
+      oeffneMelden({ name: roh && meldbarerName(roh.name) ? roh.name : null, partie: p.id, fokusDanach: knopf });
     }
     if (a === 'revanche') aktion(() => online.erstelleEinladung({ farbe: andere(online.meineFarbe(p)), bedenkzeit: p.bedenkzeit_s, inkrement: p.inkrement_s }), oeffne);
   });

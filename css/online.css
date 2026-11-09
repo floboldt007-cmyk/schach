@@ -97,6 +97,12 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-spieler .uhr[hidden], .on-ergebnis[hidden] { display: none; }
 .on-brett { width: 100%; aspect-ratio: 1; }
 .on-aktionen { display: flex; flex-wrap: wrap; gap: var(--a3); justify-content: center; }
+/* "Gegner melden" unter der Ergebniskarte (js/ui/melden.js; nur wenn der Server das Melden kennt) */
+.on-melden { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--tap); margin: var(--a2) auto 0; padding: 0 8px;
+  border: 0; background: none; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.on-melden[hidden] { display: none; }
+.on-melden svg { width: 16px; height: 16px; flex: none; }
+.on-melden:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 /* Fahne (Flo 30.10.): Remis anbieten oder Aufgeben in einem Knopf */
 .on-fahne { gap: 8px; }
 .on-fahne svg { width: 18px; height: 18px; flex: none; }

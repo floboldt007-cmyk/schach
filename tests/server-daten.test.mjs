@@ -59,7 +59,7 @@ alter default privileges in schema public grant all on functions to anon, authen
 
 // Reihenfolge wie in supabase/ANLEITUNG.md: die Datenauskunft zuletzt, weil sie alle Teile mit ausgibt
 const SCHEMATA = ['schema', 'online-schema', 'freunde-schema', 'abo-schema', 'werkstatt-schema', 'pionier-schema',
-  'coach-schema', 'schule-schema', 'kronen-schema', 'zaehler-schema', 'karte-schema', 'raetsel-duell-schema', 'daten-schema'];
+  'coach-schema', 'schule-schema', 'kronen-schema', 'zaehler-schema', 'karte-schema', 'raetsel-duell-schema', 'melden-schema', 'daten-schema'];
 
 async function lauf(db, name, sql) {
   try {
@@ -104,6 +104,8 @@ const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
 f = await lauf(db, 'Testdaten', `
 insert into auth.users (id, email) values ('${A}', 'a@a.de'), ('${B}', 'b@b.de');
+insert into public.meldungen (melder, gemeldet, grund, notiz, gemeldeter_name, tag) values
+  ('${A}', '${B}', 'name', 'NotizVonAnna', 'Bert_spielt', '2026-11-08'), ('${B}', '${A}', 'verhalten', 'NotizVonBert', 'Anna_spielt', '2026-11-08');
 insert into public.coach_nutzung (user_id, tag, anzahl) values ('${A}', '2026-11-08', 3), ('${B}', '2026-11-08', 7);
 insert into public.schule_versuche (user_id, tag, anzahl) values ('${A}', '2026-11-08', 2), ('${B}', '2026-11-08', 4);
 insert into public.klassen (id, name, code, leitung) values
@@ -157,6 +159,11 @@ const ev = (d.abo_ereignisse || []).map((e) => e.id).sort().join();
 pruefe('abo_ereignisse: eigene, auch ohne Konto-Verweis ueber die Kundennummer', ev === 'evt_AnnaMitKonto,evt_AnnaOhneKonto', ev);
 const ed = (d.edition_ereignisse || []).map((e) => e.id).join();
 pruefe('edition_ereignisse: nur die zur eigenen Reservierung', ed === 'evt_EditionAnna', ed);
+// Melden: nur die selbst abgegebenen Meldungen; Meldungen UEBER das Konto stehen nicht darin (sie verrieten den Melder)
+pruefe('meldungen: die eigene Meldung mit Grund, Text und gemeldetem Namen', d.meldungen?.length === 1 && d.meldungen[0].grund === 'name'
+  && d.meldungen[0].notiz === 'NotizVonAnna' && d.meldungen[0].gemeldeter_name === 'Bert_spielt' && !('melder' in d.meldungen[0])
+  && !('gemeldet' in d.meldungen[0]), JSON.stringify(d.meldungen));
+pruefe('meldungen: keine Meldung ueber das eigene Konto in der Auskunft', !text.includes('NotizVonBert') && !text.includes('Anna_spielt'));
 const fremd = ['Berti', 'Aufgabe von Bert', 'evt_BertMitKonto', 'evt_EditionBert', B, '"sterne": 9', '"anzahl": 7', '"anzahl": 4']
   .filter((x) => text.includes(x) || JSON.stringify(d, null, 1).includes(x));
 pruefe('keine fremden Daten in der Auskunft von A', fremd.length === 0, fremd.join(', '));
