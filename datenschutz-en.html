@@ -53,7 +53,7 @@
 
   <div class="entwurf" role="note">
     <p><b>Draft. Have a qualified person review this before publication.</b>
-    All fields in square brackets are placeholders and must be replaced. This text does not apply until then.</p>
+    Only the provider details in square brackets are still open. This text does not apply until it has been reviewed.</p>
   </div>
 
   <h2>1. Who is responsible?</h2>
@@ -61,7 +61,8 @@
     <p>Florian Boldt<br>
     Gartenstrasse 49<br>
     51379 Leverkusen, Germany<br>
-    Email: <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a></p>
+    Email: <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a>
+    <span class="platz">[Provider details as in the legal notice; set a dedicated email address for Crownmate]</span></p>
   </div>
   <p>Crownmate is a chess app that runs in your browser (a web app). This policy explains what data the app processes,
   why, on what legal basis, and what rights you have.</p>
@@ -83,8 +84,11 @@
   your IP address, the date and time, the requested file, and your browser's user agent. GitHub may store this data in
   server logs. The legal basis is our legitimate interest in providing the app securely and reliably
   (Art. 6 Abs. 1 lit. f DSGVO, the EU General Data Protection Regulation, or GDPR).</p>
-  <p>GitHub also processes data in the USA. GitHub is certified under the EU-US Data Privacy Framework
-  <span class="platz">[Check current status]</span>; the EU Standard Contractual Clauses also apply. See
+  <p>GitHub also processes data in the USA. According to GitHub, it is certified under the EU-US Data Privacy Framework
+  (the list of certified companies is at
+  <a href="https://www.dataprivacyframework.gov/list" target="_blank" rel="noopener">dataprivacyframework.gov</a>);
+  for transfers to countries without an adequacy decision, GitHub uses the EU Standard Contractual Clauses
+  (Commission Implementing Decision (EU) 2021/914). See
   <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub's privacy statement</a> for details.</p>
 
   <h2>4. Storage on your device (without cookies)</h2>
@@ -134,14 +138,15 @@
     log together with the time and sign-in method whenever you sign in, to protect your account.</li>
   </ul>
   <h3>Where and by whom</h3>
-  <p>The data is stored by Supabase, Inc., <span class="platz">[Address from the data processing agreement]</span>, on servers
-  in Frankfurt am Main (Amazon Web Services, eu-central-1 region). Supabase acts as a processor under Art. 28 DSGVO (GDPR)
-  on the basis of a data processing agreement <span class="platz">[Date the agreement was concluded]</span>.
-  Supabase is a company outside the EU; access from outside the EU is safeguarded by
-  <span class="platz">[Check Standard Contractual Clauses in the data processing agreement / other safeguards]</span>.
+  <p>The data is stored by Supabase Pte. Ltd., 65 Chulia Street #38-02/03, OCBC Centre, Singapore 049513, on servers
+  in Frankfurt am Main (Amazon Web Services, eu-central-1 region). Supabase acts as a processor under Art. 28 DSGVO (GDPR).
+  The data processing agreement is part of Supabase's terms of service and applies once they are accepted.
+  Supabase is a company outside the EU; access from outside the EU is safeguarded by the EU Standard Contractual Clauses
+  (Commission Implementing Decision (EU) 2021/914, Module 2), which are part of that agreement.
   Some tasks are handled by Supabase server programs (Edge Functions): checking moves in online games and in the puzzle
   duel, and the coach. They also run in Frankfurt, because the app sets the region on every call.
-  Sign-in emails are sent by <span class="platz">[Email service name, address, data processing agreement]</span>.</p>
+  Sign-in emails with the code are sent by Supabase itself, under the same agreement. The email service receives your
+  email address and the content of the sign-in email.</p>
   <p><b>Sign in with Google (optional):</b> Instead of using an email code, you can sign in with your Google account.
   The app redirects you to Google. Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland, learns that you
   are signing in to Crownmate. After you confirm with Google, it sends your email address, name, profile image URL,
@@ -166,12 +171,14 @@
   with the Stripe customer number until they are deleted at the next incoming payment event after 90 days. A running
   subscription does not end with the account; cancel it first (with an active subscription the app points this out when
   you delete the account).
-  Supabase's technical server logs and backups cannot be accessed immediately: they are deleted automatically according
-  to Supabase's retention periods <span class="platz">[Check Supabase retention periods: server logs, backups]</span>
-  and are not used further in the meantime. Your progress on your device is unaffected.</p>
+  Further exceptions are described in the sections "Shop: editions" and "Pioneer title" below: some details remain there
+  without your account ID.
+  Supabase's technical server logs and backups cannot be accessed immediately: depending on the plan, Supabase keeps
+  server logs for at most 7 days and backups, where the plan includes them, also for at most 7 days. They are then
+  deleted automatically and are not used further in the meantime. Your progress on your device is unaffected.</p>
 
   <!-- DRAFT stage 4b (player card): legal review by Flo before going live on main -->
-  <h3>Player card, achievements and thalers (draft)</h3>
+  <h3>Player card, achievements and thalers</h3>
   <p>With an account, we store which achievement tiers (bronze, silver, gold) you have reached, the thalers those tiers
   credited to you, which banners you own and what your player card looks like (banner, a title from a fixed list, profile
   picture, background, frame and up to three achievements on show). Without an account, all of this stays on your device.
@@ -183,7 +190,7 @@
   Download my data includes this data. If your account is deleted, it is deleted automatically too.</p>
 
   <!-- DRAFT stage B (league with weekly groups): legal review by Flo before going live on main -->
-  <h3>League with crowns and weekly groups (draft)</h3>
+  <h3>League with crowns and weekly groups</h3>
   <p>With an account, you take part in the league. For this we store:</p>
   <ul>
     <li>your league tier (Pawn III to King I), your total crowns and an estimate of your playing strength (Elo) with the
@@ -215,7 +222,7 @@
   is stored at that time.</p>
 
   <!-- DRAFT stage B (puzzle duel): legal review by Flo before going live on main -->
-  <h3>Puzzle duel (draft)</h3>
+  <h3>Puzzle duel</h3>
   <p>In the puzzle duel, two players solve the same chess puzzles for three minutes. With an account, we store for each
   duel the type (rated, between friends or against the AI), the account IDs of both players, for a duel between friends
   the invitation code, the order of the puzzles, start, duration, status and result, and for each player how many puzzles
@@ -254,8 +261,44 @@
   could be bypassed by deleting and sending again. Invitations that nobody accepted are deleted after 48 hours at the next clean-up. If no move
   is made for too long in a game (with a clock, 10 minutes before the second half-move; without a clock, 7 days), the server
   ends it as abandoned, without a result. Both counters are included in Download my data. The legal basis is our legitimate
-  interest in a secure, working service (Art. 6 Abs. 1 lit. f DSGVO, GDPR)
-  <span class="platz">[Have legal basis and retention periods confirmed by the expert]</span>.</p>
+  interest in a secure, working service (Art. 6 Abs. 1 lit. f DSGVO, GDPR; see also recital 49 on network and
+  information security).</p>
+
+  <h3>School mode (classes)</h3>
+  <p>With an account, a teacher or a club coach can create a class (leader), and others join with a 6-character code
+  (members). For each class we store the name, the code, the leader, whether it is active, and when it was created and
+  closed, plus the class tasks (title, type, goal, due date). For each member we store a self-chosen display name (first
+  name or nickname, not an email address), the day they joined, and one row of figures: bots beaten, stars, number of
+  games, average accuracy, the most frequent error types, completed tasks, and the day (without time) of the last update.
+  We do not store individual games, moves, times of day or device data for this.</p>
+  <p><b>Who sees what:</b> The leader sees the display name and figures of the members of their classes, never their
+  email address or account ID. A member sees only their own row and the class tasks, not the other members.</p>
+  <p>This data is necessary for school mode (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in Frankfurt,
+  like your account. If you leave a class, your row is deleted; if the leader deletes a class, the whole class is deleted.
+  Closed classes are deleted 90 days after closing at the next clean-up. To prevent codes from being guessed, we count
+  wrong codes per account and day and delete these counters after two days (Art. 6 Abs. 1 lit. f DSGVO, GDPR). Everything
+  is deleted automatically with your account.</p>
+
+  <h3>Shop: editions</h3>
+  <p>The shop offers limited, numbered editions. They are visible only to people who are signed in and have stated that
+  they are 18 or older. We store this statement as yes or no with a timestamp, without a date of birth.</p>
+  <p>If you buy an edition, we store: a reservation that holds your item while you are at the Stripe checkout (edition,
+  status, ID and address of the checkout session, payment ID, times); your two declarations on the right of withdrawal
+  (consent to immediate delivery and acknowledgement that the right of withdrawal expires, with text version and time) as
+  evidence; and your ownership (edition, number, status, payment and checkout session IDs, times). Only you can see your
+  ownership. To prevent misuse, we limit reservations to three per account and edition within 24 hours. Stripe payment
+  events for editions (with amount, reason and the state of any refund or chargeback) are deleted after 90 days, except
+  while a refund or a case is still open.</p>
+  <p>The legal basis is the purchase contract (Art. 6 Abs. 1 lit. b DSGVO, GDPR), and in addition Art. 6 Abs. 1 lit. c and
+  f DSGVO for evidence of the withdrawal declarations and for retention obligations. Cancelled and expired reservations
+  are deleted 90 days after their last change. Your age statement is deleted with your account. Paid reservations, the
+  withdrawal declarations and ownership remain stored without your account ID after your account is deleted, for as long
+  as the edition exists: this ensures no number is issued twice and that the purchase and declarations remain provable.</p>
+
+  <h3>Pioneer title</h3>
+  <p>The first 100 accounts receive the title "Pioneer" with a number. For this we store which number was assigned to your
+  account and when (Art. 6 Abs. 1 lit. b DSGVO, GDPR). If you delete your account, the number remains without your account
+  ID so that it is never issued a second time.</p>
 
   <h2>6. Sharing games and usage data (optional, with consent)</h2>
   <p>With an account, you can turn on Share games and usage under Settings → Data. It is off by default.
@@ -280,51 +323,65 @@
   online again and signed in on this device with the same account, before it sends anything else. If you sign out first,
   turn the switch off once more after your next sign-in, or send us an email. We store the withdrawal time as evidence. Withdrawal does not affect the
   lawfulness of processing carried out before it (Art. 7 Abs. 3 DSGVO).</p>
-  <p><b>Retention:</b> The data is tied to your account and deleted with it. Independently of that, shared games and usage
-  data are deleted or aggregated so they can no longer be linked to an account after at most
-  <span class="platz">[For example, 24 months]</span>.</p>
+  <p><b>Retention:</b> The data is tied to your account. It is deleted as soon as you withdraw consent (switch off) or
+  delete your account, whichever comes first.</p>
 
 
   <h2>7. Trainer subscription and Stripe</h2>
-  <p>The optional trainer subscription uses Stripe as payment provider: Stripe Payments Europe, Limited, <span class="platz">[ADDRESS]</span>. In particular, the account ID, email address, selected product, and payment and transaction data are sent to Stripe. Stripe processes payment details such as card numbers directly; Crownmate does not receive them in full. The legal basis is Art. 6(1)(b) GDPR. Role of Stripe (independent controller or processor) and agreement: <span class="platz">[CHECK]</span>.</p>
+  <p>The optional trainer subscription and purchases in the shop (section "Shop: editions") use Stripe as payment
+  provider. Our contracting partner in the European Economic Area is Stripe Payments Europe, Limited (Ireland). In
+  particular, the account ID, email address, selected product, and payment and transaction data are sent to Stripe. You
+  enter payment details such as card numbers directly with Stripe; Crownmate does not receive them in full. The legal
+  basis is Art. 6(1)(b) GDPR. Stripe processes this data for us as a processor and, as described in its
+  <a href="https://stripe.com/privacy" target="_blank" rel="noopener">privacy policy</a>, also uses it for its own purposes
+  under its own responsibility, for example to prevent fraud and to meet its own legal obligations. That policy also
+  describes to whom and to which countries Stripe transfers data.</p>
   <p>In Supabase we store the state of your subscription (status, plan, valid until, Stripe customer number and
   subscription ID); it is deleted immediately with your account. So that each Stripe event is processed exactly once, we
   also store technical payment events (event ID and type, Stripe customer number, subscription ID, status, plan, times).
   They are deleted at the next incoming event after 90 days; after your account is deleted they remain until then without
-  your account ID. Invoices and payment data are held by Stripe. Other recipients, transfer safeguards, and statutory
-  retention periods: <span class="platz">[CHECK AND COMPLETE]</span>.</p>
+  your account ID. Invoices and payment records are held in our Stripe account. We keep them for as long as statutory
+  retention obligations require (in particular section 147 of the German Fiscal Code (Abgabenordnung), up to 10 years;
+  legal basis Art. 6(1)(c) GDPR) and delete them afterwards.</p>
 
   <h2>8. Coach using Anthropic</h2>
-  <p>When you have the AI coach explain a move, the server sends Anthropic, PBC, <span class="platz">[ADDRESS]</span>, only facts about the position: the position (FEN), the move played and the strongest move, the engine evaluations, the classification of the move, whether you made the move yourself, and your rough playing strength as a word (for example “beginner”). There is no free text from you. Email address, username, and account ID are not sent. Crownmate stores neither the position nor the answer. It only stores how many questions you asked on a given day (to enforce the limit); these counters are deleted after a little more than a week at the next coach request and immediately with the account. Retention at Anthropic: <span class="platz">[CHECK]</span>. The legal basis is Art. 6(1)(b) GDPR; processing agreement and international transfer: <span class="platz">[DPA DATE / SAFEGUARDS]</span>.</p>
+  <p>When you have the AI coach explain a move, the server sends Anthropic (our contracting partner in the European Economic Area is Anthropic
+  Ireland, Limited, Ireland) only facts about the position: the position (FEN), the move played and the strongest move, the engine evaluations, the classification of the move, whether you made the move yourself, and your rough playing strength as a word (for example “beginner”). There is no free text from you. Email address, username, and account ID are not sent. Crownmate stores neither the position nor the answer. It only stores how many questions you asked on a given day (to enforce the limit); these counters are deleted after a little more than a week at the next coach request and immediately with the account. According to Anthropic, it deletes requests and responses within 30 days; only if a request is flagged as violating
+  Anthropic's usage policy, after up to 2 years. The legal basis is Art. 6(1)(b) GDPR. Anthropic processes the data as a
+  processor (Art. 28 GDPR); the data processing agreement is part of Anthropic's commercial terms. Anthropic may also
+  process the data in the USA; the EU Standard Contractual Clauses (Module 2), which are part of that agreement, apply.</p>
 
   <h2>9. Public product request</h2>
-  <p>When you open the “Crownmate Trainer” page, the app asks Supabase which subscription is offered, always without your account ID, even when you are signed in. This technically places the IP address, time, and connection data in server logs. The product request contains no account ID. Retention: <span class="platz">[PERIOD]</span>.</p>
+  <p>When you open the “Crownmate Trainer” page, the app asks Supabase which subscription is offered, always without your account ID, even when you are signed in. This technically places the IP address, time, and connection data in server logs. The product request contains no account ID. Supabase deletes the server logs after at most 7 days (section 5).</p>
 
   <h2>10. Scope of data sharing and retention</h2>
   <p>The “Share games and usage” switch controls only the voluntarily shared game archive and usage events. It does not control the account, cloud progress, online games, subscription, coach, or technically necessary logs.</p>
-  <p>Online games follow the periods in section 5: unanswered invitations are deleted after 48 hours at the next clean-up, completed games remain until one of the two accounts is deleted. Server logs, backups, and every area not fixed above are retained for <span class="platz">[PERIOD]</span>; no period is claimed until it has been set and checked.</p>
+  <p>Online games follow the periods in section 5: unanswered invitations are deleted after 48 hours at the next clean-up, completed games remain until one of the two accounts is deleted. Supabase deletes server logs and backups after at most 7 days (section 5). Everything else remains stored until the period named in the individual sections ends or you delete your account.</p>
 
   <h2>11. What never happens</h2>
   <ul>
     <li>No advertising or advertising trackers (no Google Analytics, Facebook Pixel, or fingerprinting).</li>
     <li>No tracking across websites.</li>
     <li>No disclosure to third parties for their own purposes and no sale of data. The processors listed above act
-    only on our instructions. For the subscription, Stripe receives the data needed for the payment (section 7; whether
-    Stripe acts as an independent controller is still being checked).</li>
+    only on our instructions. For the subscription and the shop, Stripe receives the data needed for the payment and
+    partly also uses it under its own responsibility (section 7).</li>
     <li>No profiles about you for other companies.</li>
   </ul>
 
   <h2>12. Children and parents</h2>
-  <p>Children and young people can also use Crownmate. Without an account, your progress stays on the device. If you are under 16,
-  ask your parents or legal guardians before creating an account. You may turn on sharing of games and usage data only
-  with their consent (Art. 8 DSGVO, GDPR); the switch is therefore off by default, and the app explains this right beside
-  it. Parents can request information about an account or its deletion at <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a>.
-  <span class="platz">[Check: set a minimum age for the app; is an age check or parental confirmation needed?]</span></p>
+  <p>Crownmate can be used at any age without an account; your progress then stays on the device. You can create an
+  account from the age of 13. If you are under 16, ask your parents or legal guardians before creating an account. You
+  can give consent yourself, for example to sharing games and usage data (section 6), only from the age of 16; before
+  that, only with your parents' approval (Art. 8(1) DSGVO, GDPR). The switch is therefore off by default, and the app
+  explains this right beside it. Editions in the shop are available only from 18 (section "Shop: editions"). Parents can
+  request information about an account or its deletion at
+  <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a>.</p>
 
   <h2>13. Your rights</h2>
   <ul>
     <li><b>Access</b> (Art. 15) and <b>data portability</b> (Art. 20): in the app under Settings → Data → Download my data,
-    you receive a file. <span class="platz">[PLACEHOLDER: “all your account data” applies only after the parallel data-access implementation has been fully verified.]</span></li>
+    you receive a file with all data in our database that belongs to your account. We will tell you by email, on
+    request, what Supabase, Stripe or Anthropic hold beyond that.</li>
     <li><b>Erasure</b> (Art. 17): use Delete account in the app, immediately for everything in our database except the
     exceptions in section 5; Supabase server logs and backups expire according to their retention periods (see section 5).</li>
     <li><b>Rectification</b> (Art. 16): change your username in the app; request any other corrections by email.</li>
