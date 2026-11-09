@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en" data-thema="modern" data-modus="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F4F1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171B" media="(prefers-color-scheme: dark)">
+<title>Terms and Conditions · Crownmate</title>
+<script>
+  // Hell oder Dunkel wie in der App (gespeicherte Einstellung "modus"), sonst nach dem System.
+  try {
+    var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+    if (e && (e.modus === 'hell' || e.modus === 'dunkel')) document.documentElement.setAttribute('data-modus', e.modus);
+  } catch (f) { /* privater Modus: System */ }
+</script>
+<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/themes/modern.css">
+<style>
+  /* Schlichte Textseite mit den Tokens der App (hell und dunkel ueber css/themes/modern.css), keine festen Farben. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background-color: var(--grund); color: var(--text); font-family: var(--schrift); font-size: var(--fs-text); line-height: 1.55;
+    -webkit-text-size-adjust: 100%; }
+  main { max-width: 760px; margin: 0 auto; padding: var(--a6) var(--rand) var(--a7); padding-bottom: calc(var(--a7) + env(safe-area-inset-bottom)); }
+  h1 { margin: var(--a4) 0 var(--a2); font-family: var(--display); font-size: var(--fs-h1); font-weight: var(--gw-titel); letter-spacing: var(--lw-titel); line-height: 1.1; }
+  h2 { margin: var(--a6) 0 var(--a2); font-size: var(--fs-h2); font-weight: var(--gw-stark); line-height: 1.2; }
+  h3 { margin: var(--a5) 0 var(--a1); font-size: var(--fs-text); font-weight: var(--gw-stark); }
+  p, li { margin: 0 0 var(--a3); color: var(--text); }
+  ul { padding-left: 1.2em; }
+  a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .stand { color: var(--text-2); font-size: var(--fs-klein); }
+  .entwurf { margin: 0 0 var(--a5); padding: var(--a4); border: 2px solid var(--warn); border-radius: var(--r-l); background: var(--warn-weich); }
+  .entwurf p { margin: 0; }
+  .entwurf b { display: block; margin-bottom: var(--a1); }
+  .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
+  .kasten p:last-child, .kasten ul:last-child { margin-bottom: 0; }
+  .platz { padding: 0 .3em; border-radius: var(--r-s); background: var(--flaeche-2); border: 1px dashed var(--linie-2); color: var(--text-2);
+    -webkit-box-decoration-break: clone; box-decoration-break: clone; overflow-wrap: anywhere; }
+  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+    border: 1px solid var(--linie); text-decoration: none; font-weight: var(--gw-stark); }
+  .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
+  .fuss a { margin-right: var(--a3); }
+  dl { margin: 0; display: grid; grid-template-columns: minmax(0, 12em) minmax(0, 1fr); gap: var(--a2) var(--a4); }
+  dt { color: var(--text-2); }
+  dd { margin: 0; }
+  @media (max-width: 520px) { dl { grid-template-columns: minmax(0, 1fr); gap: 0; } dd { margin-bottom: var(--a3); } }
+</style>
+</head>
+<body>
+<main>
+  <p><a class="zurueck" href="./#einstellungen">Back to Crownmate</a></p>
+  <p class="stand">This is a courtesy translation. <a href="agb.html" lang="de" hreflang="de">The German version is legally binding.</a></p>
+  <h1>Terms and Conditions</h1>
+  <p class="stand">Terms of use and subscription terms with withdrawal information. Draft, last updated November 2026</p>
+
+  <div class="entwurf" role="note">
+    <p><b>Draft. To be reviewed by a qualified person before publication.</b>
+    These terms are not yet in force and are not yet linked in the app. The "Crownmate Trainer" subscription cannot be
+    bought yet. The passages in square brackets are still open. Until the review, this text does not apply. One-time
+    purchases in the shop (editions) are not yet covered by this draft.</p>
+  </div>
+
+  <h2>1. Scope and provider</h2>
+  <p>These terms apply to the use of the chess app Crownmate (web app at crownmate.de) and to the paid subscription
+  "Crownmate Trainer". The provider and contracting party is the provider named in the
+  <a href="impressum-en.html">Legal Notice</a>; name, address and contact details are given there. The
+  <a href="datenschutz-en.html">Privacy Policy</a> describes which data the app processes.</p>
+  <p>The offer is aimed at consumers. Differing terms of users do not apply. The contract language is German; the English
+  version is a translation for information.</p>
+
+  <h2>2. Conclusion of contract</h2>
+  <p><b>Free use:</b> Crownmate can be used without an account and without payment. If you create an account, a free
+  contract of use for the account is concluded. You can delete the account in the app at any time (Settings → Data →
+  "Delete account").</p>
+  <p><b>"Crownmate Trainer" subscription:</b> The presentation of the subscription in the app is not yet a binding offer.
+  You need an account to subscribe. The app takes you to the checkout of our payment service Stripe. There, before
+  ordering, you see the essential details (service, price, billing period, term and cancellation) and can check and
+  correct your entries. By pressing the order button at the checkout you make a binding offer. The contract is concluded
+  when we confirm the order, at the latest when the subscription is activated in your account. You receive a
+  confirmation by email with these terms and the withdrawal information.
+  <span class="platz">[Check the process, the order button label and the confirmation email against the finished Stripe checkout]</span></p>
+  <p>We do not store the contract text in a way you can retrieve; the current version of these terms is on this page,
+  and your order details are in the confirmation and in the Stripe customer portal ("Manage subscription").</p>
+
+  <h2>3. Services</h2>
+  <p><b>Free app:</b> Playing against the bots, the analysis, the daily puzzle and the other features the app describes
+  as free remain free of charge. The subscription never sells access to the game.</p>
+  <p><b>Crownmate Trainer:</b> The subscription unlocks additional learning and training features. What counts is what
+  the app lists as included under "In Trainer" when you subscribe. Features described there as "In progress"
+  are not yet part of the service. The subscription gives no advantages in rating, league or games against other
+  people and does not include purchases in the shop.</p>
+  <p>To use the app you need a device with a current browser and an internet connection; you bear those costs
+  yourself.</p>
+
+  <h2>4. Prices and payment</h2>
+  <p>You see the price and the billing period before subscribing, in the app and at the Stripe checkout. The price stated
+  there at the time of subscribing applies. <span class="platz">[Statement on VAT after tax clarification]</span>
+  The amount is due in advance at the start of each billing period and is collected through the payment method chosen at
+  Stripe. You enter payment details directly at Stripe.</p>
+  <p>We announce a price change for running subscriptions by email at least 30 days in advance. It applies only from the
+  next billing period after that notice period and only if you agree; without your agreement the subscription ends at
+  the end of the current billing period. <span class="platz">[Price change clause to be reviewed or removed by the qualified person]</span></p>
+
+  <h2>5. Term and cancellation</h2>
+  <p>The subscription runs for the chosen billing period (usually one month) and renews for the same period each time
+  unless you cancel. You can cancel at any time with effect from the end of the current billing period; until then
+  Trainer remains usable. There is no minimum term beyond the current billing period.</p>
+  <p>You can cancel</p>
+  <ul>
+    <li>in the app through "Manage subscription" (Stripe customer portal),</li>
+    <li>through the cancellation button ("cancel contracts here"), without signing in
+    <span class="platz">[Enter the location of the button once it is built in]</span>,</li>
+    <li>or in text form, for example by email to the address given in the Legal Notice.</li>
+  </ul>
+  <p>We confirm receipt of your cancellation in text form. The right to terminate for good cause remains for both sides.
+  Deleting your account does not end the subscription: cancel it first. What you have earned by playing stays yours
+  after the subscription ends.</p>
+
+  <h2>6. Young people and minors</h2>
+  <p>Playing without an account is possible at any age. You can create an account from the age of 13; if you are under
+  16, ask your parents or legal guardians first. The "Crownmate Trainer" subscription on the web is available only from
+  18: before the first purchase the app asks your age, and anyone younger cannot subscribe. Everything else stays free.
+  If a minor subscribes anyway, the contract is not valid without the consent of the legal guardians; parents can then
+  contact the address given in the Legal Notice, and we end the subscription and refund the payments.</p>
+
+  <h2>7. Right of withdrawal</h2>
+  <p>As a consumer you have a statutory right of withdrawal when you take out the subscription. The following
+  information follows the statutory model.
+  <span class="platz">[Qualified person: decide whether the subscription is a digital service or digital content and adapt the information and the section "Early expiry" accordingly]</span></p>
+  <h3>Withdrawal information</h3>
+  <div class="kasten">
+    <p><b>Right of withdrawal</b></p>
+    <p>You have the right to withdraw from this contract within fourteen days without giving any reason.</p>
+    <p>The withdrawal period is fourteen days from the day of the conclusion of the contract.</p>
+    <p>To exercise the right of withdrawal, you must inform us
+    (<span class="platz">[Name, address and email address of the provider as in the Legal Notice; insert here before publication]</span>)
+    of your decision to withdraw from this contract by an unequivocal statement (for example a letter sent by post or
+    an email). You may use the attached model withdrawal form, but it is not obligatory.</p>
+    <p>To meet the withdrawal deadline, it is sufficient for you to send your communication concerning your exercise of
+    the right of withdrawal before the withdrawal period has expired.</p>
+    <p><b>Effects of withdrawal</b></p>
+    <p>If you withdraw from this contract, we shall reimburse to you all payments received from you without undue delay
+    and in any event not later than fourteen days from the day on which we are informed about your decision to withdraw
+    from this contract. We will carry out such reimbursement using the same means of payment as you used for the initial
+    transaction, unless you have expressly agreed otherwise; in any event, you will not incur any fees as a result of
+    such reimbursement.</p>
+    <p>If you requested that the services begin during the withdrawal period, you shall pay us an amount which is in
+    proportion to what has been provided until you have communicated to us your withdrawal from this contract, in
+    comparison with the full coverage of the contract.</p>
+  </div>
+  <h3>Early expiry of the right of withdrawal</h3>
+  <p>Trainer is available to you immediately after purchase if you expressly request this at the checkout. Where the
+  subscription counts as a contract for digital content that is not supplied on a tangible medium, your right of
+  withdrawal expires early once we have begun to perform the contract after you expressly consented to us beginning
+  before the end of the withdrawal period, you confirmed your knowledge that you thereby lose your right of withdrawal,
+  and we provided you with a confirmation of the contract (§ 356 Abs. 5 BGB, German Civil Code). Where the subscription
+  counts as a contract for a digital service, the right of withdrawal expires only once the service has been fully
+  performed (§ 356 Abs. 4 BGB); if you withdraw before that, the rule on the proportionate amount in the information
+  above applies. We obtain both declarations at the checkout with separate boxes that are never pre-ticked and store
+  them as proof.
+  <span class="platz">[Agree the wording of the boxes at the Stripe checkout and the withdrawal function (electronic withdrawal) with the qualified person]</span></p>
+  <h3>Model withdrawal form</h3>
+  <div class="kasten">
+    <p>(Complete and return this form only if you wish to withdraw from the contract.)</p>
+    <ul>
+      <li>To <span class="platz">[Name, address and email address of the provider as in the Legal Notice]</span>:</li>
+      <li>I/We (*) hereby give notice that I/We (*) withdraw from my/our (*) contract for the provision of the following
+      service (*): "Crownmate Trainer" subscription</li>
+      <li>Ordered on (*)/received on (*)</li>
+      <li>Name of consumer(s)</li>
+      <li>Address of consumer(s)</li>
+      <li>Signature of consumer(s) (only if this form is notified on paper)</li>
+      <li>Date</li>
+    </ul>
+    <p>(*) Delete as appropriate.</p>
+  </div>
+
+  <h2>8. Account and fair conduct</h2>
+  <p>An account is personal to you. Keep access to your email inbox and your account protected. Usernames and everything
+  others see of you must not insult or deceive anyone or infringe the rights of others. In games against people,
+  outside help from chess programs and deliberate stalling are not allowed. In case of violations we may reset names,
+  block individual features or, after a prior warning, terminate the account; in serious cases also without a warning.
+  For a subscription ended early as a result, we refund the share for the unused time, unless you are responsible for
+  the termination.
+  <span class="platz">[Blocking and refund rule to be reviewed by the qualified person]</span></p>
+
+  <h2>9. Availability and changes to the app</h2>
+  <p>We keep developing Crownmate and keep the subscription features available in conformity with the contract during
+  the term, including the necessary updates. Short interruptions for maintenance or because of faults at our service
+  providers cannot be ruled out entirely. We make changes to the subscription that go beyond what is needed for
+  conformity only for a valid reason (for example security, new technology, a change in the law), at no additional cost
+  to you and with clear information. If a change impairs your use more than insignificantly, we inform you beforehand
+  and you can end the subscription free of charge within 30 days (§ 327r BGB).</p>
+  <p>We notify you of changes to these terms for running subscriptions by email at least 30 days in advance. They take
+  effect only with your consent. <span class="platz">[Amendment clause to be reviewed by the qualified person]</span></p>
+
+  <h2>10. Rights in case of defects</h2>
+  <p>The statutory rights for defects in digital products apply (§§ 327 ff. BGB). Please report errors to the address
+  given in the Legal Notice.</p>
+
+  <h2>11. Liability</h2>
+  <p>We are liable without limitation for intent and gross negligence, for injury to life, body or health, under the
+  German Product Liability Act and where we have given a guarantee. In cases of slight negligence we are liable only for
+  breach of essential contractual obligations, meaning obligations whose fulfilment makes the contract possible in the
+  first place and on which you may regularly rely; in that case liability is limited to the foreseeable damage typical
+  for the contract. Otherwise liability is excluded. The same applies to persons we use to perform our obligations.
+  <span class="platz">[Liability clause to be reviewed by the qualified person]</span></p>
+
+  <h2>12. Dispute resolution</h2>
+  <p>We are neither obliged nor willing to participate in dispute resolution proceedings before a consumer arbitration
+  body. <span class="platz">[Decision of the provider: participation in consumer arbitration yes or no; same wording as the Legal Notice]</span></p>
+
+  <h2>13. Final provisions</h2>
+  <p>German law applies. If your habitual residence is in another member state of the European Union, the mandatory
+  consumer protection provisions of that state remain applicable. If a provision of these terms is invalid, the
+  remaining provisions stay in effect.</p>
+
+  <p class="fuss"><a href="impressum-en.html">Legal Notice</a> <a href="datenschutz-en.html">Privacy Policy</a> <a href="./#einstellungen">Back to Crownmate</a></p>
+</main>
+</body>
+</html>

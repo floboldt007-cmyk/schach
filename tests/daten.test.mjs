@@ -574,6 +574,33 @@ async function browserAblauf(browser) {
       && await recht.locator('html').getAttribute('lang') === 'de' && rechtFehler.length === 0, rechtFehler);
     await recht.close();
   }
+  // AGB mit Widerrufsbelehrung: Entwurf, noch nicht in der App verlinkt (siehe Link-Pruefung unten: genau 4 Verweise).
+  // Anbieter und Anschrift stehen nur im Impressum, hier weder Adresse noch E-Mail-Adresse noch Preis.
+  {
+    const agb = {};
+    for (const datei of ['agb.html', 'agb-en.html']) {
+      const s3 = await kontext.newPage();
+      const r = await s3.goto(BASIS + datei);
+      agb[datei] = await s3.evaluate(() => ({ text: document.body.innerText, lang: document.documentElement.lang,
+        h2: document.querySelectorAll('h2').length, h3: document.querySelectorAll('h3').length,
+        platz: [...document.querySelectorAll('.platz')].map((s) => s.textContent), entwurf: !!document.querySelector('.entwurf'),
+        links: [...document.querySelectorAll('a')].map((a) => a.getAttribute('href')), css: document.querySelector('style').textContent }));
+      agb[datei].status = r.status();
+      await s3.close();
+    }
+    const de = agb['agb.html'], en = agb['agb-en.html'];
+    const mussDe = ['Entwurf', 'fachkundigen Person', 'Crownmate Trainer', 'Widerrufsbelehrung', 'Muster-Widerrufsformular', '§ 356 Abs. 5 BGB',
+      'Verträge hier kündigen', 'ab 13 Jahren', 'ab 18 Jahren', 'Verbraucherschlichtungsstelle', 'Impressum'];
+    pruefe('Browser: agb.html erreichbar, Entwurf mit Pflichtinhalten', de.status === 200 && de.lang === 'de' && de.entwurf && mussDe.every((w) => de.text.includes(w)),
+      mussDe.filter((w) => !de.text.includes(w)).join(', '));
+    pruefe('Browser: agb-en.html gleiche Abschnitte, Platzhalter und Gestaltung, mit Übersetzungshinweis', en.status === 200 && en.lang === 'en' && en.entwurf
+      && en.h2 === de.h2 && en.h3 === de.h3 && en.platz.length === de.platz.length && en.css === de.css
+      && en.text.includes('This is a courtesy translation.') && en.text.includes('The German version is legally binding.')
+      && !/[äöüÄÖÜß\u2013\u2014]/.test(en.text), { h2: [de.h2, en.h2], h3: [de.h3, en.h3], platz: [de.platz.length, en.platz.length] });
+    pruefe('Browser: AGB ohne Anschrift, E-Mail-Adresse, Telefonnummer und Preis (Anbieter nur per Verweis aufs Impressum)',
+      [de, en].every((a) => !/@|Leverkusen|\+49|€|EUR|\d+[.,]\d{2}\b/.test(a.text) && a.platz.every((p) => /^\[[\s\S]+\]$/.test(p)))
+      && de.links.includes('impressum.html') && en.links.includes('impressum-en.html'));
+  }
   for (const sprache of ['en', 'de']) {
     await seite.goto(BASIS + '?test&sprache=' + sprache + '#einstellungen');
     await seite.waitForSelector('.daten-gruppe', { state: 'attached' });

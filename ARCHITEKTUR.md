@@ -7,8 +7,8 @@ bessere Zuege zum Durchklicken). Wer einen Bot besiegt, schaltet den naechsten f
 
 ## Rahmen
 - **Statische Web-App ohne Build-Schritt.** Vanilla JavaScript als ES-Module, HTML, CSS.
-  Laeuft auf GitHub Pages (`https://floboldt007-cmyk.github.io/schach/`), also mit
-  **relativen Pfaden** arbeiten (die App liegt in einem Unterordner).
+  Laeuft auf GitHub Pages unter der eigenen Domain `https://crownmate.de/` (Datei `CNAME`; die alte Adresse
+  `https://floboldt007-cmyk.github.io/schach/` leitet dorthin um), weiter mit **relativen Pfaden** arbeiten.
 - **Ziel-Geraet: iPad Safari (iPadOS 16.4+**, Stockfish braucht WebAssembly-SIMD; aeltere
   Versionen bekommen beim Engine-Start eine klare Meldung), Hoch- und Querformat, auch als App vom
   Home-Bildschirm (PWA). Muss auch auf Handy (390 px) und Desktop funktionieren.
@@ -2235,7 +2235,7 @@ ein Toast „Danke“. Blatt `js/pakete/abo/trainer.js` (`zeigeTrainer`, Klassen
 plus `.trainer-*`, Zustände in `data-zustand`: laedt, vorschau (auch ohne gebauten Vorteil und ohne freigeschaltetes
 Konto, damit „Zum Konto“ nie ins Leere führt), offline, abgemeldet, kaufbar, alter, unter18, bestaetigen, wartet
 („Zahlung prüfen“, „Neu abschließen“), premium, store; schließt bei Escape, Schleier und jedem Screen-Wechsel;
-`.trainer-alter` mit `ALTER_HINWEIS` „Web ab 18, Crownmate ab 16“). Optik `css/pakete/abo.css` (nur Tokens, geprüft in
+`.trainer-alter` mit `ALTER_HINWEIS` „Web ab 18, Spielen und Lernen für alle frei“). Optik `css/pakete/abo.css` (nur Tokens, geprüft in
 `tests/abo.test.mjs`, weil `tests/thema.test.mjs` `css/pakete/` nicht liest), lädt `stelleAboCssSicher()` nach.
 Tests: `tests/server-abo.test.mjs` (Node) und `tests/abo.test.mjs` (Node und Browser mit gefälschtem Supabase über
 `page.route`, `window.open` ersetzt).
@@ -2331,7 +2331,7 @@ echter Analyse und gefälschtem Supabase über `page.route`). Die echte API wird
 Eine Lehrkraft legt eine Klasse an, schreibt den 6-stelligen Code an die Tafel, Mitglieder treten mit Code und
 Anzeigename bei; die App meldet nach jeder Partie gebündelt Kennzahlen, die Lehrkraft sieht sie sortierbar und stellt
 Aufgaben. Idee, Rollen und Datenschutz (AV-Vertrag als Stichpunkte): `design/runde4/SCHULE.md`. Einrichtung für Flo:
-`supabase/ANLEITUNG.md`, Abschnitt „Schulmodus“. Zielgruppe Oberstufe und Vereine, Crownmate bleibt ab 16.
+`supabase/ANLEITUNG.md`, Abschnitt „Schulmodus“. Zielgruppe Schule und Vereine, ein Konto gibt es ab 13 (ENTSCHEIDUNGEN 09.11.).
 
 **Datenfluss:** nur Datenbank-Funktionen (RPC über PostgREST, keine Edge Function, kein Secret). App → `rpc/schule_*`
 mit dem Token der Anmeldung → security-definer-Funktion prüft `auth.uid()` und die Rolle → Tabellen. Gelesen wird über

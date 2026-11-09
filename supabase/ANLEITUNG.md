@@ -103,7 +103,9 @@ heißen.
    wird: nicht die App auf dem Home-Bildschirm (iPad, iPhone) und nicht den Browser eines anderen Geräts. Vor Testern
    mit iPad deshalb zuerst SMTP und die Code-Vorlage einrichten.
 5. **Adressen setzen:** Unter **Authentication > URL Configuration** als **Site URL** exakt
-   `https://floboldt007-cmyk.github.io/schach/` eintragen. Dieselbe exakte Adresse bei **Redirect URLs** hinzufügen.
+   `https://crownmate.de/` eintragen. Dieselbe exakte Adresse bei **Redirect URLs** hinzufügen.
+   (Vor dem Umzug auf die eigene Domain stand hier `https://floboldt007-cmyk.github.io/schach/`; steht im Dashboard noch die alte Adresse, auf die neue
+   umstellen.)
    Keine pauschale Wildcard für die Produktionsseite verwenden.
 6. **Versandgrenzen prüfen:** Unter **Authentication > Rate Limits** das Mindestintervall zwischen zwei Code-Mails
    und die OTP-Grenze kontrollieren. Erst vorsichtig testen und die Grenzen nicht unnötig erhöhen. Der
@@ -533,19 +535,19 @@ Besitzer im Supabase-Dashboard ein, **nie** in App-Dateien, Git, Screenshots ode
 
 1. **Google Cloud Console** (console.cloud.google.com) öffnen, ein Projekt anlegen oder wählen.
 2. **OAuth-Zustimmungsbildschirm** (Google Auth Platform > Branding/Zielgruppe) einrichten: App-Name `Crownmate`,
-   Support-E-Mail, Link zur Datenschutzerklärung (`https://floboldt007-cmyk.github.io/schach/datenschutz.html`, erst wenn
+   Support-E-Mail, Link zur Datenschutzerklärung (`https://crownmate.de/datenschutz.html`, erst wenn
    sie fertig geprüft ist) und zum Impressum. Nur die Standard-Bereiche `openid`, `email` und `profile` verwenden, keine
    weiteren. Zum Ausprobieren reicht der Testmodus mit eingetragenen Testnutzern; für alle Nutzer die App veröffentlichen.
 3. **Anmeldedaten > Anmeldedaten erstellen > OAuth-Client-ID**, Anwendungstyp **Webanwendung**.
-   - **Autorisierte JavaScript-Quellen:** `https://floboldt007-cmyk.github.io`
+   - **Autorisierte JavaScript-Quellen:** `https://crownmate.de`
    - **Autorisierte Weiterleitungs-URIs:** genau `https://usaamcqypmvgqmsbfecb.supabase.co/auth/v1/callback`
    Erstellen. Google zeigt Client-ID und Client-Secret.
 4. **Supabase-Dashboard > Authentication > Sign In / Providers > Google:** einschalten, Client-ID und Client-Secret dort
    einfügen, speichern. Diese beiden Werte gehören nirgendwo sonst hin. Ein versehentlich veröffentlichtes Secret sofort
    in der Google Cloud Console ersetzen und in Supabase neu eintragen.
 5. **Rückkehr-Adresse:** Unter **Authentication > URL Configuration** muss die Site URL
-   `https://floboldt007-cmyk.github.io/schach/` sein (Schritt 5 oben). Die App schickt als Rückkehr-Adresse dieselbe
-   Adresse mit `#konto`. Sicherheitshalber genau `https://floboldt007-cmyk.github.io/schach/#konto` zusätzlich unter
+   `https://crownmate.de/` sein (Schritt 5 oben). Die App schickt als Rückkehr-Adresse dieselbe
+   Adresse mit `#konto`. Sicherheitshalber genau `https://crownmate.de/#konto` zusätzlich unter
    **Redirect URLs** eintragen (keine Wildcard). Lehnt Supabase die Rückkehr-Adresse ab, landet man auf der Site URL; die
    App übernimmt die Anmeldung auch dort. Zum lokalen Testen die Testadresse (zum Beispiel `http://localhost:8000/`)
    vorübergehend unter **Redirect URLs** eintragen und danach wieder entfernen.
@@ -615,13 +617,14 @@ nur „Abo verwalten“ (angemeldet, Kundenportal von Stripe mit E-Mail-Login). 
 eine eigene Kündigungsseite bräuchte eine Edge Function mit einem Stripe-API-Schlüssel (eingeschränkt auf Abos). Bis
 dahin alles im **Testmodus** von Stripe ausprobieren: Dort fließt kein Geld.
 
-**Alter:** Crownmate ist ab 16 (`design/runde4/ENTSCHEIDUNGEN.md`). Ein Abo ist ein Vertrag mit laufenden Kosten; ohne
-Zustimmung der Eltern ist er bei 16- und 17-Jährigen schwebend unwirksam (§§ 107, 108 BGB, das „Taschengeld“ nach § 110
+**Alter:** Drei verschiedene Grenzen, kein Widerspruch (`datenschutz.html` Abschnitt 12, `design/runde4/ENTSCHEIDUNGEN.md`
+09.11.): Spielen ohne Konto in jedem Alter, ein Konto ab 13, Web-Abo und Editionen ab 18. Ein Abo ist ein Vertrag mit
+laufenden Kosten; ohne Zustimmung der Eltern ist er bei Minderjährigen schwebend unwirksam (§§ 107, 108 BGB, das „Taschengeld“ nach § 110
 BGB deckt ein laufendes Abo in der Regel nicht), Rückforderungen trägt der Verkäufer. Nach `design/runde4/SPIELKONZEPT.md`
 Regel 22 schließen Minderjährige ein Abo nur über die **Familienfreigabe** von Apple und Google ab; die gibt es im Web
 nicht. Deshalb gilt in der App: **das Web-Abo erst ab 18.** Vor dem ersten Kauf fragt das Blatt einmal „Bist du 18 oder
 älter?“ (gespeichert wird nur ja oder nein, auf dem Gerät); wer „jünger“ antwortet, bekommt keinen Kauf-Knopf, alles
-andere bleibt frei. In die AGB gehört dieselbe Regel. **Deine Entscheidung:** Soll es später einen Weg mit Zustimmung
+andere bleibt frei. In den AGB steht dieselbe Regel (Entwurf `agb.html`, § 6). **Deine Entscheidung:** Soll es später einen Weg mit Zustimmung
 der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage in `js/pakete/abo/trainer.js` ändern.
 
 1. **Schema einspielen:** Im **SQL Editor** den Inhalt von `supabase/abo-schema.sql` ausführen (nach `schema.sql`; ein
@@ -635,7 +638,7 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
    Preis (monatlich, auf Wunsch zusätzlich jährlich). Optional beim Preis einen **Lookup-Key** wie `trainer-monat`
    setzen: Er erscheint dann in der Tabelle `abos` als Plan.
 4. **Zahlungslink (Payment Link):** **Zahlungslinks > Neu**, das Produkt wählen. Unter **Nach der Zahlung**
-   „Kunden auf deine Website weiterleiten“ wählen und `https://floboldt007-cmyk.github.io/schach/#einstellungen`
+   „Kunden auf deine Website weiterleiten“ wählen und `https://crownmate.de/#einstellungen`
    eintragen. Mengenänderung aus lassen. Die App hängt beim Kaufen selbst
    `?client_reference_id=<Nutzer-ID>&prefilled_email=<E-Mail>` an den Link: Daran erkennt der Webhook, welches Konto
    bezahlt hat. Deshalb kann man nur angemeldet abschließen. Unter den erweiterten Optionen die **Zustimmung zu den

@@ -8,7 +8,7 @@ bessere Züge zum Durchklicken. Dazu gibt es ein Tagesrätsel und ein Archiv zum
 Die Oberfläche ist auf **Deutsch und Englisch** verfügbar. Ohne eigene Sprachwahl folgt sie
 der Sprache des Geräts; in den Einstellungen lässt sie sich ändern.
 
-**Spielen:** https://floboldt007-cmyk.github.io/schach/
+**Spielen:** https://crownmate.de/
 
 Bot-Partien und Spielanalyse laufen direkt auf deinem Gerät, auch ohne Internet.
 Deine Partien und Sterne werden im Browser gespeichert.

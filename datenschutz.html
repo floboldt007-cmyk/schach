@@ -94,7 +94,11 @@
   <h2>4. Speicherung auf deinem Gerät (ohne Cookies)</h2>
   <p>Crownmate speichert Einstellungen, Fortschritt, Partien und Analysen im lokalen Speicher deines Browsers
   (localStorage) und legt die App-Dateien für die Offline-Nutzung in einem Cache ab (Service Worker). Diese Daten
-  verlassen dein Gerät nicht, es sei denn, du legst ein Konto an oder schaltest das Teilen ein. Cookies werden nicht gesetzt.
+  verlassen dein Gerät nicht, es sei denn, du legst ein Konto an oder schaltest das Teilen ein. Dazu kommen kurzlebige
+  technische Merker im Sitzungsspeicher des Browsers (sessionStorage): wann die App sich zuletzt selbst neu geladen oder
+  repariert hat (damit sie das nicht in einer Schleife tut) und ob sie nach dem Neuladen einmal den Hinweis zeigen soll,
+  dass dein Spielstand von einem anderen Gerät geladen wurde. Sie enthalten nur einen Zeitpunkt oder ein Ja und
+  verschwinden, wenn du den Tab oder die App schließt. Cookies werden nicht gesetzt.
   Schriften, Bilder und Klänge kommen aus der App selbst, nicht von fremden Servern (zum Beispiel nicht von Google Fonts).
   Die lokale Speicherung ist für die Funktion der App unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG). „Fortschritt
   zurücksetzen“ in den Einstellungen löscht Spielstand, Partien und Analysen; die Einstellungen, die Anmeldung und die
@@ -129,7 +133,9 @@
     <li>ein selbst gewählter Benutzername,</li>
     <li>wenn du Freunde hinzufügst: wer mit wem befreundet ist oder eine Anfrage geschickt hat (mit Zeitpunkt), dein
     Einladungscode (7 Tage gültig) und deine Wochenwertung (Punkte und Zahl der gewerteten Partien je Woche). Deine Freunde
-    sehen davon nur deinen Benutzernamen, deine Wochenwertung und dein Profil, nie deine E-Mail-Adresse. Lehnst du eine
+    sehen davon nur deinen Benutzernamen, deine Wochenwertung und dein Profil, nie deine E-Mail-Adresse. Technisch erhält
+    die App deiner Freunde und der Personen, mit denen eine Anfrage offen ist, außerdem die Kennung deines Kontos (eine
+    zufällige Zeichenfolge ohne Namen oder E-Mail-Adresse), um Freundschaft und Anfrage zuzuordnen. Lehnst du eine
     Anfrage ab, bleibt sie 30 Tage gespeichert, damit dieselbe Person dich in der Zeit nicht erneut anfragen kann; danach
     wird sie gelöscht,</li>
     <li>dein Spielstand (Einstellungen, Fortschritt, Partien, Analysen, so wie die App sie speichert),</li>
@@ -276,7 +282,8 @@
   <h3>Online-Partien gegen Freunde</h3>
   <p>Wenn du mit einem Freund online spielst, speichern wir die beiden Konto-IDs, die Züge, die aktuelle Stellung,
   die Schachuhr, den Einladungscode und die Zeitpunkte der Partie. Nur die beiden Spieler können die Partie lesen;
-  eine offene Einladung sieht zunächst nur ihr Ersteller. Diese Daten sind für die gemeinsame Partie erforderlich
+  eine offene Einladung sieht zunächst nur ihr Ersteller. Mit der Partie erhält die App deines Gegners auch die Kennung
+  deines Kontos (eine zufällige Zeichenfolge ohne Namen oder E-Mail-Adresse), nie deine E-Mail-Adresse. Diese Daten sind für die gemeinsame Partie erforderlich
   (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto bei Supabase in Frankfurt.</p>
   <p>Dasselbe gilt für Partien aus der Gegnersuche der Liga: Dort bringt der Server dich mit einem Menschen ähnlicher
   Spielstärke zusammen (statt über einen Einladungscode), und die Partie zählt für die Liga (Abschnitt „Liga mit Kronen
@@ -412,7 +419,9 @@
   du ab 13 Jahren anlegen. Bist du jünger als 16, frag deine Eltern oder Erziehungsberechtigten, bevor du ein Konto
   anlegst. Einwilligungen, zum Beispiel in das Teilen von Partien und Nutzungsdaten (Abschnitt 6), kannst du erst ab
   16 Jahren selbst geben, vorher nur mit Zustimmung deiner Eltern (Art. 8 Abs. 1 DSGVO); der Schalter ist deshalb
-  standardmäßig aus, und die App weist direkt daneben darauf hin. Editionen im Shop gibt es erst ab 18 Jahren (Abschnitt
+  standardmäßig aus, und die App weist direkt daneben darauf hin. Das Trainer-Abo gibt es im Web erst ab 18 Jahren: Vor
+  dem ersten Kauf fragt die App einmal danach und merkt sich nur Ja oder Nein auf deinem Gerät (Abschnitt 4). Spielen und
+  Lernen bleiben davon unberührt. Editionen im Shop gibt es ebenfalls erst ab 18 Jahren (Abschnitt
   „Shop: Editionen“). Eltern können über <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a> Auskunft
   über ein Konto oder seine Löschung verlangen.</p>
 
@@ -435,7 +444,8 @@
 
   <h2>14. Sicherheit</h2>
   <p>Alle Verbindungen sind verschlüsselt (TLS). Auf dem Server sorgen Zugriffsregeln je Zeile (Row Level Security) dafür,
-  dass jedes Konto nur seine eigenen Daten anlegen und lesen kann; geteilte Nutzungsdaten kann ein Konto nur anlegen, gelesen
+  dass jedes Konto nur seine eigenen Daten anlegen und lesen kann, dazu das, was die Abschnitte oben ausdrücklich als für
+  Freunde, Gegner, die Wochen-Gruppe oder die Leitung einer Klasse sichtbar nennen; geteilte Nutzungsdaten kann ein Konto nur anlegen, gelesen
   werden sie nur über die Datenauskunft. In der App steckt nur ein öffentlicher Schlüssel; Geheimnisse liegen ausschließlich
   beim Betreiber.</p>
 
