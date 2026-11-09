@@ -325,8 +325,9 @@ nur „Freunde sind gerade nicht erreichbar“, alles andere läuft weiter.
 **Was der Server sicherstellt:** Die Tabellen sind nur über die Funktionen erreichbar (keine direkten Rechte). Freunde
 sehen nur Benutzername, Wochenpunkte und Partienzahl, nie die E-Mail. Eine abgelehnte Anfrage sperrt 30 Tage still
 (auch nach Zurückziehen), höchstens 100 Freunde und offene Anfragen je Konto, höchstens 20 neue Anfragen am Tag. Ein
-Einladungslink gilt 7 Tage, ein neuer ersetzt den alten. Die Wochenwertung sinkt nie und hat grobe Grenzen (höchstens
-1000 Partien, je Partie höchstens 100.000 Punkte). Mit dem Konto verschwindet alles.
+Einladungslink gilt 7 Tage, ein neuer ersetzt den alten. Die Wochenwertung sinkt nie und hat Grenzen (höchstens
+1000 Partien, je gemeldeter Partie höchstens 50.000 Punkte; bis zum Einspielen von Block 3 unter „Visitenkarte an
+echten Besitz binden“ gilt noch die alte Grenze von 100.000). Mit dem Konto verschwindet alles.
 
 ## Liga mit Kronen (Stand 07.11.2026, Wochen-Gruppen)
 
@@ -421,19 +422,75 @@ Wochen-Gruppe, erster Aufstieg in eine Liga, Konzept 5a) schreibt nur der Server
 Holz bis Krone). Banner aus Wochen, die vor dem Einspielen dieser Datei abgerechnet wurden, kommen beim nächsten Blick auf
 die Karte nach. Das Gerät darf keine dieser Funktionen aufrufen. Titel, Profilbild,
 Hintergrund und Rahmen kommen nur aus festen Listen (kein Freitext, keine Stücke des Erfinders, keine Labor-Rahmen), ein
-Banner nur aus dem eigenen Besitz. Die Karte eines Spielers bekommt nur, wer mit ihm in derselben Online-Partie sitzt.
+Banner nur aus dem eigenen Besitz. Seit dem 09.11.2026 prüft der Server auch Titel, Rahmen, Hintergrund und Profilbild
+gegen den Besitz (Abschnitt „Visitenkarte an echten Besitz binden“ unten). Die Karte eines Spielers bekommt nur, wer mit ihm in derselben Online-Partie sitzt.
 Erfolge, Titel und Banner kann man nie kaufen: kein Kauf und kein Abo führt dorthin. Mit dem Konto verschwindet alles.
 
 **Bekannte Grenze:** Die Stufen aus Bot-Partien, Rätseln, Serie und Level rechnet das Gerät. Ein Spieler, der seinen
 Spielstand von Hand fälscht, kann sich diese Stufen also melden. Der Schaden bleibt klein: Taler kaufen später nur
-Erspielbares, und Liga-Stufen und Liga-Banner bucht allein der Server. Eine Tagesgrenze gibt es bewusst nicht, weil es
-insgesamt nur 30 Stufen gibt. Dasselbe gilt für Titel: der Server prüft nur, dass der Titel aus der festen Liste stammt,
-nicht ob der Spieler ihn erspielt hat (Titel hängen an Level und Erfolgen, die das Gerät rechnet). Ein Schummler kann
-also einen Titel aus der Liste zeigen, den er nicht hat; Freitext ist ausgeschlossen.
+Erspielbares, und Liga-Stufen und Liga-Banner bucht allein der Server. Seit dem 09.11.2026 bremst der Server solche
+Meldungen und bindet Titel und Rahmen an die gebuchten Stufen; was genau, steht im nächsten Abschnitt.
 
 **Rückweg:** `supabase/karte-zurueck.sql` entfernt alles wieder. Achtung: gebuchte Stufen, Taler, Banner und die
 gewählten Karten sind danach weg (die Liga-Stufen leitet der Server beim nächsten Aufruf neu ab, die übrigen Stufen
 meldet das Gerät neu, gutgeschriebene Liga-Banner sind ohne Sicherung weg). Nur nach einer Sicherung ausführen (die Befehle dafür stehen oben in der Datei).
+
+### Visitenkarte an echten Besitz binden (Stand 09.11.2026): bitte neu einspielen
+
+Ein Audit hat drei Lücken gezeigt: Ein direkter Aufruf konnte sich alle Gold-Stufen samt Talern und Bannern in einem
+Schritt gutschreiben, ein neues Konto konnte jeden Titel und Rahmen der Liste tragen (zum Beispiel den Titel für
+Level 100), und die Freunde-Rangliste nahm bis zu 100.000 Punkte je Partie an. Das widerspricht „Prestige nur
+erspielbar“. Die App läuft vor und nach dem Einspielen; es gehen keine Daten verloren und niemand wird herabgestuft.
+
+**Block 1: Visitenkarte.** Im SQL Editor den ganzen Inhalt von `supabase/karte-schema.sql` noch einmal ausführen.
+
+**Block 2: Prüfen.** Den ganzen Inhalt von `supabase/karte-rls-test.sql` ausführen. Erwartung: kein `FEHLER:`, unten
+`Karte-RLS-Test erfolgreich`, am Ende `ROLLBACK`.
+
+**Block 3: Freunde-Rangliste.** Den ganzen Inhalt von `supabase/freunde-schema.sql` noch einmal ausführen, danach zum
+Prüfen `supabase/freunde-rls-test.sql` (Erwartung: `Freunde-RLS-Test erfolgreich`, am Ende `ROLLBACK`).
+
+Die Blöcke 1 und 3 hängen nicht voneinander ab. `daten-schema.sql` muss nicht neu laufen (keine neue Tabelle).
+
+**Was sich ändert:**
+
+- **Stufen melden:** Je Meldung bucht der Server höchstens eine neue Stufe je Erfolgs-Familie, in 24 Stunden höchstens
+  3 neue Silber- und 2 neue Gold-Stufen je Konto. Bronze hat keine Tagesgrenze. Eine Serie-Stufe gibt es erst, wenn es
+  die App so viele Tage gibt (7, 30, 100 Tage seit Mitte Oktober 2026). Taler und Gold-Banner hängen an der gebuchten
+  Stufe. Was heute nicht gebucht wird, verfällt nicht: Die App meldet ihren Stand bei jedem Start neu. Wer als Gast weit
+  gespielt hat und sich dann anmeldet, sieht seine Gold-Stufen deshalb über einige Tage verteilt beim Server ankommen;
+  auf dem eigenen Gerät steht von Anfang an alles.
+- **Karte wählen:** Titel, Rahmen, Hintergrund und Profilbild nimmt der Server nur an, wenn das Konto sie besitzt.
+  Besitz liest er aus den gebuchten Stufen und der Liga. Die ganze Zuordnung steht in `karte_besitz_regeln()` in
+  `karte-schema.sql`, zum Beispiel: Titel für Level 30 und höher brauchen Gold bei „Level“, der Rahmen „Serie 30“
+  braucht Silber bei „Serie“, Rahmen und Kreatur einer Welt brauchen eine gemeisterte Welt, die Titel „Krönung“ und
+  „Ligakrone“ brauchen König III.
+- **Bestand bleibt:** Was vor dem Einspielen auf einer Karte steht, bleibt dort stehen. Geprüft wird nur eine neue Wahl.
+  Gebuchte Stufen, Taler und Banner fasst das Einspielen nicht an.
+- **Freunde-Rangliste:** höchstens 50.000 Punkte je gemeldeter Partie (`wochenpunkte_je_partie_max()`, die Herleitung
+  steht dort). Schon gespeicherte Wochen bleiben, wie sie sind.
+
+**Was der Server weiterhin nicht belegen kann** (bleibt erlaubt, bewusst so):
+
+- Die Stufen selbst (Siege, Bots, Welten, Sterne, Endgegner, Siegesfolge, Rätsel, Serie, Level) meldet weiter das Gerät.
+  Der Server hat dazu keine eigenen Daten. Ein Schummler kommt also weiter an Gold, aber nur noch langsam: frühestens
+  nach 4 Tagen ist alles Gold (Serie erst ab 23.01.2027), nicht mehr in einem Aufruf.
+- Diese Titel bleiben aus der festen Liste für jeden wählbar, weil ihre Grundlage nur auf dem Gerät liegt: Schattenkönig,
+  Goldene Feder, Sternenschüler, Blitzschlag, Langer Atem, Gleichgewicht, Feinschliff, Eigene Kraft, Stammgast,
+  Tafelkönig, Rekordjäger, Fehlerjäger, Musterschüler, Erzfeind.
+- Die Stufen sind gröber als manche Wege in der App. Mit Gold bei „Level“ (Level 30) lässt der Server auch die Titel
+  für Level 35 bis 100 zu, mit einer gemeisterten Welt die Titel, Rahmen und Kreaturen aller Welten, mit einem Sieg die
+  Hintergründe der Welten 2 bis 5.
+- Rahmen und Titel der alten Saison-Liga (Rahmen Bronze bis Meister, Titel Goldlorbeer und Ligakrone) kann der Server
+  nicht belegen, die alte Liga lief nur auf dem Gerät. Konten, die es vor dem 09.11.2026 schon gab, dürfen sie weiter
+  wählen; neuere Konten nur mit König III (`alt_liga_bis` in `karte_konstanten()`).
+  Folge: Wer die alte Liga als Gast erspielt hat und erst nach dem 09.11.2026 ein Konto anlegt, sieht diese Rahmen
+  weiter auf dem eigenen Gerät, kann sie aber dem Gegner nicht zeigen. Wer das lockern will, setzt `alt_liga_bis` auf
+  ein späteres Datum und spielt die Datei noch einmal ein.
+
+**Rückweg (ohne Datenverlust):** `supabase/karte-besitz-zurueck.sql` stellt die drei Funktionen der Karte auf den Stand
+vom 07.11.2026 zurück, `supabase/freunde-grenze-zurueck.sql` die alte Grenze der Rangliste. Beide lassen alle Tabellen
+und Zeilen stehen. Wieder einschalten: die Schema-Datei noch einmal einspielen.
 
 ## Rätsel-Duell (Stand 07.11.2026)
 

@@ -13,9 +13,11 @@
 --                       oeffnet und annimmt, ist sofort befreundet: der Einladende hat mit dem Teilen zugestimmt.
 --   wochenpunkte        je Konto und Woche (Montag, Kalender Europe/Berlin wie die App) die Wochenwertung fuer die
 --                       Freunde-Rangliste: Summe der besten Partie je Bot-Tafel der Woche und die Zahl der gewerteten
---                       Partien. Die App meldet sie; sie sinkt nie (zwei Geraete: der hoehere Stand gilt). Grobe Grenzen in
---                       der Datenbank (hoechstens 1000 Partien, je Partie hoechstens 100.000 Punkte); fuer die Weltrangliste
---                       kommt spaeter eine strengere Pruefung dazu. Freunde sehen nur Name, Punkte und Partien.
+--                       Partien. Die App meldet sie; sie sinkt nie (zwei Geraete: der hoehere Stand gilt). Grenzen: hoechstens
+--                       1000 Partien je Woche und (seit 09.11.2026) je gemeldeter Partie hoechstens 50.000 Punkte
+--                       (wochenpunkte_je_partie_max; die Tabelle selbst behaelt das alte grobe Netz von 100.000, damit
+--                       schon gespeicherte Zeilen bleiben); fuer die Weltrangliste kommt spaeter eine strengere Pruefung
+--                       dazu. Freunde sehen nur Name, Punkte und Partien.
 --
 -- Funktionen (security definer, search_path = ''), alle nur fuer authenticated:
 --   freund_anfragen(name text) -> jsonb { ergebnis }   'gesendet' | 'freunde' (der andere hatte schon gefragt, jetzt
@@ -332,6 +334,22 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Wochenwertung melden und Freunde-Rangliste
 -- ---------------------------------------------------------------------------
+-- Obergrenze je gemeldeter Partie (Audit 09.11.2026, vorher 100.000). Woher die Zahl kommt (js/pakete/punkte/formel.js,
+-- Rechenstand 1): feste Teile hoechstens 10.800 (Sieg 4.000, Verwertung 3.000, Weisse Weste 2.000, Uhr 1.000, Theorie
+-- 800), dazu hoechstens 40 offene Zuege. Eine sehr starke Partie eines Menschen (im Schnitt Praezise, lange COMBO)
+-- liegt bei rund 40.000 bis 45.000, die staerksten Bot-Laeufe im Repo (daten/punkte/bot-laeufe.json) bei 27.000. Erst
+-- durchgehend Goldrichtig und Genial mit voller COMBO (Engine-Hilfe) kaeme darueber, rechnerisch bis 154.800. Die
+-- Wochenwertung zaehlt je Tafel nur die beste Partie, gemeldet wird aber die Zahl ALLER Partien: der Schnitt je
+-- gemeldeter Partie liegt bei ehrlichem Spiel also noch tiefer. Aendert sich die Formel, hier nachziehen. Nur intern.
+create or replace function public.wochenpunkte_je_partie_max()
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select 50000
+$$;
+
 create or replace function public.wochenpunkte_melden(woche date, punkte integer, partien integer)
 returns jsonb
 language plpgsql
@@ -350,7 +368,8 @@ begin
   if woche is null or extract(isodow from woche) <> 1 or woche not in (heute, heute - 7) then
     return jsonb_build_object('ergebnis', 'woche');
   end if;
-  if punkte is null or partien is null or punkte < 0 or partien < 0 or partien > 1000 or punkte > partien * 100000 then
+  if punkte is null or partien is null or punkte < 0 or partien < 0 or partien > 1000
+     or punkte > partien * public.wochenpunkte_je_partie_max() then
     return jsonb_build_object('ergebnis', 'werte');
   end if;
   insert into public.wochenpunkte as w (user_id, woche, punkte, partien, aktualisiert_am)
@@ -406,6 +425,7 @@ revoke all on function public.freund_einladung() from anon, authenticated, servi
 revoke all on function public.freund_einladung_nutzen(text) from anon, authenticated, service_role, public;
 revoke all on function public.freund_diese_woche() from anon, authenticated, service_role, public;
 revoke all on function public.wochenpunkte_melden(date, integer, integer) from anon, authenticated, service_role, public;
+revoke all on function public.wochenpunkte_je_partie_max() from anon, authenticated, service_role, public;
 revoke all on function public.freunde_rangliste(text) from anon, authenticated, service_role, public;
 
 grant execute on function public.freund_anfragen(text) to authenticated;
