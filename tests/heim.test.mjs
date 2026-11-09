@@ -579,9 +579,19 @@ async function testeRueckkehr(browser, heute) {
   await istScreen(seite, 'heim');
   let z = await zeile(seite);
   pruefe('3 Tage Pause: erste Zeile "Willkommen zurück" mit der letzten Partie', z && z.erste && z.sichtbar
-    && z.text === 'Willkommen zurück | Zuletzt vor 3 Tagen: Sieg gegen Vogelscheuche Willi', JSON.stringify(z));
+    && z.text === 'Willkommen zurück | Sieg gegen Willi vor 3 Tagen', JSON.stringify(z));
   pruefe('Knopf "Spielen", ganze Zeile ab 44 px, Vorlese-Text vollständig', z && z.knopf === 'Spielen' && z.h >= 44
-    && z.label === 'Willkommen zurück. Zuletzt vor 3 Tagen: Sieg gegen Vogelscheuche Willi. Spielen', JSON.stringify(z));
+    && z.label === 'Willkommen zurück. Sieg gegen Willi vor 3 Tagen. Spielen', JSON.stringify(z));
+  // Kundenblick 09.11.2026: die Zeile ist einzeilig; mit dem langen Bot-Namen stand am Handy nur "Sieg ge…" da.
+  // Jetzt Ergebnis und Gegner (Rufname) vorn: wird gekuerzt, faellt hoechstens die Zeit weg
+  await kontext.close();
+  ({ kontext, seite, fehler } = await neueSeite(browser, { w: 375, h: 667, speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -3)), [P + 'partien']: [PARTIE_WILLI] } }));
+  await istScreen(seite, 'heim');
+  const sichtbar = await seite.evaluate(() => { const s = document.querySelector('.heim-liste .heim-zurueck .heim-zeile-text > span');
+    if (!s) return null; const r = document.createRange(); const n = s.firstChild; const ende = n.textContent.indexOf('Willi') + 5;
+    r.setStart(n, 0); r.setEnd(n, ende); return { text: n.textContent, kern: r.getBoundingClientRect().right, rand: s.getBoundingClientRect().right }; });
+  pruefe('iPhone SE (375 px): Ergebnis und Gegner stehen vorn und ganz sichtbar („Sieg gegen Willi“)', !!sichtbar && sichtbar.text.startsWith('Sieg gegen Willi')
+    && sichtbar.kern <= sichtbar.rand, JSON.stringify(sichtbar));
   pruefe('gemerkt: heute als Besuchstag, Rückkehr mit Pause 3', await gemerkt(seite).then((b) => b && b.tag === heute && b.zurueck && b.zurueck.pause === 3 && b.zurueck.tag === heute));
   // zweiter Aufruf am selben Tag: die Zeile bleibt (der Tag der Rueckkehr zaehlt, nicht der erste Aufruf)
   await seite.goto(BASIS + '#einstellungen');
@@ -622,7 +632,7 @@ async function testeRueckkehr(browser, heute) {
     [P + 'einstellungen']: { sprache: 'en' } } }));
   await istScreen(seite, 'heim');
   z = await zeile(seite);
-  pruefe('Englisch: "Welcome back", Knopf "Play"', z && z.text.startsWith('Welcome back | Last time, 2 days ago: Win vs ') && z.knopf === 'Play', JSON.stringify(z));
+  pruefe('Englisch: "Welcome back", Knopf "Play"', z && z.text.startsWith('Welcome back | Win vs ') && z.knopf === 'Play', JSON.stringify(z));
   await kontext.close();
 }
 
