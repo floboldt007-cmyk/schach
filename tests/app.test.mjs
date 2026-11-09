@@ -1489,7 +1489,8 @@ async function testeErweiterungen(browser) {
   const serieAmScreen = await seite.evaluate(() => document.querySelector('.screen.partie').dataset.serie);
   const ov = await seite.evaluate(() => {
     const k = document.querySelector('.ergebnis-karte');
-    const kinder = [...k.children].map((c) => c.className.split(' ')[0]);
+    // seit Punkt 19 liegt der Inhalt im Scrollbereich .erg-rumpf, die Reihenfolge gilt dort
+    const kinder = [...k.querySelector('.erg-rumpf').children].map((c) => c.className.split(' ')[0]);
     return {
       kinder,
       karte: !!k.querySelector('.erg-karte-ort > .w0-test[data-ort="ergebnis:karte"]'),
