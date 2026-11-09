@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 277;
-const STAND = '13d53270cb1a';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 284;
+const STAND = 'be19b8039115';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -211,6 +211,7 @@ const DATEIEN = [
   'js/feier.js',
   'js/inhalte.js',
   'js/konto-config.js',
+  'js/botschutz.js',
   'js/konto.js',
   'js/umzug.js',
   'js/profil.js', 'js/rahmen-kunst.js', 'js/sammlung-kunst.js', 'js/kreaturen-kunst.js', 'js/emote-kunst.js', 'js/titel-kunst.js',
@@ -765,15 +766,42 @@ const DATEIEN = [
 async function mitTyp(datei, antwort) {
   if (/\.[a-z0-9]+$/i.test(datei)) return antwort;
   const text = await antwort.text();
-  return new Response(text, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  const kopf = { 'Content-Type': 'text/plain; charset=utf-8' };
+  // das ETag bleibt dran, sonst kommt die Datei bei jedem Update voll neu (holeFrisch)
+  if (antwort.headers.get('ETag')) kopf.ETag = antwort.headers.get('ETag');
+  return new Response(text, { status: 200, headers: kopf });
+}
+
+// Der Cache der Vorgaenger-Version (falls da): unveraenderte Dateien muessen beim Update nicht neu durchs Netz
+async function alterCache() {
+  const namen = (await caches.keys()).filter((n) => n.startsWith(PRAEFIX) && n !== CACHE)
+    .sort((a, b) => Number(b.slice(PRAEFIX.length + 1)) - Number(a.slice(PRAEFIX.length + 1)));
+  return namen.length ? caches.open(namen[0]) : null;
+}
+
+// Eine Datei frisch vom Server, nie ungeprueft aus einem Cache (sonst rutscht eine alte Datei in den neuen Cache):
+//   - liegt sie im alten Cache mit ETag, fragt der Server "geaendert?" (If-None-Match); 304 = die alte Antwort gilt weiter
+//   - sonst prueft der Browser seinen HTTP-Cache beim Server nach ('no-cache'): beim Erstbesuch kommen die Dateien,
+//     die die Seite gerade geladen hat, als 304 ohne zweiten Download
+// Leistungsmessung 09.11.2026: vorher lud jedes Update alle Dateien neu (744 Anfragen, 8,3 MB), auch die
+// unveraenderte Stockfish-Datei (1,8 MB), und der Erstbesuch holte die Dateien der Seite ein zweites Mal.
+async function holeFrisch(datei, alt) {
+  const vorher = alt ? await alt.match(datei) : null;
+  const etag = vorher && vorher.headers.get('ETag');
+  if (etag) {
+    const antwort = await fetch(new Request(datei, { cache: 'no-store', headers: { 'If-None-Match': etag } }));
+    if (antwort.status === 304) return vorher;
+    if (antwort.ok) return antwort;
+  }
+  return fetch(new Request(datei, { cache: 'no-cache' }));
 }
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
+    const alt = await alterCache().catch(() => null);
     await Promise.all(DATEIEN.map(async (datei) => {
-      // am HTTP-Cache vorbei, damit keine alte Datei in den neuen Cache rutscht
-      const antwort = await fetch(new Request(datei, { cache: 'reload' }));
+      const antwort = await holeFrisch(datei, alt);
       if (!antwort.ok) throw new Error(`Vorladen fehlgeschlagen: ${datei} (${antwort.status})`);
       await cache.put(datei, await mitTyp(datei, antwort));
     }));

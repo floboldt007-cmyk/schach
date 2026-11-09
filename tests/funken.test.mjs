@@ -1080,6 +1080,10 @@ async function testeBrowser(browser) {
   pruefe('ergebnis:abrechnung: eine Zeile data-zeile="funken" in der Abrechnung', await seite.locator('.erg-karte-ort .abrechnung > .fk-abr[data-zeile="funken"]').count() === 1);
   pruefe('Zeile „+Funken“ wie gebucht (Rückenwind-Karte: × 2 in der Formel)', (await seite.locator('.fk-wert').innerText()).trim() === '+' + zahlText(e1.f)
     && e1.rw === 'karte' && /× 2/.test(await seite.locator('.fk-formel').innerText()) && st1.rw.aktiv === 2, { e1, formel: await seite.locator('.fk-formel').innerText() });
+  // R5-12 (Kundenblick 09.11.2026): erster Sieg mit Meilenstein-Funken; vorher stand nur "35 + 250" da, ohne zu sagen, was welche Zahl ist
+  const formel1 = (await seite.locator('.fk-formel').innerText()).trim();
+  pruefe('Formel mit Meilenstein beschriftet: „Partie … + Bonus …“, die Bonus-Zahl ist die gebuchte (R5-12)', e1.m > 0
+    && formel1.startsWith('Partie ') && formel1.endsWith(' + Bonus ' + zahlText(e1.m)), { formel1, m: e1.m });
   const sk1 = await skala(seite, '.fk-abr .fk-balken > i');
   pruefe('Level-Balken steht auf dem neuen Stand', Math.abs(sk1 - fs1.anteil) < 0.02 && (await seite.locator('.fk-abr .fk-level').innerText()).trim() === `Level ${fs1.level}`
     && (await seite.locator('.fk-abr .fk-bis').innerText()).trim() === `${zahlText(fs1.bis)} bis Level ${fs1.level + 1}`, { sk1, fs1 });

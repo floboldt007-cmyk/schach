@@ -44,7 +44,7 @@ registriereTexte('p-sammlung', {
     'liga.1': 'Bronze', 'liga.2': 'Silber', 'liga.3': 'Gold', 'liga.4': 'Platin', 'liga.5': 'Diamant', 'liga.6': 'Meister',
     // Shop (Editionen): ruhige Fakten, kein Druck (tests/fairness.test.mjs)
     'shop.name': 'Shop', 'shop.anmelden': 'Editionen gibt es mit Konto und ab 18 Jahren.', 'shop.zumKonto': 'Zum Konto',
-    'shop.gastUeber': 'Edition', 'shop.gastKlein': 'Kaufen mit Konto, ab 18 Jahren',
+    'shop.gastUeber': 'Edition', 'shop.gastKlein': 'Kaufen mit Konto',
     'shop.laedt': 'Editionen werden geladen …', 'shop.alterFrage': 'Editionen kaufen kann, wer 18 oder älter ist.',
     'shop.alterJa': 'Ich bin 18 oder älter', 'shop.fehler': 'Das hat gerade nicht geklappt. Versuch es später noch einmal.',
     'shop.vorbereitung': 'Die erste Edition ist in Vorbereitung. Sie erscheint hier mit Datum, bevor der Verkauf beginnt.',
@@ -53,6 +53,7 @@ registriereTexte('p-sammlung', {
     'shop.anprobeText': 'So sieht das Brett aus. Benutzen kannst du es, sobald es dir gehört.',
     'shop.verfuegbar': '{n} von {auflage} verfügbar', 'shop.erhaeltlich': 'Erhältlich', 'shop.angekuendigt': 'Verkauf ab {datum}',
     'shop.pausiert': 'Verkauf pausiert', 'shop.vergeben': 'Alle {auflage} vergeben', 'shop.beendet': 'Verkauf beendet',
+    'shop.produkt.brett-mitternacht': 'Mitternacht & Gold',
     // Erfinder-Profil (nur mit Sonderstuecken vom Server)
     'erfinder.name': 'Erfinder', 'erfinder.banner': 'Banner „Blatt 0“', 'erfinder.titel': 'Der Erfinder',
     // Titel (Flo 01.11.2026: "Titel auch zu Errungenschaften, nicht nur bei den Leveln"), js/pakete/sammlung/titel.js
@@ -131,7 +132,7 @@ registriereTexte('p-sammlung', {
     'figur.K': 'King', 'figur.Q': 'Queen', 'figur.R': 'Rook', 'figur.B': 'Bishop', 'figur.N': 'Knight', 'figur.P': 'Pawn',
     'liga.1': 'Bronze', 'liga.2': 'Silver', 'liga.3': 'Gold', 'liga.4': 'Platinum', 'liga.5': 'Diamond', 'liga.6': 'Master',
     'shop.name': 'Shop', 'shop.anmelden': 'Editions need an account and are for ages 18 and up.', 'shop.zumKonto': 'Go to account',
-    'shop.gastUeber': 'Edition', 'shop.gastKlein': 'Buy with an account, ages 18 and up',
+    'shop.gastUeber': 'Edition', 'shop.gastKlein': 'Buy with an account',
     'shop.laedt': 'Loading editions …', 'shop.alterFrage': 'Editions can be bought by people aged 18 or older.',
     'shop.alterJa': 'I am 18 or older', 'shop.fehler': 'That did not work just now. Please try again later.',
     'shop.vorbereitung': 'The first edition is being prepared. It will appear here with a date before sales begin.',
@@ -140,6 +141,7 @@ registriereTexte('p-sammlung', {
     'shop.anprobeText': 'This is how the board looks. You can use it once it is yours.',
     'shop.verfuegbar': '{n} of {auflage} available', 'shop.erhaeltlich': 'Available', 'shop.angekuendigt': 'On sale from {datum}',
     'shop.pausiert': 'Sales paused', 'shop.vergeben': 'All {auflage} taken', 'shop.beendet': 'Sales ended',
+    'shop.produkt.brett-mitternacht': 'Midnight & Gold',
     'erfinder.name': 'Creator', 'erfinder.banner': 'Banner “Sheet 0”', 'erfinder.titel': 'The Creator',
     titel: 'Titles', 'titel.ab': 'From level {level}', 'titel.weg': 'With the achievement “{erfolg}”', 'titel.deiner': 'Your title',
     'titel.auto': 'Your title (automatic)', 'titel.frei': 'Unlocked, tap to wear',

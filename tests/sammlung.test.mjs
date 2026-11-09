@@ -11,7 +11,8 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { setzeSpeicher } from '../js/storage.js';
 import { teileBretter, teileKlaenge, teileErfolge, partienStand, schulStand, SIEGE_ZIELE } from '../js/pakete/sammlung/index.js';
-import { standText } from '../js/pakete/sammlung/shop.js';
+import { standText, produktName } from '../js/pakete/sammlung/shop.js';
+import { setzeSprache } from '../js/sprache.js';
 import { rahmenTeile, motivTeile, grundTeile, titelTeile, duellProfil } from '../js/pakete/sammlung/profil.js';
 import { titelListe, aktuellerTitel, ERFOLGS_TITEL, KOENNEN_TITEL, koennenFrei } from '../js/pakete/sammlung/titel.js';
 import { erspielteTitel, merkeErspielteTitel, erspielteErfolge } from '../js/profil.js';
@@ -212,6 +213,26 @@ pruefe('Shop: ohne Restzahl vom Server keine Zahl', standText({ status: 'erhaelt
 pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText({ status: 'angekuendigt', verkauf_ab: '2026-12-01T10:00:00Z', auflage: 10 }) === 'Verkauf ab 01.12.2026'
   && standText({ status: 'ausverkauft', auflage: 10 }) === 'Alle 10 vergeben' && standText({ status: 'pausiert' }) === 'Verkauf pausiert'
   && standText({ status: 'beendet' }) === 'Verkauf beendet');
+// Englisch-Durchsicht 09.11.: Name der Edition und Datum folgen der Sprache (Server kennt nur den deutschen Namen)
+pruefe('Shop: deutscher Name bleibt, Server-Name zaehlt', produktName('brett-mitternacht') === 'Mitternacht & Gold' && produktName('brett-mitternacht', 'Anders') === 'Anders');
+setzeSprache('en');
+{
+  const ab = standText({ status: 'angekuendigt', verkauf_ab: '2026-12-01T10:00:00Z', auflage: 10 });
+  pruefe('Shop englisch: Midnight & Gold statt des deutschen Server-Namens, Datum im US-Format',
+    produktName('brett-mitternacht', 'Mitternacht & Gold') === 'Midnight & Gold' && ab === 'On sale from 12/01/2026', ab);
+}
+// Der englische Name ist nur Anzeige: Besitz steht nur in der Datenbank (besitz, Schluessel produkt_id), und shop.js
+// findet Aussehen, Karte und Server-Abgleich ueber die produkt_id; mit dem Namen vergleicht nichts
+{
+  const quelle = readFileSync(path.join(WURZEL, 'js/pakete/sammlung/shop.js'), 'utf8');
+  const zeilen = quelle.split('\n').filter((z) => !z.trim().startsWith('//'));
+  const nameVergleich = zeilen.filter((z) => /\bname\s*[!=]==?|[!=]==?\s*[\w.]*\bname\b/.test(z));
+  const nameNutzung = zeilen.filter((z) => /\b(e|a|aussehen)\.name\b/.test(z));
+  pruefe('Shop: Name nur Anzeige, kein Vergleich ueber den Namen, Zuordnung ueber produkt_id',
+    nameVergleich.length === 0 && nameNutzung.every((z) => /produktName\(|aussehen\.name : id/.test(z)) && /KATALOG\[e\.produkt_id\]/.test(quelle)
+    && produktName('brett-mitternacht', 'Mitternacht & Gold') === 'Midnight & Gold', { nameVergleich, nameNutzung });
+}
+setzeSprache('de');
 
 // Titel (Flo 01.11.2026: "bessere Designs, Titel auch zu Errungenschaften, nicht nur bei den Leveln")
 {
@@ -366,6 +387,13 @@ async function shopTeil(browser) {
     const k = [...document.querySelectorAll('.sh-gast .sh-karte[data-gast]')];
     return k.length > 0 && !document.querySelector('.sh-bereich .sh-kaufen') && k.every((x) => !/€|Taler/.test(x.textContent));
   }));
+  // R5-2 (Kundenblick 09.11.2026): „ab 18“ stand doppelt im Blatt (Hinweis oben und auf der Karte)
+  pruefe('Shop abgemeldet: „ab 18“ steht genau einmal im Blatt (R5-2)', (text.match(/ab 18/g) || []).length === 1, text);
+  // R5-3: ausgegraut bleibt, aber das Brett muss als Brett erkennbar sein (vorher Deckkraft .55 = graues Karomuster wie ein kaputtes Bild)
+  const vorschau = await p.s.evaluate(() => { const b = document.querySelector('.sh-karte[data-gast] .sh-bild'); const c = getComputedStyle(b);
+    return { opacity: +c.opacity, filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
+  pruefe('Shop abgemeldet: Vorschau ausgegraut, aber kräftig genug und mit Brettrand (R5-3)', /grayscale\(1\)/.test(vorschau.filter)
+    && vorschau.opacity >= 0.8 && vorschau.rand !== 'none', vorschau);
   pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
   // Kundenblick 09.11.2026 (Befund 12): kein leeres "0 / 0" auf "Ich", ohne Partie auch keine Spielzahl im Profil
   const ich = await p.s.evaluate(() => ({ zahlen: [...document.querySelectorAll('.sa-gross .zahl, .sa-platz-zahl')].map((z) => z.textContent.trim()),
