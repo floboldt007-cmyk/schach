@@ -821,7 +821,11 @@ async function testeFundament(browser) {
   pruefe('abgelehnt per Finger: gefesselten Springer ziehen meldet c3-d5', JSON.stringify(lt) === '[{"von":"c3","nach":"d5","art":"ziehen"}]'
     && (await ht.figurSitzt('c3')), lt);
   // Finger ueber einem erlaubten Ziel: die Figur bleibt unter dem Finger (kein Einrasten von Feld zu Feld), und das
-  // Brett wird pro Geste hoechstens einmal neu gemessen (nicht bei jeder Fingerbewegung)
+  // Brett wird pro Geste hoechstens einmal neu gemessen (nicht bei jeder Fingerbewegung).
+  // Halte-Pfeile dabei aus: kommt die erste Bewegung erst nach HALTEN_MALEN (400 ms), malt der Finger gewollt einen
+  // Pfeil statt zu ziehen. Der Treiber braucht in WebKit fuer Aufsetzen und erste Bewegung gemessen 230 bis 480 ms,
+  // ohne diese Sperre war die Pruefung deshalb ein Wettlauf gegen die Uhr (CI-Lauf 42299790934).
+  await t.seite.evaluate(() => demo.brett.setzePfeileErlaubt(false));
   await ht.setzeFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const e2 = await ht.mitte('e2');
   const e3 = await ht.mitte('e3');
@@ -845,7 +849,7 @@ async function testeFundament(browser) {
   // erste Bewegung nach mehr als 400 ms waere eine Mal-Geste (Halte-Uhr), dann ist lage null: die Zeit steht in der Meldung
   const zeit = await finger.seitAufsetzen();
   await finger.hoch(fx, fy);
-  await t.seite.evaluate(() => { Element.prototype.getBoundingClientRect = window.__echtRect; });
+  await t.seite.evaluate(() => { Element.prototype.getBoundingClientRect = window.__echtRect; demo.brett.setzePfeileErlaubt(true); });
   pruefe('Finger ueber erlaubtem Ziel: Figur bleibt unter dem Finger (Abstand < 2 px, kein Einrasten)',
     !!lage && Math.abs(lage.x - fx) < 2 && Math.abs(lage.y - fy) < 2, JSON.stringify({ lage, finger: [fx, fy], zeit }));
   pruefe('Ziehen misst das Brett hoechstens zweimal pro Geste (Anheben und Start), nicht bei jeder Bewegung',
