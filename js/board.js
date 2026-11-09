@@ -353,6 +353,8 @@ export class Brett {
     this._koord = !!koordinaten;
     this._koordLage = KOORD_LAGEN.includes(koordLage) ? koordLage : 'ecke';
     this._cursorFeld = null;
+    this._bedienbar = false;     // Tastatur/Screenreader: an, sobald das Brett einmal Zuege annimmt (erlaubeZuege mit Karte)
+    this._fokusFeld = null;      // das eine Feld mit tabindex 0 (wandernder Fokus)
 
     this._baue();
     alleBretter.add(this);
@@ -406,6 +408,10 @@ export class Brett {
   erlaubeZuege(karte) {
     this._erlaubtVersion++;
     this._karte = karte || null;
+    if (karte && !this._bedienbar) {
+      this._bedienbar = true;
+      this.el.setAttribute('role', 'group');
+    }
     this._baueErlaubt();
     if (this._geste && !this._kannZiehen(this._geste.von)) this._brichGesteAb(true);
     const u = this._umwandlung;
@@ -662,10 +668,14 @@ export class Brett {
     el.removeEventListener('lostpointercapture', this._h.abbruch);
     el.removeEventListener('contextmenu', this._h.kontext);
     el.removeEventListener('pointerleave', this._h.verlassen);
+    el.removeEventListener('keydown', this._h.feldTaste);
+    el.removeEventListener('focusin', this._h.fokusRein);
+    el.removeEventListener('focusout', this._h.fokusRaus);
     document.removeEventListener('keydown', this._h.taste);
     window.removeEventListener('resize', this._h.verwerfeRechteck);
     window.removeEventListener('scroll', this._h.verwerfeRechteck, { capture: true });
     el.innerHTML = '';
+    if (this._bedienbar) el.removeAttribute('role');
     el.style.removeProperty('--brett-dauer');
     el.classList.remove('brett', 'zieht', 'greifbar', 'ohne-koordinaten', 'koord-rand', 'malt');
   }
@@ -717,7 +727,13 @@ export class Brett {
     this._umwandlungEl.setAttribute('role', 'dialog');
     this._umwandlungEl.setAttribute('aria-label', t('rahmen.brett.umwandlung'));
 
-    el.append(this._felderEl, this._koordRandEl, this._pfeileEl, this._nutzerEl, this._nummernEl, this._umwandlungEl);
+    // Fokusring der Tastatur: eigene Ebene ueber den Figuren (auf dem Feld selbst laege er unter Zug-Toenung und Figur)
+    this._fokusEl = document.createElement('div');
+    this._fokusEl.className = 'brett-fokus';
+    this._fokusEl.hidden = true;
+    this._fokusEl.setAttribute('aria-hidden', 'true');
+
+    el.append(this._felderEl, this._koordRandEl, this._pfeileEl, this._nutzerEl, this._nummernEl, this._umwandlungEl, this._fokusEl);
     el.classList.toggle('ohne-koordinaten', !this._koord);
     this._beschrifte();
 
@@ -729,6 +745,9 @@ export class Brett {
       kontext: (e) => e.preventDefault(),
       verlassen: () => this._setzeCursor(null),
       taste: (e) => { if (e.key === 'Escape' && this._umwandlung) this._brichUmwandlungAb(true); },
+      feldTaste: (e) => this._feldTaste(e),
+      fokusRein: (e) => this._fokusRein(e),
+      fokusRaus: () => { this._fokusEl.hidden = true; },
       wahlRunter: (e) => this._wahlRunter(e),
       wahlHoch: (e) => this._wahlHoch(e),
       wahlKlick: (e) => this._wahlKlick(e),
@@ -743,6 +762,9 @@ export class Brett {
     el.addEventListener('lostpointercapture', this._h.abbruch);
     el.addEventListener('contextmenu', this._h.kontext);
     el.addEventListener('pointerleave', this._h.verlassen);
+    el.addEventListener('keydown', this._h.feldTaste);
+    el.addEventListener('focusin', this._h.fokusRein);
+    el.addEventListener('focusout', this._h.fokusRaus);
     this._umwandlungEl.addEventListener('pointerdown', this._h.wahlRunter);
     this._umwandlungEl.addEventListener('pointerup', this._h.wahlHoch);
     this._umwandlungEl.addEventListener('click', this._h.wahlKlick);
@@ -774,6 +796,7 @@ export class Brett {
         if (rand) { s.style.left = prozent(spalte); this._koordRandEl.append(s); } else f.append(s);
       }
     });
+    this._benenneFelder();   // nach dem Drehen tragen die Felder andere Namen
   }
 
   // ----- Koordinaten -----
@@ -1042,6 +1065,111 @@ export class Brett {
     // gewaehlte Figur steht leicht angehoben (nicht waehrend sie gezogen wird)
     const heben = !v && !malBereit && this._auswahl && !(this._geste && this._geste.zieht) ? this._figuren.get(this._auswahl) : null;
     for (const el of this._figuren.values()) el.classList.toggle('angehoben', el === heben);
+    this._benenneFelder();
+  }
+
+  // ----- Tastatur und Screenreader (Punkt 34, Barrierefreiheit 10.11.2026) -----
+  // Nimmt das Brett Zuege an, wird jedes Feld ein Knopf mit Namen ("e4, weißer Bauer", "e5, leer, mögliches Ziel").
+  // Nur ein Feld hat tabindex 0 (wandernder Fokus): Pfeiltasten bewegen ihn, Enter/Leertaste wirkt wie ein Tipp,
+  // Escape nimmt Auswahl oder Vorschau zurueck. Ein Brett, das nie Zuege annimmt (Vorschau, Analyse), bleibt wie es war.
+  _benenneFelder() {
+    if (!this._bedienbar) return;
+    if (!this._fokusFeld) this._fokusFeld = this.ausrichtung === 'b' ? 'e7' : 'e2';
+    const v = this._vorschau;
+    const ziele = !v && this._auswahl && !this._umwandlung ? this._zieleVon(this._auswahl) : null;
+    for (const f of this._feldEls) {
+      const feld = f.dataset.feld;
+      const code = this.figurAuf(feld);
+      let name = code ? t('rahmen.brett.feldFigur', { feld, figur: t('rahmen.brett.stein.' + code) }) : t('rahmen.brett.feldLeer', { feld });
+      if (feld === (v ? v.von : this._auswahl)) name += t('rahmen.brett.zusatz.gewaehlt');
+      else if (v && feld === v.nach) name += t('rahmen.brett.zusatz.vorschau');
+      else if (ziele && ziele.has(feld)) name += t('rahmen.brett.zusatz.ziel');
+      if (feld === this._schach) name += t('rahmen.brett.zusatz.schach');
+      if (this._letzter && this._letzter.includes(feld)) name += t('rahmen.brett.zusatz.zuletzt');
+      if (f.getAttribute('aria-label') !== name) f.setAttribute('aria-label', name);
+      const tab = feld === this._fokusFeld ? '0' : '-1';
+      if (f.getAttribute('tabindex') !== tab) f.setAttribute('tabindex', tab);
+      if (f.getAttribute('role') !== 'button') f.setAttribute('role', 'button');
+    }
+    this._platziere(this._fokusEl, this._fokusFeld);
+  }
+
+  _feldEl(feld) {
+    return this._feldEls.find((f) => f.dataset.feld === feld) || null;
+  }
+
+  _fokussiere(feld) {
+    this._fokusFeld = feld;
+    this._benenneFelder();
+    const f = this._feldEl(feld);
+    if (f) f.focus();
+  }
+
+  _fokusRein(e) {
+    const f = e.target.closest && e.target.closest('.feld');
+    if (!f || !this._bedienbar) { this._fokusEl.hidden = true; return; }
+    if (f.dataset.feld !== this._fokusFeld) { this._fokusFeld = f.dataset.feld; this._benenneFelder(); }
+    // der Ring nur bei Tastatur-Fokus (wie :focus-visible), nie nach Maus oder Finger
+    let sichtbar = true;
+    try { sichtbar = f.matches(':focus-visible'); } catch (err) { /* aelterer Browser: immer zeigen */ }
+    this._fokusEl.hidden = !sichtbar;
+  }
+
+  _feldTaste(e) {
+    const f = e.target.closest && e.target.closest('.feld');
+    if (!f || !this._bedienbar || this._umwandlung || e.altKey || e.ctrlKey || e.metaKey) return;
+    const feld = f.dataset.feld;
+    const schritt = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (schritt) {
+      const [x, y] = this._spalteZeile(feld);
+      const neu = this._feldAus(x + schritt[0], y + schritt[1]);
+      if (neu) this._fokussiere(neu);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      if (!e.repeat) this._tastenTipp(feld);
+    } else if (e.key === 'Escape') {
+      if (this._vorschau) this._brichVorschauAb(true);
+      else if (this._auswahl) { this._auswahl = null; this._zeichneLagen(); }
+      else return;   // nichts zurueckzunehmen: Escape gehoert der Umgebung (z. B. Zug-Ansicht schliessen)
+    } else return;
+    // auch am Brettrand: die Seite scrollt nicht, und die Pfeiltasten der Partie (Zug-Ansicht) bekommen die Taste nicht
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  // Enter/Leertaste auf einem Feld: derselbe Weg wie ein Tipp mit der Maus (_runter), ohne Ziehen, Halten und Malen.
+  // Gilt auch bei steuerung 'ziehen', denn ziehen geht mit der Tastatur nicht.
+  _tastenTipp(feld) {
+    if (this._wartet) return;
+    this._stumm = null;
+    const v = this._vorschau;
+    if (v) {
+      if (feld === v.nach || feld === v.eingabe) { this._eingabe(v.von, v.nach, 'tippen'); this._fokussiereUmwandlung(); return; }
+      this._brichVorschauAb(true);
+      if (!this._kannZiehen(feld)) return;
+    }
+    if (this._auswahl && this._auswahl !== feld && this._zieleVon(this._auswahl).has(feld)) {
+      this._eingabe(this._auswahl, feld, 'tippen');
+      this._fokussiereUmwandlung();
+      return;
+    }
+    if (this._kannZiehen(feld)) {
+      this._auswahl = this._auswahl === feld ? null : feld;
+      this._zeichneLagen();
+      return;
+    }
+    if (this.beiAbgelehnt && this._erlaubt && this._auswahl && !this._eigeneFigur(feld)) this._meldeAbgelehnt(this._auswahl, feld, 'tippen');
+    if (this._auswahl) {
+      this._auswahl = null;
+      this._zeichneLagen();
+    }
+    this._meldeLeer(feld);
+  }
+
+  // Oeffnet die Eingabe die Umwandlungswahl, bekommt die Dame den Fokus (Enter waehlt, Tab wechselt, Escape bricht ab)
+  _fokussiereUmwandlung() {
+    if (!this._umwandlung) return;
+    const dame = this._umwandlungEl.querySelector('.umwandlung-figur[data-figur="q"]');
+    if (dame) dame.focus();
   }
 
   _zeichneNummern() {
@@ -1160,6 +1288,7 @@ export class Brett {
   // ----- Bedienung -----
 
   _runter(e) {
+    this._fokusEl.hidden = true;   // Maus oder Finger: der Tastatur-Ring geht aus, bis wieder eine Taste kommt
     if (this._umwandlung) return;
     const maus = e.pointerType === 'mouse';
     const aktiv = this._geste || this._halten || this._halteMal || this._malen;
@@ -1710,8 +1839,11 @@ export class Brett {
   }
 
   _schliesseUmwandlung() {
+    // lag der Fokus in der Wahl (Tastatur), geht er danach aufs Feld zurueck statt ins Leere
+    const hatteFokus = this._bedienbar && this._umwandlungEl.contains(document.activeElement);
     this._umwandlungEl.hidden = true;
     this._umwandlungEl.replaceChildren();
+    if (hatteFokus && this._fokusFeld) { const f = this._feldEl(this._fokusFeld); if (f) f.focus(); }
     document.removeEventListener('keydown', this._h.taste);
     const u = this._umwandlung;
     this._umwandlung = null;

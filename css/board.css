@@ -229,6 +229,19 @@
 .brett-nutzer .marke { fill: var(--b-marke-nutzer); animation: brett-ein var(--b-d-xs) var(--b-sanft) both; }
 .brett-nutzer .vorschau { opacity: .55; animation: none; }
 
+/* ---------- Tastatur (Punkt 34): Fokusring ueber den Figuren, das Feld selbst zeigt keinen (laege unter Toenung und Figur) ---------- */
+.brett .feld:focus-visible { outline: none; }
+.brett > .brett-fokus {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  z-index: 7;
+  pointer-events: none;
+  outline: var(--fokus, 2.5px solid #CC4820);
+  outline-offset: -4px;
+  border-radius: 2px;
+}
+
 /* ---------- W0+a: Striche (Mattnetz) und Koenigsfall ---------- */
 /* im Brett ueber den Figuren, in einer Effekt-Ebene ueber deren ganzer Flaeche (gleiche Lage wie die Felder) */
 .brett-striche {
