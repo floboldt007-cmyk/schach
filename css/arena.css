@@ -465,7 +465,8 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
    viel um scrollen." Die Karte zeigt die ganze Welt (breite Lage, kein Scrollen in der Karte) und ist so hoch, dass
    darunter Gegner, Farbe und Spielen-Knopf ohne Scrollen Platz haben. Spruch, Merkmale und Ziel-Liste entfallen hier;
    Liga und Heute stehen unter dem Spielen-Knopf (wer will, scrollt dorthin, der Knopf klebt dabei unten). */
-.arena.karte-kompakt { --panel-kompakt: 236px; }
+/* 262 statt 236 seit der Ziel-Zeile (Auswahl W2 B, 09.11.2026): die Karte gibt ihre 26 px ab, damit Farbe und Knopf bleiben */
+.arena.karte-kompakt { --panel-kompakt: 262px; }
 .arena.karte-kompakt .inhalt { gap: 10px; }
 .arena.karte-kompakt .karte { flex: 0 0 auto; height: max(300px, calc(100% - var(--panel-kompakt))); min-height: 0; overflow: hidden; }
 /* Design-Durchsicht 09.11. (Bots, iPhone SE mit Safari-Leiste): der Spielen-Knopf klebt nur so hoch, wie sein Panel
@@ -482,8 +483,12 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt .detail-kopf { gap: 12px; }
 .arena.karte-kompakt .detail-kopf .av { width: 52px; height: 52px; border-radius: 16px; }
 .arena.karte-kompakt .detail h2 { font-size: 20px; }
-.arena.karte-kompakt .detail-welt,
-.arena.karte-kompakt .ziel-sterne, .arena.karte-kompakt .wahl-titel { display: none; }
+.arena.karte-kompakt .detail-welt, .arena.karte-kompakt .wahl-titel { display: none; }
+/* Sterne-Ziele als eine Zeile unter dem Spruch (Flo 09.11.2026, Auswahl W2 B): sie sagt, wofuer es die drei Sterne neben
+   der Elo gibt, und zeigt die erreichten gold. Der Spielen-Knopf bleibt, wo er war (tests/arena.test.mjs) */
+.arena.karte-kompakt .ziel-sterne { order: 2; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.arena.karte-kompakt .ziel-sterne > div { flex: none; gap: 5px; font-size: 12.5px; }
+.arena.karte-kompakt .ziel-sterne b .ico { width: 15px; height: 15px; }
 /* Die gewoehnliche Begruessung entfaellt kompakt (Karte, Gegner, Farbe und Knopf passen so ohne Scrollen). Ein besonderer
    Satz (Mutmacher nach Niederlagen, Erzfeind) bleibt, knapp in hoechstens zwei Zeilen */
 .arena.karte-kompakt .detail .sprechblase:not(.besonders) { display: none; }

@@ -212,6 +212,7 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
     if (inhalt) leiste.before(inhalt);
     const vorherFokus = document.activeElement;
     let fertig = false;
+    const stillgelegt = [];
     const taste = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); ende(abbrechen); return; }
       if (e.key === 'Tab') {
@@ -227,6 +228,7 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
       if (fertig) return;
       fertig = true;
       document.removeEventListener('keydown', taste, true);
+      for (const el of stillgelegt) el.inert = false;
       if (offenesSheet && offenesSheet.ort === ort) offenesSheet = null;
       ort.classList.add('weg');
       if (tempo() === 0) ort.remove();
@@ -259,6 +261,13 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
     }
     schleier.addEventListener('pointerdown', () => ende(abbrechen));
     document.addEventListener('keydown', taste, true);
+    // U4 (Flo 09.11.2026): alles hinter dem Blatt stilllegen, damit auch ein Bildschirmleser nicht dahinter springt.
+    // Die Meldungen (role=status) bleiben hoerbar; zurueckgesetzt wird nur, was hier stillgelegt wurde.
+    for (const el of document.body.children) {
+      if (el.inert || el.matches('script, [role="status"], [aria-live]')) continue;
+      el.inert = true;
+      stillgelegt.push(el);
+    }
     document.body.append(ort);
     offenesSheet = { ort, ende: () => ende(abbrechen) };
     anim(karte, [{ transform: 'translateY(100%)' }, { transform: 'none' }], { d: 480, k: 'gleiten' });

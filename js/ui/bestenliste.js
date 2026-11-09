@@ -9,7 +9,8 @@
 //   params: { reiter?: 'gruppe' | 'ich' | 'freunde' | 'bots' | ..., fenster?: 'woche' | 'monat' | 'allzeit' }
 //
 // Aufbau: header.kopf.haupt-kopf (js/ui/seite.js), darunter .bl-rumpf (scrollt) mit .seiten-kopf, der Steuerzeile
-// .bl-steuer (Segment der Reiter aus den Anbietern, Segment der Fenster Woche / Monat / Allzeit, Standard Woche) und dem
+// .bl-steuer (Segment der Reiter aus den Anbietern, Auswahlfeld select[name="bl-fenster"] Woche / Monat / Allzeit,
+// Standard Woche) und dem
 // Behaelter .bl-ort des Orts bestenliste:reiter (Kontext { app, reiter, fenster }). Jeder Anbieter liefert ein
 // section.bl-reiter[data-reiter][data-name] (Reihenfolge: Gruppe 5 (Paket liga, Standard) / Freunde 8 / Ich 10 / Bots 20; mit
 // data-ohne-fenster blendet der Host das Fenster-Segment aus, solange dieser Reiter gewaehlt ist); ist sein
@@ -59,9 +60,15 @@ function zeigeBestenliste(root, params = {}, app) {
 
   const ort = s.querySelector('.bl-ort');
   const platzReiter = s.querySelector('.bl-steuer-reiter');
-  const fensterSeg = segment({ name: 'bl-fenster', label: t('rahmen.bestenliste.zeitraum'), optionen: fensterOptionen(), wert: fenster,
-    beiWahl: (id) => { fenster = id; merke(); fuelleOrt(); } });
-  s.querySelector('.bl-steuer-fenster').append(fensterSeg.el);
+  // Zeitraum als kleines Auswahlfeld "Woche v" statt einer zweiten Leiste (Flos Wahl U8, 09.11.2026): oben bleibt nur die
+  // Reiterleiste; ein natives select ist mit Tastatur und Bildschirmleser bedienbar, Hoehe mindestens --tipp (44 px)
+  const fensterWahl = document.createElement('label');
+  fensterWahl.className = 'bl-fenster-wahl';
+  fensterWahl.innerHTML = `<span class="sr">${esc(t('rahmen.bestenliste.zeitraum'))}</span><select name="bl-fenster">${fensterOptionen()
+    .map((o) => `<option value="${esc(o.id)}"${o.id === fenster ? ' selected' : ''}>${esc(o.text)}</option>`).join('')}</select>
+    <span class="bl-fenster-pfeil" aria-hidden="true">${icon('vor')}</span>`;
+  fensterWahl.querySelector('select').addEventListener('change', (e) => { fenster = e.target.value; merke(); fuelleOrt(); });
+  s.querySelector('.bl-steuer-fenster').append(fensterWahl);
   let reiterSeg = null;
   let reiterIds = '';
   let gefuellt = null;

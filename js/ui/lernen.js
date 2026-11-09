@@ -9,7 +9,7 @@
 //
 //   zeige(root, params, app) -> { verlasse() }
 // DOM: section.screen.ms-screen > header.haupt-kopf, .ms-rumpf > .ms-bereiche > button.ms-bkarte[data-bereich][aria-pressed],
-// .ms-bereich > .seiten-kopf, .ms-gruppe[data-stufe] > h3 + ol.ms-liste > li > button.ms-lektion[data-id]
+// .ms-bereich > .seiten-kopf, .ms-weiter > p.ms-kurz + button.ms-weiter-knopf[data-id] (nur Handy), .ms-gruppe[data-stufe] > h3 + ol.ms-liste > li > button.ms-lektion[data-id]
 // [data-geschafft][data-gesperrt][data-probe] (.mini, .ms-nr, .ms-text > b + .ms-zeile > .ms-stufe[data-stufe] + .ms-art[data-art]
 // + .ms-marke, .ms-sterne[data-sterne] | .ms-schloss), p.ms-bald. Optik: css/pakete/lernen.css.
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
@@ -97,9 +97,19 @@ export function zeige(root, params, app) {
       <span class="ms-pfeil" aria-hidden="true">${icon('vor')}</span></button></li>`;
   }
 
+  // Handy (Flo 09.11.2026, Auswahl W1 C): ein Satz zum Bereich und der Hauptknopf "Weiter mit: <Lektion>", zuerst die erste
+  // offene ohne Ergebnis, sonst die erste offene ohne drei Sterne; gibt es keine, nur der Satz. Am PC steht der Seitenkopf.
+  function weiterHtml() {
+    const offen = bereich.lektionen.filter(istOffen);
+    const l = offen.find((x) => !st.lek[x.id]) || offen.find((x) => st.lek[x.id].s < 3);
+    return `<div class="ms-weiter"><p class="ms-kurz">${esc(S('kurz.' + bereich.id))}</p>${l
+      ? `<button class="knopf primaer gross dr ms-weiter-knopf" type="button" data-id="${l.id}">${esc(S('weiterMit', { titel: S('titel.' + l.id) }))}</button>` : ''}</div>`;
+  }
+
   function zeichne(erstes) {
     const nr = (l) => bereich.lektionen.indexOf(l);
     inhalt.innerHTML = `${seitenKopf({ ueber: S('name'), titel: S('bereich.' + bereich.id), text: S('text.' + bereich.id) })}
+      ${weiterHtml()}
       ${GRUPPEN.map(([id, stufen]) => {
         const liste = bereich.lektionen.filter((l) => stufen.includes(l.stufe));
         if (!liste.length) return '';
@@ -133,6 +143,8 @@ export function zeige(root, params, app) {
     if (k) waehle(k.dataset.bereich);
   });
   inhalt.addEventListener('click', (ev) => {
+    const w = ev.target.closest('.ms-weiter-knopf');
+    if (w) { app.gehe('lektion', { id: w.dataset.id }); return; }
     const b = ev.target.closest('.ms-lektion');
     if (!b) return;
     if (!b.hasAttribute('data-gesperrt')) { app.gehe('lektion', { id: b.dataset.id }); return; }

@@ -79,7 +79,8 @@ inBeidenSprachen((sp) => {
   pruefe(`${sp}: Wochen-Regel nennt Gruppe, Aufstieg, eine Stufe tiefer, Belohnung und Tagesgrenzen wie kronen.js`,
     !fehlend(wo, [K.GRUPPE_GROESSE, K.AUFSTIEG_PLAETZE, K.ABSTIEG_PLAETZE, letzterLohn, K.BOT_TAGESGRENZE, K.KI_TAGESGRENZE, K.BOT_KI_WOCHEN_MAX], sp).length && !/\{/.test(wo), wo);
   const ohne = S.t('p-punkte.ich.kronenOhne');
-  pruefe(`${sp}: "Kronen ohne Konto" nennt die Gruppengroesse ${K.GRUPPE_GROESSE}`, !fehlend(ohne, [K.GRUPPE_GROESSE], sp).length, ohne);
+  // Flos Wahl U7 (09.11.2026): die Gruppengroesse steht nur im Reiter Gruppe, Ich verweist dorthin statt sie zu wiederholen
+  pruefe(`${sp}: "Kronen ohne Konto" wiederholt die Gruppengroesse ${K.GRUPPE_GROESSE} nicht`, !String(ohne).includes(String(K.GRUPPE_GROESSE)), ohne);
 });
 
 // ---------- Taler: ein Wort je Sprache ----------

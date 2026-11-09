@@ -115,6 +115,8 @@ export const MODUL_BUDGET = Object.freeze({
   kronen: 1000,
   // Etappe 4b: Erfolgs-Stufen, Taler-Buch, Raetsel-Zaehler und letzter Server-Besitz (js/besitz.js)
   besitz: 12000,
+  // Feinschliff 09.11.: letzter Besuchstag der Startseite und "Willkommen zurueck" (js/ui/heim.js rueckkehr)
+  besuch: 200,
 });
 // Einstellungen eines Pakets (Klangstufe, Ruhetag, Schalter ...) in Zeichen
 export const MODUL_EINSTELLUNGEN_MAX = 2000;

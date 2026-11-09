@@ -78,6 +78,10 @@
 .ms-pfeil { display: grid; color: var(--text-3); }
 .ms-pfeil .ico { width: 18px; height: 18px; }
 .ms-bald { margin: 4px 2px 0; color: var(--text-2); font-weight: 600; font-size: 14px; }
+/* Satz plus "Weiter mit" (Auswahl W1 C) nur auf dem Handy, dort ersetzt er den versteckten Seitenkopf (js/ui/lernen.js weiterHtml) */
+.ms-weiter { display: none; }
+.ms-kurz { margin: 0 2px; color: var(--text-2); font-weight: 600; font-size: 14px; line-height: 1.4; }
+.ms-weiter-knopf { width: 100%; min-height: 52px; }
 /* Handy dicht (Flo 01.11.2026: "man muss alles sehen ohne viel scrollen"): flache Zeilen, kleines Vorschaubild; der
    Bereichstitel steht schon im Umschalter und bleibt nur fuer Vorleseprogramme */
 @media (max-width: 700px) {
@@ -89,6 +93,7 @@
   .ms-screen .ms-rumpf { gap: 8px; padding-top: 4px; }
   .ms-bereich { gap: 8px; }
   .ms-bereich .seiten-kopf { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .ms-weiter { display: flex; flex-direction: column; gap: 8px; }
   .ms-gesamt { padding: 4px 12px; font-size: 13.5px; }
   .ms-liste { gap: 6px; }
   .ms-lektion { min-height: 56px; gap: 10px; padding: 6px 12px 6px 6px; border-radius: var(--r-m); }

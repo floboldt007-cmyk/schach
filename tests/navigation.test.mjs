@@ -750,10 +750,16 @@ async function testeBauteile(browser) {
   await seite.keyboard.press('Tab');
   const f2 = await seite.evaluate(() => document.activeElement.textContent);
   pruefe('Blatt: Fokus auf der Hauptaktion, Tab bleibt im Blatt', f0 === 'Ja' && f1 === 'Nein' && f2 === 'Ja', `${f0} ${f1} ${f2}`);
+  // U4 (Flo 09.11.2026): Hintergrund per inert stillgelegt, auch fuer Bildschirmleser; Meldungen (role=status) bleiben
+  const still = await seite.evaluate(() => [...document.body.children].filter((el) => !el.matches('script')).map((el) => ({
+    k: el.className || el.tagName, inert: el.inert, blatt: el.classList.contains('sheet-ort'), meldung: el.matches('[role="status"], [aria-live]') })));
+  pruefe('Blatt: alles dahinter inert, Blatt und Meldungen nicht (U4)', still.some((x) => !x.blatt && x.inert)
+    && still.every((x) => (x.blatt || x.meldung ? !x.inert : x.inert)), JSON.stringify(still));
   const kb = await seite.locator('.sheet-karte').boundingBox();
   await seite.mouse.click(kb.x + kb.width / 2, Math.max(5, kb.y - 60));
   await warte(500);
   pruefe('Blatt: Tipp auf den Schleier liefert „abbrechen“', await seite.evaluate(() => window.__bt.sheetWert()) === 'ab' && await seite.locator('.sheet-ort').count() === 0);
+  pruefe('Blatt zu: nichts bleibt inert (U4)', await seite.evaluate(() => ![...document.body.children].some((el) => el.inert)));
 
   // Meldung und Mini-Brett
   await seite.locator('[data-test="toast"]').click();
