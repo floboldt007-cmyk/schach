@@ -76,8 +76,20 @@
   padding-bottom: var(--a6); }
 .bl-steuer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px var(--rand) 4px; }
 .bl-steuer-reiter { flex: 1 1 320px; max-width: 460px; min-width: 0; }
-.bl-steuer-fenster { flex: 0 1 300px; min-width: 0; }
+.bl-steuer-fenster { flex: 0 0 auto; min-width: 0; }
 .bl-steuer-reiter:empty, .bl-steuer-fenster[hidden] { display: none; }
+/* Zeitraum als kleines Auswahlfeld (Flos Wahl U8): Pille mit Pfeil, Hoehe --tipp, Fokusring wie die Segmente */
+.bl-fenster-wahl { position: relative; display: inline-flex; align-items: center; }
+.bl-fenster-wahl select { -webkit-appearance: none; appearance: none; min-height: var(--tipp); margin: 0; padding: 0 40px 0 16px;
+  border: 0; border-radius: var(--r-pille); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text); font: inherit;
+  font-size: 14px; font-weight: 700; cursor: pointer; }
+.bl-fenster-wahl select:hover { background: var(--flaeche-3); }
+.bl-fenster-wahl select:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.bl-fenster-pfeil { position: absolute; right: 14px; top: 50%; display: grid; width: 16px; height: 16px; margin-top: -8px; color: var(--text-2);
+  pointer-events: none; transform: rotate(90deg); }
+.bl-fenster-pfeil .ico { width: 16px; height: 16px; }
+/* Liga-Kopf ueberall wie am Handy (Flos Wahl U9): nur die Sternzahl, ohne "/ 90" und ohne den Pokal-Chip "/ 30" */
+.bl-screen .haupt-kopf .chip .von, .bl-screen .haupt-kopf .chip-pokal { display: none; }
 .bl-ort { padding: 12px var(--rand) 0; }
 .bl-ort[hidden] { display: none; }
 .bl-leer-screen { margin: 16px var(--rand) 0; max-width: 640px; flex-direction: row; align-items: flex-start; gap: 16px; }
@@ -283,7 +295,7 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
   .pk-symbol { width: 34px; height: 34px; }
   .pk-wert { font-size: 21px; }
   .bl-steuer { padding-top: 4px; }
-  .bl-steuer-reiter, .bl-steuer-fenster { flex: 1 1 100%; max-width: none; }
+  .bl-steuer-reiter { flex: 1 1 100%; max-width: none; }
   .bl-karte { padding: 16px; border-radius: var(--r-l); }
   .bl-k-kopf h2 { font-size: 21px; }
   .bl-z-innen { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; padding: 6px 12px 6px 8px; }
