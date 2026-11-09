@@ -486,11 +486,11 @@ async function testeTagesziele(browser, heute) {
   });
   pruefe('"Als Naechstes" steht unter den drei Wegen', r.sichtbar && r.unterWegen, JSON.stringify(r));
   pruefe('Reihenfolge: Bauernmarsch (Tageswerk), Tagesraetsel, dann die Liga', r.reihe.join() === 'serie,tagesraetsel,heim-liga', r.reihe.join());
-  pruefe('Bauernmarsch: "Heute noch offen · Tageswerk in 5 Minuten"', r.marsch === 'Bauernmarsch | Heute noch offen · Tageswerk in 5 Minuten', r.marsch);
+  pruefe('Bauernmarsch: "Heute: 1 Partie oder 3 Rätsel spielen"', r.marsch === 'Bauernmarsch | Heute: 1 Partie oder 3 Rätsel spielen', r.marsch);
   pruefe('Tagesraetsel: Nummer und Zuege', /^Tagesrätsel \| Rätsel \d+, in \d+ (Zug|Zügen)$/.test(r.raetsel || ''), r.raetsel);
   pruefe('jede Zeile ein Knopf ab 44 px mit Beschriftung', r.knoepfe && r.aria.every((a) => a && !/undefined|NaN/.test(a)), JSON.stringify(r.aria));
   await seite.locator('.heim-naechstes [data-paket="serie"]').click();
-  pruefe('Bauernmarsch oeffnet das Training (Tageswerk in 5 Minuten)', await istScreen(seite, 'training'));
+  pruefe('Bauernmarsch oeffnet das Training (Klartext: 1 Partie oder 3 Rätsel)', await istScreen(seite, 'training'));
   await seite.goBack();
   await istScreen(seite, 'heim');
   await seite.waitForSelector('.heim-naechstes [data-paket="tagesraetsel"]', { timeout: 8000 }).catch(() => {});
