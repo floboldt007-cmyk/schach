@@ -74,6 +74,31 @@ pruefe('karte_konstanten vorhanden', !!k);
   pruefe('Kein Bot- oder Shop-Banner in den Listen des Servers', !/'(bot|shop)-/.test(k));
 }
 
+// ---------- Besitz-Regeln (09.11.2026): woran der Server Titel, Rahmen, Hintergrund und Profilbild bindet ----------
+{
+  const r = (sql.match(/function public\.karte_besitz_regeln\(\)[\s\S]*?\$\$([\s\S]*?)\$\$;/) || [])[1] || '';
+  const regeln = Object.fromEntries([...r.matchAll(/'([a-z]+)',\s*'(\{[\s\S]*?\})'::jsonb/g)].map((m) => [m[1], JSON.parse(m[2])]));
+  pruefe('Besitz-Regeln fuer Titel, Rahmen, Hintergruende und Motive', gleich(Object.keys(regeln), ['titel', 'rahmen', 'gruende', 'motive']), Object.keys(regeln));
+  const fremd = Object.entries(regeln).flatMap(([art, o]) => Object.keys(o).filter((w) => !(liste(art) || []).includes(w)).map((w) => art + ':' + w));
+  pruefe('Jede Regel gehoert zu einem Wert der festen Liste', fremd.length === 0, fremd);
+  const fam = [...FAMILIEN.map((f) => f.id), 'altliga'];
+  const kaputt = Object.entries(regeln).flatMap(([art, o]) => Object.entries(o)
+    .filter(([, v]) => !(Array.isArray(v) && fam.includes(v[0]) && [1, 2, 3].includes(v[1]))).map(([w]) => art + ':' + w));
+  pruefe('Jede Regel nennt eine Familie und eine Stufe 1 bis 3', kaputt.length === 0, kaputt);
+  // nie strenger als die App: der Gold-Titel einer Familie braucht hoechstens ihr Gold, Serie und Level wie die Ziele
+  const gold = FAMILIEN.filter((f) => f.gold.titel && !f.server).filter((f) => { const x = regeln.titel[f.gold.titel]; return !x || x[0] !== f.id; }).map((f) => f.id);
+  pruefe('Gold-Titel jeder gemeldeten Familie haengt an ihrer eigenen Stufe', gold.length === 0, gold);
+  pruefe('Immer frei bleiben ohne, holz, standard, welt-1, die Figuren und der erste Level-Titel', !regeln.rahmen.ohne && !regeln.rahmen.holz
+    && !regeln.gruende.standard && !regeln.gruende['welt-1'] && ['Q', 'R', 'B', 'N', 'P'].every((m) => !regeln.motive[m]) && !regeln.titel['level-1']);
+  pruefe('Serie-Deckel wie die Ziele der Familie serie', gleich(liste('serie_tage'), FAMILIEN.find((f) => f.id === 'serie').ziele({})), liste('serie_tage'));
+  pruefe('Rahmen und Titel der Serie an Bronze, Silber, Gold', JSON.stringify([regeln.rahmen['serie-7'], regeln.rahmen['serie-30'], regeln.rahmen['serie-100'],
+    regeln.titel['erfolg-wochenflamme'], regeln.titel['erfolg-monatsfeuer'], regeln.titel['erfolg-ewige-flamme']])
+    === JSON.stringify([['serie', 1], ['serie', 2], ['serie', 3], ['serie', 1], ['serie', 2], ['serie', 3]]));
+  const klein = ohneKommentare(lies('supabase/karte-besitz-zurueck.sql'));
+  pruefe('Kleiner Rueckweg laesst Tabellen und Daten stehen', !/drop table|delete from|truncate/i.test(klein)
+    && ['karte_frei', 'karte_stufe_moeglich', 'karte_besitz_regeln'].every((f) => new RegExp(`drop function if exists public\\.${f}\\(`).test(klein)));
+}
+
 // ---------- Rechte, RLS, Rueckweg ----------
 {
   const tabellen = ['karte_stufen', 'taler_buchungen', 'banner_besitz', 'karte_wahl'];

@@ -16,10 +16,13 @@ drop function if exists public.karte_von(uuid);
 drop function if exists public.karte_waehle(text, text, text[], text, text, text);
 drop function if exists public.karte_melde_stufen(jsonb);
 drop function if exists public.karte_mein_stand();
+drop function if exists public.karte_stufe_moeglich(uuid, text, integer);
+drop function if exists public.karte_frei(uuid);
 drop function if exists public.karte_liga_banner_nachtragen(uuid);
 drop function if exists public.karte_banner_gutschreiben(uuid, text);
 drop function if exists public.karte_sichern(uuid);
 drop function if exists public.karte_buche_stufe(uuid, text, integer);
+drop function if exists public.karte_besitz_regeln();
 drop function if exists public.karte_in_liste(text, text);
 drop function if exists public.karte_konstanten();
 

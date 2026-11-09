@@ -36,7 +36,8 @@ setzeOnlineFetch(async (url, opt) => {
   if (d && d.__status) return { ok: false, status: d.__status, json: async () => ({ message: d.message }) };
   return { ok: true, status: 200, json: async () => d };
 });
-const stand = (x = {}) => ({ taler: 70, stufen: { siege: 2, liga: 1 }, banner: ['start', 'saison-bronze'], wahl: { banner: 'start' }, ...x });
+// Stufen wie gemeldet (Siege Silber, Raetsel Bronze): der Server ist auf dem Stand des Geraets, niemand fragt nach
+const stand = (x = {}) => ({ taler: 70, stufen: { siege: 2, raetsel: 1, liga: 1 }, banner: ['start', 'saison-bronze'], wahl: { banner: 'start' }, ...x });
 
 // ohne Konto: nichts geht raus
 abmelden();
@@ -64,13 +65,105 @@ pruefe('Laufender Abgleich: spaetere Aufrufe teilen genau einen zweiten Lauf', a
 
 // Absage der Wahl: zweiter Versuch nur mit Besitz
 setzeProfilWahl({ banner: 'shop-kronjuwel', rahmen: 'neon' });
-antworten = { karte_melde_stufen: stand({ stufen: { siege: 2 } }),
+antworten = { karte_melde_stufen: stand({ stufen: { siege: 2, raetsel: 1 } }),
   karte_waehle: (d) => (d.titel ? { __status: 400, message: 'KARTE_TITEL' } : stand({ wahl: { banner: d.banner } })) };
 aufrufe = [];
 await K.abgleichKonto({ titel: 'erfolg-gibtsnicht' });
 const w2 = aufrufe.filter((a) => a.name === 'karte_waehle');
 pruefe('Nach Absage: zweite Wahl ohne Titel, Banner und Rahmen auf Standard, Vitrine nur Besitz', w2.length === 2 && w2[1].daten.titel === null
-  && w2[1].daten.banner === 'start' && w2[1].daten.rahmen === 'ohne' && w2[1].daten.vitrine.join() === 'stufe-siege', w2.map((x) => x.daten));
+  && w2[1].daten.banner === 'start' && w2[1].daten.rahmen === 'ohne' && w2[1].daten.vitrine.join() === 'stufe-siege,stufe-raetsel', w2.map((x) => x.daten));
+
+// ---------- Besitz-Pruefung und Bremse des Servers (supabase/karte-schema.sql ab 09.11.2026) ----------
+// nachgebildeter Server: je Meldung hoechstens eine neue Stufe je Familie, hoechstens `tag` neue Stufen insgesamt
+function bremsServer(tag) {
+  const hat = {};
+  let frei = tag;
+  const melde = (d) => {
+    for (const [f, ziel] of Object.entries(d.stufen)) {
+      if (frei > 0 && (hat[f] || 0) < ziel) { hat[f] = (hat[f] || 0) + 1; frei--; }
+    }
+    return stand({ stufen: { ...hat }, taler: 0 });
+  };
+  return { karte_melde_stufen: melde, karte_waehle: (d) => stand({ stufen: { ...hat }, taler: 0, wahl: { banner: d.banner } }) };
+}
+speichereModul('besitz', {});
+abgleichen({ siege: 100, raetsel: 200, level: 1 });
+setzeProfilWahl({ figur: 'Q', rahmen: 'ohne', vitrine: [null, null, null], titel: null, banner: 'start' });
+antworten = bremsServer(99);
+aufrufe = [];
+await K.abgleichKonto();
+let m = aufrufe.filter((a) => a.name === 'karte_melde_stufen');
+pruefe('Eine Stufe je Meldung: Gold kommt mit drei Meldungen an, dann ist Schluss', m.length === 3 && serverStand(UID).stufen.siege === 3
+  && serverStand(UID).stufen.raetsel === 3 && m.every((x) => x.daten.stufen.siege === 3), { n: m.length, s: serverStand(UID) });
+aufrufe = [];
+await K.abgleichKonto();
+pruefe('Server auf dem Stand des Geraets: genau eine Meldung', aufrufe.filter((a) => a.name === 'karte_melde_stufen').length === 1, aufrufe);
+// Tagesgrenze: der Server bucht nur zwei Stufen, danach nichts mehr
+speichereModul('besitz', {});
+abgleichen({ siege: 100, raetsel: 200, level: 1 });
+antworten = bremsServer(2);
+aufrufe = [];
+const gebremst = await K.abgleichKonto();
+m = aufrufe.filter((a) => a.name === 'karte_melde_stufen');
+pruefe('Bremse: der Abgleich hoert auf, sobald nichts mehr vorangeht (kein Dauerfeuer), und liefert den Stand', m.length === 2 && !!gebremst
+  && serverStand(UID).stufen.siege === 1 && serverStand(UID).stufen.raetsel === 1, { n: m.length, s: serverStand(UID) });
+pruefe('Bremse: das Geraet behaelt seinen eigenen Stand (nichts verfaellt)', ladeBesitz().stufen.siege === 3 && ladeBesitz().stufen.raetsel === 3);
+aufrufe = [];
+await K.abgleichKonto();
+pruefe('Bremse am selben Tag: beim naechsten Abgleich nur eine Meldung', aufrufe.filter((a) => a.name === 'karte_melde_stufen').length === 1, aufrufe);
+// Server vor dem 09.11.2026 (bucht alles auf einmal): wie bisher eine Meldung
+speichereModul('besitz', {});
+abgleichen({ siege: 100, level: 1 });
+antworten = { karte_melde_stufen: (d) => stand({ stufen: { ...d.stufen } }), karte_waehle: (d) => stand({ stufen: { siege: 3 }, wahl: { banner: d.banner } }) };
+aufrufe = [];
+await K.abgleichKonto();
+pruefe('Alter Server (alles auf einmal): eine Meldung', aufrufe.filter((a) => a.name === 'karte_melde_stufen').length === 1, aufrufe);
+
+// Wahl gegen Besitz: der Server lehnt ab, was er nicht belegen kann; der zweite Versuch traegt nur, was frei ist
+const FREI = { titel: ['level-1', 'level-5', 'erfolg-feuertaufe'], rahmen: ['ohne', 'holz', 'serie-7'], gruende: ['standard', 'welt-1'], motive: ['Q', 'R', 'B', 'N', 'P'] };
+const besitzServer = (wahl) => (d) => {
+  const ok = (liste, x, alt) => x === alt || FREI[liste].includes(x);
+  if (d.titel !== null && !ok('titel', d.titel, wahl.titel)) return { __status: 400, message: 'KARTE_TITEL' };
+  if (!ok('rahmen', d.rahmen, wahl.rahmen) || !ok('gruende', d.grund, wahl.grund) || !ok('motive', d.motiv, wahl.motiv)) return { __status: 400, message: 'KARTE_PROFIL' };
+  Object.assign(wahl, d);
+  return stand({ frei: FREI, wahl: { ...wahl } });
+};
+let serverWahl = { banner: 'start', titel: null, vitrine: [], motiv: 'P', grund: 'standard', rahmen: 'ohne' };
+setzeProfilWahl({ figur: 'karo', grund: 'welt-3', rahmen: 'liga-6', titel: 'level-100', banner: 'start' });
+antworten = { karte_melde_stufen: () => stand({ stufen: { siege: 3 }, frei: FREI, wahl: { ...serverWahl } }), karte_waehle: besitzServer(serverWahl) };
+aufrufe = [];
+let rw = await K.abgleichKonto({ titel: 'level-100' });
+let wz = aufrufe.filter((a) => a.name === 'karte_waehle');
+pruefe('Nicht belegte Wahl: erst der Wunsch, dann ohne die fremden Stuecke (Standard)', wz.length === 2 && wz[0].daten.titel === 'level-100'
+  && JSON.stringify(wz[1].daten) === JSON.stringify({ banner: 'start', titel: null, vitrine: [], motiv: 'P', grund: 'standard', rahmen: 'ohne' }), wz.map((x) => x.daten));
+pruefe('Nicht belegte Wahl: der Abgleich endet mit dem Stand des Servers, ohne Fehler', !!rw && rw.wahl.rahmen === 'ohne' && rw.wahl.titel === null, rw);
+// ein Teil der Wahl ist belegt: der bleibt, nur das Fremde faellt weg
+setzeProfilWahl({ figur: 'N', grund: 'welt-1', rahmen: 'serie-7', titel: 'level-100' });
+aufrufe = [];
+rw = await K.abgleichKonto({ titel: 'level-100' });
+wz = aufrufe.filter((a) => a.name === 'karte_waehle');
+pruefe('Teils belegte Wahl: Rahmen, Hintergrund und Bild bleiben, nur der Titel faellt weg', wz.length === 2 && wz[1].daten.rahmen === 'serie-7'
+  && wz[1].daten.grund === 'welt-1' && wz[1].daten.motiv === 'N' && wz[1].daten.titel === null && rw.wahl.rahmen === 'serie-7', wz.map((x) => x.daten));
+// Bestandsschutz: was schon auf der Server-Karte steht, sendet der zweite Versuch wieder (der Server nimmt es weiter an)
+serverWahl = { banner: 'start', titel: 'erfolg-sternenkrone', vitrine: [], motiv: 'P', grund: 'standard', rahmen: 'liga-6' };
+antworten = { karte_melde_stufen: () => stand({ stufen: { siege: 3 }, frei: FREI, wahl: { ...serverWahl } }), karte_waehle: besitzServer(serverWahl) };
+setzeProfilWahl({ figur: 'Q', grund: 'standard', rahmen: 'liga-3', titel: 'erfolg-sternenkrone' });
+aufrufe = [];
+rw = await K.abgleichKonto({ titel: 'erfolg-sternenkrone' });
+wz = aufrufe.filter((a) => a.name === 'karte_waehle');
+pruefe('Bestand: nach der Absage bleibt, was schon auf der Karte stand (Titel und alter Rahmen), das Bild wechselt', wz.length === 2
+  && wz[1].daten.titel === 'erfolg-sternenkrone' && wz[1].daten.rahmen === 'liga-6' && wz[1].daten.motiv === 'Q' && rw.wahl.rahmen === 'liga-6', wz.map((x) => x.daten));
+// belegte Wahl: ein Aufruf genuegt
+setzeProfilWahl({ figur: 'Q', grund: 'standard', rahmen: 'holz', titel: 'erfolg-feuertaufe' });
+aufrufe = [];
+await K.abgleichKonto({ titel: 'erfolg-feuertaufe' });
+pruefe('Belegte Wahl: ein Aufruf', aufrufe.filter((a) => a.name === 'karte_waehle').length === 1, aufrufe);
+pruefe('wahlFuerServer ohne frei im Stand (alter Server): wie bisher kein Titel, Rahmen aus der festen Liste',
+  JSON.stringify(K.wahlFuerServer({ figur: 'Q', rahmen: 'liga-6', titel: 'level-100', vitrine: [] }, { stufen: {}, banner: ['start'] }))
+  === JSON.stringify({ banner: 'start', titel: null, vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'liga-6' }));
+antworten = { karte_melde_stufen: stand(), karte_waehle: (d) => stand({ wahl: { banner: d.banner } }) };
+speichereModul('besitz', {});
+await K.abgleichKonto();
 
 // offline: null, nichts gemerkt
 netzFehlt = true;

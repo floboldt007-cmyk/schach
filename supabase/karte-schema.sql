@@ -5,14 +5,21 @@
 -- Was der Server entscheidet: Taler, Banner-Besitz und welche Stufen gebucht sind. Jede Stufe wird je Konto genau
 -- einmal gebucht (zahlt einmal Taler), Stufen kommen nur der Reihe nach (Bronze, Silber, Gold). Gold schreibt ein
 -- Gold-Banner gut. Erfolge sind nie kaeuflich: es gibt keinen Weg aus einem Kauf in diese Tabellen.
--- TITEL prueft der Server nur gegen die feste Liste (kein Freitext), nicht ob der Spieler ihn erspielt hat: Titel haengen an
--- Level, Erfolgen und Koennen, die das Geraet rechnet. Ein Schummler kann also einen fremden Titel aus der Liste zeigen
--- (gleiche Grenze wie unten, bewusst so; Titel-Besitz je Konto ist ein moeglicher spaeterer Schritt).
--- BEKANNTE GRENZE (Flo 07.11.2026 so entschieden): Bot-, Raetsel-, Serie- und Level-Stufen meldet das Geraet, weil diese
--- Partien nur dort laufen; ein geuebter Schummler kann sie vortaeuschen. Begrenzt ist das durch die feste Zahl der
--- Stufen (10 Familien, je 3) und weil Taler nur Erspielbares kaufen. Die Liga-Stufen leitet der Server selbst aus
--- kronen_stand.stufe und den Wochen-Gruppen (liga_mitglieder, liga_gruppen) ab; die meldet niemand. Liga-Banner schreibt
--- nur der Server gut (karte_banner_gutschreiben, aufgerufen von liga_abrechnen in kronen-schema.sql).
+-- BESITZ (Stand 09.11.2026, Audit "Visitenkarte an echten Besitz binden"): Titel, Rahmen, Hintergrund und Profilbild
+-- nimmt karte_waehle nur an, wenn das Konto sie besitzt. Besitz leitet der Server aus dem ab, was er selbst hat: den
+-- gebuchten Stufen (karte_stufen) und der Liga (Kronen). Die Zuordnung steht in karte_besitz_regeln(), die Liste des
+-- eigenen Besitzes liefert karte_frei() (auch im Stand, Schluessel frei). Was der Server nicht belegen kann (z. B. die
+-- Koennen-Titel aus dem Partien-Archiv des Geraets), hat keine Regel und bleibt aus der festen Liste waehlbar.
+-- Was schon auf der Karte steht, bleibt (nur eine NEUE Wahl wird geprueft): niemand verliert beim Einspielen etwas.
+-- BEKANNTE GRENZE (Flo 07.11.2026, am 09.11.2026 enger gefasst): Bot-, Raetsel-, Serie- und Level-Stufen meldet das
+-- Geraet, weil diese Partien nur dort laufen (auch als Gast, vor dem Konto); der Server hat dazu keine eigenen Daten und
+-- kann sie nicht nachrechnen. Er bremst deshalb: je Meldung hoechstens EINE neue Stufe je Familie, in 24 Stunden
+-- hoechstens 3 neue Silber- und 2 neue Gold-Stufen je Konto (melde_tagesgrenze), und eine Serie-Stufe erst, wenn es die
+-- App so viele Tage gibt (app_start). Taler und Gold-Banner gibt es nur fuer wirklich gebuchte Stufen. Ein geuebter
+-- Schummler kann die Stufen also weiter vortaeuschen, aber nur langsam und nie auf einen Schlag. Die Liga-Stufen leitet
+-- der Server selbst aus kronen_stand.stufe und den Wochen-Gruppen (liga_mitglieder, liga_gruppen) ab; die meldet
+-- niemand. Liga-Banner schreibt nur der Server gut (karte_banner_gutschreiben, aufgerufen von liga_abrechnen in
+-- kronen-schema.sql).
 --
 -- Wer die Karte eines anderen sieht: nur der Gegner einer gemeinsamen Online-Partie (karte_der_partie), mit
 -- Benutzername. Datenschutz-Text dazu: datenschutz.html (Entwurf, Rechtspruefung vor dem Live-Gang).
@@ -20,7 +27,8 @@
 -- Nutzer haben keine Tabellenrechte; alles laeuft ueber die Funktionen unten (security definer, fester search_path).
 -- Einspielen: nach supabase/schema.sql, supabase/online-schema.sql und supabase/kronen-schema.sql im SQL Editor.
 -- Wiederholbar. Pruefen: supabase/karte-rls-test.sql (rollt alles zurueck). Rueckweg: supabase/karte-zurueck.sql.
--- Rein additiv: neue Tabellen und Funktionen, nichts Bestehendes wird geaendert.
+-- Rein additiv: neue Tabellen und Funktionen, nichts Bestehendes wird geaendert. Der Stand vor dem 09.11.2026 (ohne
+-- Besitz-Pruefung und Bremse) kommt mit supabase/karte-besitz-zurueck.sql zurueck, ohne Daten zu verlieren.
 
 create table if not exists public.karte_stufen (
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -125,7 +133,75 @@ as $$
     'motive', jsonb_build_array('Q', 'R', 'B', 'N', 'P', 'karo', 'stups', 'zinni', 'klippa', 'glimm'),
     'gruende', jsonb_build_array('standard', 'welt-1', 'welt-2', 'welt-3', 'welt-4', 'welt-5'),
     'rahmen', jsonb_build_array('ohne', 'holz', 'liga-1', 'liga-2', 'liga-3', 'liga-4', 'liga-5', 'liga-6',
-      'welt-1', 'welt-2', 'welt-3', 'welt-4', 'welt-5', 'serie-7', 'serie-30', 'serie-100')
+      'welt-1', 'welt-2', 'welt-3', 'welt-4', 'welt-5', 'serie-7', 'serie-30', 'serie-100'),
+    -- Bremse fuer gemeldete Stufen (karte_stufe_moeglich): neue Silber- und Gold-Stufen je Konto in 24 Stunden. Bronze
+    -- hat keine Tagesgrenze (ein guter erster Tag kann jede Familie anfangen); Liga-Stufen zaehlen nie mit.
+    'melde_tagesgrenze', jsonb_build_object('silber', 3, 'gold', 2),
+    -- Serie (Tage in Folge) fuer Bronze, Silber, Gold wie in js/pakete/sammlung/stufen.js; eine Serie kann nicht laenger
+    -- sein, als es die App gibt (erster Stand im Repo 16.10.2026, ein Tag Luft fuer Zeitzonen)
+    'serie_tage', jsonb_build_array(7, 30, 100),
+    'app_start', '2026-10-15',
+    -- Rahmen und Titel der alten Saison-Liga (lief bis 08.11.2026 nur auf dem Geraet, nicht mehr zu erspielen): der
+    -- Server kann sie nicht belegen. Waehlbar bleiben sie fuer Konten, die es vor diesem Tag schon gab (die koennen sie
+    -- ehrlich erspielt haben), und mit Gold der Familie liga (Koenig III, so rechnet auch die App). Ein Konto, das
+    -- danach entsteht, kann sie nicht mehr neu waehlen.
+    'alt_liga_bis', '2026-11-09'
+  );
+$$;
+
+-- Woran der Server Besitz erkennt (karte_frei): je Liste der Karte ein Objekt Wert -> [Familie, Mindeststufe]. Erfuellt
+-- ist eine Regel, wenn die Familie in karte_stufen mindestens bis zu dieser Stufe gebucht ist. Ein Wert OHNE Regel ist
+-- fuer jeden frei: entweder immer frei (ohne, holz, standard, die Figuren, level-1) oder vom Server nicht belegbar.
+-- Die Regeln sind nie strenger als die App (js/pakete/sammlung/index.js teileErfolge, profil.js, titel.js): wer ein
+-- Stueck ehrlich hat, erfuellt sie. Wo die Stufen groeber sind als der Weg in der App, gilt die naechste Stufe darunter:
+--   Level-Titel      Level 10/20/30 = Bronze/Silber/Gold der Familie level. level-5 liegt unter Bronze (frei), level-15
+--                    und level-25 brauchen die Stufe darunter, level-35 bis level-100 nur Gold (mehr weiss der Server nicht)
+--   Serie            7/30/100 Tage = Bronze/Silber/Gold der Familie serie (Titel und Rahmen), genau
+--   Welt gemeistert  Titel, Rahmen und Kreatur einer Welt: mindestens eine Welt gemeistert (welten Bronze); welche Welt,
+--                    weiss der Server nicht
+--   Hintergrund      welt-2 bis welt-5: die Welt ist erreicht, dafuer braucht es mindestens einen Sieg (siege Bronze)
+--   Sieg, drei Sterne      siege Bronze (ein besiegter Bot)
+--   alle Bots, alle Sterne, alle Endgegner, 100 Siege   Gold von bots, sterne, endgegner, siege, genau
+--   ein Endgegner    endgegner Bronze; Siegesfolge 5 = siegesfolge Silber
+--   Koennen          kroenung = liga Gold (Koenig III, leitet der Server ab); raetselfuchs (100 Raetsel) = raetsel Silber
+--                    (50); weltenwanderer (Sieg in jeder Welt, also 5 besiegte Bots) = bots Bronze; sterne-sammler (eine
+--                    Welt mit allen Sternen) = welten Bronze
+--   altliga          Rahmen liga-1 bis liga-6, Titel Goldlorbeer und Ligakrone: siehe alt_liga_bis in karte_konstanten()
+-- Ohne Regel, weil nicht belegbar: schattenkoenig, goldene-feder, sternenschueler und die Koennen-Titel blitzschlag,
+-- langer-atem, gleichgewicht, feinschliff, eigene-kraft, stammgast, tafelkoenig, rekordjaeger, fehlerjaeger,
+-- musterschueler, erzfeind (Partien-Archiv, Tafeln, Kartei und Meisterschule liegen nur auf dem Geraet).
+create or replace function public.karte_besitz_regeln()
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'titel', '{
+      "level-10": ["level", 1], "level-15": ["level", 1], "level-20": ["level", 2], "level-25": ["level", 2],
+      "level-30": ["level", 3], "level-35": ["level", 3], "level-40": ["level", 3], "level-45": ["level", 3],
+      "level-50": ["level", 3], "level-60": ["level", 3], "level-75": ["level", 3], "level-100": ["level", 3],
+      "erfolg-feuertaufe": ["siege", 1], "erfolg-sternenglanz": ["siege", 1],
+      "erfolg-goldene-aehre": ["welten", 1], "erfolg-eichenlaub": ["welten", 1], "erfolg-turmzinne": ["welten", 1],
+      "erfolg-brandung": ["welten", 1], "erfolg-tiefenlicht": ["welten", 1],
+      "erfolg-bot-schreck": ["bots", 3], "erfolg-sternenkrone": ["sterne", 3],
+      "erfolg-goldlorbeer": ["altliga", 3], "erfolg-ligakrone": ["altliga", 3],
+      "erfolg-wochenflamme": ["serie", 1], "erfolg-monatsfeuer": ["serie", 2], "erfolg-ewige-flamme": ["serie", 3],
+      "erfolg-siegeszug": ["siegesfolge", 2], "erfolg-bezwinger": ["endgegner", 1],
+      "erfolg-siegesbanner": ["siege", 3], "erfolg-weltenbezwinger": ["endgegner", 3],
+      "koennen-kroenung": ["liga", 3], "koennen-raetselfuchs": ["raetsel", 2],
+      "koennen-weltenwanderer": ["bots", 1], "koennen-sterne-sammler": ["welten", 1]
+    }'::jsonb,
+    'rahmen', '{
+      "liga-1": ["altliga", 3], "liga-2": ["altliga", 3], "liga-3": ["altliga", 3], "liga-4": ["altliga", 3],
+      "liga-5": ["altliga", 3], "liga-6": ["altliga", 3],
+      "welt-1": ["welten", 1], "welt-2": ["welten", 1], "welt-3": ["welten", 1], "welt-4": ["welten", 1],
+      "welt-5": ["welten", 1],
+      "serie-7": ["serie", 1], "serie-30": ["serie", 2], "serie-100": ["serie", 3]
+    }'::jsonb,
+    'gruende', '{"welt-2": ["siege", 1], "welt-3": ["siege", 1], "welt-4": ["siege", 1], "welt-5": ["siege", 1]}'::jsonb,
+    'motive', '{"karo": ["welten", 1], "stups": ["welten", 1], "zinni": ["welten", 1], "klippa": ["welten", 1],
+      "glimm": ["welten", 1]}'::jsonb
   );
 $$;
 
@@ -258,7 +334,82 @@ begin
 end;
 $$;
 
--- Eigener Stand: Taler, erreichte Stufe je Familie, eigene Banner, gewaehlte Karte
+-- Was ein Konto fuer die Karte waehlen darf: { titel: [...], rahmen: [...], gruende: [...], motive: [...] }, je Liste
+-- die Werte aus karte_konstanten(), deren Regel (karte_besitz_regeln) erfuellt ist oder die keine Regel haben.
+-- Der Erfinder (Flo 30.10.2026: als Erfinder ist alles Ausruestbare frei; Zeile erfinder-titel in sonderstuecke,
+-- werkstatt-schema.sql, nur von Flo per SQL eingetragen) darf jeden Rahmen, Hintergrund und jedes Profilbild der Liste
+-- waehlen; Titel bleiben auch fuer ihn erspielt. Ohne die Tabelle sonderstuecke gibt es keinen Erfinder. Nur intern.
+create or replace function public.karte_frei(uid uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  k jsonb := public.karte_konstanten();
+  r jsonb := public.karte_besitz_regeln();
+  st jsonb;
+  erfinder boolean := false;
+  altliga boolean;
+begin
+  select coalesce(jsonb_object_agg(s.familie, s.stufe), '{}'::jsonb) into st
+  from (select x.familie, max(x.stufe) as stufe from public.karte_stufen x where x.user_id = uid group by x.familie) s;
+  if to_regclass('public.sonderstuecke') is not null then
+    execute 'select exists (select 1 from public.sonderstuecke s where s.user_id = $1 and s.stueck_id = ''erfinder-titel'')'
+      into erfinder using uid;
+  end if;
+  -- to_jsonb: laeuft auch gegen eine Auth-Tabelle ohne die Spalte created_at (dann zaehlt nur Liga Gold)
+  altliga := coalesce((st ->> 'liga')::integer, 0) >= 3
+    or coalesce((select (to_jsonb(u) ->> 'created_at')::timestamptz < ((k ->> 'alt_liga_bis')::date::timestamp at time zone 'Europe/Berlin')
+                 from auth.users u where u.id = uid), false);
+  return (
+    select jsonb_object_agg(a.art, coalesce((
+      select jsonb_agg(w.wert order by w.o)
+      from jsonb_array_elements_text(k -> a.art) with ordinality as w(wert, o)
+      where (erfinder and a.art <> 'titel')
+         or r -> a.art -> w.wert is null
+         or case when r -> a.art -> w.wert ->> 0 = 'altliga' then altliga
+                 else coalesce((st ->> (r -> a.art -> w.wert ->> 0))::integer, 0) >= (r -> a.art -> w.wert ->> 1)::integer end
+    ), '[]'::jsonb))
+    from (values ('titel'), ('rahmen'), ('gruende'), ('motive')) as a(art)
+  );
+end;
+$$;
+
+-- Darf das Konto die Stufe nr der Familie fam JETZT auf eine Meldung des Geraets hin buchen? Zwei Deckel, weil der
+-- Server diese Stufen nicht nachrechnen kann (Kopf der Datei):
+--   Serie         nicht, bevor es die App so viele Tage gibt (serie_tage, app_start; Kalender Europe/Berlin)
+--   Tagesgrenze   Silber und Gold: hoechstens melde_tagesgrenze neue gemeldete Stufen dieser Hoehe in 24 Stunden
+-- Was heute nicht geht, verfaellt nicht: das Geraet meldet seinen Stand bei jedem Start neu. Nur intern.
+create or replace function public.karte_stufe_moeglich(uid uuid, fam text, nr integer)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  k jsonb := public.karte_konstanten();
+  grenze integer := (k -> 'melde_tagesgrenze' ->> (k -> 'stufen' ->> (nr - 1)))::integer;
+begin
+  if fam = 'serie' and (now() at time zone 'Europe/Berlin')::date - (k ->> 'app_start')::date
+       < (k -> 'serie_tage' ->> (nr - 1))::integer then
+    return false;
+  end if;
+  if grenze is not null and (
+       select count(*) from public.karte_stufen s
+       where s.user_id = uid and s.stufe = nr and s.am > now() - interval '24 hours'
+         and not coalesce((k -> 'familien' -> s.familie) ? 'server', false)
+     ) >= grenze then
+    return false;
+  end if;
+  return true;
+end;
+$$;
+
+-- Eigener Stand: Taler, erreichte Stufe je Familie, eigene Banner, gewaehlte Karte und (seit 09.11.2026) frei: was das
+-- Konto fuer die Karte waehlen darf (karte_frei)
 create or replace function public.karte_mein_stand()
 returns jsonb
 language plpgsql
@@ -277,13 +428,17 @@ begin
       select familie, max(stufe) as stufe from public.karte_stufen where user_id = uid group by familie) s), '{}'::jsonb),
     'banner', coalesce((select jsonb_agg(b.banner order by b.am, b.banner) from public.banner_besitz b where b.user_id = uid), '[]'::jsonb),
     'wahl', jsonb_build_object('banner', w.banner, 'titel', w.titel, 'vitrine', to_jsonb(w.vitrine),
-      'motiv', w.motiv, 'grund', w.grund, 'rahmen', w.rahmen)
+      'motiv', w.motiv, 'grund', w.grund, 'rahmen', w.rahmen),
+    'frei', public.karte_frei(uid)
   );
 end;
 $$;
 
--- Das Geraet meldet seine Stufen ({ familie: 0..3 }); gebucht wird, was fehlt, der Reihe nach. Die Familie liga
--- wird ignoriert (leitet der Server selbst ab). Unbekannte Familien oder Werte ausserhalb 0..3 lehnt er ab.
+-- Das Geraet meldet seine Stufen ({ familie: 0..3 }). Gebucht wird je Familie hoechstens die NAECHSTE fehlende Stufe
+-- (kein Sprung mehr von 0 auf Gold in einem Aufruf), und nur, wenn karte_stufe_moeglich sie zulaesst. Was heute nicht
+-- gebucht wird, ist kein Fehler: die Antwort ist der Stand, das Geraet meldet beim naechsten Start wieder. Taler und
+-- Gold-Banner haengen an der gebuchten Stufe (karte_buche_stufe), nie an der Meldung. Die Familie liga wird ignoriert
+-- (leitet der Server selbst ab). Unbekannte Familien oder Werte ausserhalb 0..3 lehnt er ab.
 create or replace function public.karte_melde_stufen(stufen jsonb)
 returns jsonb
 language plpgsql
@@ -297,12 +452,13 @@ declare
   wert jsonb;
   ziel integer;
   hat integer;
-  i integer;
 begin
   perform public.karte_sichern(uid);
   if stufen is null or jsonb_typeof(stufen) <> 'object' then
     raise exception 'KARTE_MELDUNG';
   end if;
+  -- je Konto nacheinander, damit die Tagesgrenze auch bei gleichzeitigen Meldungen haelt
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('karte-melden:' || uid::text));
   for fam, wert in select * from jsonb_each(stufen) loop
     if not (k -> 'familien') ? fam then
       raise exception 'KARTE_FAMILIE';
@@ -313,16 +469,17 @@ begin
     continue when (k -> 'familien' -> fam) ? 'server';
     ziel := (wert #>> '{}')::integer;
     select coalesce(max(s.stufe), 0) into hat from public.karte_stufen s where s.user_id = uid and s.familie = fam;
-    for i in (hat + 1)..ziel loop
-      perform public.karte_buche_stufe(uid, fam, i);
-    end loop;
+    if ziel > hat and public.karte_stufe_moeglich(uid, fam, hat + 1) then
+      perform public.karte_buche_stufe(uid, fam, hat + 1);
+    end if;
   end loop;
   return public.karte_mein_stand();
 end;
 $$;
 
--- Karte waehlen: Banner nur aus dem eigenen Besitz, Titel/Motiv/Grund/Rahmen nur aus der festen Liste (nie Freitext),
--- Vitrine hoechstens drei verschiedene erreichte Familien ('stufe-<familie>')
+-- Karte waehlen: Banner nur aus dem eigenen Besitz, Titel/Motiv/Grund/Rahmen nur aus der festen Liste (nie Freitext)
+-- UND nur aus dem eigenen Besitz (karte_frei); was schon auf der Karte steht, darf stehen bleiben (nur eine neue Wahl
+-- wird geprueft). Vitrine hoechstens drei verschiedene erreichte Familien ('stufe-<familie>')
 create or replace function public.karte_waehle(banner text, titel text, vitrine text[], motiv text, grund text, rahmen text)
 returns jsonb
 language plpgsql
@@ -333,16 +490,28 @@ declare
   uid uuid := auth.uid();
   v text;
   sauber text[] := '{}';
+  alt public.karte_wahl;
+  frei jsonb;
 begin
   perform public.karte_sichern(uid);
+  select * into alt from public.karte_wahl x where x.user_id = uid;
+  frei := public.karte_frei(uid);
   if not exists (select 1 from public.banner_besitz b where b.user_id = uid and b.banner = karte_waehle.banner) then
     raise exception 'KARTE_BANNER';
   end if;
   if titel is not null and not public.karte_in_liste('titel', titel) then
     raise exception 'KARTE_TITEL';
   end if;
+  if titel is not null and titel is distinct from alt.titel and not (frei -> 'titel') ? titel then
+    raise exception 'KARTE_TITEL';
+  end if;
   if not public.karte_in_liste('motive', motiv) or not public.karte_in_liste('gruende', grund)
      or not public.karte_in_liste('rahmen', rahmen) then
+    raise exception 'KARTE_PROFIL';
+  end if;
+  if (motiv is distinct from alt.motiv and not (frei -> 'motive') ? motiv)
+     or (grund is distinct from alt.grund and not (frei -> 'gruende') ? grund)
+     or (rahmen is distinct from alt.rahmen and not (frei -> 'rahmen') ? rahmen) then
     raise exception 'KARTE_PROFIL';
   end if;
   if vitrine is not null and cardinality(vitrine) > 3 then
@@ -425,6 +594,9 @@ $$;
 -- Rechte: alles zu, nur die vier Funktionen fuer angemeldete Nutzer
 revoke all on function public.karte_konstanten() from public, anon, authenticated;
 revoke all on function public.karte_in_liste(text, text) from public, anon, authenticated;
+revoke all on function public.karte_besitz_regeln() from public, anon, authenticated;
+revoke all on function public.karte_frei(uuid) from public, anon, authenticated;
+revoke all on function public.karte_stufe_moeglich(uuid, text, integer) from public, anon, authenticated;
 revoke all on function public.karte_buche_stufe(uuid, text, integer) from public, anon, authenticated;
 revoke all on function public.karte_sichern(uuid) from public, anon, authenticated;
 revoke all on function public.karte_banner_gutschreiben(uuid, text) from public, anon, authenticated;

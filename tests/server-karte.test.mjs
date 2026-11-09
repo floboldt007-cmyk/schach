@@ -29,7 +29,7 @@ try {
 
 const ATTRAPPE = `
 create schema if not exists auth;
-create table auth.users (id uuid primary key, email text);
+create table auth.users (id uuid primary key, email text, created_at timestamptz default now());
 create or replace function auth.uid() returns uuid language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
     (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid;
@@ -103,6 +103,30 @@ f = await lauf(db, 'karte-schema.sql (nach Rueckweg)', lies('supabase/karte-sche
 pruefe('karte-schema.sql laeuft nach dem Rueckweg wieder', f === null, f);
 f = await lauf(db, 'karte-rls-test.sql (nach Rueckweg)', lies('supabase/karte-rls-test.sql'));
 pruefe('karte-rls-test.sql laeuft nach dem Rueckweg wieder', f === null, f);
+
+// Kleiner Rueckweg (karte-besitz-zurueck.sql): nur Besitz-Pruefung und Bremse weg, Tabellen und Daten bleiben, die
+// vier Nutzer-Funktionen bleiben erreichbar. GEGENPROBE: der Test muss gegen diesen alten Stand ROT sein (sonst
+// pruefte er die Besitz-Regeln gar nicht) und nach erneutem Einspielen wieder gruen.
+await lauf(db, 'Zeile fuer den Rueckweg', `insert into auth.users (id, email) values ('99999999-9999-4999-8999-999999999999', 'bleibt@example.invalid');
+  insert into public.karte_stufen (user_id, familie, stufe) values ('99999999-9999-4999-8999-999999999999', 'siege', 1);`);
+f = await lauf(db, 'karte-besitz-zurueck.sql', lies('supabase/karte-besitz-zurueck.sql') + lies('supabase/karte-besitz-zurueck.sql'));
+pruefe('karte-besitz-zurueck.sql laeuft (zweimal)', f === null, f);
+const klein = await db.query(`select
+    (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'
+      and p.proname in ('karte_frei', 'karte_stufe_moeglich', 'karte_besitz_regeln')) as neu,
+    (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'
+      and p.proname like 'karte\\_%' and has_function_privilege('authenticated', p.oid, 'execute')) as offen,
+    (select count(*)::int from public.karte_stufen) as zeilen`);
+pruefe('kleiner Rueckweg: Hilfsfunktionen weg, vier Nutzer-Funktionen offen, Daten bleiben',
+  klein.rows[0].neu === 0 && klein.rows[0].offen === 4 && klein.rows[0].zeilen === 1, JSON.stringify(klein.rows[0]));
+f = await lauf(db, 'karte-rls-test.sql (alter Stand)', lies('supabase/karte-rls-test.sql'));
+pruefe('Gegenprobe: ohne Besitz-Pruefung ist karte-rls-test.sql rot', f !== null && f.includes('FEHLER:'), f);
+await lauf(db, 'Aufraeumen nach Gegenprobe', 'rollback;');
+f = await lauf(db, 'karte-schema.sql (nach kleinem Rueckweg)', lies('supabase/karte-schema.sql'));
+pruefe('karte-schema.sql laeuft nach dem kleinen Rueckweg wieder', f === null, f);
+f = await lauf(db, 'karte-rls-test.sql (nach kleinem Rueckweg)', lies('supabase/karte-rls-test.sql'));
+pruefe('karte-rls-test.sql ist danach wieder gruen', f === null, f);
+await lauf(db, 'Zeile wieder weg', `delete from auth.users where id = '99999999-9999-4999-8999-999999999999';`);
 
 await db.close();
 console.log(`\n${ok}/${gesamt} bestanden`);
