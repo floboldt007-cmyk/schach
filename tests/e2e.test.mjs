@@ -97,6 +97,7 @@ function ladePlaywright() {
 
 const ergebnisse = [];
 let gruppe = '';
+let schrittJetzt = '';   // laufender Schritt im Update-Teil (steht im Zeitlimit des Abschnitts)
 function pruefe(name, ok, detail = '') {
   ergebnisse.push({ name: (gruppe ? gruppe + ': ' : '') + name, ok: !!ok, detail });
   console.log(`${ok ? 'ok  ' : 'FEHLER'} ${gruppe ? gruppe + ': ' : ''}${name}${!ok && detail ? ' (' + detail + ')' : ''}`);
@@ -142,6 +143,14 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
   });
   if (process.env.TEST_E2E_SW_STILL === '1') await kontext.addInitScript(() => {
     Object.defineProperty(navigator.serviceWorker, 'ready', { get: () => new Promise(() => {}) });
+  });
+  // Gegenprobe zu Punkt 28: die wartende Version bekommt nie "aktivieren", das Update muss mit Schrittnamen rot werden
+  if (process.env.TEST_E2E_UPDATE_STILL === '1') await kontext.addInitScript(() => {
+    const senden = ServiceWorker.prototype.postMessage;
+    ServiceWorker.prototype.postMessage = function (d, ...rest) {
+      if (d === 'aktivieren' || (d && d.typ === 'aktivieren')) return;
+      return senden.call(this, d, ...rest);
+    };
   });
   const seite = await kontext.newPage();
   return { kontext, seite, fehler, fehlgeschlagen };
@@ -633,7 +642,34 @@ async function testeAufgabe(seite, h, fehler) {
 }
 
 // ---------- 7. Update auf eine neue Version ----------
+// Punkt 28 (09.11.2026): In CI hing "Update" Teil b dreimal ueber 165 s, ohne dass eine Grenze eines Einzelschritts
+// griff (#189, #195, 42676662172, immer chromium (1)). Jeder Schritt hat darum einen Namen und eine eigene Grenze.
+// Haengt er, nennt der Fehler den Schritt und die Lage des Service Workers; langsame Schritte (ab 5 s) stehen im Log.
+async function swLage(seite) {
+  return begrenzt('SW-Lage', () => seite.evaluate(async () => {
+    const r = await navigator.serviceWorker.getRegistration();
+    const z = (w) => (w ? w.state : '-');
+    return JSON.stringify({ steuert: !!navigator.serviceWorker.controller, installiert: r && z(r.installing), wartet: r && z(r.waiting),
+      aktiv: r && z(r.active), caches: await caches.keys(), merker: sessionStorage.getItem('schach-arena:sw-wechsel'),
+      meta: document.querySelector('meta[name="schach-test-version"]')?.content || null, hash: location.hash });
+  }), 5000).catch((e) => 'unbekannt (' + e.message + ')');
+}
+async function schritt(seite, name, arbeit, ms = 40000) {
+  const start = Date.now();
+  schrittJetzt = name;
+  try {
+    return await begrenzt(`${gruppe}: ${name}`, arbeit, ms);
+  } catch (e) {
+    throw new Error(`${gruppe}, Schritt "${name}" nach ${Date.now() - start} ms: ${e.message.split(/\r?\n/)[0]}; SW: ${await swLage(seite)}`, { cause: e });
+  } finally {
+    const dauer = Date.now() - start;
+    if (dauer >= 5000) console.log(`… e2e: ${gruppe}, Schritt "${name}" brauchte ${dauer} ms`);
+    schrittJetzt = '';
+  }
+}
+
 async function testeUpdate(seite, h, fehler) {
+  const S = (name, arbeit, ms) => schritt(seite, name, arbeit, ms);
   gruppe = 'Update';
   await seite.evaluate(() => window.__app.gehe('arena'));
   await h.screen('arena');
@@ -659,16 +695,16 @@ async function testeUpdate(seite, h, fehler) {
   pruefe('Kein Hinweis mehr', await seite.locator('.update-hinweis').count() === 0);
 
   // b) Neue Version liegt beim Start schon bereit: sie uebernimmt sofort
-  await seite.evaluate(() => sessionStorage.clear());
+  await S('b1 Merker loeschen', () => seite.evaluate(() => sessionStorage.clear()));
   neueVersion += 1;
-  await seite.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()).then(() => true));
-  await seite.waitForFunction(() => navigator.serviceWorker.getRegistration().then((r) => !!r.waiting), null, { timeout: 30000, polling: 200 });
-  await seite.evaluate(() => { document.querySelector('.update-hinweis')?.remove(); });
-  await seite.reload();
-  await seite.waitForFunction((v) => document.querySelector('meta[name="schach-test-version"]')?.content === String(v), neueVersion, { timeout: 20000 });
-  await h.screen('arena');
-  pruefe('Beim nächsten Start: neue Version übernimmt', (await h.swVersion()) === neueVersion);
-  cache = await h.cache();
+  await S('b2 update()', () => seite.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()).then(() => true)));
+  await S('b3 neue Version wartet', () => seite.waitForFunction(() => navigator.serviceWorker.getRegistration().then((r) => !!r.waiting), null, { timeout: 30000, polling: 200 }));
+  await S('b4 Hinweis weg', () => seite.evaluate(() => { document.querySelector('.update-hinweis')?.remove(); }));
+  await S('b5 Neuladen', () => seite.reload());
+  await S('b6 neue Dateien da', () => seite.waitForFunction((v) => document.querySelector('meta[name="schach-test-version"]')?.content === String(v), neueVersion, { timeout: 20000 }));
+  await S('b7 Arena', () => h.screen('arena'));
+  pruefe('Beim nächsten Start: neue Version übernimmt', (await S('b8 Version fragen', () => h.swVersion())) === neueVersion);
+  cache = await S('b9 Cache lesen', () => h.cache());
   pruefe('Beim nächsten Start: nur der neue Cache', Object.keys(cache).join() === 'schach-arena-v' + neueVersion, Object.keys(cache).join(', '));
 
   // c) Flo 31.10.2026 abends ("auf dem Handy hat sich nichts veraendert"): eine bereitliegende Version uebernimmt beim
@@ -874,11 +910,11 @@ async function abschnitt(name, arbeit, ms = 180000) {
   const start = Date.now();
   gruppe = name;
   console.log(`… e2e: ${name}`);
-  const puls = setInterval(() => console.log(`… e2e: ${name}, Gruppe ${gruppe}, ${Math.round((Date.now() - start) / 1000)} s`), 15000);
+  const puls = setInterval(() => console.log(`… e2e: ${name}, Gruppe ${gruppe}${schrittJetzt ? ', Schritt ' + schrittJetzt : ''}, ${Math.round((Date.now() - start) / 1000)} s`), 15000);
   try {
     return await begrenzt(`e2e ${name} (Gruppe ${gruppe})`, arbeit, ms);
   } catch (e) {
-    throw new Error(`e2e ${name}, letzte Gruppe ${gruppe}: ${e.message}`, { cause: e });
+    throw new Error(`e2e ${name}, letzte Gruppe ${gruppe}${schrittJetzt ? ', Schritt ' + schrittJetzt : ''}: ${e.message}`, { cause: e });
   } finally { clearInterval(puls); }
 }
 

@@ -832,17 +832,20 @@ self.addEventListener('fetch', (e) => {
 });
 
 async function antworte(req, url) {
-  const cache = await caches.open(CACHE);
+  // Nie caches.open vor dem Treffer: das legt einen fehlenden Cache an. Bis clients.claim() der neuen Fassung beantwortet
+  // die alte noch Anfragen, ihr Cache ist da aber schon geloescht und kaeme so wieder (tests/sw-cache.test.mjs, CI 09.11.2026).
   const navigation = req.mode === 'navigate';
   // "./" und "index.html?test" sind dieselbe Startseite
   const start = url.pathname === BASIS || url.pathname === BASIS + 'index.html';
-  const treffer = start ? await cache.match(BASIS + 'index.html')
-    : await cache.match(req, { ignoreSearch: navigation });
+  const treffer = start ? await caches.match(BASIS + 'index.html', { cacheName: CACHE })
+    : await caches.match(req, { cacheName: CACHE, ignoreSearch: navigation });
   if (treffer) return treffer;
-  // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen
+  // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen, aber nur, solange der eigene Cache noch besteht
   const antwort = await fetch(req);
   if (antwort.status === 200 && antwort.type === 'basic') {
-    cache.put(req, antwort.clone()).catch(() => { /* Speicher voll o. ae.: egal */ });
+    const kopie = antwort.clone();
+    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, kopie))
+      .catch(() => { /* Speicher voll o. ae.: egal */ });
   }
   return antwort;
 }
