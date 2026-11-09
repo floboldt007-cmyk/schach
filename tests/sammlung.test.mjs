@@ -221,6 +221,17 @@ setzeSprache('en');
   pruefe('Shop englisch: Midnight & Gold statt des deutschen Server-Namens, Datum im US-Format',
     produktName('brett-mitternacht', 'Mitternacht & Gold') === 'Midnight & Gold' && ab === 'On sale from 12/01/2026', ab);
 }
+// Der englische Name ist nur Anzeige: Besitz steht nur in der Datenbank (besitz, Schluessel produkt_id), und shop.js
+// findet Aussehen, Karte und Server-Abgleich ueber die produkt_id; mit dem Namen vergleicht nichts
+{
+  const quelle = readFileSync(path.join(WURZEL, 'js/pakete/sammlung/shop.js'), 'utf8');
+  const zeilen = quelle.split('\n').filter((z) => !z.trim().startsWith('//'));
+  const nameVergleich = zeilen.filter((z) => /\bname\s*[!=]==?|[!=]==?\s*[\w.]*\bname\b/.test(z));
+  const nameNutzung = zeilen.filter((z) => /\b(e|a|aussehen)\.name\b/.test(z));
+  pruefe('Shop: Name nur Anzeige, kein Vergleich ueber den Namen, Zuordnung ueber produkt_id',
+    nameVergleich.length === 0 && nameNutzung.every((z) => /produktName\(|aussehen\.name : id/.test(z)) && /KATALOG\[e\.produkt_id\]/.test(quelle)
+    && produktName('brett-mitternacht', 'Mitternacht & Gold') === 'Midnight & Gold', { nameVergleich, nameNutzung });
+}
 setzeSprache('de');
 
 // Titel (Flo 01.11.2026: "bessere Designs, Titel auch zu Errungenschaften, nicht nur bei den Leveln")
