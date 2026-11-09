@@ -116,7 +116,10 @@ async function abgleichEinmal(titel) {
   // Wahl der Karte: erst so, wie der Spieler sie gewaehlt hat; lehnt der Server ab (z. B. ein Titel, den er nicht kennt),
   // ein zweites Mal nur mit dem, was er als Besitz kennt. Scheitert auch das, bleibt die alte Karte stehen.
   const wahl = profilWahl();
-  for (const w of [wahlFuerServer(wahl, null, titel === undefined ? wahl.titel : titel), wahlFuerServer(wahl, stand)]) {
+  // derselbe Titel fuer beide Versuche: ohne eigene Wahl ist es der berechnete Level-Titel (wahl.titel ist dann null);
+  // er darf im zweiten Versuch nicht verloren gehen, nur weil z. B. der Rahmen abgelehnt wurde
+  const wunsch = titel === undefined ? wahl.titel : titel;
+  for (const w of [wahlFuerServer(wahl, null, wunsch), wahlFuerServer(wahl, stand, wunsch)]) {
     try {
       const d = await rpc('karte_waehle', w);
       if (istStand(d)) { merkeServer(uid, d); return d; }

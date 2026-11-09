@@ -153,6 +153,16 @@ rw = await K.abgleichKonto({ titel: 'erfolg-sternenkrone' });
 wz = aufrufe.filter((a) => a.name === 'karte_waehle');
 pruefe('Bestand: nach der Absage bleibt, was schon auf der Karte stand (Titel und alter Rahmen), das Bild wechselt', wz.length === 2
   && wz[1].daten.titel === 'erfolg-sternenkrone' && wz[1].daten.rahmen === 'liga-6' && wz[1].daten.motiv === 'Q' && rw.wahl.rahmen === 'liga-6', wz.map((x) => x.daten));
+// Codex-Befund PR #206: ohne eigene Titel-Wahl (wahl.titel null) kommt der berechnete Level-Titel als Parameter. Wird nur
+// der Rahmen abgelehnt, muss der erlaubte Titel im zweiten Versuch stehen bleiben.
+serverWahl = { banner: 'start', titel: null, vitrine: [], motiv: 'P', grund: 'standard', rahmen: 'ohne' };
+antworten = { karte_melde_stufen: () => stand({ stufen: { siege: 3 }, frei: FREI, wahl: { ...serverWahl } }), karte_waehle: besitzServer(serverWahl) };
+setzeProfilWahl({ figur: 'Q', grund: 'standard', rahmen: 'liga-6', titel: null });
+aufrufe = [];
+rw = await K.abgleichKonto({ titel: 'level-5' });
+wz = aufrufe.filter((a) => a.name === 'karte_waehle');
+pruefe('Berechneter Titel ohne eigene Wahl: bleibt im zweiten Versuch, nur der gesperrte Rahmen faellt weg', wz.length === 2 && wz[0].daten.titel === 'level-5'
+  && wz[1].daten.titel === 'level-5' && wz[1].daten.rahmen === 'ohne' && rw.wahl.titel === 'level-5', wz.map((x) => x.daten));
 // belegte Wahl: ein Aufruf genuegt
 setzeProfilWahl({ figur: 'Q', grund: 'standard', rahmen: 'holz', titel: 'erfolg-feuertaufe' });
 aufrufe = [];
