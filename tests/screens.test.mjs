@@ -515,6 +515,36 @@ async function testePruefrunde(browser, d) {
 }
 
 // ---------------------------------------------------------------------------
+// Kundenblick 09.11. (Befund 10): das Brett der Analyse steht beim Oeffnen ganz im Bild und endet ueber der festen
+// Knopfleiste (Handy). Gemessen wird die Ueberlappung der Rechtecke, nicht nur die Sichtbarkeit im Fenster.
+async function testeBrettFrei(browser, d) {
+  for (const [breite, hoehe, name] of [[390, 664, 'iPhone 13'], [375, 548, 'iPhone SE'], [820, 1106, 'iPad hoch'], [1280, 720, 'PC']]) {
+    for (const schema of ['light', 'dark']) {
+      gruppe = `Brett frei ${name} ${schema === 'dark' ? 'dunkel' : 'hell'}`;
+      const { kontext, seite, fehler } = await neueSeite(browser, { breite, hoehe, touch: breite < 900 });
+      await seite.emulateMedia({ colorScheme: schema });
+      await oeffne(seite, `screen=analyse&partieId=${d.oper}`);
+      await seite.waitForSelector('.an-brett .feld, .an-brett img', { timeout: 30000 }).catch(() => {});
+      await warte(1300);
+      const m = await seite.evaluate(() => {
+        const b = document.querySelector('.an-brett').getBoundingClientRect();
+        const l = document.querySelector('.an-aktionsleiste');
+        const lr = l && getComputedStyle(l).display !== 'none' ? l.getBoundingClientRect() : null;
+        const sec = document.querySelector('.an-screen');
+        return { b: [b.left, b.top, b.right, b.bottom].map(Math.round), l: lr && [lr.left, lr.top, lr.right, lr.bottom].map(Math.round),
+          iw: innerWidth, ih: innerHeight, scroll: sec.scrollTop, breite: Math.round(b.width) };
+      });
+      const [bl, bt, br, bb] = m.b;
+      const ueberlappt = !!m.l && bl < m.l[2] && br > m.l[0] && bt < m.l[3] && bb > m.l[1];
+      pruefe('Brett ganz im Fenster, ohne Scrollen', m.scroll === 0 && bt >= 0 && bl >= 0 && br <= m.iw + 0.5 && bb <= m.ih + 0.5, JSON.stringify(m));
+      pruefe('Brett und Knopfleiste ueberlappen nicht', !ueberlappt, JSON.stringify(m));
+      pruefe('Brett mindestens 280 px breit', m.breite >= 280, JSON.stringify(m));
+      pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+      await kontext.close();
+    }
+  }
+}
+
 async function testeTouch(browser, d) {
   gruppe = 'Touch (iPad)';
   const { kontext, seite, fehler } = await neueSeite(browser, { breite: 820, hoehe: 1180, touch: true });
@@ -854,6 +884,7 @@ try {
   await testeAnalyse(browser, d);
   await testePruefrunde(browser, d);
   await testeTouch(browser, d);
+  await testeBrettFrei(browser, d);
   await testeWenigerBewegung(browser, d);
   await testeVerlauf(browser, d);
   await testeEinstellungen(browser);
