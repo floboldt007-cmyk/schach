@@ -704,6 +704,16 @@ async function gruppeTeil(browser, start) {
         assert.equal(await page.locator('.lg-gr details.lg-gr-regeln').count(), 1);
         assert.equal(await page.locator('.lg-gr details.lg-gr-regeln').getAttribute('open'), null);
       });
+      // Kundenblick 09.11.2026: ohne Pfeil sah „So zählen Kronen“ wie ein Satz aus, nicht wie etwas zum Aufklappen
+      await browserPruefe('Gruppe ohne Konto: „So zählen Kronen“ zeigt einen Aufklapp-Pfeil, der sich beim Öffnen dreht', async () => {
+        const pfeil = () => page.evaluate(() => { const c = getComputedStyle(document.querySelector('.lg-gr-regeln summary'), '::after');
+          return { inhalt: c.content, rand: c.borderRightStyle, drehung: c.transform }; });
+        const zu = await pfeil();
+        assert.ok(zu.inhalt !== 'none' && zu.rand === 'solid', JSON.stringify(zu));
+        await page.locator('.lg-gr-regeln summary').click();
+        await page.waitForTimeout(300);
+        assert.notEqual((await pfeil()).drehung, zu.drehung);
+      });
     } finally { await kontext.close(); }
   }
   {
