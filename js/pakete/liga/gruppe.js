@@ -255,7 +255,12 @@ export function reiterGruppe({ app } = {}) {
   s.dataset.zustand = 'laedt';
   Promise.all([import('../../kronen.js'), ladeBild()]).then(([k]) => {
     if (weg) return;
-    if (!k.angemeldet()) { karte('ohne-konto', T('ohneKonto', { n: zahl(GRUPPE_GROESSE) }), true); s.dataset.zustand = 'ohne-konto'; return; }
+    if (!k.angemeldet()) {
+      karte('ohne-konto', T('ohneKonto', { n: zahl(GRUPPE_GROESSE) }), true);
+      s.insertAdjacentHTML('beforeend', regeln());
+      s.dataset.zustand = 'ohne-konto';
+      return;
+    }
     return k.holeGruppe().then((d) => {
       if (weg) return;
       const lg = gruppeLage(Array.isArray(d) ? d[0] : d);
