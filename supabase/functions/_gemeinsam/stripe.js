@@ -16,11 +16,18 @@
 //       grund: 'kein_geheimnis' | 'kein_kopf' | 'kein_zeitstempel' | 'keine_signatur' | 'signatur' | 'zeit'
 //       Stripe signiert `${t}.${koerper}` mit HMAC-SHA256 und dem Webhook-Geheimnis (whsec_...) als Schluessel; der
 //       Kopf Stripe-Signature lautet "t=<Sekunden>,v1=<hex>[,v1=<hex>][,v0=<hex>]". Gezaehlt wird nur v1.
-//   auswerten(ereignis) -> { daten } | { ignoriert: grund }
+//   auswerten(ereignis, erlaubt) -> { daten } | { ignoriert: grund }
 //       daten sind genau die Parameter von public.abo_stripe_ereignis (supabase/abo-schema.sql):
 //       { ereignis_id, typ, erstellt, kunde_id, abo_id, nutzer, status, gueltig_bis, plan }
+//       erlaubt (Liste aus erlaubtePreise, leer oder weggelassen = keine Pruefung wie bisher): Abo-Ereignisse und
+//       bezahlte Rechnungen zaehlen nur, wenn ihr Preis dazugehoert, sonst { ignoriert: 'fremdes_produkt' }.
+//   erlaubtePreise(umgebung) -> [text]   Produktpruefung (Audit 09.11.2026, Befund M4): Ohne sie gaebe JEDES Abo im
+//       selben Stripe-Konto Premium. ABO_STRIPE_PLAN = Lookup-Keys und/oder Preis-IDs mit Komma getrennt (z. B.
+//       "trainer-monat"), dazu ABO_STRIPE_PREIS (Preis-ID price_..., derselbe Wert wie fuer die Kasse). Keine echten IDs
+//       im Code: Die Werte stehen nur in den Supabase-Secrets. Sind beide leer, wird nicht geprueft.
+//   preiseVonAbo(abo), preiseVonRechnung(rechnung) -> [{ id, schluessel }]   Preise eines Abos bzw. der Rechnungszeilen
 //   verarbeite({ methode, koerper, signatur }, umgebung, { fetch, jetzt }) -> Promise<{ status, kopf, koerper }>
-//       umgebung: { STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY }
+//       umgebung: { STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ABO_STRIPE_PLAN?, ABO_STRIPE_PREIS? }
 //       405 kein POST, 413 zu gross, 400 Signatur oder JSON falsch (Stripe zeigt den Fehler im Dashboard),
 //       200 verbucht oder bewusst ignoriert, 500 Konfiguration fehlt oder Datenbank nicht erreichbar (Stripe
 //       wiederholt die Zustellung bis zu 3 Tage). Die Antwort enthaelt nie Geheimnisse oder personenbezogene Daten.
@@ -122,6 +129,41 @@ export function planVon(abo) {
   return anzahl > 1 ? `${anzahl}-${name}` : name;
 }
 
+// ---------------------------------------------------------------------------
+// Produktpruefung: nur der Trainer gibt Premium
+// ---------------------------------------------------------------------------
+const KENNUNG = /^[A-Za-z0-9_.:-]{1,200}$/;
+export function erlaubtePreise(umgebung = {}) {
+  const roh = [umgebung && umgebung.ABO_STRIPE_PLAN, umgebung && umgebung.ABO_STRIPE_PREIS]
+    .map((x) => (typeof x === 'string' ? x : '')).join(',');
+  return [...new Set(roh.split(/[\s,;]+/).map((x) => x.trim()).filter((x) => KENNUNG.test(x)))];
+}
+// Ein Preis als { id, schluessel }: Stripe liefert ihn als Objekt (id, lookup_key) oder nur als ID-Text
+function preisAus(x) {
+  if (typeof x === 'string') return x ? { id: x, schluessel: null } : null;
+  if (!x || typeof x !== 'object') return null;
+  const id = typeof x.id === 'string' && x.id ? x.id : null;
+  const schluessel = typeof x.lookup_key === 'string' && x.lookup_key.trim() ? x.lookup_key.trim() : null;
+  return id || schluessel ? { id, schluessel } : null;
+}
+export function preiseVonAbo(abo) {
+  const pos = abo && abo.items && Array.isArray(abo.items.data) ? abo.items.data : [];
+  return [...pos.map((i) => i && (preisAus(i.price) || preisAus(i.plan))), preisAus(abo && abo.plan)].filter(Boolean);
+}
+// Rechnungszeilen: aeltere API price/plan an der Zeile, neuere pricing.price_details.price (nur die ID, ohne Lookup-Key)
+export function preiseVonRechnung(r) {
+  const zeilen = r && r.lines && Array.isArray(r.lines.data) ? r.lines.data : [];
+  return zeilen.map((z) => z && (preisAus(z.price) || preisAus(z.plan)
+    || preisAus(z.pricing && z.pricing.price_details && z.pricing.price_details.price))).filter(Boolean);
+}
+// Ohne Liste keine Pruefung. Mit Liste muss mindestens ein Preis sicher dazugehoeren: Was sich nicht bestimmen laesst,
+// zaehlt als fremd (eine Rechnung ohne erkennbaren Preis verlaengert dann nicht; das Abo-Ereignis derselben
+// Verlaengerung bringt den Stand trotzdem).
+function produktPasst(preise, erlaubt) {
+  if (!Array.isArray(erlaubt) || !erlaubt.length) return true;
+  return preise.some((p) => (p.id && erlaubt.includes(p.id)) || (p.schluessel && erlaubt.includes(p.schluessel)));
+}
+
 // Abo einer Rechnung: aeltere API-Versionen invoice.subscription, neuere invoice.parent.subscription_details.subscription,
 // notfalls die erste Rechnungszeile mit Abo
 function aboDerRechnung(r) {
@@ -133,7 +175,7 @@ function aboDerRechnung(r) {
     || ausZeile || null;
 }
 
-export function auswerten(e) {
+export function auswerten(e, erlaubt = null) {
   if (!e || typeof e !== 'object' || Array.isArray(e)) return { ignoriert: 'form' };
   if (!TYPEN.includes(e.type)) return { ignoriert: 'typ' };
   if (typeof e.id !== 'string' || !MUSTER.evt.test(e.id)) return { ignoriert: 'form' };
@@ -162,6 +204,7 @@ export function auswerten(e) {
   } else if (e.type === 'invoice.paid') {
     abo = aboDerRechnung(o);
     if (!abo) return { ignoriert: 'kein_abo' };
+    if (!produktPasst(preiseVonRechnung(o), erlaubt)) return { ignoriert: 'fremdes_produkt' };
     // Die Zeilen tragen die bezahlte Leistungszeit (invoice.period_end waere die vorige Periode)
     const zeilen = o.lines && Array.isArray(o.lines.data) ? o.lines.data : [];
     const ende = groesste(zeilen.map((z) => z && z.period && z.period.end));
@@ -170,6 +213,8 @@ export function auswerten(e) {
     bis = zeitstempel(ende);
   } else {
     abo = idVon(o.id);
+    // Ein anderes Abo im selben Stripe-Konto gibt nie Premium (und nimmt auch keins weg)
+    if (!produktPasst(preiseVonAbo(o), erlaubt)) return { ignoriert: 'fremdes_produkt' };
     plan = planVon(o);
     if (e.type === 'customer.subscription.deleted') {
       status = 'abgelaufen';
@@ -224,7 +269,7 @@ export async function verarbeite({ methode, koerper, signatur } = {}, umgebung =
   if (!sig.ok) return antwort(400, { fehler: 'Signatur ungueltig', grund: sig.grund });
   let ereignis = null;
   try { ereignis = JSON.parse(koerper); } catch (f) { return antwort(400, { fehler: 'Kein JSON' }); }
-  const a = auswerten(ereignis);
+  const a = auswerten(ereignis, erlaubtePreise(umgebung));
   if (!a.daten) return antwort(200, { ok: true, ignoriert: a.ignoriert });
   const f = holen || globalThis.fetch;
   let r = null;

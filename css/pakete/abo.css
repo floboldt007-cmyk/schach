@@ -76,3 +76,27 @@
   .premium-hinweis { flex-wrap: wrap; }
   .premium-hinweis .ph-mehr.knopf { width: 100%; }
 }
+
+/* ---------- Blatt "Vertrag kündigen" (js/pakete/abo/kuendigen.js, Kuendigungsbutton) ---------- */
+.kuend-karte { width: min(560px, calc(100% - 24px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px));
+  overflow-y: auto; overscroll-behavior: contain; text-align: left; }
+.kuend-karte h3:focus { outline: none; }
+.kuend-karte .kuend-text { font-size: 15px; }
+.kuend-karte .kuend-text:empty { display: none; }
+.kuend-form[hidden], .kuend-beleg[hidden], .kuend-meldung[hidden], .kuend-zusatz[hidden] { display: none; }
+.kuend-angaben { margin: 14px 0 0; padding: 12px 14px; display: grid; gap: 8px; border-radius: var(--r-l); background: var(--flaeche-2);
+  border: 1px solid var(--linie); }
+.kuend-angaben > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; }
+.kuend-angaben dt { font-size: 14px; font-weight: 700; color: var(--text-2); }
+.kuend-angaben dd { margin: 0; font-size: 15px; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.kuend-angaben .kuend-ende dd { font-weight: 600; color: var(--text-2); }
+.kuend-feld { margin: 14px 0 0; padding: 0; border: 0; min-width: 0; display: grid; gap: 4px; }
+.kuend-feld legend { padding: 0; margin: 0 0 4px; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber);
+  text-transform: uppercase; color: var(--text-2); }
+.kuend-wahl { display: flex; align-items: center; gap: 10px; min-height: 46px; font-size: 15px; font-weight: 600; color: var(--text); }
+.kuend-wahl input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--akzent); }
+.kuend-zusatz { display: grid; gap: 6px; margin: 4px 0 4px 30px; font-size: 14px; font-weight: 700; color: var(--text-2); }
+.kuend-zusatz textarea, .kuend-zusatz input { width: 100%; min-height: 44px; padding: 10px 12px; border-radius: var(--r-m); border: 1px solid var(--linie-2);
+  background: var(--flaeche); color: var(--text); font: inherit; font-weight: 600; }
+.kuend-karte .kuend-meldung { margin-top: 14px; padding: 12px 14px; border-radius: var(--r-l); border: 1px solid var(--linie-2);
+  background: var(--flaeche-2); font-size: 15px; font-weight: 700; color: var(--text); }

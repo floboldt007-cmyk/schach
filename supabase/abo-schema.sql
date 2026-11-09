@@ -22,6 +22,8 @@
 --   abo_stripe_ereignis(...)      nur Service-Rolle: ein ausgewertetes Stripe-Ereignis verbuchen. Die Auswertung macht
 --                                 supabase/functions/_gemeinsam/stripe.js; Rueckgabe ist ein kurzes Ergebnis:
 --                                 'neu' | 'doppelt' | 'wartet' | 'veraltet' | 'fremdes_abo' | 'zugeordnet' | 'ohne_nutzer'
+--                                 | 'konflikt' (Kauf fuer ein Konto, dessen laufendes Abo an einem ANDEREN Stripe-Kunden
+--                                 haengt: nichts wird zugeordnet, Flo klaert von Hand, siehe ANLEITUNG)
 --   abo_wende_an(...)             intern (kein Recht fuer irgendwen ausser dem Besitzer)
 --   abo_hole_nach(kunde, abo)     wartende Ereignisse eines Stripe-Kunden auf seine Zeile in abos anwenden. Ruft der Kauf
 --                                 selbst auf; Flo ruft es im SQL Editor (als Besitzer) nach einer von Hand angelegten
@@ -38,6 +40,15 @@
 -- (checkout.session.completed) setzt nur die Zuordnung Nutzer <-> Stripe-Kunde und einen vorlaeufigen Stand
 -- (stand_zeit null), den das naechste Abo-Ereignis immer ueberschreibt. Dabei werden die Ereignisse nachgeholt, die vor
 -- dem Kauf ankamen ('wartet', und bei einem zweiten Abo desselben Kunden die 'fremdes_abo' dieses neuen Abos).
+--
+-- Kein Umhaengen (Audit 09.11.2026, Befund M4): Die Nutzer-ID eines Kaufs ist nur so vertrauenswuerdig wie ihr Weg
+-- hierher. Solange sie aus der Adresse eines oeffentlichen Zahlungslinks stammt (client_reference_id), kann jeder mit
+-- einer fremden Nutzer-ID bezahlen. Deshalb ueberschreibt ein Kauf NIE die Stripe-Zuordnung eines Kontos, dessen Abo
+-- gerade laeuft (status aktiv oder gekuendigt, gueltig_bis in der Zukunft) und an einem anderen Stripe-Kunden haengt:
+-- Das Ereignis bekommt das Ergebnis 'konflikt', die Zeile in abos bleibt unberuehrt, die echten Ereignisse des Kontos
+-- kommen weiter an. Die folgenden Ereignisse des fremden Kunden bleiben 'wartet'. Das gilt auch fuer einen ehrlichen
+-- Doppelkauf (zwei laufende Abos fuer ein Konto): Auch den soll Flo sehen statt eines der beiden still zu verlieren.
+-- Handzeilen ohne kunde_id (quelle 'manuell') und abgelaufene Abos darf ein Kauf wie bisher uebernehmen.
 --
 -- Fehler melden die Funktionen als Kennungen (ABO_EREIGNIS_UNGUELTIG); die Edge Function antwortet dann mit 500 und
 -- Stripe wiederholt die Zustellung. Die Kennungen sind ein Vertrag mit supabase/functions/_gemeinsam/stripe.js.
@@ -284,6 +295,7 @@ declare
   v_plan text := left(plan, 60);
   v_ziel uuid;
   v_ergebnis text;
+  v_alt record;
   n integer;
 begin
   -- Form pruefen (die Auswertung im Modul prueft dasselbe; hier zur Sicherheit noch einmal)
@@ -318,25 +330,34 @@ begin
       v_ergebnis := 'ohne_nutzer';
     else
       update public.stripe_ereignisse t set user_id = v_nutzer where t.id = v_id;
-      -- Ein Stripe-Kunde gehoert genau einem Nutzer: Wer ihn bisher hatte, gibt ihn ab.
-      update public.abos t set kunde_id = null where t.kunde_id = v_kunde and t.user_id <> v_nutzer;
-      insert into public.abos as t (user_id, status, gueltig_bis, quelle, kunde_id, abo_id, stand_zeit)
-      values (v_nutzer, v_status, v_bis, 'stripe', v_kunde, v_abo, null)
-      on conflict (user_id) do update
-      set kunde_id = excluded.kunde_id,
-          abo_id = excluded.abo_id,
-          quelle = 'stripe',
-          stand_zeit = null,
-          -- Ein neuer Kauf nimmt nichts weg: ein noch gueltiges Abo behaelt sein spaeteres Datum
-          status = case when t.status in ('aktiv', 'gekuendigt') and t.gueltig_bis > excluded.gueltig_bis
-                        then t.status else excluded.status end,
-          gueltig_bis = case when t.status in ('aktiv', 'gekuendigt')
-                             then greatest(t.gueltig_bis, excluded.gueltig_bis) else excluded.gueltig_bis end;
-      -- Ereignisse, die vor dem Kauf ankamen, jetzt in ihrer Reihenfolge anwenden: wartende (Kunde noch unbekannt) und,
-      -- wenn ein bekannter Kunde ein zweites Mal abschliesst, die schon als 'fremdes_abo' abgelegten Ereignisse genau
-      -- dieses neuen Abos (sonst gaelte nur der vorlaeufige Tag bis zur naechsten Verlaengerung)
-      perform public.abo_hole_nach(v_kunde, v_abo);
-      v_ergebnis := 'zugeordnet';
+      -- Kein Umhaengen (Befund M4, siehe Kopf): Laeuft das Abo dieses Kontos ueber einen ANDEREN Stripe-Kunden, wird
+      -- nichts zugeordnet. Die Zeile wird dabei gesperrt, damit ein gleichzeitiges Ereignis des echten Kunden (anderer
+      -- Kunde, also andere Transaktions-Sperre) den Stand nicht zwischen Pruefung und Schreiben aendert.
+      select * into v_alt from public.abos t where t.user_id = v_nutzer for update;
+      if v_alt.kunde_id is not null and v_alt.kunde_id <> v_kunde
+        and v_alt.status in ('aktiv', 'gekuendigt') and v_alt.gueltig_bis > now() then
+        v_ergebnis := 'konflikt';
+      else
+        -- Ein Stripe-Kunde gehoert genau einem Nutzer: Wer ihn bisher hatte, gibt ihn ab.
+        update public.abos t set kunde_id = null where t.kunde_id = v_kunde and t.user_id <> v_nutzer;
+        insert into public.abos as t (user_id, status, gueltig_bis, quelle, kunde_id, abo_id, stand_zeit)
+        values (v_nutzer, v_status, v_bis, 'stripe', v_kunde, v_abo, null)
+        on conflict (user_id) do update
+        set kunde_id = excluded.kunde_id,
+            abo_id = excluded.abo_id,
+            quelle = 'stripe',
+            stand_zeit = null,
+            -- Ein neuer Kauf nimmt nichts weg: ein noch gueltiges Abo behaelt sein spaeteres Datum
+            status = case when t.status in ('aktiv', 'gekuendigt') and t.gueltig_bis > excluded.gueltig_bis
+                          then t.status else excluded.status end,
+            gueltig_bis = case when t.status in ('aktiv', 'gekuendigt')
+                               then greatest(t.gueltig_bis, excluded.gueltig_bis) else excluded.gueltig_bis end;
+        -- Ereignisse, die vor dem Kauf ankamen, jetzt in ihrer Reihenfolge anwenden: wartende (Kunde noch unbekannt) und,
+        -- wenn ein bekannter Kunde ein zweites Mal abschliesst, die schon als 'fremdes_abo' abgelegten Ereignisse genau
+        -- dieses neuen Abos (sonst gaelte nur der vorlaeufige Tag bis zur naechsten Verlaengerung)
+        perform public.abo_hole_nach(v_kunde, v_abo);
+        v_ergebnis := 'zugeordnet';
+      end if;
     end if;
   else
     select t.user_id into v_ziel from public.abos t where t.kunde_id = v_kunde for update;

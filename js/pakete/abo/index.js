@@ -7,6 +7,8 @@
 //                           Flo), weil man ohne Konto nichts abschliessen kann. Knopf oeffnet das Blatt. Sie zeichnet
 //                           neu bei "abo:stand" und wenn sich die Anmeldung aendert (Abmelden in der Gruppe Konto,
 //                           Anmelden, Abmelden in einem anderen Tab); nach dem Abmelden raeumt sie den Abo-Stand weg.
+//                           Darin immer sichtbar, in jedem Zustand: "Verträge hier kündigen" (Kuendigungsbutton nach
+//                           Paragraf 312k BGB), oeffnet die Bestaetigungsseite ./kuendigen.js.
 //   app:bereit, app:sichtbar   nach einem Kauf (Stripe im neuen Fenster) fragt das Paket beim Zurueckkommen und beim
 //                           naechsten Start neu nach dem Premium-Stand, und zwar als Serie mit Pausen (bestaetigeKauf in
 //                           js/abo.js: sofort, nach 3, 10 und 30 s), solange der Kauf hoechstens NACH_KAUF_MS alt ist.
@@ -23,7 +25,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 import { hoere } from '../../ereignisse.js';
 import { kontoFreigeschaltet } from '../../konto.js';
 import { toast } from '../../ui/bauteile.js';
-import { istPremium, premiumStand, kaufStand, bestaetigeKauf, aufraeumen, nutzerId, stelleAboCssSicher, NACH_KAUF_MS } from '../../abo.js';
+import { istPremium, premiumStand, kaufStand, bestaetigeKauf, aufraeumen, nutzerId, stelleAboCssSicher, oeffneKuendigen, NACH_KAUF_MS } from '../../abo.js';
 import { zeigeTrainer, standText } from './trainer.js';
 
 export { NACH_KAUF_MS };
@@ -47,7 +49,8 @@ export function aboGruppe({ app } = {}) {
   el.innerHTML = `<h3 class="es-titel" id="es-g-abo">Crownmate Trainer</h3>
     <p class="abo-stand" aria-live="polite"></p>
     <p class="es-hilfe">${esc(A('gruppe'))}</p>
-    <div class="es-knoepfe"><button class="knopf dr" type="button" data-abo="zeigen"></button></div>`;
+    <div class="es-knoepfe"><button class="knopf dr" type="button" data-abo="zeigen"></button>
+      <button class="knopf dr" type="button" data-abo="kuendigen">${esc(A('k.knopf'))}</button></div>`;
   let weg = false;
   const render = () => {
     if (weg) return;
@@ -56,7 +59,10 @@ export function aboGruppe({ app } = {}) {
     el.querySelector('[data-abo="zeigen"]').textContent = st.premium ? A('mein') : A('mehr');
     el.querySelector('.abo-stand').textContent = gruppenText(st);
   };
-  el.addEventListener('click', (e) => { if (e.target.closest('[data-abo="zeigen"]')) zeigeTrainer({ app }); });
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-abo="zeigen"]')) zeigeTrainer({ app });
+    else if (e.target.closest('[data-abo="kuendigen"]')) oeffneKuendigen({ app });
+  });
   const neu = () => render();
   document.addEventListener('abo:stand', neu);
   // Anmeldung geaendert (js/konto.js zeichnet nur die eigene Gruppe neu und meldet nichts): an jeder DOM-Aenderung

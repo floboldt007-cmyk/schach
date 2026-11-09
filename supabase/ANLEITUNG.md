@@ -610,9 +610,10 @@ die Stripe über jede Änderung informiert. Preise stehen nie im Code (öffentli
 **Vorher klären (keine Rechtsberatung):** Echte Zahlungen erst mit Gewerbe, Impressum, Datenschutzerklärung (Stripe
 nennen), AGB mit Widerrufsbelehrung für digitale Inhalte und geklärter Umsatzsteuer. Dazu der **Kündigungsbutton nach
 § 312k BGB**: Wer Abos über eine Website verkauft, braucht dort eine gut sichtbare Schaltfläche „Verträge hier kündigen“
-mit einer Bestätigungsseite; Gerichte haben eine vorgeschaltete Anmeldung als unzulässig angesehen. Die App hat bisher
-nur „Abo verwalten“ (angemeldet, Kundenportal von Stripe mit E-Mail-Login). Mit der Fachperson klären, was davon reicht;
-eine eigene Kündigungsseite bräuchte eine Edge Function mit einem Stripe-API-Schlüssel (eingeschränkt auf Abos). Bis
+mit einer Bestätigungsseite; Gerichte haben eine vorgeschaltete Anmeldung als unzulässig angesehen. Die App hat dafür
+seit dem 09.11.2026 die Schaltfläche „Verträge hier kündigen“ mit Bestätigungsseite (Block „Abo-Zuordnung absichern und
+Kündigungsbutton“ weiter unten, dort stehen auch die offenen Rechtsfragen), daneben weiter „Abo verwalten“ (Kundenportal
+von Stripe mit E-Mail-Login). **Ob das so reicht, muss eine Fachperson prüfen, bevor das Abo verkauft wird.** Bis
 dahin alles im **Testmodus** von Stripe ausprobieren: Dort fließt kein Geld.
 
 **Alter:** Crownmate ist ab 16 (`design/runde4/ENTSCHEIDUNGEN.md`). Ein Abo ist ein Vertrag mit laufenden Kosten; ohne
@@ -685,6 +686,75 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
     **im Live-Modus neu** anlegen (Testobjekte gelten dort nicht), das neue `whsec_...` wie in Schritt 8 setzen und in
     `produkte` die Live-Links eintragen.
 
+### Abo-Zuordnung absichern und Kündigungsbutton (Stand 09.11.2026): bitte einspielen
+
+Drei Dinge, alle **bevor** das Abo verkauft wird. Die App funktioniert vor und nach jedem Schritt; die Reihenfolge ist
+frei. Nichts davon ändert Preise, `produkte.aktiv` oder schaltet das Abo frei.
+
+**Warum (Audit 09.11.2026, Befund M4):** Der Kauf wird über die Nutzer-ID zugeordnet, die am Zahlungslink hängt. Die
+kann jeder ändern. Wer mit der ID eines anderen Kontos bezahlte, hängte dessen laufendes Abo auf den eigenen
+Stripe-Kunden um; kündigte er dann, verlor das andere Konto den Trainer, obwohl es weiter zahlte. Außerdem gab **jedes**
+Abo im selben Stripe-Konto Premium, nicht nur der Trainer. Der Entwurf PR #139 („Kasse auf dem Server“) nimmt die
+Nutzer-ID ganz aus dem Link; die Schritte hier wirken auch ohne ihn und bleiben danach als zweite Sicherung.
+
+1. **Schema neu einspielen** (kein Umhängen mehr): Im **SQL Editor** den Inhalt von `supabase/abo-schema.sql`
+   ausführen (ein erneuter Lauf ist erlaubt, es ändert sich nur die Funktion `abo_stripe_ereignis`; Tabellen und Daten
+   bleiben). Danach `supabase/abo-rls-test.sql` ausführen: Am Ende muss `Abo-RLS-Test erfolgreich` stehen (der Test
+   enthält jetzt den Kaper-Fall und rollt alles zurück). Neu ist das Ergebnis `'konflikt'`: Ein Kauf für ein Konto,
+   dessen Abo gerade läuft und an einem **anderen** Stripe-Kunden hängt, wird nicht zugeordnet. Die Zeile in `abos`
+   bleibt, wie sie ist.
+   **Rückweg:** die vorige Fassung der Datei einspielen (GitHub, `supabase/abo-schema.sql`, History, Stand vor diesem
+   Block). Daten gehen dabei nicht verloren; Ereignisse mit `'konflikt'` bleiben einfach stehen.
+2. **Produktprüfung im Webhook** (nur der Trainer gibt Premium): Im Terminal
+   `npx supabase secrets set ABO_STRIPE_PLAN=trainer-monat` (der **Lookup-Key** des Preises aus Schritt 3 oben; mehrere
+   mit Komma, z. B. `trainer-monat,trainer-jahr`) und, wenn du magst, zusätzlich
+   `npx supabase secrets set ABO_STRIPE_PREIS=price_...` (die Preis-ID; derselbe Name wie in PR #139). Dann
+   `npx supabase functions deploy stripe-webhook --no-verify-jwt`. **Wichtig:** Der Preis in Stripe muss den Lookup-Key
+   wirklich tragen (Produktkatalog, Preis bearbeiten), sonst erkennt der Webhook den Trainer nicht und verbucht nichts
+   (im Protokoll der Function steht dann `fremdes_produkt`). Bezahlte Rechnungen tragen in neueren Stripe-Versionen nur
+   die Preis-ID: Mit `ABO_STRIPE_PREIS` verlängern auch sie; ohne verlängert das Abo-Ereignis derselben Zahlung.
+   Solange beide Secrets fehlen, prüft der Webhook wie bisher nichts.
+   **Rückweg:** `npx supabase secrets unset ABO_STRIPE_PLAN ABO_STRIPE_PREIS` und die Function neu hochladen.
+3. **Kündigungsbutton:** In Stripe (Testmodus) unter **Entwickler > API-Schlüssel** einen **eingeschränkten Schlüssel**
+   anlegen, nur mit **Abonnements (Subscriptions): Schreiben** (für PR #139 kommt später **Checkout Sessions:
+   Schreiben** am selben Schlüssel dazu). Dann `npx supabase secrets set ABO_STRIPE_RK=rk_test_...` und
+   `npx supabase functions deploy abo-kuendigen` (**ohne** `--no-verify-jwt`: Die App schickt die Anmeldung mit). Der
+   Schlüssel gehört nur in die Secrets, nie in Dateien, Git, Screenshots oder Chats; ein voller `sk_...`-Schlüssel wird
+   abgelehnt. Testen: mit einem Test-Abo **Einstellungen > Crownmate Trainer > Verträge hier kündigen > Jetzt
+   kündigen**; die App zeigt Datum und Uhrzeit des Eingangs und das Vertragsende, in `abos` steht kurz danach
+   `gekuendigt`, in Stripe am Abo die Metadaten `crownmate_kuendigung` (Eingang) und `crownmate_kuendigung_art`.
+   Solange die Function fehlt, sagt die App ehrlich „noch nicht eingegangen“ und bietet das Kundenportal an
+   (`portal_link`).
+   **Rückweg:** `npx supabase functions delete abo-kuendigen` und den Schlüssel in Stripe löschen; die Schaltfläche
+   führt dann wieder zum Kundenportal.
+
+**Wenn ein `'konflikt'` auftaucht** (im Protokoll der Function `stripe-webhook`, oder mit
+`select id, kunde_id, abo_id, user_id, erstellt from public.stripe_ereignisse where ergebnis = 'konflikt';`):
+Jemand hat für ein Konto bezahlt, das schon ein laufendes Abo über einen anderen Stripe-Kunden hat. Das Konto behält
+sein Abo. In Stripe den **neuen** Kunden (`kunde_id` aus der Abfrage) ansehen: Ist es dieselbe Person (Doppelkauf, etwa
+mit einer zweiten E-Mail-Adresse), dort das zweite Abo kündigen und erstatten. Ist es jemand Fremdes, ebenso kündigen
+und erstatten; ein Abo für ein fremdes Konto gibt es nicht. Nichts in `abos` von Hand umhängen.
+
+**Kündigungsbutton, rechtlich offen (keine Rechtsberatung, vor dem Verkauf mit einer Fachperson klären):**
+- Die Schaltfläche heißt „Verträge hier kündigen“, die Bestätigungsschaltfläche „Jetzt kündigen“. Sie steht in den
+  Einstellungen in der Gruppe „Crownmate Trainer“ und im Blatt des Trainers. Die Gruppe ist bisher nur für
+  freigeschaltete Konten sichtbar (wie das Abo selbst). **Zum Verkaufsstart muss die Schaltfläche für alle ständig und
+  leicht erreichbar sein, auch ohne Anmeldung**, zum Beispiel zusätzlich als Link im Fuß der Seite und im Impressum.
+- **Ohne Anmeldung** kann die App den Vertrag nicht sicher einem Konto zuordnen. Die Seite verweist dann auf die
+  Anmeldung und auf das Kundenportal von Stripe (E-Mail-Adresse des Kaufs). Ob das genügt oder ein Formular ohne
+  Anmeldung nötig ist (Name, E-Mail, Vertrag; dann bearbeitest du die Kündigung von Hand), entscheidet die Fachperson.
+- **Bestätigung:** Die App zeigt Eingang (Datum, Uhrzeit) und Vertragsende und bietet sie als Textdatei an. Das Gesetz
+  verlangt eine sofortige Bestätigung in Textform auf elektronischem Weg; **eine E-Mail schickt Crownmate bisher
+  nicht.** In Stripe unter **Einstellungen > Billing > Abonnements und E-Mails** die E-Mail bei Kündigung einschalten
+  und prüfen lassen, ob Inhalt und Zeitpunkt reichen.
+- **Außerordentliche Kündigung:** Die App nimmt Grund und Wunschtermin an und trägt die Kündigung spätestens zum
+  genannten Zeitpunkt ein; ob der Vertrag früher endet und Geld zurückgeht, entscheidest du von Hand (der Grund steht
+  in Stripe am Abo unter den Kündigungsdetails). Die App sagt der Person genau das.
+- Ein Wunschtermin vor dem Ende des bezahlten Zeitraums wird als Kündigung zum Ende dieses Zeitraums eingetragen
+  (nichts wird ohne Erstattung früher beendet); der Wunschtermin steht in Stripe am Abo in der Notiz zur Kündigung
+  („Wunschtermin JJJJ-MM-TT“). Ob das so in die AGB gehört, mitprüfen lassen.
+- Wer schon ordentlich gekündigt hat, kann auf derselben Seite weiter eine außerordentliche Kündigung erklären.
+
 **Von Hand freischalten** (z. B. für Testerinnen): **Table Editor > abos > Insert row** mit `user_id` (aus
 **Authentication > Users**), `status` = `aktiv`, `gueltig_bis` = Datum, `quelle` = `manuell`. Ein späterer Kauf
 derselben Person verkürzt das nie.
@@ -703,9 +773,11 @@ Kommt ein Kauf ohne Nutzer-ID an (z. B. weil jemand den Zahlungslink direkt gete
    Spätere Ereignisse kommen danach von selbst an. Ohne diesen Schritt bliebe es beim Datum aus Schritt 1.
 
 **Hängende Ereignisse finden** (z. B. einmal im Monat im SQL Editor):
-`select * from public.stripe_ereignisse where ergebnis in ('wartet', 'ohne_nutzer') and eingegangen_am < now() - interval '1 hour';`
-Normal ist eine leere Liste. Steht dort etwas, gehört der Kauf keinem Konto: wie oben zuordnen.
-**Konto löschen** entfernt die Zeile in `abos`, kündigt aber **nicht** das Stripe-Abo: vorher im Kundenportal kündigen.
+`select * from public.stripe_ereignisse where ergebnis in ('wartet', 'ohne_nutzer', 'konflikt') and eingegangen_am < now() - interval '1 hour';`
+Normal ist eine leere Liste. Steht dort etwas, gehört der Kauf keinem Konto: wie oben zuordnen (bei `konflikt` und den
+wartenden Ereignissen desselben Kunden nicht zuordnen, sondern wie im Block „Abo-Zuordnung absichern“ vorgehen).
+**Konto löschen** entfernt die Zeile in `abos`, kündigt aber **nicht** das Stripe-Abo: vorher kündigen („Verträge hier
+kündigen“ oder im Kundenportal).
 
 **App Store und Google Play:** In einer iOS-App aus dem App Store müssen digitale Abos über Apples In-App-Kauf laufen
 (App Review Guideline 3.1.1), in Google Play über Google Play Billing. Stripe gilt nur für die Web-App. Für die
