@@ -1499,7 +1499,10 @@ async function testeErweiterungen(browser) {
     };
   });
   const iF = ov.kinder.indexOf('erg-feier');
-  pruefe('Ort ergebnis:karte zwischen .erg-feier und .erg-bot', ov.karte && iF >= 0 && ov.kinder[iF + 1] === 'erg-karte-ort' && ov.kinder[iF + 2] === 'erg-bot', ov.kinder.join(' '));
+  // Sieg-Blatt C: nach Siegen steht der Liga-Verweis zwischen Ort und Bot, der Ort folgt weiter direkt auf die Feier
+  const iB = ov.kinder.indexOf('erg-bot');
+  pruefe('Ort ergebnis:karte zwischen .erg-feier und .erg-bot', ov.karte && iF >= 0 && ov.kinder[iF + 1] === 'erg-karte-ort' && iB > iF + 1
+    && ov.kinder.slice(iF + 2, iB).every((k) => k === 'erg-liga-verweis'), ov.kinder.join(' '));
   // W0+a: dazu boss (Modus boss, sonst null)
   pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
   pruefe('Feier im Ergebnis: höchstens 3, höchstens 1 groß, nach prio (doppelte Meldung zählt einmal)', JSON.stringify(ov.feier) === JSON.stringify(['G:GROSS A', 'Zeile C', 'Zeile D']), JSON.stringify(ov.feier));

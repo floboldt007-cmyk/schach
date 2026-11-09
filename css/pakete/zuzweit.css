@@ -20,13 +20,10 @@
 .zz-titel { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(20px, 2.4vw, 26px); line-height: 1.2;
   letter-spacing: -.01em; color: var(--auf-buehne, var(--auf-tinte)); overflow-wrap: anywhere; }
 .zz-einleitung { font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--auf-buehne-2, var(--auf-tinte)); }
-/* Los steht unter den Einstellungen (Flo 08.11.2026: erst waehlen, dann starten) */
-.zz-los { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 12px 16px;
-  border: 0; border-radius: var(--r-knopf-gross, var(--r-l)); cursor: pointer; font: inherit; font-size: 16px; font-weight: var(--gw-stark);
-  background: var(--gold); color: var(--kg-stark); box-shadow: var(--s2, none);
-  transition: transform var(--d-s) var(--feder-weich), filter var(--d-s) var(--gleiten); }
+/* Los steht unter den Einstellungen (Flo 08.11.2026: erst waehlen, dann starten); Farbe wie jeder Hauptknopf aus
+   .knopf.primaer (U6, Flo 09.11.2026: "Orange wie ueberall", vorher gold) */
+.zz-los { display: flex; min-height: 52px; padding: 12px 16px; border-radius: var(--r-knopf-gross, var(--r-l)); }
 .zz-los svg { width: 18px; height: 18px; }
-.zz-los:hover { filter: brightness(1.05); }
 .zz-los:active { transform: scale(.98); }
 .zz-los:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
 /* schmal: Koenige ueber dem Text */

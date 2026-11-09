@@ -211,3 +211,10 @@
     .heim-buehne[data-art="partie"] { --heim-brett: max(220px, min(100cqw - 2 * var(--a5), 100dvh - 430px)); }
   }
 }
+
+/* ---------- Willkommen zurueck (Feinschliff 09.11., js/ui/heim.js rueckkehr) ----------
+   erste Zeile unter "Als Naechstes" am Tag der Rueckkehr: dieselbe Form wie die anderen Zeilen, rechts statt des Pfeils
+   ein kleiner Knopf (Weiterspielen bzw. Spielen); die ganze Zeile ist das Tippziel */
+.heim-zurueck .heim-zeile-bild { background: var(--gold-weich); color: var(--kt-stark); }
+.heim-zurueck-knopf { flex: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: var(--r-pille);
+  background: var(--text); color: var(--flaeche); font-size: 13.5px; font-weight: var(--gw-stark); white-space: nowrap; }
