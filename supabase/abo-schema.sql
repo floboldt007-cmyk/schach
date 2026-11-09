@@ -74,9 +74,12 @@ create table if not exists public.abos (
   kunde_id text unique,
   abo_id text,
   stand_zeit timestamptz,
+  status_vor_streit text,
+  gueltig_bis_vor_streit timestamptz,
   erstellt_am timestamptz not null default now(),
   aktualisiert_am timestamptz not null default now(),
-  constraint abos_status check (status in ('aktiv', 'gekuendigt', 'abgelaufen')),
+  constraint abos_status check (status in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig')),
+  constraint abos_status_vor_streit check (status_vor_streit is null or status_vor_streit in ('aktiv', 'gekuendigt', 'abgelaufen')),
   constraint abos_quelle check (quelle in ('stripe', 'manuell')),
   constraint abos_plan_laenge check (plan is null or char_length(plan) <= 60),
   constraint abos_kunde_form check (kunde_id is null or kunde_id ~ '^cus_[A-Za-z0-9]{1,200}$'),
@@ -97,12 +100,30 @@ create table if not exists public.stripe_ereignisse (
   eingegangen_am timestamptz not null default now(),
   constraint stripe_ereignisse_id_form check (id ~ '^evt_[A-Za-z0-9]{1,200}$'),
   constraint stripe_ereignisse_typ check (typ in ('checkout.session.completed', 'customer.subscription.created',
-    'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid')),
+    'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid', 'charge.refunded',
+    'charge.dispute.created', 'charge.dispute.closed')),
   constraint stripe_ereignisse_kunde_form check (kunde_id ~ '^cus_[A-Za-z0-9]{1,200}$'),
   constraint stripe_ereignisse_abo_form check (abo_id is null or abo_id ~ '^sub_[A-Za-z0-9]{1,200}$'),
-  constraint stripe_ereignisse_status check (status is null or status in ('aktiv', 'gekuendigt', 'abgelaufen')),
+  constraint stripe_ereignisse_status check (status is null or status in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig', 'wiederherstellen')),
   constraint stripe_ereignisse_plan_laenge check (plan is null or char_length(plan) <= 60)
 );
+
+-- Wiederholbare Erweiterung bestehender Installationen. Constraints werden ersetzt, weil Postgres
+-- CREATE OR REPLACE fuer Tabellen-Checks nicht anbietet.
+alter table public.abos add column if not exists status_vor_streit text;
+alter table public.abos add column if not exists gueltig_bis_vor_streit timestamptz;
+alter table public.abos drop constraint if exists abos_status;
+alter table public.abos add constraint abos_status check (status in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig'));
+alter table public.abos drop constraint if exists abos_status_vor_streit;
+alter table public.abos add constraint abos_status_vor_streit
+  check (status_vor_streit is null or status_vor_streit in ('aktiv', 'gekuendigt', 'abgelaufen'));
+alter table public.stripe_ereignisse drop constraint if exists stripe_ereignisse_typ;
+alter table public.stripe_ereignisse add constraint stripe_ereignisse_typ check (typ in ('checkout.session.completed',
+  'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid',
+  'charge.refunded', 'charge.dispute.created', 'charge.dispute.closed'));
+alter table public.stripe_ereignisse drop constraint if exists stripe_ereignisse_status;
+alter table public.stripe_ereignisse add constraint stripe_ereignisse_status
+  check (status is null or status in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig', 'wiederherstellen'));
 
 create index if not exists stripe_ereignisse_kunde on public.stripe_ereignisse (kunde_id, erstellt);
 create index if not exists stripe_ereignisse_eingang on public.stripe_ereignisse (eingegangen_am);
@@ -128,6 +149,26 @@ drop trigger if exists abos_setze_aktualisiert_am on public.abos;
 create trigger abos_setze_aktualisiert_am
 before update on public.abos
 for each row execute function public.setze_aktualisiert_am();
+
+-- Buchungsbelege bleiben bei Stripe. Lokal werden beim Entfernen der Abo-Zeile alle Stripe-Kennungen des Kontos
+-- vor dem ON DELETE SET NULL der Ereignistabelle vollstaendig geloescht. Das laufende Stripe-Abo wird nicht gekuendigt.
+create or replace function public.loesche_stripe_kennungen_vor_abo()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.stripe_ereignisse t
+  where t.user_id = old.user_id or t.kunde_id = old.kunde_id or (old.abo_id is not null and t.abo_id = old.abo_id);
+  return old;
+end;
+$$;
+
+drop trigger if exists abos_loesche_stripe_kennungen on public.abos;
+create trigger abos_loesche_stripe_kennungen
+before delete on public.abos
+for each row execute function public.loesche_stripe_kennungen_vor_abo();
 
 -- Premium fuer den Aufrufer. Laeuft mit den Rechten des Aufrufers (RLS: nur die eigene Zeile).
 create or replace function public.ist_premium()
@@ -186,11 +227,34 @@ begin
   -- Gleiche Sekunde: Stripe schickt beim Abschluss mehrere Ereignisse mit demselben created (z. B. subscription.created
   -- noch "incomplete" und subscription.updated schon "active"), die Zustellreihenfolge ist zufaellig. Bei Gleichstand
   -- nimmt deshalb nur das Ende des Abos (deleted) ein laufendes Premium weg.
-  if a.stand_zeit is not null and zeit = a.stand_zeit and art <> 'customer.subscription.deleted'
+  if a.stand_zeit is not null and zeit = a.stand_zeit
+    and art not in ('customer.subscription.deleted', 'charge.refunded', 'charge.dispute.closed')
     and neu_status = 'abgelaufen' and a.status in ('aktiv', 'gekuendigt') then
     return 'veraltet';
   end if;
-  if art = 'invoice.paid' then
+  if art = 'charge.dispute.created' then
+    update public.abos t
+    set status_vor_streit = case when a.status = 'strittig' then a.status_vor_streit else a.status end,
+        gueltig_bis_vor_streit = case when a.status = 'strittig' then a.gueltig_bis_vor_streit else a.gueltig_bis end,
+        status = 'strittig', quelle = 'stripe', stand_zeit = zeit
+    where t.user_id = ziel;
+  elsif art = 'charge.dispute.closed' and neu_status = 'wiederherstellen' then
+    if a.status <> 'strittig' or a.status_vor_streit is null or a.gueltig_bis_vor_streit is null then
+      return 'veraltet';
+    end if;
+    update public.abos t
+    set status = a.status_vor_streit, gueltig_bis = a.gueltig_bis_vor_streit,
+        status_vor_streit = null, gueltig_bis_vor_streit = null, quelle = 'stripe', stand_zeit = zeit
+    where t.user_id = ziel;
+  elsif a.status = 'strittig' and art not in ('charge.refunded', 'charge.dispute.closed') then
+    -- Laufzeitereignisse waehrend eines offenen Streits aktualisieren nur den Stand, der bei einem Sieg zurueckkommt.
+    update public.abos t
+    set status_vor_streit = case when art = 'invoice.paid' and a.status_vor_streit = 'gekuendigt'
+                                  then 'gekuendigt' else neu_status end,
+        gueltig_bis_vor_streit = case when art = 'invoice.paid' then greatest(a.gueltig_bis_vor_streit, neu_bis) else neu_bis end,
+        plan = coalesce(neu_plan, a.plan), abo_id = coalesce(a.abo_id, abo), quelle = 'stripe', stand_zeit = zeit
+    where t.user_id = ziel;
+  elsif art = 'invoice.paid' then
     update public.abos t
     set status = case when a.status = 'gekuendigt' then 'gekuendigt' else 'aktiv' end,
         gueltig_bis = greatest(a.gueltig_bis, neu_bis),
@@ -203,6 +267,8 @@ begin
     update public.abos t
     set status = neu_status,
         gueltig_bis = neu_bis,
+        status_vor_streit = null,
+        gueltig_bis_vor_streit = null,
         plan = coalesce(neu_plan, a.plan),
         abo_id = coalesce(a.abo_id, abo),
         quelle = 'stripe',
@@ -289,11 +355,12 @@ begin
   -- Form pruefen (die Auswertung im Modul prueft dasselbe; hier zur Sicherheit noch einmal)
   if v_id is null or v_id !~ '^evt_[A-Za-z0-9]{1,200}$'
     or v_typ is null or v_typ not in ('checkout.session.completed', 'customer.subscription.created',
-      'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid')
+      'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid', 'charge.refunded',
+      'charge.dispute.created', 'charge.dispute.closed')
     or v_zeit is null
     or v_kunde is null or v_kunde !~ '^cus_[A-Za-z0-9]{1,200}$'
     or (v_abo is not null and v_abo !~ '^sub_[A-Za-z0-9]{1,200}$')
-    or v_status is null or v_status not in ('aktiv', 'gekuendigt', 'abgelaufen')
+    or v_status is null or v_status not in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig', 'wiederherstellen')
     or v_bis is null then
     raise exception 'ABO_EREIGNIS_UNGUELTIG';
   end if;
@@ -382,6 +449,7 @@ grant select, insert, update, delete on table public.produkte, public.abos, publ
 
 -- Funktionen: nie fuer anon oder public. ist_premium fuer angemeldete Nutzer, der Rest nur Service-Rolle.
 revoke all on function public.ist_premium() from anon, public;
+revoke all on function public.loesche_stripe_kennungen_vor_abo() from anon, authenticated, public, service_role;
 revoke all on function public.ist_premium_von(uuid) from anon, authenticated, public;
 revoke all on function public.abo_wende_an(uuid, text, timestamptz, text, text, timestamptz, text) from anon, authenticated, public, service_role;
 revoke all on function public.abo_hole_nach(text, text) from anon, authenticated, public, service_role;
