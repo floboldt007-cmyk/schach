@@ -333,6 +333,16 @@ async function testePartie(seite, h, fehler) {
     && (await seite.locator('.screen.partie .zugansage[role="status"][aria-live="polite"]').count()) === 1
     && /e4/.test(await seite.locator('.screen.partie .zugansage').textContent()), await seite.locator('.screen.partie .zugansage').textContent());
   pruefe('Zugliste: Symbol an Flos Zug', await seite.locator('.zugliste .z.du .z-sym').count() >= 1);
+  // Punkt 33 (09.11.): Der Vorlesetext der Zugliste ist "<Name>: " ohne Satzzeichen davor (vorher "Solide.:", "Pflichtzug::").
+  // Geprueft am DOM und fuer alle Klassen in beiden Sprachen (Name ohne Satzzeichen am Ende, das Wort darf eins haben)
+  const vorlesen = await seite.evaluate(async () => {
+    const S = await import('/js/sprache.js');
+    const namen = ['de', 'en'].flatMap((s) => Object.entries(S.texte(s)).filter(([k]) => /^analyse\.klasse\.[a-z]+\.name$/.test(k)).map(([k, v]) => s + ' ' + k + ' ' + v));
+    return { sr: [...document.querySelectorAll('.zugliste .z-sym .sr')].map((e) => e.textContent),
+      namenMitZeichen: namen.filter((x) => /[.!:?]$/.test(x)), anzahl: namen.length };
+  });
+  pruefe('Zugliste vorlesen: "<Klasse>: " ohne Satzzeichen davor, alle Klassennamen (DE und EN) ohne Satzzeichen am Ende',
+    vorlesen.sr.length >= 1 && vorlesen.sr.every((x) => /^[^.!:?]+: $/.test(x)) && vorlesen.anzahl >= 22 && vorlesen.namenMitZeichen.length === 0, vorlesen);
 
   // Bot antwortet
   await h.warteFlo();
@@ -497,6 +507,27 @@ async function testeSchwarz(seite, h, fehler) {
   pruefe('Neuladen setzt die Partie fort', JSON.stringify(await h.zuege()) === JSON.stringify(zuege));
   pruefe('Farbe bleibt Schwarz', await seite.locator('.screen.partie .brett[data-ausrichtung="b"]').count() === 1);
   pruefe('Live-Klassen bleiben', (await seite.locator('.zugliste .z.du .z-sym').count()) >= 1);
+  // Punkt 33: jede Klasse einmal an Flos ersten bewerteten Zug setzen, neu zeichnen und den Vorlesetext lesen; er ist genau
+  // "<Name der Klasse>: ". Die Partie allein bringt nur Klassen ohne Satzzeichen, darum alle Klassen gezielt (Gegenprobe
+  // mit KLASSEN_WORT: "Solide.:", "Pflichtzug::" schlagen an)
+  const srZeilen = await seite.evaluate(async () => {
+    const { KLASSEN_NAME } = await import('/js/zugklassen.js');
+    const p = window.__partie;
+    const i = p.z.liveKlassen.findIndex(Boolean);
+    const alt = p.z.liveKlassen[i];
+    const aus = [];
+    for (const k of Object.keys(KLASSEN_NAME)) {
+      p.z.liveKlassen[i] = k;
+      p.zeichneZugliste();
+      const sr = document.querySelector(`.zugliste .z[data-ply="${i}"] .z-sym .sr`);
+      aus.push({ k, sr: sr && sr.textContent, soll: KLASSEN_NAME[k] + ': ' });
+    }
+    p.z.liveKlassen[i] = alt;
+    p.zeichneZugliste();
+    return aus;
+  });
+  pruefe('Zugliste vorlesen: "<Name>: " fuer jede Klasse (ohne Satzzeichen vor dem Doppelpunkt)',
+    srZeilen.length >= 11 && srZeilen.every((x) => x.sr === x.soll), JSON.stringify(srZeilen.filter((x) => x.sr !== x.soll)));
   // Zurueck: Pausieren
   await h.tippe('.screen.partie [data-aktion="zurueck"]');
   await seite.waitForSelector('.dialog-ort .dialog');

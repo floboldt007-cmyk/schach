@@ -748,7 +748,7 @@ export function zeige(root, params, app) {
       if (istFlo(i) && liveAn()) {
         const k = z.liveKlassen[i];
         const e = z.live[i];
-        if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_WORT[k])}: </span></span>`;
+        if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_NAME[k])}: </span></span>`;  // Vorlesen: Name ohne Satzzeichen (sonst "Solid.:")
         else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
       }
       return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}${i === ansehen.ply ? ' angesehen' : ''}" data-ply="${i}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
@@ -2777,6 +2777,8 @@ export function zeige(root, params, app) {
       gegnerLeiste, spielerLeiste, aktionen, mattOrt: () => mattOrt, zugBot: () => zugBot,
       // U7: Uhr-Anzeige (W0+b), Groessenrechnung, Duell-Vertrag
       uhr, fmtUhr, layout, duellBereit, halte: () => halte,
+      // Punkt 33: Zugliste neu zeichnen (Vorlesetext je Klasse pruefen)
+      zeichneZugliste,
     };
   }
 
