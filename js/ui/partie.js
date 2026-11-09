@@ -2047,6 +2047,9 @@ export function zeige(root, params, app) {
   function baueOverlay(ergebnis, grund) {
     const o = document.createElement('div');
     o.className = `ergebnis-overlay ${ergebnis}`;
+    // Auswahl Sieg-Blatt (Flo waehlt, nur zum Fotografieren): ?siegblatt=a|b|c, ohne Angabe a. css/ergebnis.css
+    const siegblatt = (/[?&]siegblatt=([abc])/.exec(location.search) || [])[1] || 'a';
+    o.dataset.siegblatt = siegblatt;
     o.setAttribute('role', 'dialog');
     o.setAttribute('aria-modal', 'true');
     o.setAttribute('aria-labelledby', 'erg-wort');
@@ -2085,6 +2088,27 @@ export function zeige(root, params, app) {
       s.classList.remove('mit-ergebnis');
       $('.ergebnis-zeigen').hidden = false;
     });
+    // Variante B: alles ausser den Sternen hinter "Details"; Variante C: Punkte und Wertung als Verweis in die Liga
+    if (ergebnis === 'sieg' && siegblatt !== 'a') {
+      const knopf = document.createElement('button');
+      knopf.type = 'button';
+      if (siegblatt === 'b') {
+        knopf.className = 'erg-details';
+        knopf.setAttribute('aria-expanded', 'false');
+        knopf.textContent = t('partie.erg.details');
+        knopf.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const offen = o.classList.toggle('details-offen');
+          knopf.setAttribute('aria-expanded', String(offen));
+          knopf.textContent = t(offen ? 'partie.erg.detailsZu' : 'partie.erg.details');
+        });
+      } else {
+        knopf.className = 'erg-liga-verweis';
+        knopf.textContent = t('partie.erg.ligaVerweis');
+        knopf.addEventListener('click', () => app.gehe('bestenliste'));
+      }
+      o.querySelector(siegblatt === 'b' ? '.erg-mitte' : '.erg-karte-ort').after(knopf);
+    }
     s.append(o);
     // U7: der Screen dahinter tritt zurueck (scale .975, nur transform), die Karte federt auf
     s.classList.add('mit-ergebnis');
