@@ -346,10 +346,12 @@ export function profilKarte({ app } = {}) {
   const tj = titelJetzt(erfolge);
   const titel = tj ? `<span class="pr-chip pr-chip-titel" data-art="${esc(tj.art)}" data-seltenheit="${esc(tj.seltenheit)}">${titelBild(tj, 'pr-titel-wappen')}<span>${esc(tj.name)}</span></span>` : '';
   const krone = kronenText(eigeneKronenStufe());
+  // Kundenblick 09.11.2026 (Befund 12): "Ich" zeigt wenigstens eine Spielzahl
+  const partienZahl = ladePartien().filter(wertet).length;
   k.innerHTML = `<div class="pr-kopf"><span class="pr-banner" aria-hidden="true" style="background-image:url('${bannerUrl(banner)}')"></span>
       <span class="pr-av">${floAvatar('w')}</span>
       <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone">${esc(krone)}</span>` : ''}</div>
-        <small class="pr-seit">${esc(seitText())}</small></div></div>
+        <small class="pr-seit">${esc(seitText())}${partienZahl ? ' · ' + esc(S(partienZahl === 1 ? 'profil.partieEine' : 'profil.partien', { zahl: partienZahl })) : ''}</small></div></div>
     <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
       <button type="button" class="knopf pr-banner-wahl">${esc(KT('karte.banner'))}</button></div>
     <h4 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h4>
