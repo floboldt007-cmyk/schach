@@ -367,6 +367,10 @@ async function shopTeil(browser) {
     return k.length > 0 && !document.querySelector('.sh-bereich .sh-kaufen') && k.every((x) => !/€|Taler/.test(x.textContent));
   }));
   pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
+  // Kundenblick 09.11.2026 (Befund 12): kein leeres "0 / 0" auf "Ich", ohne Partie auch keine Spielzahl im Profil
+  const ich = await p.s.evaluate(() => ({ zahlen: [...document.querySelectorAll('.sa-gross .zahl, .sa-platz-zahl')].map((z) => z.textContent.trim()),
+    seit: document.querySelector('.pr-seit')?.textContent || '' }));
+  pruefe('Ich: kein „0 / 0“, ohne Partie keine Spielzahl (Befund 12)', !ich.zahlen.some((z) => /^0\s*\/\s*0$/.test(z)) && !/Partie/.test(ich.seit), ich);
   await p.s.locator('.sh-bereich .knopf').click();
   await p.s.waitForSelector('.konto-gruppe', { timeout: 15000 }).catch(() => {});
   pruefe('Shop abgemeldet: „Zum Konto“ öffnet die Einstellungen mit der Konto-Gruppe', await p.s.locator('.konto-gruppe').count() === 1);
