@@ -408,6 +408,8 @@ const blattZustand = (seite) => seite.evaluate(() => {
   const r = k.getBoundingClientRect();
   return {
     zustand: k.dataset.zustand, preis: k.querySelector('.trainer-preis-text').textContent, stand: k.querySelector('.trainer-stand').textContent,
+    frage: k.querySelector('.trainer-frage')?.hidden === false ? k.querySelector('.trainer-frage').textContent : '',
+    frageVorKnoepfen: k.querySelector('.trainer-frage')?.nextElementSibling === k.querySelector('.trainer-knoepfe'),
     knoepfe: [...k.querySelectorAll('.trainer-knoepfe button')].map((b) => b.textContent + (b.disabled ? ' (aus)' : '')),
     vorteile: k.querySelector('.trainer-im-abo').hidden ? 0 : k.querySelectorAll('.trainer-im-abo li').length,
     imAbo: [...k.querySelectorAll('.trainer-im-abo li')].map((l) => l.textContent),
@@ -468,9 +470,12 @@ async function browserTeil(browser) {
     const z = await blattZustand(seite);
     pruefe('Blatt: Dialog, Preis folgt, "Bald verfügbar" aus, Schließen', z.dialog && z.zustand === 'vorschau' && z.preis === 'Preis folgt'
       && JSON.stringify(z.knoepfe) === JSON.stringify(['Bald verfügbar (aus)', 'Schließen']) && /in Vorbereitung/.test(z.stand), z);
-    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 9 unter "In Arbeit" (noch nicht enthalten), 5 immer gratis, jederzeit kündbar',
-      z.vorteile === 0 && z.geplant === 9 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 5
-      && /Jederzeit kündbar/.test(await seite.locator('.trainer-karte').innerText()), z);
+    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 9 unter "In Arbeit" (noch nicht enthalten), 5 immer gratis',
+      z.vorteile === 0 && z.geplant === 9 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 5, z);
+    // Paragraf 312j Abs. 2 BGB: Laufzeit und automatische Verlaengerung stehen am Preis, nicht erst auf der Bezahlseite
+    const amPreis = await seite.locator('.trainer-karte .trainer-preis').innerText();
+    pruefe('Blatt: am Preis steht, dass das Abo monatlich kündbar ist und sich automatisch verlängert',
+      /Monatlich kündbar/.test(amPreis) && /verlängert sich automatisch um je einen Monat/.test(amPreis), amPreis);
     // Luecken-Check 2 (Paragraf 5 UWG): "Immer gratis" nennt nur Gebautes; Wochen-Boss, Raetsel ohne Tageslimit, Lernpfad 1
     // bis 4 und Medaillen stehen gesondert als "Kommt noch, ebenfalls gratis"
     const ungebaut = /Wochen-Boss|ohne Tageslimit|Lernpfad|Medaillen/;
@@ -567,7 +572,8 @@ async function browserTeil(browser) {
     await seite.click('.trainer-knoepfe [data-trainer="kaufen"]');
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'alter');
     const fr = await blattZustand(seite);
-    pruefe('erster Kauf: erst die Altersfrage (einmal), noch nichts geoeffnet', /18 oder älter/.test(fr.stand)
+    pruefe('erster Kauf: erst die Altersfrage (einmal) direkt über den Knöpfen, oben nicht doppelt, noch nichts geoeffnet',
+      /18 oder älter/.test(fr.frage) && fr.frageVorKnoepfen && !/18 oder älter/.test(fr.stand)
       && JSON.stringify(fr.knoepfe) === JSON.stringify(['Ja, 18 oder älter', 'Nein, jünger', 'Schließen']) && fr.alter === ''
       && (await seite.evaluate(() => window.__geoeffnet.length)) === 0, fr);
     await bild(seite, 'abo-altersfrage-hell');

@@ -155,6 +155,7 @@ export function zeigeTrainer({ app = null } = {}) {
       <ul class="trainer-zusagen">${ZUSAGEN.map((_, i) => li(A('zusagen.' + i))).join('')}</ul>
       <p class="trainer-alter">${esc(A('alterHinweis'))}</p>
       <p class="trainer-test" hidden>${esc(A('test'))}</p>
+      <p class="trainer-frage" aria-live="polite" hidden></p>
       <div class="trainer-knoepfe"></div>
     </div>`;
   const karte = ort.querySelector('.trainer-karte');
@@ -204,8 +205,12 @@ export function zeigeTrainer({ app = null } = {}) {
     karte.dataset.zustand = zustand;
     ort.querySelector('.trainer-alter').hidden = ['premium', 'store', 'alter', 'unter18'].includes(zustand);
     ort.querySelector('.trainer-test').hidden = !(istTestLink(p) && ['kaufbar', 'alter', 'wartet', 'bestaetigen'].includes(zustand));
+    // Die Altersfrage steht direkt ueber ihren Knoepfen (Rechtspruefung 09.11.2026), nicht oben im Stand
+    const frageText = ort.querySelector('.trainer-frage');
+    frageText.hidden = zustand !== 'alter';
+    frageText.textContent = zustand === 'alter' ? zustandText('alter') : '';
     // Zustandstexte, die eine Antwort brauchen, gehen vor; sonst Meldung zum letzten Klick, eigener Stand, Zustand
-    const stand = ['bestaetigen', 'alter', 'unter18', 'offline'].includes(zustand) ? zustandText(zustand) : (meldung || standText(st) || zustandText(zustand) || '');
+    const stand = zustand === 'alter' ? '' : ['bestaetigen', 'unter18', 'offline'].includes(zustand) ? zustandText(zustand) : (meldung || standText(st) || zustandText(zustand) || '');
     ort.querySelector('.trainer-stand').textContent = stand;
     const knoepfe = [];
     if (zustand === 'premium') {

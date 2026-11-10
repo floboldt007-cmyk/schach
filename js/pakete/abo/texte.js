@@ -72,7 +72,7 @@ export const DE = {
   "verwaltungFehler": "Die Verwaltung ist gerade nicht erreichbar.",
   "stripe": "Die Bezahlseite von Stripe ist offen. Nach der Zahlung prüft die App hier von selbst.",
   "untertitel": "Lehrer und Lernstoff für dein Schach. Das Spiel selbst bleibt gratis.",
-  "kuendbar": "Jederzeit kündbar",
+  "kuendbar": "Monatlich kündbar, verlängert sich automatisch um je einen Monat.",
   "drin": "Im Trainer",
   "arbeit": "In Arbeit",
   "gratisTitel": "Immer gratis"
@@ -149,7 +149,7 @@ export const EN = {
   "verwaltungFehler": "Subscription management is not available right now.",
   "stripe": "The Stripe checkout page is open. The app will check your payment here automatically.",
   "untertitel": "Teachers and learning material for your chess. The game itself stays free.",
-  "kuendbar": "Cancel anytime",
+  "kuendbar": "Cancel monthly, renews automatically for one month at a time.",
   "drin": "In Trainer",
   "arbeit": "In progress",
   "gratisTitel": "Always free"
