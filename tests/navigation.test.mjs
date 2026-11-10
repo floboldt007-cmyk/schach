@@ -57,6 +57,9 @@ function nodeTeil() {
   pruefe('Icon liga (Kronen-Umriss) fuer den Liga-Reiter', iconNamen().includes('liga') && !/fill="currentColor"/.test(icon('liga')));
   pruefe('erweiterungen.js: REITER bestenliste und ich', /export const REITER = Object\.freeze\(\['bestenliste', 'ich'\]\)/.test(lies('js/erweiterungen.js')));
   pruefe('Pille misst ueber einen ResizeObserver', /new ResizeObserver/.test(app));
+  // R13 CLS-1: zeigeScreen merkt die Scrollposition des verlassenen Screens, beiVerlauf stellt sie wieder her
+  pruefe('Scrollposition je Verlaufseintrag gemerkt und beim Zurueck wiederhergestellt',
+    /merkeScroll\(\)/.test(app) && /wiederherstellen/.test(app.slice(app.indexOf('function beiVerlauf'), app.indexOf('async function zeigeScreen'))));
 
   gruppe = 'CSS';
   for (const d of ['css/navigation.css', 'css/bauteile.css', 'css/training.css']) {
@@ -873,10 +876,62 @@ async function testePremium(browser) {
   await v.kontext.close();
 }
 
+// R13 CLS-1 (10.11.2026): nach der Zurueck-Taste landete man immer oben, weil zeigeScreen() den Screen neu baut und das
+// innere Element, das wirklich scrollt, nirgends gemerkt wurde. Jetzt: Zurueck stellt die alte Position wieder her,
+// ein neuer Bildschirm startet oben. Scroller wie im Messwerkzeug: groesste Flaeche mit overflow-y auto/scroll, sonst die Seite.
+async function testeScrollZurueck(browser) {
+  gruppe = 'Scroll nach Zurueck';
+  const h = await neueSeite(browser, { w: 390, h: 844, handy: true });
+  await h.seite.addInitScript(() => {
+    window.__scroller = () => {
+      let best = null; let flaeche = 0;
+      for (const el of document.querySelectorAll('#app *')) {
+        const st = getComputedStyle(el);
+        if (!/(auto|scroll)/.test(st.overflowY) || el.scrollHeight <= el.clientHeight + 40) continue;
+        const f = el.clientWidth * el.clientHeight;
+        if (f > flaeche) { best = el; flaeche = f; }
+      }
+      const seite = document.scrollingElement;
+      if (seite.scrollHeight > seite.clientHeight + 40 && (!best || seite.clientWidth * seite.clientHeight > flaeche)) return seite;
+      return best;
+    };
+  });
+  await h.seite.goto(BASIS + '#premium');
+  await h.seite.waitForSelector('.screen.pm-screen .pm-plan');
+  await warte(500);
+  const vorher = await h.seite.evaluate(() => {
+    const s = window.__scroller();
+    if (!s) return null;
+    s.scrollTop = Math.round((s.scrollHeight - s.clientHeight) * 0.6);
+    return Math.round(s.scrollTop);
+  });
+  pruefe('Premium scrollt am Handy (Voraussetzung)', vorher > 50, String(vorher));
+  await warte(200);
+  await h.seite.evaluate(() => { location.hash = '#einstellungen'; });
+  await h.seite.waitForFunction(() => document.documentElement.dataset.screen === 'einstellungen');
+  await warte(400);
+  const neu = await h.seite.evaluate(() => { const s = window.__scroller(); return s ? Math.round(s.scrollTop) : 0; });
+  pruefe('neuer Bildschirm startet oben', neu === 0, String(neu));
+  await h.seite.goBack();
+  await h.seite.waitForSelector('.screen.pm-screen .pm-plan');
+  await warte(800);
+  const nachher = await h.seite.evaluate(() => { const s = window.__scroller(); return s ? Math.round(s.scrollTop) : null; });
+  pruefe('Zurueck stellt die alte Scrollposition wieder her', nachher != null && Math.abs(nachher - vorher) <= 2, `vorher ${vorher}, nachher ${nachher}`);
+  // Vor-Taste auf einen frisch geoeffneten Eintrag: Einstellungen wieder oben (dort wurde nicht gescrollt)
+  await h.seite.goForward();
+  await h.seite.waitForFunction(() => document.documentElement.dataset.screen === 'einstellungen');
+  await warte(400);
+  const vor = await h.seite.evaluate(() => { const s = window.__scroller(); return s ? Math.round(s.scrollTop) : 0; });
+  pruefe('Vor-Taste auf ungescrollten Eintrag bleibt oben', vor === 0, String(vor));
+  pruefe('keine Konsolenfehler', h.fehler.length === 0, h.fehler.join(' | '));
+  await h.kontext.close();
+}
+
 async function browserTeil(browser) {
   await testeSprunglink(browser);
   await testeLeiste(browser);
   await testeKopf(browser);
+  await testeScrollZurueck(browser);
   await testePremium(browser);
   await testeTraining(browser);
   await testeBauteile(browser);
