@@ -820,9 +820,9 @@ async function testePremium(browser) {
   pruefe('Preise nie im Code: "Preis folgt", Knopf "Bald verfügbar" gesperrt, Vorschau-Hinweis', p.preise.every((x) => x === 'Preis folgt') && p.kaufen.aus
     && p.kaufen.text === 'Bald verfügbar' && p.stand === 'vorschau', JSON.stringify({ preise: p.preise, kaufen: p.kaufen, stand: p.stand }));
   // Paragraf 312j Abs. 2 BGB (Rechtspruefung 09.11.2026): Laufzeit und automatische Verlaengerung stehen am Preis
-  pruefe('am Preis: Monat und Jahr nennen Laufzeit und automatische Verlaengerung, "Für immer" kein Abo',
+  pruefe('am Preis: Monat nennt die automatische Verlaengerung, Jahr danach monatlich kuendbar (309 Nr. 9 BGB), "Für immer" kein Abo',
     /Monatlich kündbar/.test(p.planZeilen[0]) && /verlängert sich automatisch um je einen Monat/.test(p.planZeilen[0])
-    && /verlängert sich automatisch um je ein Jahr/.test(p.planZeilen[1]) && /kein Abo/.test(p.planZeilen[2]), JSON.stringify(p.planZeilen));
+    && /Läuft ein Jahr, danach monatlich kündbar/.test(p.planZeilen[1]) && !/um je ein Jahr/.test(p.planZeilen[1]) && /kein Abo/.test(p.planZeilen[2]), JSON.stringify(p.planZeilen));
   pruefe('Vergleich: Kopfzeile und 7 Zeilen', p.zeilen === 8, String(p.zeilen));
   pruefe('kein Druck, kein Betrag (nur noch, letzte Chance, Euro, Komma-Preise)', !/nur noch|letzte chance|€|\bEUR\b|\d+,\d\d/i.test(p.text), p.text.slice(0, 120));
   pruefe('Handy 390 x 844: Plaene ohne Scrollen im Bild, kein Ueberlauf, Knoepfe >= 44 px', p.plaeneImBild && p.ueber <= 0 && p.klein === 0, JSON.stringify(p));

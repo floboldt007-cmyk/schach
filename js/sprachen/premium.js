@@ -16,9 +16,10 @@ registriereTexte('premium', {
     'plan.monat': 'Monatlich',
     'plan.jahr': 'Jährlich',
     'plan.immer': 'Für immer',
-    // Paragraf 312j Abs. 2 BGB: Laufzeit und automatische Verlaengerung am Preis (Rechtspruefung 09.11.2026)
+    // Paragraf 312j Abs. 2 BGB: Laufzeit und automatische Verlaengerung am Preis (Rechtspruefung 09.11.2026). Jahr: nach
+    // Paragraf 309 Nr. 9 BGB keine stille Verlaengerung um ein weiteres Jahr, danach monatlich kuendbar (vor Live pruefen)
     'zeile.monat': 'Monatlich kündbar, verlängert sich automatisch um je einen Monat',
-    'zeile.jahr': 'Läuft ein Jahr, verlängert sich automatisch um je ein Jahr',
+    'zeile.jahr': 'Läuft ein Jahr, danach monatlich kündbar',
     'zeile.immer': 'Einmal zahlen, kein Abo',
     empfohlen: 'Empfohlen',
     preisFolgt: 'Preis folgt',
@@ -61,7 +62,7 @@ registriereTexte('premium', {
     'plan.jahr': 'Yearly',
     'plan.immer': 'Forever',
     'zeile.monat': 'Cancel monthly, renews automatically for one month at a time',
-    'zeile.jahr': 'Runs for one year, renews automatically for one year at a time',
+    'zeile.jahr': 'Runs for one year, then cancel monthly',
     'zeile.immer': 'Pay once, no subscription',
     empfohlen: 'Recommended',
     preisFolgt: 'Price to follow',
