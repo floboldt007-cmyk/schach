@@ -26,6 +26,9 @@
 //   appAdresse(href) -> Text         MARKEN_ADRESSE, sonst adresseAus(href)
 //   gueltigerName(x) -> Text | null  nur ein Benutzername wie im Konto (3 bis 20 Zeichen A-Z, a-z, 0-9, _)
 //   bildDaten(p, { bot, name, adresse }) -> eingefrorenes Objekt mit genau FELDERN (siehe unten)
+//   teilText(daten) -> Text          Satz zum geteilten Bild (Flo 10.11., R12-W2): nach einem Sieg gegen einen bekannten
+//                                    Bot die Herausforderung "Ich habe <Bot> in <n> Zuegen besiegt. Schaffst du das
+//                                    schneller?", sonst der Titel des Bildes; daten aus bildDaten()
 //   layout() -> eingefrorene Lage aller Bereiche (Karte, Marke, Kopf, Portraet, Brett, Werte, Fuss)
 //   feldRechteck(feld, unten = 'w', l = layout()) -> { x, y, s }   Feld 'e4' auf der Leinwand; unten: Farbe unten
 //   themaTokens(regeln, themaId, modus) -> { '--name': Wert }      aus CSS-Regeln [{ selektor, decls: [[k, v]],
@@ -188,6 +191,14 @@ export function bildDaten(p, { bot = null, name = null, adresse = '' } = {}) {
     dateiname: `crownmate-${t('p-teilen.datei.' + ergebnis)}${/^\d{4}-\d{2}-\d{2}$/.test(tag) ? '-' + tag : ''}.png`,
   };
   return Object.freeze(daten);
+}
+
+export function teilText(daten) {
+  const d = daten && typeof daten === 'object' ? daten : {};
+  const n = Math.floor(Number(d.zuege) || 0);
+  // Remis, kein Zug oder unbekannter Gegner ("Ich habe deinen Gegner besiegt" waere schief): der Titel bleibt
+  if (d.ergebnis !== 'sieg' || n < 1 || !d.botId) return typeof d.titel === 'string' && d.titel ? d.titel : 'Crownmate';
+  return t(n === 1 ? 'p-teilen.herausforderung.eins' : 'p-teilen.herausforderung.mehr', { name: d.botName, n });
 }
 
 // ---------- Lage auf der Leinwand ----------

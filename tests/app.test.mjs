@@ -422,6 +422,8 @@ async function testePartie(seite, h, fehler) {
   await seite.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 30000 });
   pruefe('Overlay: Niederlage', /^Partie verloren$/.test(await seite.locator('.erg-wort').innerText()));
   pruefe('Overlay: Knopf "Zur Analyse"', await seite.locator('.erg-knoepfe [data-ziel="analyse"]').count() === 1);
+  // R12-W1: nach einer Niederlage bleibt die Analyse der leuchtende Hauptknopf (Lernen hilft dann mehr)
+  pruefe('Niederlage: „Zur Analyse“ bleibt der Hauptknopf', await seite.locator('.erg-knoepfe .knopf.primaer[data-ziel="analyse"]').count() === 1);
   pruefe('Overlay: Knopf "Nochmal"', await seite.locator('.erg-knoepfe [data-ziel="nochmal"]').count() === 1);
   const liste = await h.gespeichert();
   const p = liste[0] || {};
@@ -3877,7 +3879,8 @@ async function testeU7(browser) {
       const wort = document.querySelector('.erg-wort');
       const aus = wort.querySelector('.ausruf');
       const inh = getComputedStyle(document.querySelector('.screen.partie > .inhalt')).transform;
-      const k = [...document.querySelectorAll('.erg-knoepfe .knopf')].map((b) => { const r = b.getBoundingClientRect(); return { ziel: b.dataset.ziel, primaer: b.classList.contains('primaer'), t: r.top, l: r.left }; });
+      const k = [...document.querySelectorAll('.erg-aktionen [data-ziel], .erg-aktionen .erg-lobby')].map((b) => { const r = b.getBoundingClientRect();
+        return { ziel: b.dataset.ziel || 'lobby', primaer: b.classList.contains('primaer'), knopf: b.classList.contains('knopf'), t: r.top, u: r.bottom, l: r.left, w: r.width, hh: r.height }; });
       return { text: wort.textContent, ausruf: aus && getComputedStyle(aus).color, gold: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim(),
         konfetti: document.querySelectorAll('.konfetti').length, schleier: getComputedStyle(o).backgroundColor, filter: getComputedStyle(o).backdropFilter || getComputedStyle(o).webkitBackdropFilter || 'none',
         zurueck: document.querySelector('.screen.partie').classList.contains('mit-ergebnis'), inh, sterne: document.querySelectorAll('.erg-stern .e-stern svg').length, knoepfe: k };
@@ -3886,10 +3889,14 @@ async function testeU7(browser) {
     pruefe('Sieg: „Sieg!“ mit goldenem Ausrufezeichen, kein Konfetti, Sterne als Symbole', sieg.text === 'Sieg!' && hex(sieg.ausruf) === sieg.gold.toUpperCase() && sieg.konfetti === 0 && sieg.sterne === 3, JSON.stringify(sieg));
     pruefe('Schleier ohne Weichzeichner, der Screen dahinter tritt zurück (scale .975)', /rgba?\(/.test(sieg.schleier) && (sieg.filter === 'none' || !sieg.filter) && sieg.zurueck && /matrix\(0\.975/.test(sieg.inh), JSON.stringify(sieg));
     const a = sieg.knoepfe.find((x) => x.ziel === 'analyse');
-    const b = sieg.knoepfe.find((x) => x.ziel !== 'analyse');
-    // Handy seit 01.11.2026 auch nebeneinander, fest am unteren Rand der Karte (Flo: "man sollte direkt die Lobby sehen")
-    pruefe(g.handy ? 'Handy: Knöpfe nebeneinander, „Zur Analyse“ (Zinnober) links' : 'Knöpfe nebeneinander, „Zur Analyse“ in Zinnober', a && b && a.primaer
-      && Math.abs(a.t - b.t) < 2 && a.l < b.l, JSON.stringify(sieg.knoepfe));
+    const b = sieg.knoepfe.find((x) => x.ziel === 'weiter');
+    const lo = sieg.knoepfe.find((x) => x.ziel === 'lobby');
+    // R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner leuchtet "Nächster Gegner" gross ueber die
+    // ganze Breite, "Zur Analyse" und "Zu den Bots" stehen klein darunter nebeneinander (Analyse links), beide antippbar
+    pruefe(g.handy ? 'Handy: „Nächster Gegner“ gross (Zinnober), darunter klein „Zur Analyse“ links, „Zu den Bots“ rechts'
+      : '„Nächster Gegner“ gross (Zinnober), darunter klein „Zur Analyse“ links, „Zu den Bots“ rechts',
+    a && b && lo && b.primaer && b.knopf && !a.knopf && !a.primaer && a.t >= b.u - 1 && Math.abs(a.t - lo.t) < 2 && a.l < lo.l
+      && a.w < b.w && a.hh >= 44 && lo.hh >= 44 && sieg.knoepfe.filter((x) => x.primaer).length === 1, JSON.stringify(sieg.knoepfe));
     if (g.handy) {
       const fest = await seite.evaluate(() => { const k = document.querySelector('.ergebnis-karte').getBoundingClientRect();
         const l = document.querySelector('.erg-lobby').getBoundingClientRect(); const a = document.querySelector('.erg-aktionen');

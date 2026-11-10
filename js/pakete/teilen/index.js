@@ -26,7 +26,7 @@ import { segment, schalter, toast } from '../../ui/bauteile.js';
 import { anim, tempo } from '../../bewegung.js';
 import { sitzung, ladeProfil } from '../../konto.js';
 import { tagSchluessel } from '../../tag.js';
-import { teilbar, bildDaten, appAdresse, gueltigerName, RECHENSTAND, MARKEN_ADRESSE } from './logik.js';
+import { teilbar, bildDaten, teilText, appAdresse, gueltigerName, RECHENSTAND, MARKEN_ADRESSE } from './logik.js';
 import { rendere, alsDatei } from './bild.js';
 import { t } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
@@ -343,7 +343,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     const datei = stand.datei;
     if (!datei || !stand.bereit) return;
     let laeuft;
-    try { laeuft = teileDatei(datei, daten ? daten.titel : 'Crownmate'); } catch (f) { laeuft = Promise.reject(f); }
+    try { laeuft = teileDatei(datei, daten ? teilText(daten) : 'Crownmate'); } catch (f) { laeuft = Promise.reject(f); }
     // zwei Zweige statt then().catch(): nur ein Fehler von share() selbst fuehrt zum Speichern
     laeuft.then((weg) => erledigt(weg, t(weg === 'teilen' ? 'p-teilen.geteilt' : 'p-teilen.gespeichert')), (f) => {
       if (f && f.name === 'AbortError') return;   // im Teilen-Blatt abgebrochen: unser Blatt bleibt offen
