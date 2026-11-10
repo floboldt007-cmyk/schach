@@ -3,10 +3,11 @@
 // entscheidet der Server. Reine Rechnung und Anzeige: js/pakete/lobby/raetsel-duell.js.
 //
 //   angemeldet() -> boolean
-//   suche({ warteMs, alleMs, beiTreffer, beiKi, beiFehler }) -> { stopp() }
-//     Gegnersuche wie js/kronen.js suche: ein Treffer ruft beiTreffer(duellId). Nach warteMs (10 s) ohne Treffer legt
-//     der Server ein Duell gegen den KI-Gegner an (duell_suche_ende(true)) und beiKi(duellId) kommt; gibt der Server
-//     keins (offline), beiFehler(e). stopp() bricht ab.
+//   suche({ warteMs, alleMs, beiTreffer, beiKi, beiFehler, beiLage }) -> { stopp(), jetztKi(), lage() }
+//     Gegnersuche wie js/kronen.js suche (Ablauf js/gegnersuche.js): ein Treffer ruft beiTreffer(duellId). Nach der
+//     Wartezeit des Servers (warte_s; ohne das Feld 10 s) oder mit jetztKi() ab ki_ab_s legt der Server ein Duell gegen
+//     den KI-Gegner an (duell_suche_ende(true)) und beiKi(duellId) kommt; gibt der Server keins (offline),
+//     beiFehler(e). stopp() bricht ab. warteMs nur im Test.
 //   einladen() -> Promise<{ duell, code }>        Freundschaft per Code (ohne Wertung)
 //   beitreten(code) -> Promise<{ duell }>         Fehler mit e.kennung 'DUELL_CODE' | 'DUELL_ZU_VIELE_VERSUCHE' | ...
 //   stand(duell) -> Promise<Stand | null>         normalisiert (js/pakete/lobby/raetsel-duell.js)
@@ -14,6 +15,7 @@
 //     Fehler mit e.kennung (DUELL_ZEIT_UM, DUELL_STAND_VERALTET, DUELL_ZUG_ILLEGAL, ...)
 //   KI_ERSATZ_MS = 10000
 import { rpc, edgeFunktion } from './online.js';
+import { gegnersuche } from './gegnersuche.js';
 import { sitzung } from './konto.js';
 import { KONST, normalisiereStand } from './pakete/lobby/raetsel-duell.js';
 
@@ -36,45 +38,13 @@ const kennungAus = (e) => {
   return /^DUELL_[A-Z_]{1,40}$/.test(k) ? k : null;
 };
 
-export function suche({ warteMs = KI_ERSATZ_MS, alleMs = 1000, beiTreffer = () => {}, beiKi = () => {}, beiFehler = () => {} } = {}) {
-  let aus = false;
-  let abfrage = null;
-  const uhren = new Set();
-  const spaeter = (fn, ms) => { const u = setTimeout(() => { uhren.delete(u); fn(); }, ms); uhren.add(u); };
-  const ende = () => { aus = true; for (const u of uhren) clearTimeout(u); uhren.clear(); };
-  const treffer = (d) => { if (aus) return; ende(); beiTreffer(d); };
-
-  function frage() {
-    if (aus || abfrage) return;
-    abfrage = rpc('duell_suche_stand', {}).then((d) => { const x = duellVon(d); if (x) treffer(x); }, () => {})
-      .finally(() => { abfrage = null; if (!aus) spaeter(frage, alleMs); });
-  }
-  rpc('duell_suche_start', {}).then((d) => {
-    const x = duellVon(d);
-    if (x) { treffer(x); return; }
-    if (!aus) spaeter(frage, alleMs);
-  }, (e) => { if (aus) return; ende(); beiFehler(e); });
-
-  spaeter(async () => {
-    if (aus) return;
-    ende();
-    try {
-      const x = duellVon(await rpc('duell_suche_ende', { ki: true }));
-      if (x) { beiKi(x); return; }
-      // kein KI-Duell: vielleicht kam die Paarung gerade noch an
-      const p = duellVon(await rpc('duell_suche_stand', {}).catch(() => null));
-      if (p) { beiTreffer(p); return; }
-      beiFehler(kennungsFehler('DUELL_SERVER'));
-    } catch (e) { beiFehler(e); }
-  }, warteMs);
-
-  return {
-    stopp() {
-      if (aus) return;
-      ende();
-      rpc('duell_suche_ende', { ki: false }).catch(() => {});
-    },
-  };
+export function suche({ warteMs, alleMs = 1000, beiTreffer = () => {}, beiKi = () => {}, beiFehler = () => {}, beiLage } = {}) {
+  return gegnersuche({
+    rufe: rpc, namen: { start: 'duell_suche_start', stand: 'duell_suche_stand', ende: 'duell_suche_ende' },
+    idVon: duellVon, belegVon: duellVon, warteMs, alleMs, beiTreffer, beiFehler, beiLage,
+    // kein KI-Duell und keine Paarung: offline oder Server-Fehler
+    beiKi: ({ beleg, fehler }) => (beleg ? beiKi(beleg) : beiFehler(fehler || kennungsFehler('DUELL_SERVER'))),
+  });
 }
 
 export async function einladen() {

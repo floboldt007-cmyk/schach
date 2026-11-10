@@ -48,6 +48,7 @@ const SUITEN = [
   { name: 'server-schule', datei: 'server-schule.test.mjs', args: [], was: 'Schulmodus: Schema-Vertrag, Rechte, Grenzen (Server)' },
   { name: 'schule', datei: 'schule.test.mjs', args: [], was: 'Schulmodus: Lehrkraft-Ansicht, Beitreten, Heute-Karte, Melden' },
   { name: 'server-werkstatt', datei: 'server-werkstatt.test.mjs', args: [], was: 'Limitierte Editionen: Kasse, Webhook, Schema-Vertrag (Server, Testmodus)' },
+  { name: 'gegnersuche', datei: 'gegnersuche.test.mjs', args: [], was: 'Sofort-Suche: Wartezeit vom Server, Knopf Jetzt gegen KI, Rueckfall auf altes SQL' },
   { name: 'kronen', datei: 'kronen.test.mjs', args: [], was: 'Liga mit Kronen: reine Rechnung (Stufen, Saison, Boden, Start aus Elo)' },
   { name: 'kronen-vertrag', datei: 'kronen-vertrag.test.mjs', args: [], was: 'Liga mit Kronen: Schema-Vertrag mit js/pakete/liga/kronen.js, Rechte, Rueckweg (Server)' },
   { name: 'besitz', datei: 'besitz.test.mjs', args: [], was: 'Etappe 4b: Erfolge in Stufen, lokales Taler- und Banner-Buch (ohne Konto)' },
@@ -113,7 +114,7 @@ const DAUERN = new Map([
   ['navigation', 39], ['ansicht', 150], ['arena', 154], ['funken', 124], ['punkte', 167], ['serie', 140],
   ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
-  ['e2e', 111], ['native', 0],
+  ['e2e', 111], ['native', 0], ['gegnersuche', 2],
 ]);
 
 function teile(suiten, anzahl) {

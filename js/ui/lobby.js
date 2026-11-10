@@ -21,7 +21,7 @@ import { ladeFortschritt } from '../storage.js';
 import { avatarVon, floAvatar } from '../thema.js';
 import { t } from '../sprache.js';
 import { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, modusLeiste, ladeLobbyCss } from '../pakete/lobby/index.js';
-import { suche as kronenSuche, angemeldet as kronenAngemeldet, BOT_ERSATZ_MS } from '../kronen.js';
+import { suche as kronenSuche, angemeldet as kronenAngemeldet, RANKED_ZEIT } from '../kronen.js';
 import { karteDerPartie } from '../karte.js';
 import { visitenkarte, eigeneKarte, fremdeKarte, botKarte, karteVomServer } from './visitenkarte.js';
 import '../sprachen/allgemein.js';
@@ -116,7 +116,9 @@ export function zeige(root, params, app) {
   });
   const seg = segment({ name: 'lb-wertung', label: L('wertung.label'), wert: 'gewertet',
     optionen: [{ id: 'gewertet', text: L('gewertet') }, { id: 'freundschaft', text: L('freundschaft') }],
-    beiWahl: (id) => { gewertet = id === 'gewertet'; } });
+    // Ranked hat eine feste Bedenkzeit (RANKED_ZEIT, Konzept "Zwei Ligen"): die Wahl gibt es nur fuer Freundschaft
+    beiWahl: (id) => { gewertet = id === 'gewertet'; zeitenEl.hidden = gewertet; } });
+  zeitenEl.hidden = gewertet;
   s.querySelector('.lb-wertung-ort').replaceWith(seg.el);
 
   s.querySelector('.lb-mehr').addEventListener('click', (e) => {
@@ -177,7 +179,8 @@ export function zeige(root, params, app) {
     el.setAttribute('aria-modal', 'true');
     el.tabIndex = -1;
     el.setAttribute('aria-label', L('suche.aria'));
-    const zeileText = L('suche.zeile', { art: L('art.' + zeit.art), zeit: zeitText(zeit), wertung: gewertet ? L('gewertet') : L('freundschaft') });
+    const z = gewertet ? RANKED_ZEIT : zeit;
+    const zeileText = L('suche.zeile', { art: L('art.' + z.art), zeit: zeitText(z), wertung: gewertet ? L('gewertet') : L('freundschaft') });
     el.innerHTML = `<div class="lb-suche-karte">
         <div class="lb-radar" aria-hidden="true"><i></i><i></i><i></i><span class="lb-ich">${floAvatar('w')}</span>
           <span class="lb-gegner"><img src="${esc(avatarVon(bot))}" alt=""></span><b class="lb-vs">VS</b></div>
@@ -188,6 +191,7 @@ export function zeige(root, params, app) {
         <p class="lb-gefunden-text" hidden>${esc(L('gefunden.text', { bot: bot.name, elo: bot.elo }))}</p>
         <div class="lb-suche-knoepfe">
           <button type="button" class="knopf primaer dr lb-spielen-bot" hidden>${esc(L('gefunden.spielen', { bot: bot.name }))}</button>
+          <button type="button" class="knopf primaer dr lb-ki-jetzt" hidden disabled>${esc(L('suche.kiJetzt'))}</button>
           <button type="button" class="knopf dr lb-abbrechen">${esc(L('abbrechen'))}</button>
         </div>
       </div>`;
@@ -198,12 +202,20 @@ export function zeige(root, params, app) {
     const start = Date.now();
     const tick = () => {
       if (!suche || suche.el !== el) return;
-      const sek = Math.floor((Date.now() - start) / 1000);
+      // mit Server-Suche zaehlt die Uhr ab dem Beginn, den der Server nennt (js/gegnersuche.js)
+      const l = suche.server ? suche.server.lage() : null;
+      const sek = Math.floor((l ? l.vergangenMs : Date.now() - start) / 1000);
+      // "Jetzt gegen KI" nur, wenn der Server eine KI-Grenze vor dem Ende nennt (neues SQL), und erst ab da
+      const ki = el.querySelector('.lb-ki-jetzt');
+      if (l && el.dataset.phase === 'suche') {
+        ki.hidden = !(l.vomServer && l.kiAbMs < l.warteMs);
+        ki.disabled = l.vergangenMs < l.kiAbMs;
+      } else ki.hidden = true;
       uhr.textContent = `${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, '0')}`;
       if (el.dataset.phase === 'suche') spaeter(tick, 1000);
     };
     spaeter(tick, 1000);
-    const tempoWahl = { grund: zeit.grund, zuschlag: zeit.zuschlag };
+    const tempoWahl = { grund: z.grund, zuschlag: z.zuschlag };
     // Etappe B Task 4: gewertet = echte Gegnersuche auf dem Server (js/kronen.js), nach 10 s ein KI-Gegner mit Beleg;
     // Freundschaft bleibt die Vorschau mit einem Bot ohne Kronen
     if (gewertet) {
@@ -214,8 +226,9 @@ export function zeige(root, params, app) {
         text.textContent = L('suche.anmelden.text');
       } else {
         text.firstChild.textContent = L('suche.server') + ' · ';
-        const warteMs = typeof window !== 'undefined' && Number.isFinite(window.__lobbyBotMs) ? window.__lobbyBotMs : BOT_ERSATZ_MS;
-        suche.server = kronenSuche(zeit.id, {
+        // die Wartezeit nennt der Server; __lobbyBotMs nur im Test
+        const warteMs = typeof window !== 'undefined' && Number.isFinite(window.__lobbyBotMs) ? window.__lobbyBotMs : undefined;
+        suche.server = kronenSuche(z.id, {
           warteMs,
           beiTreffer: (partieId) => {
             if (!suche || suche.el !== el) return;
@@ -260,6 +273,7 @@ export function zeige(root, params, app) {
     el.addEventListener('click', (e) => {
       if (suche && suche.gesperrt) return;
       if (e.target.closest('.lb-abbrechen') || e.target === el) schliesseSuche();
+      else if (e.target.closest('.lb-ki-jetzt')) { if (suche.server) suche.server.jetztKi(); }
       else if (e.target.closest('.lb-spielen-bot')) {
         const b = suche.bot;
         schliesseSuche();

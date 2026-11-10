@@ -368,11 +368,43 @@ async function nebenwege(browser) {
       await p.s.waitForSelector('.screen.raetsel-duell[data-phase="suche"] .rd-rest', { timeout: 5000 });
       await warte(1300);
       const rest = await p.s.evaluate(() => ({ text: document.querySelector('.rd-rest').textContent,
-        ring: Number(document.querySelector('.rd-warten .rd-ring-rest').getAttribute('stroke-dashoffset')) }));
-      pruefe('Online-Tuer: Suche startet sofort, Restzeit zaehlt sichtbar (Noch 58/59 s, Ring laeuft)', /^Noch 5[89] s/.test(rest.text) && rest.ring > 0
+        ring: Number(document.querySelector('.rd-warten .rd-ring-rest').getAttribute('stroke-dashoffset')),
+        titel: document.querySelector('.rd-warten h2').textContent.replace(/\s+/g, ' ').trim(), ki: document.querySelector('.rd-ki-jetzt').hidden }));
+      // altes SQL (Antwort ohne warte_s): wie bisher, kein Knopf "Jetzt gegen KI"
+      pruefe('Online-Tuer: Suche startet sofort, "Suche Gegner … 0:01", Restzeit zaehlt sichtbar (Noch 58/59 s, Ring laeuft), altes SQL ohne KI-Knopf',
+        /^Noch 5[89] s/.test(rest.text) && rest.ring > 0 && /^Suche Gegner … 0:0[12]$/.test(rest.titel) && rest.ki
         && p.aufrufe.some((a) => a.name === 'duell_suche_start'), rest);
       await p.s.locator('.rd-abbrechen').click();
       await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"]', { timeout: 3000 });
+      pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+    } finally { await p.k.close(); }
+  }
+  // Neues SQL (Punkt 40, Konzept "Zwei Ligen"): 30 s Wartezeit vom Server, "Jetzt gegen KI" erst ab ki_ab_s, dann KI-Duell
+  {
+    gruppe = 'Neues SQL';
+    const srv = neuerServer();
+    let seit = new Date().toISOString();
+    const p = await seite(browser, { breite: 390, hoehe: 844, srv, rpc: (name, daten) => {
+      if (name === 'duell_suche_start' || name === 'duell_suche_stand') return { wartet: true, seit, warte_s: 30, ki_ab_s: 1 };
+      if (name === 'duell_suche_ende') { if (daten && daten.ki === true) { srv.anlegen(); return { duell: DUELL }; } return {}; }
+      return undefined;
+    } });
+    try {
+      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"] .rd-suchen', { timeout: 30000 });
+      await p.s.evaluate(() => { delete window.__duellKiMs; });
+      seit = new Date().toISOString();
+      await p.s.locator('.rd-suchen').click();
+      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="suche"] .rd-ki-jetzt:not([hidden])', { timeout: 5000 });
+      const frueh = await p.s.evaluate(() => ({ rest: document.querySelector('.rd-rest').textContent, an: !document.querySelector('.rd-ki-jetzt').disabled,
+        text: document.querySelector('.rd-ki-jetzt').textContent }));
+      await p.s.waitForFunction(() => !document.querySelector('.rd-ki-jetzt').disabled, null, { timeout: 4000 });
+      const spaet = await p.s.evaluate(() => document.querySelector('.rd-ki-jetzt').textContent);
+      pruefe('Neues SQL: Restzeit 30 s vom Server, "Jetzt gegen KI" erst gesperrt ("in 1 s"), ab ki_ab_s frei',
+        /^Noch (29|30) s/.test(frueh.rest) && !frueh.an && /in 1 s/.test(frueh.text) && spaet === 'Jetzt gegen KI', { frueh, spaet });
+      await p.s.locator('.rd-ki-jetzt').click();
+      await p.s.waitForFunction(() => document.querySelector('.screen.raetsel-duell')?.dataset.phase !== 'suche', null, { timeout: 5000 });
+      pruefe('Neues SQL: Knopf beendet die Suche mit ki true und startet das KI-Duell',
+        p.aufrufe.some((a) => a.name === 'duell_suche_ende' && a.daten?.ki === true) && !p.aufrufe.some((a) => a.name === 'duell_suche_ende' && a.daten?.ki === false));
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }

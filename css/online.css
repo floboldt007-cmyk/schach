@@ -48,6 +48,7 @@
 /* Gegnersuche in der Partie-Karte (Konzept 3 A): Ring mit Restzeit, "Gleich gegen die KI", Abbrechen */
 .on-suche { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
 .on-suche h3 { margin: 0; font-size: 17px; }
+.on-uhr { font-variant-numeric: tabular-nums; color: var(--text-2); }
 .on-rest { margin: 0; font-size: 13.5px; color: var(--text-2); }
 .on-suche .knopf { align-self: stretch; min-height: 48px; justify-content: center; }
 .on-ki-hinweis { margin-top: -4px; font-size: 12.5px; color: var(--text-2); }
@@ -71,11 +72,8 @@
 .on-freunde[open] > .on-freunde-zeile { margin-bottom: var(--a3); }
 html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 @media (prefers-reduced-motion: reduce) { .on-ring-rest { transition: none; } }
-.on-zeiten[hidden] { display: none; }
-.on-zeiten { --n: 3; }
-.on-zeiten .seg[aria-checked="true"] { background: var(--flaeche); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 2px 6px -1px rgba(0, 0, 0, .08), var(--kante); }
-:root[data-modus="dunkel"] .on-zeiten .seg[aria-checked="true"] { background: var(--flaeche-3); }
-@media (prefers-color-scheme: dark) { :root[data-modus="system"] .on-zeiten .seg[aria-checked="true"] { background: var(--flaeche-3); } }
+.on-zeit-fest { margin: 0; font-size: 13.5px; color: var(--text-2); }
+.on-zeit-fest[hidden] { display: none; }
 .on-art .t-fuss { justify-content: flex-start; }
 .on-inhalt, .on-meldung { max-width: 960px; margin: 0 auto; }
 .on-meldung { padding: var(--a4); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
