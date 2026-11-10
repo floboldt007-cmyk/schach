@@ -47,6 +47,11 @@
 .erg-lobby { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; margin: -2px auto 0; padding: 0 18px;
   border: 0; border-radius: var(--r-pille); background: none; color: var(--text-2); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
 .erg-lobby[hidden] { display: none; }
+.erg-freund { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; margin: 0 auto 2px; padding: 0 18px;
+  border: 0; border-radius: var(--r-pille); background: none; color: var(--text-2); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.erg-freund svg { width: 18px; height: 18px; }
+.erg-freund:hover, .erg-freund:focus-visible { color: var(--text); background: var(--flaeche-2); }
+.erg-freund:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .erg-lobby svg { width: 18px; height: 18px; }
 .erg-lobby:hover, .erg-lobby:focus-visible { color: var(--text); background: var(--flaeche-2); }
 .erg-lobby:focus-visible { outline: var(--fokus); outline-offset: 2px; }

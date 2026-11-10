@@ -2323,6 +2323,22 @@ export function zeige(root, params, app) {
           // Flo 30.10. abends: "mich stoert, dass ich nicht von da aus direkt zur Lobby kann (Startseite)"
           const lobby = o.querySelector('.erg-lobby');
           if (lobby) { lobby.hidden = false; lobby.onclick = () => app.gehe('arena'); }
+          // W3 R12: "Freund herausfordern" – nach Sieg den Link zur Bot-Herausforderung teilen
+          if (ergebnis === 'sieg' && !o.querySelector('.erg-freund')) {
+            const freundBtn = document.createElement('button');
+            freundBtn.type = 'button';
+            freundBtn.className = 'knopf erg-freund';
+            freundBtn.innerHTML = `${icon('teilen')} <span>${esc(t('partie.erg.freundHerausfordern'))}</span>`;
+            freundBtn.addEventListener('click', () => {
+              const url = new URL(location.href);
+              url.search = new URLSearchParams({ bot: bot.id }).toString();
+              url.hash = '';
+              const text = t('partie.erg.freundHerausfordern');
+              if (navigator.share) navigator.share({ title: 'Crownmate', text, url: url.href }).catch(() => {});
+              else navigator.clipboard?.writeText(url.href).catch(() => {});
+            });
+            o.querySelector('.erg-aktionen').prepend(freundBtn);
+          }
           // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.
           // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
           const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]');
