@@ -26,7 +26,9 @@ declare
   mein_platz integer;
 begin
   st := public.kronen_stand_sichern(auth.uid());
-  select * into m from public.liga_mitglieder x where x.user_id = st.user_id and x.woche = wo;
+  select * into m from public.liga_mitglieder x where x.user_id = st.user_id and x.woche = wo
+    -- Zwei Ligen (zwei-ligen-schema.sql): nur die Online-Gruppe; ohne die Spalte liga ist jede Gruppe online
+    and coalesce(to_jsonb(x) ->> 'liga', 'online') = 'online';
   if m.gruppe is not null then
     select coalesce(jsonb_agg(jsonb_build_object(
         'platz', r.platz,
@@ -59,7 +61,8 @@ begin
       'max', (k ->> 'bot_ki_wochen_max')::integer),
     'offen', coalesce((select jsonb_agg(jsonb_build_object('woche', x.woche, 'platz', x.platz, 'art', x.art, 'menge', x.menge)
                          order by x.woche, x.art)
-                       from public.liga_belohnungen x where x.user_id = st.user_id and not x.ausgezahlt), '[]'::jsonb)
+                       from public.liga_belohnungen x where x.user_id = st.user_id and not x.ausgezahlt
+                         and coalesce(to_jsonb(x) ->> 'liga', 'online') = 'online'), '[]'::jsonb)
   );
 end;
 $$;
