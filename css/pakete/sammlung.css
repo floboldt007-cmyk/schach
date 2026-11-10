@@ -311,8 +311,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 @media (max-width: 420px) { .sa-gross-reihe { grid-template-columns: minmax(0, 1fr); } }
 /* Shop ohne Konto (G-002): Stuecke ausgegraut, nur zum Ansehen; Text bleibt in --text-2 lesbar, nur das Bild ist entsaettigt */
 .sh-gast { display: grid; gap: 12px; margin-top: 14px; }
-/* R5-3 (Kundenblick 09.11.2026): ausgegraut bleibt (Flo 08.11.), aber als Brett erkennbar; vorher grayscale + .55 = hellgrau auf hellgrau,
-   das wie ein fehlendes Bild aussah */
-.sh-karte[data-gast] .sh-bild { filter: grayscale(1) contrast(1.35); opacity: .85; }
+/* R13-Shop (10.11.2026): gedaempft statt ausgegraut (Flo 10.11.) — Editionsfarben sichtbar, aber entsaettigt */
+.sh-karte[data-gast] .sh-bild { filter: grayscale(0.75) opacity(0.8); }
 .sh-karte[data-gast] .sh-brett { box-shadow: 0 0 0 2px var(--text-2); }
 .sh-karte[data-gast] .sh-name { color: var(--text-2); }

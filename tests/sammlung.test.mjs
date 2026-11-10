@@ -392,8 +392,8 @@ async function shopTeil(browser) {
   // R5-3: ausgegraut bleibt, aber das Brett muss als Brett erkennbar sein (vorher Deckkraft .55 = graues Karomuster wie ein kaputtes Bild)
   const vorschau = await p.s.evaluate(() => { const b = document.querySelector('.sh-karte[data-gast] .sh-bild'); const c = getComputedStyle(b);
     return { opacity: +c.opacity, filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
-  pruefe('Shop abgemeldet: Vorschau ausgegraut, aber kräftig genug und mit Brettrand (R5-3)', /grayscale\(1\)/.test(vorschau.filter)
-    && vorschau.opacity >= 0.8 && vorschau.rand !== 'none', vorschau);
+  pruefe('Shop abgemeldet: Vorschau gedaempft, erkennbar farbig und mit Brettrand (R13-Shop)', /grayscale\(0\.75\)/.test(vorschau.filter)
+    && vorschau.rand !== 'none', vorschau);
   pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
   // Kundenblick 09.11.2026 (Befund 12): kein leeres "0 / 0" auf "Ich", ohne Partie auch keine Spielzahl im Profil
   const ich = await p.s.evaluate(() => ({ zahlen: [...document.querySelectorAll('.sa-gross .zahl, .sa-platz-zahl')].map((z) => z.textContent.trim()),
