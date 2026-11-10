@@ -42,7 +42,7 @@
 .ms-willkommen .ico { flex: none; width: 16px; height: 16px; color: var(--stern); }
 .ms-bk-balken > i { display: block; height: 100%; border-radius: inherit; background: var(--stern); }
 .ms-gruppe { display: flex; flex-direction: column; gap: 8px; }
-.ms-gruppe > h3 { margin: 6px 2px 0; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.ms-gruppe > h2 { margin: 6px 2px 0; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
 .ms-marke { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: var(--r-pille); font-size: 12px; font-weight: 800; }
 .ms-marke[data-marke="probe"] { background: var(--k-bester); color: var(--kg-bester); }
 .ms-marke[data-marke="trainer"] { background: #1C1B19; color: #F5C451; }

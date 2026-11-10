@@ -28,7 +28,7 @@
 /* ---------- Kopf: Zurueck, Bot-Name und Unterzeile, Brettwahl (iPad), Klang, Zaehlwerk, Zahnrad ---------- */
 .partie .p-kopf { height: var(--kopf-hoehe-partie); padding: 0 24px; gap: 10px; }
 .partie .p-kopf .titel { margin-right: auto; }
-.partie .p-kopf h2 { font-size: 22px; letter-spacing: -.025em; }
+.partie .p-kopf h1 { font-size: 22px; letter-spacing: -.025em; }
 .partie .p-kopf .unter { margin-top: 3px; font-size: 13.5px; font-weight: 650; color: var(--text-2); }
 .brettwahl { flex: none; display: flex; gap: 4px; padding: 4px; border-radius: 15px; background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
 .brettwahl button { width: var(--tipp); height: var(--tipp); margin: 0; padding: 0; border: 0; border-radius: 12px; background: none;
@@ -352,7 +352,7 @@
 @media (orientation: portrait) and (max-width: 600px) {
   .partie { --balken: 6px; --spalt: 4px; }
   .partie .p-kopf { padding: 0 10px; gap: 8px; }
-  .partie .p-kopf h2 { font-size: 19px; }
+  .partie .p-kopf h1 { font-size: 19px; }
   .partie .p-kopf .unter { margin-top: 2px; font-size: 12.5px; }
   .partie .p-kopf .p-eroeffnung, .partie .p-kopf .p-eroeffnung + .p-sep, .partie .p-kopf .p-lang { display: none; }
   /* Kundenblick 09.11. (Befund 9): der Name steht nur einmal, im Kopf. Die Karte zeigt Bild, Elo und Sprechblase. */
