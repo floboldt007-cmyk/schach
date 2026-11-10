@@ -70,7 +70,7 @@ function startblatt(root, app) {
         <div class="zz-paar" aria-hidden="true"><img src="${esc(pfad)}wK.svg" alt="" draggable="false"><img src="${esc(pfad)}bK.svg" alt="" draggable="false"></div>
         <div class="zz-buehne-text">
           <small class="zz-ueber">${esc(Z('ueber'))}</small>
-          <h2 class="zz-titel">${esc(Z('amBrett'))}</h2>
+          <h1 class="zz-titel">${esc(Z('amBrett'))}</h1>
           <p class="zz-einleitung">${esc(Z('einleitung'))}</p>
         </div>
       </div>
@@ -149,7 +149,7 @@ function partie(root, quelle, app, fortgesetzt) {
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
   s.setAttribute('aria-label', Z('amBrett'));
-  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.training')}</button><h2>${Z('titel')}</h2></header>
+  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.training')}</button><h1>${Z('titel')}</h1></header>
     <div class="zz-rumpf"><div class="zz-spielbereich">
       <div class="zz-spieler zz-oben" role="group"></div>
       <div class="zz-feld"><div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div></div>
