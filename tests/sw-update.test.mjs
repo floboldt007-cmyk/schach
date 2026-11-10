@@ -60,7 +60,19 @@ const server = http.createServer(async (q, r) => {
   r.end(d);
 });
 
-const swVersion = (s) => s.evaluate(() => new Promise((res) => {
+// Wechselt der Service Worker, laedt die App von selbst neu (js/app.js registriereSW). Eine Auswertung, die genau
+// dann laeuft, bricht mit "Execution context was destroyed" ab: auf die neue Seite warten und wiederholen.
+const KONTEXT_WEG = /Execution context was destroyed|Cannot find context|frame was detached|navigation/i;
+async function werte(s, fn, arg) {
+  for (let versuch = 0; ; versuch++) {
+    try { return await s.evaluate(fn, arg); } catch (e) {
+      if (versuch >= 3 || !KONTEXT_WEG.test(e.message)) throw e;
+      await s.waitForLoadState('load').catch(() => {});
+      await warte(200);
+    }
+  }
+}
+const swVersion = (s) => werte(s, () => new Promise((res) => {
   const c = navigator.serviceWorker.controller;
   if (!c) return res(null);
   navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.typ === 'version') res(e.data.version); }, { once: true });
@@ -68,6 +80,31 @@ const swVersion = (s) => s.evaluate(() => new Promise((res) => {
   setTimeout(() => res('keine Antwort'), 3000);
 }));
 const startBereit = (s) => s.waitForFunction(() => !!document.querySelector('.screen.heim, #app > .screen'), null, { timeout: 30000 });
+
+// Wartet auf den Endzustand nach einem Wechsel des Service Workers, statt einmal zu pruefen: die Zielversion steuert
+// die Seite, keine Fassung wartet mehr, nur ihr Cache ist uebrig (activate hat den alten geloescht), und die Seite laedt
+// nicht mehr neu (zweimal hintereinander dieselbe fertig geladene Seite, performance.timeOrigin).
+async function warteAufVersion(s, version, ms = 60000) {
+  const ende = Date.now() + ms;
+  const soll = JSON.stringify(['schach-arena-v' + version]);
+  let zuletzt = null;
+  while (Date.now() < ende) {
+    let jetzt = null;
+    try {
+      const v = await swVersion(s);
+      const lage = await s.evaluate(async () => {
+        const r = await navigator.serviceWorker.getRegistration();
+        return { seite: document.readyState === 'complete' ? performance.timeOrigin : null, caches: await caches.keys(),
+          ruhig: !!r && !r.waiting && !r.installing && !!r.active && r.active.state === 'activated' };
+      });
+      if (v === version && lage.seite && lage.ruhig && JSON.stringify(lage.caches) === soll) jetzt = lage.seite;
+    } catch (e) { /* die Seite laedt gerade neu */ }
+    if (jetzt && jetzt === zuletzt) { await startBereit(s).catch(() => {}); return true; }
+    zuletzt = jetzt;
+    await warte(600);
+  }
+  return false;
+}
 
 async function main() {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -98,17 +135,12 @@ async function main() {
     // naechster Besuch: die wartende Fassung uebernimmt von selbst
     await warte(16000);
     await s.reload(); await startBereit(s);
-    await s.waitForFunction((v) => new Promise((res) => {
-      const c = navigator.serviceWorker.controller; if (!c) return res(false);
-      navigator.serviceWorker.addEventListener('message', (e) => res(!!(e.data && e.data.version === v)), { once: true });
-      c.postMessage({ typ: 'version' }); setTimeout(() => res(false), 1000);
-    }), VERSION + 1, { timeout: 30000, polling: 500 }).catch(() => {});
-    await startBereit(s);
-    const lage = await s.evaluate(() => navigator.serviceWorker.getRegistration().then(async (r) => ({ caches: await caches.keys(),
+    await warteAufVersion(s, VERSION + 1);
+    const lage = await werte(s, () => navigator.serviceWorker.getRegistration().then(async (r) => ({ caches: await caches.keys(),
       wartet: !!r.waiting, aktiv: r.active && r.active.state, merker: sessionStorage.getItem('schach-arena:sw-wechsel') })));
     pruefe(`Übernahme: Version ${VERSION + 1} steuert die Seite, nur ihr Cache bleibt`, await swVersion(s) === VERSION + 1
       && JSON.stringify(lage.caches) === JSON.stringify([`schach-arena-v${VERSION + 1}`]), JSON.stringify(lage));
-    const probe = await s.evaluate((x) => fetch('js/ui/heim.js').then((r) => r.text()).then((t) => t.includes(x)), PROBE);
+    const probe = await werte(s, (x) => fetch('js/ui/heim.js').then((r) => r.text()).then((t) => t.includes(x)), PROBE);
     pruefe('Übernahme: die geänderte Datei kommt in der neuen Fassung aus dem Cache (keine alte Datei im neuen Cache)', probe);
     pruefe('Übernahme: die App läuft (Start sichtbar), keine Seitenfehler', await s.locator('#app > .screen').count() > 0 && fehler.length === 0, fehler.join(' | '));
   } catch (e) {

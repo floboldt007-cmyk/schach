@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 283;
-const STAND = 'f16fc43fcfd6';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 287;
+const STAND = '15e8b18ee847';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -832,17 +832,20 @@ self.addEventListener('fetch', (e) => {
 });
 
 async function antworte(req, url) {
-  const cache = await caches.open(CACHE);
+  // Nie caches.open vor dem Treffer: das legt einen fehlenden Cache an. Bis clients.claim() der neuen Fassung beantwortet
+  // die alte noch Anfragen, ihr Cache ist da aber schon geloescht und kaeme so wieder (tests/sw-cache.test.mjs, CI 09.11.2026).
   const navigation = req.mode === 'navigate';
   // "./" und "index.html?test" sind dieselbe Startseite
   const start = url.pathname === BASIS || url.pathname === BASIS + 'index.html';
-  const treffer = start ? await cache.match(BASIS + 'index.html')
-    : await cache.match(req, { ignoreSearch: navigation });
+  const treffer = start ? await caches.match(BASIS + 'index.html', { cacheName: CACHE })
+    : await caches.match(req, { cacheName: CACHE, ignoreSearch: navigation });
   if (treffer) return treffer;
-  // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen
+  // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen, aber nur, solange der eigene Cache noch besteht
   const antwort = await fetch(req);
   if (antwort.status === 200 && antwort.type === 'basic') {
-    cache.put(req, antwort.clone()).catch(() => { /* Speicher voll o. ae.: egal */ });
+    const kopie = antwort.clone();
+    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, kopie))
+      .catch(() => { /* Speicher voll o. ae.: egal */ });
   }
   return antwort;
 }
