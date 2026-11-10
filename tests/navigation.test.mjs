@@ -222,9 +222,11 @@ async function testeLeiste(browser) {
   // ---------- R11 Pixel (10.11.2026): von Start in die Partie springt nichts ----------
   // Die Leiste wurde erst nach dem Zeichnen des neuen Screens weggenommen: die Partie rechnete ihr Brett im 88 px
   // kuerzeren Screen (iPhone 13 mit Leiste: 288 statt 376 px), danach wuchs alles nach (layout-shift 0,109).
-  gruppe = 'Wechsel ohne Sprung (Handy 390 x 664)';
-  {
-    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 664, handy: true });
+  // R13 CLS-2 (10.11.2026): derselbe Ruck am iPhone SE, live 287 gemessen 0,0899 (Coach, Spielerzeile und Knoepfe 72 px
+  // nach unten, Brett 296 -> 368 px); mit Safari-Leiste (375 x 548) 0,0102. Darum auch beide SE-Fenster.
+  for (const [w, h] of [[390, 664], [375, 667], [375, 548]]) {
+    gruppe = `Wechsel ohne Sprung (Handy ${w} x ${h})`;
+    const { kontext, seite, fehler } = await neueSeite(browser, { w, h, handy: true });
     await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
     await seite.waitForSelector('.heim-screen');
     await warte(600);
