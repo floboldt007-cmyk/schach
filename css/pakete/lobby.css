@@ -36,6 +36,7 @@
 .lb-spielen { gap: 14px; }
 .lb-spielen .ueberzeile + h2 { margin-top: -10px; }
 .lb-zeiten { display: flex; flex-direction: column; gap: 10px; }
+.lb-zeiten[hidden], .lb-ki-jetzt[hidden] { display: none; }
 .lb-gruppe { display: grid; grid-template-columns: 132px minmax(0, 1fr); align-items: center; gap: 10px; }
 .lb-gruppe-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14.5px; color: var(--text-2); }
 .lb-gruppe-name .ico { width: 18px; height: 18px; color: var(--akzent); }

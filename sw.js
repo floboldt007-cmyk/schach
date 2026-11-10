@@ -228,6 +228,7 @@ const DATEIEN = [
   'js/online.js',
   'js/freunde.js',
   'js/kronen.js',
+  'js/gegnersuche.js',
   'js/zaehler.js',
   'js/openings.js',
   'js/orte.js',
