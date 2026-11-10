@@ -69,12 +69,16 @@ export function standText(e) {
   return S('shop.beendet');
 }
 
-function anprobieren(e, aussehen) {
+// bereich: der Shop-Bereich (section.sa-bereich). Die Vorschau schliesst das Shop-Blatt (nur ein Blatt zugleich); danach
+// fuehrt "Schliessen" zurueck in den Shop: "Ich" oeffnet das Blatt auf das Ereignis sa:oeffne wieder (js/ui/ich.js).
+// Ist der Bereich nicht mehr im Dokument (Bildschirm verlassen), passiert nichts.
+function anprobieren(e, aussehen, bereich = null) {
   const vorschau = document.createElement('div');
   vorschau.className = 'sh-anprobe';
   vorschau.innerHTML = brettSvg(aussehen, 'sh-brett gross');
   sheet({ titel: produktName(e.produkt_id, e.name), text: S('shop.anprobeText'), inhalt: vorschau,
-    knoepfe: [{ text: t('allgemein.schliessen'), wert: true }], abbrechen: true }).catch(() => {});
+    knoepfe: [{ text: t('allgemein.schliessen'), wert: true }], abbrechen: true }).catch(() => {})
+    .then(() => { if (bereich && bereich.isConnected) bereich.dispatchEvent(new CustomEvent('sa:oeffne', { bubbles: true })); });
 }
 
 // Stueck ohne Konto: nur Aussehen und Name aus dem Katalog, ausgegraut
@@ -102,7 +106,7 @@ function karte(e) {
       <button type="button" class="knopf primaer sh-kaufen" disabled aria-disabled="true">${esc(S('shop.bald'))}</button></div>`;
   k.querySelector('.sh-name').textContent = produktName(e.produkt_id, e.name);
   k.querySelector('.sh-stand').textContent = standText(e);
-  k.querySelector('.sh-anprobieren').addEventListener('click', () => anprobieren(e, aussehen));
+  k.querySelector('.sh-anprobieren').addEventListener('click', () => anprobieren(e, aussehen, k.closest('.sa-bereich')));
   return k;
 }
 

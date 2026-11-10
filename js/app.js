@@ -757,6 +757,9 @@ async function zeigeScreen(name, params, hash) {
     zeigeReiter(null);
     return;
   }
+  // Leiste VOR dem Zeichnen: Sie bestimmt die Hoehe des Screens (html[data-reiter]). Danach gesetzt, rechnete die Partie
+  // ihr Brett im 88 px kuerzeren Screen und alles wuchs sichtbar nach (R11 Pixel 10.11.2026, iPhone 13: CLS 0,109)
+  zeigeReiter(name, params || {});
   try {
     aktuell.handle = modul.zeige(root, params || {}, app) || { verlasse() {} };
   } catch (e) {
@@ -768,7 +771,6 @@ async function zeigeScreen(name, params, hash) {
     return;
   }
   richteSprunglinkEin(root);
-  zeigeReiter(name, params || {});
   sende('app:screen', { name, params: params || {} });
 }
 

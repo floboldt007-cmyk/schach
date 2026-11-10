@@ -430,6 +430,12 @@ async function shopTeil(browser) {
   await p.s.locator('.sh-anprobieren').click();
   await p.s.waitForSelector('.sheet-karte .sh-brett.gross', { timeout: 5000 }).catch(() => {});
   pruefe('Shop: Anprobieren zeigt das Brett groß im Blatt', await p.s.locator('.sheet-karte .sh-brett.gross').count() === 1);
+  // R11 Pixel: Schliessen der Anprobe fuehrt zurueck in den Shop, nicht auf "Ich" (sheet() kennt nur ein Blatt zugleich)
+  await p.s.locator('.sheet-karte .sheet-knoepfe button').first().click();
+  await p.s.waitForSelector('.sh-anprobe', { state: 'detached', timeout: 5000 }).catch(() => {});
+  await p.s.waitForSelector('.sa-blatt .sh-karte', { timeout: 5000 }).catch(() => {});
+  pruefe('Shop: Schließen der Anprobe führt zurück in den Shop', await p.s.locator('.sa-blatt .sa-bereich[data-bereich="shop"] .sh-karte').count() === 1
+    && await p.s.locator('.sh-anprobe').count() === 0);
   pruefe('Shop angemeldet: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
 
