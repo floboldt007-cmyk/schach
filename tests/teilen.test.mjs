@@ -499,7 +499,11 @@ async function browserTeil(browser) {
   pruefe('navigator.share mit genau einer PNG-Datei (crownmate-sieg-<Tag>.png), Titel und Text ohne persoenliche Daten', geteilt.anzahl === 1 && geteilt.type === 'image/png'
     && /^crownmate-sieg-\d{4}-\d{2}-\d{2}\.png$/.test(geteilt.name) && geteilt.size > 20000 && geteilt.title === 'Crownmate' && geteilt.text === 'Sieg gegen Bauer Lukas',
   JSON.stringify({ ...geteilt, daten: undefined }));
-  const appUrl = await seite.evaluate(() => location.origin + '/');
+  // mit fester Markenadresse (MARKEN_ADRESSE) immer https://<Marke>/, sonst die Adresse dieser Seite
+  const appUrl = await seite.evaluate(async () => {
+    const fest = (await import('/js/pakete/teilen/logik.js')).MARKEN_ADRESSE.trim();
+    return fest ? `https://${fest}/` : location.origin + '/';
+  });
   pruefe('navigator.share mit Link zur App (zum Antippen im Messenger), dieselbe Adresse wie im Bild', geteilt.url === appUrl, `${geteilt.url} statt ${appUrl}`);
   await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 });
   const nachTeilen = await seite.evaluate(() => ({

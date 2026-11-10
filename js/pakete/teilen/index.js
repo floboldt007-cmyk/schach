@@ -26,7 +26,7 @@ import { segment, schalter, toast } from '../../ui/bauteile.js';
 import { anim, tempo } from '../../bewegung.js';
 import { sitzung, ladeProfil } from '../../konto.js';
 import { tagSchluessel } from '../../tag.js';
-import { teilbar, bildDaten, appAdresse, gueltigerName, RECHENSTAND } from './logik.js';
+import { teilbar, bildDaten, appAdresse, gueltigerName, RECHENSTAND, MARKEN_ADRESSE } from './logik.js';
 import { rendere, alsDatei } from './bild.js';
 import { t } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
@@ -124,12 +124,14 @@ function teileDatei(datei, titel) {
   speichereDatei(datei);
   return Promise.resolve('datei');
 }
-// Adresse wie im Bild (appAdresse), mit Protokoll; leer in einer App-Huelle ohne Web-Adresse
+// Adresse wie im Bild (appAdresse), mit Protokoll; leer in einer App-Huelle ohne Web-Adresse. Eine feste Markenadresse
+// (MARKEN_ADRESSE) ist immer https, nur die Adresse der Seite selbst behaelt deren Protokoll (lokal http)
 function appLink() {
   const ort = globalThis.location;
   const adresse = appAdresse(ort && ort.href);
   if (!adresse) return '';
-  return (ort && ort.protocol === 'http:' ? 'http:' : 'https:') + '//' + adresse + '/';
+  const fest = typeof MARKEN_ADRESSE === 'string' && MARKEN_ADRESSE.trim() !== '';
+  return (!fest && ort && ort.protocol === 'http:' ? 'http:' : 'https:') + '//' + adresse + '/';
 }
 
 // ---------- Blatt mit Vorschau ----------
