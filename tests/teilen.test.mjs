@@ -138,8 +138,9 @@ async function nodeTeil() {
   pruefe('App-Huelle (capacitor://localhost, https://localhost) und Dateien: keine Adresse statt einer nutzlosen',
     L.adresseAus('capacitor://localhost/index.html#arena') === '' && L.adresseAus('https://localhost/index.html') === '' && L.adresseAus('http://localhost:8000/') === ''
     && L.adresseAus('file:///C:/Spiele/schach/index.html') === '');
-  pruefe('appAdresse: ohne feste Markenadresse die Adresse der Seite (eine Stelle zum Umstellen: MARKEN_ADRESSE)', L.MARKEN_ADRESSE === ''
-    && L.appAdresse('https://floboldt007-cmyk.github.io/schach/') === L.adresseAus('https://floboldt007-cmyk.github.io/schach/') && L.appAdresse('capacitor://localhost/') === '');
+  const marke = ['https://floboldt007-cmyk.github.io/schach/', 'https://crownmate.de/#arena', 'http://127.0.0.1:9700/', 'capacitor://localhost/'].map(L.appAdresse);
+  pruefe('appAdresse: feste Markenadresse crownmate.de ueberall, auch auf github.io und in der App-Huelle (eine Stelle: MARKEN_ADRESSE)',
+    L.MARKEN_ADRESSE === 'crownmate.de' && marke.every((a) => a === 'crownmate.de'), marke);
   pruefe('Benutzername nur wie im Konto (3 bis 20 Zeichen A-Z, 0-9, _), keine E-Mail, kein Klarname mit Leerzeichen',
     L.gueltigerName('FloTest') === 'FloTest' && L.gueltigerName('flo@example.org') === null && L.gueltigerName('Max Mustermann') === null && L.gueltigerName('ab') === null && L.gueltigerName(42) === null);
 
@@ -428,7 +429,7 @@ async function browserTeil(browser) {
     && !nah(p1.h5, [...fh, 255], 6), JSON.stringify({ h5: p1.h5, h5Soll, f7: p1.f7, f7Soll }));
   pruefe('Texte im Bild: Sieg, "gegen Bauer Lukas", Schachmatt im 4. Zug, Genauigkeit, Datum, crownmate, Adresse', z1.texte.includes('Sieg') && z1.texte.includes('gegen Bauer Lukas')
     && z1.texte.includes('SCHACHMATT IM 4. ZUG') && z1.texte.some((t) => /^\d{1,3},\d %$/.test(t)) && z1.texte.some((t) => /^\d\d\.\d\d\.\d{4}$/.test(t))
-    && z1.texte.includes('crownmate') && z1.texte.includes(`127.0.0.1:${PORT}`), z1.texte.join(' | '));
+    && z1.texte.includes('crownmate') && z1.texte.includes((await import('../js/pakete/teilen/logik.js')).MARKEN_ADRESSE || `127.0.0.1:${PORT}`), z1.texte.join(' | '));
   pruefe('Figuren als Bilder gezeichnet (keine Ersatz-Buchstaben)', !z1.texte.includes('D') && !z1.texte.includes('T'), z1.texte.join(' | '));
   const blatt = await seite.evaluate(() => {
     const b = document.querySelector('.tl-blatt');

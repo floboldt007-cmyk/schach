@@ -2564,8 +2564,8 @@ Paket haengt sein CSS selbst als `link[data-paket="teilen"]` ein). Test: `tests/
   „gegen <Bot>“, optional „Gespielt von <Benutzername>“, Portraet (`thema.avatarVon`) auf der Bot-Toenung, Endstellung im
   Sockel (Feldfarben und `--zuletzt` aus Flos Brettfarbe, Figuren aus dem Figuren-Pfad des Themes, Brett gedreht bei
   Schwarz, Koordinaten ueber den Figuren), Werte rechts: Sterne (nur wertender Sieg), Genauigkeit (nur wenn bekannt),
-  Zuege; Fuss „crownmate“ und die Adresse der App (`appAdresse(location.href)`: `MARKEN_ADRESSE` in `logik.js`, solange
-  leer die Adresse der Seite; in einer App-Huelle wie `capacitor://localhost`, `https://localhost` oder `file:` keine).
+  Zuege; Fuss „crownmate“ und die Adresse der App (`appAdresse(location.href)`: `MARKEN_ADRESSE` in `logik.js`, seit 10.11.2026 `crownmate.de`, auch in der App-Huelle; leer waere es
+  die Adresse der Seite, in einer App-Huelle wie `capacitor://localhost`, `https://localhost` oder `file:` keine).
   Sperrt ein Browser die Leinwand wegen der SVG-Bilder (`toBlob` wirft), entsteht das Bild neu ohne Figurenbilder
   (Kreis mit Buchstabe); in WebKitGTK 2.52 und Chromium sperrt nichts. Farben: `themaTokens()` liest die Theme-Regeln des gewuenschten Modus aus
   dem CSSOM, ohne den Modus der App umzuschalten. Im Bild steht nur, was `bildDaten()` liefert (`FELDER`).
