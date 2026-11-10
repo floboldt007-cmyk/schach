@@ -6,12 +6,13 @@
 //     Gruppe dieser Woche, ziel = Kronen auf Platz 5; ohne Gruppe platz und ziel null; ohne Konto ein Fehler)
 //   holeGruppe() -> Promise<{ woche, ende, stufe, gruppe, platz, n, mitglieder, belohnung, offen }>   (liga_meine_gruppe)
 //   angemeldet() -> boolean                                                 Sitzung vorhanden (ohne Konto keine Suche)
-//   suche(zeit, { warteMs, alleMs, beiTreffer, beiBot, beiFehler }) -> { stopp() }
-//     zeit wie '3+2'. Fragt alle alleMs, ob gepaart; ein Treffer ruft beiTreffer(partieId). Nach warteMs ohne Treffer
-//     endet die Suche beim Server mit Beleg (online_suche_ende(true)) und ruft beiBot({ kiRef }) (kiRef null, wenn
+//   suche(zeit, { warteMs, alleMs, beiTreffer, beiBot, beiFehler, beiLage }) -> { stopp(), jetztKi(), lage() }
+//     zeit wie '5+3' (RANKED_ZEIT). Ablauf in js/gegnersuche.js: fragt alle alleMs, ob gepaart; ein Treffer ruft
+//     beiTreffer(partieId). Nach der Wartezeit des Servers (warte_s, neues SQL 30 s; ohne das Feld 10 s) oder mit
+//     jetztKi() ab ki_ab_s endet die Suche mit online_suche_ende(true) und ruft beiBot({ kiRef }) (kiRef null, wenn
 //     der Server keinen Beleg gab: dann spielt man ohne Kronen). Nach einem Treffer nie mehr beiBot. stopp() bricht ab
-//     (genau ein online_suche_ende). beiFehler(e), wenn der Start scheitert (offline, abgemeldet).
-//   BOT_ERSATZ_MS = 10000
+//     (genau ein online_suche_ende). beiFehler(e), wenn der Start scheitert (offline, abgemeldet). warteMs nur im Test.
+//   BOT_ERSATZ_MS = 10000, RANKED_ZEIT = { id: '5+3', grund: 300, zuschlag: 3 }
 //   meldeBotErgebnis({ partieId, ergebnis, botElo }) -> Promise<{ delta, kronen, stufe } | null>   (Task 5, Bot-Leiter)
 //   meldeKiErgebnis({ kiRef, ergebnis }) -> Promise<{ delta, kronen, stufe } | null>             (Task 5, KI-Gegner)
 //     ergebnis 'sieg' | 'remis' | 'niederlage'. Ohne Konto, offline oder bei einer Absage des Servers (Grenze, Beleg,
@@ -19,12 +20,15 @@
 //   setzeStartLiga() -> Promise<void>   (Task 6) meldet die lokale Liga-Elo einmal je Konto und Geraet an kronen_start;
 //     Merker startGemeldet im Modul kronen. Ohne Konto, ohne gewertete Partie oder offline nichts (dann beim naechsten Mal).
 import { rpc } from './online.js';
+import { gegnersuche } from './gegnersuche.js';
 import { sitzung } from './konto.js';
 import { ladeModul, speichereModul } from './storage.js';
 import { normalisiereStand } from './pakete/liga/wertung.js';
 import { kronenSpeicher } from './pakete/liga/kronen.js';
 
-export const BOT_ERSATZ_MS = 10000; // entschieden 06.11.2026: nach 10 s ohne Mensch ein KI-Gegner
+export const BOT_ERSATZ_MS = 10000; // entschieden 06.11.2026: nach 10 s ohne Mensch ein KI-Gegner (gilt mit altem SQL)
+// Ranked Online hat eine feste Bedenkzeit (Konzept "Zwei Ligen", ranked_zeit); der Server nennt sie auch in der Antwort
+export const RANKED_ZEIT = Object.freeze({ id: '5+3', art: 'blitz', grund: 300, zuschlag: 3 });
 
 export const angemeldet = () => !!sitzung()?.access_token;
 
@@ -73,47 +77,12 @@ async function startEinmal() {
 
 const partieVon = (d) => (d && typeof d === 'object' && typeof d.partie === 'string' ? d.partie : null);
 
-export function suche(zeit, { warteMs = BOT_ERSATZ_MS, alleMs = 1000, beiTreffer = () => {}, beiBot = () => {}, beiFehler = () => {} } = {}) {
-  let aus = false;
-  let abfrage = null;
-  const uhren = new Set();
-  const spaeter = (fn, ms) => { const u = setTimeout(() => { uhren.delete(u); fn(); }, ms); uhren.add(u); };
-  const ende = () => { aus = true; for (const u of uhren) clearTimeout(u); uhren.clear(); };
-  const treffer = (p) => { if (aus) return; ende(); beiTreffer(p); };
-
-  function frage() {
-    if (aus || abfrage) return;
-    abfrage = rpc('online_suche_stand', {}).then((d) => { const p = partieVon(d); if (p) treffer(p); }, () => {})
-      .finally(() => { abfrage = null; if (!aus) spaeter(frage, alleMs); });
-  }
-
-  rpc('online_suche_start', { zeit }).then((d) => {
-    const p = partieVon(d);
-    if (p) { treffer(p); return; }
-    if (!aus) spaeter(frage, alleMs);
-  }, (e) => { if (aus) return; ende(); beiFehler(e); });
-
-  spaeter(async () => {
-    if (aus) return;
-    ende();
-    let kiRef = null;
-    try {
-      const d = await rpc('online_suche_ende', { ki: true });
-      kiRef = d && typeof d.ki_ref === 'string' ? d.ki_ref : null;
-      // kein Beleg: vielleicht kam die Paarung gerade noch an (dann zur Partie, nie zum Bot)
-      if (!kiRef) {
-        const p = partieVon(await rpc('online_suche_stand', {}).catch(() => null));
-        if (p) { beiTreffer(p); return; }
-      }
-    } catch (e) { /* offline: Bot ohne Beleg, also ohne Kronen */ }
-    beiBot({ kiRef });
-  }, warteMs);
-
-  return {
-    stopp() {
-      if (aus) return;
-      ende();
-      rpc('online_suche_ende', { ki: false }).catch(() => {});
-    },
-  };
+export function suche(zeit, { warteMs, alleMs = 1000, beiTreffer = () => {}, beiBot = () => {}, beiFehler = () => {}, beiLage } = {}) {
+  return gegnersuche({
+    rufe: rpc, namen: { start: 'online_suche_start', stand: 'online_suche_stand', ende: 'online_suche_ende' },
+    startDaten: { zeit }, idVon: partieVon, belegVon: (d) => (d && typeof d.ki_ref === 'string' ? d.ki_ref : null),
+    warteMs, alleMs, beiTreffer, beiFehler, beiLage,
+    // offline oder ohne Beleg: KI ohne Kronen
+    beiKi: ({ beleg }) => beiBot({ kiRef: beleg }),
+  });
 }

@@ -1083,6 +1083,13 @@ export function zeige(root, params, app) {
       erklaerung: String(erklaerung || '').trim(),
     });
   }
+  // Punkt 34 (Barrierefreiheit 09.11.): auch der Zug des Bots kommt in die Live-Region ("Benno zieht 1… e5. Schach."),
+  // sonst erfaehrt man ohne Bild nicht, was der Gegner gezogen hat
+  function sageBotZugAn(ply) {
+    if (!zugansageEl) return;
+    const zusatz = z.chess.isCheckmate() ? t('partie.ansage.matt') : z.chess.inCheck() ? t('partie.ansage.schach') : '';
+    zugansageEl.textContent = t('partie.ansage.bot', { name: rufnameVon(bot), zug: zugLabel(ply) }) + zusatz;
+  }
 
   function zeigeIdee(ply) {
     const e = z.live[ply];
@@ -1626,6 +1633,7 @@ export function zeige(root, params, app) {
     sendeZug(ply, m, 'bot');
     spieleKlang(m, brett.gleitDauer(), ply);
     melde({ typ: 'zug', wer: 'bot', uci: m.lan, ply });
+    sageBotZugAn(ply);
     const paar = ply - 1;
     if (m.captured) zeigeBlase('schlagen', paar, { prio: 50 });
     else if (z.chess.inCheck()) zeigeBlase('schach', paar, { prio: 50 });

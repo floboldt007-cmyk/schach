@@ -21,17 +21,12 @@ import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
 import { fremdeKarte, bannerUrl } from './visitenkarte.js';
 import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
-import { holeStand, suche as kronenSuche, BOT_ERSATZ_MS } from '../kronen.js';
+import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
 import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
+import { hoere } from '../ereignisse.js';
 
-// Bedenkzeiten der Gegnersuche (dieselben Kennungen wie die Lobby, js/pakete/lobby/index.js ZEITEN)
-const SUCH_ZEITEN = Object.freeze([
-  { id: '3+2', art: 'blitz', grund: 180, zuschlag: 2 },
-  { id: '10+0', art: 'schnell', grund: 600, zuschlag: 0 },
-  { id: '15+10', art: 'lang', grund: 900, zuschlag: 10 },
-]);
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -164,19 +159,21 @@ export function zeige(root, params, app) {
     }
     const code = online.gemerkteEinladung() || '';
     // Gegnersuche fuer die Liga (dieselbe Suche wie die Lobby, js/kronen.js): erst zeigen, wenn der Server die Liga kennt
-    // (kronen_mein_stand antwortet); sonst ein ruhiger Hinweis "kommt bald", kein Fehler
+    // (kronen_mein_stand antwortet); sonst ein ruhiger Hinweis "kommt bald", kein Fehler.
+    // Kein Springen beim Laden (G-005 AC-06): Liga-Streifen, feste Bedenkzeit und Suchknopf stehen schon waehrend der Pruefung
+    // in voller Hoehe da, Streifen als leerer Platzhalter, Knopf gesperrt; "kommt bald" blendet den Platzhalter aus
     inhalt.innerHTML = `${kopfHtml}
-      <button class="on-liga dr" type="button" data-online="liga" hidden></button>
+      <button class="on-liga dr" type="button" data-online="liga" data-laedt disabled aria-hidden="true"><span class="on-liga-schild">${icon('liga')}</span>
+        <span class="on-liga-text"><b></b><span></span></span></button>
       <div class="on-tueren" data-zustand="konto">
-      ${tuer('partie', `<p class="on-suche-text">${esc(O('suche.pruefen'))}</p>
-        <div class="segment on-zeiten" role="radiogroup" aria-label="${esc(O('bedenkzeit'))}" hidden>${SUCH_ZEITEN.map((z, i) =>
-          `<button class="seg" type="button" role="radio" data-zeit="${z.id}" aria-checked="${i === 0}">${esc(z.id.replace('+', ' + '))}<small>${esc(O('zeit.' + z.art))}</small></button>`).join('')}</div>
-        <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="suchen" hidden>${esc(O('tuer.partie.knopf'))}</button>
+      ${tuer('partie', `<p class="on-suche-text" hidden>${esc(O('suche.pruefen'))}</p>
+        <p class="on-zeit-fest">${esc(O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) }))}</p>
+        <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="suchen" disabled>${esc(O('tuer.partie.knopf'))}</button>
         <div class="on-suche" hidden>
           <div class="on-ring" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="on-ring-spur" cx="50" cy="50" r="44"/>
             <circle class="on-ring-rest" cx="50" cy="50" r="44" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="0"/></svg>
             <span class="on-ring-ich">${floAvatar('w')}</span></div>
-          <h3>${esc(O('suche.ring'))}</h3><p class="on-rest" role="status"></p>
+          <h3>${esc(O('suche.ring'))} <span class="on-uhr zahl" aria-hidden="true">0:00</span></h3><p class="on-rest" role="status"></p>
           <button class="knopf primaer dr" type="button" data-online="ki-jetzt">${esc(O('suche.kiJetzt'))}</button>
           <small class="on-ki-hinweis">${esc(O('suche.kiHinweis'))}</small>
           <button class="knopf dr" type="button" data-online="suche-stopp">${esc(O('suche.abbrechen'))}</button>
@@ -199,30 +196,44 @@ export function zeige(root, params, app) {
     pruefeSuche();
   }
   const sucheKarte = () => inhalt.querySelector('.on-art[data-art="partie"]');
-  let restUhr = null, suchStart = 0, suchDauer = BOT_ERSATZ_MS;
+  let restUhr = null;
   function sucheZustand(zustand, text) {
     const k = sucheKarte(); if (!k || weg) return;
     k.dataset.zustand = zustand;
     const zeile = k.querySelector('.on-suche-text');
     zeile.textContent = text; zeile.hidden = zustand === 'bereit' || zustand === 'sucht';
     k.querySelector('.on-tuer-kopf').hidden = zustand === 'sucht';
-    k.querySelector('.on-zeiten').hidden = zustand !== 'bereit';
+    k.querySelector('.on-zeit-fest').hidden = zustand !== 'bereit';
     k.querySelector('[data-online="suchen"]').hidden = zustand !== 'bereit';
+    k.querySelector('[data-online="suchen"]').disabled = zustand !== 'bereit';
+    if (zustand === 'bald') { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) l.hidden = true; }
     k.querySelector('.on-suche').hidden = zustand !== 'sucht';
     if (zustand !== 'sucht') { clearInterval(restUhr); restUhr = null; }
   }
-  // Restzeit bis zum KI-Gegner als Ring und Satz (Konzept 3 A); die Uhr selbst fuehrt js/kronen.js
+  // Restzeit bis zum KI-Gegner als Ring und Satz (Konzept 3 A), dazu die Suchdauer "0:12"; Wartezeit und Beginn nennt
+  // der Server (js/gegnersuche.js, ohne neues SQL 10 s). Ab ki_ab_s zaehlt "Jetzt gegen KI" fuer die Liga.
   function zeigeRest() {
-    const k = sucheKarte(); if (!k || weg) return;
-    const rest = Math.max(0, suchDauer - (Date.now() - suchStart));
+    const k = sucheKarte(); if (!k || weg || !suche) return;
+    const l = suche.lage();
+    const rest = Math.max(0, l.warteMs - l.vergangenMs);
+    const sek = Math.floor(l.vergangenMs / 1000);
+    k.querySelector('.on-uhr').textContent = `${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, '0')}`;
     k.querySelector('.on-rest').textContent = O('suche.rest', { s: Math.ceil(rest / 1000) });
-    k.querySelector('.on-ring-rest').setAttribute('stroke-dashoffset', (RING * (1 - rest / suchDauer)).toFixed(2));
+    k.querySelector('.on-ring-rest').setAttribute('stroke-dashoffset', (RING * (1 - rest / l.warteMs)).toFixed(2));
+    const gewertet = l.vergangenMs >= l.kiAbMs;
+    const hinweis = k.querySelector('.on-ki-hinweis');
+    if (hinweis.dataset.gewertet !== String(gewertet)) {
+      hinweis.dataset.gewertet = String(gewertet);
+      hinweis.textContent = O(gewertet ? 'suche.kiGewertet' : 'suche.kiHinweis');
+    }
   }
   // Liga-Streifen: Stufe, Platz in der Wochen-Gruppe und Kronen (kronen_mein_stand); unbrauchbare Antwort: kein Streifen
   function zeigeLiga(d) {
     const st = Array.isArray(d) ? d[0] : d;
     const el = inhalt.querySelector('.on-liga');
-    if (!el || !st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) return;
+    if (!el) return;
+    if (!st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) { el.hidden = true; return; }
+    delete el.dataset.laedt; el.disabled = false; el.removeAttribute('aria-hidden');
     const stufe = stufenName(Math.min(17, Math.max(0, Math.trunc(Number(st.stufe)) || 0)));
     const n = Number.isInteger(st.n) && st.n > 0 ? st.n : 30;
     const zeile = Number.isInteger(st.platz) && st.platz > 0 ? O('liga.platz', { platz: st.platz, n }) : O('liga.ohneGruppe');
@@ -236,33 +247,42 @@ export function zeige(root, params, app) {
     try { const d = await holeStand(); if (weg) return; zeigeLiga(d); sucheZustand('bereit', O('suche.erklaert')); }
     catch (e) { sucheZustand('bald', O('suche.bald')); }
   }
-  const gewaehlteZeit = () => SUCH_ZEITEN.find(z => z.id === sucheKarte()?.querySelector('.on-zeiten [aria-checked="true"]')?.dataset.zeit) || SUCH_ZEITEN[0];
   async function botFuerMich() {
     try { const l = await import('../pakete/lobby/index.js'); return l.passenderBot(l.schaetzeWertung()); } catch (e) { return null; }
   }
   function starteSuche() {
     const k = sucheKarte(); if (!k || suche) return;
-    const zeit = gewaehlteZeit();
-    const tempoWahl = { grund: zeit.grund, zuschlag: zeit.zuschlag };
-    const warteMs = typeof window !== 'undefined' && Number.isFinite(window.__onlineBotMs) ? window.__onlineBotMs : BOT_ERSATZ_MS;
-    suchStart = Date.now(); suchDauer = Math.max(1, warteMs);
+    // Ranked hat eine feste Bedenkzeit (RANKED_ZEIT); die Wartezeit nennt der Server, __onlineBotMs nur im Test
+    const warteMs = typeof window !== 'undefined' && Number.isFinite(window.__onlineBotMs) ? window.__onlineBotMs : undefined;
     sucheZustand('sucht', O('suche.laeuft'));
-    zeigeRest(); restUhr = setInterval(zeigeRest, 250);
+    k.querySelector('.on-ki-hinweis').removeAttribute('data-gewertet');
     k.querySelector('[data-online="ki-jetzt"]').focus();
-    suche = kronenSuche(zeit.id, {
+    suche = kronenSuche(RANKED_ZEIT.id, {
       warteMs,
       beiTreffer: (partieId) => { suche = null; if (!weg) { ton('start'); app.gehe('online', { partieId }); } },
-      // nach 10 s ohne Menschen ein KI-Gegner in passender Staerke, wie in der Lobby (dort steht die Wahl des Bots)
+      // nach der Wartezeit des Servers (oder Jetzt gegen KI) ein KI-Gegner in passender Staerke, wie in der Lobby (dort steht die Wahl des Bots)
       beiBot: async ({ kiRef }) => {
         suche = null;
+        clearInterval(restUhr); restUhr = null;
         if (weg) return;
         const bot = await botFuerMich();
         if (weg) return;
         if (!bot) { sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); return; }
-        app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl, ki: true, ...(kiRef ? { kiRef } : {}) });
+        // gewertet mit Beleg und neuem SQL (#213: Vorab-Niederlage, ein offener Beleg): Verlassen zaehlt als Niederlage.
+        // Mit altem SQL stimmt der Satz nicht, dort kein Hinweis.
+        // erst wenn die Partie steht: der Seitenwechsel leert die Meldungen (js/app.js zeigeScreen)
+        if (kiRef && lage().vomServer) { const ab = hoere('app:screen', (d) => { if (d.name !== 'partie') return; ab(); app.meldung(O('suche.kiVerlassen'), { dauer: 4500 }); }); }
+        app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl(lage), ki: true, ...(kiRef ? { kiRef } : {}) });
       },
       beiFehler: (e) => { suche = null; sucheZustand('bereit', O('suche.erklaert')); melde(e?.message || O('fehler')); },
     });
+    const lage = suche.lage;
+    zeigeRest(); restUhr = setInterval(zeigeRest, 250);
+  }
+  // Uhr der KI-Partie: die Zeit, die der Server nennt (ranked_zeit), sonst die feste der App
+  function tempoWahl(lage) {
+    const z = /^(\d{1,3})\+(\d{1,2})$/.exec(lage?.().zeit || RANKED_ZEIT.id);
+    return { grund: Number(z[1]) * 60, zuschlag: Number(z[2]) };
   }
   function stoppeSuche() {
     if (!suche) return;
@@ -270,16 +290,19 @@ export function zeige(root, params, app) {
     suche = null;
     sucheZustand('bereit', O('suche.erklaert'));
   }
-  // "Gleich gegen die KI" (Konzept 3 A, ohne Server): Suche beenden und eine Uebungspartie gegen den passenden Bot mit
-  // derselben Uhr starten. Uebung wertet nie (storage.wertet), also keine Kronen und kein Liga-Punkt, wie der Knopf sagt.
+  // "Jetzt gegen KI": ab ki_ab_s beendet der Server die Suche mit Beleg (gewertet, weiter in beiBot). Davor wie bisher
+  // (Konzept 3 A, ohne Server): Suche beenden und eine Uebungspartie gegen den passenden Bot mit derselben Uhr. Uebung
+  // wertet nie (storage.wertet), also keine Kronen und kein Liga-Punkt, wie der Hinweis sagt.
   async function kiJetzt() {
-    if (!suche) return;
-    const zeit = gewaehlteZeit();
+    // laeuft der Wechsel zur KI schon (Uhr oder erster Druck), nichts doppelt starten
+    if (!suche || !suche.lage().laeuft) return;
+    if (suche.jetztKi()) { clearInterval(restUhr); restUhr = null; return; }
+    const tempo = tempoWahl(suche.lage);
     stoppeSuche();
     const bot = await botFuerMich();
     if (weg) return;
     if (!bot) { melde(O('fehler')); return; }
-    app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: { grund: zeit.grund, zuschlag: zeit.zuschlag }, modus: 'uebung' });
+    app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo, modus: 'uebung' });
   }
   async function ladeListe() {
     await aktion(() => online.meinePartien({ beendete: true }), liste => {

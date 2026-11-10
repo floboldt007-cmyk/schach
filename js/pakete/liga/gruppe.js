@@ -197,6 +197,34 @@ function liste(lg) {
   }).join('');
 }
 
+// Zwei Ligen (G-005, Schach-App/Konzept Zwei Ligen.md Abschnitt 4): liga_gruppe('online') und liga_gruppe('raetsel').
+// Ohne das neue SQL (Funktion fehlt, Fehler oder unbrauchbare Antwort) wie bisher liga_meine_gruppe, nur ein Reiter.
+// Fehlt nur die Raetsel-Liga, bleibt es ebenfalls bei einem Reiter. Ergebnis { online, raetsel? } aus gruppeLage.
+export async function ladeLigen({ rpc, holeGruppe }) {
+  const lies = (liga) => rpc('liga_gruppe', { liga }).then((d) => gruppeLage(Array.isArray(d) ? d[0] : d), () => null);
+  const [online, raetsel] = await Promise.all([lies('online'), lies('raetsel')]);
+  if (online) return raetsel ? { online, raetsel } : { online };
+  const lg = gruppeLage(await holeGruppe().then((d) => (Array.isArray(d) ? d[0] : d)));
+  if (!lg) throw new Error('Gruppe unbrauchbar');
+  return { online: lg };
+}
+
+// Leiste ueber der Buehne: je Liga Wappen, Name und der eigene Platz (oder "noch keine Gruppe")
+const LIGEN_ARTEN = ['online', 'raetsel'];
+function ligenLeiste(ligen, gewaehlt) {
+  return `<div class="lg-ligen" role="tablist" aria-label="${esc(T('ligen'))}">${LIGEN_ARTEN.map((a) => {
+    const lg = ligen[a], an = a === gewaehlt;
+    const zone = lg.platz ? zoneVon(lg.platz, { n: lg.n, stufe: lg.stufe }) : null;
+    return `<button class="lg-liga" type="button" role="tab" id="lg-liga-${a}" data-liga="${a}" aria-selected="${an}"
+      aria-controls="lg-ligen-feld" tabindex="${an ? 0 : -1}"${zone ? ` data-zone="${zone}"` : ''}>
+      <img src="${esc(wappenUrl(lg.stufe))}" alt="" width="28" height="34">
+      <span class="lg-liga-text"><b>${esc(T('liga.' + a))}</b><small>${lg.platz ? `${zone === 'auf' ? HOCH : ''}${esc(T('liga.platz', { platz: zahl(lg.platz) }))}`
+        : esc(T('liga.ohne'))}</small></span>
+    </button>`;
+  }).join('')}</div>`;
+}
+let gewaehlt = 'online';
+
 export function reiterGruppe({ app } = {}) {
   const s = huelleGruppe();
   s.hidden = false;
@@ -211,22 +239,42 @@ export function reiterGruppe({ app } = {}) {
   const regeln = () => {
     const w = kronenRegelWerte();
     return `<details class="lg-gr-regeln"><summary>${esc(T('regeln.titel'))}</summary>
-      <p>${esc(T('regeln.kronen', w))}</p><p>${esc(T('regeln.woche', w))}</p><p>${esc(T('keine'))}</p></details>`;
+      ${ligen?.raetsel ? `<p>${esc(T('regeln.zwei'))}</p>` : ''}<p>${esc(T('regeln.kronen', w))}</p><p>${esc(T('regeln.woche', w))}</p><p>${esc(T('keine'))}</p></details>`;
   };
   function zeichne(lg) {
     lage = lg;
     const ende = endeText(lg);
-    s.innerHTML = `${buehne(lg)}
+    const zwei = !!ligen?.raetsel;
+    const inhalt = `${buehne(lg)}
       ${ende ? `<p class="lg-gr-ende">${esc(ende)}</p>` : ''}
       ${lg.offen ? `<p class="lg-gr-offen">${esc(lg.offen === 1 ? T('offenEins') : T('offen', { n: zahl(lg.offen) }))}</p>` : ''}
       ${lg.botKiVoll ? `<p class="lg-gr-botvoll">${esc(T('botVoll'))}</p>` : ''}
-      ${lg.gruppe != null && lg.mitglieder.length ? `<div class="lg-gr-liste">${liste(lg)}</div>` : ''}
+      ${lg.gruppe != null && lg.mitglieder.length ? `<div class="lg-gr-liste">${liste(lg)}</div>`
+        : lg.gruppe == null && zwei && gewaehlt === 'raetsel' ? `<p class="lg-gr-leer">${esc(T('leerRaetsel'))}</p>` : ''}
       ${regeln()}`;
+    // Zwei Ligen: die Leiste "Online | Raetsel" ueber der Buehne, darunter die gewaehlte Liga als Tab-Feld
+    s.innerHTML = zwei ? `${ligenLeiste(ligen, gewaehlt)}<div class="lg-ligen-feld" role="tabpanel" id="lg-ligen-feld"
+      aria-labelledby="lg-liga-${gewaehlt}">${inhalt}</div>` : inhalt;
     s.dataset.zustand = lg.gruppe != null ? 'gruppe' : 'leer';
+    if (zwei) s.dataset.liga = gewaehlt; else delete s.dataset.liga;
   }
+  const waehle = (liga, fokus) => {
+    if (!ligen?.[liga] || liga === gewaehlt) return;
+    gewaehlt = liga;
+    zeichne(ligen[liga]);
+    if (fokus) s.querySelector(`.lg-liga[data-liga="${liga}"]`)?.focus();
+  };
 
-  let lage = null;
+  let lage = null, ligen = null;
+  // Pfeiltasten in der Leiste (Tab-Muster): links/rechts wechseln die Liga
+  s.addEventListener('keydown', (e) => {
+    if (!e.target.closest('.lg-liga') || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    e.preventDefault();
+    waehle(gewaehlt === 'online' ? 'raetsel' : 'online', true);
+  });
   s.addEventListener('click', (e) => {
+    const liga = e.target.closest('.lg-liga');
+    if (liga) { waehle(liga.dataset.liga, false); return; }
     const wer = e.target.closest('.lg-gr-wer');
     if (wer && lage) {
       const platz = Number(wer.closest('.lg-gr-zeile').dataset.platz);
@@ -261,11 +309,11 @@ export function reiterGruppe({ app } = {}) {
       s.dataset.zustand = 'ohne-konto';
       return;
     }
-    return k.holeGruppe().then((d) => {
+    return import('../../online.js').then((o) => ladeLigen({ rpc: o.rpc, holeGruppe: k.holeGruppe })).then((l) => {
       if (weg) return;
-      const lg = gruppeLage(Array.isArray(d) ? d[0] : d);
-      if (!lg) throw new Error('Gruppe unbrauchbar');
-      zeichne(lg);
+      ligen = l;
+      if (!ligen[gewaehlt]) gewaehlt = 'online';
+      zeichne(ligen[gewaehlt]);
     });
   }).catch(() => {
     if (weg) return;

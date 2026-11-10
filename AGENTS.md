@@ -23,6 +23,12 @@ Codex ist der unabhängige Prüfer. Die beiden prüfen sich gegenseitig, damit F
 - Claude Code arbeitet auf Zweigen `claude/*` und merged nach `main`, wenn alle Tests grün sind.
 - Codex pusht nie auf `claude/*` und nie auf `main`. Eigene Änderungen kommen auf einen Zweig `codex/*` mit
   Pull Request. Claude prüft ihn, bevor er gemergt wird.
+- Nur eine Sitzung stellt live. Läuft ein Feinschliff-Zweig `feinschliff-*` mit Commits von heute, führt allein
+  dessen Hauptsitzung am PC Zweige zusammen und schiebt nach `main` und `stabil`. Alle anderen (Codex,
+  Cloud-Sitzungen, zweite Fenster) öffnen nur einen Pull Request gegen diesen Zweig und melden, wenn er grün ist.
+- `stabil` und `main` bewegen sich nur vorwärts, nie per Force-Push.
+- Eigene Commits erkennbar zeichnen: Codex als Autor `Codex`, Cloud-Sitzungen als `Claude Cloud`, die PC-Sitzung
+  als `Claude`. So sieht man in der Historie, wer was gemacht hat.
 - Ein Befund braucht einen Beleg: Datei und Zeile, dazu ein Weg, wie man den Fehler nachstellt. Vermutungen als
   solche kennzeichnen.
 - Sprache: Deutsch, Commit-Nachrichten auf Deutsch.

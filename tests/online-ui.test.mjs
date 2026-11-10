@@ -31,6 +31,10 @@ let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehn
 let strittigAntwort = null;
 // Handy-Runde 08.11.: kennt der Server die Liga (kronen_mein_stand)? Ohne sie zeigt Online "kommt bald" statt der Suche
 let ligaDa = false;
+let neuesSql = null; // { seit }: die Attrappe antwortet wie das neue SQL (Konzept "Zwei Ligen")
+let altBeleg = false; // altes SQL, das nach der Wartezeit einen KI-Beleg gibt (Gegenprobe zum Hinweis "Verlassen")
+// G-005 AC-06: kronen_mein_stand antwortet so viele ms spaeter (wie im Handy-Netz), damit ein Springen beim Laden messbar wird
+let ligaVerzug = 0;
 const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
 const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234' } = {}) {
@@ -68,8 +72,11 @@ try {
       return antwort(p && (!seit || p.aktualisiert_am > seit) ? [p] : []);
     }
     const rpc = url.pathname.split('/').at(-1), p = partien.get(body.partie);
-    // Gegnersuche (js/kronen.js): niemand da, die Suche wartet; "Gleich gegen die KI" beendet sie mit ki false
-    if (rpc === 'online_suche_start' || rpc === 'online_suche_stand' || rpc === 'online_suche_ende') return antwort({});
+    // Gegnersuche (js/kronen.js): niemand da, die Suche wartet. Altes SQL antwortet ohne Wartezeit (dann 10 s wie bisher),
+    // neues SQL (Konzept "Zwei Ligen") mit seit, warte_s, ki_ab_s und zeit; ende(true) gibt dort ab ki_ab_s einen Beleg
+    if (rpc === 'online_suche_start' || rpc === 'online_suche_stand') return antwort(neuesSql ? { wartet: true, seit: neuesSql.seit, warte_s: 30, ki_ab_s: 1, zeit: '5+3' } : {});
+    if (rpc === 'kronen_mein_stand' && ligaVerzug) await new Promise(r => setTimeout(r, ligaVerzug));
+    if (rpc === 'online_suche_ende') return antwort((neuesSql || altBeleg) && body.ki === true ? { ki_ref: '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' } : {});
     if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
     if (rpc === 'online_meine') return antwort([...partien.values()].filter(p => p.status !== 'beendet'));
@@ -178,7 +185,7 @@ try {
   pruefe('Ohne Liga auf dem Server: Gegnersuche ruhig "kommt bald", ohne Suchknopf, ohne Fehlermeldung, ohne Liga-Streifen', await seite.evaluate(() => {
     const k = document.querySelector('.on-art[data-art="partie"]');
     return k?.dataset.zustand === 'bald' && /kommt bald/.test(k.textContent) && k.querySelector('[data-online="suchen"]').hidden
-      && k.querySelector('.on-zeiten').hidden && document.querySelector('.on-meldung').hidden && document.querySelector('.on-liga').hidden;
+      && k.querySelector('.on-zeit-fest').hidden && document.querySelector('.on-meldung').hidden && document.querySelector('.on-liga').hidden;
   }));
   await seite.getByRole('button', { name: 'Beitreten', exact: true }).click(); await bereit();
   pruefe('Beitritt: eigene schwarze Seite unten, Merker geloescht', await seite.evaluate(() => window.__online.brett().ausrichtung === 'b' && !localStorage.getItem('schach-arena:online:einladung')));
@@ -376,19 +383,20 @@ try {
   await seite.evaluate(() => localStorage.removeItem('schach-arena:online:einladung'));
   await seite.evaluate(() => window.__app.gehe('online'));
   await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit').catch(() => {});
-  pruefe('Mit Liga auf dem Server: Gegnersuche mit drei Bedenkzeiten und Suchknopf', await seite.evaluate(() => {
+  // Ranked hat eine feste Bedenkzeit 5+3 (Punkt 40, Konzept "Zwei Ligen"): keine Zeitwahl, nur der Hinweis
+  pruefe('Mit Liga auf dem Server: Gegnersuche mit fester Bedenkzeit 5 + 3 (keine Wahl) und Suchknopf', await seite.evaluate(() => {
     const k = document.querySelector('.on-art[data-art="partie"]');
-    return k?.dataset.zustand === 'bereit' && !k.querySelector('[data-online="suchen"]').hidden && !k.querySelector('.on-zeiten').hidden
-      && k.querySelectorAll('.on-zeiten [data-zeit]').length === 3 && k.querySelector('.on-zeiten [aria-checked="true"]')?.dataset.zeit === '3+2';
+    return k?.dataset.zustand === 'bereit' && !k.querySelector('[data-online="suchen"]').hidden && !k.querySelector('.on-zeit-fest').hidden
+      && /5 \+ 3/.test(k.querySelector('.on-zeit-fest').textContent) && !k.querySelector('[role="radio"], .on-zeiten');
   }));
-  await seite.locator('.on-zeiten [data-zeit="10+0"]').click();
-  pruefe('Bedenkzeit waehlbar (genau eine gewaehlt)', await seite.evaluate(() => [...document.querySelectorAll('.on-zeiten [aria-checked="true"]')].map((b) => b.dataset.zeit).join() === '10+0'));
   // Handybreite (Lehre aus Auftrag V: die Online-Pruefung lief nur auf 1180 px). iPhone 13, hell und dunkel: Liga-Streifen,
   // zwei Tueren, jeder Suchen-Knopf traegt "gewertet", Freunde-Zeile; alles ohne Scrollen und ohne Beispiel-Liga.
   for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width: 390, height: 844 }); await seite.evaluate(m => window.__app.setzeEinstellungen({ modus: m }), modus);
     await seite.evaluate(() => window.__app.gehe('online'));
-    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit' && !document.querySelector('.on-liga').hidden);
+    // seit #216 steht der Streifen schon als Platzhalter da: warten, bis die Liga-Antwort ihn gefuellt hat
+    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit' && !document.querySelector('.on-liga').hidden
+      && !document.querySelector('.on-liga').hasAttribute('data-laedt'));
     const handy = await seite.evaluate(() => {
       const rumpf = document.querySelector('.online-screen .on-rumpf');
       const leiste = document.querySelector('.reiter-leiste');
@@ -406,23 +414,82 @@ try {
       && !handy.beispiel && handy.klein.length === 0, handy);
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-390-${modus}.png`) });
   }
-  // Gegnersuche Partie (Konzept 3 A): Ring mit Restzeit, "Gleich gegen die KI" startet ohne Server eine Uebungspartie
+  // G-005 AC-06: kein Springen beim Laden. iPhone SE, die Liga-Antwort kommt 700 ms spaet; gezaehlt wird jede Verschiebung
+  // ohne Eingabe davor (Layout-Shift-API, wie der Web-Vital CLS). Vorher 0,167: Liga-Streifen und Suchkarte wuchsen erst mit der Antwort.
+  {
+    await seite.setViewportSize({ width: 375, height: 667 });
+    ligaVerzug = 700;
+    await seite.evaluate(() => window.__app.gehe('heim'));
+    await seite.evaluate(() => {
+      window.__cls = 0; window.__clsQuellen = [];
+      window.__clsBeob = new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) {
+        window.__cls += e.value; for (const s of e.sources || []) window.__clsQuellen.push(s.node?.className || s.node?.nodeName || '?'); } });
+      window.__clsBeob.observe({ type: 'layout-shift' });
+      window.__app.gehe('online');
+    });
+    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit');
+    await seite.waitForTimeout(400);
+    const cls = await seite.evaluate(() => { window.__clsBeob.disconnect(); return { wert: +window.__cls.toFixed(4), quellen: [...new Set(window.__clsQuellen)].slice(0, 6) }; });
+    ligaVerzug = 0;
+    pruefe('iPhone SE: Online springt beim Laden nicht (CLS unter 0,1, Liga-Antwort 700 ms spaet)', cls.wert < 0.1, cls);
+    pruefe('iPhone SE: nach der Pruefung Suchknopf frei, Liga-Platzhalter ersetzt',await seite.evaluate(() =>
+      [...document.querySelectorAll('[data-online="suchen"]')].every((b) => !b.disabled)
+      && !document.querySelector('.on-liga').hasAttribute('data-laedt')));
+  }
+  // Gegnersuche Partie (Konzept 3 A), altes SQL: Ring mit Restzeit, "Jetzt gegen KI" startet ohne Server eine Uebungspartie
   await seite.evaluate(() => { window.__onlineBotMs = 60000; });
-  await seite.locator('.on-zeiten [data-zeit="10+0"]').click();
   await knopf('suchen').click();
   await seite.locator('.on-suche:not([hidden])').waitFor();
   await seite.waitForTimeout(1300);
   const suchend = await seite.evaluate(() => ({ rest: document.querySelector('.on-rest').textContent, kopfWeg: document.querySelector('.on-art[data-art="partie"] .on-tuer-kopf').hidden,
-    ring: Number(document.querySelector('.on-ring-rest').getAttribute('stroke-dashoffset')), hinweis: document.querySelector('.on-ki-hinweis').textContent }));
-  pruefe('Suche: Restzeit zaehlt sichtbar herunter (Satz und Ring), "zaehlt nicht fuer die Liga" steht am KI-Knopf', /^Noch 5[89] s/.test(suchend.rest)
+    ring: Number(document.querySelector('.on-ring-rest').getAttribute('stroke-dashoffset')), hinweis: document.querySelector('.on-ki-hinweis').textContent,
+    titel: document.querySelector('.on-suche h3').textContent.replace(/\s+/g, ' ').trim(), knopf: document.querySelector('[data-online="ki-jetzt"]').textContent.trim() }));
+  pruefe('Suche: "Suche Gegner … 0:01", Restzeit zaehlt sichtbar herunter (Satz und Ring), Knopf "Jetzt gegen KI" mit "zaehlt nicht fuer die Liga"',
+    /^Noch 5[89] s/.test(suchend.rest) && /^Suche Gegner … 0:0[12]$/.test(suchend.titel) && suchend.knopf === 'Jetzt gegen KI'
     && suchend.ring > 0 && suchend.kopfWeg && /nicht für die Liga/.test(suchend.hinweis), suchend);
   await knopf('ki-jetzt').click();
   await seite.waitForFunction(() => location.hash.startsWith('#partie'));
   const geschaut = await seite.evaluate(() => history.state?.params || null);
-  pruefe('"Gleich gegen die KI": Suche beim Server beendet (ki false), Uebungspartie mit 10+0 gegen einen Bot, ohne KI-Beleg',
+  pruefe('Altes SQL, "Jetzt gegen KI" vor der Grenze: Suche beim Server beendet (ki false), Uebungspartie 5+3 gegen einen Bot, ohne KI-Beleg',
     calls.some((c) => c.pfad.endsWith('online_suche_ende') && c.body.ki === false) && !calls.some((c) => c.pfad.endsWith('online_suche_ende') && c.body.ki === true)
-    && geschaut?.modus === 'uebung' && geschaut?.tempo?.grund === 600 && !geschaut?.ki && !!geschaut?.botId, geschaut);
+    && calls.filter((c) => c.pfad.endsWith('online_suche_start')).every((c) => c.body.zeit === '5+3')
+    && geschaut?.modus === 'uebung' && geschaut?.tempo?.grund === 300 && geschaut?.tempo?.zuschlag === 3 && !geschaut?.ki && !!geschaut?.botId, geschaut);
   await seite.evaluate(() => { delete window.__onlineBotMs; });
+  // Neues SQL: 30 s Wartezeit vom Server, "Jetzt gegen KI" ab ki_ab_s (1 s) gewertet ueber online_suche_ende(true)
+  neuesSql = { seit: new Date().toISOString() };
+  await seite.evaluate(() => window.__app.gehe('online'));
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit');
+  neuesSql.seit = new Date().toISOString();
+  await knopf('suchen').click();
+  await seite.locator('.on-suche:not([hidden])').waitFor();
+  await seite.waitForFunction(() => /^Noch (29|30) s/.test(document.querySelector('.on-rest').textContent));
+  const frueh = await seite.evaluate(() => document.querySelector('.on-ki-hinweis').textContent);
+  await seite.waitForFunction(() => /jetzt für die Liga/.test(document.querySelector('.on-ki-hinweis').textContent), null, { timeout: 5000 });
+  const vorKi = calls.length;
+  await knopf('ki-jetzt').click();
+  await seite.waitForFunction(() => location.hash.startsWith('#partie'));
+  const gewertet = await seite.evaluate(() => history.state?.params || null);
+  await seite.waitForFunction(() => /Verlassen zählt als Niederlage/.test(document.querySelector('.toast-ort .toast')?.textContent || ''), null, { timeout: 3000 }).catch(() => {});
+  const verlassenNeu = await seite.evaluate(() => document.querySelector('.toast-ort .toast')?.textContent || '');
+  const neu = calls.slice(vorKi);
+  pruefe('Neues SQL: Restzeit 30 s vom Server, ab ki_ab_s "zaehlt jetzt", Knopf beendet mit ki true und spielt gewertet mit Beleg in 5+3',
+    /noch nicht/.test(frueh) && neu.some((c) => c.pfad.endsWith('online_suche_ende') && c.body.ki === true) && !neu.some((c) => c.pfad.endsWith('online_suche_ende') && c.body.ki === false)
+    && gewertet?.ki === true && gewertet?.kiRef === '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' && gewertet?.tempo?.grund === 300 && gewertet?.tempo?.zuschlag === 3 && !gewertet?.modus, { frueh, gewertet });
+  pruefe('Neues SQL: beim Start der gewerteten KI-Partie der Hinweis "Verlassen zählt als Niederlage"', /Verlassen zählt als Niederlage/.test(verlassenNeu), verlassenNeu);
+  neuesSql = null;
+  // Gegenprobe altes SQL: auch mit Beleg nach der Wartezeit kein Hinweis (dort gibt es den Schutz aus #213 nicht)
+  altBeleg = true;
+  await seite.evaluate(() => window.__app.gehe('online'));
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit');
+  await seite.evaluate(() => { window.__onlineBotMs = 400; });
+  await knopf('suchen').click();
+  await seite.waitForFunction(() => location.hash.startsWith('#partie') && history.state?.params?.kiRef, null, { timeout: 8000 });
+  await seite.waitForTimeout(600);
+  const verlassenAlt = await seite.evaluate(() => ({ toast: [...document.querySelectorAll('.toast-ort .toast')].map((t) => t.textContent).join(' | '), p: history.state?.params }));
+  pruefe('Altes SQL mit Beleg: gewertete KI-Partie, aber kein Hinweis "Verlassen"', verlassenAlt.p?.ki === true && !!verlassenAlt.p?.kiRef
+    && !/Verlassen/.test(verlassenAlt.toast), verlassenAlt);
+  await seite.evaluate(() => { delete window.__onlineBotMs; });
+  altBeleg = false;
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet });
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
 finally { await kontext?.close(); await browser?.close(); await new Promise(r => server.close(r)); }

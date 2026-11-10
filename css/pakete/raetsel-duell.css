@@ -149,3 +149,6 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
 @media (prefers-reduced-motion: reduce) {
   .rd-ring-rest, .rd-balken > i { transition: none; }
 }
+/* Sofort-Suche (Punkt 40): Suchdauer neben dem Titel, "Jetzt gegen KI" erst ab der KI-Grenze des Servers */
+.rd-uhr { font-variant-numeric: tabular-nums; color: var(--text-2); }
+.rd-ki-jetzt[hidden] { display: none; }
