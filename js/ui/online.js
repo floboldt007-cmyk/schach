@@ -164,14 +164,17 @@ export function zeige(root, params, app) {
     }
     const code = online.gemerkteEinladung() || '';
     // Gegnersuche fuer die Liga (dieselbe Suche wie die Lobby, js/kronen.js): erst zeigen, wenn der Server die Liga kennt
-    // (kronen_mein_stand antwortet); sonst ein ruhiger Hinweis "kommt bald", kein Fehler
+    // (kronen_mein_stand antwortet); sonst ein ruhiger Hinweis "kommt bald", kein Fehler.
+    // Kein Springen beim Laden (G-005 AC-06): Liga-Streifen, Zeitwahl und Suchknopf stehen schon waehrend der Pruefung
+    // in voller Hoehe da, Streifen als leerer Platzhalter, Zeitwahl und Knopf gesperrt; "kommt bald" blendet den Platzhalter aus
     inhalt.innerHTML = `${kopfHtml}
-      <button class="on-liga dr" type="button" data-online="liga" hidden></button>
+      <button class="on-liga dr" type="button" data-online="liga" data-laedt disabled aria-hidden="true"><span class="on-liga-schild">${icon('liga')}</span>
+        <span class="on-liga-text"><b></b><span></span></span></button>
       <div class="on-tueren" data-zustand="konto">
-      ${tuer('partie', `<p class="on-suche-text">${esc(O('suche.pruefen'))}</p>
-        <div class="segment on-zeiten" role="radiogroup" aria-label="${esc(O('bedenkzeit'))}" hidden>${SUCH_ZEITEN.map((z, i) =>
-          `<button class="seg" type="button" role="radio" data-zeit="${z.id}" aria-checked="${i === 0}">${esc(z.id.replace('+', ' + '))}<small>${esc(O('zeit.' + z.art))}</small></button>`).join('')}</div>
-        <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="suchen" hidden>${esc(O('tuer.partie.knopf'))}</button>
+      ${tuer('partie', `<p class="on-suche-text" hidden>${esc(O('suche.pruefen'))}</p>
+        <div class="segment on-zeiten" role="radiogroup" aria-label="${esc(O('bedenkzeit'))}">${SUCH_ZEITEN.map((z, i) =>
+          `<button class="seg" type="button" role="radio" data-zeit="${z.id}" aria-checked="${i === 0}" disabled>${esc(z.id.replace('+', ' + '))}<small>${esc(O('zeit.' + z.art))}</small></button>`).join('')}</div>
+        <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="suchen" disabled>${esc(O('tuer.partie.knopf'))}</button>
         <div class="on-suche" hidden>
           <div class="on-ring" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="on-ring-spur" cx="50" cy="50" r="44"/>
             <circle class="on-ring-rest" cx="50" cy="50" r="44" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="0"/></svg>
@@ -208,6 +211,8 @@ export function zeige(root, params, app) {
     k.querySelector('.on-tuer-kopf').hidden = zustand === 'sucht';
     k.querySelector('.on-zeiten').hidden = zustand !== 'bereit';
     k.querySelector('[data-online="suchen"]').hidden = zustand !== 'bereit';
+    for (const b of k.querySelectorAll('.on-zeiten .seg, [data-online="suchen"]')) b.disabled = zustand !== 'bereit';
+    if (zustand === 'bald') { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) l.hidden = true; }
     k.querySelector('.on-suche').hidden = zustand !== 'sucht';
     if (zustand !== 'sucht') { clearInterval(restUhr); restUhr = null; }
   }
@@ -222,7 +227,9 @@ export function zeige(root, params, app) {
   function zeigeLiga(d) {
     const st = Array.isArray(d) ? d[0] : d;
     const el = inhalt.querySelector('.on-liga');
-    if (!el || !st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) return;
+    if (!el) return;
+    if (!st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) { el.hidden = true; return; }
+    delete el.dataset.laedt; el.disabled = false; el.removeAttribute('aria-hidden');
     const stufe = stufenName(Math.min(17, Math.max(0, Math.trunc(Number(st.stufe)) || 0)));
     const n = Number.isInteger(st.n) && st.n > 0 ? st.n : 30;
     const zeile = Number.isInteger(st.platz) && st.platz > 0 ? O('liga.platz', { platz: st.platz, n }) : O('liga.ohneGruppe');
