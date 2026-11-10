@@ -683,19 +683,73 @@ function freundZiel() {
 }
 
 function beiVerlauf() {
+  // nur ein eigener Verlaufseintrag (Zurueck/Vor) bekommt seine Scrollposition zurueck, ein frischer Link beginnt oben
+  const eigenerEintrag = !!(history.state && history.state.schach);
   const einladung = uebernimmEinladungsLink();
-  const ziel = einladung ? { name: 'online', params: {} } : freundZiel() || ersterScreen() || ausVerlauf();
+  const freund = !einladung && freundZiel();
+  const erster = !einladung && !freund && ersterScreen();
+  const ziel = einladung ? { name: 'online', params: {} } : freund || erster || ausVerlauf();
   const hash = hashFuer(ziel.name, ziel.params);
   if (!einladung && !ziel.freund && aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
+  const wiederherstellen = eigenerEintrag && !einladung && !freund && !erster && hash === location.hash;
   if (hash !== location.hash || !(history.state && history.state.schach)) {
     try { history.replaceState({ schach: true, name: ziel.name, params: sauber(ziel.params), tiefe }, '', hash); } catch (e) { /* egal */ }
   }
-  zeigeScreen(ziel.name, ziel.params, hash);
+  zeigeScreen(ziel.name, ziel.params, hash, { wiederherstellen });
+}
+
+// Scrollposition je Verlaufseintrag (R13 CLS-1, 10.11.2026: nach Zurueck landete man immer oben). Gescrollt wird meist ein
+// inneres Element des Screens (div.inhalt, .ms-rumpf, .pm-rumpf ...), nicht die Seite. Nur im Speicher: nach dem Neuladen
+// beginnt jeder Screen oben, und beim Zurueck ist der verlassene Verlaufseintrag nicht mehr beschreibbar.
+const scrollMerker = new Map();   // 'tiefe|hash' -> { wo, y }
+function scrollerIn(root) {
+  let best = null;
+  let flaeche = 0;
+  for (const el of root.querySelectorAll('*')) {
+    if (el.scrollHeight <= el.clientHeight + 1 || !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) continue;
+    const f = el.clientWidth * el.clientHeight;
+    if (f > flaeche) { best = el; flaeche = f; }
+  }
+  const seite = document.scrollingElement;
+  if (seite && seite.scrollHeight > seite.clientHeight + 1 && (!best || seite.clientWidth * seite.clientHeight > flaeche)) return seite;
+  return best;
+}
+const scrollerKennung = (el) => (el === document.scrollingElement ? 'seite' : el.tagName.toLowerCase() + '.' + [...el.classList].join('.'));
+
+function merkeScroll() {
+  if (!aktuell) return;
+  const schluessel = aktuell.tiefe + '|' + aktuell.hash;
+  const el = scrollerIn(document.getElementById('app'));
+  const y = el ? Math.round(el.scrollTop) : 0;
+  scrollMerker.delete(schluessel);
+  if (y > 0) scrollMerker.set(schluessel, { wo: scrollerKennung(el), y });
+  if (scrollMerker.size > 50) scrollMerker.delete(scrollMerker.keys().next().value);
+}
+
+// Gemerkte Position setzen, sobald der Inhalt hoch genug ist: zuerst synchron vor dem ersten Bild (kein Sprung), laedt der
+// Screen nach, pro Bild hoechstens 1 s lang. Eine eigene Eingabe oder ein neuer Screen beendet das Nachsetzen.
+function stelleScrollHer(root, nr, ziel) {
+  const ende = Date.now() + 1000;
+  const eingaben = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+  let aus = false;
+  const stopp = () => { aus = true; eingaben.forEach((e) => window.removeEventListener(e, stopp, true)); };
+  eingaben.forEach((e) => window.addEventListener(e, stopp, true));
+  const versuch = () => {
+    if (aus || nr !== ladeNr) return stopp();
+    const el = scrollerIn(root);
+    if (el && scrollerKennung(el) === ziel.wo) {
+      el.scrollTop = ziel.y;
+      if (Math.abs(el.scrollTop - ziel.y) <= 1) return stopp();
+    }
+    if (Date.now() > ende) return stopp();
+    requestAnimationFrame(versuch);
+  };
+  versuch();
 }
 
 const NEU_GELADEN = 'schach-arena:neu-geladen';
 let ladeFertig = 0;   // ladeNr des zuletzt gezeigten Screens; ungleich ladeNr = ein Screen laedt gerade
-async function zeigeScreen(name, params, hash) {
+async function zeigeScreen(name, params, hash, { wiederherstellen = false } = {}) {
   const nr = ++ladeNr;
   schliesseDialog();
   let modul = null;
@@ -708,6 +762,7 @@ async function zeigeScreen(name, params, hash) {
     modul = null;
   }
   if (nr !== ladeNr) return;  // inzwischen woanders hin
+  merkeScroll();
   if (aktuell && aktuell.handle) {
     try { aktuell.handle.verlasse(); } catch (e) {
       console.error(e);
@@ -719,7 +774,7 @@ async function zeigeScreen(name, params, hash) {
   schliesseSheet();
   const root = document.getElementById('app');
   root.replaceChildren();
-  aktuell = { name, params, hash, handle: null };
+  aktuell = { name, params, hash, handle: null, tiefe };
   if (HEIM_ORTE.has(name)) herkunft = name;
   ladeFertig = nr;
   document.documentElement.dataset.screen = name;
@@ -771,6 +826,8 @@ async function zeigeScreen(name, params, hash) {
     return;
   }
   richteSprunglinkEin(root);
+  const gemerkt = wiederherstellen && scrollMerker.get(tiefe + '|' + hash);
+  if (gemerkt) stelleScrollHer(root, nr, gemerkt);
   sende('app:screen', { name, params: params || {} });
 }
 
