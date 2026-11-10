@@ -25,6 +25,7 @@ import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
 import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
+import { hoere } from '../ereignisse.js';
 
 
 const WURZEL = new URL('../../', import.meta.url);
@@ -267,6 +268,10 @@ export function zeige(root, params, app) {
         const bot = await botFuerMich();
         if (weg) return;
         if (!bot) { sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); return; }
+        // gewertet mit Beleg und neuem SQL (#213: Vorab-Niederlage, ein offener Beleg): Verlassen zaehlt als Niederlage.
+        // Mit altem SQL stimmt der Satz nicht, dort kein Hinweis.
+        // erst wenn die Partie steht: der Seitenwechsel leert die Meldungen (js/app.js zeigeScreen)
+        if (kiRef && lage().vomServer) { const ab = hoere('app:screen', (d) => { if (d.name !== 'partie') return; ab(); app.meldung(O('suche.kiVerlassen'), { dauer: 4500 }); }); }
         app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl(lage), ki: true, ...(kiRef ? { kiRef } : {}) });
       },
       beiFehler: (e) => { suche = null; sucheZustand('bereit', O('suche.erklaert')); melde(e?.message || O('fehler')); },

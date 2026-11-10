@@ -32,6 +32,7 @@ let strittigAntwort = null;
 // Handy-Runde 08.11.: kennt der Server die Liga (kronen_mein_stand)? Ohne sie zeigt Online "kommt bald" statt der Suche
 let ligaDa = false;
 let neuesSql = null; // { seit }: die Attrappe antwortet wie das neue SQL (Konzept "Zwei Ligen")
+let altBeleg = false; // altes SQL, das nach der Wartezeit einen KI-Beleg gibt (Gegenprobe zum Hinweis "Verlassen")
 // G-005 AC-06: kronen_mein_stand antwortet so viele ms spaeter (wie im Handy-Netz), damit ein Springen beim Laden messbar wird
 let ligaVerzug = 0;
 const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
@@ -75,7 +76,7 @@ try {
     // neues SQL (Konzept "Zwei Ligen") mit seit, warte_s, ki_ab_s und zeit; ende(true) gibt dort ab ki_ab_s einen Beleg
     if (rpc === 'online_suche_start' || rpc === 'online_suche_stand') return antwort(neuesSql ? { wartet: true, seit: neuesSql.seit, warte_s: 30, ki_ab_s: 1, zeit: '5+3' } : {});
     if (rpc === 'kronen_mein_stand' && ligaVerzug) await new Promise(r => setTimeout(r, ligaVerzug));
-    if (rpc === 'online_suche_ende') return antwort(neuesSql && body.ki === true ? { ki_ref: '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' } : {});
+    if (rpc === 'online_suche_ende') return antwort((neuesSql || altBeleg) && body.ki === true ? { ki_ref: '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' } : {});
     if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
     if (rpc === 'online_meine') return antwort([...partien.values()].filter(p => p.status !== 'beendet'));
@@ -468,11 +469,27 @@ try {
   await knopf('ki-jetzt').click();
   await seite.waitForFunction(() => location.hash.startsWith('#partie'));
   const gewertet = await seite.evaluate(() => history.state?.params || null);
+  await seite.waitForFunction(() => /Verlassen zählt als Niederlage/.test(document.querySelector('.toast-ort .toast')?.textContent || ''), null, { timeout: 3000 }).catch(() => {});
+  const verlassenNeu = await seite.evaluate(() => document.querySelector('.toast-ort .toast')?.textContent || '');
   const neu = calls.slice(vorKi);
   pruefe('Neues SQL: Restzeit 30 s vom Server, ab ki_ab_s "zaehlt jetzt", Knopf beendet mit ki true und spielt gewertet mit Beleg in 5+3',
     /noch nicht/.test(frueh) && neu.some((c) => c.pfad.endsWith('online_suche_ende') && c.body.ki === true) && !neu.some((c) => c.pfad.endsWith('online_suche_ende') && c.body.ki === false)
     && gewertet?.ki === true && gewertet?.kiRef === '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' && gewertet?.tempo?.grund === 300 && gewertet?.tempo?.zuschlag === 3 && !gewertet?.modus, { frueh, gewertet });
+  pruefe('Neues SQL: beim Start der gewerteten KI-Partie der Hinweis "Verlassen zählt als Niederlage"', /Verlassen zählt als Niederlage/.test(verlassenNeu), verlassenNeu);
   neuesSql = null;
+  // Gegenprobe altes SQL: auch mit Beleg nach der Wartezeit kein Hinweis (dort gibt es den Schutz aus #213 nicht)
+  altBeleg = true;
+  await seite.evaluate(() => window.__app.gehe('online'));
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit');
+  await seite.evaluate(() => { window.__onlineBotMs = 400; });
+  await knopf('suchen').click();
+  await seite.waitForFunction(() => location.hash.startsWith('#partie') && history.state?.params?.kiRef, null, { timeout: 8000 });
+  await seite.waitForTimeout(600);
+  const verlassenAlt = await seite.evaluate(() => ({ toast: [...document.querySelectorAll('.toast-ort .toast')].map((t) => t.textContent).join(' | '), p: history.state?.params }));
+  pruefe('Altes SQL mit Beleg: gewertete KI-Partie, aber kein Hinweis "Verlassen"', verlassenAlt.p?.ki === true && !!verlassenAlt.p?.kiRef
+    && !/Verlassen/.test(verlassenAlt.toast), verlassenAlt);
+  await seite.evaluate(() => { delete window.__onlineBotMs; });
+  altBeleg = false;
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet });
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
 finally { await kontext?.close(); await browser?.close(); await new Promise(r => server.close(r)); }
