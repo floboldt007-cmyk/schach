@@ -565,7 +565,7 @@ async function gratisTeil(browser) {
     schloss: document.querySelectorAll('.ms-lektion[data-gesperrt] .ms-schloss').length,
     kopf: document.querySelector('.ms-kopf-sterne')?.innerText || '',
     karten: document.querySelectorAll('.ms-bkarte').length,
-    gruppen: [...document.querySelectorAll('.ms-gruppe > h3')].map((h) => h.textContent).join('|'),
+    gruppen: [...document.querySelectorAll('.ms-gruppe > h2')].map((h) => h.textContent).join('|'),
   }));
   pruefe('Gratis: Mattbilder mit 13 Schlössern (20 minus 6 leicht minus Probe), Probe „Ersticktes Matt“ offen mit Marke',
     r.gesperrt.length === 13 && r.schloss === 13 && !r.gesperrt.includes('grundreihe') && r.probeOffen && /Gratis-Probe/.test(r.probe), r);

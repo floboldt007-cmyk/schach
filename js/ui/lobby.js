@@ -10,8 +10,8 @@
 // button.lb-zeit[data-zeit][aria-checked], .segment[data-seg="lb-wertung"], button.lb-suchen), .lb-wertungen
 // (.lb-wert[data-art]), .lb-mehr (button.lb-modus-karte[data-ziel]);
 // waehrend der Suche .lb-suche[data-phase="suche"|"gefunden"|"anmelden"|"fehler"]. Optik: css/pakete/lobby.css.
-// Gewertet (Etappe B Task 4): echte Gegnersuche ueber js/kronen.js; Treffer oeffnet die Online-Partie, nach 10 s
-// (window.__lobbyBotMs verkuerzt es im Test) startet die Partie gegen den passenden Bot als KI-Gegner (params ki, kiRef).
+// Gewertet (Etappe B Task 4): echte Gegnersuche ueber js/kronen.js; Treffer oeffnet die Online-Partie, nach der Wartezeit
+// des Servers (window.__lobbyBotMs verkuerzt sie im Test) startet die Partie gegen den passenden Bot als KI-Gegner (params ki, kiRef).
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { segment } from './bauteile.js';
 import { icon } from './icons.js';
@@ -216,7 +216,7 @@ export function zeige(root, params, app) {
     };
     spaeter(tick, 1000);
     const tempoWahl = { grund: z.grund, zuschlag: z.zuschlag };
-    // Etappe B Task 4: gewertet = echte Gegnersuche auf dem Server (js/kronen.js), nach 10 s ein KI-Gegner mit Beleg;
+    // Etappe B Task 4: gewertet = echte Gegnersuche auf dem Server (js/kronen.js), nach der Wartezeit des Servers ein KI-Gegner mit Beleg;
     // Freundschaft bleibt die Vorschau mit einem Bot ohne Kronen
     if (gewertet) {
       const text = el.querySelector('.lb-suche-text');

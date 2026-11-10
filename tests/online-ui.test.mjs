@@ -32,6 +32,8 @@ let strittigAntwort = null;
 // Handy-Runde 08.11.: kennt der Server die Liga (kronen_mein_stand)? Ohne sie zeigt Online "kommt bald" statt der Suche
 let ligaDa = false;
 let neuesSql = null; // { seit }: die Attrappe antwortet wie das neue SQL (Konzept "Zwei Ligen")
+// G-005 AC-06: kronen_mein_stand antwortet so viele ms spaeter (wie im Handy-Netz), damit ein Springen beim Laden messbar wird
+let ligaVerzug = 0;
 const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
 const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234' } = {}) {
@@ -72,6 +74,7 @@ try {
     // Gegnersuche (js/kronen.js): niemand da, die Suche wartet. Altes SQL antwortet ohne Wartezeit (dann 10 s wie bisher),
     // neues SQL (Konzept "Zwei Ligen") mit seit, warte_s, ki_ab_s und zeit; ende(true) gibt dort ab ki_ab_s einen Beleg
     if (rpc === 'online_suche_start' || rpc === 'online_suche_stand') return antwort(neuesSql ? { wartet: true, seit: neuesSql.seit, warte_s: 30, ki_ab_s: 1, zeit: '5+3' } : {});
+    if (rpc === 'kronen_mein_stand' && ligaVerzug) await new Promise(r => setTimeout(r, ligaVerzug));
     if (rpc === 'online_suche_ende') return antwort(neuesSql && body.ki === true ? { ki_ref: '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' } : {});
     if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
@@ -390,7 +393,9 @@ try {
   for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width: 390, height: 844 }); await seite.evaluate(m => window.__app.setzeEinstellungen({ modus: m }), modus);
     await seite.evaluate(() => window.__app.gehe('online'));
-    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit' && !document.querySelector('.on-liga').hidden);
+    // seit #216 steht der Streifen schon als Platzhalter da: warten, bis die Liga-Antwort ihn gefuellt hat
+    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit' && !document.querySelector('.on-liga').hidden
+      && !document.querySelector('.on-liga').hasAttribute('data-laedt'));
     const handy = await seite.evaluate(() => {
       const rumpf = document.querySelector('.online-screen .on-rumpf');
       const leiste = document.querySelector('.reiter-leiste');
@@ -407,6 +412,28 @@ try {
       handy.scroll <= 1 && handy.quer && handy.freundeSichtbar && handy.gewertet && handy.freundeZu && /Platz 3 von 30/.test(handy.liga) && /140/.test(handy.liga)
       && !handy.beispiel && handy.klein.length === 0, handy);
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-390-${modus}.png`) });
+  }
+  // G-005 AC-06: kein Springen beim Laden. iPhone SE, die Liga-Antwort kommt 700 ms spaet; gezaehlt wird jede Verschiebung
+  // ohne Eingabe davor (Layout-Shift-API, wie der Web-Vital CLS). Vorher 0,167: Liga-Streifen und Suchkarte wuchsen erst mit der Antwort.
+  {
+    await seite.setViewportSize({ width: 375, height: 667 });
+    ligaVerzug = 700;
+    await seite.evaluate(() => window.__app.gehe('heim'));
+    await seite.evaluate(() => {
+      window.__cls = 0; window.__clsQuellen = [];
+      window.__clsBeob = new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) {
+        window.__cls += e.value; for (const s of e.sources || []) window.__clsQuellen.push(s.node?.className || s.node?.nodeName || '?'); } });
+      window.__clsBeob.observe({ type: 'layout-shift' });
+      window.__app.gehe('online');
+    });
+    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit');
+    await seite.waitForTimeout(400);
+    const cls = await seite.evaluate(() => { window.__clsBeob.disconnect(); return { wert: +window.__cls.toFixed(4), quellen: [...new Set(window.__clsQuellen)].slice(0, 6) }; });
+    ligaVerzug = 0;
+    pruefe('iPhone SE: Online springt beim Laden nicht (CLS unter 0,1, Liga-Antwort 700 ms spaet)', cls.wert < 0.1, cls);
+    pruefe('iPhone SE: nach der Pruefung Suchknopf frei, Liga-Platzhalter ersetzt',await seite.evaluate(() =>
+      [...document.querySelectorAll('[data-online="suchen"]')].every((b) => !b.disabled)
+      && !document.querySelector('.on-liga').hasAttribute('data-laedt')));
   }
   // Gegnersuche Partie (Konzept 3 A), altes SQL: Ring mit Restzeit, "Jetzt gegen KI" startet ohne Server eine Uebungspartie
   await seite.evaluate(() => { window.__onlineBotMs = 60000; });
