@@ -757,6 +757,9 @@ async function zeigeScreen(name, params, hash) {
     zeigeReiter(null);
     return;
   }
+  // Leiste VOR dem Zeichnen: Sie bestimmt die Hoehe des Screens (html[data-reiter]). Danach gesetzt, rechnete die Partie
+  // ihr Brett im 88 px kuerzeren Screen und alles wuchs sichtbar nach (R11 Pixel 10.11.2026, iPhone 13: CLS 0,109)
+  zeigeReiter(name, params || {});
   try {
     aktuell.handle = modul.zeige(root, params || {}, app) || { verlasse() {} };
   } catch (e) {
@@ -768,7 +771,6 @@ async function zeigeScreen(name, params, hash) {
     return;
   }
   richteSprunglinkEin(root);
-  zeigeReiter(name, params || {});
   sende('app:screen', { name, params: params || {} });
 }
 
@@ -871,12 +873,16 @@ function registriereSW() {
   if (TEST && !/[?&]sw\b/.test(location.search)) return;
   const sw = navigator.serviceWorker;
   let wechsel = false;
+  // nur im Test: Ablauf des Versionswechsels fuer die Fehlermeldung von tests/e2e.test.mjs (Update)
+  const swLog = (s) => { if (TEST) console.info('SW-Ablauf ' + s); };
   sw.addEventListener('controllerchange', () => {
+    swLog('controllerchange wechsel=' + wechsel);
     if (!wechsel) return;
     wechsel = false;
     location.reload();
   });
   const aktiviere = (w) => {
+    swLog('aktiviere von ' + String((new Error().stack || '').split('\n')[2] || '').trim().replace(/^.*\/js\//, ''));
     wechsel = true;
     try { sessionStorage.setItem(SW_MERKER, String(Date.now())); } catch (e) { /* egal */ }
     // laufende Partie sichern (verlasse speichert den Stand), dann uebernimmt die neue Version
@@ -889,6 +895,7 @@ function registriereSW() {
   };
   aktiviereSW = aktiviere;
   sw.register('sw.js').then((reg) => {
+    swLog('register wartet=' + !!reg.waiting + ' kuerzlich=' + kuerzlich() + ' screen=' + (aktuell && aktuell.name));
     if (reg.waiting && sw.controller) {
       wartenderSW = reg.waiting;
       const inPartie = (aktuell && aktuell.name === 'partie') || /^#partie/.test(location.hash);

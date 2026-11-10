@@ -219,6 +219,37 @@ async function testeLeiste(browser) {
     await kontext.close();
   }
 
+  // ---------- R11 Pixel (10.11.2026): von Start in die Partie springt nichts ----------
+  // Die Leiste wurde erst nach dem Zeichnen des neuen Screens weggenommen: die Partie rechnete ihr Brett im 88 px
+  // kuerzeren Screen (iPhone 13 mit Leiste: 288 statt 376 px), danach wuchs alles nach (layout-shift 0,109).
+  // R13 CLS-2 (10.11.2026): derselbe Ruck am iPhone SE, live 287 gemessen 0,0899 (Coach, Spielerzeile und Knoepfe 72 px
+  // nach unten, Brett 296 -> 368 px); mit Safari-Leiste (375 x 548) 0,0102. Darum auch beide SE-Fenster.
+  for (const [w, h] of [[390, 664], [375, 667], [375, 548]]) {
+    gruppe = `Wechsel ohne Sprung (Handy ${w} x ${h})`;
+    const { kontext, seite, fehler } = await neueSeite(browser, { w, h, handy: true });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    await warte(600);
+    await seite.evaluate(() => {
+      window.__sprung = { cls: 0, brett: [] };
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__sprung.cls += e.value; }).observe({ type: 'layout-shift' });
+      const t0 = performance.now();
+      const bild = () => {
+        const v = document.querySelector('.screen.partie .inhalt')?.style.getPropertyValue('--brett');
+        if (v && window.__sprung.brett[window.__sprung.brett.length - 1] !== v) window.__sprung.brett.push(v);
+        if (performance.now() - t0 < 1500) requestAnimationFrame(bild);
+      };
+      requestAnimationFrame(bild);
+      window.__app.gehe('partie', { botId: 'benno', farbe: 'w' });
+    });
+    await warte(1800);
+    const m = await seite.evaluate(() => window.__sprung);
+    pruefe('Partie: das Brett bekommt beim Oeffnen genau eine Groesse', m.brett.length === 1, JSON.stringify(m));
+    pruefe('Partie: keine Layout-Verschiebung beim Oeffnen (CLS unter 0,01)', m.cls < 0.01, JSON.stringify(m));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // ---------- Handy: schwebende Glas-Kapsel unten (Konzept 2026-11-06, Entwurf .dock) ----------
   for (const schema of ['light', 'dark']) {
     gruppe = `glas-leiste Handy 390 ${schema === 'dark' ? 'dunkel' : 'hell'}`;

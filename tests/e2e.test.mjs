@@ -51,6 +51,9 @@ const TYPEN = {
   '.txt': 'text/plain; charset=utf-8',
 };
 const serverLog = [];
+// Update-Diagnose (10.11.2026, #219 Update b6 dreimal rot): Startseite, sw.js, Seitenwechsel und SW-Ereignisse mit Zeit
+const ablauf = [];
+const merke = (s) => { ablauf.push([Date.now(), s]); if (ablauf.length > 200) ablauf.shift(); };
 const server404 = [];
 let neueVersion = 0;   // > 0: der Server liefert eine "neue Version" (sw.js und index.html geaendert)
 
@@ -81,6 +84,7 @@ const server = http.createServer((req, res) => {
   }
   const typ = TYPEN[path.extname(datei).toLowerCase()] || 'application/octet-stream';
   serverLog.push({ pfad, status: 200 });
+  if (rel === 'index.html' || rel === 'sw.js') merke(`server ${rel}${neueVersion ? ' v' + neueVersion : ''}`);
   // wie GitHub Pages: 10 Minuten im HTTP-Cache
   res.writeHead(200, { 'Content-Type': typ, 'Content-Length': inhalt.length, 'Cache-Control': 'max-age=600' });
   res.end(req.method === 'HEAD' ? undefined : inhalt);
@@ -115,7 +119,10 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
   const beobachte = (seite) => {
     const auswerten = seite.evaluate.bind(seite);
     seite.evaluate = (...args) => begrenzt(`${gruppe}: Browserauswertung`, () => auswerten(...args));
+    seite.on('framenavigated', (f) => { if (f === seite.mainFrame()) merke('dokument ' + new URL(f.url()).hash); });
+    seite.on('load', () => merke('load'));
     seite.on('console', (m) => {
+      if (m.type() === 'info' && /^SW-Ablauf/.test(m.text())) merke(m.text());
       if (m.type() !== 'error') return;
       const url = (m.location() && m.location().url) || '';
       fehler.push(m.text() + (url ? ' @ ' + url : ''));
@@ -651,7 +658,9 @@ async function swLage(seite) {
     const z = (w) => (w ? w.state : '-');
     return JSON.stringify({ steuert: !!navigator.serviceWorker.controller, installiert: r && z(r.installing), wartet: r && z(r.waiting),
       aktiv: r && z(r.active), caches: await caches.keys(), merker: sessionStorage.getItem('schach-arena:sw-wechsel'),
-      meta: document.querySelector('meta[name="schach-test-version"]')?.content || null, hash: location.hash });
+      meta: document.querySelector('meta[name="schach-test-version"]')?.content || null, hash: location.hash,
+      // wie alt ist das Dokument und wie kam es (reload/navigate)?
+      dok: { art: performance.getEntriesByType('navigation')[0]?.type || '-', alterMs: Math.round(performance.now()) } });
   }), 5000).catch((e) => 'unbekannt (' + e.message + ')');
 }
 async function schritt(seite, name, arbeit, ms = 40000) {
@@ -660,7 +669,8 @@ async function schritt(seite, name, arbeit, ms = 40000) {
   try {
     return await begrenzt(`${gruppe}: ${name}`, arbeit, ms);
   } catch (e) {
-    throw new Error(`${gruppe}, Schritt "${name}" nach ${Date.now() - start} ms: ${e.message.split(/\r?\n/)[0]}; SW: ${await swLage(seite)}`, { cause: e });
+    throw new Error(`${gruppe}, Schritt "${name}" nach ${Date.now() - start} ms: ${e.message.split(/\r?\n/)[0]}; SW: ${await swLage(seite)}`
+      + `; Ablauf (ms vor dem Fehler): ${ablauf.slice(-25).map(([t, s]) => `${Date.now() - t} ${s}`).join(' | ')}`, { cause: e });
   } finally {
     const dauer = Date.now() - start;
     if (dauer >= 5000) console.log(`… e2e: ${gruppe}, Schritt "${name}" brauchte ${dauer} ms`);
