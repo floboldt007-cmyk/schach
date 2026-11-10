@@ -95,7 +95,7 @@ function beweisFuer(st, r) {
   if (!r.plakette) return null;
   if (r.meilenstein < T.BEWEIS_AB) return t('p-serie.zeitraum', { von: T.datumText(r.plakette.von), bis: T.datumText(r.plakette.bis) });
   const partien = sicher(() => ladePartien().map((p) => ({
-    datum: p.datum, genauigkeit: p.genauigkeit, liveKlassen: p.liveKlassen, eigeneZuege: eigeneZuege(p), modus: p.modus,
+    datum: p.datum, genauigkeit: p.genauigkeit, liveKlassen: p.liveKlassen, eigeneZuege: eigeneZuege(p), modus: p.modus, ergebnis: p.ergebnis,
   })), 'Beweis') || [];
   return T.beweis({ partien, von: r.plakette.von, bis: r.plakette.bis, tage: r.aktuell, z: st.kapitel ? st.kapitel.z : {} });
 }
@@ -167,13 +167,13 @@ function partieBeendet(d) {
   if (uebung) {
     const schluessel = uebungen.get(d.laufId) || 'p:' + d.partieId;
     quelle = T.aktivitaet(st, { tag, art: 'uebung', schluessel });
-  } else if (Number(d.eigeneZuege) >= T.WERK.partieZuege) {
+  } else if (T.partieZaehlt(d)) {
     quelle = T.aktivitaet(st, { tag, art: 'partie' });
   }
   const feldVorher = st.felder;
   const r = quelle ? zaehle(st, tag, quelle, zeit, einst) : null;
   if (uebung) T.zaehleEinheit(st, 'uebung');
-  else if (Number(d.eigeneZuege) >= T.WERK.partieZuege) T.zaehleEinheit(st, 'partie');
+  else if (T.partieZaehlt(d)) T.zaehleEinheit(st, 'partie');
   // Siegeslauf
   const lb = LA.buche(st.lauf, d, laufKontext(st, d));
   st.abr.push({
