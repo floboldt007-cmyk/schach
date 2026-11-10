@@ -72,8 +72,9 @@ as $$
     ),
     'bot_tagesgrenze', 10,
     'ki_tagesgrenze', 20,
-    -- Gewinne gegen Bot und KI je Woche, Konto und LIGA (Online: bot + ki, Raetsel: duell_ki); Menschen-Partien frei
-    'bot_ki_wochen_max', 300,
+    -- Gewinne gegen Bot und KI je Woche, Konto und LIGA (Online: bot + ki, Raetsel: duell_ki); Menschen-Partien frei.
+    -- 60 = etwa drei KI-Siege (Flos Wahl R13-K1, 10.11.2026, gegen das Farmen von KI-Kronen; kronen-schema.sql: 300)
+    'bot_ki_wochen_max', 60,
     'ki_mindestdauer_s', 60,
     'online_mindest_halbzuege', 4,
     'paar_tagesgrenze', 3,
