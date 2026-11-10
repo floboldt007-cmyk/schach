@@ -155,8 +155,13 @@
 @media (max-width: 560px) and (orientation: portrait) {
   .heim-liste > .heim-zeile:nth-child(n + 4) { display: none; }
 }
-/* niedrige Handys (iPhone 13 in Safari mit Leisten, 375 x 667): die Wege nur mit Namen */
-@media (max-width: 560px) and (orientation: portrait) and (max-height: 720px) {
+/* mittlere Handys (iPhone 13 in Safari mit Leisten, ~390 x 664): Wege nur mit Namen, 2 Zeilen */
+@media (max-width: 560px) and (orientation: portrait) and (min-height: 661px) and (max-height: 720px) {
+  .heim-text > span { display: none; }
+  .heim-liste > .heim-zeile:nth-child(n + 3) { display: none; }
+}
+/* niedrige Handys (iPhone SE, 375 x 548): die Wege nur mit Namen, 1 Zeile */
+@media (max-width: 560px) and (orientation: portrait) and (max-height: 660px) {
   .heim-text > span { display: none; }
   .heim-liste > .heim-zeile:nth-child(n + 2) { display: none; }
 }
@@ -204,7 +209,7 @@
   .heim-modus { padding: 16px; gap: 16px; }
   /* Brett so gross, wie Spalte und Fensterhoehe (ohne Kopf, Gruss und Text der Buehne) erlauben */
   .heim-buehne { --heim-brett: max(220px, min(100cqw - 2 * var(--a5) - var(--a4) - 230px, 100dvh - 300px)); padding: var(--a5); }
-  .heim-buehne[data-art="gegner"] { --heim-brett: clamp(120px, 22cqw, 180px); }
+  .heim-buehne[data-art="gegner"] { --heim-brett: clamp(120px, 35dvh, 280px); }
 }
 @container heimlinks (max-width: 639px) {
   @media (min-width: 900px) and (orientation: landscape) {
