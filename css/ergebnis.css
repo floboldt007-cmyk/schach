@@ -52,7 +52,7 @@
 .erg-lobby:focus-visible, .erg-link:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 /* R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner ein grosser Knopf "Nächster Gegner" ueber die ganze
    Breite, darunter klein "Zur Analyse" (links) und "Zu den Bots" (rechts); die Knoepfe-Zeile loest sich ins Raster auf */
-.erg-aktionen.sieg-vorne { grid-template-columns: 1fr 1fr; }
+.erg-aktionen.sieg-vorne { grid-template-columns: 1fr 1fr; align-items: start; }
 .erg-aktionen.sieg-vorne .erg-knoepfe { display: contents; }
 .erg-aktionen.sieg-vorne .erg-knoepfe > * { animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(990ms * var(--tempo)) both; }
 .erg-aktionen.sieg-vorne [data-ziel="weiter"] { grid-column: 1 / -1; }
