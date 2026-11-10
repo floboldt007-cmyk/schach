@@ -810,7 +810,7 @@ async function testePremium(browser) {
     const plaene = [...document.querySelectorAll('.pm-plan')];
     const kaufen = document.querySelector('.pm-kaufen');
     return { hash: location.hash, plaene: plaene.map((b) => b.dataset.plan + ':' + b.getAttribute('aria-checked')).join(),
-      preise: plaene.map((b) => b.querySelector('.pm-preis').textContent), kaufen: { aus: kaufen.disabled, text: kaufen.textContent.trim() },
+      preise: plaene.map((b) => b.querySelector('.pm-preis').textContent), planZeilen: plaene.map((b) => b.querySelector('.pm-plan-zeile').textContent), kaufen: { aus: kaufen.disabled, text: kaufen.textContent.trim() },
       zeilen: document.querySelectorAll('.pm-vergleich [role="row"]').length, stand: document.querySelector('.pm-stand').dataset.art,
       ueber: document.scrollingElement.scrollWidth - innerWidth, text: document.querySelector('.pm-screen').textContent.replace(/\s+/g, ' '),
       klein: [...document.querySelectorAll('.pm-screen button')].filter((b) => { const r = b.getBoundingClientRect(); return r.width && (r.width < 44 || r.height < 44); }).length,
@@ -819,6 +819,10 @@ async function testePremium(browser) {
   pruefe('Krone oeffnet Premium (#premium): drei Plaene, Jahr vorgewaehlt', p.hash === '#premium' && p.plaene === 'monat:false,jahr:true,immer:false', JSON.stringify(p.plaene));
   pruefe('Preise nie im Code: "Preis folgt", Knopf "Bald verfügbar" gesperrt, Vorschau-Hinweis', p.preise.every((x) => x === 'Preis folgt') && p.kaufen.aus
     && p.kaufen.text === 'Bald verfügbar' && p.stand === 'vorschau', JSON.stringify({ preise: p.preise, kaufen: p.kaufen, stand: p.stand }));
+  // Paragraf 312j Abs. 2 BGB (Rechtspruefung 09.11.2026): Laufzeit und automatische Verlaengerung stehen am Preis
+  pruefe('am Preis: Monat und Jahr nennen Laufzeit und automatische Verlaengerung, "Für immer" kein Abo',
+    /Monatlich kündbar/.test(p.planZeilen[0]) && /verlängert sich automatisch um je einen Monat/.test(p.planZeilen[0])
+    && /verlängert sich automatisch um je ein Jahr/.test(p.planZeilen[1]) && /kein Abo/.test(p.planZeilen[2]), JSON.stringify(p.planZeilen));
   pruefe('Vergleich: Kopfzeile und 7 Zeilen', p.zeilen === 8, String(p.zeilen));
   pruefe('kein Druck, kein Betrag (nur noch, letzte Chance, Euro, Komma-Preise)', !/nur noch|letzte chance|€|\bEUR\b|\d+,\d\d/i.test(p.text), p.text.slice(0, 120));
   pruefe('Handy 390 x 844: Plaene ohne Scrollen im Bild, kein Ueberlauf, Knoepfe >= 44 px', p.plaeneImBild && p.ueber <= 0 && p.klein === 0, JSON.stringify(p));
