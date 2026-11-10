@@ -153,6 +153,8 @@
   .erg-stern:nth-child(2) .e-stern { width: 60px; height: 60px; margin-top: -6px; }
   .erg-stern b { font-size: 13px; }
   .erg-stern small { font-size: 12px; }
+  /* R13-1: das NEU-Schild der rechten Spalte ragte am iPhone SE 2 px ueber den Rumpf, naeher an den kleineren Stern */
+  .e-neu { left: calc(50% + 10px); padding: 2px 5px; }
   .erg-knoepfe { grid-template-columns: 1fr; }
   .erg-knoepfe .knopf { min-height: 52px; font-size: 16px; }
   .erg-bot .av { width: 42px; height: 42px; border-radius: 14px; }
