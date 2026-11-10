@@ -113,9 +113,23 @@ function speichereDatei(datei) {
 // Muss im Klick bleiben (Safari verlangt fuer share() eine frische Nutzer-Geste): die Datei liegt schon bereit,
 // share() wird ohne await davor aufgerufen.
 function teileDatei(datei, titel) {
-  if (kannTeilen(datei)) return navigator.share({ files: [datei], title: 'Crownmate', text: titel }).then(() => 'teilen');
+  if (kannTeilen(datei)) {
+    const daten = { files: [datei], title: 'Crownmate', text: titel };
+    // Link zur App dazu, damit Empfaenger (z. B. im Messenger) etwas zum Antippen haben; nur wenn das Geraet ihn
+    // zusammen mit der Datei annimmt, sonst teilt es wie bisher nur Bild und Text
+    const link = appLink();
+    try { if (link && navigator.canShare({ ...daten, url: link })) daten.url = link; } catch (e) { /* ohne Link */ }
+    return navigator.share(daten).then(() => 'teilen');
+  }
   speichereDatei(datei);
   return Promise.resolve('datei');
+}
+// Adresse wie im Bild (appAdresse), mit Protokoll; leer in einer App-Huelle ohne Web-Adresse
+function appLink() {
+  const ort = globalThis.location;
+  const adresse = appAdresse(ort && ort.href);
+  if (!adresse) return '';
+  return (ort && ort.protocol === 'http:' ? 'http:' : 'https:') + '//' + adresse + '/';
 }
 
 // ---------- Blatt mit Vorschau ----------
