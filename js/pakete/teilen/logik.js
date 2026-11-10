@@ -19,8 +19,8 @@
 //   datumText(iso) -> 'TT.MM.JJJJ' | null   derselbe Kalendertag fuers Bild (der Dateiname nimmt ihn auch); Englisch
 //                                    'MM/TT/JJJJ'. Alle Texte des Bildes kommen aus dem Woerterbuch p-teilen (texte.js)
 //                                    in der eingestellten Sprache, ohne Wahl Deutsch (so auch in Node).
-//   MARKEN_ADRESSE                   feste Adresse fuer den Fuss des Bildes; leer: die Adresse der Seite (Flo entscheidet,
-//                                    z. B. spaeter die Crownmate-Domain statt der GitHub-Adresse)
+//   MARKEN_ADRESSE                   feste Adresse fuer den Fuss des Bildes und den Teilen-Link: crownmate.de (seit 10.11.2026,
+//                                    die Domain liefert die App aus); leer: die Adresse der Seite
 //   adresseAus(href) -> Text         Adresse der App ohne Protokoll, index.html, Suche und Anker; leer fuer alles, was
 //                                    keine Web-Adresse ist (App-Huelle capacitor://localhost, https://localhost, file:)
 //   appAdresse(href) -> Text         MARKEN_ADRESSE, sonst adresseAus(href)
@@ -39,7 +39,7 @@ import { t, zahl } from '../../sprache.js';
 import './texte.js';
 
 export const RECHENSTAND = 1;
-export const MARKEN_ADRESSE = '';
+export const MARKEN_ADRESSE = 'crownmate.de';
 export const BREITE = 1080;
 export const HOEHE = 1350;
 

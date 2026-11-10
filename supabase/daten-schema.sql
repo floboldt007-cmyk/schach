@@ -330,6 +330,7 @@ declare
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
   duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
+  raetsel jsonb;
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -429,7 +430,8 @@ begin
                ''buchungen'', coalesce((select jsonb_agg(to_jsonb(b) - ''user_id'' order by b.am, b.id)
                  from public.kronen_buchungen b where b.user_id = $1), ''[]''::jsonb),
                ''gruppen'', coalesce((select jsonb_agg(jsonb_build_object(''woche'', m.woche, ''stufe'', g.stufe,
-                   ''kronen'', m.kronen, ''beigetreten'', m.beigetreten) order by m.woche)
+                   ''kronen'', m.kronen, ''beigetreten'', m.beigetreten,
+                   ''liga'', coalesce(to_jsonb(m) ->> ''liga'', ''online'')) order by m.woche)
                  from public.liga_mitglieder m join public.liga_gruppen g on g.id = m.gruppe where m.user_id = $1), ''[]''::jsonb),
                ''belohnungen'', coalesce((select jsonb_agg(to_jsonb(l) - ''user_id'' order by l.woche, l.id)
                  from public.liga_belohnungen l where l.user_id = $1), ''[]''::jsonb),
@@ -437,6 +439,13 @@ begin
                ''ki_belege'', coalesce((select jsonb_agg(to_jsonb(k) - ''user_id'' order by k.erstellt_am)
                  from public.suche_ki_belege k where k.user_id = $1), ''[]''::jsonb))'
       into kronen using uid;
+    kronen := kronen || jsonb_build_object('raetsel_stand', null);
+  end if;
+  -- Zwei Ligen (zwei-ligen-schema.sql): der eigene Stand der Raetsel-Liga (Stufe, Kronen, Raetsel-Elo)
+  if to_regclass('public.raetsel_stand') is not null then
+    execute 'select to_jsonb(r) - ''user_id'' from public.raetsel_stand r where r.user_id = $1'
+      into raetsel using uid;
+    kronen := kronen || jsonb_build_object('raetsel_stand', raetsel);
   end if;
   -- Visitenkarte und Erfolge (karte-schema.sql, Etappe 4b): erreichte Stufen, alle Taler-Buchungen, eigene Banner und die
   -- gewaehlte Karte (Banner, Titel, Vitrine, Profilbild)

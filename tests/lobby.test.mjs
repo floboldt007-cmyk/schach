@@ -56,8 +56,9 @@ pruefe('Umschalter ohne Labor: nichts (null)', modusLeiste({ gehe() {} }, 'welte
 {
   const { BOT_ERSATZ_MS } = await import('../js/kronen.js');
   const quelle = (await import('node:fs')).readFileSync(path.join(WURZEL, 'js/ui/lobby.js'), 'utf8');
-  pruefe('KI-Gegner nach 10 s: BOT_ERSATZ_MS 10000, die Lobby nimmt ihn ohne Testschalter',
-    BOT_ERSATZ_MS === 10000 && /window\.__lobbyBotMs : BOT_ERSATZ_MS;/.test(quelle));
+  // Punkt 40: die Wartezeit nennt der Server (warte_s), ohne neues SQL gelten die 10 s aus js/gegnersuche.js
+  pruefe('KI-Gegner: BOT_ERSATZ_MS 10000 (altes SQL), die Lobby nimmt ohne Testschalter die Wartezeit des Servers',
+    BOT_ERSATZ_MS === 10000 && /window\.__lobbyBotMs : undefined;/.test(quelle));
   const kern = (await import('node:fs')).readFileSync(path.join(WURZEL, 'js/sprachen/partie.js'), 'utf8');
   // das Abzeichen steht in den Kern-Texten (partie.kiGegner): der Kern laedt ohne Pakete keine Paket-Datei
   pruefe('Texte fuer die Gegnersuche: KI-Gegner (Kern) und Anmelde-Hinweis', /kiGegner: 'KI-Gegner'/.test(kern) && /kiGegner: 'AI opponent'/.test(kern) && !('ki' in DE)
@@ -164,17 +165,19 @@ async function browserTeil() {
         werte: [...document.querySelectorAll('.lb-wert')].map((w) => w.dataset.art + ':' + w.querySelector('b').textContent),
         liga: document.querySelectorAll('.lb-liga, .lb-tabelle li').length, beispiel: /Beispiel|Turmfalke/.test(document.querySelector('.screen.lobby').textContent), mehr: [...document.querySelectorAll('.lb-modus-karte')].map((b) => b.dataset.ziel + (b.disabled ? '-' : '+')),
         reiter: document.querySelector('.reiter-leiste .reiter[aria-current="page"], .reiter-leiste .reiter.aktiv')?.dataset.reiter || null,
-        hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1,
-        klein: [...document.querySelectorAll('.lb-zeit, .lb-suchen, .lb-modus-karte')].filter((e) => e.getBoundingClientRect().height < 44).length,
+        hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1, zeitenZu: document.querySelector('.lb-zeiten').hidden,
+        klein: [...document.querySelectorAll('.lb-zeit, .lb-suchen, .lb-modus-karte')].filter((e) => e.getClientRects().length && e.getBoundingClientRect().height < 44).length,
       }));
       pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), keine Beispiel-Liga (Flo 08.11.2026)',
         lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2*,5+0,10+0,15+10,30+0' && lobby.werte.join() === 'blitz:400,schnell:400,klassisch:400'
         && lobby.liga === 0 && !lobby.beispiel, lobby);
+      // Punkt 40: Ranked (gewertet) hat die feste Zeit 5 + 3, die Wahl gibt es nur fuer Freundschaft
+      pruefe('Lobby: gewertet ohne Bedenkzeit-Wahl (feste Zeit), Freundschaft zeigt sie', lobby.zeitenZu, lobby);
       pruefe('Lobby: Gegen Freunde und Raetsel-Duell offen, Turniere bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
         lobby.mehr.join() === 'online+,turniere-,duell+' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
-      await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
       // Etappe B Task 4: gewertet sucht jetzt echt auf dem Server; die Vorschau mit Bot bleibt bei Freundschaft
       await p.s.locator('.lb-spielen [data-wert="freundschaft"]').click();
+      await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
       const zeile = await p.s.locator('.lb-zeile').innerText();
       pruefe('Bedenkzeit 10 + 0 waehlen: Haken wandert, Zeile nennt Schnellschach', await p.s.locator('.lb-zeit[aria-checked="true"]').getAttribute('data-zeit') === '10+0'
         && /Schnellschach/.test(zeile), zeile);
@@ -250,18 +253,19 @@ async function browserTeil() {
         await zurLobby(p);
         await p.s.locator('.lb-suchen').click();
         await warte(BOT_MS - 800);
-        const frueh = { suche: await p.s.locator('.lb-suche[data-phase="suche"]').count(), screen: await screen(p), namen: p.aufrufe.map((a) => a.name) };
+        const frueh = { suche: await p.s.locator('.lb-suche[data-phase="suche"]').count(), screen: await screen(p), namen: p.aufrufe.map((a) => a.name),
+          kiKnopf: await p.s.evaluate(() => document.querySelector('.lb-ki-jetzt')?.hidden) };
         // nur die Suche zaehlt: der Karten-Abgleich (karte_melde_stufen, Etappe 4b) darf beim Start davor laufen
         const sucheAufrufe = p.aufrufe.filter((a) => a.name.startsWith('online_suche'));
         pruefe('suche: Bot erst nach der Wartezeit (vorher Suche beim Server, kein Bot)', frueh.suche === 1 && frueh.screen === 'lobby'
-          && sucheAufrufe[0]?.name === 'online_suche_start' && sucheAufrufe[0].daten?.zeit === '3+2' && frueh.namen.includes('online_suche_stand')
-          && !frueh.namen.includes('online_suche_ende'), frueh);
+          && sucheAufrufe[0]?.name === 'online_suche_start' && sucheAufrufe[0].daten?.zeit === '5+3' && frueh.namen.includes('online_suche_stand')
+          && !frueh.namen.includes('online_suche_ende') && frueh.kiKnopf === true, frueh);
         await p.s.waitForFunction(() => window.__partie && window.__partie.z, null, { timeout: 15000 });
         const ki = await p.s.evaluate(() => ({ abz: document.querySelector('.screen.partie .ki-abzeichen')?.textContent, ki: window.__partie.z.ki,
           ref: window.__partie.z.kiRef, tempo: window.__partie.z.tempo, suche: !!document.querySelector('.lb-suche') }));
         const enden = p.aufrufe.filter((a) => a.name === 'online_suche_ende');
-        pruefe('suche: danach Partie mit Abzeichen "KI-Gegner", Beleg gemerkt, gleiche Uhr 3 + 2, genau ein Ende mit ki',
-          ki.abz === 'KI-Gegner' && ki.ki === true && ki.ref === KI && ki.tempo?.grund === 180 && ki.tempo?.zuschlag === 2 && !ki.suche
+        pruefe('suche: danach Partie mit Abzeichen "KI-Gegner", Beleg gemerkt, feste Ranked-Uhr 5 + 3, genau ein Ende mit ki',
+          ki.abz === 'KI-Gegner' && ki.ki === true && ki.ref === KI && ki.tempo?.grund === 300 && ki.tempo?.zuschlag === 3 && !ki.suche
           && enden.length === 1 && enden[0].daten?.ki === true, { ki, enden });
         pruefe('suche: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
         await p.k.close();
