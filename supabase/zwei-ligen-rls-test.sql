@@ -4,7 +4,8 @@
 -- Abschnitte: 1 neuer Stand je Liga, Rechte; 2 Trennung der Kronen nach Quelle; 3 Start der Raetsel-Liga; 4 KI-Deckel je
 -- Liga; 5 Ranked-Zeit und Antwort der Suche; 6 Paarung nur nach Reihenfolge (grosser Elo-Abstand wird gepaart, die
 -- naechste Elo zuerst), online und Raetsel; 7 "Jetzt gegen KI" erst ab ki_frueh_s; 8 Wochen-Abrechnung je Liga;
--- 9 Raetsel-Elo aendert sich durch ein gewertetes Duell, die Online-Elo nicht.
+-- 9 Raetsel-Elo aendert sich durch ein gewertetes Duell, die Online-Elo nicht; 10 KI-Belege: Vorab-Niederlage, hoechstens
+-- ein offener Beleg, Korrektur auf Sieg und Remis, Abbruch ohne Meldung, volle Tagesgrenze.
 begin;
 
 insert into auth.users (id, email)
@@ -457,6 +458,111 @@ begin
   perform public.duell_auswerten(dd.id);
   if (select r.elo_n from public.raetsel_stand r where r.user_id = ub) <> 1 then
     raise exception 'FEHLER: Elo doppelt gebucht';
+  end if;
+end;
+$$;
+
+-- ---------- 10. KI-Belege: Vorab-Niederlage, hoechstens ein offener Beleg ----------
+-- Als Besitzer mit gesetzter Anmeldung (die Funktionen sind security definer; die Rechte prueft Abschnitt 1).
+-- now() steht in der Transaktion still: Suchbeginn und Alter eines Belegs werden zurueckgestellt.
+insert into auth.users (id, email) values ('a8000000-0000-4000-8000-000000000008', 'ligen-ki@example.invalid');
+do $$
+declare
+  u uuid := 'a8000000-0000-4000-8000-000000000008';
+  r1 uuid;
+  r2 uuid;
+  r3 uuid;
+  r4 uuid;
+  r5 uuid;
+  a jsonb;
+  ref_text text;
+  i integer;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"a8000000-0000-4000-8000-000000000008","role":"authenticated"}', true);
+  perform public.kronen_einfach_buchen(u, 'bot', 'ki-start', 'sieg');
+  update public.liga_mitglieder m set kronen = 100 where m.user_id = u and m.liga = 'online';
+  update public.kronen_stand s set kronen = 100 where s.user_id = u;
+
+  -- Beleg 1: sofort -10
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (u, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '11 seconds');
+  r1 := (public.online_suche_ende(true) ->> 'ki_ref')::uuid;
+  if r1 is null or (select m.kronen from public.liga_mitglieder m where m.user_id = u and m.liga = 'online') <> 90 then
+    raise exception 'FEHLER: Beleg ohne Vorab-Niederlage (%)',
+      (select m.kronen from public.liga_mitglieder m where m.user_id = u and m.liga = 'online');
+  end if;
+
+  -- Stapeln: Beleg 2 schliesst Beleg 1 (bleibt verloren), Beleg 1 ist nicht mehr einloesbar
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (u, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '11 seconds');
+  r2 := (public.online_suche_ende(true) ->> 'ki_ref')::uuid;
+  update public.suche_ki_belege b set erstellt_am = now() - interval '61 seconds' where b.user_id = u;
+  a := public.kronen_ki_ergebnis(r1, 'sieg');
+  if a->>'fehler' is distinct from 'KRONEN_BELEG'
+     or (select count(*) from public.suche_ki_belege b where b.user_id = u and not b.eingeloest) <> 1 then
+    raise exception 'FEHLER: Belege lassen sich stapeln (%)', a;
+  end if;
+  if (select m.kronen from public.liga_mitglieder m where m.user_id = u and m.liga = 'online') <> 80 then
+    raise exception 'FEHLER: zwei Belege nicht je -10';
+  end if;
+
+  -- zu frueh: Fehler, Beleg bleibt offen, -10 bleibt; danach Sieg: -10 weg, +20 (80 + 30 = 110), delta 20
+  update public.suche_ki_belege b set erstellt_am = now() - interval '30 seconds' where b.ref = r2;
+  a := public.kronen_ki_ergebnis(r2, 'sieg');
+  if a->>'fehler' is distinct from 'KRONEN_ZU_FRUEH'
+     or (select m.kronen from public.liga_mitglieder m where m.user_id = u and m.liga = 'online') <> 80 then
+    raise exception 'FEHLER: zu fruehe Meldung (%)', a;
+  end if;
+  update public.suche_ki_belege b set erstellt_am = now() - interval '61 seconds' where b.ref = r2;
+  a := public.kronen_ki_ergebnis(r2, 'sieg');
+  if (a->>'delta')::int is distinct from 20 or (a->>'kronen')::int is distinct from 110
+     or (select b.delta from public.kronen_buchungen b where b.user_id = u and b.quelle = 'ki' and b.ref = r2::text) <> 20 then
+    raise exception 'FEHLER: Sieg korrigiert die Vorab-Niederlage nicht (%)', a;
+  end if;
+  a := public.kronen_ki_ergebnis(r2, 'sieg');
+  if a->>'fehler' is distinct from 'KRONEN_BELEG'
+     or (select m.kronen from public.liga_mitglieder m where m.user_id = u and m.liga = 'online') <> 110 then
+    raise exception 'FEHLER: Sieg doppelt eingeloest (%)', a;
+  end if;
+
+  -- Abbruch ohne Meldung: Beleg 3 bleibt bei -10 (110 -> 100), auch nachdem Beleg 4 ihn schliesst (100 -> 90)
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (u, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '11 seconds');
+  r3 := (public.online_suche_ende(true) ->> 'ki_ref')::uuid;
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (u, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '11 seconds');
+  r4 := (public.online_suche_ende(true) ->> 'ki_ref')::uuid;
+  if (select m.kronen from public.liga_mitglieder m where m.user_id = u and m.liga = 'online') <> 90
+     or (select b.delta from public.kronen_buchungen b where b.user_id = u and b.quelle = 'ki' and b.ref = r3::text)
+        is distinct from -10 then
+    raise exception 'FEHLER: Abbruch ohne Meldung kostet nichts';
+  end if;
+
+  -- Niederlage gemeldet (alte App): nicht doppelt bestraft, bleibt -10 (90)
+  update public.suche_ki_belege b set erstellt_am = now() - interval '61 seconds' where b.ref = r4;
+  a := public.kronen_ki_ergebnis(r4, 'niederlage');
+  if (a->>'delta')::int is distinct from -10 or (a->>'kronen')::int is distinct from 90 then
+    raise exception 'FEHLER: Niederlage doppelt bestraft (%)', a;
+  end if;
+
+  -- Remis: -10 weg, +5 (90 -> 80 -> 95)
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (u, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '11 seconds');
+  r5 := (public.online_suche_ende(true) ->> 'ki_ref')::uuid;
+  update public.suche_ki_belege b set erstellt_am = now() - interval '61 seconds' where b.ref = r5;
+  a := public.kronen_ki_ergebnis(r5, 'remis');
+  if (a->>'delta')::int is distinct from 5 or (a->>'kronen')::int is distinct from 95 then
+    raise exception 'FEHLER: Remis korrigiert nicht sauber (%)', a;
+  end if;
+
+  -- Tagesgrenze voll: Beleg ohne Vorab-Buchung, Meldung wie bisher KRONEN_GRENZE, Kronen unveraendert
+  for i in 1..20 loop
+    insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche)
+    values (u, 'ki', 'voll-' || i, 0, public.liga_woche_am(pg_catalog.clock_timestamp()));
+  end loop;
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (u, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '11 seconds');
+  ref_text := public.online_suche_ende(true) ->> 'ki_ref';
+  update public.suche_ki_belege b set erstellt_am = now() - interval '61 seconds' where b.ref = ref_text::uuid;
+  a := public.kronen_ki_ergebnis(ref_text::uuid, 'sieg');
+  if a->>'fehler' is distinct from 'KRONEN_GRENZE'
+     or exists (select 1 from public.kronen_buchungen b where b.user_id = u and b.ref = ref_text)
+     or (select m.kronen from public.liga_mitglieder m where m.user_id = u and m.liga = 'online') <> 95 then
+    raise exception 'FEHLER: volle Tagesgrenze (%)', a;
   end if;
 end;
 $$;

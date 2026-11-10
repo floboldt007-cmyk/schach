@@ -722,6 +722,10 @@ $$;
 
 -- Suche beenden ("Jetzt gegen KI", nach 30 s von selbst, oder Abbruch). Mit ki = true und mindestens ki_frueh_s Suche
 -- ohne Paarung: Beleg { ki_ref } fuer kronen_ki_ergebnis; sonst {} (dann ohne Kronen).
+-- Gegen Farmen (Befund 10.11.2026): hoechstens EIN offener Beleg je Konto, ein neuer schliesst den alten (der zaehlt dann
+-- als verloren), und jeder Beleg bucht sofort eine Vorab-Niederlage, die kronen_ki_ergebnis auf das Ergebnis korrigiert.
+-- Wer eine KI-Partie verlaesst, ohne zu melden, hat sie so verloren. Ist die Tagesgrenze schon voll, gibt es den Beleg
+-- ohne Vorab-Buchung (die Meldung bekommt dann wie bisher KRONEN_GRENZE).
 create or replace function public.online_suche_ende(ki boolean default false)
 returns jsonb
 language plpgsql
@@ -740,10 +744,79 @@ begin
   if ki is true and seit_war is not null
      and seit_war <= now() - make_interval(secs => (public.kronen_konstanten() ->> 'ki_frueh_s')::integer)
      and public.online_suche_partie(uid) is null then
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('kronen-melden:' || uid::text));
+    update public.suche_ki_belege b set eingeloest = true where b.user_id = uid and not b.eingeloest;
     insert into public.suche_ki_belege (user_id) values (uid) returning ref into r;
+    if public.kronen_heute_anzahl(uid, 'ki') < (public.kronen_konstanten() ->> 'ki_tagesgrenze')::integer then
+      perform public.kronen_einfach_buchen(uid, 'ki', r::text, 'niederlage');
+    end if;
     return jsonb_build_object('ki_ref', r);
   end if;
   return '{}'::jsonb;
+end;
+$$;
+
+-- Ergebnis gegen einen KI-Gegner (ersetzt die Fassung aus kronen-schema.sql, gleiche Antwortform). Reihenfolge:
+-- Eingabe -> Beleg (eigener, offen, juenger als 6 h) -> Mindestdauer 60 s (Beleg bleibt offen, die Vorab-Niederlage
+-- steht) -> einloesen. Mit Vorab-Buchung wird sie auf das Ergebnis korrigiert (die Tagesgrenze zaehlte schon beim
+-- Beleg; ein Sieg wie bisher hoechstens bis zum Wochendeckel); delta ist das Ergebnis der ganzen Partie. Ohne
+-- Vorab-Buchung (Beleg von vor dem Einspielen oder bei voller Tagesgrenze) wie bisher: Tagesgrenze, dann buchen.
+-- Liegt die Vorab-Buchung in einer frueheren Woche (Partie ueber Montag 0 Uhr), bleibt sie stehen (delta 0).
+create or replace function public.kronen_ki_ergebnis(ki_ref uuid, ergebnis text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  konst jsonb := public.kronen_konstanten();
+  beleg public.suche_ki_belege;
+  vor public.kronen_buchungen;
+  wo date := public.liga_woche_am(pg_catalog.clock_timestamp());
+  ziel integer;
+  stufe integer;
+  d integer;
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  if ki_ref is null or ergebnis is null or ergebnis not in ('sieg', 'remis', 'niederlage') then
+    return jsonb_build_object('fehler', 'KRONEN_EINGABE');
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('kronen-melden:' || uid::text));
+  select * into beleg from public.suche_ki_belege b
+  where b.ref = ki_ref and b.user_id = uid and not b.eingeloest and b.erstellt_am > now() - interval '6 hours'
+  for update;
+  if beleg.ref is null then
+    return jsonb_build_object('fehler', 'KRONEN_BELEG');
+  end if;
+  if now() - beleg.erstellt_am < make_interval(secs => (konst ->> 'ki_mindestdauer_s')::integer) then
+    return jsonb_build_object('fehler', 'KRONEN_ZU_FRUEH');
+  end if;
+  update public.suche_ki_belege b set eingeloest = true where b.ref = ki_ref;
+  select * into vor from public.kronen_buchungen b
+  where b.user_id = uid and b.quelle = 'ki' and b.ref = ki_ref::text for update;
+  if vor.id is null then
+    if public.kronen_heute_anzahl(uid, 'ki') >= (konst ->> 'ki_tagesgrenze')::integer then
+      return jsonb_build_object('fehler', 'KRONEN_GRENZE');
+    end if;
+    return public.kronen_einfach_buchen(uid, 'ki', ki_ref::text, ergebnis);
+  end if;
+  stufe := public.liga_stufe_sichern(uid, 'online');
+  if vor.woche = wo then
+    ziel := (konst #>> array['kronen', 'ki', ergebnis])::integer;
+    if ziel > 0 then
+      ziel := least(ziel, greatest(0, (konst ->> 'bot_ki_wochen_max')::integer - public.liga_bot_ki_genutzt_in(uid, wo, 'online')));
+    end if;
+    d := public.liga_buchen_in(uid, 'online', ziel - vor.delta);
+    update public.kronen_buchungen b set delta = vor.delta + d where b.id = vor.id;
+    vor.delta := vor.delta + d;
+  end if;
+  return jsonb_build_object('delta', vor.delta,
+    'kronen', coalesce((public.liga_mein_platz_in(uid, 'online') ->> 'kronen')::integer, 0),
+    'stufe', stufe,
+    'bot_ki_voll', public.liga_bot_ki_genutzt_in(uid, wo, 'online') >= (konst ->> 'bot_ki_wochen_max')::integer);
 end;
 $$;
 
@@ -1004,6 +1077,7 @@ revoke all on function public.online_suche_warten(uuid) from public, anon, authe
 revoke all on function public.online_suche_start(text) from public, anon, authenticated;
 revoke all on function public.online_suche_stand() from public, anon, authenticated;
 revoke all on function public.online_suche_ende(boolean) from public, anon, authenticated;
+revoke all on function public.kronen_ki_ergebnis(uuid, text) from public, anon, authenticated;
 revoke all on function public.duell_suche_paaren(uuid) from public, anon, authenticated;
 revoke all on function public.duell_suche_warten(uuid) from public, anon, authenticated;
 revoke all on function public.duell_suche_start() from public, anon, authenticated;
@@ -1019,6 +1093,7 @@ grant execute on function public.kronen_konstanten() to authenticated;
 grant execute on function public.online_suche_start(text) to authenticated;
 grant execute on function public.online_suche_stand() to authenticated;
 grant execute on function public.online_suche_ende(boolean) to authenticated;
+grant execute on function public.kronen_ki_ergebnis(uuid, text) to authenticated;
 grant execute on function public.duell_suche_start() to authenticated;
 grant execute on function public.duell_suche_stand() to authenticated;
 grant execute on function public.duell_suche_ende(boolean) to authenticated;
