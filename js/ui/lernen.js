@@ -113,7 +113,7 @@ export function zeige(root, params, app) {
       ${GRUPPEN.map(([id, stufen]) => {
         const liste = bereich.lektionen.filter((l) => stufen.includes(l.stufe));
         if (!liste.length) return '';
-        return `<section class="ms-gruppe" data-stufe="${id}"><h3>${esc(S('gruppe.' + id))}</h3>
+        return `<section class="ms-gruppe" data-stufe="${id}"><h2>${esc(S('gruppe.' + id))}</h2>
           <ol class="ms-liste">${liste.map((l) => zeile(l, nr(l), stufen.length > 1)).join('')}</ol></section>`;
       }).join('')}`;
     if (tempo() > 0) {

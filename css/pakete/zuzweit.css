@@ -1,7 +1,7 @@
 /* Zu zweit: Namen und Uhr am gemeinsamen Brett; Farben und Abstaende aus dem Theme. */
 .partie.zz-screen { display: flex; flex-direction: column; min-height: 0; }
 .zz-screen > .kopf { gap: var(--a3); flex-shrink: 0; }
-.zz-screen > .kopf h2 { margin: 0; font-size: var(--fs-h2); }
+.zz-screen > .kopf h1 { margin: 0; font-size: var(--fs-h2); }
 .zz-rumpf { flex: 1; min-height: 0; overflow: auto; padding: var(--a4); }
 
 /* ---------- Startblatt (Stil der Startseite, css/heim.css): Buehne, Pillen, Schalter, Namen eingeklappt ---------- */
