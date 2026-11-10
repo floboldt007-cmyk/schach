@@ -36,9 +36,10 @@ begin
     raise exception 'FEHLER: Raetsel-Gruppe ohne Buchung falsch (%)', g;
   end if;
   if public.kronen_mein_stand() ? 'liga' or public.liga_meine_gruppe() ? 'liga' then
+  -- ranked_zeit ist Flos Wahl L3 (Empfehlung 5+3): nur das Format wird hier geprueft, der Wert steht EINMAL im Schema
     raise exception 'FEHLER: alte Aufrufe haben das neue Feld liga';
   end if;
-  if k->>'ranked_zeit' <> '5+3' or (k->>'mensch_warte_s')::int <> 30 or (k->>'ki_frueh_s')::int <> 10
+  if k->>'ranked_zeit' !~ '^[0-9]+[+][0-9]+$' or (k->>'mensch_warte_s')::int <> 30 or (k->>'ki_frueh_s')::int <> 10
      or k->'quellen_liga'->>'duell' <> 'raetsel' or k->'quellen_liga'->>'bot' <> 'online' then
     raise exception 'FEHLER: Konstanten falsch (%)', k;
   end if;
@@ -194,7 +195,7 @@ declare
   r jsonb;
 begin
   r := public.online_suche_start('3+2');
-  if not (r->>'wartet')::boolean or r->>'zeit' <> '5+3' or (r->>'warte_s')::int <> 30 or (r->>'ki_ab_s')::int <> 10
+  if not (r->>'wartet')::boolean or r->>'zeit' <> public.kronen_konstanten() ->> 'ranked_zeit' or (r->>'warte_s')::int <> 30 or (r->>'ki_ab_s')::int <> 10
      or r->>'seit' is null then
     raise exception 'FEHLER: Antwort der Online-Suche falsch (%)', r;
   end if;
@@ -213,14 +214,14 @@ $$;
 reset role;
 do $$
 begin
-  if (select q.zeit from public.suche_warteschlange q where q.user_id = 'b2000000-0000-4000-8000-000000000002') <> '5+3' then
+  if (select q.zeit from public.suche_warteschlange q where q.user_id = 'b2000000-0000-4000-8000-000000000002') <> public.kronen_konstanten() ->> 'ranked_zeit' then
     raise exception 'FEHLER: Warteschlange nicht in der Ranked-Zeit';
   end if;
 end;
 $$;
 
 -- ---------- 6. Paarung: grosser Elo-Abstand wird gepaart, naechste Elo zuerst ----------
--- B wartet mit Elo 2800 (gesetzt), E sucht mit Elo 400 ohne Zeitangabe: sofort eine gewertete Partie in 5+3
+-- B wartet mit Elo 2800 (gesetzt), E sucht mit Elo 400 ohne Zeitangabe: sofort eine gewertete Partie in der Ranked-Zeit
 update public.suche_warteschlange q set elo = 2800 where q.user_id = 'b2000000-0000-4000-8000-000000000002';
 do $$
 begin
@@ -246,7 +247,7 @@ declare
 begin
   select * into p from public.partien_online x
   where 'e5000000-0000-4000-8000-000000000005' in (x.weiss, x.schwarz) and x.gewertet;
-  if p.id is null or p.bedenkzeit_s <> 300 or p.inkrement_s <> 3
+  if p.id is null or p.bedenkzeit_s || '+' || p.inkrement_s <> (split_part(public.kronen_konstanten() ->> 'ranked_zeit', '+', 1)::int * 60) || '+' || split_part(public.kronen_konstanten() ->> 'ranked_zeit', '+', 2)
      or 'b2000000-0000-4000-8000-000000000002' not in (p.weiss, p.schwarz) then
     raise exception 'FEHLER: gepaarte Partie falsch (%)', to_jsonb(p);
   end if;
@@ -260,8 +261,8 @@ $$;
 do $$
 begin
   insert into public.suche_warteschlange (user_id, zeit, elo, seit) values
-    ('d4000000-0000-4000-8000-000000000004', '5+3', 1000, now() - interval '20 seconds'),
-    ('c3000000-0000-4000-8000-000000000003', '5+3', 1777, now() - interval '5 seconds');
+    ('d4000000-0000-4000-8000-000000000004', public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '20 seconds'),
+    ('c3000000-0000-4000-8000-000000000003', public.kronen_konstanten() ->> 'ranked_zeit', 1777, now() - interval '5 seconds');
   update public.kronen_stand s set elo = 1700 where s.user_id = 'a1000000-0000-4000-8000-000000000001';
 end;
 $$;
@@ -329,7 +330,7 @@ $$;
 do $$
 begin
   insert into public.suche_warteschlange (user_id, zeit, elo, seit) values
-    ('d4000000-0000-4000-8000-000000000004', '5+3', 1000, now() - interval '5 seconds');
+    ('d4000000-0000-4000-8000-000000000004', public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '5 seconds');
   insert into public.duell_warteschlange (user_id, elo, seit) values
     ('d4000000-0000-4000-8000-000000000004', 1000, now() - interval '5 seconds');
 end;
@@ -347,7 +348,7 @@ reset role;
 do $$
 begin
   insert into public.suche_warteschlange (user_id, zeit, elo, seit) values
-    ('d4000000-0000-4000-8000-000000000004', '5+3', 1000, now() - interval '11 seconds');
+    ('d4000000-0000-4000-8000-000000000004', public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '11 seconds');
   insert into public.duell_warteschlange (user_id, elo, seit) values
     ('d4000000-0000-4000-8000-000000000004', 1234, now() - interval '11 seconds');
 end;
