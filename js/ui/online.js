@@ -33,10 +33,15 @@ const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const andere = f => f === 'w' ? 'b' : 'w';
 const TEMPI = { ohne: [null, 0], '5': [300, 0], '10': [600, 0], '15': [900, 10] };
 const uhrText = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-// Mit Uhr und vor dem 2. Halbzug beendet der Server eine Partie nach 10 Minuten ohne Zug (online_haengt in
-// supabase/online-schema.sql). Danach fragt die Oberflaeche hoechstens einmal je Minute nach (online_pruefe_zeit).
+// Mit Uhr und vor dem 2. Halbzug beendet der Server eine Partie ohne Zug (online_haengt in supabase/zwei-ligen-schema.sql):
+// gewertet nach ranked_haengt_s (30 s), Freundespartien nach 10 Minuten. Die Oberflaeche fragt erst danach
+// (online_pruefe_zeit), gewertet eine Sekunde nach dem Server; meldet er noch nichts (Uhren weichen ab), fragt sie
+// gewertet nach 5 s, sonst nach einer Minute erneut. Vertrag: tests/online-haengt-vertrag.test.mjs.
 const HAENGT_MS = 10 * 60 * 1000;
 const HAENGT_ABFRAGE_MS = 60 * 1000;
+const HAENGT_RANKED_MS = (30 + 1) * 1000;
+const HAENGT_RANKED_ABFRAGE_MS = 5 * 1000;
+const haengtNachMs = p => p.gewertet ? HAENGT_RANKED_MS : HAENGT_MS;
 // Partie-Ansicht wie die Bot-Partie (Flo 11.11.2026: "soll aussehen wie die Bot-Partie"): dasselbe Gerippe wie
 // js/ui/partie.js (.partie > .inhalt > .brettzone + .seite, Spielerleisten, .spielknoepfe), damit css/partie.css Brett,
 // Leisten, Uhren und Knoepfe gleich setzt. Auf dem Handy rechnet layout() unten die Brettgroesse wie dort.
@@ -634,9 +639,10 @@ export function zeige(root, params, app) {
     if (halbzuege >= 2 && rest(p.am_zug) === 0) {
       zeitPruefung = Date.now() + 5000;
       aktion(() => online.pruefeZeit(p.id));
-    } else if (halbzuege < 2 && p.letzter_zug_am && Date.now() - Date.parse(p.letzter_zug_am) >= HAENGT_MS) {
-      // vor dem 2. Halbzug laeuft keine Uhr: der Server beendet die Partie nach 10 Minuten ohne Zug als abgebrochen
-      zeitPruefung = Date.now() + HAENGT_ABFRAGE_MS;
+    } else if (halbzuege < 2 && p.letzter_zug_am && Date.now() - Date.parse(p.letzter_zug_am) >= haengtNachMs(p)) {
+      // vor dem 2. Halbzug laeuft keine Uhr: der Server beendet die Partie ohne Zug als abgebrochen (gewertet 30 s,
+      // sonst 10 Minuten)
+      zeitPruefung = Date.now() + (p.gewertet ? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS);
       aktion(() => online.pruefeZeit(p.id));
     }
   }
