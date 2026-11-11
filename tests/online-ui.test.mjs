@@ -37,6 +37,8 @@ let altBeleg = false; // altes SQL, das nach der Wartezeit einen KI-Beleg gibt (
 let ligaVerzug = 0;
 // Befund 4 (11.11.2026): Erfinder-Konto mit Figurensatz Blaupause; die Antwort kommt spaet, wie im Handy-Netz
 let erfinder = false, sonderVerzug = 0;
+// R2: Tageskontingent der Live-Bewertung (online_live_bewertung_frei/nutzen), Antwort wie supabase/zwei-ligen-schema.sql
+let liveFrei = { frei: true, rest: 1, unbegrenzt: false };
 const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
 const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234', gewertet = false } = {}) {
@@ -84,6 +86,9 @@ try {
     if (rpc === 'online_suche_ende') return antwort((neuesSql || altBeleg) && body.ki === true ? { ki_ref: '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' } : {});
     if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
+    if (rpc === 'online_live_bewertung_frei') return antwort(liveFrei);
+    if (rpc === 'online_live_bewertung_nutzen') return antwort(liveFrei.frei ? { ok: true, frei: true, rest: 0, unbegrenzt: liveFrei.unbegrenzt, gebucht: !liveFrei.unbegrenzt }
+      : { ok: false, frei: false, rest: 0, unbegrenzt: false, gebucht: false });
     if (rpc === 'online_meine') return antwort([...partien.values()].filter(p => p.status !== 'beendet'));
     if (rpc === 'online_erstelle') {
       const neu = partie({ farbe: body.farbe === 'b' ? 'b' : 'w', status: 'offen', zeit: body.bedenkzeit_s, code: 'DEF567' });
@@ -142,6 +147,16 @@ try {
     // test:einstellungen (sessionStorage, ueberlebt ein Neuladen): Zusatz-Einstellungen einzelner Pruefungen, z. B. Figurensatz
     let zusatz = {}; try { zusatz = JSON.parse(sessionStorage.getItem('test:einstellungen') || '{}'); } catch (e) { /* ohne */ }
     localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus', ...zusatz }));
+    // R2: Live-Bewertung ohne Stockfish (js/ui/online.js nimmt im Testmodus window.__onlineLiveEngine): jede Stellung bekommt
+    // ihre legalen Zuege als Varianten, der erste ist der beste; protokolliert jede Analyse
+    window.__liveAnalysen = [];
+    window.__onlineLiveEngine = async () => ({ async analyse(fen, o = {}) {
+      window.__liveAnalysen.push(fen);
+      const { Chess } = await import('/vendor/chess/chess.js');
+      const c = new Chess(fen), z = c.moves({ verbose: true }), n = Math.min(o.multipv || 1, z.length);
+      return { fen, turn: c.turn(), depth: o.depth, bestmove: z[0]?.lan,
+        lines: z.slice(0, Math.max(n, 1)).map((m, i) => ({ multipv: i + 1, depth: o.depth, eval: { cp: 20 - 10 * i, mate: null }, pv: [m.lan] })) };
+    } });
     const zeit = Date.now.bind(Date); window.__versatz = 0; Date.now = () => zeit() + window.__versatz;
     Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.__kopiert = t; } } });
@@ -601,6 +616,61 @@ try {
   if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, 'skin-blaupause.png') });
   pruefe('Online-Brett nutzt den eingestellten Figurensatz, auch wenn der Erfinder-Status spaet kommt', skin.bilder > 0 && skin.fremd.length === 0, skin);
   erfinder = false; sonderVerzug = 0;
+  // R2 (Feinschliff 11.11.2026, Flos Variante): Live-Bewertung eigener Zuege. Gewertet: Kontingent beim Start fragen,
+  // erst beim ersten eigenen Zug buchen, Symbol am Zielfeld, nichts zum Gegner
+  const symbol = f => seite.locator(`.on-brett .abzeichen-ort[data-feld="${f}"]`);
+  const liveRufe = ab => calls.slice(ab).filter(c => /online_live_bewertung/.test(c.pfad)).map(c => c.pfad.split('/').at(-1).replace('online_live_bewertung_', '') + ':' + c.body.partie);
+  const liveText = () => seite.evaluate(() => { const el = document.querySelector('.on-live'); return el && !el.hidden ? el.textContent : ''; });
+  liveFrei = { frei: true, rest: 1, unbegrenzt: false };
+  const gw = partie({ gewertet: true }), vorGw = calls.length; await oeffne(gw);
+  await seite.waitForFunction(() => /heute noch/.test(document.querySelector('.on-live')?.textContent));
+  pruefe('Gewertet: beim Start nur frei mit der Partie, Hinweis "heute noch 1 Partie frei", noch nichts gebucht',
+    liveRufe(vorGw).join() === 'frei:' + gw.id && /heute noch 1 Partie frei/.test(await liveText()), { rufe: liveRufe(vorGw), text: await liveText() });
+  await tippe('e2e4'); await symbol('e4').waitFor();
+  await seite.waitForFunction(() => /deine freie/.test(document.querySelector('.on-live').textContent));
+  pruefe('Erster eigener Zug: genau einmal nutzen, Symbol am Zielfeld, Hinweis "diese Partie ist deine freie"',
+    liveRufe(vorGw).join() === `frei:${gw.id},nutzen:${gw.id}` && await seite.locator('.on-brett .abzeichen-ort').count() === 1, liveRufe(vorGw));
+  const analysen = await seite.evaluate(() => window.__liveAnalysen.length);
+  zug(gw, 'e7e5'); await seite.waitForFunction(() => window.__online.chess().history().length === 2);
+  await seite.waitForTimeout(300);
+  pruefe('Gegnerzug: keine Analyse, kein Symbol am Feld des Gegners', await seite.evaluate(() => window.__liveAnalysen.length) === analysen && await symbol('e5').count() === 0);
+  await tippe('g1f3'); await symbol('f3').waitFor();
+  pruefe('Zweiter eigener Zug: Symbol wandert mit, keine zweite Buchung', liveRufe(vorGw).filter(r => r.startsWith('nutzen')).length === 1 && await symbol('e4').count() === 0);
+  liveFrei = { frei: false, rest: 0, unbegrenzt: false };
+  const leer = partie({ gewertet: true }), vorLeer = calls.length; await oeffne(leer);
+  await seite.waitForFunction(() => /morgen wieder/.test(document.querySelector('.on-live')?.textContent));
+  await tippe('e2e4'); await seite.waitForFunction(() => window.__online.partie().zuege.endsWith('e2e4') && !window.__online.busy());
+  await seite.waitForTimeout(300);
+  pruefe('Kontingent aufgebraucht: Hinweis "morgen wieder" mit Premium, kein nutzen, kein Symbol',
+    /morgen wieder/.test(await liveText()) && /Premium/.test(await liveText()) && liveRufe(vorLeer).join() === 'frei:' + leer.id && await symbol('e4').count() === 0, { rufe: liveRufe(vorLeer), text: await liveText() });
+  liveFrei = { frei: true, rest: null, unbegrenzt: true };
+  const prem = partie({ gewertet: true }); await oeffne(prem);
+  await tippe('e2e4'); await symbol('e4').waitFor();
+  pruefe('Premium: Symbol ohne Kontingent-Hinweis', await liveText() === '');
+  liveFrei = { frei: true, rest: 1, unbegrenzt: false };
+  const freund = partie(), vorFreund = calls.length; await oeffne(freund);
+  await tippe('e2e4'); await symbol('e4').waitFor();
+  pruefe('Freundespartie: live wie in der Bot-Partie, ohne Kontingent-Abfrage und ohne Hinweis', liveRufe(vorFreund).length === 0 && await liveText() === '');
+  // R2: die Probe sah beim Fortsetzen ein Brett ohne Zuege. Gemessen war es ein Tipp auf das 0 px breite Brett beim
+  // Screen-Wechsel (Zug kam nie an); diese Pruefung haelt fest, dass das erste sichtbare Bild schon alle Figuren zeigt
+  await seite.evaluate(() => sessionStorage.setItem('test:einstellungen', JSON.stringify({ bewegung: 'normal' })));
+  const fort = partie({ zuege: 'e2e4 e7e5 g1f3' }); await seite.goto(start + '#online');
+  // das erste Bild, in dem das Brett Flaeche hat: wie viele Figuren stehen dort, und wie viele sind noch durchscheinend?
+  await seite.evaluate(id => {
+    window.__erstesBild = null;
+    const sieh = () => {
+      const b = document.querySelector('.on-brett');
+      if (!b || b.getBoundingClientRect().width <= 100) { requestAnimationFrame(sieh); return; }
+      const f = [...b.querySelectorAll('img.figur')];
+      window.__erstesBild = { n: f.length, blass: f.filter(x => Number(getComputedStyle(x).opacity) < 0.99).length };
+    };
+    requestAnimationFrame(sieh);
+    window.__app.gehe('online', { partieId: id });
+  }, fort.id);
+  await seite.waitForFunction(() => window.__erstesBild);
+  const erstes = await seite.evaluate(() => window.__erstesBild);
+  pruefe('Fortsetzen mit Bewegung: im ersten sichtbaren Bild stehen alle 32 Figuren voll da, kein leeres Brett', erstes.n === 32 && erstes.blass === 0, erstes);
+  await seite.evaluate(() => sessionStorage.removeItem('test:einstellungen'));
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet });
 } catch (e) {
   pruefe('Ablauf ohne Abbruch', false, e.stack);
