@@ -101,6 +101,9 @@
 
 /* Banner in der Sammlung (die Wahl laeuft ueber die Zeile "Banner" unter "So sehen dich andere") */
 .sa-bild img.sk-banner { width: 100%; max-width: 168px; height: 42px; object-fit: cover; object-position: 30% center; border-radius: 6px; }
+/* Platz "Banner" (64 x 64, cover): das 4:1-Bild ist dort 256 px breit; die Mitte (Vorgabe 50 %) war die leere dunkle Flaeche.
+   Das Motiv liegt bei x 0,267 (siehe oben): 0,267 * 256 - 32 = 36 px von 192 px Ueberstand, also 19 % */
+.sa-platz-bild img.sk-banner { object-position: 19% center; }
 
 /* ---------- Freischalt-Moment ---------- */
 .st-moment { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; padding: 16px; background: rgba(8, 10, 14, .62); }
