@@ -35,14 +35,16 @@ let neuesSql = null; // { seit }: die Attrappe antwortet wie das neue SQL (Konze
 let altBeleg = false; // altes SQL, das nach der Wartezeit einen KI-Beleg gibt (Gegenprobe zum Hinweis "Verlassen")
 // G-005 AC-06: kronen_mein_stand antwortet so viele ms spaeter (wie im Handy-Netz), damit ein Springen beim Laden messbar wird
 let ligaVerzug = 0;
+// Befund 4 (11.11.2026): Erfinder-Konto mit Figurensatz Blaupause; die Antwort kommt spaet, wie im Handy-Netz
+let erfinder = false, sonderVerzug = 0;
 const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
 const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
-function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234' } = {}) {
+function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234', gewertet = false } = {}) {
   const c = new Chess(); for (const u of zuege.split(' ').filter(Boolean)) c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
   const p = aktualisieren({ id: 'partie-' + ++nummer, code, weiss: farbe === 'w' ? 'u1' : 'u2', schwarz: farbe === 'b' ? 'u1' : 'u2', erstellt_von: 'u1',
     status, fen: c.fen(), am_zug: c.turn(), zuege, ergebnis: null, grund: null, remis_angebot: null, bedenkzeit_s: zeit, inkrement_s: 0,
     uhr_weiss_ms: zeit == null ? null : zeit * 1000, uhr_schwarz_ms: zeit == null ? null : zeit * 1000,
-    letzter_zug_am: new Date().toISOString(), erstellt_am: new Date().toISOString() });
+    letzter_zug_am: new Date().toISOString(), erstellt_am: new Date().toISOString(), gewertet });
   if (status === 'offen') p[farbe === 'w' ? 'schwarz' : 'weiss'] = null;
   partien.set(p.id, p); return p;
 }
@@ -63,7 +65,10 @@ try {
     if (url.pathname === '/auth/v1/verify') return antwort(sitzung);
     if (url.pathname === '/rest/v1/spielstaende') return antwort([]);
     // Erfinder-Status: die App fragt seit dem 31.10.2026 fuer jedes angemeldete Konto nach (js/app.js); hier keine Stuecke
-    if (url.pathname === '/rest/v1/sonderstuecke') return antwort([]);
+    if (url.pathname === '/rest/v1/sonderstuecke') {
+      if (sonderVerzug) await new Promise(r => setTimeout(r, sonderVerzug));
+      return antwort(erfinder ? [{ stueck_id: 'erfinder-titel' }, { stueck_id: 'erfinder-figuren-blaupause' }] : []);
+    }
     if (url.pathname === '/rest/v1/profile') return antwort([{ user_id: 'u1', benutzername: 'Spieler_1' }]);
     if (url.pathname === '/rest/v1/partien_online') {
       if (url.searchParams.has('status')) return antwort([...partien.values()].filter(p => p.status === 'beendet'));
@@ -74,7 +79,7 @@ try {
     const rpc = url.pathname.split('/').at(-1), p = partien.get(body.partie);
     // Gegnersuche (js/kronen.js): niemand da, die Suche wartet. Altes SQL antwortet ohne Wartezeit (dann 10 s wie bisher),
     // neues SQL (Konzept "Zwei Ligen") mit seit, warte_s, ki_ab_s und zeit; ende(true) gibt dort ab ki_ab_s einen Beleg
-    if (rpc === 'online_suche_start' || rpc === 'online_suche_stand') return antwort(neuesSql ? { wartet: true, seit: neuesSql.seit, warte_s: 30, ki_ab_s: 1, zeit: '5+3' } : {});
+    if (rpc === 'online_suche_start' || rpc === 'online_suche_stand') return antwort(neuesSql ? { wartet: true, seit: neuesSql.seit, warte_s: neuesSql.warte ?? 30, ki_ab_s: neuesSql.kiAb ?? 1, zeit: '5+3' } : {});
     if (rpc === 'kronen_mein_stand' && ligaVerzug) await new Promise(r => setTimeout(r, ligaVerzug));
     if (rpc === 'online_suche_ende') return antwort((neuesSql || altBeleg) && body.ki === true ? { ki_ref: '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' } : {});
     if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
@@ -134,7 +139,9 @@ try {
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {
-    localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus' }));
+    // test:einstellungen (sessionStorage, ueberlebt ein Neuladen): Zusatz-Einstellungen einzelner Pruefungen, z. B. Figurensatz
+    let zusatz = {}; try { zusatz = JSON.parse(sessionStorage.getItem('test:einstellungen') || '{}'); } catch (e) { /* ohne */ }
+    localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus', ...zusatz }));
     const zeit = Date.now.bind(Date); window.__versatz = 0; Date.now = () => zeit() + window.__versatz;
     Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.__kopiert = t; } } });
@@ -143,7 +150,10 @@ try {
   seite.on('pageerror', e => fehler.push(e.message));
   const start = `http://127.0.0.1:${PORT}/?test&kern&erw=pakete/online/index`;
   const knopf = a => seite.locator(`[data-online="${a}"]`);
-  const bereit = () => seite.waitForFunction(() => window.__online?.brett() && !window.__online.busy());
+  // Seit 11.11. misst sich das Brett wie in der Bot-Partie an der Hoehe des Screens: solange der alte Screen beim Wechsel
+  // noch daneben steht, ist das neue Brett einen Moment 0 px gross. Erst tippen, wenn genau ein Brett Flaeche hat.
+  const bereit = () => seite.waitForFunction(() => window.__online?.brett() && !window.__online.busy()
+    && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100);
   async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(); }
   async function tippe(uci) {
     for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
@@ -209,12 +219,23 @@ try {
   await seite.evaluate(() => { window.__versatz += 2500; });
   const danach = await seite.evaluate(() => ({ w: window.__online.rest('w'), b: window.__online.rest('b') }));
   pruefe('Nur die aktive Server-Uhr laeuft herunter', danach.w === vorher.w && danach.b <= vorher.b - 2400, { vorher, danach });
-  // Flo 30.10. abends: Remis ueber die Fahne (Remis anbieten oder Aufgeben)
-  await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Remis anbieten', exact: true }).click();
+  // Flo 11.11.2026 (Befund 3): Remis anbieten und Aufgeben als zwei sichtbare Knoepfe unter dem Brett wie in der Bot-Partie,
+  // nicht mehr hinter der Fahne; der Aufgeben-Dialog fragt nur noch nach dem Aufgeben
+  pruefe('Remis anbieten und Aufgeben stehen sichtbar in der Knopfreihe, ohne Fahnen-Dialog', await seite.evaluate(() => {
+    const reihe = document.querySelector('.online-partie .spielknoepfe');
+    return [...reihe.querySelectorAll('.knopf')].filter((b) => b.getClientRects().length).map((b) => b.dataset.online).join() === 'remis,aufgeben';
+  }));
+  await knopf('remis').click();
   await seite.getByRole('button', { name: 'Remis angeboten', exact: true }).waitFor();
   pruefe('Remis anbieten erreicht den Server', weiss.remis_angebot === 'w');
   weiss.remis_angebot = 'b'; aktualisieren(weiss);
-  await knopf('annehmen').waitFor(); await knopf('annehmen').click();
+  await knopf('annehmen').waitFor();
+  pruefe('Remis-Angebot des Gegners deutlich sichtbar: Streifen mit Namen, Annehmen als Hauptknopf', await seite.evaluate(() => {
+    const s = document.querySelector('.on-angebot'), r = s?.getBoundingClientRect();
+    return !s.hidden && r.height > 0 && /bietet dir Remis an/.test(s.textContent)
+      && document.querySelector('[data-online="annehmen"]').classList.contains('primaer');
+  }));
+  await knopf('annehmen').click();
   await seite.locator('.on-ergebnis:not([hidden])').waitFor();
   pruefe('Remis annehmen zeigt Ergebnis ohne Sterne', (await seite.locator('.on-ergebnis').innerText()).includes('Remis vereinbart') && !(await seite.locator('.on-ergebnis').innerText()).includes('Stern'));
   await knopf('revanche').click(); await seite.locator('.on-code').waitFor();
@@ -366,7 +387,7 @@ try {
     const masse = await seite.evaluate(() => {
       const b = document.querySelector('.on-brett').getBoundingClientRect();
       return { quer: document.documentElement.scrollWidth <= innerWidth, brett: b.x >= 0 && b.right <= innerWidth + 1 && b.y >= 0 && b.bottom <= innerHeight + 1,
-        knoepfe: [...document.querySelectorAll('.online-screen button')].filter(b => b.getClientRects().length > 0).every(b => b.getBoundingClientRect().height >= 44), karten: document.querySelectorAll('.on-spieler img').length === 2 };
+        knoepfe: [...document.querySelectorAll('.online-screen button')].filter(b => b.getClientRects().length > 0).every(b => b.getBoundingClientRect().height >= 44), karten: document.querySelectorAll('.on-spieler > .av > :is(svg, img)').length === 2 };
     });
     pruefe(`${width}x${height} ${modus}: Brett, Spielerkarten und Tippflaechen passen`, Object.values(masse).every(Boolean), masse);
     if (process.env.BILDER) { mkdirSync(process.env.BILDER, { recursive: true }); await seite.screenshot({ path: path.join(process.env.BILDER, `online-${width}-${modus}.png`) }); }
@@ -378,6 +399,9 @@ try {
   await seite.getByRole('button', { name: 'Einladung erstellen', exact: true }).click(); await seite.locator('.on-code').waitFor();
   pruefe('Training und Einladungsformular: Farbe und 15+10 an den Server', calls.filter(c => c.pfad.endsWith('online_erstelle')).at(-1)?.body.bedenkzeit_s === 900
     && calls.filter(c => c.pfad.endsWith('online_erstelle')).at(-1)?.body.inkrement_s === 10);
+  // Die bisher geoeffneten Freundes-Partien laufen in der Attrappe noch. Mit laufender Partie zeigt die Partie-Tuer
+  // "Partie fortsetzen" statt der Suche (eigene Pruefung am Ende); fuer die Such-Pruefungen hier alle beenden.
+  for (const q of partien.values()) if (q.status === 'laeuft') { Object.assign(q, { status: 'beendet', grund: 'aufgabe', ergebnis: '1-0' }); aktualisieren(q); }
   ligaDa = true;
   // ohne gemerkte Einladung bleibt die Freunde-Zeile zu (so sieht ein Spieler die Seite normalerweise)
   await seite.evaluate(() => localStorage.removeItem('schach-arena:online:einladung'));
@@ -405,7 +429,7 @@ try {
       const leiste = document.querySelector('.reiter-leiste');
       const unten = leiste && leiste.getClientRects().length ? leiste.getBoundingClientRect().top : innerHeight;
       const zeile = document.querySelector('.on-freunde-zeile').getBoundingClientRect();
-      const knoepfe = [...document.querySelectorAll('.on-tuer-knopf')].map((b) => b.textContent.trim());
+      const knoepfe = [...document.querySelectorAll('.on-tuer-knopf:not([hidden])')].map((b) => b.textContent.trim());
       return { scroll: rumpf.scrollHeight - rumpf.clientHeight, quer: document.documentElement.scrollWidth <= innerWidth,
         freundeSichtbar: zeile.bottom <= unten + 1, knoepfe, gewertet: knoepfe.length === 2 && knoepfe.every((t) => /gewertet/.test(t)),
         freundeZu: !document.querySelector('.on-freunde').open, liga: document.querySelector('.on-liga').textContent.replace(/\s+/g, ' ').trim(),
@@ -447,8 +471,8 @@ try {
   const suchend = await seite.evaluate(() => ({ rest: document.querySelector('.on-rest').textContent, kopfWeg: document.querySelector('.on-art[data-art="partie"] .on-tuer-kopf').hidden,
     ring: Number(document.querySelector('.on-ring-rest').getAttribute('stroke-dashoffset')), hinweis: document.querySelector('.on-ki-hinweis').textContent,
     titel: document.querySelector('.on-suche h3').textContent.replace(/\s+/g, ' ').trim(), knopf: document.querySelector('[data-online="ki-jetzt"]').textContent.trim() }));
-  pruefe('Suche: "Suche Gegner … 0:01", Restzeit zaehlt sichtbar herunter (Satz und Ring), Knopf "Jetzt gegen KI" mit "zaehlt nicht fuer die Liga"',
-    /^Noch 5[89] s/.test(suchend.rest) && /^Suche Gegner … 0:0[12]$/.test(suchend.titel) && suchend.knopf === 'Jetzt gegen KI'
+  pruefe('Suche: "Suche Gegner … 0:01", Restzeit zaehlt sichtbar herunter (Satz und Ring), Knopf "Sofort gegen den Bot" mit "zaehlt nicht fuer die Liga"',
+    /^Noch 5[89] s/.test(suchend.rest) && /^Suche Gegner … 0:0[12]$/.test(suchend.titel) && suchend.knopf === 'Sofort gegen den Bot'
     && suchend.ring > 0 && suchend.kopfWeg && /nicht für die Liga/.test(suchend.hinweis), suchend);
   await knopf('ki-jetzt').click();
   await seite.waitForFunction(() => location.hash.startsWith('#partie'));
@@ -493,7 +517,94 @@ try {
     && !/Verlassen/.test(verlassenAlt.toast), verlassenAlt);
   await seite.evaluate(() => { delete window.__onlineBotMs; });
   altBeleg = false;
+  // Befund 5 (Flo 11.11.2026): "Sofort gegen den Bot" ab Sekunde 0, gesteuert allein vom Serverwert (hier ki_ab_s 0, warte_s 10)
+  neuesSql = { seit: new Date().toISOString(), warte: 10, kiAb: 0 };
+  await seite.evaluate(() => window.__app.gehe('online'));
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit');
+  neuesSql.seit = new Date().toISOString();
+  await knopf('suchen').click();
+  await seite.locator('.on-suche:not([hidden])').waitFor();
+  // die Werte kommen mit der ersten Server-Antwort (vorher gelten die alten 10 s); gemessen wird noch in Sekunde 0
+  await seite.waitForFunction(() => /jetzt für die Liga/.test(document.querySelector('.on-ki-hinweis').textContent), null, { timeout: 1500 }).catch(() => {});
+  const sofort = await seite.evaluate(() => { const b = document.querySelector('[data-online="ki-jetzt"]');
+    return { uhr: document.querySelector('.on-art[data-art="partie"] .on-uhr')?.textContent, rest: document.querySelector('.on-rest').textContent, hinweis: document.querySelector('.on-ki-hinweis').textContent, knopf: b?.textContent.trim(), sichtbar: !!b?.getClientRects().length }; });
+  pruefe('Serverwert ki_ab_s 0: "Sofort gegen den Bot" ab Sekunde 0 sichtbar und zaehlt fuer die Liga, Restzeit 10 s vom Server',
+    /^0:0[01]$/.test(sofort.uhr) && /^Noch (9|10) s/.test(sofort.rest) && /jetzt für die Liga/.test(sofort.hinweis) && sofort.knopf === 'Sofort gegen den Bot' && sofort.sichtbar, sofort);
+  await knopf('ki-jetzt').click();
+  await seite.waitForFunction(() => location.hash.startsWith('#partie'));
+  pruefe('Sofort gegen den Bot in Sekunde 0: gewertete Partie mit Beleg', await seite.evaluate(() => history.state?.params?.ki === true && !!history.state?.params?.kiRef));
+  neuesSql = null;
+  // Befund 2 ("kein Zug", 11.11.2026): zwei gewertete Partien liefen parallel, jedes Geraet zeigte eine andere. Die Online-Seite
+  // bietet die NEUESTE laufende an (nicht die zuletzt geaenderte), in der aelteren weist ein Hinweis auf die neuere.
+  const aeltere = partie({ farbe: 'b', zuege: 'e2e4', zeit: 300, gewertet: true, code: 'NPQ234' });
+  aeltere.erstellt_am = new Date(Date.now() - 5 * 60000).toISOString(); // aelter als die Intro-Frist (1 Minute)
+  const neueste = partie({ farbe: 'w', zeit: 300, gewertet: true, code: 'RST567' });
+  zug(aeltere, 'e7e5'); // die aeltere wurde zuletzt geaendert: sie darf trotzdem nicht gewinnen
+  await seite.evaluate(() => { window.__duellProtokoll = []; window.__app.gehe('online'); });
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'laufend');
+  const tuer = await seite.evaluate(() => { const b = document.querySelector('[data-online="fortsetzen"]');
+    return { sichtbar: !!b?.getClientRects().length, id: b?.dataset.partie, text: b?.textContent.trim(), suchen: !document.querySelector('[data-online="suchen"]').getClientRects().length }; });
+  pruefe('Laufende Partie: Partie-Tuer zeigt "Partie fortsetzen" fuer die neueste Partie statt einer zweiten Suche', tuer.sichtbar && tuer.id === neueste.id
+    && tuer.text === 'Partie fortsetzen' && tuer.suchen, tuer);
+  await knopf('fortsetzen').click();
+  await seite.waitForFunction(id => window.__online?.partie()?.id === id && !window.__online.busy(), neueste.id);
+  pruefe('Fortsetzen oeffnet die neueste laufende Partie', true);
+  await seite.waitForFunction(() => (window.__duellProtokoll || []).some(e => e.bot === 'online'), null, { timeout: 5000 }).catch(() => {});
+  const intro = await seite.evaluate(() => (window.__duellProtokoll || []).filter(e => e.bot === 'online'));
+  pruefe('Ranked-Partie: Duell-Intro wie vor einer Bot-Partie, genau einmal, Anlass Liga', intro.length === 1 && intro[0].anlass === 'liga', intro);
+  await oeffne(aeltere); await seite.waitForFunction(id => window.__online?.partie()?.id === id, aeltere.id);
+  await seite.locator('.on-neuer:not([hidden])').waitFor();
+  pruefe('Aeltere Partie offen: Hinweis auf die neuere laufende Partie mit Knopf dorthin', await seite.locator('.on-neuer [data-partie]').getAttribute('data-partie') === neueste.id);
+  await seite.locator('.on-neuer [data-partie]').click();
+  await seite.waitForFunction(id => window.__online?.partie()?.id === id && !window.__online.busy(), neueste.id);
+  pruefe('Hinweis-Knopf wechselt in die neuere Partie, Intro laeuft dort nicht ein zweites Mal', await seite.evaluate(() =>
+    (window.__duellProtokoll || []).filter(e => e.bot === 'online').length === 1));
+  // Intro mit Bewegung: Name und Liga des Gegners stehen im Bild (Befund 4 im Laufzettel, Flo: "wie bei der Bot-Partie")
+  {
+    const frisch = partie({ farbe: 'w', zeit: 300, gewertet: true, code: 'UVW234' });
+    await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'normal' }));
+    await oeffne(frisch);
+    const bild = await seite.waitForFunction(() => { const d = document.querySelector('.duell'); return d && d.textContent.replace(/\s+/g, ' ').trim(); }, null, { timeout: 5000 })
+      .then(h => h.jsonValue()).catch(() => '');
+    pruefe('Intro mit Bewegung zeigt Gegnername und Liga', /Gegner_2/.test(bild) && /Läufer II/.test(bild), bild);
+    await seite.waitForFunction(() => !document.querySelector('.duell'), null, { timeout: 8000 }).catch(() => {});
+    await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'aus' }));
+    // beenden, damit "neueste" fuer die Groessenpruefung wieder die neueste ist (sonst steht dort der Hinweis-Streifen)
+    Object.assign(frisch, { status: 'beendet', grund: 'aufgabe', ergebnis: '1-0' }); aktualisieren(frisch);
+  }
+  // Abnahme (Laufzettel Befund 1, Mass wie tests/online-ranked-probe.test.mjs): Online-Brett mindestens so gross wie in der
+  // Bot-Partie. Ohne Coach-Zeile darf es auf dem Handy etwas groesser sein (390 x 664: 384 statt 376 px).
+  for (const [width, height] of [[375, 667], [390, 664], [820, 1180], [1280, 720]]) {
+    await seite.setViewportSize({ width, height });
+    await oeffne(neueste); await seite.waitForFunction(id => window.__online?.partie()?.id === id, neueste.id);
+    await seite.waitForTimeout(250);
+    const on = await seite.evaluate(() => Math.round([...document.querySelectorAll('.online-screen .brett-rahmen > .brett')].at(-1).getBoundingClientRect().width));
+    if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `groesse-online-${width}x${height}.png`) });
+    await seite.evaluate(() => window.__app.gehe('partie', { botId: 'fridolin' }));
+    await seite.waitForFunction(() => document.querySelector('.screen.partie:not(.online-screen) .brett-rahmen > .brett')?.getBoundingClientRect().width > 0);
+    await seite.waitForTimeout(250);
+    const bot = await seite.evaluate(() => Math.round(document.querySelector('.screen.partie:not(.online-screen) .brett-rahmen > .brett').getBoundingClientRect().width));
+    if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `groesse-bot-${width}x${height}.png`) });
+    pruefe(`${width}x${height}: Online-Brett mindestens so gross wie das Brett der Bot-Partie`, on >= bot - 1, { online: on, bot });
+  }
+  // Befund 4 (Skin): Erfinder-Konto mit Figurensatz Blaupause; die Erfinder-Antwort kommt erst nach dem Aufbau der Partie
+  erfinder = true; sonderVerzug = 900;
+  // wie auf einem frischen Geraet: der gemerkte Erfinder-Status fehlt, die App fragt erst nach dem Laden nach
+  await seite.evaluate(() => { sessionStorage.setItem('test:einstellungen', JSON.stringify({ figuren: 'blaupause' })); localStorage.removeItem('schach-arena:konto:sonderstuecke'); });
+  await seite.reload(); await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), neueste.id);
+  await seite.waitForFunction(() => document.querySelector('.on-brett img[src*="blaupause"]'), null, { timeout: 8000 }).catch(() => {});
+  const skin = await seite.evaluate(() => {
+    const bilder = [...document.querySelectorAll('.on-brett img')].map(i => i.getAttribute('src'));
+    return { bilder: bilder.length, fremd: bilder.filter(s => !/blaupause/.test(s)).slice(0, 2), figuren: JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').figuren,
+      sonder: localStorage.getItem('schach-arena:konto:sonderstuecke'), partie: window.__online?.partie()?.id };
+  });
+  if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, 'skin-blaupause.png') });
+  pruefe('Online-Brett nutzt den eingestellten Figurensatz, auch wenn der Erfinder-Status spaet kommt', skin.bilder > 0 && skin.fremd.length === 0, skin);
+  erfinder = false; sonderVerzug = 0;
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet });
-} catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
+} catch (e) {
+  pruefe('Ablauf ohne Abbruch', false, e.stack);
+  if (process.env.BILDER) await kontext?.pages()[0]?.screenshot({ path: path.join(process.env.BILDER, 'online-abbruch.png') }).catch(() => {});
+}
 finally { await kontext?.close(); await browser?.close(); await new Promise(r => server.close(r)); }
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;

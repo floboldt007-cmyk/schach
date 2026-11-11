@@ -99,15 +99,7 @@
 .pr-orden-knopf[data-stufe="2"] { border-color: var(--st-silber); }
 .pr-orden-knopf[data-stufe="3"] { border-color: var(--st-gold); }
 
-/* Banner-Wahl im Blatt und in der Sammlung */
-.pr-banner-wahl-liste { display: grid; gap: 10px; }
-.pr-banner-knopf { display: grid; grid-template-columns: 120px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-items: center; min-height: 48px;
-  padding: 8px; border-radius: var(--r-m, 14px); border: 1px solid var(--linie); background: var(--flaeche); color: var(--text); text-align: start; font: inherit; cursor: pointer; }
-.pr-banner-knopf img { grid-row: 1 / 3; width: 120px; height: 30px; object-fit: cover; object-position: 30% center; border-radius: 6px; }
-.pr-banner-knopf small { color: var(--text-2); }
-.pr-banner-knopf[aria-pressed="true"] { border-color: var(--akzent); box-shadow: inset 0 0 0 1px var(--akzent); }
-.pr-banner-knopf:disabled { cursor: default; opacity: .7; }
-.pr-banner-knopf:focus-visible { outline: 3px solid var(--fokus, var(--akzent)); outline-offset: 2px; }
+/* Banner in der Sammlung (die Wahl laeuft ueber die Zeile "Banner" unter "So sehen dich andere") */
 .sa-bild img.sk-banner { width: 100%; max-width: 168px; height: 42px; object-fit: cover; object-position: 30% center; border-radius: 6px; }
 
 /* ---------- Freischalt-Moment ---------- */

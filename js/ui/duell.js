@@ -13,7 +13,10 @@
 //       eine Vitrine, haelt die Vollfassung bis HALTE_VITRINE (4,3 s) statt HALTE_BIS, Titel und Errungenschaften kommen
 //       nacheinander, ein Balken zeigt die Zeit bis zum Start, harte Grenze DAUER_VITRINE (5,3 s). Tippen startet sofort.
 //       Seit 01.11.2026 (Flo, Handy: "zu kurz") haelt sie bis 4,3 s statt 3,3 s.
-//   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
+//   spieleDuell({ bot, farbe, anlass, von, art?, einstellung?, bildschirm? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
+//       bildschirm: Name des Screens, in dessen .screen.partie die Portraets landen (Vorgabe 'partie'; Online nutzt
+//       'online' und ruft das Intro, wenn die Partie schon dasteht). bot.liga (Text) ersetzt die Stufe im Chip, ohne
+//       Zahl in bot.elo entfaellt "Elo" in der Unterzeile (Gegner aus Fleisch und Blut, js/ui/online.js).
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
 //       duellArt(). bereit erfuellt sich, sobald die Buehne den ganzen Schirm deckt (ihre Animation ist fertig,
@@ -151,7 +154,7 @@ function flieger(html, von, nach, { d = 440, v = 0, k = 'weich', rund = true } =
   return { el, a };
 }
 
-export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art = null, einstellung = 'besondere' } = {}) {
+export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art = null, einstellung = 'besondere', bildschirm = 'partie' } = {}) {
   const f = farbe === 'b' ? 'b' : 'w';
   // Vitrine (Flo, 30.10.2026: "beim Matchbeginn kurz flexen"): Titel und bis zu drei Errungenschaften unter Flos Namen,
   // vom Ort duell:profil? (Paket sammlung); ohne Anbieter wie bisher. Wer etwas zu zeigen hat, bekommt die Buehne.
@@ -216,7 +219,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   ueber.setAttribute('role', voll ? 'dialog' : 'presentation');
   ueber.tabIndex = -1;
   if (voll) ueber.setAttribute('aria-label', t('arena.duell.aria', { name: bot.name }));
-  const stufeText = bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
+  // Online (Ranked gegen Menschen): statt der Bot-Stufe die Liga des Gegners als Text (bot.liga)
+  const stufeText = typeof bot.liga === 'string' && bot.liga ? bot.liga : bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
   const anlassText = ANLASS_TEXT[anlass] ? t(ANLASS_TEXT[anlass]) : '';
   // lange Fassung nur in der Vollfassung mit Vitrine (Zeiten absolut, die Haltephase dehnt sich nicht mit dem Tempo)
   const lang = voll && hatVitrine;
@@ -239,7 +243,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
           <div class="duell-seite bot">
             <div class="duell-av" data-rolle="bot"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></div>
             <div class="duell-name">${esc(bot.name)}</div>
-            <div class="duell-unter">Elo ${esc(bot.elo)} · ${esc(t(FARBE_NAME[f === 'w' ? 'b' : 'w']))}</div>
+            <div class="duell-unter">${Number.isFinite(Number(bot.elo)) && bot.elo !== null && bot.elo !== '' ? `Elo ${esc(bot.elo)} · ` : ''}${esc(t(FARBE_NAME[f === 'w' ? 'b' : 'w']))}</div>
           </div>
           <div class="duell-gegen">${esc(t('arena.duell.gegen'))}</div>
           <div class="duell-seite flo">
@@ -364,7 +368,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const startScreen = html.dataset.screen || null;
   const beiPartie = (d) => {
     if (!d || zuEnde) return;
-    if (d.name !== 'partie') {
+    if (d.name !== bildschirm) {
       if (partieAb != null || d.name !== startScreen) ueberspringe();
       return;
     }
@@ -381,6 +385,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     });
   };
   try { abPartie = hoere('app:screen', beiPartie); } catch (e) { abPartie = null; }
+  // Online ruft das Intro erst, wenn die Partie schon dasteht (bildschirm 'online'): dann gilt sie als angekommen
+  if (bildschirm !== 'partie' && startScreen === bildschirm) beiPartie({ name: bildschirm });
   // haerteste Grenze: hoechstens dauerMax ms (DAUER_MAX, lange Fassung DAUER_VITRINE), auch wenn die Partie nicht kommt
   spaeter(() => { if (!zuEnde) ende(); }, dauerMax);
 
