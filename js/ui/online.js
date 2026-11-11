@@ -95,6 +95,7 @@ export function zeige(root, params, app) {
   let kartenDaten = null, kartenPartie = null;
   // introGelaufen: Duell-Intro dieser Ansicht schon entschieden; neuerGeprueft: Partie, fuer die nach einer neueren gefragt wurde
   let introGelaufen = false, introUhr = null, neuerGeprueft = null, layoutRo = null, layoutBild = 0;
+  let live = null, liveFuer = null;
   const handyMq = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(orientation: portrait) and (max-width: 600px)') : null;
   // Klang: gehoert = Halbzuege, die schon geklungen haben; uhrGewarnt = Uhr-Warnung dieser Partie gespielt
   let gehoert = 0, uhrGewarnt = false;
@@ -381,16 +382,16 @@ export function zeige(root, params, app) {
     } else {
       if (!brett) {
         // Gerippe der Bot-Partie (js/ui/partie.js): Brett ohne Bewertungsbalken, rechts bzw. darunter die Spalte mit den
-        // Spielerleisten (Name, Elo oder Liga, Uhr, geschlagene Figuren) und den Knoepfen. .on-symbol-ort haelt den Platz
-        // fuer das Zug-Symbol der Live-Bewertung eigener Zuege (js/pakete/online/live-eigene.js, Einbau in R2).
+        // Spielerleisten (Name, Elo oder Liga, Uhr, geschlagene Figuren) und den Knoepfen. Das Symbol der Live-Bewertung
+        // eigener Zuege setzt das Brett selbst (zeigeAbzeichen), .on-live nennt das Tageskontingent.
         s.classList.add('partie', 'online-partie', 'im-spiel', 'ohne-balken');
         s.classList.toggle('mit-uhr', p.bedenkzeit_s != null);
         inhalt.innerHTML = `<div class="inhalt on-spiel">
-          <div class="brettzone"><div class="brett-rahmen"><div class="brett on-brett"></div><div class="on-symbol-ort" aria-hidden="true"></div></div></div>
+          <div class="brettzone"><div class="brett-rahmen"><div class="brett on-brett"></div></div></div>
           <div class="seite">
             <div class="spieler gegner on-spieler on-oben" role="group"></div>
             <div class="on-hinweise"><p class="on-angebot" role="alert" hidden></p><p class="on-neuer" hidden></p>
-              <p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p></div>
+              <p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p><p class="on-live" hidden></p></div>
             <p class="on-zuege" aria-label="${esc(O('zuege'))}"></p>
             <section class="on-ergebnis on-karte flaeche" hidden></section>
             <div class="spieler ich on-spieler on-unten" role="group"></div>
@@ -403,7 +404,8 @@ export function zeige(root, params, app) {
       }
       zeichne();
       pruefeNeuere();
-      if (p.status === 'beendet') { beobachter?.stop(); clearInterval(uhrTimer); }
+      starteLive();
+      if (p.status === 'beendet') { beobachter?.stop(); clearInterval(uhrTimer); live?.stop(); zeigeLiveHinweis(); }
     }
     sperre();
     meldeStrittigVonSelbst();
@@ -419,6 +421,41 @@ export function zeige(root, params, app) {
       koordinaten: e.koordinaten !== false, koordLage: e.koordLage, autoDame: e.autoDame !== false, turmRochade: e.turmRochade === true,
       steuerung: e.steuerung, pfeile: e.pfeile !== false });
     brett.setzeAusrichtung(online.meineFarbe(p)); brett.setzeDauer(300);
+  }
+  // Live-Bewertung eigener Zuege (js/pakete/online/live-eigene.js, Flo 11.11.2026): nach dem eigenen Zug das Symbol am
+  // Zielfeld wie in der Bot-Partie, kein Balken, kein bester Zug, nichts zum Gegner. Gewertet fragt das Modul das
+  // Tageskontingent beim Start und bucht erst beim ersten eigenen Zug; Freundespartien ohne Kontingent.
+  function starteLive() {
+    if (!p || p.status !== 'laeuft' || widerspruch || liveFuer === p.id) return;
+    liveFuer = p.id;
+    const id = p.id;
+    const test = app.test && typeof window.__onlineLiveEngine === 'function' ? { engine: window.__onlineLiveEngine } : {};
+    import('../pakete/online/live-eigene.js')
+      .then(({ erstelle }) => erstelle({ modus: p.gewertet ? 'ranked' : 'freund', partieId: id, meineFarbe: online.meineFarbe(p), app, ...test }))
+      .then((l) => { if (weg || !p || p.id !== id) { l.stop(); return; } live = l; zeigeLiveHinweis(); })
+      .catch(() => { /* ohne Modul keine Live-Bewertung, die Partie laeuft weiter */ });
+  }
+  // Hinweis nur ohne Premium: "heute noch 1 frei" vor dem ersten Zug, danach "diese Partie ist deine freie",
+  // aufgebraucht "morgen wieder". rest 0 bei freiem Stand heisst: diese Partie ist heute schon gebucht (Neuladen).
+  function zeigeLiveHinweis() {
+    const el = inhalt.querySelector('.on-live');
+    if (!el) return;
+    const k = live && live.kontingent;
+    const text = !k || k.unbegrenzt || !p || p.status !== 'laeuft' ? ''
+      : live.grund === 'kontingent' ? O('live.genutzt')
+        : !live.an ? '' : k.gebucht || k.rest === 0 ? O('live.diese') : k.rest != null ? O('live.frei', { n: k.rest }) : '';
+    el.textContent = text;
+    el.hidden = !text;
+  }
+  function bewerteLive(fenVorher, m) {
+    if (!live || !live.an || app.einstellungen().liveBewertung === false) return;
+    const id = p.id, n = chess.history().length;
+    // das Symbol nur, wenn der Zug noch steht: lehnt der Server ihn ab, ist er bis zur Antwort der Engine zurueckgenommen
+    const steht = () => chess.history().length >= n && chess.history({ verbose: true })[n - 1]?.lan === m.lan;
+    live.bewerteEigenenZug(fenVorher, m.lan)
+      .then((erg) => { if (!weg && brett && p && p.id === id && erg && erg.klasse && steht()) brett.zeigeAbzeichen(m.to, erg.klasse); })
+      .catch(() => { /* aus, abgebrochen oder Engine-Fehler: dann eben ohne Symbol */ })
+      .finally(() => { if (!weg) zeigeLiveHinweis(); });
   }
   function beiEinstellungen(ev) {
     if (weg || !brett || blockiert) return;
@@ -649,7 +686,9 @@ export function zeige(root, params, app) {
   function beiZug(von, nach, umwandlung) {
     if (busy || blockiert || widerspruch || weg || !online.binAmZug(p)) return false;
     let m;
+    const fenVorher = chess.fen();
     try { m = chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { return false; }
+    bewerteLive(fenVorher, m);
     // Nur der Zug geht an den Server; ob er gilt und wie die Partie danach steht, entscheidet er (Etappe 1a)
     const daten = { uci: m.lan };
     // der eigene Zug klingt sofort; endet die Partie mit ihm, kommt nur der Ende-Klang, sobald der Server bestaetigt
@@ -710,6 +749,6 @@ export function zeige(root, params, app) {
   });
   if (app.test) window.__online = { partie: () => p, chess: () => chess, brett: () => brett, blockiert: () => blockiert, widerspruch: () => widerspruch, busy: () => busy, rest };
   start();
-  return { verlasse() { weg = true; clearInterval(restUhr); clearTimeout(introUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
+  return { verlasse() { weg = true; live?.stop(); clearInterval(restUhr); clearTimeout(introUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
     window.removeEventListener('schach:einstellungen', beiEinstellungen); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
 }

@@ -136,6 +136,9 @@ async function bediene(route) {
     return antwort(warten(uid) || { wartet: true });
   }
   if (rpc === 'online_suche_ende') { schlange.delete(uid); return antwort({}); }
+  // R2: Tageskontingent der Live-Bewertung wie supabase/zwei-ligen-schema.sql (ohne Premium, heute noch frei)
+  if (rpc === 'online_live_bewertung_frei') return antwort({ frei: true, rest: 1, unbegrenzt: false });
+  if (rpc === 'online_live_bewertung_nutzen') return antwort({ ok: true, frei: true, rest: 0, unbegrenzt: false, gebucht: true });
   if (rpc === 'online_meine') return antwort([...partien.values()].filter(q => q.status !== 'beendet' && farbeVon(q, uid)));
   if (url.pathname === '/functions/v1/online-zug') {
     const q = partien.get(body.partie);
@@ -191,7 +194,10 @@ async function neuerKontext(uid, viewport = { width: 1180, height: 820 }) {
   return seite;
 }
 const START = () => `http://127.0.0.1:${PORT}/?test&kern&erw=pakete/online/index`;
-const bereit = s => s.waitForFunction(() => window.__online?.brett() && !window.__online.busy(), null, { timeout: 15000 });
+// Beim Bildschirmwechsel ist das neue Brett einen Moment 0 px breit (R2 gemessen: 0, 800 ms spaeter 738 px); ein Tipp
+// ginge ins Leere. Erst bereit, wenn genau ein Screen steht und das Brett Flaeche hat (wie tests/online-ui.test.mjs)
+const bereit = s => s.waitForFunction(() => window.__online?.brett() && !window.__online.busy()
+  && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100, null, { timeout: 15000 });
 // 'laufend': bei einer laufenden Partie zeigt die Partie-Tuer "Partie fortsetzen" statt der Suche (seit R1-C)
 const sucheBereit = s => s.waitForFunction(() => ['bereit', 'laufend'].includes(document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand), null, { timeout: 15000 });
 const partieId = s => s.evaluate(() => window.__online?.partie()?.id || null);

@@ -2,13 +2,17 @@
 // (review.js bewerteZug, Engine app.engine('bewertung')), gibt aber nur Klasse und Symbol heraus.
 //
 //   const live = await erstelle({ modus: 'ranked'|'freund'|'ki', partieId, meineFarbe: 'w'|'b', app })
-//     -> { an, grund, bewerteEigenenZug(fenVorher, uci) -> Promise<{ symbol, klasse }>, stop() }
+//     -> { an, grund, kontingent: { unbegrenzt, rest, gebucht } | null,
+//          bewerteEigenenZug(fenVorher, uci) -> Promise<{ symbol, klasse }>, stop() }
 //
 // Regeln (Flo, 11.11.2026):
 // - ranked (gewertet gegen Menschen): nur der eigene Zug, erst nachdem er gezogen ist. Kein Balken, kein bester Zug,
-//   kein Hinweis, nichts zu Zuegen des Gegners. Kontingent fragt der Server: online_live_bewertung_frei() (Dauer-Premium
-//   unbegrenzt, sonst 1 Partie am Tag), danach online_live_bewertung_nutzen(partie). Fehlt eine der beiden Funktionen
-//   oder antwortet der Server unklar, bleibt die Bewertung AUS.
+//   kein Hinweis, nichts zu Zuegen des Gegners. Kontingent fragt der Server beim Start mit
+//   online_live_bewertung_frei(partie) (Dauer-Premium unbegrenzt, sonst 1 Partie am Tag; eine heute schon gebuchte
+//   Partie bleibt nach dem Neuladen frei). Gebucht wird erst beim ersten eigenen Zug mit online_live_bewertung_nutzen
+//   (partie): wer nur hineinschaut, verbraucht nichts. Fehlt eine der beiden Funktionen oder antwortet der Server
+//   unklar, bleibt die Bewertung AUS; scheitert die Buchung, geht sie aus (an false, grund gesetzt).
+//   kontingent: rest = freie Partien heute vor der Buchung (null unbekannt), gebucht = diese Partie zaehlt heute.
 // - freund (ohne Kronen) und ki (KI-Gegner): wie bei den Bots, ohne Server-Kontingent.
 // - In allen Modi gilt die Einstellung liveBewertung, und nie wird ein Gegnerzug bewertet: die Seite am Zug in
 //   fenVorher muss meineFarbe sein.
@@ -43,7 +47,7 @@ function abgebrochen() {
 export async function erstelle({ modus, partieId = null, meineFarbe, app = null, rpc = standardRpc, engine = null } = {}) {
   let gestoppt = false;
   const aus = (grund) => ({
-    an: false, grund,
+    an: false, grund, kontingent: null,
     bewerteEigenenZug: () => Promise.reject(Object.assign(new Error('Live-Bewertung aus: ' + grund), { aus: true, grund })),
     stop() { gestoppt = true; },
   });
@@ -53,25 +57,48 @@ export async function erstelle({ modus, partieId = null, meineFarbe, app = null,
   const holeEngine = engine || (app && typeof app.engine === 'function' ? () => app.engine('bewertung') : null);
   if (!holeEngine) return aus('engine');
 
+  const NUTZEN = 'online_live_bewertung_nutzen';
+  let kontingent = null;
   if (modus === 'ranked') {
     if (!partieId) return aus('server');
     try {
       const frei = 'online_live_bewertung_frei';
-      const nutzen = 'online_live_bewertung_nutzen';
-      if (!jaVomServer(await rpc(frei, {}), frei, ['frei', 'erlaubt'])) return aus('kontingent');
-      if (!jaVomServer(await rpc(nutzen, { partie: partieId }), nutzen, ['ok', 'erlaubt', 'genutzt'])) return aus('kontingent');
+      const d = await rpc(frei, { partie: partieId });
+      if (!jaVomServer(d, frei, ['frei', 'erlaubt'])) return { ...aus('kontingent'), kontingent: { unbegrenzt: false, rest: 0, gebucht: false } };
+      const x = Array.isArray(d) ? d[0] : d;
+      kontingent = { unbegrenzt: !!(x && x.unbegrenzt === true), rest: x && Number.isInteger(x.rest) ? x.rest : null, gebucht: false };
     } catch (err) {
       return aus('server');
     }
   }
 
+  // Buchung beim ersten eigenen Zug, hoechstens ein Aufruf (auch bei zwei Zuegen kurz hintereinander)
+  let buchung = null;
+  const buche = () => {
+    if (!buchung) {
+      buchung = rpc(NUTZEN, { partie: partieId }).then(
+        (d) => (jaVomServer(d, NUTZEN, ['ok', 'erlaubt', 'genutzt']) ? 'an' : 'kontingent'),
+        () => 'server');
+    }
+    return buchung;
+  };
   const tiefe = () => (app && typeof app.einstellungen === 'function' && app.einstellungen().tiefe) || 14;
-  return {
-    an: true, grund: 'an',
+  const live = {
+    an: true, grund: 'an', kontingent,
     async bewerteEigenenZug(fenVorher, uci) {
       if (gestoppt) throw abgebrochen();
+      if (!live.an) throw Object.assign(new Error('Live-Bewertung aus: ' + live.grund), { aus: true, grund: live.grund });
       if (String(fenVorher || '').split(' ')[1] !== meineFarbe) {
         throw Object.assign(new Error('Nur eigene Zuege werden bewertet'), { grund: 'gegner' });
+      }
+      if (modus === 'ranked') {
+        const ergebnis = await buche();
+        if (gestoppt) throw abgebrochen();
+        if (ergebnis !== 'an') {
+          live.an = false; live.grund = ergebnis;
+          throw Object.assign(new Error('Live-Bewertung aus: ' + ergebnis), { aus: true, grund: ergebnis });
+        }
+        if (kontingent) kontingent.gebucht = true;
       }
       const e = await holeEngine();
       if (gestoppt) throw abgebrochen();
@@ -82,4 +109,5 @@ export async function erstelle({ modus, partieId = null, meineFarbe, app = null,
     },
     stop() { gestoppt = true; },
   };
+  return live;
 }

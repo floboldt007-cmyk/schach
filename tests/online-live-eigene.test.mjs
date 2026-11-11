@@ -89,10 +89,14 @@ for (const modus of ['freund', 'ki']) {
   const eng = new FakeEngine(tabelle());
   const live = await erstelle({ modus: 'ranked', partieId: 'p-42', meineFarbe: 'b', app: appMit(), rpc: s.rpc, engine: async () => eng });
   pruefe('ranked frei: an', live.an === true, live.grund);
-  pruefe('ranked frei: erst frei, dann nutzen mit partie',
-    s.aufrufe.length === 2 && s.aufrufe[0].name === 'online_live_bewertung_frei'
-    && s.aufrufe[1].name === 'online_live_bewertung_nutzen' && s.aufrufe[1].daten.partie === 'p-42', JSON.stringify(s.aufrufe));
+  // R2 (11.11.2026): beim Start nur frei(partie) fragen; gebucht wird erst mit dem ersten eigenen Zug
+  pruefe('ranked Start: nur frei mit partie, noch keine Buchung',
+    s.aufrufe.length === 1 && s.aufrufe[0].name === 'online_live_bewertung_frei' && s.aufrufe[0].daten.partie === 'p-42', JSON.stringify(s.aufrufe));
   const erg = await live.bewerteEigenenZug(DAME, 'd8g5');
+  pruefe('ranked erster eigener Zug: nutzen mit partie, genau einmal', s.aufrufe.length === 2
+    && s.aufrufe[1].name === 'online_live_bewertung_nutzen' && s.aufrufe[1].daten.partie === 'p-42', JSON.stringify(s.aufrufe));
+  await live.bewerteEigenenZug(DAME, 'b8c6');
+  pruefe('ranked zweiter eigener Zug: keine zweite Buchung', s.aufrufe.filter((a) => a.name === 'online_live_bewertung_nutzen').length === 1, JSON.stringify(s.aufrufe));
   pruefe('ranked: nur symbol und klasse, kein bester Zug',
     JSON.stringify(erg) === JSON.stringify({ symbol: '??', klasse: 'patzer' }), JSON.stringify(erg));
   let fehler = null;
@@ -123,6 +127,20 @@ for (const [name, antworten, grund] of [
   try { await live.bewerteEigenenZug(DAME, 'd8g5'); } catch (e) { fehler = e; }
   pruefe(`ranked ${name}: AUS (${grund})`, live.an === false && live.grund === grund && fehler && fehler.aus === true && eng.aufrufe.length === 0,
     `${live.an} ${live.grund}`);
+}
+// Kontingent fuer den Hinweis in der Online-Ansicht (Server: { frei, rest, unbegrenzt })
+{
+  const s = serverMit({ online_live_bewertung_frei: { frei: true, rest: 1, unbegrenzt: false }, online_live_bewertung_nutzen: { ok: true, rest: 0, gebucht: true } });
+  const live = await erstelle({ modus: 'ranked', partieId: 'p7', meineFarbe: 'b', app: appMit(), rpc: s.rpc, engine: async () => new FakeEngine(tabelle()) });
+  pruefe('Kontingent ohne Premium: rest 1, noch nicht gebucht', live.kontingent && live.kontingent.rest === 1 && !live.kontingent.unbegrenzt && !live.kontingent.gebucht, JSON.stringify(live.kontingent));
+  await live.bewerteEigenenZug(DAME, 'd8g5');
+  pruefe('Kontingent nach dem ersten Zug: gebucht', live.kontingent.gebucht === true, JSON.stringify(live.kontingent));
+  const prem = await erstelle({ modus: 'ranked', partieId: 'p8', meineFarbe: 'b', app: appMit(), rpc: serverMit({ online_live_bewertung_frei: { frei: true, rest: null, unbegrenzt: true } }).rpc, engine: async () => new FakeEngine() });
+  pruefe('Kontingent Premium: unbegrenzt', prem.kontingent && prem.kontingent.unbegrenzt === true, JSON.stringify(prem.kontingent));
+  const leer = await erstelle({ modus: 'ranked', partieId: 'p9', meineFarbe: 'b', app: appMit(), rpc: serverMit({ online_live_bewertung_frei: { frei: false, rest: 0, unbegrenzt: false } }).rpc, engine: async () => new FakeEngine() });
+  pruefe('Kontingent verbraucht: AUS mit rest 0 (Hinweis "morgen wieder")', leer.an === false && leer.grund === 'kontingent' && leer.kontingent?.rest === 0, JSON.stringify(leer));
+  const freund = await erstelle({ modus: 'freund', meineFarbe: 'b', app: appMit(), engine: async () => new FakeEngine() });
+  pruefe('Freund: kein Kontingent', freund.kontingent === null);
 }
 {
   const s = serverMit({ online_live_bewertung_frei: false });
@@ -162,9 +180,11 @@ for (const [name, antworten, grund] of [
 
 // ---------- Texte und Quelle ----------
 setzeSprache('de');
-pruefe('Text de', t('online.live.genutzt') === 'Live-Bewertung heute schon genutzt, mit Premium unbegrenzt.', t('online.live.genutzt'));
+pruefe('Text de', t('online.live.genutzt') === 'Live-Bewertung heute schon genutzt, morgen wieder frei. Mit Premium unbegrenzt.', t('online.live.genutzt'));
+pruefe('Text de frei', t('online.live.frei', { n: 1 }) === 'Live-Bewertung: heute noch 1 Partie frei. Sie zählt ab deinem ersten Zug.', t('online.live.frei', { n: 1 }));
 setzeSprache('en');
-pruefe('Text en', t('online.live.genutzt') === 'Live rating already used today, unlimited with Premium.', t('online.live.genutzt'));
+pruefe('Text en', t('online.live.genutzt') === 'Live rating already used today, free again tomorrow. Unlimited with Premium.', t('online.live.genutzt'));
+pruefe('Text en frei', t('online.live.frei', { n: 1 }) === 'Live rating: 1 free game left today. It counts from your first move.', t('online.live.frei', { n: 1 }));
 setzeSprache('de');
 const quelle = readFileSync(path.join(WURZEL, 'js/pakete/online/live-eigene.js'), 'utf8');
 pruefe('Quelle: kein Zugriff auf js/ui/online.js', !/ui\/online/.test(quelle));
