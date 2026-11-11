@@ -110,9 +110,6 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .online-screen.im-spiel .on-meldung[hidden] { display: none; }
 .online-partie .brett-rahmen { position: relative; }
 .on-brett { aspect-ratio: 1; }
-/* Platz fuer das Zug-Symbol der Live-Bewertung eigener Zuege (R2, js/pakete/online/live-eigene.js) */
-.on-symbol-ort { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
-.on-symbol-ort:empty { display: none; }
 /* Banner der Visitenkarte hinter der Leiste (css/visitenkarte.css, dunkel mit heller Schrift): die Partie-Regeln fuer Name
    und Unterzeile faerben sonst dunkel auf dunkel */
 .online-partie .spieler > .on-banner { border-radius: inherit; pointer-events: none; }
@@ -120,7 +117,9 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .online-partie .spieler .name b { font-weight: inherit; }
 .online-partie .spieler .on-titel { flex: none; font-size: inherit; }
 .on-hinweise { display: flex; flex-direction: column; gap: 6px; }
-.on-zug, .on-uhr-hinweis, .on-zuege { margin: 0; text-align: center; color: var(--text-2); font-size: var(--fs-klein); }
+/* Tageskontingent der Live-Bewertung (gewertet, ohne Premium): ruhige Zeile wie der Uhr-Hinweis */
+.on-live[hidden] { display: none; }
+.on-zug, .on-uhr-hinweis, .on-zuege, .on-live { margin: 0; text-align: center; color: var(--text-2); font-size: var(--fs-klein); }
 .on-zug { font-weight: 700; color: var(--text); }
 .on-uhr-hinweis:empty, .on-zuege:empty { display: none; }
 .on-zuege { overflow: auto; font-variant-numeric: tabular-nums; }
