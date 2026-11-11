@@ -3868,7 +3868,7 @@ async function testeU7(browser) {
 
   // --- Ergebnis (PLAN 2.6): Schleier, Screen tritt zurueck, "Sieg!" mit goldenem Ausrufezeichen, kein Konfetti,
   //     Niederlage mit Lichtblick, Remis gold-neutral, Handy: Knoepfe untereinander, Hauptknopf zuerst ---
-  for (const g of [{ w: 1180, h: 820 }, { w: 390, h: 844, handy: true }]) {
+  for (const g of [{ w: 1180, h: 820 }, { w: 390, h: 844, handy: true }, { w: 375, h: 667, handy: true }]) {
     gruppe = `U7 Ergebnis ${g.w}x${g.h}`;
     const { kontext, seite, fehler, h } = await u7Seite(browser, g);
     await h.schaefermatt();
@@ -3897,6 +3897,9 @@ async function testeU7(browser) {
       : '„Nächster Gegner“ gross (Zinnober), darunter klein „Zur Analyse“ links, „Zu den Bots“ rechts',
     a && b && lo && b.primaer && b.knopf && !a.knopf && !a.primaer && a.t >= b.u - 1 && Math.abs(a.t - lo.t) < 2 && a.l < lo.l
       && a.w < b.w && a.hh >= 44 && lo.hh >= 44 && sieg.knoepfe.filter((x) => x.primaer).length === 1, JSON.stringify(sieg.knoepfe));
+    // R14-1: "Zu den Bots" bricht nicht um (auf 375/390 px vorher drei Zeilen, 63 px hoch, weil "Freund herausfordern"
+    // die linke Spalte aufblaehte) und ist so hoch wie "Zur Analyse"
+    pruefe('„Zur Analyse“ und „Zu den Bots“ gleich hoch, einzeilig', a && lo && Math.abs(a.hh - lo.hh) < 2 && lo.hh < 50, JSON.stringify(sieg.knoepfe));
     if (g.handy) {
       const fest = await seite.evaluate(() => { const k = document.querySelector('.ergebnis-karte').getBoundingClientRect();
         const l = document.querySelector('.erg-lobby').getBoundingClientRect(); const a = document.querySelector('.erg-aktionen');
