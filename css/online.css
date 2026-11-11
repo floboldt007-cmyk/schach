@@ -92,19 +92,60 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-listeneintrag { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--a3); text-align: left; }
 .on-einladung { max-width: 600px; margin-inline: auto; text-align: center; }
 .on-code { font-size: var(--fs-h1); letter-spacing: .15em; font-weight: var(--gw-titel); }
-.on-spiel { display: grid; gap: var(--a3); width: min(100%, 680px, calc(100dvh - 300px)); min-width: min(100%, 280px); margin: auto; }
-.on-spieler { display: flex; align-items: center; gap: var(--a3); padding: var(--a2) var(--a3); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
-.on-spieler img { width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--r-s); background: var(--feld-hell); }
-.on-spieler > div { display: grid; flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.on-spieler > div > span, .on-uhr-hinweis, .on-zuege { color: var(--text-2); font-size: var(--fs-klein); }
-.on-spieler .uhr { flex-shrink: 0; }
-.on-spieler .uhr[hidden], .on-ergebnis[hidden] { display: none; }
-.on-brett { width: 100%; aspect-ratio: 1; }
-.on-aktionen { display: flex; flex-wrap: wrap; gap: var(--a3); justify-content: center; }
-/* Fahne (Flo 30.10.): Remis anbieten oder Aufgeben in einem Knopf */
-.on-fahne { gap: 8px; }
-.on-fahne svg { width: 18px; height: 18px; flex: none; }
-.on-zug, .on-uhr-hinweis, .on-zuege { margin: 0; text-align: center; }
-.on-uhr-hinweis:empty { display: none; }
-.on-zuege { max-height: 4em; overflow: auto; }
-.on-ergebnis { text-align: center; }
+/* Online-Partie wie die Bot-Partie (Flo 11.11.2026): js/ui/online.js setzt am Screen .partie .online-partie .im-spiel und
+   baut das Gerippe aus js/ui/partie.js (.inhalt > .brettzone + .seite); Brett, Spielerleisten, Uhren und Knoepfe setzt
+   css/partie.css. Hier nur, was die Online-Partie anders hat: Rumpf der Online-Seite, keine Coach-Karte, Hinweise (Zug,
+   Remis-Angebot, neuere Partie), Zugtext, Ergebniskarte und zwei Knoepfe statt fuenf. */
+/* Kopf so hoch wie der Kopf der Bot-Partie (--kopf-hoehe-partie, css/tokens.css und css/partie.css), sonst fehlen dem Brett
+   auf dem Desktop 22 px */
+.screen.online-screen.im-spiel > .kopf.haupt-kopf { height: var(--kopf-hoehe-partie); min-height: 0; padding-top: 0; }
+@media (orientation: portrait) and (max-width: 600px) { .screen.online-screen.im-spiel > .kopf.haupt-kopf { padding: 0 10px; gap: 8px; } }
+/* Handy mit wenig Hoehe (layout() in js/ui/online.js, wie .coach-eng in der Bot-Partie): erst ruecken die Hinweise
+   zusammen, dann wird das Brett kleiner */
+.online-partie.eng .on-hinweise { gap: 2px; }
+.online-partie.eng .on-uhr-hinweis { display: none; }
+.online-screen.im-spiel .on-rumpf { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.online-screen.im-spiel .on-inhalt { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; }
+.online-screen.im-spiel .on-meldung { flex: none; max-width: none; margin: 6px 12px 0; padding: 8px 12px; }
+.online-screen.im-spiel .on-meldung[hidden] { display: none; }
+.online-partie .brett-rahmen { position: relative; }
+.on-brett { aspect-ratio: 1; }
+/* Platz fuer das Zug-Symbol der Live-Bewertung eigener Zuege (R2, js/pakete/online/live-eigene.js) */
+.on-symbol-ort { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+.on-symbol-ort:empty { display: none; }
+/* Banner der Visitenkarte hinter der Leiste (css/visitenkarte.css, dunkel mit heller Schrift): die Partie-Regeln fuer Name
+   und Unterzeile faerben sonst dunkel auf dunkel */
+.online-partie .spieler > .on-banner { border-radius: inherit; pointer-events: none; }
+.online-partie .spieler.mit-banner .name, .online-partie .spieler.mit-banner .unter { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
+.online-partie .spieler .name b { font-weight: inherit; }
+.online-partie .spieler .on-titel { flex: none; font-size: inherit; }
+.on-hinweise { display: flex; flex-direction: column; gap: 6px; }
+.on-zug, .on-uhr-hinweis, .on-zuege { margin: 0; text-align: center; color: var(--text-2); font-size: var(--fs-klein); }
+.on-zug { font-weight: 700; color: var(--text); }
+.on-uhr-hinweis:empty, .on-zuege:empty { display: none; }
+.on-zuege { overflow: auto; font-variant-numeric: tabular-nums; }
+.on-ergebnis { text-align: center; margin-bottom: 0; }
+.on-ergebnis .on-aktionen { display: flex; flex-wrap: wrap; gap: var(--a3); justify-content: center; }
+.on-ergebnis[hidden], .on-angebot[hidden], .on-neuer[hidden] { display: none; }
+/* Remis-Angebot des Gegners: deutlich, nicht zu uebersehen (Flo 11.11.) */
+.on-angebot { margin: 0; padding: 10px 14px; border-radius: 14px; background: var(--tinte); color: var(--auf-tinte); font-weight: 800; text-align: center; }
+.on-neuer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; margin: 0; padding: 8px 12px; border-radius: 14px;
+  background: var(--warn-weich); color: var(--text); font-weight: 700; text-align: center; }
+.on-neuer .knopf { min-height: 44px; }
+/* zwei Knoepfe (Remis, Aufgeben), im Widerspruch Strittig und Aufgeben: gleich breit */
+.online-partie .spielknoepfe { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.online-partie .spielknoepfe:empty { display: none; }
+.online-partie .spielknoepfe > .knopf.primaer .ico { color: currentColor; }
+/* Reihenfolge der Spalte: quer Gegner, Hinweise, Zuege, Ergebnis, ich, Knoepfe; hoch Gegner, Brett, ich, Hinweise,
+   Ergebnis, Knoepfe, Zuege (die Ordnungszahlen der Partie-Teile stehen in css/partie.css) */
+@media (orientation: landscape) {
+  .online-partie .on-hinweise { order: 2; }
+  /* fuellt die Spalte wie die Zugliste der Bot-Partie, auch leer: die eigene Leiste und die Knoepfe stehen unten */
+  .online-partie .on-zuege, .online-partie .on-zuege:empty { display: block; order: 3; flex: 1 1 0; min-height: 0; text-align: left; }
+  .online-partie .on-ergebnis { order: 3; }
+}
+@media (orientation: portrait) {
+  .online-partie .on-hinweise, .online-partie .on-ergebnis { order: 3; }
+  .online-partie .spielknoepfe { order: 4; }
+  .online-partie .on-zuege { order: 6; max-height: 4.2em; }
+}

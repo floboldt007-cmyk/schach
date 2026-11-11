@@ -15,7 +15,7 @@ const O = (k, w) => t('online.' + k, w);
 import { Brett, zielKarte } from '../board.js';
 import { icon } from './icons.js';
 import { figurenPfad } from '../figurensatz.js';
-import { sanAnzeige } from '../review.js';
+import { sanAnzeige, materialBilanz } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
@@ -26,7 +26,7 @@ import { stufenName } from '../pakete/liga/texte.js';
 import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { hoere } from '../ereignisse.js';
-
+import { spieleDuell } from './duell.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -37,6 +37,22 @@ const uhrText = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s /
 // supabase/online-schema.sql). Danach fragt die Oberflaeche hoechstens einmal je Minute nach (online_pruefe_zeit).
 const HAENGT_MS = 10 * 60 * 1000;
 const HAENGT_ABFRAGE_MS = 60 * 1000;
+// Partie-Ansicht wie die Bot-Partie (Flo 11.11.2026: "soll aussehen wie die Bot-Partie"): dasselbe Gerippe wie
+// js/ui/partie.js (.partie > .inhalt > .brettzone + .seite, Spielerleisten, .spielknoepfe), damit css/partie.css Brett,
+// Leisten, Uhren und Knoepfe gleich setzt. Auf dem Handy rechnet layout() unten die Brettgroesse wie dort.
+const BRETT_MIN = 280;
+const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+const UHR_SYMBOL = '<svg class="ico uhr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+  + 'stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>';
+const REMIS_SYMBOL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><text x="12" y="18" text-anchor="middle" '
+  + 'font-size="17" font-weight="800" fill="currentColor">½</text></svg>';
+// Duell-Intro vor gewerteten Partien (js/ui/duell.js) nur einmal je Partie und nur in der ersten Minute
+const INTRO_SCHLUESSEL = 'schach-arena:online:intro';
+const INTRO_FRIST_MS = 60 * 1000;
+// neueste laufende Partie zuerst (Befund 2 vom 11.11.: zwei gewertete Partien zugleich, jedes Geraet sass in einer anderen)
+const zeitVon = (row) => Date.parse(row?.erstellt_am || row?.aktualisiert_am || '') || 0;
+const neuesteLaufende = (liste) => (Array.isArray(liste) ? liste : []).filter((row) => row && row.status === 'laeuft')
+  .sort((a, b) => zeitVon(b) - zeitVon(a))[0] || null;
 // Ein Ende, das der Ziehende selbst meldet, muss am nachgespielten Brett stimmen. Zeit, Aufgabe, Remis per Angebot,
 // Abbruch und "strittig" entscheidet der Server selbst; die gelten, wie sie kommen.
 function endePasst(stand, c) {
@@ -77,6 +93,9 @@ export function zeige(root, params, app) {
   let strittigFaellig = false;
   let profil = null, uhrTimer = null, zeitPruefung = 0;
   let kartenDaten = null, kartenPartie = null;
+  // introGelaufen: Duell-Intro dieser Ansicht schon entschieden; neuerGeprueft: Partie, fuer die nach einer neueren gefragt wurde
+  let introGelaufen = false, introUhr = null, neuerGeprueft = null, layoutRo = null, layoutBild = 0;
+  const handyMq = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(orientation: portrait) and (max-width: 600px)') : null;
   // Klang: gehoert = Halbzuege, die schon geklungen haben; uhrGewarnt = Uhr-Warnung dieser Partie gespielt
   let gehoert = 0, uhrGewarnt = false;
   const ton = name => { try { klang.spiele(name); } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ } };
@@ -169,6 +188,7 @@ export function zeige(root, params, app) {
       ${tuer('partie', `<p class="on-suche-text" hidden>${esc(O('suche.pruefen'))}</p>
         <p class="on-zeit-fest">${esc(O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) }))}</p>
         <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="suchen" disabled>${esc(O('tuer.partie.knopf'))}</button>
+        <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="fortsetzen" hidden>${esc(O('laufend.knopf'))}</button>
         <div class="on-suche" hidden>
           <div class="on-ring" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="on-ring-spur" cx="50" cy="50" r="44"/>
             <circle class="on-ring-rest" cx="50" cy="50" r="44" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="0"/></svg>
@@ -206,6 +226,7 @@ export function zeige(root, params, app) {
     k.querySelector('.on-zeit-fest').hidden = zustand !== 'bereit';
     k.querySelector('[data-online="suchen"]').hidden = zustand !== 'bereit';
     k.querySelector('[data-online="suchen"]').disabled = zustand !== 'bereit';
+    k.querySelector('[data-online="fortsetzen"]').hidden = zustand !== 'laufend';
     if (zustand === 'bald') { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) l.hidden = true; }
     k.querySelector('.on-suche').hidden = zustand !== 'sucht';
     if (zustand !== 'sucht') { clearInterval(restUhr); restUhr = null; }
@@ -243,9 +264,22 @@ export function zeige(root, params, app) {
     el.setAttribute('aria-label', O('liga.label', { stufe, zeile, kronen: O('liga.kronen', { n: zahlKronen }) }));
     el.hidden = false;
   }
+  // Laeuft fuer das Konto eine Partie (online_meine), wird die Partie-Tuer zur Karte "Laufende Partie fortsetzen" und
+  // oeffnet die NEUESTE laufende (Befund 3 vom 11.11.: kein Weg zurueck; Befund 2: zwei laufende zugleich). Solange eine
+  // laeuft, gibt es dort keinen Suchknopf, damit keine zweite gewertete Partie entsteht. Der Platz ist derselbe wie fuer
+  // Zeile und Suchknopf (kein Springen beim Laden, G-005 AC-06).
   async function pruefeSuche() {
-    try { const d = await holeStand(); if (weg) return; zeigeLiga(d); sucheZustand('bereit', O('suche.erklaert')); }
-    catch (e) { sucheZustand('bald', O('suche.bald')); }
+    const laufend = online.meinePartien().then(neuesteLaufende, () => null);
+    let liga = true;
+    try { const d = await holeStand(); if (weg) return; zeigeLiga(d); } catch (e) { liga = false; }
+    const lp = await laufend;
+    if (weg) return;
+    if (lp) {
+      sucheZustand('laufend', O(online.binAmZug(lp) ? 'laufend.du' : 'laufend.gegner'));
+      sucheKarte().querySelector('[data-online="fortsetzen"]').dataset.partie = lp.id;
+      if (!liga) { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) l.hidden = true; }
+    } else if (liga) sucheZustand('bereit', O('suche.erklaert'));
+    else sucheZustand('bald', O('suche.bald'));
   }
   async function botFuerMich() {
     try { const l = await import('../pakete/lobby/index.js'); return l.passenderBot(l.schaetzeWertung()); } catch (e) { return null; }
@@ -346,20 +380,135 @@ export function zeige(root, params, app) {
         <button class="knopf" type="button" data-online="liste-zurueck">${esc(O('meine'))}</button></section>`;
     } else {
       if (!brett) {
-        inhalt.innerHTML = `<div class="on-spiel"><div class="on-spieler on-oben"></div><div class="brett-rahmen"><div class="brett on-brett"></div></div><div class="on-spieler on-unten"></div>`
-          + `<p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p><div class="on-aktionen"></div><p class="on-zuege" aria-label="${esc(O('zuege'))}"></p><section class="on-ergebnis on-karte flaeche" hidden></section></div>`;
-        const e = app.einstellungen();
-        brett = new Brett(inhalt.querySelector('.brett'), { beiZug, figurenPfad: new URL(figurenPfad(), WURZEL).href,
-          koordinaten: e.koordinaten !== false, koordLage: e.koordLage, autoDame: e.autoDame !== false, turmRochade: e.turmRochade === true,
-          steuerung: e.steuerung, pfeile: e.pfeile !== false });
-        brett.setzeAusrichtung(online.meineFarbe(p)); brett.setzeDauer(300);
+        // Gerippe der Bot-Partie (js/ui/partie.js): Brett ohne Bewertungsbalken, rechts bzw. darunter die Spalte mit den
+        // Spielerleisten (Name, Elo oder Liga, Uhr, geschlagene Figuren) und den Knoepfen. .on-symbol-ort haelt den Platz
+        // fuer das Zug-Symbol der Live-Bewertung eigener Zuege (js/pakete/online/live-eigene.js, Einbau in R2).
+        s.classList.add('partie', 'online-partie', 'im-spiel', 'ohne-balken');
+        s.classList.toggle('mit-uhr', p.bedenkzeit_s != null);
+        inhalt.innerHTML = `<div class="inhalt on-spiel">
+          <div class="brettzone"><div class="brett-rahmen"><div class="brett on-brett"></div><div class="on-symbol-ort" aria-hidden="true"></div></div></div>
+          <div class="seite">
+            <div class="spieler gegner on-spieler on-oben" role="group"></div>
+            <div class="on-hinweise"><p class="on-angebot" role="alert" hidden></p><p class="on-neuer" hidden></p>
+              <p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p></div>
+            <p class="on-zuege" aria-label="${esc(O('zuege'))}"></p>
+            <section class="on-ergebnis on-karte flaeche" hidden></section>
+            <div class="spieler ich on-spieler on-unten" role="group"></div>
+            <div class="spielknoepfe aktionen on-aktionen"></div>
+          </div></div>`;
+        bauBrett();
         uhrTimer = setInterval(tick, 100);
+        beobachteLayout();
+        introUhr = setTimeout(intro, 1500);
       }
       zeichne();
+      pruefeNeuere();
       if (p.status === 'beendet') { beobachter?.stop(); clearInterval(uhrTimer); }
     }
     sperre();
     meldeStrittigVonSelbst();
+  }
+  // Brett mit dem eigenen Figurensatz (figurenPfad(e) wie alle anderen Ansichten; Befund 4 vom 11.11.: ohne
+  // Einstellungen). Aendert sich der Satz waehrend der Partie (Erfinder-Status kommt erst nach dem Aufbau vom Server,
+  // js/app.js pruefeSonderstuecke, oder Wahl in den Einstellungen), wird das Brett mit der Stellung neu gebaut.
+  const skinPfad = (e = app.einstellungen()) => new URL(figurenPfad(e), WURZEL).href;
+  function bauBrett() {
+    const e = app.einstellungen();
+    brett?.zerstoere();
+    brett = new Brett(inhalt.querySelector('.on-brett'), { beiZug, figurenPfad: skinPfad(e),
+      koordinaten: e.koordinaten !== false, koordLage: e.koordLage, autoDame: e.autoDame !== false, turmRochade: e.turmRochade === true,
+      steuerung: e.steuerung, pfeile: e.pfeile !== false });
+    brett.setzeAusrichtung(online.meineFarbe(p)); brett.setzeDauer(300);
+  }
+  function beiEinstellungen(ev) {
+    if (weg || !brett || blockiert) return;
+    const e = ev?.detail || app.einstellungen();
+    if (skinPfad(e) === brett.figurenPfad) return;
+    bauBrett(); zeichne();
+  }
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
+  // Handy hoch: Brett von Rand zu Rand, ein Vielfaches von 8; passt die Spalte bis zu den Knoepfen nicht, wird es
+  // kleiner, nie unter BRETT_MIN (wie layout() in js/ui/partie.js, dort ausserdem Coach und Zugstreifen)
+  function layout() {
+    const spiel = inhalt.querySelector('.on-spiel');
+    if (weg || !spiel || !s.isConnected) return;
+    const handy = !!(handyMq && handyMq.matches);
+    s.classList.toggle('handy', handy);
+    s.classList.remove('eng');
+    if (!handy) { spiel.style.removeProperty('--brett'); spiel.style.removeProperty('--spalte'); return; }
+    const rahmen = spiel.querySelector('.brett-rahmen');
+    const rs = getComputedStyle(rahmen);
+    const sockelX = (parseFloat(rs.paddingLeft) || 0) + (parseFloat(rs.paddingRight) || 0);
+    const sockelY = (parseFloat(rs.paddingTop) || 0) + (parseFloat(rs.paddingBottom) || 0);
+    const breit = Math.floor((spiel.clientWidth - sockelX) / 8) * 8;
+    const setze = (g) => { spiel.style.setProperty('--brett', g + 'px'); spiel.style.setProperty('--spalte', (g + sockelX) + 'px'); };
+    // unterstes Element, das sichtbar bleiben soll: die Knoepfe, nach dem Ende die Ergebniskarte
+    const knoepfe = spiel.querySelector('.spielknoepfe');
+    const ziel = knoepfe.childElementCount ? knoepfe : spiel.querySelector('.on-unten');
+    const untenVon = (el) => { let y = el.offsetHeight, x = el; while (x && x !== spiel) { y += x.offsetTop; x = x.offsetParent; } return y; };
+    const passt = () => untenVon(ziel) + 4 <= spiel.clientHeight + 0.5;
+    setze(breit);
+    if (!passt()) s.classList.add('eng');
+    if (!passt()) {
+      const rest = untenVon(ziel) + 4 - rahmen.offsetHeight;
+      setze(Math.max(BRETT_MIN, Math.min(breit, Math.floor((spiel.clientHeight - rest - sockelY) / 8) * 8)));
+    }
+  }
+  function beobachteLayout() {
+    if (typeof ResizeObserver !== 'function' || layoutRo) { layout(); return; }
+    layoutRo = new ResizeObserver(() => {
+      if (layoutBild || weg) return;
+      layoutBild = requestAnimationFrame(() => { layoutBild = 0; layout(); });
+    });
+    layoutRo.observe(s);
+    for (const k of inhalt.querySelector('.seite').children) layoutRo.observe(k);
+    layout();
+  }
+  // Gegner fuer Leiste und Intro: Name und Liga aus der Visitenkarte (karte_der_partie), Elo nur, wenn der Server sie
+  // mitschickt (Feld elo, heute noch nicht); sonst Liga, sonst die Farbe
+  function spielerDaten(f) {
+    const eigen = online.meineFarbe(p);
+    const roh = kartenDaten && (f === 'w' ? kartenDaten.w : kartenDaten.s);
+    const k = roh ? fremdeKarte(roh) : null;
+    const name = k && roh.name ? k.name : f === eigen ? profil?.benutzername || O('ich') : p.gewertet ? O('gegnerName') : O('freund');
+    const elo = roh && Number.isInteger(roh.elo) && roh.elo >= 100 && roh.elo <= 4000 ? roh.elo : null;
+    const liga = k && Number.isInteger(k.kronenStufe) ? stufenName(k.kronenStufe) : '';
+    return { k, name, elo, liga };
+  }
+  // Duell-Intro vor gewerteten Partien (Flo 11.11.: "Intro wie bei den Bots", Gegnername, Elo, Liga): einmal je Partie,
+  // nur in der ersten Minute nach dem Anlegen, sobald die Visitenkarten da sind (oder nach 1,5 s ohne sie)
+  function intro() {
+    clearTimeout(introUhr); introUhr = null;
+    if (introGelaufen || weg || !brett || !p || p.gewertet !== true || p.status !== 'laeuft' || blockiert) return;
+    introGelaufen = true;
+    const alter = Date.now() - zeitVon(p);
+    if (!(alter > -5000 && alter < INTRO_FRIST_MS)) return;
+    let gesehen = [];
+    try { gesehen = JSON.parse(sessionStorage.getItem(INTRO_SCHLUESSEL) || '[]'); } catch (e) { gesehen = []; }
+    if (!Array.isArray(gesehen)) gesehen = [];
+    if (gesehen.includes(p.id)) return;
+    try { sessionStorage.setItem(INTRO_SCHLUESSEL, JSON.stringify([...gesehen, p.id].slice(-20))); } catch (e) { /* nur Komfort */ }
+    const eigen = online.meineFarbe(p);
+    const g = spielerDaten(andere(eigen));
+    const avatar = g.k?.avatar ? 'data:image/svg+xml,' + encodeURIComponent(g.k.avatar) : '';
+    try {
+      spieleDuell({ bot: { id: 'online', name: g.name, elo: g.elo, liga: g.liga, avatar }, farbe: eigen, anlass: 'liga',
+        einstellung: app.einstellungen().duellIntro || 'besondere', bildschirm: 'online' });
+    } catch (e) { /* das Intro ist Schmuck, nie ein Grund fuer einen Fehler */ }
+  }
+  // Befund 2 (11.11.): Gibt es fuer das Konto eine NEUERE laufende Partie als die gezeigte, nennt ein Streifen sie und
+  // fuehrt hin. Einmal je geoeffneter Partie, eine Anfrage (online_meine).
+  function pruefeNeuere() {
+    if (!p || p.status !== 'laeuft' || neuerGeprueft === p.id) return;
+    neuerGeprueft = p.id;
+    const id = p.id;
+    online.meinePartien().then((liste) => {
+      const neu = neuesteLaufende(liste);
+      const el = inhalt.querySelector('.on-neuer');
+      if (weg || !el || !p || p.id !== id || !neu || neu.id === id || zeitVon(neu) <= zeitVon(p)) return;
+      el.innerHTML = `<span>${esc(O('neuere'))}</span><button class="knopf primaer dr" type="button" data-partie="${esc(neu.id)}">${esc(O('neuereKnopf'))}</button>`;
+      el.hidden = false;
+    }).catch(() => { /* ohne Antwort bleibt der Streifen weg */ });
   }
   // Klaenge wie in der Partie (js/sounds.js zugKlangName): der Zug des Freundes, sobald er ankommt (der eigene klang
   // schon in beiZug); das Ende einmal beim Wechsel von "laeuft" auf "beendet" (Sieg, Niederlage, Remis; strittig und
@@ -385,21 +534,46 @@ export function zeige(root, params, app) {
       kartenPartie = p.id;
       kartenDaten = null;
       const id = p.id;
-      karteDerPartie(id, { frist: 8000 }).then((d) => { if (d && !weg && p && p.id === id) { kartenDaten = d; karten(); } });
+      karteDerPartie(id, { frist: 8000 }).then((d) => { if (d && !weg && p && p.id === id) { kartenDaten = d; karten(); intro(); } });
     }
     const eigen = online.meineFarbe(p);
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
-      const roh = kartenDaten && (f === 'w' ? kartenDaten.w : kartenDaten.s);
-      const k = roh ? fremdeKarte(roh) : null;
-      const name = k && roh.name ? k.name : f === eigen ? profil?.benutzername || O('ich') : O('freund');
+      const { k, name, elo, liga } = spielerDaten(f);
       const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
       const titel = k && k.titel ? `<small class="on-titel">${esc(k.titel.name)}</small>` : '';
+      // Unterzeile wie in der Bot-Partie: Elo (wenn bekannt) und Liga, sonst die Farbe; dahinter die geschlagenen Figuren
+      const meta = [elo != null ? `Elo ${elo}` : '', liga].filter(Boolean).join(' · ') || (f === 'w' ? O('weiss') : O('schwarz'));
+      const avatar = k?.avatar || floAvatar(f);
+      const unter = `<div class="unter bot-meta">${titel}<span class="p-meta">${esc(meta)}</span><span class="geschlagen-ort" data-wer="${f}"></span></div>`;
+      const uhr = `<div class="uhr zahl" data-farbe="${f}"${p.bedenkzeit_s == null ? ' hidden' : ''}>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
       const el = inhalt.querySelector('.on-' + ort);
       el.classList.toggle('mit-banner', !!banner);
-      el.innerHTML = `${banner}<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div><b>${esc(name)}</b>${titel}<span>${f === 'w' ? O('weiss') : O('schwarz')}</span></div>
-        <span class="uhr zahl" data-farbe="${f}"${p.bedenkzeit_s == null ? ' hidden' : ''}></span>`;
+      el.setAttribute('aria-label', name);
+      // Gegner: Bild, Feld info (Name, Unterzeile), Uhr; eigene Leiste: Bild, Name, Unterzeile, Uhr (Gitter aus css/partie.css)
+      el.innerHTML = ort === 'oben'
+        ? `${banner}<span class="av">${avatar}</span><div class="info"><div class="name"><b>${esc(name)}</b></div>${unter}</div>${uhr}`
+        : `${banner}<span class="av">${avatar}</span><div class="name"><b>${esc(name)}</b></div>${unter}${uhr}`;
     }
+    zeichneGeschlagen();
     tick();
+  }
+  // geschlagene Figuren je Seite und Materialvorsprung "+n" (wie zeichneGeschlagen in js/ui/partie.js)
+  function zeichneGeschlagen() {
+    if (!chess) return;
+    const von = { w: [], b: [] };
+    for (const m of chess.history({ verbose: true })) if (m.captured) von[m.color].push(m.captured);
+    const bilanz = materialBilanz(chess.fen());
+    for (const ort of inhalt.querySelectorAll('.geschlagen-ort')) {
+      const f = ort.dataset.wer;
+      const plus = bilanz * (f === 'w' ? 1 : -1);
+      const liste = von[f].sort((a, b) => WERT[b] - WERT[a]);
+      let vor = null;
+      const imgs = liste.map((x) => { const neu = vor !== null && vor !== x; vor = x;
+        return `<img${neu ? ' class="neu-gruppe"' : ''} src="${new URL(`assets/pieces/${andere(f)}${x.toUpperCase()}.svg`, WURZEL).href}" alt="" decoding="sync">`; }).join('');
+      const html = !liste.length && plus <= 0 ? '<span class="geschlagen leer"></span>'
+        : `<span class="geschlagen">${imgs}${plus > 0 ? `<span class="plus zahl">+${plus}</span>` : ''}</span>`;
+      if (ort._html !== html) { ort._html = html; ort.innerHTML = html; }
+    }
   }
   function rest(f) {
     const wert = Number(f === 'w' ? p.uhr_weiss_ms : p.uhr_schwarz_ms) || 0;
@@ -408,9 +582,11 @@ export function zeige(root, params, app) {
   }
   function tick() {
     if (weg || !brett || !p || p.bedenkzeit_s == null) return;
-    for (const el of inhalt.querySelectorAll('.uhr')) {
-      const f = el.dataset.farbe;
-      el.textContent = uhrText(rest(f)); el.classList.toggle('laeuft', p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2);
+    for (const el of inhalt.querySelectorAll('.uhr[data-farbe]')) {
+      const f = el.dataset.farbe, r = rest(f), zeit = el.querySelector('.uhr-zeit');
+      if (zeit) zeit.textContent = uhrText(r);
+      el.classList.toggle('laeuft', p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2);
+      el.classList.toggle('warn', p.status === 'laeuft' && r < 20000);
     }
     // Uhr-Warnung einmal je Partie, sobald die eigene laufende Uhr unter 20 s faellt (wie in der Partie)
     if (!uhrGewarnt && p.status === 'laeuft' && online.binAmZug(p) && online.zuegeListe(p).length >= 2 && rest(online.meineFarbe(p)) < 20000) {
@@ -432,17 +608,25 @@ export function zeige(root, params, app) {
     const m = chess.history({ verbose: true }).at(-1);
     brett.setzeStellung(chess.fen(), { letzterZug: m ? [m.from, m.to] : null, schach: chess.inCheck() ? true : null });
     karten();
-    inhalt.querySelector('.on-zug').textContent = p.status === 'beendet' ? O('fertig') : widerspruch ? O('stellung') : busy ? O('bestaetigt') : online.binAmZug(p) ? O('du') : O('gegner');
+    zeichneGeschlagen();
+    const gegnerZug = p.gewertet ? O('gegnerAmZug') : O('gegner');
+    inhalt.querySelector('.on-zug').textContent = p.status === 'beendet' ? O('fertig') : widerspruch ? O('stellung') : busy ? O('bestaetigt') : online.binAmZug(p) ? O('du') : gegnerZug;
     inhalt.querySelector('.on-uhr-hinweis').textContent = p.bedenkzeit_s != null && online.zuegeListe(p).length < 2 ? O('uhr') : '';
     inhalt.querySelector('.on-zuege').textContent = chess.history().map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanAnzeige(san)}`).join(' ');
-    const angebot = p.remis_angebot && p.remis_angebot !== online.meineFarbe(p);
-    inhalt.querySelector('.on-aktionen').innerHTML = p.status !== 'laeuft' ? ''
-      : widerspruch ? `<button class="knopf primaer" type="button" data-online="strittig">${esc(O('strittigMelden'))}</button><button class="knopf" type="button" data-online="aufgeben">${esc(O('aufgeben'))}</button>`
-      // Flo 30.10. abends: "Remis anbieten okay, das mit der Fahne ist gut, Remis nur online". Die Fahne oeffnet die Wahl
-      // Remis anbieten oder Aufgeben; ein Angebot des Freundes steht als eigener Knopf daneben.
-      : `${angebot ? `<button class="knopf primaer" type="button" data-online="annehmen">${esc(O('annehmen'))}</button>`
-        : p.remis_angebot ? `<button class="knopf" type="button" data-online="angeboten" disabled>${esc(O('angeboten'))}</button>` : ''}`
-        + `<button class="knopf on-fahne" type="button" data-online="aufgeben" aria-label="${esc(O('fahneLabel'))}">${icon('flagge')}<span>${esc(O('fahne'))}</span></button>`;
+    const angebot = p.status === 'laeuft' && !widerspruch && p.remis_angebot && p.remis_angebot !== online.meineFarbe(p);
+    // Remis-Angebot des Gegners deutlich als eigener Streifen ueber den Knoepfen (Flo 11.11.: sonst uebersehen)
+    const angebotEl = inhalt.querySelector('.on-angebot');
+    angebotEl.hidden = !angebot;
+    angebotEl.textContent = angebot ? O('angebotText', { name: spielerDaten(andere(online.meineFarbe(p))).name }) : '';
+    // Knoepfe wie in der Bot-Partie sichtbar unter dem Brett (Flo 11.11.: "Remis und Aufgeben hinter der Fahne fand ich
+    // nicht"): Remis anbieten (oder annehmen, oder "angeboten") und Aufgeben; im Widerspruch Strittig melden und Aufgeben
+    const k = (a, ico, text, extra = '', zu = false) => `<button class="knopf aktion dr ${extra}" type="button" data-online="${a}"${zu ? ' disabled' : ''}>${ico}<span>${esc(text)}</span></button>`;
+    const aufgeben = k('aufgeben', icon('flagge'), O('aufgeben'), 'aufgeben');
+    const remis = angebot ? k('annehmen', icon('haken'), O('annehmen'), 'primaer')
+      : p.remis_angebot ? k('angeboten', REMIS_SYMBOL, O('angeboten'), '', true) : k('remis', REMIS_SYMBOL, O('anbieten'));
+    const knoepfe = inhalt.querySelector('.spielknoepfe');
+    const html = p.status !== 'laeuft' ? '' : widerspruch ? k('strittig', icon('hinweis'), O('strittigMelden'), 'primaer') + aufgeben : remis + aufgeben;
+    if (knoepfe._html !== html) { knoepfe._html = html; knoepfe.innerHTML = html; }
     const ergebnis = inhalt.querySelector('.on-ergebnis');
     ergebnis.hidden = p.status !== 'beendet';
     if (!ergebnis.hidden) {
@@ -514,20 +698,18 @@ export function zeige(root, params, app) {
     if (a === 'strittig') aktion(() => online.meldeStrittig(p.id));
     if (a === 'aufgeben') {
       busy = true; sperre();
-      // Fahne: Remis anbieten (nur solange noch keins von dir steht) oder Aufgeben; im Widerspruch nur Aufgeben
-      const remisGeht = !widerspruch && !p.remis_angebot;
-      const wahl = await app.frage({ titel: O(remisGeht ? 'fahneTitel' : 'aufgebenTitel'), text: O(remisGeht ? 'fahneText' : 'freundGewinnt'),
-        knoepfe: [{ text: O('weiter'), wert: false }, ...(remisGeht ? [{ text: O('anbieten'), wert: 'remis' }] : []),
-          { text: O('aufgeben'), wert: true, art: 'gefahr' }], abbrechen: false });
+      // Aufgeben mit Rueckfrage (Remis anbieten hat seit dem 11.11. einen eigenen Knopf daneben)
+      const wahl = await app.frage({ titel: O('aufgebenTitel'), text: O(p.gewertet ? 'gegnerGewinnt' : 'freundGewinnt'),
+        knoepfe: [{ text: O('weiter'), wert: false }, { text: O('aufgeben'), wert: true, art: 'gefahr' }], abbrechen: false });
       busy = false;
       if (weg) return;
       if (wartend) { const neu = wartend; wartend = null; uebernehme(neu); }
-      if (wahl === 'remis' && p.status === 'laeuft') aktion(() => online.bieteRemis(p.id));
-      else if (wahl === true && p.status === 'laeuft') aktion(() => online.gibAuf(p.id)); else sperre();
+      if (wahl === true && p.status === 'laeuft') aktion(() => online.gibAuf(p.id)); else sperre();
     }
     if (a === 'revanche') aktion(() => online.erstelleEinladung({ farbe: andere(online.meineFarbe(p)), bedenkzeit: p.bedenkzeit_s, inkrement: p.inkrement_s }), oeffne);
   });
   if (app.test) window.__online = { partie: () => p, chess: () => chess, brett: () => brett, blockiert: () => blockiert, widerspruch: () => widerspruch, busy: () => busy, rest };
   start();
-  return { verlasse() { weg = true; clearInterval(restUhr); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
+  return { verlasse() { weg = true; clearInterval(restUhr); clearTimeout(introUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
+    window.removeEventListener('schach:einstellungen', beiEinstellungen); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
 }
