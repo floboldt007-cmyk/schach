@@ -389,11 +389,11 @@ async function shopTeil(browser) {
   }));
   // R5-2 (Kundenblick 09.11.2026): „ab 18“ stand doppelt im Blatt (Hinweis oben und auf der Karte)
   pruefe('Shop abgemeldet: „ab 18“ steht genau einmal im Blatt (R5-2)', (text.match(/ab 18/g) || []).length === 1, text);
-  // R5-3: ausgegraut bleibt, aber das Brett muss als Brett erkennbar sein (vorher Deckkraft .55 = graues Karomuster wie ein kaputtes Bild)
+  // R13-Shop: volle Farben, kein Grau-Filter, aber Brettrand bleibt (Flo 10.11.)
   const vorschau = await p.s.evaluate(() => { const b = document.querySelector('.sh-karte[data-gast] .sh-bild'); const c = getComputedStyle(b);
-    return { opacity: +c.opacity, filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
-  pruefe('Shop abgemeldet: Vorschau ausgegraut, aber kräftig genug und mit Brettrand (R5-3)', /grayscale\(1\)/.test(vorschau.filter)
-    && vorschau.opacity >= 0.8 && vorschau.rand !== 'none', vorschau);
+    return { filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
+  pruefe('Shop abgemeldet: Vorschau zeigt volle Farben, kein Grau-Filter, aber mit Brettrand (R13-Shop)', !/grayscale/.test(vorschau.filter)
+    && vorschau.rand !== 'none', vorschau);
   pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
   // Kundenblick 09.11.2026 (Befund 12): kein leeres "0 / 0" auf "Ich", ohne Partie auch keine Spielzahl im Profil
   const ich = await p.s.evaluate(() => ({ zahlen: [...document.querySelectorAll('.sa-gross .zahl, .sa-platz-zahl')].map((z) => z.textContent.trim()),
