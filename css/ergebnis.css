@@ -201,6 +201,9 @@
   .erg-knoepfe .knopf { min-height: 48px; font-size: 15px; padding: 0 8px; }
   /* .erg-link mit (R12-W1): sonst behielt "Zur Analyse" die -2px oben und stand 2px hoeher als "Zu den Bots" */
   .erg-lobby, .erg-link { margin: 0 auto; }
+  /* R14-1: "Freund herausfordern" (nowrap) stand in der linken Spalte und blaehte sie auf ~222 px auf, rechts blieben
+     95 px und "Zu den Bots" brach in drei Zeilen um; mit eigener Zeile sind beide Spalten gleich breit */
+  .erg-aktionen.sieg-vorne .erg-freund { grid-column: 1 / -1; }
 }
 
 /* ---------- Sieg-Blatt (Flo 09.11., Variante C; .erg-liga-verweis aus js/ui/partie.js) ---------- */
