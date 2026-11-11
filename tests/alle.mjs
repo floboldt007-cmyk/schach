@@ -35,6 +35,7 @@ const SUITEN = [
   { name: 'konto', datei: 'konto.test.mjs', args: [], was: 'Konto, Anmeldung und Cloud-Spielstand' },
   { name: 'konto-link', datei: 'konto-link.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster (Dialoge, Uhr)', was: 'Anmelde-Link: Rückkehr, Abgleich-Riegel, zwei Tabs (Browser)' },
   { name: 'online', datei: 'online.test.mjs', args: [], was: 'Online gegen Freunde: Einladung, Zuege, Abfrage' },
+  { name: 'online-live-eigene', datei: 'online-live-eigene.test.mjs', args: [], was: 'Online-Live-Bewertung: nur eigene Zuege, kein bester Zug, Ranked nur mit Server-Kontingent' },
   { name: 'freunde', datei: 'freunde.test.mjs', args: [], was: 'Freunde: Anfrage, Antwort, Einladungslink (Server abgefangen)' },
   // Fester Port: zuzweit wertet PORT noch nicht aus und bleibt deshalb exklusiv (online-ui sicherheitshalber auch).
   { name: 'online-ui', datei: 'online-ui.test.mjs', args: [], exklusiv: 'fester Port 8887', was: 'Online-Oberflaeche mit abgefangenen Server-Anfragen' },
