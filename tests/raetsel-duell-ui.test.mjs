@@ -3,8 +3,9 @@
 // Wertung (richtige Zuege, ein Raetsel mit Gegenantwort, Farbwechsel, ein falscher Zug mit 5 s Abzug, Stand des
 // Gegners live), dazu Freundschaft per Link, falscher Code, ohne Konto und ohne Labor (seit 08.11.2026 fuer alle frei,
 // Einstieg auch ueber die Online-Tuer mit sofortiger Suche und sichtbarer Restzeit).
-//   node tests/raetsel-duell-ui.test.mjs                    iPhone 390x844 hell und iPad 820x1180 dunkel
-//   node tests/raetsel-duell-ui.test.mjs --bilder=<ordner>  dazu Bilder (iPhone und iPad, je hell und dunkel)
+//   node tests/raetsel-duell-ui.test.mjs                    iPhone 13 390x844 hell, iPhone SE 375x667 dunkel, iPad 820x1180
+//                                                           dunkel, PC 1280x720 hell (Funktionsprobe: Start, Zuege, Ende)
+//   node tests/raetsel-duell-ui.test.mjs --bilder=<ordner>  dazu Bilder (alle vier Geraete, je hell und dunkel)
 // Die echten Regeln (Zeit, Abzug, Wertung, Kronen) prueft tests/server-raetsel-duell.test.mjs gegen das SQL; hier
 // geht es nur darum, dass der Screen zeigt, was der Server sagt.
 import { createRequire } from 'node:module';
@@ -263,14 +264,26 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
     });
     pruefe('Gegner live: Stand des KI-Gegners kommt an, beide Balken gefuellt', live.ich !== 'none' && live.gegner !== 'none', live);
     const g1 = await geometrie(s);
+    // Gerippe der Bot-Partie (R3): Hochformat Gegner ueber, Flo unter dem Brett; Querformat Brett links, Leisten rechts.
+    // Handy hoch: Brett von Rand zu Rand. Reiter-Leiste weg wie in der Partie.
     const brett = await s.evaluate(() => {
-      const b = document.querySelector('.rd-brett').getBoundingClientRect();
-      const l = document.querySelector('.rd-leiste').getBoundingClientRect();
-      const z = document.querySelector('.rd-zeile').getBoundingClientRect();
-      return { b: Math.round(b.width), quadrat: Math.abs(b.width - b.height) < 2, unterLeiste: b.top >= l.bottom - 1, zeileSichtbar: z.bottom <= innerHeight + 1 };
+      const r = (q) => document.querySelector(q).getBoundingClientRect();
+      const b = r('.rd-brett'); const g = r('.rd-seite.spieler.gegner'); const i = r('.rd-seite.spieler.ich'); const z = r('.rd-zeile');
+      const leiste = document.querySelector('.reiter-leiste');
+      return { b: Math.round(b.width), quadrat: Math.abs(b.width - b.height) < 2, quer: innerWidth > innerHeight,
+        hoch: g.bottom <= b.top + 1 && i.top >= b.bottom - 1, querOk: g.left >= b.right - 1 && i.left >= b.right - 1 && i.top > g.bottom,
+        gleichBreit: Math.abs(g.width - i.width) < 1, leisteH: Math.round(g.height),
+        zeileSichtbar: z.bottom <= innerHeight + 1 && i.bottom <= innerHeight + 1,
+        reiterWeg: !leiste || leiste.hidden || getComputedStyle(leiste).display === 'none' || document.documentElement.dataset.reiter !== 'unten' };
     });
-    pruefe('Duell: Brett quadratisch unter der Leiste, Zeile sichtbar ohne Scrollen, nichts breiter',
-      brett.quadrat && brett.unterLeiste && brett.zeileSichtbar && brett.b >= Math.min(breite - 40, 300) && g1.breit, { ...brett, ...g1 });
+    // iPhone SE (667 hoch) ist knapp hoehenbegrenzt: 373 von 375 px, je Seite 1 px Luft, optisch Rand zu Rand
+    const randZuRand = breite <= 600 && hoehe > breite ? brett.b >= breite - 4 : brett.b >= Math.min(breite - 40, 300);
+    pruefe('Duell: Brett quadratisch, Gegner-Leiste und eigene Leiste wie in der Bot-Partie, alles ohne Scrollen sichtbar, nichts breiter',
+      brett.quadrat && (brett.quer ? brett.querOk : brett.hoch) && brett.gleichBreit && brett.leisteH >= 54 && brett.zeileSichtbar && randZuRand && g1.breit, { ...brett, ...g1 });
+    pruefe('Duell: keine Reiter-Leiste waehrend des Spiels (wie die Partie)', brett.reiterWeg, brett);
+    const introLauf = await s.evaluate(() => (window.__duellProtokoll || []).slice(-1)[0] || null);
+    pruefe('Duell-Intro lief im Vorlauf (gewertet: Vollfassung) und flog beide Portraets in die Leisten',
+      !!introLauf && introLauf.art === 'voll' && introLauf.ziele === 2, introLauf);
 
     // Ende: der Server wertet aus
     srv.beendet = true;
@@ -431,9 +444,12 @@ try {
   browser = await browserTyp(ladePlaywright()).launch();
   const laeufe = [
     { geraet: 'iphone', breite: 390, hoehe: 844, schema: 'light' },
+    { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'dark' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'dark' },
+    { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'light' },
   ];
-  if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' });
+  if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'light' },
+    { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' });
   for (const l of laeufe) await duellGegenKi(browser, l);
   await nebenwege(browser);
 } catch (e) {
