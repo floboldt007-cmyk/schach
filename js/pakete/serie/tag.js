@@ -38,6 +38,7 @@
 //   pauseAnsagen(st, heute, { ab, tage }) -> { ok, tage: [...], grund? }   nur heute oder kuenftig, 30 Tage je Jahr
 //   pauseBeenden(st, heute) -> Zahl              entfernt angesagte Pausentage ab heute (sie zaehlen wieder fuers Jahr)
 //   waehleFigur(st, figur) -> boolean            erste offene Umwandlung ('?') bekommt 'D' | 'T' | 'L' | 'S'
+//   partieZaehlt(p) -> boolean                   Partie fuers Tageswerk: Sieg immer, sonst ab WERK.partieZuege, nie Uebung
 //   beweis({ partien, von, bis, tage, z }) -> Text   Beweis-Karte eines Meilensteins (nur Verbesserungen, sonst Fakten)
 //   kuerze(st)                                   haelt Listen klein (Budget des Moduls)
 import { istSchluessel, addiereTage, tageZwischen, wochentag, tagSchluessel, kalenderwoche } from '../../tag.js';
@@ -48,6 +49,12 @@ import './texte.js';
 export const STAND = 1;
 // Tageswerk (3.14 Regel 2): eins davon genuegt
 export const WERK = Object.freeze({ partieZuege: 10, karten: 3, uebungen: 2, raetsel: 3, lektionen: 1 });
+// Eine Partie zaehlt fuers Tageswerk ab WERK.partieZuege eigenen Zuegen (Schutz gegen schnelles Aufgeben). Ein Sieg zaehlt
+// immer (Punkt 43, Variante F2): ein Matt im 4. Zug ist eine ganze Partie. Uebungen zaehlen getrennt.
+export function partieZaehlt(p) {
+  if (!p || (p.modus || 'normal') === 'uebung') return false;
+  return p.ergebnis === 'sieg' || Number(p.eigeneZuege) >= WERK.partieZuege;
+}
 export const FELDER = 6;
 export const REIHE = 8;
 export const BRETT = 64;
@@ -443,7 +450,7 @@ export function beweis({ partien = [], von, bis, tage = 0, z = {} } = {}) {
   const dauer = tageZwischen(von, bis) + 1;
   const davorVon = addiereTage(von, -dauer);
   const tagVon = (p) => { try { return tagSchluessel(new Date(p.datum)); } catch (e) { return null; } };
-  const rein = (p) => p && (p.modus || 'normal') !== 'uebung' && Number(p.eigeneZuege) >= WERK.partieZuege;
+  const rein = partieZaehlt;
   const imZeitraum = [];
   const davor = [];
   for (const p of partien) {
