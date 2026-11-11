@@ -394,7 +394,7 @@ async function shopTeil(browser) {
     return { filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
   pruefe('Shop abgemeldet: Vorschau zeigt volle Farben, kein Grau-Filter, aber mit Brettrand (R13-Shop)', !/grayscale/.test(vorschau.filter)
     && vorschau.rand !== 'none', vorschau);
-  pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
+  pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} Sammelstücken freigeschaltet`, zaehl);
   // Kundenblick 09.11.2026 (Befund 12): kein leeres "0 / 0" auf "Ich", ohne Partie auch keine Spielzahl im Profil
   const ich = await p.s.evaluate(() => ({ zahlen: [...document.querySelectorAll('.sa-gross .zahl, .sa-platz-zahl')].map((z) => z.textContent.trim()),
     seit: document.querySelector('.pr-seit')?.textContent || '' }));
@@ -773,7 +773,7 @@ async function browserTeil() {
       pruefe(`${name}: acht Bereiche (Emotes, Titel, Banner, Rahmen, Bretter, Klänge, Erfolge, Shop), keine Finisher`, bereiche === 'emotes,titel,banner,rahmen,bretter,klaenge,erfolge,shop', bereiche);
       const stand = await s.locator('.sa-stand').innerText();
       const zaehl = await s.evaluate(() => ({ alle: document.querySelectorAll('.sa-teil').length, frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
-      pruefe(`${name}: Zähler „N von M freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
+      pruefe(`${name}: Zähler „N von M Sammelstücken freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} Sammelstücken freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
       await waehle(s, 'titel');
       const tit = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="titel"] .sa-teil')].map((x) => ({
         id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild .sa-frage'), zeile: x.querySelector('.sa-zeile').textContent,
@@ -810,7 +810,7 @@ async function browserTeil() {
     await s.waitForSelector('.sa-screen', { timeout: 30000 });
     await waehle(s, 'titel');
     const text = (await s.locator('.sa-screen').innerText()) + '\n' + (await s.locator('.sa-blatt').innerText());
-    pruefe('Englisch: Me (Reitername), unlocked, From level', /^Me$/m.test(text) && /of \d+ unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
+    pruefe('Englisch: Me (Reitername), unlocked, From level', /^Me$/m.test(text) && /of \d+ collectibles unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
     await k.close();
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);
