@@ -447,6 +447,13 @@ begin
       into raetsel using uid;
     kronen := kronen || jsonb_build_object('raetsel_stand', raetsel);
   end if;
+  -- Live-Bewertung (zwei-ligen-schema.sql, 11.11.2026): an welchen Tagen welche gewertete Partie live bewertet wurde
+  if to_regclass('public.live_bewertung_nutzung') is not null then
+    execute 'select coalesce(jsonb_agg(to_jsonb(b) - ''user_id'' order by b.tag, b.erstellt_am), ''[]''::jsonb)
+             from public.live_bewertung_nutzung b where b.user_id = $1'
+      into raetsel using uid;
+    kronen := kronen || jsonb_build_object('live_bewertung', raetsel);
+  end if;
   -- Visitenkarte und Erfolge (karte-schema.sql, Etappe 4b): erreichte Stufen, alle Taler-Buchungen, eigene Banner und die
   -- gewaehlte Karte (Banner, Titel, Vitrine, Profilbild)
   if to_regclass('public.karte_stufen') is not null then

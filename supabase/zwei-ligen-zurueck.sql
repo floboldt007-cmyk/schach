@@ -4,7 +4,9 @@
 -- und freier Zeit, ein Kronen-Topf). Bis dahin sind die Liga-Funktionen nicht nutzbar.
 --
 -- Was verloren geht: alles der Raetsel-Liga (Wochen-Gruppen, Plaetze, Belohnungen mit liga = 'raetsel', raetsel_stand
--- mit Stufe, Kronen und Raetsel-Elo). Die Online-Liga bleibt vollstaendig. Die Buchungen (kronen_buchungen) bleiben; die
+-- mit Stufe, Kronen und Raetsel-Elo) und der Tageszaehler der Live-Bewertung (live_bewertung_nutzung). Achtung: mit der
+-- alten Suche (60-s-Fenster) kann wieder eine zweite gewertete Partie derselben Konten entstehen (Befund 11.11.2026).
+-- Die Online-Liga bleibt vollstaendig. Die Buchungen (kronen_buchungen) bleiben; die
 -- Duell-Kronen seit dem Einspielen von zwei-ligen-schema.sql kommen dadurch NICHT nachtraeglich in den Online-Topf.
 -- Wiederholbar.
 
@@ -48,5 +50,11 @@ drop function if exists public.online_suche_warten(uuid);
 drop function if exists public.duell_suche_warten(uuid);
 -- hat hier einen Vorgabewert; kronen-schema.sql legt sie ohne an (das geht mit create or replace nicht)
 drop function if exists public.online_suche_start(text);
+-- Live-Bewertung (11.11.2026): Funktionen und Zaehler-Tabelle weg (nur Zaehlung je Tag, keine Partiedaten).
+-- online_suche_partie bleibt; kronen-schema.sql stellt beim erneuten Einspielen die alte 60-s-Fassung wieder her.
+drop function if exists public.online_live_bewertung_nutzen(uuid);
+drop function if exists public.online_live_bewertung_frei(uuid);
+drop function if exists public.live_bewertung_unbegrenzt(uuid);
+drop table if exists public.live_bewertung_nutzung;
 -- erst nach den Funktionen: raetsel_stand_sichern gibt den Zeilentyp der Tabelle zurueck
 drop table if exists public.raetsel_stand;

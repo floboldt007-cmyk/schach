@@ -1,7 +1,17 @@
+-- EINSPIELEN DIESER FASSUNG (Stand 11.11.2026, Zweig so/R1-server; Flo, nie Claude):
+--   1. Supabase SQL Editor, diese ganze Datei ausfuehren (wiederholbar; ersetzt den Live-Stand von PR #213, aa6f036).
+--   2. supabase/zwei-ligen-rls-test.sql ausfuehren: muss ohne "FEHLER:" mit ROLLBACK enden (aendert nichts).
+--   3. supabase/daten-schema.sql erneut einspielen (die Datenauskunft nennt dann auch live_bewertung_nutzung).
+--   Faellt abo-schema.sql weg oder kommt spaeter: nichts weiter noetig, Premium wird zur Laufzeit gefragt.
+--   Rueckweg: supabase/zwei-ligen-zurueck.sql (Anleitung dort). Neu gegenueber aa6f036: Riegel gegen zwei gleichzeitige
+--   gewertete Partien (online_suche_partie ohne 60-s-Fenster, Paarung prueft beide Seiten), Bot nach 10 s und
+--   "Jetzt gegen KI" ab 0 s, Kontingent der Live-Bewertung (Tabelle live_bewertung_nutzung, zwei Funktionen).
+--
 -- Zwei Ligen (G-005, Punkt 38, 10.11.2026): Ranked Online 1 gegen 1 und Raetselduell bekommen je eigene Kronen,
--- Wochen-Gruppen, Plaetze und Belohnungen. Dazu die Sofort-Suche: eine feste Ranked-Zeit, 30 s auf einen Menschen
--- warten, "Jetzt gegen KI" ab 10 s gewertet, und die Elo bestimmt nur die Reihenfolge der Paarung, nie, ob gepaart wird
--- (Flo: "direkt den naechsten, der online ist"). Konzept und RPC-Vertrag: Vault, Schach-App/Konzept Zwei Ligen.md.
+-- Wochen-Gruppen, Plaetze und Belohnungen. Dazu die Sofort-Suche: eine feste Ranked-Zeit, 10 s auf einen Menschen
+-- warten, "Jetzt gegen KI" ab 0 s gewertet (bis 11.11.2026: 30 s und 10 s), und die Elo bestimmt nur die Reihenfolge der
+-- Paarung, nie, ob gepaart wird (Flo: "direkt den naechsten, der online ist"). Konzept und RPC-Vertrag: Vault,
+-- Schach-App/Konzept Zwei Ligen.md.
 --
 -- Modell: Spalte liga ('online' | 'raetsel', Vorgabe 'online') an liga_gruppen, liga_mitglieder, liga_belohnungen.
 -- kronen_stand bleibt der Stand der Online-Liga (Bedeutung unveraendert), neu ist raetsel_stand. Die Liga einer Buchung
@@ -72,8 +82,9 @@ as $$
     ),
     'bot_tagesgrenze', 10,
     'ki_tagesgrenze', 20,
-    -- Gewinne gegen Bot und KI je Woche, Konto und LIGA (Online: bot + ki, Raetsel: duell_ki); Menschen-Partien frei
-    'bot_ki_wochen_max', 300,
+    -- Gewinne gegen Bot und KI je Woche, Konto und LIGA (Online: bot + ki, Raetsel: duell_ki); Menschen-Partien frei.
+    -- 60 = etwa drei KI-Siege (Flos Wahl R13-K1, 10.11.2026, gegen das Farmen von KI-Kronen; kronen-schema.sql: 300)
+    'bot_ki_wochen_max', 60,
     'ki_mindestdauer_s', 60,
     'online_mindest_halbzuege', 4,
     'paar_tagesgrenze', 3,
@@ -93,11 +104,14 @@ as $$
       jsonb_build_object('von', 11, 'bis', 20, 'art', 'taler', 'menge', 20)
     ),
     'bot_ziel_max', jsonb_build_array(150, 250, 350, 450, 600, 800),
-    -- Zwei Ligen (G-005): eine feste Ranked-Zeit, damit sich alle Suchenden finden; 30 s auf einen Menschen, danach
-    -- nimmt die App die KI; "Jetzt gegen KI" bringt erst ab 10 s Suche einen gewerteten KI-Gegner (der alte Schutz)
+    -- Zwei Ligen (G-005): eine feste Ranked-Zeit, damit sich alle Suchenden finden; 10 s auf einen Menschen, danach
+    -- nimmt die App die KI; "Jetzt gegen KI" bringt ab Sekunde 0 einen gewerteten KI-Gegner (Flo 11.11.2026: "Bot nach
+    -- 10 s, Sofort-Knopf ab 0"; vorher 30 und 10). Gegen das Farmen bleiben Vorab-Niederlage, Tagesgrenze und Deckel 60.
     'ranked_zeit', '5+3',
-    'mensch_warte_s', 30,
-    'ki_frueh_s', 10,
+    'mensch_warte_s', 10,
+    'ki_frueh_s', 0,
+    -- Live-Bewertung in gewerteten Online-Partien: Partien je Kalendertag (Europe/Berlin) ohne Premium (Flo 11.11.2026)
+    'live_bewertung_tag', 1,
     'ligen', jsonb_build_array('online', 'raetsel'),
     'quellen_liga', jsonb_build_object('online', 'online', 'ki', 'online', 'bot', 'online', 'duell', 'raetsel',
       'duell_ki', 'raetsel')
@@ -591,8 +605,41 @@ $$;
 
 -- ---------- Sofort-Suche Online ----------
 
+-- Laufende gewertete Partie des Kontos, sonst null (ersetzt die Fassung aus kronen-schema.sql, die nur Partien der
+-- letzten 60 s erkannte). Befund 11.11.2026: live entstanden um 20:09:58 und 20:11:45 zwei laufende Partien derselben
+-- zwei Konten, weil die zweite Suche die erste Partie nicht mehr sah. Jetzt zaehlt jede laufende gewertete Partie, die
+-- Suche fuehrt dorthin zurueck. Damit niemand an einer Partie haengen bleibt, deren Gegner gegangen ist, prueft sie
+-- vorher die Uhr (online_uhr_pruefen): abgelaufene Partien enden dabei auf Zeit, haengende als 'abgebrochen'.
+-- Die neueste noch laufende zaehlt. Nur intern.
+create or replace function public.online_suche_partie(uid uuid)
+returns uuid
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  p public.partien_online;
+begin
+  for p in
+    select * from public.partien_online t
+    where t.gewertet and t.status = 'laeuft' and uid in (t.weiss, t.schwarz)
+    order by t.erstellt_am desc
+    for update
+  loop
+    p := public.online_uhr_pruefen(p);
+    if p.status = 'laeuft' then
+      return p.id;
+    end if;
+  end loop;
+  return null;
+end;
+$$;
+
 -- Paart mit dem Wartenden der Ranked-Zeit, dessen Elo am naechsten liegt (bei Gleichstand der laenger Wartende). Die
 -- Elo bestimmt nur die Reihenfolge: zwei Suchende werden immer gepaart, egal wie weit ihre Elo auseinander liegt.
+-- Riegel (11.11.2026): wer schon eine laufende gewertete Partie hat, wird nicht neu gepaart, sondern bekommt diese
+-- Partie zurueck (seine Zeile in der Warteschlange geht weg); als Gegner kommt nur in Frage, wer keine hat.
 create or replace function public.online_suche_paaren(uid uuid)
 returns uuid
 language plpgsql
@@ -608,12 +655,19 @@ declare
   s uuid;
   p uuid;
 begin
+  p := public.online_suche_partie(uid);
+  if p is not null then
+    delete from public.suche_warteschlange q where q.user_id = uid;
+    return p;
+  end if;
   select * into ich from public.suche_warteschlange q where q.user_id = uid for update skip locked;
   if ich.user_id is null then
     return null;
   end if;
   select * into g from public.suche_warteschlange q
   where q.user_id <> uid and q.zeit = ich.zeit
+    and not exists (select 1 from public.partien_online t
+                    where t.gewertet and t.status = 'laeuft' and q.user_id in (t.weiss, t.schwarz))
   order by abs(q.elo - ich.elo), q.seit
   limit 1
   for update skip locked;
@@ -683,8 +737,10 @@ begin
   end if;
   delete from public.suche_warteschlange q where q.seit < now() - interval '2 minutes';
   delete from public.suche_ki_belege b where b.erstellt_am < now() - interval '6 hours';
+  -- laeuft schon eine gewertete Partie: dorthin zurueck, keine neue Suche (Riegel 11.11.2026)
   p := public.online_suche_partie(uid);
   if p is not null then
+    delete from public.suche_warteschlange q where q.user_id = uid;
     return jsonb_build_object('partie', p);
   end if;
   st := public.kronen_stand_sichern(uid);
@@ -720,7 +776,7 @@ begin
 end;
 $$;
 
--- Suche beenden ("Jetzt gegen KI", nach 30 s von selbst, oder Abbruch). Mit ki = true und mindestens ki_frueh_s Suche
+-- Suche beenden ("Jetzt gegen KI", nach mensch_warte_s von selbst, oder Abbruch). Mit ki = true und mindestens ki_frueh_s Suche
 -- ohne Paarung: Beleg { ki_ref } fuer kronen_ki_ergebnis; sonst {} (dann ohne Kronen).
 -- Gegen Farmen (Befund 10.11.2026): hoechstens EIN offener Beleg je Konto, ein neuer schliesst den alten (der zaehlt dann
 -- als verloren), und jeder Beleg bucht sofort eine Vorab-Niederlage, die kronen_ki_ergebnis auf das Ergebnis korrigiert.
@@ -1050,7 +1106,133 @@ begin
 end;
 $$;
 
+-- ---------- Live-Bewertung in gewerteten Online-Partien (Kontingent) ----------
+-- Flo 11.11.2026: in Ranked gegen Menschen bewertet die App live nur die eigenen Zuege; mit Premium unbegrenzt, sonst
+-- live_bewertung_tag Partien je Kalendertag (Europe/Berlin). Der Server zaehlt nur, angezeigt wird in der App.
+-- Premium = ist_premium_von (abo-schema.sql: status 'aktiv' oder 'gekuendigt', gueltig_bis in der Zukunft); eine eigene
+-- lebenslange Stufe gibt es im Schema noch nicht, eine solche Zeile (gueltig_bis weit in der Zukunft) faellt automatisch
+-- darunter. Ist abo-schema.sql nicht eingespielt, hat niemand Premium. Je Partie zaehlt die Nutzung genau einmal (ein
+-- Neuladen kostet nichts). Zeilen aelter als 3 Tage werden beim Buchen geloescht (sie zaehlen nie mehr).
+create table if not exists public.live_bewertung_nutzung (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  partie uuid not null,
+  tag date not null,
+  erstellt_am timestamptz not null default now(),
+  primary key (user_id, partie)
+);
+create index if not exists live_bewertung_nutzung_tag on public.live_bewertung_nutzung (user_id, tag);
+create index if not exists live_bewertung_nutzung_alt on public.live_bewertung_nutzung (tag);
+alter table public.live_bewertung_nutzung enable row level security;
+revoke all on table public.live_bewertung_nutzung from anon, authenticated, public;
+
+-- Hat das Konto Premium (unbegrenzte Live-Bewertung)? Nur intern.
+create or replace function public.live_bewertung_unbegrenzt(uid uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  ja boolean := false;
+begin
+  -- abo-schema.sql kann fehlen oder spaeter kommen: nur aufrufen, wenn es die Funktion gibt
+  if pg_catalog.to_regprocedure('public.ist_premium_von(uuid)') is not null then
+    execute 'select public.ist_premium_von($1)' into ja using uid;
+  end if;
+  return coalesce(ja, false);
+end;
+$$;
+
+-- Stand des Kontingents fuer den Aufrufer: { frei, rest, unbegrenzt } (rest ist null bei Premium). Mit partie: ist diese
+-- Partie heute schon gebucht, ist sie frei (Neuladen), auch wenn das Kontingent sonst aufgebraucht ist.
+create or replace function public.online_live_bewertung_frei(partie uuid default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  grenze integer := (public.kronen_konstanten() ->> 'live_bewertung_tag')::integer;
+  heute date := (now() at time zone 'Europe/Berlin')::date;
+  n integer;
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  if public.live_bewertung_unbegrenzt(uid) then
+    return jsonb_build_object('frei', true, 'rest', null, 'unbegrenzt', true);
+  end if;
+  select count(*) into n from public.live_bewertung_nutzung b where b.user_id = uid and b.tag = heute;
+  return jsonb_build_object(
+    'frei', n < grenze or exists (select 1 from public.live_bewertung_nutzung b
+                                  where b.user_id = uid and b.partie = online_live_bewertung_frei.partie),
+    'rest', greatest(grenze - n, 0),
+    'unbegrenzt', false);
+end;
+$$;
+
+-- Live-Bewertung fuer eine gewertete Partie des Aufrufers nutzen. Bucht ohne Premium hoechstens einmal je Partie.
+-- Antwort { ok, frei, rest, unbegrenzt, gebucht } (ok ist der Vertrag mit js/pakete/online/live-eigene.js, gleich frei):
+-- frei false = Kontingent fuer heute verbraucht (nichts gebucht); gebucht
+-- true = diese Partie zaehlt heute (auch beim zweiten Aufruf). Fremde oder ungewertete Partie: KRONEN_EINGABE; eine
+-- schon beendete, noch nicht gebuchte: ONLINE_PARTIE_BEENDET.
+create or replace function public.online_live_bewertung_nutzen(partie uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  grenze integer := (public.kronen_konstanten() ->> 'live_bewertung_tag')::integer;
+  heute date := (now() at time zone 'Europe/Berlin')::date;
+  p public.partien_online;
+  n integer;
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  select * into p from public.partien_online t where t.id = online_live_bewertung_nutzen.partie;
+  if p.id is null or not p.gewertet or (uid is distinct from p.weiss and uid is distinct from p.schwarz) then
+    raise exception 'KRONEN_EINGABE';
+  end if;
+  if public.live_bewertung_unbegrenzt(uid) then
+    return jsonb_build_object('ok', true, 'frei', true, 'rest', null, 'unbegrenzt', true, 'gebucht', false);
+  end if;
+  -- alle Buchungen eines Kontos nacheinander (zwei gleichzeitige Aufrufe buchen nie zwei Partien ueber die Grenze)
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('live-bewertung:' || uid::text));
+  select count(*) into n from public.live_bewertung_nutzung b where b.user_id = uid and b.tag = heute;
+  if exists (select 1 from public.live_bewertung_nutzung b where b.user_id = uid and b.partie = p.id) then
+    return jsonb_build_object('ok', true, 'frei', true, 'rest', greatest(grenze - n, 0), 'unbegrenzt', false,
+      'gebucht', true);
+  end if;
+  if p.status <> 'laeuft' then
+    raise exception 'ONLINE_PARTIE_BEENDET';
+  end if;
+  if n >= grenze then
+    return jsonb_build_object('ok', false, 'frei', false, 'rest', 0, 'unbegrenzt', false, 'gebucht', false);
+  end if;
+  delete from public.live_bewertung_nutzung b
+  where (b.user_id, b.partie) in (
+    select a.user_id, a.partie from public.live_bewertung_nutzung a where a.tag < heute - 3 limit 1000
+    for update skip locked);
+  insert into public.live_bewertung_nutzung (user_id, partie, tag) values (uid, p.id, heute);
+  return jsonb_build_object('ok', true, 'frei', true, 'rest', greatest(grenze - n - 1, 0), 'unbegrenzt', false,
+    'gebucht', true);
+end;
+$$;
+
 -- ---------- Rechte ----------
+-- die neuen Funktionen auch ohne service_role (nur die App ruft sie, als angemeldeter Nutzer)
+revoke all on function public.online_suche_partie(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.live_bewertung_unbegrenzt(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.online_live_bewertung_frei(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.online_live_bewertung_nutzen(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.online_live_bewertung_frei(uuid) to authenticated;
+grant execute on function public.online_live_bewertung_nutzen(uuid) to authenticated;
 revoke all on function public.liga_pruefen(text) from public, anon, authenticated;
 revoke all on function public.liga_der_quelle(text) from public, anon, authenticated;
 revoke all on function public.raetsel_stand_sichern(uuid) from public, anon, authenticated;

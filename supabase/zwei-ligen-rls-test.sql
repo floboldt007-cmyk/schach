@@ -5,8 +5,15 @@
 -- Liga; 5 Ranked-Zeit und Antwort der Suche; 6 Paarung nur nach Reihenfolge (grosser Elo-Abstand wird gepaart, die
 -- naechste Elo zuerst), online und Raetsel; 7 "Jetzt gegen KI" erst ab ki_frueh_s; 8 Wochen-Abrechnung je Liga;
 -- 9 Raetsel-Elo aendert sich durch ein gewertetes Duell, die Online-Elo nicht; 10 KI-Belege: Vorab-Niederlage, hoechstens
--- ein offener Beleg, Korrektur auf Sieg und Remis, Abbruch ohne Meldung, volle Tagesgrenze.
+-- ein offener Beleg, Korrektur auf Sieg und Remis, Abbruch ohne Meldung, volle Tagesgrenze; 11 Riegel gegen eine zweite
+-- gewertete Partie (Suche fuehrt zurueck, Paarung prueft beide Seiten, abgelaufene Uhr macht frei); 12 Kontingent der
+-- Live-Bewertung (1 Partie je Tag, je Partie einmal, Premium unbegrenzt falls abo-schema.sql da ist, Rechte).
+-- Auf der echten Datenbank: die Pruefungen beschraenken sich auf die Testkonten. Damit kein echter Suchender mit einem
+-- Testkonto gepaart wird, leert der Test zuerst beide Warteschlangen; das rollt mit zurueck (echte Zeilen bleiben).
 begin;
+
+delete from public.suche_warteschlange;
+delete from public.duell_warteschlange;
 
 insert into auth.users (id, email)
 values
@@ -14,7 +21,8 @@ values
   ('b2000000-0000-4000-8000-000000000002', 'ligen-b@example.invalid'),
   ('c3000000-0000-4000-8000-000000000003', 'ligen-c@example.invalid'),
   ('d4000000-0000-4000-8000-000000000004', 'ligen-d@example.invalid'),
-  ('e5000000-0000-4000-8000-000000000005', 'ligen-e@example.invalid');
+  ('e5000000-0000-4000-8000-000000000005', 'ligen-e@example.invalid'),
+  ('c9000000-0000-4000-8000-000000000009', 'ligen-i@example.invalid');
 
 -- ---------- 1. Neuer Stand je Liga, Rechte ----------
 set local role authenticated;
@@ -33,14 +41,16 @@ begin
   end if;
   g := public.liga_gruppe('raetsel');
   if g->>'liga' <> 'raetsel' or g->>'gruppe' is not null or jsonb_array_length(g->'mitglieder') <> 0
-     or (g->'bot_ki'->>'max')::int <> 300 or jsonb_typeof(g->'offen') <> 'array' then
+     or (g->'bot_ki'->>'max')::int <> 60 or jsonb_typeof(g->'offen') <> 'array' then
     raise exception 'FEHLER: Raetsel-Gruppe ohne Buchung falsch (%)', g;
   end if;
   if public.kronen_mein_stand() ? 'liga' or public.liga_meine_gruppe() ? 'liga' then
   -- ranked_zeit ist Flos Wahl L3 (Empfehlung 5+3): nur das Format wird hier geprueft, der Wert steht EINMAL im Schema
     raise exception 'FEHLER: alte Aufrufe haben das neue Feld liga';
   end if;
-  if k->>'ranked_zeit' !~ '^[0-9]+[+][0-9]+$' or (k->>'mensch_warte_s')::int <> 30 or (k->>'ki_frueh_s')::int <> 10
+  -- Flo 11.11.2026: Bot nach 10 s, "Jetzt gegen KI" ab 0 s; ohne Premium 1 Partie Live-Bewertung je Tag
+  if k->>'ranked_zeit' !~ '^[0-9]+[+][0-9]+$' or (k->>'mensch_warte_s')::int <> 10 or (k->>'ki_frueh_s')::int <> 0
+     or (k->>'live_bewertung_tag')::int <> 1
      or k->'quellen_liga'->>'duell' <> 'raetsel' or k->'quellen_liga'->>'bot' <> 'online' then
     raise exception 'FEHLER: Konstanten falsch (%)', k;
   end if;
@@ -65,7 +75,10 @@ $$;
 reset role;
 do $$
 begin
-  if exists (select 1 from public.liga_mitglieder) then
+  -- nur die Testkonten: auf der echten Datenbank gibt es laengst Mitglieder
+  if exists (select 1 from public.liga_mitglieder m where m.user_id in ('a1000000-0000-4000-8000-000000000001',
+       'b2000000-0000-4000-8000-000000000002', 'c3000000-0000-4000-8000-000000000003',
+       'd4000000-0000-4000-8000-000000000004', 'e5000000-0000-4000-8000-000000000005')) then
     raise exception 'FEHLER: Lesen hat eine Gruppe angelegt';
   end if;
 end;
@@ -174,9 +187,9 @@ declare
   r jsonb;
 begin
   perform public.kronen_stand_sichern(d);
-  -- Online-Deckel voll (300 aus KI-Gegnern)
+  -- Online-Deckel voll (60 aus KI-Gegnern, Flos Wahl R13-K1)
   insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche)
-  values (d, 'ki', 'voll-1', 300, public.liga_woche_am(clock_timestamp()));
+  values (d, 'ki', 'voll-1', 60, public.liga_woche_am(clock_timestamp()));
   r := public.kronen_einfach_buchen(d, 'bot', 'bot-d', 'sieg');
   if (r->>'delta')::int <> 0 or not (r->>'bot_ki_voll')::boolean then
     raise exception 'FEHLER: Online-Deckel greift nicht (%)', r;
@@ -196,7 +209,7 @@ declare
   r jsonb;
 begin
   r := public.online_suche_start('3+2');
-  if not (r->>'wartet')::boolean or r->>'zeit' <> public.kronen_konstanten() ->> 'ranked_zeit' or (r->>'warte_s')::int <> 30 or (r->>'ki_ab_s')::int <> 10
+  if not (r->>'wartet')::boolean or r->>'zeit' <> public.kronen_konstanten() ->> 'ranked_zeit' or (r->>'warte_s')::int <> 10 or (r->>'ki_ab_s')::int <> 0
      or r->>'seit' is null then
     raise exception 'FEHLER: Antwort der Online-Suche falsch (%)', r;
   end if;
@@ -252,7 +265,8 @@ begin
      or 'b2000000-0000-4000-8000-000000000002' not in (p.weiss, p.schwarz) then
     raise exception 'FEHLER: gepaarte Partie falsch (%)', to_jsonb(p);
   end if;
-  if exists (select 1 from public.suche_warteschlange) then
+  if exists (select 1 from public.suche_warteschlange q where q.user_id in ('b2000000-0000-4000-8000-000000000002',
+       'e5000000-0000-4000-8000-000000000005')) then
     raise exception 'FEHLER: Warteschlange nach der Paarung nicht leer';
   end if;
 end;
@@ -283,7 +297,8 @@ begin
      or exists (select 1 from public.suche_warteschlange q where q.user_id = 'c3000000-0000-4000-8000-000000000003') then
     raise exception 'FEHLER: nicht die naechste Elo gepaart';
   end if;
-  delete from public.suche_warteschlange;
+  delete from public.suche_warteschlange q where q.user_id in ('a1000000-0000-4000-8000-000000000001',
+    'c3000000-0000-4000-8000-000000000003', 'd4000000-0000-4000-8000-000000000004');
 end;
 $$;
 
@@ -302,7 +317,7 @@ do $$
 declare
   r jsonb := public.duell_suche_start();
 begin
-  if not (r->>'wartet')::boolean or (r->>'warte_s')::int <> 30 or (r->>'ki_ab_s')::int <> 10 or r->>'seit' is null then
+  if not (r->>'wartet')::boolean or (r->>'warte_s')::int <> 10 or (r->>'ki_ab_s')::int <> 0 or r->>'seit' is null then
     raise exception 'FEHLER: Antwort der Duell-Suche falsch (%)', r;
   end if;
 end;
@@ -328,20 +343,46 @@ end;
 $$;
 
 -- ---------- 7. "Jetzt gegen KI" erst ab ki_frueh_s ----------
+-- Flo 11.11.2026: ki_frueh_s = 0, der Sofort-Knopf zaehlt ab Sekunde 0. Die Sperre davor wird nur geprueft, wenn es eine
+-- gibt (ki_frueh_s > 0); der Wert selbst steht in Abschnitt 1.
 do $$
+declare
+  frueh integer := (public.kronen_konstanten() ->> 'ki_frueh_s')::integer;
 begin
-  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values
-    ('d4000000-0000-4000-8000-000000000004', public.kronen_konstanten() ->> 'ranked_zeit', 1000, now() - interval '5 seconds');
-  insert into public.duell_warteschlange (user_id, elo, seit) values
-    ('d4000000-0000-4000-8000-000000000004', 1000, now() - interval '5 seconds');
+  if frueh > 0 then
+    insert into public.suche_warteschlange (user_id, zeit, elo, seit) values
+      ('d4000000-0000-4000-8000-000000000004', public.kronen_konstanten() ->> 'ranked_zeit', 1000,
+       now() - make_interval(secs => frueh) / 2);
+    insert into public.duell_warteschlange (user_id, elo, seit) values
+      ('d4000000-0000-4000-8000-000000000004', 1000, now() - make_interval(secs => frueh) / 2);
+  end if;
 end;
 $$;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"d4000000-0000-4000-8000-000000000004","role":"authenticated"}', true);
 do $$
 begin
-  if public.online_suche_ende(true) <> '{}'::jsonb or public.duell_suche_ende(true) <> '{}'::jsonb then
+  if (public.kronen_konstanten() ->> 'ki_frueh_s')::integer > 0
+     and (public.online_suche_ende(true) <> '{}'::jsonb or public.duell_suche_ende(true) <> '{}'::jsonb) then
     raise exception 'FEHLER: KI vor ki_frueh_s gewertet';
+  end if;
+end;
+$$;
+-- bei ki_frueh_s = 0: der Sofort-Knopf in Sekunde 0 bringt einen gewerteten KI-Gegner (Beleg)
+reset role;
+do $$
+declare
+  r jsonb;
+begin
+  if (public.kronen_konstanten() ->> 'ki_frueh_s')::integer = 0 then
+    -- eigenes Konto I: C und E spielen seit Abschnitt 6
+    insert into public.suche_warteschlange (user_id, zeit, elo, seit) values
+      ('c9000000-0000-4000-8000-000000000009', public.kronen_konstanten() ->> 'ranked_zeit', 1000, now());
+    perform set_config('request.jwt.claims', '{"sub":"c9000000-0000-4000-8000-000000000009","role":"authenticated"}', true);
+    r := public.online_suche_ende(true);
+    if r->>'ki_ref' is null then
+      raise exception 'FEHLER: Sofort-Knopf in Sekunde 0 ohne Beleg (%)', r;
+    end if;
   end if;
 end;
 $$;
@@ -563,6 +604,260 @@ begin
      or exists (select 1 from public.kronen_buchungen b where b.user_id = u and b.ref = ref_text)
      or (select m.kronen from public.liga_mitglieder m where m.user_id = u and m.liga = 'online') <> 95 then
     raise exception 'FEHLER: volle Tagesgrenze (%)', a;
+  end if;
+end;
+$$;
+
+-- ---------- 11. Riegel: keine zweite gewertete Partie, die Suche fuehrt zurueck ----------
+-- Befund 11.11.2026 (live 20:09:58 und 20:11:45): dieselben zwei Konten hatten zwei laufende Partien, weil die Suche
+-- eine Partie nur 60 s lang erkannte. F und G werden gepaart, die Partie wird kuenstlich 2 Minuten alt; beide suchen
+-- erneut und landen in derselben Partie. H wartet, F (Zeile von Hand in der Warteschlange) wird nicht mit H gepaart.
+-- Ist F's Uhr abgelaufen, endet die Partie beim Suchen auf Zeit und F wird frei.
+insert into auth.users (id, email)
+values
+  ('f6000000-0000-4000-8000-000000000006', 'ligen-f@example.invalid'),
+  ('a7000000-0000-4000-8000-000000000007', 'ligen-g@example.invalid'),
+  ('b8000000-0000-4000-8000-000000000008', 'ligen-h@example.invalid');
+do $$
+declare
+  f uuid := 'f6000000-0000-4000-8000-000000000006';
+  g uuid := 'a7000000-0000-4000-8000-000000000007';
+  h uuid := 'b8000000-0000-4000-8000-000000000008';
+  r jsonb;
+  p1 uuid;
+  p2 uuid;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000006","role":"authenticated"}', true);
+  r := public.online_suche_start();
+  if not (r->>'wartet')::boolean then
+    raise exception 'FEHLER: Riegel: F wartet nicht (%)', r;
+  end if;
+  perform set_config('request.jwt.claims', '{"sub":"a7000000-0000-4000-8000-000000000007","role":"authenticated"}', true);
+  p1 := (public.online_suche_start() ->> 'partie')::uuid;
+  if p1 is null then
+    raise exception 'FEHLER: Riegel: F und G nicht gepaart';
+  end if;
+  -- aelter als das alte 60-s-Fenster, Uhr laeuft noch (erst der Beitritt, kein Zug)
+  update public.partien_online t set erstellt_am = now() - interval '2 minutes' where t.id = p1;
+
+  -- F steht dabei noch in der Warteschlange (alter App-Stand): die Zeile muss weg
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (f, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now());
+  perform set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000006","role":"authenticated"}', true);
+  r := public.online_suche_start();
+  if (r->>'partie')::uuid is distinct from p1 or exists (select 1 from public.suche_warteschlange q where q.user_id = f) then
+    raise exception 'FEHLER: Riegel: F bekommt nicht die laufende Partie zurueck (%)', r;
+  end if;
+  if (public.online_suche_stand() ->> 'partie')::uuid is distinct from p1 then
+    raise exception 'FEHLER: Riegel: online_suche_stand fuehrt F nicht zurueck';
+  end if;
+  perform set_config('request.jwt.claims', '{"sub":"a7000000-0000-4000-8000-000000000007","role":"authenticated"}', true);
+  if (public.online_suche_start() ->> 'partie')::uuid is distinct from p1 then
+    raise exception 'FEHLER: Riegel: G bekommt nicht die laufende Partie zurueck';
+  end if;
+  if (select count(*) from public.partien_online t where t.gewertet and t.status = 'laeuft' and f in (t.weiss, t.schwarz)) <> 1 then
+    raise exception 'FEHLER: Riegel: zwei laufende gewertete Partien fuer F';
+  end if;
+  -- "Jetzt gegen KI" waehrend einer laufenden Partie gibt keinen Beleg
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (g, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now());
+  if public.online_suche_ende(true) <> '{}'::jsonb then
+    raise exception 'FEHLER: Riegel: KI-Beleg trotz laufender Partie';
+  end if;
+
+  -- F steht (z. B. aus einem alten App-Stand) in der Warteschlange: H wird nicht mit F gepaart
+  insert into public.suche_warteschlange (user_id, zeit, elo, seit) values (f, public.kronen_konstanten() ->> 'ranked_zeit', 1000, now());
+  perform public.kronen_stand_sichern(h);
+  perform set_config('request.jwt.claims', '{"sub":"b8000000-0000-4000-8000-000000000008","role":"authenticated"}', true);
+  r := public.online_suche_start();
+  if not coalesce((r->>'wartet')::boolean, false) then
+    raise exception 'FEHLER: Riegel: H mit F gepaart, obwohl F spielt (%)', r;
+  end if;
+  -- F's Paarung bringt F in seine Partie zurueck und nimmt die Zeile aus der Warteschlange, H wartet weiter
+  r := to_jsonb(public.online_suche_paaren(f));
+  if (r #>> '{}')::uuid is distinct from p1 then
+    raise exception 'FEHLER: Riegel: online_suche_paaren fuer F gibt nicht die laufende Partie (% statt %)', r, p1;
+  end if;
+  if exists (select 1 from public.suche_warteschlange q where q.user_id = f) then
+    raise exception 'FEHLER: Riegel: F bleibt trotz laufender Partie in der Warteschlange';
+  end if;
+  if not exists (select 1 from public.suche_warteschlange q where q.user_id = h) then
+    raise exception 'FEHLER: Riegel: H wartet nicht mehr';
+  end if;
+
+  -- F ist am Zug und seine Uhr ist abgelaufen: die Suche beendet die Partie auf Zeit, F wird frei und trifft H
+  update public.partien_online t
+  set zuege = 'e2e4 e7e5', am_zug = case when t.weiss = f then 'w' else 'b' end, uhr_weiss_ms = 1000, uhr_schwarz_ms = 1000,
+      letzter_zug_am = now() - interval '1 hour'
+  where t.id = p1;
+  perform set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000006","role":"authenticated"}', true);
+  p2 := (public.online_suche_start() ->> 'partie')::uuid;
+  if p2 is null or p2 = p1 or h not in (select x from public.partien_online t, unnest(array[t.weiss, t.schwarz]) x where t.id = p2) then
+    raise exception 'FEHLER: Riegel: nach Zeitablauf keine neue Partie mit H (%)', p2;
+  end if;
+  if (select t.status || '/' || t.grund from public.partien_online t where t.id = p1) is distinct from 'beendet/zeit' then
+    raise exception 'FEHLER: Riegel: abgelaufene Partie nicht auf Zeit beendet';
+  end if;
+  perform set_config('ligen_test.p1', p1::text, true);
+  perform set_config('ligen_test.p2', p2::text, true);
+
+  -- haengende Partie (Uhr laeuft noch nicht, 11 Minuten kein Zug): die Suche bricht sie ab, G wird frei
+  insert into public.partien_online (erstellt_von, fen, bedenkzeit_s, inkrement_s) values (g, 'x', 300, 3)
+  returning id into p1;
+  update public.partien_online t
+  set weiss = g, schwarz = 'c9000000-0000-4000-8000-000000000009', gewertet = true, status = 'laeuft',
+      letzter_zug_am = now() - interval '11 minutes'
+  where t.id = p1;
+  perform set_config('request.jwt.claims', '{"sub":"a7000000-0000-4000-8000-000000000007","role":"authenticated"}', true);
+  r := public.online_suche_start();
+  if r ? 'partie' or (select t.status || '/' || t.grund from public.partien_online t where t.id = p1) is distinct from 'beendet/abgebrochen' then
+    raise exception 'FEHLER: Riegel: haengende Partie sperrt G (%)', r;
+  end if;
+  delete from public.suche_warteschlange q where q.user_id = g;
+end;
+$$;
+
+-- ---------- 12. Live-Bewertung: 1 Partie je Tag ohne Premium, je Partie einmal, Rechte ----------
+-- F spielt P2 (laeuft), P1 ist beendet. P3 ist eine zweite laufende gewertete Partie von F (von Hand angelegt, die Suche
+-- legt sie nach Abschnitt 11 nie an), damit die Grenze pruefbar ist.
+do $$
+declare
+  p3 uuid;
+begin
+  insert into public.partien_online (erstellt_von, fen, bedenkzeit_s, inkrement_s)
+  values ('a7000000-0000-4000-8000-000000000007', 'x', 300, 3)
+  returning id into p3;
+  update public.partien_online t
+  set weiss = 'f6000000-0000-4000-8000-000000000006', schwarz = 'a7000000-0000-4000-8000-000000000007', gewertet = true,
+      status = 'laeuft', letzter_zug_am = clock_timestamp()
+  where t.id = p3;
+  perform set_config('ligen_test.p3', p3::text, true);
+end;
+$$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000006","role":"authenticated"}', true);
+do $$
+declare
+  p1 uuid := current_setting('ligen_test.p1')::uuid;
+  p2 uuid := current_setting('ligen_test.p2')::uuid;
+  p3 uuid := current_setting('ligen_test.p3')::uuid;
+  r jsonb;
+begin
+  r := public.online_live_bewertung_frei();
+  if r <> '{"frei": true, "rest": 1, "unbegrenzt": false}'::jsonb then
+    raise exception 'FEHLER: Kontingent: Anfang falsch (%)', r;
+  end if;
+  r := public.online_live_bewertung_nutzen(p2);
+  if r <> '{"ok": true, "frei": true, "rest": 0, "unbegrenzt": false, "gebucht": true}'::jsonb then
+    raise exception 'FEHLER: Kontingent: erste Partie nicht gebucht (%)', r;
+  end if;
+  r := public.online_live_bewertung_nutzen(p2);
+  if r <> '{"ok": true, "frei": true, "rest": 0, "unbegrenzt": false, "gebucht": true}'::jsonb then
+    raise exception 'FEHLER: Kontingent: dieselbe Partie zaehlt doppelt (%)', r;
+  end if;
+  r := public.online_live_bewertung_frei();
+  if (r->>'frei')::boolean or (r->>'rest')::int <> 0 then
+    raise exception 'FEHLER: Kontingent: nach einer Partie noch frei (%)', r;
+  end if;
+  if not (public.online_live_bewertung_frei(p2) ->> 'frei')::boolean then
+    raise exception 'FEHLER: Kontingent: gebuchte Partie nach Neuladen gesperrt';
+  end if;
+  r := public.online_live_bewertung_nutzen(p3);
+  if r <> '{"ok": false, "frei": false, "rest": 0, "unbegrenzt": false, "gebucht": false}'::jsonb then
+    raise exception 'FEHLER: Kontingent: zweite Partie am selben Tag frei (%)', r;
+  end if;
+  begin
+    perform public.online_live_bewertung_nutzen(gen_random_uuid());
+    raise exception 'FEHLER: Kontingent: unbekannte Partie angenommen';
+  exception when others then
+    if sqlerrm <> 'KRONEN_EINGABE' then raise; end if;
+  end;
+  begin
+    perform public.online_live_bewertung_nutzen(p1);
+    raise exception 'FEHLER: Kontingent: beendete Partie gebucht';
+  exception when others then
+    if sqlerrm <> 'ONLINE_PARTIE_BEENDET' then raise; end if;
+  end;
+  begin
+    perform 1 from public.live_bewertung_nutzung;
+    raise exception 'FEHLER: Kontingent: live_bewertung_nutzung lesbar';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.live_bewertung_unbegrenzt('f6000000-0000-4000-8000-000000000006');
+    raise exception 'FEHLER: Kontingent: live_bewertung_unbegrenzt fuer Nutzer offen';
+  exception when insufficient_privilege then null;
+  end;
+end;
+$$;
+-- fremde Partie: H spielt P3 nicht
+select set_config('request.jwt.claims', '{"sub":"b8000000-0000-4000-8000-000000000008","role":"authenticated"}', true);
+do $$
+begin
+  perform public.online_live_bewertung_nutzen(current_setting('ligen_test.p3')::uuid);
+  raise exception 'FEHLER: Kontingent: fremde Partie gebucht';
+exception when others then
+  if sqlerrm <> 'KRONEN_EINGABE' then raise; end if;
+end;
+$$;
+reset role;
+-- naechster Kalendertag: die Buchung von gestern zaehlt nicht mehr
+do $$
+declare
+  r jsonb;
+begin
+  -- der Tag ist der Berliner Kalendertag
+  if (select b.tag from public.live_bewertung_nutzung b where b.partie = current_setting('ligen_test.p2')::uuid)
+     is distinct from (now() at time zone 'Europe/Berlin')::date then
+    raise exception 'FEHLER: Kontingent: Tag nicht nach Europe/Berlin';
+  end if;
+  update public.live_bewertung_nutzung b set tag = tag - 1 where b.user_id = 'f6000000-0000-4000-8000-000000000006';
+  -- eine Zeile von vor 5 Tagen wird beim naechsten Buchen weggeraeumt
+  insert into public.live_bewertung_nutzung (user_id, partie, tag)
+  values ('f6000000-0000-4000-8000-000000000006', gen_random_uuid(), (now() at time zone 'Europe/Berlin')::date - 5);
+  perform set_config('request.jwt.claims', '{"sub":"f6000000-0000-4000-8000-000000000006","role":"authenticated"}', true);
+  r := public.online_live_bewertung_nutzen(current_setting('ligen_test.p3')::uuid);
+  if r <> '{"ok": true, "frei": true, "rest": 0, "unbegrenzt": false, "gebucht": true}'::jsonb then
+    raise exception 'FEHLER: Kontingent: neuer Tag gibt keine neue Partie frei (%)', r;
+  end if;
+  if exists (select 1 from public.live_bewertung_nutzung b
+             where b.user_id = 'f6000000-0000-4000-8000-000000000006' and b.tag < (now() at time zone 'Europe/Berlin')::date - 3) then
+    raise exception 'FEHLER: Kontingent: alte Zeilen bleiben liegen';
+  end if;
+  -- Premium (nur wenn abo-schema.sql eingespielt ist): unbegrenzt, ohne Buchung
+  if to_regclass('public.abos') is not null then
+    insert into public.abos (user_id, status, gueltig_bis, quelle)
+    values ('f6000000-0000-4000-8000-000000000006', 'aktiv', now() + interval '30 days', 'manuell')
+    on conflict (user_id) do update set status = 'aktiv', gueltig_bis = excluded.gueltig_bis;
+    r := public.online_live_bewertung_frei();
+    if r <> '{"frei": true, "rest": null, "unbegrenzt": true}'::jsonb then
+      raise exception 'FEHLER: Kontingent: Premium nicht unbegrenzt (%)', r;
+    end if;
+    r := public.online_live_bewertung_nutzen(current_setting('ligen_test.p2')::uuid);
+    if r <> '{"ok": true, "frei": true, "rest": null, "unbegrenzt": true, "gebucht": false}'::jsonb then
+      raise exception 'FEHLER: Kontingent: Premium-Nutzung falsch (%)', r;
+    end if;
+    update public.abos a set status = 'abgelaufen', gueltig_bis = now() - interval '1 day'
+    where a.user_id = 'f6000000-0000-4000-8000-000000000006';
+    if (public.online_live_bewertung_frei() ->> 'unbegrenzt')::boolean then
+      raise exception 'FEHLER: Kontingent: abgelaufenes Abo noch unbegrenzt';
+    end if;
+  end if;
+end;
+$$;
+set local role anon;
+do $$
+begin
+  perform public.online_live_bewertung_frei();
+  raise exception 'FEHLER: anon darf online_live_bewertung_frei';
+exception when insufficient_privilege then null;
+end;
+$$;
+reset role;
+do $$
+begin
+  if has_function_privilege('service_role', 'public.online_live_bewertung_nutzen(uuid)', 'execute')
+     or has_function_privilege('service_role', 'public.live_bewertung_unbegrenzt(uuid)', 'execute')
+     or not has_function_privilege('authenticated', 'public.online_live_bewertung_frei(uuid)', 'execute') then
+    raise exception 'FEHLER: Kontingent: Rechte nicht nur fuer authenticated';
   end if;
 end;
 $$;
