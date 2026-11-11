@@ -628,6 +628,17 @@ as $$
     or (p.bedenkzeit_s is null and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp()) - interval '7 days'));
 $$;
 
+-- Die Fassung mit einem Argument leitet nur weiter. Live stand am 11.11.2026 noch eine aeltere Fassung mit eigener
+-- 10-Minuten-Regel (vor online-schema.sql eingespielt); ohne diese Zeilen galt ranked_haengt_s dort nicht (RLS-Test 14).
+create or replace function public.online_haengt(p public.partien_online)
+returns boolean
+language sql
+volatile
+set search_path = ''
+as $$
+  select public.online_haengt(p, pg_catalog.clock_timestamp());
+$$;
+
 -- Laufende gewertete Partie des Kontos, sonst null (ersetzt die Fassung aus kronen-schema.sql, die nur Partien der
 -- letzten 60 s erkannte). Befund 11.11.2026: live entstanden um 20:09:58 und 20:11:45 zwei laufende Partien derselben
 -- zwei Konten, weil die zweite Suche die erste Partie nicht mehr sah. Jetzt zaehlt jede laufende gewertete Partie, die
@@ -1283,6 +1294,7 @@ $$;
 revoke all on function public.online_suche_partie(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.duell_suche_duell(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.online_haengt(public.partien_online, timestamptz) from public, anon, authenticated;
+revoke all on function public.online_haengt(public.partien_online) from public, anon, authenticated;
 revoke all on function public.live_bewertung_unbegrenzt(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.online_live_bewertung_frei(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.online_live_bewertung_nutzen(uuid) from public, anon, authenticated, service_role;
