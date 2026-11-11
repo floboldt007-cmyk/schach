@@ -29,7 +29,8 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
   try { pw = require(p); break; } catch (e) { /* naechster */ }
 }
 if (!pw) throw new Error('Playwright fehlt');
-const STRENG = process.env.PROBE_STRENG === '1';
+// Seit der Reparatur R1 (sammel-r1, 11.11.) streng als Vorgabe; PROBE_STRENG=0 zeigt die alte Probe-Ansicht
+const STRENG = process.env.PROBE_STRENG !== '0';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.json': 'application/json' };
 const server = http.createServer((req, res) => {
@@ -191,7 +192,8 @@ async function neuerKontext(uid, viewport = { width: 1180, height: 820 }) {
 }
 const START = () => `http://127.0.0.1:${PORT}/?test&kern&erw=pakete/online/index`;
 const bereit = s => s.waitForFunction(() => window.__online?.brett() && !window.__online.busy(), null, { timeout: 15000 });
-const sucheBereit = s => s.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit', null, { timeout: 15000 });
+// 'laufend': bei einer laufenden Partie zeigt die Partie-Tuer "Partie fortsetzen" statt der Suche (seit R1-C)
+const sucheBereit = s => s.waitForFunction(() => ['bereit', 'laufend'].includes(document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand), null, { timeout: 15000 });
 const partieId = s => s.evaluate(() => window.__online?.partie()?.id || null);
 async function zurOnlineSeite(s) {
   await s.evaluate(() => window.__app.gehe('online'));
@@ -214,10 +216,12 @@ async function beideSuchen(a, b) {
 }
 const sieht = (s, uci) => s.waitForFunction(u => (window.__online?.partie()?.zuege || '').split(' ').includes(u), uci, { timeout: 10000 }).then(() => true).catch(() => false);
 async function fahne(s, welcher) {
+  // Seit R1-C sind Remis und Aufgeben eigene Knoepfe; der Aufgeben-Dialog hat nur Weiterspielen/Aufgeben
+  if (welcher === 'remis') return s.locator('[data-online="remis"]').click();
   await s.locator('[data-online="aufgeben"]').click();
   const knoepfe = s.locator('.dialog-ort:not(.weg) .dialog-knoepfe button');
   await knoepfe.first().waitFor();
-  await (welcher === 'remis' ? knoepfe.nth(1) : knoepfe.last()).click();
+  await knoepfe.last().click();
 }
 // Figurensatz auf einem Brett: steht der Skin-Pfad in den Bildern oder Hintergruenden?
 const skinAuf = (s, sel) => s.evaluate(({ sel, skin }) => {
@@ -297,6 +301,8 @@ try {
   }
   // ohne Rueckweg die Partie direkt oeffnen, damit die weiteren Pruefungen laufen
   if (!zurueck) { await a.evaluate(id => window.__app.gehe('online', { partieId: id }), id3); await bereit(a); }
+  // Die Zuege kommen nach dem Oeffnen nach (Laden vom Server); bis zu 5 s darauf warten, dann den Stand nehmen
+  if (zurueck) await a.waitForFunction(() => window.__online.partie()?.zuege === 'd2d4', null, { timeout: 5000 }).catch(() => {});
   const zuegeZurueck = zurueck ? await a.evaluate(() => window.__online.partie().zuege) : null;
   pruefe('Zurueckkehren: ein Tipp fuehrt in dieselbe Partie mit allen Zuegen (Befund 3)', zurueck && zuegeZurueck === 'd2d4', { zurueck, zuegeZurueck }, { hart: true });
 
