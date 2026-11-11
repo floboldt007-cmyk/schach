@@ -862,4 +862,103 @@ begin
 end;
 $$;
 
+-- ---------- 13. Riegel im Raetselduell: kein zweites laufendes Liga-Duell, die Suche fuehrt zurueck ----------
+-- Wie Abschnitt 11: J und K werden gepaart, das Duell wird kuenstlich 2 Minuten alt (das alte 60-s-Fenster sah es
+-- nicht mehr); beide suchen erneut und landen im selben Duell. L wird nicht mit J gepaart. Ist die Duellzeit um, wertet
+-- die Suche das Duell aus und J wird frei. Ein laufendes KI-Duell zaehlt ebenso (kein zweites KI-Duell).
+insert into auth.users (id, email)
+values
+  ('d1000000-0000-4000-8000-00000000000a', 'ligen-j@example.invalid'),
+  ('d2000000-0000-4000-8000-00000000000b', 'ligen-k@example.invalid'),
+  ('d3000000-0000-4000-8000-00000000000c', 'ligen-l@example.invalid');
+do $$
+declare
+  j uuid := 'd1000000-0000-4000-8000-00000000000a';
+  k uuid := 'd2000000-0000-4000-8000-00000000000b';
+  l uuid := 'd3000000-0000-4000-8000-00000000000c';
+  r jsonb;
+  d1 uuid;
+  d2 uuid;
+  dk uuid;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"d1000000-0000-4000-8000-00000000000a","role":"authenticated"}', true);
+  r := public.duell_suche_start();
+  if not coalesce((r->>'wartet')::boolean, false) then
+    raise exception 'FEHLER: Duell-Riegel: J wartet nicht (%)', r;
+  end if;
+  perform set_config('request.jwt.claims', '{"sub":"d2000000-0000-4000-8000-00000000000b","role":"authenticated"}', true);
+  d1 := (public.duell_suche_start() ->> 'duell')::uuid;
+  if d1 is null then
+    raise exception 'FEHLER: Duell-Riegel: J und K nicht gepaart';
+  end if;
+  update public.duelle x set erstellt_am = now() - interval '2 minutes' where x.id = d1;
+
+  -- J steht dabei noch in der Warteschlange (alter App-Stand): die Zeile muss weg
+  insert into public.duell_warteschlange (user_id, elo, seit) values (j, 1000, now());
+  perform set_config('request.jwt.claims', '{"sub":"d1000000-0000-4000-8000-00000000000a","role":"authenticated"}', true);
+  r := public.duell_suche_start();
+  if (r->>'duell')::uuid is distinct from d1 then
+    raise exception 'FEHLER: Duell-Riegel: J bekommt nicht das laufende Duell zurueck (%)', r;
+  end if;
+  if exists (select 1 from public.duell_warteschlange q where q.user_id = j) then
+    raise exception 'FEHLER: Duell-Riegel: J bleibt trotz laufendem Duell in der Warteschlange';
+  end if;
+  if (public.duell_suche_stand() ->> 'duell')::uuid is distinct from d1 then
+    raise exception 'FEHLER: Duell-Riegel: duell_suche_stand fuehrt J nicht zurueck';
+  end if;
+  perform set_config('request.jwt.claims', '{"sub":"d2000000-0000-4000-8000-00000000000b","role":"authenticated"}', true);
+  if (public.duell_suche_start() ->> 'duell')::uuid is distinct from d1 then
+    raise exception 'FEHLER: Duell-Riegel: K bekommt nicht das laufende Duell zurueck';
+  end if;
+  if (select count(*) from public.duelle x where x.status = 'laeuft' and x.art in ('gewertet', 'ki') and j in (x.a, x.b)) <> 1 then
+    raise exception 'FEHLER: Duell-Riegel: zwei laufende Liga-Duelle fuer J';
+  end if;
+
+  -- J steht in der Warteschlange: L wird nicht mit J gepaart, J's Paarung bringt J zurueck
+  insert into public.duell_warteschlange (user_id, elo, seit) values (j, 1000, now());
+  perform set_config('request.jwt.claims', '{"sub":"d3000000-0000-4000-8000-00000000000c","role":"authenticated"}', true);
+  r := public.duell_suche_start();
+  if not coalesce((r->>'wartet')::boolean, false) then
+    raise exception 'FEHLER: Duell-Riegel: L mit J gepaart, obwohl J spielt (%)', r;
+  end if;
+  r := to_jsonb(public.duell_suche_paaren(j));
+  if (r #>> '{}')::uuid is distinct from d1 then
+    raise exception 'FEHLER: Duell-Riegel: duell_suche_paaren fuer J gibt nicht das laufende Duell (%)', r;
+  end if;
+  if exists (select 1 from public.duell_warteschlange q where q.user_id = j) then
+    raise exception 'FEHLER: Duell-Riegel: J bleibt nach der Paarung in der Warteschlange';
+  end if;
+  if not exists (select 1 from public.duell_warteschlange q where q.user_id = l) then
+    raise exception 'FEHLER: Duell-Riegel: L wartet nicht mehr';
+  end if;
+
+  -- Duellzeit um: die Suche wertet aus, J wird frei und trifft L
+  update public.duelle x set start_am = now() - interval '10 minutes' where x.id = d1;
+  perform set_config('request.jwt.claims', '{"sub":"d1000000-0000-4000-8000-00000000000a","role":"authenticated"}', true);
+  d2 := (public.duell_suche_start() ->> 'duell')::uuid;
+  if d2 is null or d2 = d1 or l not in (select x.a from public.duelle x where x.id = d2
+                                        union select x.b from public.duelle x where x.id = d2) then
+    raise exception 'FEHLER: Duell-Riegel: nach Ablauf kein neues Duell mit L (%)', d2;
+  end if;
+  if (select x.status from public.duelle x where x.id = d1) <> 'beendet' then
+    raise exception 'FEHLER: Duell-Riegel: abgelaufenes Duell nicht ausgewertet';
+  end if;
+
+  -- K ist frei: ein KI-Duell laeuft, dann gibt es weder ein zweites KI-Duell noch eine neue Paarung
+  insert into public.duell_warteschlange (user_id, elo, seit) values (k, 1000, now() - interval '20 seconds');
+  perform set_config('request.jwt.claims', '{"sub":"d2000000-0000-4000-8000-00000000000b","role":"authenticated"}', true);
+  dk := (public.duell_suche_ende(true) ->> 'duell')::uuid;
+  if dk is null then
+    raise exception 'FEHLER: Duell-Riegel: kein KI-Duell fuer K';
+  end if;
+  insert into public.duell_warteschlange (user_id, elo, seit) values (k, 1000, now() - interval '20 seconds');
+  if public.duell_suche_ende(true) <> '{}'::jsonb then
+    raise exception 'FEHLER: Duell-Riegel: zweites KI-Duell waehrend eines laufenden';
+  end if;
+  if (public.duell_suche_start() ->> 'duell')::uuid is distinct from dk then
+    raise exception 'FEHLER: Duell-Riegel: Suche fuehrt K nicht ins laufende KI-Duell';
+  end if;
+end;
+$$;
+
 rollback;

@@ -51,7 +51,8 @@ drop function if exists public.duell_suche_warten(uuid);
 -- hat hier einen Vorgabewert; kronen-schema.sql legt sie ohne an (das geht mit create or replace nicht)
 drop function if exists public.online_suche_start(text);
 -- Live-Bewertung (11.11.2026): Funktionen und Zaehler-Tabelle weg (nur Zaehlung je Tag, keine Partiedaten).
--- online_suche_partie bleibt; kronen-schema.sql stellt beim erneuten Einspielen die alte 60-s-Fassung wieder her.
+-- online_suche_partie und duell_suche_duell bleiben; kronen-schema.sql und raetsel-duell-schema.sql stellen beim
+-- erneuten Einspielen die alten 60-s-Fassungen wieder her.
 drop function if exists public.online_live_bewertung_nutzen(uuid);
 drop function if exists public.online_live_bewertung_frei(uuid);
 drop function if exists public.live_bewertung_unbegrenzt(uuid);

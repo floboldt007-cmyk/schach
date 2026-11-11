@@ -878,7 +878,28 @@ $$;
 
 -- ---------- Sofort-Suche Raetselduell (Raetsel-Liga) ----------
 
--- Paart wie online: naechste Raetsel-Elo zuerst, nie ausschliessen
+-- Laufendes Liga-Duell des Kontos (gewertet oder gegen die KI), sonst null. Ersetzt die Fassung aus
+-- raetsel-duell-schema.sql, die nur Duelle der letzten 60 s erkannte (gleicher Riegel wie online_suche_partie,
+-- 11.11.2026). Vorher wertet sie die faelligen Duelle des Kontos aus, damit ein abgelaufenes Duell (dauer_s + gnade_s)
+-- niemanden festhaelt. Freundschafts-Duelle zaehlen nicht. Die neueste zaehlt. Nur intern.
+create or replace function public.duell_suche_duell(uid uuid)
+returns uuid
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.duell_faellige_auswerten(uid);
+  return (select x.id from public.duelle x
+          where x.art in ('gewertet', 'ki') and x.status = 'laeuft' and uid in (x.a, x.b)
+          order by x.erstellt_am desc
+          limit 1);
+end;
+$$;
+
+-- Paart wie online: naechste Raetsel-Elo zuerst, nie ausschliessen. Riegel (11.11.2026): wer ein laufendes Liga-Duell
+-- hat, bekommt dieses zurueck (seine Zeile geht weg); als Gegner kommt nur in Frage, wer keines hat.
 create or replace function public.duell_suche_paaren(uid uuid)
 returns uuid
 language plpgsql
@@ -890,12 +911,19 @@ declare
   g public.duell_warteschlange;
   d uuid;
 begin
+  d := public.duell_suche_duell(uid);
+  if d is not null then
+    delete from public.duell_warteschlange q where q.user_id = uid;
+    return d;
+  end if;
   select * into ich from public.duell_warteschlange q where q.user_id = uid for update skip locked;
   if ich.user_id is null then
     return null;
   end if;
   select * into g from public.duell_warteschlange q
   where q.user_id <> uid
+    and not exists (select 1 from public.duelle x
+                    where x.art in ('gewertet', 'ki') and x.status = 'laeuft' and q.user_id in (x.a, x.b))
   order by abs(q.elo - ich.elo), q.seit
   limit 1
   for update skip locked;
@@ -939,8 +967,10 @@ begin
   end if;
   perform public.duell_faellige_auswerten(uid);
   delete from public.duell_warteschlange q where q.seit < now() - interval '2 minutes';
+  -- laeuft schon ein Liga-Duell: dorthin zurueck, keine neue Suche (Riegel 11.11.2026)
   d := public.duell_suche_duell(uid);
   if d is not null then
+    delete from public.duell_warteschlange q where q.user_id = uid;
     return jsonb_build_object('duell', d);
   end if;
   rs := public.raetsel_stand_sichern(uid);
@@ -1228,6 +1258,7 @@ $$;
 -- ---------- Rechte ----------
 -- die neuen Funktionen auch ohne service_role (nur die App ruft sie, als angemeldeter Nutzer)
 revoke all on function public.online_suche_partie(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.duell_suche_duell(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.live_bewertung_unbegrenzt(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.online_live_bewertung_frei(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.online_live_bewertung_nutzen(uuid) from public, anon, authenticated, service_role;
