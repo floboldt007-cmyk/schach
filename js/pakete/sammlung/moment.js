@@ -4,6 +4,7 @@
 //
 //   zeigeStufen([{ familie, stufe, taler, lohn }])   reiht ein und zeigt, sobald die Buehne frei ist
 //   lohnText(lohn) -> 'Titel frei: …' | 'Banner frei: …' | ''
+//   zielText({ familie, gold }) -> 'Ziel für Gold: 100 Siege gegen Bots' | ''
 import { tempo, anim } from '../../bewegung.js';
 import { klang } from '../../sounds.js';
 import { hoere } from '../../ereignisse.js';
@@ -29,6 +30,14 @@ export function lohnText(lohn) {
   return '';
 }
 
+// R13-G3 (Flos Wahl "satz"): das Bild zeigt die Gold-Medaille der Familie (z. B. "100" = 100 Siege); der Satz sagt, wofuer
+// die Zahl steht. Liga zaehlt Stufen, dort steht der Weg in Worten.
+export function zielText(x) {
+  if (!x) return '';
+  if (x.familie === 'liga') return K('zeile.liga');
+  return Number.isInteger(x.gold) && x.gold > 0 ? K('moment.ziel', { n: x.gold, was: K('was.' + x.familie) }) : '';
+}
+
 // waehrend einer Partie nicht ueber das Brett legen (das Ergebnis hat Vorrang)
 const buehneFrei = () => typeof document !== 'undefined' && !document.querySelector('.screen.partie');
 
@@ -47,6 +56,7 @@ function naechste() {
       <span class="st-bild" aria-hidden="true">${bild}</span>
       <b class="st-name">${esc(K('fam.' + x.familie))}</b>
       <span class="st-stufe">${esc(K('stufe.' + x.stufe))}</span>
+      ${zielText(x) ? `<span class="st-ziel">${esc(zielText(x))}</span>` : ''}
       <span class="st-lohn">${esc(K('lohn.taler', { n: x.taler }))}</span>
       ${x.lohn ? `<span class="st-lohn st-lohn-gold">${esc(lohnText(x.lohn))}</span>` : ''}
       <button type="button" class="knopf primaer st-weiter">${esc(K('moment.weiter'))}</button>

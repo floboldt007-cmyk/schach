@@ -2298,7 +2298,14 @@ export function zeige(root, params, app) {
           const naechster = !wertet || bot.stufe == null ? null : neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
           // nicht wertend: "Nochmal ab hier" mit denselben Params (Uebung bzw. eigene Stellung), sonst "Nochmal"
           const abHier = z.modus === 'uebung' || (z.modus === 'normal' && !!startFen);
-          knoepfe.innerHTML = `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
+          // R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner leuchtet "Nächster Gegner", die Analyse
+          // steht klein darunter neben "Zu den Bots"; nach Niederlage und Remis bleibt die Analyse vorne
+          const siegVorne = ergebnis === 'sieg' && !!naechster;
+          o.querySelector('.erg-aktionen').classList.toggle('sieg-vorne', siegVorne);
+          knoepfe.innerHTML = siegVorne
+            ? `<button class="knopf primaer gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>
+          <button class="erg-link" type="button" data-ziel="analyse">${icon('analyse')}<span>${esc(t('partie.erg.zurAnalyse'))}</span></button>`
+            : `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
           ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${esc(t(abHier ? 'partie.erg.abHier' : 'partie.erg.nochmal'))}</button>`
             : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>`
               : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
@@ -2323,6 +2330,22 @@ export function zeige(root, params, app) {
           // Flo 30.10. abends: "mich stoert, dass ich nicht von da aus direkt zur Lobby kann (Startseite)"
           const lobby = o.querySelector('.erg-lobby');
           if (lobby) { lobby.hidden = false; lobby.onclick = () => app.gehe('arena'); }
+          // W3 R12: "Freund herausfordern" – nach Sieg den Link zur Bot-Herausforderung teilen
+          if (ergebnis === 'sieg' && !o.querySelector('.erg-freund')) {
+            const freundBtn = document.createElement('button');
+            freundBtn.type = 'button';
+            freundBtn.className = 'knopf erg-freund';
+            freundBtn.innerHTML = `${icon('teilen')} <span>${esc(t('partie.erg.freundHerausfordern'))}</span>`;
+            freundBtn.addEventListener('click', () => {
+              const url = new URL(location.href);
+              url.search = new URLSearchParams({ bot: bot.id }).toString();
+              url.hash = '';
+              const text = t('partie.erg.freundHerausfordern');
+              if (navigator.share) navigator.share({ title: 'Crownmate', text, url: url.href }).catch(() => {});
+              else navigator.clipboard?.writeText(url.href).catch(() => {});
+            });
+            o.querySelector('.erg-aktionen').prepend(freundBtn);
+          }
           // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.
           // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
           const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]');

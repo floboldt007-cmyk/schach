@@ -159,6 +159,7 @@ registriereTexte('partie', {
     'erg.abHier': 'Nochmal ab hier',
     'erg.nochmal': 'Nochmal',
     'erg.naechster': 'Nächster Gegner',
+    'erg.freundHerausfordern': 'Freund herausfordern',
     // Chip nicht wertender Partien
     'chip.uebung': 'ÜBUNG',
     'chip.boss': 'BOSS',
@@ -310,6 +311,7 @@ registriereTexte('partie', {
     'erg.abHier': 'Retry from here',
     'erg.nochmal': 'Play again',
     'erg.naechster': 'Next opponent',
+    'erg.freundHerausfordern': 'Challenge a friend',
     'chip.uebung': 'PRACTICE',
     'chip.boss': 'BOSS',
     'chip.frei': 'FREE PLAY',

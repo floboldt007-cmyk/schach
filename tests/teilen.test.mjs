@@ -160,6 +160,11 @@ async function nodeTeil() {
   const boss = L.bildDaten({ ...sieg, modus: 'boss', botId: 'boss-x' }, { bot: { id: 'boss-x', name: 'Der Eiserne', avatar: 'data:image/svg+xml,<svg/>' } });
   pruefe('Boss: Ueberzeile "Boss · …", keine Sterne (wertet nie)', boss.ueber === 'Boss · Schachmatt im 4. Zug' && boss.sterne === null, boss.ueber);
   pruefe('ohne Bot: "gegen deinen Gegner"', L.bildDaten(sieg, {}).titel === 'Sieg gegen deinen Gegner');
+  // R12-W2 (Flo 10.11., Variante B): beim Teilen eines Sieges steht eine Herausforderung statt der Meldung
+  const herausf = typeof L.teilText === 'function' ? [L.teilText(d), L.teilText(remis), L.teilText(L.bildDaten(sieg, {})), L.teilText({ ...d, zuege: 1 })] : [];
+  pruefe('teilText: Sieg als Herausforderung mit Zugzahl, Remis und unbekannter Gegner behalten den Titel, Einzahl "1 Zug"',
+    herausf[0] === 'Ich habe Kommissar Tobias König in 4 Zügen besiegt. Schaffst du das schneller?' && herausf[1] === 'Remis gegen Kommissar Tobias König'
+    && herausf[2] === 'Sieg gegen deinen Gegner' && herausf[3] === 'Ich habe Kommissar Tobias König in 1 Zug besiegt. Schaffst du das schneller?', herausf);
   pruefe('Schwarz unten bei Partien mit Schwarz', L.bildDaten({ ...sieg, spielerFarbe: 'b' }, { bot }).unten === 'b');
   pruefe('Genauigkeit ausserhalb 0..100 oder kaputt: nicht im Bild', L.bildDaten({ ...sieg, genauigkeit: 140 }, { bot }).genauigkeit === null
     && L.bildDaten({ ...sieg, genauigkeit: 'viel' }, { bot }).genauigkeit === null);
@@ -498,7 +503,7 @@ async function browserTeil(browser) {
   const geteilt = await seite.evaluate(() => window.__geteilt[0]);
   writeFileSync(path.join(BILDER, 'siegesbild-dunkel.png'), Buffer.from(geteilt.daten.split(',')[1], 'base64'));
   pruefe('navigator.share mit genau einer PNG-Datei (crownmate-sieg-<Tag>.png), Titel und Text ohne persoenliche Daten', geteilt.anzahl === 1 && geteilt.type === 'image/png'
-    && /^crownmate-sieg-\d{4}-\d{2}-\d{2}\.png$/.test(geteilt.name) && geteilt.size > 20000 && geteilt.title === 'Crownmate' && geteilt.text === 'Sieg gegen Bauer Lukas',
+    && /^crownmate-sieg-\d{4}-\d{2}-\d{2}\.png$/.test(geteilt.name) && geteilt.size > 20000 && geteilt.title === 'Crownmate' && /^Ich habe Bauer Lukas in \d+ Zügen besiegt\. Schaffst du das schneller\?$/.test(geteilt.text),
   JSON.stringify({ ...geteilt, daten: undefined }));
   // mit fester Markenadresse (MARKEN_ADRESSE) immer https://<Marke>/, sonst die Adresse dieser Seite
   const appUrl = await seite.evaluate(async () => {

@@ -57,7 +57,7 @@ export function abgleichen(stand = {}) {
       const ref = stufenRef(x.familie, s);
       const taler = TALER_JE_STUFE[STUFEN[s - 1]];
       if (!(ref in b.buch)) b.buch[ref] = taler;
-      neu.push({ familie: x.familie, stufe: s, taler, lohn: s === 3 ? goldLohn(x.familie) : null });
+      neu.push({ familie: x.familie, stufe: s, taler, lohn: s === 3 ? goldLohn(x.familie) : null, gold: x.ziele[2] });
     }
     if (x.stufe > vorher) b.stufen[x.familie] = x.stufe;
   }
