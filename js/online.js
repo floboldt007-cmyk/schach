@@ -50,14 +50,14 @@
 //   seine eigene Zeit seit dem letzten Zug ab. Fuer die Anzeige rechnet der Client die laufende Uhr aus
 //   uhr_*_ms und letzter_zug_am selbst herunter.
 // Fehlerkennungen des Servers (ONLINE_...) werden hier in ganze Saetze uebersetzt (FEHLER_TEXTE).
-import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { SUPABASE_URL, SUPABASE_KEY, mitRegion } from './konto-config.js';
 import { t } from './sprache.js';
 import './sprachen/online.js';
 const O = (k, w) => t('online.' + k, w);
 import { sitzung, erneuereSitzung, aktiveSitzung as kontoSitzung, userId, kontoFreigeschaltet } from './konto.js';
 
 export const EINLADUNG_SCHLUESSEL = 'schach-arena:online:einladung';
-export const LINK_BASIS = 'https://floboldt007-cmyk.github.io/schach/';
+export const LINK_BASIS = 'https://crownmate.de/';
 export const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 // Edge Function, die jeden Zug prueft und verbucht (supabase/functions/online-zug, Anti-Cheat Etappe 1a)
 export const ZUG_PFAD = '/functions/v1/online-zug';
@@ -143,9 +143,16 @@ async function aktiveSitzung() {
   if (!sitzung()?.access_token) throw new Error(FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET);
   return kontoSitzung();
 }
-async function rpc(name, daten) {
+// exportiert fuer js/kronen.js (Gegnersuche, Kronen-Stand): dieselbe Sitzung, dieselben Fehlertexte
+export async function rpc(name, daten) {
   const s = await aktiveSitzung();
   return anfrage(`/rest/v1/rpc/${name}`, { methode: 'POST', token: s.access_token, daten });
+}
+// exportiert fuer js/raetsel-duell.js (Edge Function raetsel-duell): POST an eine Edge Function mit derselben Sitzung.
+// Unbekannte Kennungen (DUELL_...) stehen im Fehler unter detail.
+export async function edgeFunktion(pfad, daten) {
+  const s = await aktiveSitzung();
+  return anfrage(mitRegion(pfad), { methode: 'POST', token: s.access_token, daten });
 }
 // PostgREST liefert eine einzelne Zeile als Objekt, setof als Liste: beides annehmen. Antworten mit jsonb (zuerst
 // online_tritt_bei) melden einen Fehler ohne raise als { fehler: 'ONLINE_...' }: daraus wird derselbe Fehler wie aus
@@ -197,7 +204,7 @@ export async function sendeZug(id, { uci } = {}) {
   const zug = String(uci || '');
   if (!UCI_RE.test(zug)) throw new Error(FEHLER_TEXTE.ONLINE_ZUG_FORM);
   const s = await aktiveSitzung();
-  return partieAus(await anfrage(ZUG_PFAD, { methode: 'POST', token: s.access_token, daten: { partie: String(id || ''), zug } }));
+  return partieAus(await anfrage(mitRegion(ZUG_PFAD), { methode: 'POST', token: s.access_token, daten: { partie: String(id || ''), zug } }));
 }
 
 export async function gibAuf(id) { return partieAus(await rpc('online_gib_auf', { partie: id })); }

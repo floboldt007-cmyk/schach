@@ -24,13 +24,6 @@ export const DE = {
   geschaetzt: 'geschätzt',
   'wertungen.titel': 'Deine Wertungen',
   'wertungen.text': 'Geschätzt aus deinen Siegen gegen die Bots. Mit den ersten gewerteten Online-Partien wird daraus deine echte Wertung.',
-  'liga.ueber': 'Online-Liga · Saison 1',
-  'liga.titel': 'Bronze · Gruppe 12',
-  beispiel: 'Beispiel',
-  du: 'Du',
-  punkte: '{n} P.',
-  'liga.text': 'Acht Spieler in einer Gruppe, eine Woche lang. Sieg 2 Punkte, Remis 1. Die ersten drei steigen auf, nach unten geht es nie.',
-  'zone.auf': 'Aufstieg',
   'mehr.titel': 'Mehr Spielarten',
   'freunde.titel': 'Gegen Freunde',
   'freunde.text': 'Lade jemanden mit einem Link ein und spielt mit Uhr.',
@@ -49,6 +42,12 @@ export const DE = {
   'gefunden.text': 'Vorschau: Echte Online-Gegner kommen mit dem Server. Bis dahin spielst du mit derselben Uhr gegen {bot} ({elo}).',
   'gefunden.spielen': 'Gegen {bot} spielen',
   zurueck: 'Zurück',
+  'suche.anmelden': 'Zum Suchen anmelden',
+  'suche.anmelden.text': 'Gewertete Partien gegen Menschen brauchen ein Konto. Freundschaftspartien gehen auch ohne.',
+  'suche.server': 'Gegner aus der ganzen Welt, sonst ein KI-Gegner',
+  'suche.kiJetzt': 'Jetzt gegen KI',
+  'suche.kiVerlassen': 'Verlassen zählt als Niederlage',
+  'suche.fehler': 'Die Suche geht gerade nicht. Prüfe die Verbindung und versuche es gleich noch einmal.',
 };
 
 export const EN = {
@@ -73,13 +72,6 @@ export const EN = {
   geschaetzt: 'estimated',
   'wertungen.titel': 'Your ratings',
   'wertungen.text': 'Estimated from your wins against the bots. Your first rated online games turn it into your real rating.',
-  'liga.ueber': 'Online league · Season 1',
-  'liga.titel': 'Bronze · Group 12',
-  beispiel: 'Example',
-  du: 'You',
-  punkte: '{n} pts',
-  'liga.text': 'Eight players in a group for one week. A win is 2 points, a draw 1. The top three move up, and nobody ever moves down.',
-  'zone.auf': 'Promotion',
   'mehr.titel': 'More ways to play',
   'freunde.titel': 'Against friends',
   'freunde.text': 'Invite someone with a link and play with a clock.',
@@ -98,6 +90,12 @@ export const EN = {
   'gefunden.text': 'Preview: real online opponents arrive with the server. Until then you play {bot} ({elo}) with the same clock.',
   'gefunden.spielen': 'Play {bot}',
   zurueck: 'Back',
+  'suche.anmelden': 'Sign in to search',
+  'suche.anmelden.text': 'Rated games against people need an account. Casual games work without one.',
+  'suche.server': 'Opponents from all over the world, otherwise an AI opponent',
+  'suche.kiJetzt': 'Play the AI now',
+  'suche.kiVerlassen': 'Leaving counts as a loss',
+  'suche.fehler': 'Searching is not possible right now. Check your connection and try again in a moment.',
 };
 
 registriereTexte('p-lobby', { de: DE, en: EN });

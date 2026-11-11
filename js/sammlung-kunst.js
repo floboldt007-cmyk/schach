@@ -6,7 +6,7 @@
 //
 //   klangKunst(id) -> string | null          ganzes <svg> fuer ein Klangset (PAKETE_KLANG in js/sounds.js)
 //   brettKunst(hell, dunkel, rand, figuren?) -> string  ganzes <svg> fuer ein Brett-Design (figuren: Ordner des Satzes)
-//   finisherKunst(id, figuren?) -> string | null  ganzes <svg> fuer einen Finisher ('krone', 'welle', 'koenig', 'signatur')
+//   finisherKunst(id, figuren?) -> string | null  ganzes <svg> fuer einen Finisher ('krone', 'welle', 'koenig', 'kronensturz', 'signatur')
 //   erfolgKunst(id) -> string | null         ganzes <svg> fuer einen Erfolg ('erster-sieg', 'welt-3', 'liga-6', ...)
 //   erfolgSeltenheit(id) -> string           'frei' | 'selten' | 'episch' | 'legende'
 //   ligaWappen(stufe) -> string              ganzes <svg> fuer die Liga-Stufe 0 (Holz) bis 6 (Meister)
@@ -185,6 +185,16 @@ const FINISHER = {
       + `<g transform="translate(0 ${(-h * 0.36).toFixed(1)}) rotate(90 ${bx.toFixed(1)} ${fuss.toFixed(1)})">${stein(figuren, 'bK', bx, fuss, h)}</g>`
       + `<g fill="#C9CFDF" opacity=".7"><circle cx="${(kopf[0] + 10).toFixed(1)}" cy="${(fuss - 2).toFixed(1)}" r="2.2"/><circle cx="${(kopf[0] + 15).toFixed(1)}" cy="${(fuss - 6).toFixed(1)}" r="1.5"/><circle cx="${(bx - 6).toFixed(1)}" cy="${(fuss - 3).toFixed(1)}" r="1.8"/></g>`
       + funke(bx + 4, fuss - h - 14, 0.8, 0.5, '#F2BE4A');
+  },
+  // Kronensturz: die Krone ist vom mattgesetzten Koenig gefallen, ausgerollt und liegt schraeg neben ihm; der Bogen zeigt den Fall
+  kronensturz: (figuren) => {
+    const b = boden(2, 3, 76, 112, 80, 118); const g = id('ks'); const [x, y] = b.mitte(0, 0); const [kx, ky] = b.mitte(1, 2);
+    return `<defs>${verlauf(g, AKZENT, 0, 1)}</defs>${buehne(b, 2, 3)}${stein(figuren, 'bK', x, y + 5, 50)}`
+      + `<path d="M${(x + 6).toFixed(1)} ${(y - 50).toFixed(1)}Q${(kx - 6).toFixed(1)} ${(y - 58).toFixed(1)} ${(kx - 4).toFixed(1)} ${(ky - 22).toFixed(1)}" fill="none" stroke="#FF8A64" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 6"/>`
+      + `<g transform="translate(${(kx - 15).toFixed(1)} ${(ky - 22).toFixed(1)}) rotate(28 15 13) scale(.78)"><path d="${KRONE_FORM}" fill="url(#${g})" stroke="#7A2A12" stroke-width="1.3" stroke-linejoin="round"/>`
+      + '<rect x="-2" y="22" width="40" height="4.5" rx="2" fill="#7A2A12"/><circle cx="18" cy="0" r="2.6" fill="#FFE08A"/></g>'
+      + `<ellipse cx="${kx.toFixed(1)}" cy="${(ky + 2).toFixed(1)}" rx="14" ry="2.6" fill="#000" opacity=".2"/>`
+      + funke(kx + 14, ky - 26, 0.8, 0.4, '#F2BE4A');
   },
   // Signatur (Erfinder, Nr. 0): goldener Namenszug wie im Spiel, Linie, Nummer, Licht und Funken
   signatur: () => {

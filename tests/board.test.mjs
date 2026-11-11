@@ -43,6 +43,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await new Promise((r) => setTimeout(r, 150));
@@ -580,8 +581,9 @@ async function testeTouch(browser) {
       });
     },
   });
+  const zeitZug = await finger.seitAufsetzen();
   await warte(200);
-  pruefe('Ziehen per Finger: Figur folgt, vergroessert', mitten.gezogen && mitten.beruehrung && mitten.groesser > 1.2, JSON.stringify(mitten));
+  pruefe('Ziehen per Finger: Figur folgt, vergroessert', mitten.gezogen && mitten.beruehrung && mitten.groesser > 1.2, JSON.stringify({ ...mitten, zeitZug }));
   pruefe('Ziehen per Finger: Figur bleibt unter dem Finger', mitten.versatz < 3, JSON.stringify(mitten));
   pruefe('Ziehen per Finger: Zielfeld hervorgehoben', mitten.ueber);
   pruefe('Ziehen per Finger Sg8-f6', (await h.figur('f6')) === 'bN' && (await h.figurSitzt('f6')) && !(await h.figur('g8')));
@@ -841,12 +843,14 @@ async function testeFundament(browser) {
     return { x: r.left + r.width / 2, y: r.top + r.height / 2, messungen: window.__messungen };
   });
   const [fx, fy] = punkte[punkte.length - 1];
+  // erste Bewegung nach mehr als 400 ms waere eine Mal-Geste (Halte-Uhr), dann ist lage null: die Zeit steht in der Meldung
+  const zeit = await finger.seitAufsetzen();
   await finger.hoch(fx, fy);
   await t.seite.evaluate(() => { Element.prototype.getBoundingClientRect = window.__echtRect; });
   pruefe('Finger ueber erlaubtem Ziel: Figur bleibt unter dem Finger (Abstand < 2 px, kein Einrasten)',
-    !!lage && Math.abs(lage.x - fx) < 2 && Math.abs(lage.y - fy) < 2, { lage, finger: [fx, fy] });
+    !!lage && Math.abs(lage.x - fx) < 2 && Math.abs(lage.y - fy) < 2, JSON.stringify({ lage, finger: [fx, fy], zeit }));
   pruefe('Ziehen misst das Brett hoechstens zweimal pro Geste (Anheben und Start), nicht bei jeder Bewegung',
-    !!lage && lage.messungen <= 2, lage);
+    !!lage && lage.messungen <= 2, JSON.stringify({ lage, zeit }));
   pruefe('Keine Konsolenfehler (Finger)', t.fehler.length === 0, t.fehler.join(' | '));
   await t.kontext.close();
 }
@@ -919,7 +923,16 @@ async function testeOptik(browser) {
   pruefe('Koordinate "8" endet innerhalb von 20 % der Feldecke', ecke.zahlRechts <= 0.2 && ecke.zahlUnten <= 0.2 && ecke.imFeld, JSON.stringify(ecke));
   pruefe('Koordinate "a" sitzt unten rechts innerhalb von 20 %', ecke.buchstLinks <= 0.2 && ecke.buchstOben <= 0.2, JSON.stringify(ecke));
   pruefe('Koordinaten Gewicht 700, Groesse 10 bis 12 px (Ansicht: nie unter 10 px)', ecke.gewicht === '700' && ecke.groesse >= 10 && ecke.groesse <= 12, JSON.stringify(ecke));
-  pruefe('Koordinaten in der Gegenfeldfarbe', ecke.zahlFarbe === ecke.dunkel && ecke.buchstFarbe === ecke.hell, JSON.stringify(ecke));
+  // Handy-Runde K (08.11.2026): nicht mehr exakt die Gegenfeldfarbe (auf dunklen Feldern kaum lesbar, 2,8:1), sondern
+  // auf dem eigenen Feld mindestens 3:1 (helles Feld: dunkler als das dunkle Feld; dunkles Feld: weiss)
+  const rgb = (c) => { const m = String(c).match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/); if (m) return m.slice(1, 4).map(Number);
+    return String(c).match(/[\d.]+/g).slice(0, 3).map((x) => Number(x) / 255); };
+  const lum = (c) => { const [r, g, b] = rgb(c).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const kontrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const kz = kontrast(ecke.zahlFarbe, ecke.hell);
+  const kb = kontrast(ecke.buchstFarbe, ecke.dunkel);
+  pruefe('Koordinaten auf dem eigenen Feld lesbar (Kontrast >= 3:1, hell und dunkel)', kz >= 3 && kb >= 3 && lum(ecke.zahlFarbe) < lum(ecke.dunkel),
+    JSON.stringify({ kz: kz.toFixed(2), kb: kb.toFixed(2), ...ecke }));
   // Feld unten rechts (h1, gedreht a8): das Brett-Eck ist abgerundet; der Buchstabe (unteres Viertel seiner Box, wo der Fuss
   // des Zeichens steht) liegt ganz innerhalb des Rundes (Pruefer U6: das "h" wurde angeschnitten), beide Ausrichtungen
   // Dazu der Vergleich mit dem Nachbarfeld (g1, gedreht b8): rechts gleich weit vom Feldrand, sonst stuende der Buchstabe
@@ -1477,10 +1490,11 @@ async function testeKomfort(browser) {
   await finger.runter(b8f.x, b8f.y);
   await finger.bewege((b8f.x + a8f.x) / 2, b8f.y);
   await finger.bewege(a8f.x, a8f.y);
+  const zeitRutsch = await finger.seitAufsetzen();
   await finger.hoch(a8f.x, a8f.y);
   await warte(220);
   pruefe('Auto-Dame per Finger: auf ein anderes Feld gerutscht = kein Zug, b7 bleibt gewaehlt', (await hf.fen()) === UMWANDLUNG && !(await offenF())
-    && (await hf.anzahl('.lage.auswahl[data-feld="b7"]')) === 1);
+    && (await hf.anzahl('.lage.auswahl[data-feld="b7"]')) === 1, JSON.stringify({ zeit: zeitRutsch }));
   await s.evaluate(() => demo.brett.setzeAutoDame(false));
 
   // Steuerung per Finger
@@ -1758,6 +1772,7 @@ async function testePfeile(browser) {
   await finger.runter(a.x, a.y);
   await warte(150);
   const eigenVor = await eigenZustand('e2');
+  const zeitVor = await finger.seitAufsetzen();   // obere Grenze: eigenVor muss vor 400 ms gelesen sein
   await warteSeite(s, 400);
   const eigenNach = await eigenZustand('e2');
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
@@ -1767,7 +1782,7 @@ async function testePfeile(browser) {
   nt = await nutzer(s);
   pruefe('Finger: eigene ziehbare Figur vor 400 ms normal gewaehlt, danach malbereit (Auswahl bleibt, Zielpunkte und Anheben aus)',
     eigenVor.auswahl === 1 && eigenVor.ziele === 2 && eigenVor.angehoben && !eigenVor.malt
-    && eigenNach.auswahl === 1 && eigenNach.ziele === 0 && !eigenNach.angehoben && !eigenNach.malt && eigenNach.vorschau === 0, JSON.stringify({ eigenVor, eigenNach }));
+    && eigenNach.auswahl === 1 && eigenNach.ziele === 0 && !eigenNach.angehoben && !eigenNach.malt && eigenNach.vorschau === 0, JSON.stringify({ eigenVor, eigenNach, zeitVor }));
   pruefe('Finger: eigene ziehbare Figur halten und ziehen malt den Pfeil e2-e4 (Vorschau beim Ziehen), kein Zug, Figur bleibt, die Marke bleibt',
     eigenMalt.malt && eigenMalt.vorschau === 1 && eigenMalt.auswahl === 0 && nt.pfeile.join() === 'e2e4' && nt.marken.join() === 'a1'
     && (await ht.fen()) === START && (await ht.figurSitzt('e2')) && (await ht.anzahl('.lage.auswahl')) === 0, JSON.stringify({ eigenMalt, nt }));

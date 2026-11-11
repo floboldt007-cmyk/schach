@@ -41,7 +41,8 @@ function aktualisiere() {
   if (!app) return;
   const e = einstellung();
   const fest = e.musikMelodie && e.musikMelodie !== 'welt' && istMelodieFrei(e.musikMelodie) ? e.musikMelodie : null;
-  musik.einstellen({ an: e.musik === true && !partie && screen !== 'partie', laut: e.musikLautstaerke, welt: fest || weltId() });
+  // Der Lautsprecher im Kopf (klang aus) macht alles still, auch die Musik; die Musik-Wahl selbst bleibt gespeichert
+  musik.einstellen({ an: e.musik === true && e.klang !== false && !partie && screen !== 'partie', laut: e.musikLautstaerke, welt: fest || weltId() });
 }
 function entsperre() { musik.aktivieren(); aktualisiere(); }
 if (typeof window !== 'undefined') {

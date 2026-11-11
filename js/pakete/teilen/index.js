@@ -26,7 +26,7 @@ import { segment, schalter, toast } from '../../ui/bauteile.js';
 import { anim, tempo } from '../../bewegung.js';
 import { sitzung, ladeProfil } from '../../konto.js';
 import { tagSchluessel } from '../../tag.js';
-import { teilbar, bildDaten, appAdresse, gueltigerName, RECHENSTAND } from './logik.js';
+import { teilbar, bildDaten, teilText, appAdresse, gueltigerName, RECHENSTAND, MARKEN_ADRESSE } from './logik.js';
 import { rendere, alsDatei } from './bild.js';
 import { t } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
@@ -113,9 +113,25 @@ function speichereDatei(datei) {
 // Muss im Klick bleiben (Safari verlangt fuer share() eine frische Nutzer-Geste): die Datei liegt schon bereit,
 // share() wird ohne await davor aufgerufen.
 function teileDatei(datei, titel) {
-  if (kannTeilen(datei)) return navigator.share({ files: [datei], title: 'Crownmate', text: titel }).then(() => 'teilen');
+  if (kannTeilen(datei)) {
+    const daten = { files: [datei], title: 'Crownmate', text: titel };
+    // Link zur App dazu, damit Empfaenger (z. B. im Messenger) etwas zum Antippen haben; nur wenn das Geraet ihn
+    // zusammen mit der Datei annimmt, sonst teilt es wie bisher nur Bild und Text
+    const link = appLink();
+    try { if (link && navigator.canShare({ ...daten, url: link })) daten.url = link; } catch (e) { /* ohne Link */ }
+    return navigator.share(daten).then(() => 'teilen');
+  }
   speichereDatei(datei);
   return Promise.resolve('datei');
+}
+// Adresse wie im Bild (appAdresse), mit Protokoll; leer in einer App-Huelle ohne Web-Adresse. Eine feste Markenadresse
+// (MARKEN_ADRESSE) ist immer https, nur die Adresse der Seite selbst behaelt deren Protokoll (lokal http)
+function appLink() {
+  const ort = globalThis.location;
+  const adresse = appAdresse(ort && ort.href);
+  if (!adresse) return '';
+  const fest = typeof MARKEN_ADRESSE === 'string' && MARKEN_ADRESSE.trim() !== '';
+  return (!fest && ort && ort.protocol === 'http:' ? 'http:' : 'https:') + '//' + adresse + '/';
 }
 
 // ---------- Blatt mit Vorschau ----------
@@ -327,7 +343,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     const datei = stand.datei;
     if (!datei || !stand.bereit) return;
     let laeuft;
-    try { laeuft = teileDatei(datei, daten ? daten.titel : 'Crownmate'); } catch (f) { laeuft = Promise.reject(f); }
+    try { laeuft = teileDatei(datei, daten ? teilText(daten) : 'Crownmate'); } catch (f) { laeuft = Promise.reject(f); }
     // zwei Zweige statt then().catch(): nur ein Fehler von share() selbst fuehrt zum Speichern
     laeuft.then((weg) => erledigt(weg, t(weg === 'teilen' ? 'p-teilen.geteilt' : 'p-teilen.gespeichert')), (f) => {
       if (f && f.name === 'AbortError') return;   // im Teilen-Blatt abgebrochen: unser Blatt bleibt offen

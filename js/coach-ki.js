@@ -23,7 +23,7 @@
 //   vergissAntworten()        Merker leeren (fuer Tests; nach dem Abmelden ist es nicht noetig, der Merker schluesselt
 //                             je Nutzer-ID und lebt nur im Arbeitsspeicher)
 //   setzeCoachFetch(fn), setzeCoachWartezeit(ms)   nur fuer Tests (null: Standard)
-import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { SUPABASE_URL, SUPABASE_KEY, mitRegion } from './konto-config.js';
 import { t } from './sprache.js';
 import './sprachen/coach-ki.js';
 const C = (k, w) => t('coach-ki.' + k, w);
@@ -117,7 +117,7 @@ async function frage(eingabe, schluessel) {
   let d = null;
   try {
     try {
-      r = await Promise.race([fetchFn(SUPABASE_URL + COACH_PFAD, {
+      r = await Promise.race([fetchFn(SUPABASE_URL + mitRegion(COACH_PFAD), {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(eingabe),

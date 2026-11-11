@@ -61,7 +61,7 @@
 .st-sockel { position: relative; width: min(100%, 380px); padding: var(--sockel-rand); border-radius: var(--r-sockel);
   background-color: var(--sockel); background-image: var(--textur-sockel, none); box-shadow: var(--s-brett), var(--kante); }
 .st-sockel .mini { width: 100%; border-radius: var(--r-brett); box-shadow: none; }
-.st-klasse { position: absolute; right: -14px; top: 20%; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 15px;
+.st-klasse { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 15px;
   border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s2), var(--kante); font-size: 14.5px; font-weight: 800; color: var(--kt-bester); }
 .st-klasse i { width: 12px; height: 12px; border-radius: var(--r-pille); background: var(--k-bester); }
 
@@ -101,11 +101,6 @@
 
 /* ---------- Heute-Karte: "Neu fuer dich" (Ort arena:heute) ---------- */
 .st-neu { display: flex; align-items: center; gap: 0; min-width: 0; min-height: 44px; }
-/* "Neu fuer dich" ist die leiseste Zeile der Heute-Karte: steht dort schon eine Zeile eines anderen Pakets (z. B. faellige
-   Karten der Kartei), tritt sie zurueck und kommt wieder, sobald sie allein ist (der Hinweis bleibt der des Tages, er
-   gilt nicht als erledigt). Zwei Zeilen schoben auf dem iPad quer 1024 x 768 den Spielen-Knopf 21 px unter den Rand.
-   Haelt die Arena den Spielen-Knopf einmal selbst im Bild (U5/U7), kann diese Regel fallen. */
-.heute-karte .st-neu:not(:only-child) { display: none; }
 .st-neu-los { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 5px; margin: 0; padding: 4px 2px 4px 0;
   border: 0; border-radius: var(--r-m); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .st-neu-los:focus-visible { outline: var(--fokus); outline-offset: 2px; }
@@ -151,7 +146,10 @@
   .st-text { gap: 12px; }
   .st-text p { font-size: 15px; }
   .st-sockel { width: min(100%, 220px); }
-  .st-klasse { right: -8px; height: 32px; padding: 0 12px; font-size: 13px; }
+  .st-klasse { height: 32px; padding: 0 12px; font-size: 13px; }
+  /* Seite 1: das Schild steht neben dem kleinen Brett (Handy-Runde K, 08.11.2026), nicht darauf */
+  .st-buehne[data-seite="w1"] .st-bild { width: 100%; height: auto; flex-direction: row; justify-content: flex-start; }
+  .st-buehne[data-seite="w1"] .st-sockel { flex: none; width: min(58%, 220px); }
   .st-leiter { gap: 8px; }
   .st-kacheln { gap: 8px; }
   .st-kachel { padding: 10px 12px; }
@@ -168,4 +166,42 @@
 }
 @media (max-width: 380px) {
   .st-screen .haupt-kopf .marke-zeichen { display: none; }
+}
+/* ---------- Kurze Handys (Kundenblick 09.11.2026): jeder Knopf ohne Scrollen ganz sichtbar ----------
+   iPhone 13 mit Safari-Leiste ist 664 px hoch, das SE 548 px: Bild und Abstaende werden kleiner, die Knoepfe nie
+   (mindestens 44 px, gemessen in tests/einfuehrung-rand.test.mjs). */
+@media (max-width: 600px) and (max-height: 760px) {
+  .st-screen .st-rumpf { gap: 2px; padding-top: 2px; padding-bottom: 6px; }
+  .st-buehne { gap: 12px; padding: 14px 16px; }
+  .st-text { gap: 9px; }
+  .st-titel { font-size: 27px; }
+  .st-text p { font-size: 14.5px; line-height: 1.42; }
+  .st-sockel { width: min(100%, 150px); }
+  .st-buehne[data-seite="w1"] .st-sockel { width: min(46%, 160px); }
+  .st-stapel { width: min(100%, 180px); }
+  .st-portraet { width: min(34%, 104px); }
+  .st-portraet-name b { font-size: 17px; }
+  .st-leiter { width: min(100%, 300px); gap: 6px; }
+  .st-kacheln { gap: 6px; }
+  .st-kachel { padding: 7px 10px; }
+  .st-kachel-symbol { width: 34px; height: 34px; border-radius: 11px; }
+  .st-kachel b { font-size: 15px; }
+  .st-kachel span { font-size: 13px; }
+  .st-knoepfe { margin-top: 2px; }
+  .st-knoepfe .knopf { min-height: 48px; }
+  .st-wahl { gap: 8px; margin-top: 2px; }
+  .st-wahl-knopf { min-height: 56px; padding-top: 9px; padding-bottom: 9px; }
+}
+/* iPhone SE mit Leiste: auf den Seiten mit Wahl weicht das Schmuckbild (aria-hidden), der Text bleibt ganz */
+@media (max-width: 600px) and (max-height: 600px) {
+  .st-buehne:is([data-seite="frage"], [data-seite="einstufung"], [data-seite="empfehlung"], [data-seite="nach-regeln"]) .st-bild { display: none; }
+  .st-sockel { width: min(100%, 120px); }
+  .st-buehne[data-seite="w1"] .st-sockel { width: min(40%, 130px); }
+  .st-leiter { width: min(100%, 250px); }
+  .st-kacheln { gap: 4px; }
+  .st-kachel { gap: 10px; padding: 5px 10px; }
+  .st-kachel-symbol { width: 30px; height: 30px; border-radius: 10px; }
+  .st-kachel-symbol .ico { width: 19px; height: 19px; }
+  .st-titel { font-size: 25px; }
+  .st-text p { font-size: 14px; line-height: 1.38; }
 }

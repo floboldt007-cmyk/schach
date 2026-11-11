@@ -57,6 +57,9 @@ function nodeTeil() {
   pruefe('Icon liga (Kronen-Umriss) fuer den Liga-Reiter', iconNamen().includes('liga') && !/fill="currentColor"/.test(icon('liga')));
   pruefe('erweiterungen.js: REITER bestenliste und ich', /export const REITER = Object\.freeze\(\['bestenliste', 'ich'\]\)/.test(lies('js/erweiterungen.js')));
   pruefe('Pille misst ueber einen ResizeObserver', /new ResizeObserver/.test(app));
+  // R13 CLS-1: zeigeScreen merkt die Scrollposition des verlassenen Screens, beiVerlauf stellt sie wieder her
+  pruefe('Scrollposition je Verlaufseintrag gemerkt und beim Zurueck wiederhergestellt',
+    /merkeScroll\(\)/.test(app) && /wiederherstellen/.test(app.slice(app.indexOf('function beiVerlauf'), app.indexOf('async function zeigeScreen'))));
 
   gruppe = 'CSS';
   for (const d of ['css/navigation.css', 'css/bauteile.css', 'css/training.css']) {
@@ -91,6 +94,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await warte(150);
@@ -191,12 +195,70 @@ async function testeLeiste(browser) {
     await kontext.close();
   }
 
+  // ---------- Handy-Runde 08.11.: wo bin ich? Leiste und aktiver Reiter je Screen, Seitenname = Kachel- bzw. Reitername ----------
+  gruppe = 'Leiste je Screen (Handy 390)';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    const stand = async (name, params) => {
+      await seite.evaluate(([n, p]) => window.__app.gehe(n, p), [name, params || {}]);
+      await seite.waitForFunction((n) => document.documentElement.dataset.screen === n, name).catch(() => {});
+      await warte(300);
+      const m = await lageMessen(seite);
+      return { leiste: m.sichtbar && !m.klasse.split(' ').includes('weg'), reiter: m.reiter, h1: await seite.evaluate(() => document.querySelector('#app > .screen .seiten-kopf h1')?.textContent || '') };
+    };
+    let r = await stand('online');
+    pruefe('Online (ohne Partie): Leiste bleibt, Start aktiv, Seite heisst Online', r.leiste && r.reiter.includes('heim*') && r.h1 === 'Online', JSON.stringify(r));
+    r = await stand('online', { partieId: '00000000-0000-4000-8000-000000000001' });
+    pruefe('Online-Partie: keine Leiste (das Brett braucht den Platz)', !r.leiste, JSON.stringify(r));
+    r = await stand('partie', { modus: 'zuzweit' });
+    pruefe('Zu-zweit-Startblatt: Leiste bleibt, Start aktiv', r.leiste && r.reiter.includes('heim*'), JSON.stringify(r));
+    r = await stand('partie', { modus: 'zuzweit', zuzweit: { weiss: 'A', schwarz: 'B' } });
+    pruefe('Zu-zweit-Partie: keine Leiste', !r.leiste, JSON.stringify(r));
+    r = await stand('training');
+    pruefe('Lernen (Kachel auf Start): Seite heisst Lernen, Start aktiv', r.leiste && r.reiter.includes('heim*') && r.h1 === 'Lernen', JSON.stringify(r));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // ---------- R11 Pixel (10.11.2026): von Start in die Partie springt nichts ----------
+  // Die Leiste wurde erst nach dem Zeichnen des neuen Screens weggenommen: die Partie rechnete ihr Brett im 88 px
+  // kuerzeren Screen (iPhone 13 mit Leiste: 288 statt 376 px), danach wuchs alles nach (layout-shift 0,109).
+  // R13 CLS-2 (10.11.2026): derselbe Ruck am iPhone SE, live 287 gemessen 0,0899 (Coach, Spielerzeile und Knoepfe 72 px
+  // nach unten, Brett 296 -> 368 px); mit Safari-Leiste (375 x 548) 0,0102. Darum auch beide SE-Fenster.
+  for (const [w, h] of [[390, 664], [375, 667], [375, 548]]) {
+    gruppe = `Wechsel ohne Sprung (Handy ${w} x ${h})`;
+    const { kontext, seite, fehler } = await neueSeite(browser, { w, h, handy: true });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    await warte(600);
+    await seite.evaluate(() => {
+      window.__sprung = { cls: 0, brett: [] };
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__sprung.cls += e.value; }).observe({ type: 'layout-shift' });
+      const t0 = performance.now();
+      const bild = () => {
+        const v = document.querySelector('.screen.partie .inhalt')?.style.getPropertyValue('--brett');
+        if (v && window.__sprung.brett[window.__sprung.brett.length - 1] !== v) window.__sprung.brett.push(v);
+        if (performance.now() - t0 < 1500) requestAnimationFrame(bild);
+      };
+      requestAnimationFrame(bild);
+      window.__app.gehe('partie', { botId: 'benno', farbe: 'w' });
+    });
+    await warte(1800);
+    const m = await seite.evaluate(() => window.__sprung);
+    pruefe('Partie: das Brett bekommt beim Oeffnen genau eine Groesse', m.brett.length === 1, JSON.stringify(m));
+    pruefe('Partie: keine Layout-Verschiebung beim Oeffnen (CLS unter 0,01)', m.cls < 0.01, JSON.stringify(m));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // ---------- Handy: schwebende Glas-Kapsel unten (Konzept 2026-11-06, Entwurf .dock) ----------
   for (const schema of ['light', 'dark']) {
     gruppe = `glas-leiste Handy 390 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true, schema });
     await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     await warte(400);
     const m = await lageMessen(seite);
     pruefe('Lage unten, schwebend, nicht im Kopf', m.html === 'unten' && m.sichtbar && !m.imKopf, JSON.stringify({ h: m.html, k: m.imKopf }));
@@ -273,7 +335,7 @@ async function testeLeiste(browser) {
         f();
       });
       await seite.locator('.reiter-leiste [data-reiter="heim"]').click();
-      await seite.waitForFunction(() => location.hash === '#heim' && !!document.querySelector('.heim-screen .heim-ring'), null, { timeout: 10000 }).catch(() => {});
+      await seite.waitForFunction(() => location.hash === '#heim' && !!document.querySelector('.heim-screen .heim-buehne'), null, { timeout: 10000 }).catch(() => {});
       await warte(800);
       m = await lageMessen(seite);
       const abtast = await seite.evaluate(() => { window.__pilleAbtast.an = false; return window.__pilleAbtast.oben; });
@@ -325,7 +387,7 @@ async function testeLeiste(browser) {
     pruefe('Verlauf gehoert zu Ich: Ich aktiv, Zurueck-Knopf da', m.reiter.includes('ich*') && m.wurzel === 'nein'
       && await seite.locator('.vl-screen .kopf-zurueck').isVisible(), JSON.stringify({ r: m.reiter, w: m.wurzel }));
     await seite.evaluate(() => window.__app.gehe('heim'));
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     m = await lageMessen(seite);
     pruefe('auf heim: Start aktiv, Wurzel (kein Zurueck)', m.reiter.includes('heim*') && m.wurzel === 'ja' && !(await seite.locator('.heim-screen .kopf-zurueck').isVisible()),
       JSON.stringify({ r: m.reiter, w: m.wurzel }));
@@ -339,7 +401,7 @@ async function testeLeiste(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
     // Browser ohne backdrop-filter nachstellen: CSS.supports meldet ihn nicht, die @supports-Regel prueft der Node-Teil
     await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     const ersatz = await seite.evaluate(() => {
       const regeln = [];
       for (const s of document.styleSheets) { try { for (const r of s.cssRules) if (r.conditionText && /not/.test(r.conditionText) && /backdrop-filter/.test(r.conditionText)) regeln.push(r.cssText); } catch (e) { /* fremd */ } }
@@ -399,6 +461,25 @@ async function testeLeiste(browser) {
     await seite.waitForSelector('.screen.arena .knoten');
     pruefe('zurueck: sofort da, ohne Animation', await seite.evaluate(() => { const n = document.querySelector('.reiter-leiste'); return !n.hidden && n.getAnimations().length === 0; }));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Kundenblick 09.11. (Befund 9): Zurueck aus der Partie fuehrt dorthin, woher man kam, und der Knopf sagt es
+  gruppe = 'Partie zurueck zur Herkunft';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 664 });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    for (const [von, sel, wort] of [['heim', '.heim-screen', 'Zurück zum Start'], ['arena', '.screen.arena .knoten', 'Zurück zu den Bots']]) {
+      await seite.evaluate((v) => window.__app.gehe(v, {}, { ersetzen: true }), von);
+      await seite.waitForSelector(sel);
+      await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w' }); });
+      await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+      const label = await seite.evaluate(() => document.querySelector('.screen.partie .kopf [data-aktion="zurueck"]').getAttribute('aria-label'));
+      await seite.locator('.screen.partie .kopf [data-aktion="zurueck"]').click();
+      const da = await seite.waitForSelector(sel, { timeout: 5000 }).then(() => true, () => false);
+      pruefe(`von ${von}: der Knopf heisst „${wort}“ und fuehrt ohne Zug dorthin zurueck`, label === wort && da, JSON.stringify({ label, da, screen: await seite.evaluate(() => document.documentElement.dataset.screen) }));
+    }
+    pruefe('keine Konsolenfehler', fehler.filter((f) => !/stockfish|wasm|Engine/i.test(f)).length === 0, fehler.join(' | '));
     await kontext.close();
   }
   gruppe = 'Leiste nur im Testmodus';
@@ -539,13 +620,13 @@ async function testeTraining(browser) {
       leer: !document.querySelector('.training-leer').hidden, gitter: document.querySelector('.training-gitter').hidden,
       h1: document.querySelector('.seiten-kopf h1').textContent, ueber: document.querySelector('.seiten-kopf .ueberzeile').textContent,
       zurueck: !!document.querySelector('.kopf-zurueck') && getComputedStyle(document.querySelector('.kopf-zurueck')).display !== 'none' }));
-    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Training · Crownmate' && !r.platzhalter, JSON.stringify(r));
-    pruefe('Seitenkopf „Üben ohne Druck“ / „Training“, die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Training'
+    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Lernen · Crownmate' && !r.platzhalter, JSON.stringify(r));
+    pruefe('Seitenkopf „Üben ohne Druck“ / „Lernen“ (wie die Kachel auf Start), die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Lernen'
       && await seite.locator('.screen.training-screen h1').count() === 1, JSON.stringify(r));
     pruefe('ohne Anbieter: ruhige Karte, Gitter versteckt; ohne Reiter ein Zurueck-Knopf', r.leer && r.gitter && r.zurueck, JSON.stringify(r));
     await seite.locator('.training-leer [data-aktion="arena"]').click();
     await seite.waitForSelector('.screen.arena .knoten');
-    pruefe('„Zur Arena“ fuehrt in die Arena', await seite.evaluate(() => location.hash) === '#arena');
+    pruefe('„Zu den Bots“ fuehrt zu den Bots', await seite.evaluate(() => location.hash) === '#arena');
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -703,10 +784,16 @@ async function testeBauteile(browser) {
   await seite.keyboard.press('Tab');
   const f2 = await seite.evaluate(() => document.activeElement.textContent);
   pruefe('Blatt: Fokus auf der Hauptaktion, Tab bleibt im Blatt', f0 === 'Ja' && f1 === 'Nein' && f2 === 'Ja', `${f0} ${f1} ${f2}`);
+  // U4 (Flo 09.11.2026): Hintergrund per inert stillgelegt, auch fuer Bildschirmleser; Meldungen (role=status) bleiben
+  const still = await seite.evaluate(() => [...document.body.children].filter((el) => !el.matches('script')).map((el) => ({
+    k: el.className || el.tagName, inert: el.inert, blatt: el.classList.contains('sheet-ort'), meldung: el.matches('[role="status"], [aria-live]') })));
+  pruefe('Blatt: alles dahinter inert, Blatt und Meldungen nicht (U4)', still.some((x) => !x.blatt && x.inert)
+    && still.every((x) => (x.blatt || x.meldung ? !x.inert : x.inert)), JSON.stringify(still));
   const kb = await seite.locator('.sheet-karte').boundingBox();
   await seite.mouse.click(kb.x + kb.width / 2, Math.max(5, kb.y - 60));
   await warte(500);
   pruefe('Blatt: Tipp auf den Schleier liefert „abbrechen“', await seite.evaluate(() => window.__bt.sheetWert()) === 'ab' && await seite.locator('.sheet-ort').count() === 0);
+  pruefe('Blatt zu: nichts bleibt inert (U4)', await seite.evaluate(() => ![...document.body.children].some((el) => el.inert)));
 
   // Meldung und Mini-Brett
   await seite.locator('[data-test="toast"]').click();
@@ -805,11 +892,14 @@ async function testePremium(browser) {
   await v.seite.goto(`http://127.0.0.1:${PORT}/index.html?test#arena`);
   await v.seite.waitForSelector('.screen.arena .knoten');
   await v.seite.click('.haupt-kopf [data-aktion="shop"]');
-  await v.seite.waitForSelector('.screen.sa-screen .sa-bereich[data-bereich="shop"]');
+  // G-002 (Sammlung B): der Shop oeffnet als Blatt ueber der Sammlung
+  await v.seite.waitForSelector('.sa-blatt .sa-bereich[data-bereich="shop"]');
   const sh = await v.seite.evaluate(() => ({ bereich: document.querySelector('.screen.sa-screen').dataset.bereich,
     sichtbar: !document.querySelector('.sa-bereich[data-bereich="shop"]').hidden,
     verlauf: getComputedStyle(document.querySelector('.sa-screen .haupt-kopf [data-aktion="verlauf"]')).display }));
   pruefe('Shop oeffnet die Sammlung beim Bereich Shop, Verlauf-Knopf im Kopf von Ich', sh.bereich === 'shop' && sh.sichtbar && sh.verlauf !== 'none', JSON.stringify(sh));
+  await v.seite.click('.sa-blatt .sheet-knoepfe button');
+  await v.seite.waitForSelector('.sa-blatt', { state: 'detached', timeout: 8000 }).catch(() => {});
   await v.seite.click('.sa-screen .haupt-kopf [data-aktion="verlauf"]');
   await v.seite.waitForSelector('.screen.vl-screen, .screen.verlauf', { timeout: 8000 }).catch(() => {});
   pruefe('Verlauf aus Ich erreichbar', await v.seite.evaluate(() => location.hash.startsWith('#verlauf')));
@@ -817,10 +907,62 @@ async function testePremium(browser) {
   await v.kontext.close();
 }
 
+// R13 CLS-1 (10.11.2026): nach der Zurueck-Taste landete man immer oben, weil zeigeScreen() den Screen neu baut und das
+// innere Element, das wirklich scrollt, nirgends gemerkt wurde. Jetzt: Zurueck stellt die alte Position wieder her,
+// ein neuer Bildschirm startet oben. Scroller wie im Messwerkzeug: groesste Flaeche mit overflow-y auto/scroll, sonst die Seite.
+async function testeScrollZurueck(browser) {
+  gruppe = 'Scroll nach Zurueck';
+  const h = await neueSeite(browser, { w: 390, h: 844, handy: true });
+  await h.seite.addInitScript(() => {
+    window.__scroller = () => {
+      let best = null; let flaeche = 0;
+      for (const el of document.querySelectorAll('#app *')) {
+        const st = getComputedStyle(el);
+        if (!/(auto|scroll)/.test(st.overflowY) || el.scrollHeight <= el.clientHeight + 40) continue;
+        const f = el.clientWidth * el.clientHeight;
+        if (f > flaeche) { best = el; flaeche = f; }
+      }
+      const seite = document.scrollingElement;
+      if (seite.scrollHeight > seite.clientHeight + 40 && (!best || seite.clientWidth * seite.clientHeight > flaeche)) return seite;
+      return best;
+    };
+  });
+  await h.seite.goto(BASIS + '#premium');
+  await h.seite.waitForSelector('.screen.pm-screen .pm-plan');
+  await warte(500);
+  const vorher = await h.seite.evaluate(() => {
+    const s = window.__scroller();
+    if (!s) return null;
+    s.scrollTop = Math.round((s.scrollHeight - s.clientHeight) * 0.6);
+    return Math.round(s.scrollTop);
+  });
+  pruefe('Premium scrollt am Handy (Voraussetzung)', vorher > 50, String(vorher));
+  await warte(200);
+  await h.seite.evaluate(() => { location.hash = '#einstellungen'; });
+  await h.seite.waitForFunction(() => document.documentElement.dataset.screen === 'einstellungen');
+  await warte(400);
+  const neu = await h.seite.evaluate(() => { const s = window.__scroller(); return s ? Math.round(s.scrollTop) : 0; });
+  pruefe('neuer Bildschirm startet oben', neu === 0, String(neu));
+  await h.seite.goBack();
+  await h.seite.waitForSelector('.screen.pm-screen .pm-plan');
+  await warte(800);
+  const nachher = await h.seite.evaluate(() => { const s = window.__scroller(); return s ? Math.round(s.scrollTop) : null; });
+  pruefe('Zurueck stellt die alte Scrollposition wieder her', nachher != null && Math.abs(nachher - vorher) <= 2, `vorher ${vorher}, nachher ${nachher}`);
+  // Vor-Taste auf einen frisch geoeffneten Eintrag: Einstellungen wieder oben (dort wurde nicht gescrollt)
+  await h.seite.goForward();
+  await h.seite.waitForFunction(() => document.documentElement.dataset.screen === 'einstellungen');
+  await warte(400);
+  const vor = await h.seite.evaluate(() => { const s = window.__scroller(); return s ? Math.round(s.scrollTop) : 0; });
+  pruefe('Vor-Taste auf ungescrollten Eintrag bleibt oben', vor === 0, String(vor));
+  pruefe('keine Konsolenfehler', h.fehler.length === 0, h.fehler.join(' | '));
+  await h.kontext.close();
+}
+
 async function browserTeil(browser) {
   await testeSprunglink(browser);
   await testeLeiste(browser);
   await testeKopf(browser);
+  await testeScrollZurueck(browser);
   await testePremium(browser);
   await testeTraining(browser);
   await testeBauteile(browser);

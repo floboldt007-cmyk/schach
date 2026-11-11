@@ -191,7 +191,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -370,6 +370,10 @@ async function schrittZwei(browser) {
       else if (u.pathname === '/rest/v1/produkte') body = [{ id: 'trainer', name: 'Crownmate Trainer', preis_text: 'Test price from server', beschreibung: 'Training for your chess', kauf_link: 'https://buy.stripe.com/test_probe' }];
       // Sonderstuecke: die App fragt seit dem 31.10.2026 fuer jedes angemeldete Konto nach (Erfinder-Status, js/app.js)
       else if (['/rest/v1/abos', '/rest/v1/profile', '/rest/v1/spielstaende', '/rest/v1/sonderstuecke'].includes(u.pathname) || u.pathname.endsWith('/online_meine') || u.pathname === '/rest/v1/partien_online') body = [];
+      // Etappe 4b: beim Start meldet das Konto seine Erfolgs-Stufen und die Wahl der Visitenkarte (js/karte.js)
+      else if (u.pathname.endsWith('/karte_melde_stufen') || u.pathname.endsWith('/karte_waehle')) body = { taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } };
+      // Handy-Runde 08.11.: die Online-Seite fragt, ob die Liga da ist; mit Antwort zeigt sie die Gegnersuche (deren englische Texte prueft dieser Lauf mit)
+      else if (u.pathname.endsWith('/kronen_mein_stand')) body = { stufe: 0, kronen: 0, platz: null, ziel: null, n: 30, woche: '2026-11-02' };
       else if (u.pathname === '/functions/v1/coach') body = { text: 'Develop your knight and protect the center.', rest: 4, modell: 'probe' };
       else { unerwartet.push(u.pathname); body = {}; }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
@@ -421,7 +425,7 @@ async function schrittZwei(browser) {
       await seite.waitForSelector('.sm-beitreten:not([hidden])');
       await pruefeAnsicht('klasse-beitreten', '.schule-gruppe');
       await pruefeAnsicht('daten-sicherung', '.es-inhalt');
-      await seite.evaluate(() => window.__app.gehe('online'));
+      await seite.evaluate(() => window.__app.gehe('online', { freunde: true }));
       await seite.waitForSelector('.on-start');
       await pruefeAnsicht('online-formular', '.online-screen');
       await seite.evaluate(() => window.__app.gehe('schule'));

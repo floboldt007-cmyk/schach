@@ -76,7 +76,7 @@ const vorher = calls.length;
 pruefe('nutzeEinladung: Unsinn ohne Anfrage', (await nutzeEinladung('#freund/zzz')).ergebnis === 'ungueltig' && calls.length === vorher);
 
 pruefe('Link: Adresse ohne Hash und Suche', einladungsLink(CODE, 'https://a.b/schach/index.html?x=1#arena') === `https://a.b/schach/index.html#freund/${CODE}`);
-pruefe('Link: ohne Browser die feste Adresse', einladungsLink(CODE) === `https://floboldt007-cmyk.github.io/schach/#freund/${CODE}`);
+pruefe('Link: ohne Browser die feste Adresse', einladungsLink(CODE) === `https://crownmate.de/#freund/${CODE}`);
 pruefe('Link: falscher Code wirft', await fehlerVon(() => einladungsLink('abc')) === 'ungueltig');
 pruefe('codeAusLink', codeAusLink(`#freund/${CODE}`) === CODE && codeAusLink(CODE) === CODE && codeAusLink(`#freund/${CODE}x`) === null
   && codeAusLink('#online/ABC234') === null && codeAusLink('') === null);
@@ -172,7 +172,7 @@ async function browserTeil() {
   const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser;
   try {
-    for (let i = 0; i < 60; i++) { try { const r = await fetch(`http://127.0.0.1:${PORT}/index.html`); if (r.ok) break; } catch (e) { /* noch nicht */ } await warte(150); }
+    for (let i = 0; i < 60; i++) { try { const r = await fetch(`http://127.0.0.1:${PORT}/index.html`); await r.arrayBuffer(); if (r.ok) break; } catch (e) { /* noch nicht */ } await warte(150); }
     browser = await browserTyp(pw).launch();
     // abgemeldet: Satz, Weg zum Konto, Codes offen, keine Anfrage
     let p = await seiteMit(browser);

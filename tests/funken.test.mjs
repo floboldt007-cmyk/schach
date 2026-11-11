@@ -18,6 +18,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { alteOrte } from './ohne-host.mjs';
 import { setzeSpeicher, ladeFortschritt, statistik, MODUL_BUDGET, speicherePartie, ladeModul } from '../js/storage.js';
 import { hoere, sende } from '../js/ereignisse.js';
 import { fuerOverlay } from '../js/feier.js';
@@ -774,6 +775,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await warte(150);
@@ -897,6 +899,7 @@ function hilfen(seite) {
       await seite.evaluate(() => window.__app.gehe('arena'));
       await seite.waitForSelector('.screen.arena');
       await warte(500);
+      await alteOrte(seite);   // Heute-Karte und panel-bot nur im Test (Variante A, tests/ohne-host.mjs)
     },
     // wartet, bis die Abrechnungszeile ihr Endbild zeigt (Wert wie im Speicher)
     async abrFertig(ms = 8000) {
@@ -1012,13 +1015,24 @@ async function testeBrowser(browser) {
     && Math.abs(kopfMass.sicht.h - kopfMass.sterne.h) <= 1 && kopfMass.oben === 1 && kopfMass.ganz && kopfMass.knoepfeKopf, kopfMass);
   const tipp = await seite.evaluate(() => Math.round(document.querySelector('.fk-heute .fk-zuenden').getBoundingClientRect().height));
   pruefe('Tippfläche „Zünden“ mindestens 44 px', tipp >= 44, tipp);
-  pruefe('arena:panel-bot: Faktor vor der Partie („Einstieg · Funken × 1“)', (await seite.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Einstieg · Funken × 1');
   await bild(seite, 'arena-frisch');
   await h.tippe('.fk-chip');
   await seite.waitForSelector('.fk-spiegel-ort .fk-spiegel');
   await warte(500);
   const vorn = await seite.locator('.fk-spiegel').innerText();
-  pruefe('Funken-Spiegel vorn nur Level, Balken, heute und als Nächstes; Tagesbogen und Rückenwind zugeklappt', /Level 1 · Funke/.test(vorn)
+  // T-3: Rueckenwind mit "Zuenden" und der Faktor gegen den naechsten Gegner stehen sichtbar im Spiegel (vorher Heute-Karte und Panel)
+  const jetzt = await seite.evaluate(() => {
+    const j = document.querySelector('.fk-spiegel .fk-s-jetzt');
+    const z = j && j.querySelector('.fk-heute .fk-zuenden');
+    const r = z && z.getBoundingClientRect();
+    return { da: !!j, vorMehr: !!(j && j.compareDocumentPosition(document.querySelector('.fk-spiegel .fk-s-mehr')) & Node.DOCUMENT_POSITION_FOLLOWING),
+      text: j ? j.querySelector('.fk-h-text')?.textContent.trim() : '', zuenden: r ? Math.round(r.height) : 0,
+      gegner: j ? j.querySelector('.fk-s-gegner')?.textContent.trim() : '', faktor: j ? j.querySelector('.fk-faktor')?.textContent.trim() : '' };
+  });
+  pruefe('Funken-Spiegel: Rückenwind-Zeile mit „Zünden“ (mindestens 44 px) vor „Mehr“, Faktor gegen den nächsten Gegner („Einstieg · Funken × 1“)',
+    jetzt.da && jetzt.vorMehr && /^Neu für dich: eine Rückenwind-Karte\./.test(jetzt.text) && jetzt.zuenden >= 44
+    && /^Nächster Gegner: .*Willi/.test(jetzt.gegner) && jetzt.faktor === 'Einstieg · Funken × 1', jetzt);
+  pruefe('Funken-Spiegel vorn Level, Balken, heute und als Nächstes; Tagesbogen und Rückenwind-Stand zugeklappt', /Level 1 · Funke/.test(vorn)
     && /Level 5: Titel Glut/.test(vorn) && /Mehr zu deinen Funken/.test(vorn) && !/Heute zählen noch/.test(vorn) && !/Rückenwind-Karte im Fach/.test(vorn), vorn.slice(0, 300));
   await seite.locator('.fk-spiegel .fk-s-mehr summary').click();
   const spiegel = await seite.locator('.fk-spiegel').innerText();
@@ -1066,6 +1080,10 @@ async function testeBrowser(browser) {
   pruefe('ergebnis:abrechnung: eine Zeile data-zeile="funken" in der Abrechnung', await seite.locator('.erg-karte-ort .abrechnung > .fk-abr[data-zeile="funken"]').count() === 1);
   pruefe('Zeile „+Funken“ wie gebucht (Rückenwind-Karte: × 2 in der Formel)', (await seite.locator('.fk-wert').innerText()).trim() === '+' + zahlText(e1.f)
     && e1.rw === 'karte' && /× 2/.test(await seite.locator('.fk-formel').innerText()) && st1.rw.aktiv === 2, { e1, formel: await seite.locator('.fk-formel').innerText() });
+  // R5-12 (Kundenblick 09.11.2026): erster Sieg mit Meilenstein-Funken; vorher stand nur "35 + 250" da, ohne zu sagen, was welche Zahl ist
+  const formel1 = (await seite.locator('.fk-formel').innerText()).trim();
+  pruefe('Formel mit Meilenstein beschriftet: „Partie … + Bonus …“, die Bonus-Zahl ist die gebuchte (R5-12)', e1.m > 0
+    && formel1.startsWith('Partie ') && formel1.endsWith(' + Bonus ' + zahlText(e1.m)), { formel1, m: e1.m });
   const sk1 = await skala(seite, '.fk-abr .fk-balken > i');
   pruefe('Level-Balken steht auf dem neuen Stand', Math.abs(sk1 - fs1.anteil) < 0.02 && (await seite.locator('.fk-abr .fk-level').innerText()).trim() === `Level ${fs1.level}`
     && (await seite.locator('.fk-abr .fk-bis').innerText()).trim() === `${zahlText(fs1.bis)} bis Level ${fs1.level + 1}`, { sk1, fs1 });
@@ -1195,12 +1213,22 @@ async function testeBrowser(browser) {
     await warte(500);
     await hh.tippe('.knoten[data-bot="benno"]');
     await warte(300);
-    pruefe('Lukas nach 12 Siegen: „Training · Funken × 0,5“ (Lage 600 = Elo 200 + 400, Abstand −400)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Training · Funken × 0,5');
+    // T-3: der Faktor steht nur noch im Spiegel und gilt dem naechsten Gegner (Maxi); fuer Lukas bleibt die Rechnung
+    pruefe('Lukas nach 12 Siegen: Rechnung „Training · Funken × 0,5“ (Lage 600 = Elo 200 + 400, Abstand −400)', await s.evaluate(() => {
+      const f = window.__funken.R.faktorVon(-400, 12);
+      return f.name === 'Training' && f.faktor === 0.5;
+    }));
     await hh.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
     await warte(500);
     await hh.tippe('.knoten[data-bot="kalle"]');
     await warte(300);
-    pruefe('Maxi: „Herausforderung · Funken × 1,25“ (Elo 800, Abstand +200)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Herausforderung · Funken × 1,25');
+    await hh.tippe('.fk-chip');
+    await s.waitForSelector('.fk-spiegel-ort .fk-spiegel');
+    pruefe('Maxi als nächster Gegner: im Spiegel „Herausforderung · Funken × 1,25“ (Elo 800, Abstand +200)', await s.evaluate(() =>
+      document.querySelector('.fk-spiegel .fk-s-gegner')?.textContent.trim().startsWith('Nächster Gegner: Maxi')
+      && document.querySelector('.fk-spiegel .fk-s-faktor .fk-faktor')?.textContent.trim() === 'Herausforderung · Funken × 1,25'));
+    await s.locator('.fk-spiegel .fk-schliessen').click();
+    await s.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
     // Antippen der Ergebnis-Karte zeigt sofort alles (auch die Funken-Zeile springt auf ihr Endbild)
     await hh.planBot();
     await hh.starte({ botId: 'benno', farbe: 'w' });
@@ -1235,7 +1263,7 @@ async function testeBrowser(browser) {
     await hh.planBot();
     await hh.starte({ botId: 'benno', farbe: 'w' });
     await hh.warteFlo();
-    pruefe('partie:spieler-leiste: Level-Emblem an Flos Namen', (await s.locator('.ort-spieler-leiste .fk-spieler').first().innerText()).trim() === '1');
+    pruefe('partie:spieler-leiste: Level-Emblem an Flos Namen', (await s.locator('.ort-spieler-leiste .fk-spieler').first().innerText()).trim() === 'Level 1');
     await hh.zugTippen('e2e4');
     await s.waitForFunction(() => { const l = document.querySelector('.p-funkenlinie .fk-linie'); return l && /matrix\((0\.0[1-9]|0\.[1-9])/.test(getComputedStyle(l).transform); }, null, { timeout: 30000 }).catch(() => {});
     const an = await s.evaluate(() => {
@@ -1336,7 +1364,9 @@ async function testeBrowser(browser) {
     const form = (s) => s.evaluate(() => {
       const c = document.querySelector('.haupt-kopf .fk-chip');
       const w = c && c.querySelector('.fk-chip-wort');
-      return { schmal: !!c && c.classList.contains('fk-schmal'), wort: !!w && getComputedStyle(w).display !== 'none' };
+      const kz = c && c.querySelector('.fk-chip-kurz');
+      return { schmal: !!c && c.classList.contains('fk-schmal'), wort: !!w && getComputedStyle(w).display !== 'none',
+        kurz: !!kz && getComputedStyle(kz).display !== 'none' && kz.textContent.trim() === 'Lv' };
     });
     const passt = (m) => m.rolle && m.ganz && m.tipp.w >= 44 && m.tipp.h >= 44 && m.oben === 1 && Math.abs(m.sicht.h - m.sterne.h) <= 1;
     // frisch geladen im Hochformat des iPad mini (744 x 1133): ganz sichtbar. Seit der Zahlenruhe (Flo 23.10.) tritt
@@ -1371,8 +1401,9 @@ async function testeBrowser(browser) {
     const zurueck = { ...(await s.evaluate(kopfChipMass)), ...(await form(s)) };
     pruefe('iPad hoch (744, 768, 810, 834 px): Level-Chip ganz sichtbar, Tippfläche mindestens 44 x 44, eine Oberkante, so hoch wie Sterne',
       [744, 768, 810, 834].every((w) => passt(mass[w])), mass);
-    pruefe('Form folgt dem Platz: 1180 px ganz („Level n“ mit Balken), 600 px schmal (nur die Zahl, ganz sichtbar), zurück auf 1180 px wieder ganz',
-      passt(breit) && !breit.schmal && breit.wort && mass[600].schmal && !mass[600].wort && passt(mass[600]) && passt(zurueck) && !zurueck.schmal && zurueck.wort,
+    pruefe('Form folgt dem Platz: 1180 px ganz („Level n“ mit Balken), 600 px schmal („Lv n“, Flo 08.11.2026, ganz sichtbar), zurück auf 1180 px wieder ganz',
+      passt(breit) && !breit.schmal && breit.wort && !breit.kurz && mass[600].schmal && !mass[600].wort && mass[600].kurz && passt(mass[600])
+      && passt(zurueck) && !zurueck.schmal && zurueck.wort && !zurueck.kurz,
     { breit, m600: mass[600], zurueck });
     pruefe('Größenwechsel: keine Konsolenfehler (keine ResizeObserver-Schleife)', f.length === 0, f.join(' | '));
     await k.close();

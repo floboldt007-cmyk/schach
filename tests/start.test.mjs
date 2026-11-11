@@ -364,7 +364,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -407,6 +407,25 @@ async function bereite(seite, { modul = null, partien = null, fortschritt = null
   await seite.reload();
   const ziel = { '#arena': '.screen.arena .knoten', '#einstellungen': '.es-screen .st-gruppe', '#start': '.st-screen .st-titel' }[hash] || '#app > .screen:not(.lade-screen)';
   await seite.waitForFunction((sel) => !!window.__app && !!document.querySelector('link[data-paket="start"]') && !!document.querySelector(sel), ziel, { timeout: 20000 });
+  if (hash === '#arena') await heuteKarte(seite);
+}
+
+// Seit Variante A (08.11.2026) hat arena:heute keinen Host mehr: "Neu fuer dich" ist fuer Spieler nicht sichtbar. Damit
+// die Logik geprueft bleibt, bis die Zeile einen neuen Platz bekommt, setzt der Test die Heute-Karte an ihre alte Stelle im
+// Bots-Panel (nach .ort-panel-oben) und fuellt sie wie frueher arena.js; ohne Zeilen bleibt sie versteckt.
+async function heuteKarte(seite) {
+  await seite.waitForSelector('.screen.arena .detail .ort-panel-oben', { state: 'attached', timeout: 20000 });
+  await seite.evaluate(async () => {
+    const { fuelle } = await import('/js/orte.js');
+    document.querySelector('#test-heute')?.remove();
+    const k = document.createElement('section');
+    k.id = 'test-heute';
+    k.className = 'heute-karte';
+    k.innerHTML = '<div class="hk-kopf">Heute</div><div class="ort-heute"></div>';
+    document.querySelector('.screen.arena .detail .ort-panel-oben').after(k);
+    const r = fuelle('arena:heute', k.querySelector('.ort-heute'), { app: window.__app });
+    k.hidden = r.anzahl === 0;
+  });
 }
 
 const sz = (seite) => seite.evaluate(() => (window.__start ? window.__start.zustand() : { offen: false }));
@@ -520,7 +539,7 @@ async function browserTeil(browser) {
     && await seite.evaluate(() => location.hash === '#start' && history.state && history.state.params && history.state.params.seite === 'frage'));
   // "Einfuehrung ueberspringen" -> Startseite heim (Etappe A); der zweite Start zeigt kein Willkommen
   await seite.locator('.st-raus').click();
-  await seite.waitForSelector('.heim-screen .heim-ring', { timeout: 15000 });
+  await seite.waitForSelector('.heim-screen .heim-buehne', { timeout: 15000 });
   pruefe('"Einführung überspringen" fuehrt zur Startseite heim', await seite.evaluate(() => location.hash) === '#heim');
   await seite.goto(BASIS);
   await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
@@ -546,13 +565,24 @@ async function browserTeil(browser) {
   await warte(300);
   pruefe('nur Fortschritt mit 5 Partien, keine Partienliste (und nie gesehen): kein Willkommen', await seite.evaluate(() => !document.querySelector('.st-screen')
     && location.hash === '#heim'));
-  // Ueberspringen auf Seite 1
+  // Handy-Runde K (08.11.2026): ein Knopf zum Ueberspringen, nicht zwei ("Einfuehrung ueberspringen" oben bleibt), und
+  // das Schild "Praezise" steht unter dem Brett statt auf den Figuren
   await seite.evaluate(() => localStorage.clear());
   await seite.goto(BASIS);
   await seite.waitForSelector('.st-screen .st-titel', { timeout: 20000 });
-  await seite.locator('[data-st="ueberspringen"]').click();
-  await warteSeite(seite, 'frage');
-  pruefe('Ueberspringen auf Seite 1 fuehrt direkt zur Frage', (await sz(seite)).seite === 'frage');
+  const eins = await seite.evaluate(() => {
+    const sk = document.querySelector('.st-klasse').getBoundingClientRect();
+    const br = document.querySelector('.st-sockel').getBoundingClientRect();
+    return { unten: document.querySelectorAll('[data-st="ueberspringen"]').length, oben: document.querySelectorAll('[data-st="raus"]').length,
+      unterBrett: sk.top >= br.bottom - 0.5 || sk.left >= br.right - 0.5 };
+  });
+  pruefe('Seite 1: nur "Einfuehrung ueberspringen" oben, kein zweiter Knopf unten', eins.unten === 0 && eins.oben === 1, eins);
+  pruefe('Seite 1: Schild unter oder neben dem Brett, nicht auf den Figuren', eins.unterBrett, eins);
+  // weiter zur Frage (frueher ueber "Ueberspringen" unten): dreimal Weiter
+  for (const naechste of ['w2', 'w3', 'frage']) {
+    await seite.locator('[data-st="weiter"]').click();
+    await warteSeite(seite, naechste);
+  }
 
   // ---------- Regel-Hilfe ----------
   gruppe = 'Regel-Hilfe';
@@ -612,7 +642,7 @@ async function browserTeil(browser) {
   const nr = await seite.evaluate(() => ({ ueber: document.querySelector('.st-text .ueberzeile').textContent, h1: document.querySelector('.st-titel').textContent,
     knoepfe: [...document.querySelectorAll('.st-knoepfe .knopf')].map((k) => k.textContent.trim()) }));
   pruefe('"Fertig": zurueck zum Willkommen, Seite "Bereit für deine erste Partie?" mit Willi', nr.ueber === 'Regel-Hilfe geschafft' && nr.h1 === 'Bereit für deine erste Partie?'
-    && nr.knoepfe.join('|') === 'Gegen Vogelscheuche Willi spielen|Einstufung machen|Zur Arena', JSON.stringify(nr));
+    && nr.knoepfe.join('|') === 'Gegen Vogelscheuche Willi spielen|Einstufung machen|Zu den Bots', JSON.stringify(nr));
   await bild(seite, 'nach-regeln-ipad');
   await seite.locator('[data-st="benno"]').click();
   await seite.waitForFunction(() => !!window.__partie && document.querySelector('.screen.partie'), null, { timeout: 15000 });
@@ -713,8 +743,8 @@ async function browserTeil(browser) {
   pruefe('"Fertig": Seite "Deine Empfehlung" mit Portraet, Ergebnis, Begruendung und Hinweis, dass die Probepartie nicht wertet', em.h1 === 'Starte gegen Lisa Läufer'
     && em.portraet === 'Lisa Läufer' && em.chips.join('|') === '6 von 8 gelöst|5 im ersten Versuch' && em.grund.length === 4 && /Probepartie wertet nicht/.test(em.notiz)
     && /Vogelscheuche Willi dein nächster Gegner/.test(em.notiz), JSON.stringify(em));
-  pruefe('Knoepfe: Probepartie (wertet nicht), Leiter, Einstufung wiederholen, Zur Arena', em.knoepfe.join('|')
-    === 'Probepartie gegen Lisa Läufer wertet nicht|Leiter: Vogelscheuche Willi|Einstufung wiederholen|Zur Arena', em.knoepfe.join('|'));
+  pruefe('Knoepfe: Probepartie (wertet nicht), Leiter, Einstufung wiederholen, Zu den Bots', em.knoepfe.join('|')
+    === 'Probepartie gegen Lisa Läufer wertet nicht|Leiter: Vogelscheuche Willi|Einstufung wiederholen|Zu den Bots', em.knoepfe.join('|'));
   await seite.reload();
   await warteSeite(seite, 'empfehlung', 20000);
   pruefe('Neuladen auf der Empfehlung: wieder die Empfehlung (nicht Seite 1)', (await sz(seite)).seite === 'empfehlung'
@@ -791,6 +821,23 @@ async function browserTeil(browser) {
   // erster Tag ohne Partie: nichts
   await bereite(n.seite, { modul: modulMit({}) }, '#arena');
   pruefe('erster Tag ohne Partie: kein Hinweis, Heute-Karte ohne Zeile', await zeile(n.seite) === null);
+  // T-3 (Flo 09.11.2026): derselbe Hinweis als Zeile unter "Als Naechstes" auf der Startseite, Antippen fuehrt hin
+  await bereite(n.seite, { modul: modulMit({}, { letzte: 'pprobe1' }) }, '#heim');
+  await n.seite.waitForSelector('.heim-naechstes [data-paket="start"]', { timeout: 8000 }).catch(() => {});
+  const heimNeu = await n.seite.evaluate(() => {
+    const z = document.querySelector('.heim-naechstes [data-paket="start"]');
+    const alle = [...document.querySelectorAll('.heim-naechstes .heim-zeile')].map((x) => x.dataset.paket || x.dataset.aktion);
+    return z && { id: z.dataset.entdeckung, text: [...z.querySelectorAll('.heim-zeile-text > *')].map((e) => e.textContent.trim()).join(' | '),
+      label: z.getAttribute('aria-label'), knopf: z.tagName === 'BUTTON' && z.getBoundingClientRect().height >= 44, vorTageswerk: alle.indexOf('start') < (alle.indexOf('serie') < 0 ? 99 : alle.indexOf('serie')),
+      sichtbar: !document.querySelector('.heim-naechstes').hidden };
+  });
+  pruefe('Startseite: Zeile "Neu für dich | Die Spielanalyse" unter "Als Nächstes", ein Knopf ab 44 px, vor dem Tageswerk', heimNeu && heimNeu.id === 'analyse'
+    && heimNeu.text === 'Neu für dich | Die Spielanalyse' && heimNeu.label === 'Neu für dich: Die Spielanalyse. Wo deine letzte Partie kippte.' && heimNeu.knopf
+    && heimNeu.vorTageswerk && heimNeu.sichtbar, JSON.stringify(heimNeu));
+  await n.seite.locator('.heim-naechstes [data-paket="start"]').click();
+  await n.seite.waitForSelector('.screen.vl-screen', { timeout: 15000 });
+  pruefe('Startseite: Antippen führt hin (Verlauf) und erledigt den Hinweis', await n.seite.evaluate(() => location.hash) === '#verlauf'
+    && (await modulImBrowser(n.seite)).fahrplan.erledigt.includes('analyse'));
   // nach der ersten Partie (hier eine Probepartie: letzte gesetzt)
   await bereite(n.seite, { modul: modulMit({}, { letzte: 'pprobe1' }) }, '#arena');
   let zl = await zeile(n.seite);
@@ -803,6 +850,7 @@ async function browserTeil(browser) {
     && (await modulImBrowser(n.seite)).fahrplan.erledigt.includes('analyse'));
   await n.seite.evaluate(() => window.__app.gehe('arena', {}, { ersetzen: true }));
   await n.seite.waitForSelector('.screen.arena .knoten');
+  await heuteKarte(n.seite);
   pruefe('am selben Tag kein zweiter Hinweis', await zeile(n.seite) === null);
   // naechster Tag: die Einstufung; Ausblenden
   const gestern = await vor(-1);
@@ -818,6 +866,7 @@ async function browserTeil(browser) {
     && (await modulImBrowser(n.seite)).fahrplan.erledigt.includes('einstufung'));
   await n.seite.reload();
   await n.seite.waitForSelector('.screen.arena .knoten');
+  await heuteKarte(n.seite);
   pruefe('nach dem Neuladen am selben Tag: nichts', await zeile(n.seite) === null);
   // abschaltbar
   mm = await modulImBrowser(n.seite);
@@ -919,6 +968,7 @@ async function browserTeil(browser) {
     }, { modul, kartei, fort: fortK(partien), P });
     await s.reload();
     await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen.arena .knoten') && !!document.querySelector('link[data-paket="start"]'), null, { timeout: 20000 });
+    await heuteKarte(s);
     await warte(600);
   }
   const messeK = (s) => s.evaluate(async () => {
@@ -936,9 +986,10 @@ async function browserTeil(browser) {
   // Fall des Pruefers: Tag 1 nach dem ersten Start, die Einstufung waere dran, und die Kartei meldet eine faellige Karte
   await bereiteK(mk.seite, { modul: startK({}), kartei: karteiModul(tm) });
   let mK = await messeK(mk.seite);
-  pruefe('Kartei-Zeile und "Neu für dich" zugleich: die Kartei-Zeile steht, "Die Einstufung" tritt zurueck (unsichtbar, nicht erledigt, bleibt der Hinweis des Tages)',
-    mK.karte && mK.kartei && mK.neu === 'einstufung' && !mK.neuSichtbar && mK.hinweis === 'einstufung' && mK.heute === 'einstufung' && !mK.erledigt.includes('einstufung'), JSON.stringify(mK));
-  pruefe('...und der Spielen-Knopf bleibt auf dem iPad quer 1024 x 768 ganz im Bild', mK.unten <= mK.innerHeight, JSON.stringify({ unten: mK.unten, innerHeight: mK.innerHeight }));
+  // T-3: die Heute-Karte hat keinen Host mehr (die Zeilen stehen auf der Startseite), das Zuruecktreten (css/pakete/start.css)
+  // ist mit ihr entfallen; beide Zeilen stehen, der Hinweis bleibt der des Tages und gilt nicht als erledigt
+  pruefe('Kartei-Zeile und "Neu für dich" zugleich: beide stehen, "Die Einstufung" bleibt der Hinweis des Tages (nicht erledigt)',
+    mK.karte && mK.kartei && mK.neu === 'einstufung' && mK.neuSichtbar && mK.hinweis === 'einstufung' && mK.heute === 'einstufung' && !mK.erledigt.includes('einstufung'), JSON.stringify(mK));
   await bild(mk.seite, 'heute-kartei-ipad-1024');
   // dieselbe Lage, die Karte ist erst morgen faellig: keine Kartei-Zeile, "Neu fuer dich" steht wieder allein
   await bereiteK(mk.seite, { modul: startK({}), kartei: karteiModul(morgenK) });

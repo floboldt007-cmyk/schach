@@ -1,8 +1,86 @@
 /* Online-Partien nutzen dieselben Theme-Tokens wie das lokale Brett. */
 .online-screen { display: flex; flex-direction: column; min-height: 0; }
-.online-screen > .kopf { flex-shrink: 0; gap: var(--a3); }
-.online-screen h2 { margin: 0; font-size: var(--fs-h2); }
-.on-rumpf { flex: 1; overflow: auto; min-height: 0; padding: var(--a4); }
+.online-screen > .kopf { flex-shrink: 0; }
+.on-rumpf { flex: 1; overflow: auto; min-height: 0; padding: var(--a4); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+/* Online-Seite "Zwei Tueren" (Flo 08.11.2026, Konzept 1 A): Seitenkopf, Liga-Streifen, Partie und Raetsel-Duell als zwei
+   gleich gebaute Karten (Handy untereinander, ab 760 px nebeneinander), unten die Freunde-Zeile. Ohne Scrollen auf dem
+   iPhone 13 (390 x 844), gemessen in tests/online-ui.test.mjs. */
+.on-inhalt > .seiten-kopf { padding: 0; margin-bottom: var(--a3); }
+.on-inhalt > .seiten-kopf h1 { font-size: clamp(26px, 7vw, 34px); }
+.on-inhalt > .seiten-kopf p { margin-top: 2px; }
+.on-konto { margin-bottom: var(--a4); }
+.on-art [hidden], .on-freunde [hidden] { display: none; }
+.on-tueren { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--a3); margin-bottom: var(--a3); }
+@media (min-width: 760px) { .on-tueren { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.on-tuer { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--r-l); background: var(--flaeche);
+  box-shadow: var(--s1), var(--kante); color: var(--text); min-width: 0; }
+.on-tuer-kopf { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: center; }
+.on-tuer-kopf[hidden] { display: none; }
+.on-tuer-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.on-tuer-ueber { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--akzent-text, var(--akzent)); }
+.on-tuer h2 { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; text-wrap: balance; }
+.on-tuer-text p { margin: 0; font-size: 13.5px; line-height: 1.35; color: var(--text-2); }
+.on-tuer-knopf { min-height: 48px; justify-content: center; }
+/* kleines Brett als Bild (nur Deko): 8 x 8 Felder in den Brettfarben, Figuren aus dem Standardsatz */
+.on-bild { position: relative; display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr); width: 76px; aspect-ratio: 1; border-radius: 10px;
+  overflow: hidden; box-shadow: var(--kante);
+  background: repeating-conic-gradient(var(--feld-dunkel) 0 25%, var(--feld-hell) 0 50%) 0 0 / 25% 25%; }
+.on-bild img { width: 100%; height: 100%; }
+.on-bild-uhr { position: absolute; left: 4px; bottom: 4px; padding: 1px 6px; border-radius: 8px; background: var(--tinte); color: var(--auf-tinte);
+  font-size: 13px; font-weight: 800; }
+/* ohne Konto: reine Erklaerung, flach und ohne Knopf, damit nichts tippbar aussieht (Befund V 6) */
+.on-tueren[data-zustand="ohne"] .on-tuer { box-shadow: none; background: transparent; border: 1px dashed var(--linie-2); }
+.on-tuer-hinweis { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.on-art[data-zustand="bald"] .on-suche-text, .on-suche-text { margin: 0; font-size: 13.5px; color: var(--text-2); }
+/* Liga-Streifen: Schild, Stufe, Platz, Kronen; tippen fuehrt zur Liga */
+.on-liga { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; margin-bottom: var(--a3); padding: 8px 14px; border: 0;
+  border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--s1), var(--kante); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.on-liga[hidden] { display: none; }
+/* Platzhalter waehrend der Pruefung (G-005 AC-06): gleiche Hoehe wie der fertige Streifen, zwei ruhige Balken statt Text */
+.on-liga[data-laedt] { cursor: default; }
+.on-liga[data-laedt] .on-liga-text { gap: 6px; }
+.on-liga[data-laedt] .on-liga-text b, .on-liga[data-laedt] .on-liga-text span { display: block; height: 14px; width: 45%; border-radius: 7px; background: var(--flaeche-2); }
+.on-liga[data-laedt] .on-liga-text span { height: 12px; width: 30%; }
+.on-liga[data-laedt] .on-liga-schild { color: var(--text-3); }
+.on-liga:focus-visible, .on-freunde-zeile:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+.on-liga-schild { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--flaeche-2); color: var(--text); }
+.on-liga-schild .ico { width: 22px; height: 22px; }
+.on-liga-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.on-liga-text b { font-size: 15.5px; }
+.on-liga-text span { font-size: 13px; color: var(--text-2); }
+.on-liga-kronen { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 6px 12px; border-radius: var(--r-pille); background: var(--flaeche-2);
+  font-weight: 800; }
+.on-liga-kronen .ico { width: 16px; height: 16px; color: var(--gold, var(--akzent)); }
+/* Gegnersuche in der Partie-Karte (Konzept 3 A): Ring mit Restzeit, "Gleich gegen die KI", Abbrechen */
+.on-suche { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.on-suche h3 { margin: 0; font-size: 17px; }
+.on-uhr { font-variant-numeric: tabular-nums; color: var(--text-2); }
+.on-rest { margin: 0; font-size: 13.5px; color: var(--text-2); }
+.on-suche .knopf { align-self: stretch; min-height: 48px; justify-content: center; }
+.on-ki-hinweis { margin-top: -4px; font-size: 12.5px; color: var(--text-2); }
+.on-ring { position: relative; display: grid; place-items: center; width: 104px; height: 104px; }
+.on-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.on-ring circle { fill: none; stroke-width: 6; }
+.on-ring-spur { stroke: var(--linie-2); }
+.on-ring-rest { stroke: var(--akzent); stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
+.on-ring-ich { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; }
+.on-ring-ich svg, .on-ring-ich img { position: static; width: 100%; height: 100%; transform: none; }
+/* Freunde-Zeile: der lockere Weg, klappt Einladen, Code und Meine Partien auf */
+.on-freunde { margin-bottom: var(--a4); }
+.on-freunde-zeile { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; border-radius: var(--r-l); background: var(--flaeche);
+  box-shadow: var(--kante); cursor: pointer; list-style: none; }
+.on-freunde-zeile::-webkit-details-marker { display: none; }
+.on-freunde-zeile > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.on-freunde-zeile b { color: var(--text); font-size: 15px; }
+.on-freunde-zeile small { font-size: 12.5px; color: var(--text-2); }
+.on-freunde-symbol { display: grid; place-items: center; flex: none; width: 32px; height: 32px; color: var(--akzent-text, var(--akzent)); }
+.on-freunde-symbol .ico { width: 22px; height: 22px; }
+.on-freunde[open] > .on-freunde-zeile { margin-bottom: var(--a3); }
+html[data-bewegung="aus"] .on-ring-rest { transition: none; }
+@media (prefers-reduced-motion: reduce) { .on-ring-rest { transition: none; } }
+.on-zeit-fest { margin: 0; font-size: 13.5px; color: var(--text-2); }
+.on-zeit-fest[hidden] { display: none; }
+.on-art .t-fuss { justify-content: flex-start; }
 .on-inhalt, .on-meldung { max-width: 960px; margin: 0 auto; }
 .on-meldung { padding: var(--a4); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
 .on-start { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--a4); }

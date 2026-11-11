@@ -65,7 +65,7 @@ const PEGEL = {
     'fehler': [7940, 'c81586899379', -11.7, 442, -21.0, -21.0], 'feier': [3342, '35c6591500cd', -8.6, 136, -20.0, -20.0], 'finisher-glocke': [28002, '8c1f41b7220b', -7.1, 1676, -14.0, -14.0],
     'finisher-kreide': [24658, '0e127db69ad0', -8.8, 1476, -14.5, -14.5], 'finisher-tinte': [25076, 'b477f93ae36c', -6.2, 1515, -14.5, -14.5], 'gut': [6686, '30c99a3fe635', -12.2, 341, -20.5, -20.5],
     'klick': [2506, '896706574499', -3.8, 80, -19.0, -19.0], 'level': [18389, '6b68df70f01a', -6.5, 1093, -14.0, -14.0], 'niederlage': [23822, '77b40bf3051d', -14.3, 1414, -20.0, -20.0],
-    'patzer': [9612, '63f71c93eb64', -17.8, 533, -23.0, -23.0], 'raetsel-falsch': [4596, '53216db5dd23', -9.9, 235, -21.0, -21.0], 'raetsel-richtig': [13373, '3f1e9be6f9ad', -10.2, 778, -15.0, -15.0],
+    'patzer': [9656, 'bdb6e3a6c39a', -16.0, 533, -21.2, -21.2], 'raetsel-falsch': [4596, '53216db5dd23', -9.9, 235, -21.0, -21.0], 'raetsel-richtig': [13373, '3f1e9be6f9ad', -10.2, 778, -15.0, -15.0],
     'rekord': [15463, '40c4cef1a244', -9.1, 895, -15.0, -15.0], 'remis': [18389, '61413bab3d49', -10.7, 1079, -17.5, -17.5], 'rochade': [5432, 'eaf7d56a29d1', -5.2, 281, -16.5, -16.5],
     'schach': [5850, '36aad6337789', -10.3, 290, -15.5, -15.5], 'schalter': [2506, '402fe5691a82', -6.2, 100, -19.0, -19.0], 'schlagen': [4178, '4d003babaea2', -6.8, 185, -15.5, -15.5],
     'schlagen-2': [4178, '695ab0afd0dd', -6.8, 184, -15.5, -15.5], 'sieg': [33017, 'c40ffc7ac052', -6.5, 1987, -13.5, -13.5], 'siegel': [19225, 'e4014d020593', -7.6, 1131, -14.0, -14.0],
@@ -152,7 +152,7 @@ function leseMp3(b) {
 // Node
 // =====================================================================
 async function testeNode() {
-  const { KATALOG, PAKETE_KLANG, PAKETE_LABOR, KLANGGRUPPEN, KLANGSTUFEN, klassenKlang } = await import('../js/sounds.js');
+  const { KATALOG, PAKETE_KLANG, PAKETE_LABOR, KLANGGRUPPEN, KLANGSTUFEN, klassenKlang, zugKlangName } = await import('../js/sounds.js');
   gruppe = 'Katalog';
   const namen = Object.keys(KATALOG);
   pruefe('33 Namen wie in PLAN 3.2, eingefroren', namen.length === 33 && JSON.stringify([...namen].sort()) === JSON.stringify(Object.keys(SOLL).sort())
@@ -260,6 +260,22 @@ async function testeNode() {
   pruefe('ungenau -> ungenau, fehler und verpasst -> fehler, patzer -> patzer', fall('ungenau') === '{"name":"ungenau"}' && fall('fehler') === '{"name":"fehler"}'
     && fall('verpasst') === '{"name":"fehler"}' && fall('patzer') === '{"name":"patzer"}' && fall('patzer', { trivial: true }) === '{"name":"patzer"}');
   pruefe('exzellent, gut, buch, erzwungen und Unbekanntes still', ['exzellent', 'gut', 'buch', 'erzwungen', 'gibtsnicht', undefined].every((k) => klassenKlang(k, { serie: 9 }) === null));
+
+  // Zugklang auf jedem Brett gleich (Partie, Zu zweit, Online, Raetsel, Lektion), echte Zuege aus chess.js
+  {
+    const { Chess } = await import('../vendor/chess/chess.js');
+    const zk = (fen, zug) => { const c = new Chess(fen); const m = c.move(zug); return zugKlangName(m, c.inCheck()); };
+    pruefe('zugKlangName: Zug, Schlagen, Rochade (kurz und lang), Umwandlung, Schach, Umwandlung mit Schach',
+      zk(undefined, 'e4') === 'zug'
+      && zk('rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2', 'exd5') === 'schlagen'
+      && zk('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'O-O') === 'rochade'
+      && zk('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'O-O-O') === 'rochade'
+      && zk('8/P6k/8/8/8/8/8/K7 w - - 0 1', 'a8=N') === 'umwandlung'
+      && zk('4k3/8/8/8/8/8/8/R3K3 w - - 0 1', 'Ra8+') === 'schach'
+      && zk('8/P7/8/8/8/8/8/K3k3 w - - 0 1', 'a8=Q') === 'umwandlung'
+      && zk('4k3/P7/8/8/8/8/8/K7 w - - 0 1', 'a8=Q+') === 'schach'
+      && zugKlangName(null) === 'zug');
+  }
 
   await testeLogik();
 }
@@ -752,6 +768,19 @@ async function testeBrowser(browser) {
   pruefe('80 Dateien dekodiert, stereo, 44,1 kHz', gemessen.length === 80 && gemessen.every((g) => g.kanaele === 2 && g.rate === 44100));
   pruefe('Spitze jeder Datei nach dem Dekodieren unter -1 dBFS und nicht über der gemessenen Echtspitze', zuLaut.length === 0, zuLaut.slice(0, 4));
   pruefe('Länge jeder Datei nach dem Dekodieren wie gemessen (+-60 ms)', laenge.length === 0, laenge.slice(0, 4).map((g) => `${g.p}/${g.d} ${g.dauer.toFixed(3)}`));
+  // U3 (Flo 09.11.2026): Grusel neu gemastert, LIZENZEN.md verspricht hoechstens -1,5 dBFS (vorher bis 0,0 bei schalter)
+  const grusel = await seite.evaluate(async (namen) => {
+    const aus = [];
+    for (const d of namen) {
+      const b = await new OfflineAudioContext(2, 1, 44100).decodeAudioData(await (await fetch(`assets/klang/grusel/${d}.mp3`)).arrayBuffer());
+      let spitze = 0;
+      for (let c = 0; c < b.numberOfChannels; c++) { const x = b.getChannelData(c); for (let i = 0; i < x.length; i++) spitze = Math.max(spitze, Math.abs(x[i])); }
+      aus.push({ d, db: Math.round(200 * Math.log10(spitze || 1e-9)) / 10 });
+    }
+    return aus;
+  }, Object.keys(PEGEL.holz));
+  const gruselLaut = grusel.filter((g) => !(g.db <= -1.5));
+  pruefe('Grusel: jede Datei nach dem Dekodieren hoechstens -1,5 dBFS', grusel.length === 40 && gruselLaut.length === 0, gruselLaut);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 

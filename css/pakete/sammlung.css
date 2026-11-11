@@ -9,7 +9,34 @@
    (Flo 31.10., Handy: die Namen lagen uebereinander); --n setzt segment() in js/ui/bauteile.js */
 .sa-steuer { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .sa-steuer::-webkit-scrollbar { display: none; }
-.sa-steuer .segment { min-width: max(100%, calc(var(--n, 6) * 104px)); }
+/* G-001: 84 statt 104 px je Reiter, damit auf dem iPad (hoch 810 px, quer 1080 px) alle Reiter in die Zeile passen statt rechts herauszulaufen */
+.sa-steuer .segment { min-width: max(100%, calc(var(--n, 6) * 84px)); }
+/* Handy-Runde 08.11.: auf dem Handy liefen die hinteren Reiter rechts aus dem Bild, ohne dass man es sah. Dort stehen
+   alle Bereiche jetzt in Zeilen zu vier (nichts versteckt, nichts zu wischen); die gleitende Pille braucht eine Zeile,
+   darum traegt hier der gewaehlte Reiter selbst die Flaeche. Ab 760 px bleibt es bei einer Zeile mit Pille. */
+@media (max-width: 759px) {
+  .sa-steuer { overflow: visible; }
+  .sa-steuer .segment { min-width: 0; grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 4px; }
+  .sa-steuer .seg-pille { display: none; }
+  .sa-steuer .seg { padding: 4px 3px; overflow-wrap: anywhere; }
+  .sa-steuer .seg[aria-checked="true"] { background: var(--flaeche); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 2px 6px -1px rgba(0, 0, 0, .08), var(--kante); }
+  :root[data-modus="dunkel"] .sa-steuer .seg[aria-checked="true"] { background: var(--flaeche-3); }
+}
+@media (max-width: 759px) and (prefers-color-scheme: dark) {
+  :root[data-modus="system"] .sa-steuer .seg[aria-checked="true"] { background: var(--flaeche-3); }
+}
+/* G-001: iPad hoch (760 bis 899 px) mit 9 und mehr Reitern (Sonderstuecke) passt eine Zeile nicht mehr: dann zwei Zeilen zu sechs,
+   gleiche Darstellung wie auf dem Handy (die Pille ist das erste Kind, der neunte Reiter also nth-child(10)) */
+@media (min-width: 760px) and (max-width: 899px) {
+  .sa-steuer:has(.seg:nth-child(10)) { overflow: visible; }
+  .sa-steuer:has(.seg:nth-child(10)) .segment { min-width: 0; grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 4px; }
+  .sa-steuer:has(.seg:nth-child(10)) .seg-pille { display: none; }
+  .sa-steuer:has(.seg:nth-child(10)) .seg[aria-checked="true"] { background: var(--flaeche); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 2px 6px -1px rgba(0, 0, 0, .08), var(--kante); }
+  :root[data-modus="dunkel"] .sa-steuer:has(.seg:nth-child(10)) .seg[aria-checked="true"] { background: var(--flaeche-3); }
+}
+@media (min-width: 760px) and (max-width: 899px) and (prefers-color-scheme: dark) {
+  :root[data-modus="system"] .sa-steuer:has(.seg:nth-child(10)) .seg[aria-checked="true"] { background: var(--flaeche-3); }
+}
 .sa-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .sa-teil { display: grid; gap: 10px; padding: 12px; border-radius: var(--r-l, 18px); background: var(--flaeche); border: 1px solid var(--linie);
   box-shadow: var(--s1); min-width: 0; }
@@ -75,7 +102,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 /* Profil (profil.js, Flo 30.10.2026): Karte oben im Reiter Ich, Figur- und Rahmenwahl, Vitrine mit drei Plaetzen */
 .sa-kopf-ort { padding-left: var(--rand); padding-right: var(--rand); min-width: 0; }
 .pr-karte { display: grid; gap: 12px; padding: 14px; border-radius: var(--r-l, 18px); background: var(--flaeche); border: 1px solid var(--linie);
-  box-shadow: var(--s1); max-width: 680px; }
+  box-shadow: var(--s1); }
 .pr-kopf { display: flex; gap: 14px; align-items: center; min-width: 0; }
 .pr-av { width: 76px; height: 76px; flex: none; border-radius: 50%; overflow: hidden; }
 .pr-av svg { display: block; width: 100%; height: 100%; }
@@ -158,7 +185,8 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 @media (prefers-reduced-motion: reduce) { .sa-teil[data-zustand="zu"] .sa-bild::after { animation: none; } }
 .sa-teil[data-zustand="zu"] .sa-geheim > svg { width: 64px; height: 64px; }
 /* "N von M freigeschaltet" mit Balken in Gold (Flo 30.10.) */
-.sa-stand { display: grid; gap: 8px; max-width: 520px; }
+/* G-001: volle Inhaltsbreite wie Reiter und Raster (vorher 520 px, auf dem iPad sichtbar schmaler) */
+.sa-stand { display: grid; gap: 8px; }
 .sa-stand::after { content: ''; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--gold) calc(var(--anteil, 0) * 100%),
   var(--grund-2, var(--flaeche-2)) calc(var(--anteil, 0) * 100%)); box-shadow: var(--kante); }
 /* gesperrte Silhouette etwas sichtbarer, in hell und dunkel */
@@ -203,6 +231,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
    uebersichtlich") */
 @media (max-width: 520px) {
   .pr-av { width: 52px; height: 52px; }
+  .pr-karte { --banner-motiv: 40px; }
   .pr-orden { min-height: 58px; padding: 6px 4px; gap: 2px; }
   .pr-orden-bild { width: 28px; height: 28px; }
   .pr-plus { font-size: 20px; line-height: 28px; }
@@ -243,10 +272,45 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   .sa-raster > .sa-teil .sa-text b { font-size: 12px; }
 }
 
-/* Handy dicht (Flo 01.11.2026: "man muss alles sehen ohne viel scrollen"): "Profilbild aendern" rechts neben dem Namen
-   statt in einer eigenen Zeile */
+/* Handy dicht (Flo 01.11.2026: "man muss alles sehen ohne viel scrollen"). G-002: die Knoepfe stehen seit dem Banner
+   gemeinsam in .pr-knoepfe; die alte Zwei-Spalten-Regel liess das Banner 14 px vor dem Kartenrand enden und gab
+   "Profilbild aendern" eine kleinere Schrift als "Banner waehlen". Jetzt eine Spalte, beide Knoepfe gleich. */
 @media (max-width: 520px) {
-  .pr-karte { grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; }
-  .pr-karte > :not(.pr-kopf):not(.pr-aendern) { grid-column: 1 / -1; }
-  .pr-aendern { grid-column: 2; grid-row: 1; align-self: center; padding: 0 12px; font-size: 13.5px; }
+  .pr-knoepfe .knopf { padding: 0 12px; font-size: 14px; }
 }
+
+/* Ausruestung mit Plaetzen (G-002, Sammlung B): Plaetze untereinander, Auswahl als Blatt, Erfolge und Shop als grosse Knoepfe */
+.sa-ort[hidden] { display: none; }
+.sa-plaetze { display: grid; gap: 20px; min-width: 0; max-width: 760px; padding: 0 var(--rand) 24px; }
+.sa-platz-gruppe { display: grid; gap: 10px; min-width: 0; }
+.sa-platz-titel { margin: 0; padding: 0 4px; font-size: 13px; font-weight: var(--gw-stark); letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+.sa-platz-liste { display: grid; gap: 10px; min-width: 0; }
+.sa-platz, .sa-gross { display: grid; align-items: center; gap: 14px; width: 100%; min-width: 0; margin: 0; padding: 10px 16px 10px 10px; border: 0;
+  border-radius: var(--r-xl); background-color: var(--flaeche); background-image: var(--textur-flaeche, none); box-shadow: var(--s2), var(--kante);
+  color: var(--text); font: inherit; text-align: start; cursor: pointer; }
+.sa-platz { grid-template-columns: 64px minmax(0, 1fr) auto 20px; min-height: 84px; }
+.sa-platz:focus-visible, .sa-gross:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.sa-platz .ico, .sa-gross .ico { width: 20px; height: 20px; color: var(--text-2); }
+.sa-platz-bild { display: grid; place-items: center; width: 64px; height: 64px; overflow: hidden; border-radius: var(--r-m); background: var(--flaeche-3); }
+.sa-platz-bild > * { max-width: 100%; max-height: 100%; }
+.sa-platz-bild svg, .sa-platz-bild img { width: 100%; height: 100%; object-fit: cover; }
+.sa-platz-text { display: grid; gap: 2px; min-width: 0; }
+.sa-platz-text b { font-size: 17px; font-weight: var(--gw-stark); }
+.sa-platz-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; font-weight: 600; color: var(--text-2); }
+.sa-platz-zahl, .sa-gross small { font-size: 15px; font-weight: var(--gw-stark); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.sa-gross-reihe { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sa-gross { grid-template-columns: minmax(0, 1fr) auto 20px; min-height: 72px; padding: 12px 16px 12px 20px; }
+.sa-gross-name { font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); overflow-wrap: anywhere; }
+@media (hover: hover) { .sa-platz:hover, .sa-gross:hover { box-shadow: var(--s3, var(--s2)), var(--kante); } }
+/* Blatt eines Bereichs: breiter als ein Rueckfrage-Blatt, scrollt in sich */
+.sheet-karte.sa-blatt { width: min(900px, calc(100% - 24px)); max-height: calc(100dvh - 24px - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
+  overscroll-behavior: contain; text-align: start; }
+.sa-blatt h3 { padding: 0 2px; }
+.sa-blatt-inhalt { margin-top: 14px; min-width: 0; }
+.sa-blatt .sheet-knoepfe { position: sticky; bottom: -22px; padding: 12px 0 0; background: inherit; }
+@media (max-width: 420px) { .sa-gross-reihe { grid-template-columns: minmax(0, 1fr); } }
+/* Shop ohne Konto (G-002): Stuecke ausgegraut, nur zum Ansehen; Text bleibt in --text-2 lesbar, nur das Bild ist entsaettigt */
+.sh-gast { display: grid; gap: 12px; margin-top: 14px; }
+/* R13-Shop (10.11.2026): volle Farben auch ohne Konto (Flo 10.11.) */
+.sh-karte[data-gast] .sh-brett { box-shadow: 0 0 0 2px var(--text-2); }
+.sh-karte[data-gast] .sh-name { color: var(--text-2); }

@@ -27,6 +27,9 @@ registriereTexte('p-teilen', {
     datum: '{t}.{m}.{j}',
     'datei.sieg': 'sieg',
     'datei.remis': 'remis',
+    // Satz beim Teilen eines Sieges (logik.teilText, Flo 10.11., R12-W2 Variante B); der Link steht darunter
+    'herausforderung.eins': 'Ich habe {name} in {n} Zug besiegt. Schaffst du das schneller?',
+    'herausforderung.mehr': 'Ich habe {name} in {n} Zügen besiegt. Schaffst du das schneller?',
     // Im Bild (bild.js)
     gespieltVon: 'Gespielt von {name}',
     'bild.sterne': 'Sterne',
@@ -77,6 +80,8 @@ registriereTexte('p-teilen', {
     datum: '{m}/{t}/{j}',
     'datei.sieg': 'victory',
     'datei.remis': 'draw',
+    'herausforderung.eins': 'I beat {name} in {n} move. Can you do it faster?',
+    'herausforderung.mehr': 'I beat {name} in {n} moves. Can you do it faster?',
     gespieltVon: 'Played by {name}',
     'bild.sterne': 'Stars',
     'bild.genauigkeit': 'Accuracy',

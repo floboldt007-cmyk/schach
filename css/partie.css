@@ -28,7 +28,7 @@
 /* ---------- Kopf: Zurueck, Bot-Name und Unterzeile, Brettwahl (iPad), Klang, Zaehlwerk, Zahnrad ---------- */
 .partie .p-kopf { height: var(--kopf-hoehe-partie); padding: 0 24px; gap: 10px; }
 .partie .p-kopf .titel { margin-right: auto; }
-.partie .p-kopf h2 { font-size: 22px; letter-spacing: -.025em; }
+.partie .p-kopf h1 { font-size: 22px; letter-spacing: -.025em; }
 .partie .p-kopf .unter { margin-top: 3px; font-size: 13.5px; font-weight: 650; color: var(--text-2); }
 .brettwahl { flex: none; display: flex; gap: 4px; padding: 4px; border-radius: 15px; background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
 .brettwahl button { width: var(--tipp); height: var(--tipp); margin: 0; padding: 0; border: 0; border-radius: 12px; background: none;
@@ -74,6 +74,9 @@
   white-space: nowrap; font-size: 13px; font-weight: 650; color: var(--text-2); }
 .partie .spieler.ich > .unter { grid-area: unter; }
 .partie .spieler .p-meta { flex: none; }
+/* Etappe B Task 4: Bot als Ersatz aus der Gegnersuche, ehrlich gekennzeichnet (Text in Schriftfarbe, nur ein Rahmen) */
+.partie .spieler .ki-abzeichen { flex: none; display: inline-block; margin-inline-end: .4em; padding: 0 .45em; border: 1px solid currentColor;
+  border-radius: 999px; font-size: .72em; font-weight: 600; line-height: 1.5; vertical-align: middle; white-space: nowrap; }
 .partie .spieler .denkt-ort { display: inline-flex; align-items: center; flex: none; }
 .partie .spieler .denkt { margin-left: 2px; }
 .partie .spieler > .ort-gegner-leiste { grid-area: leiste; margin-bottom: 8px; min-width: 0; }
@@ -150,6 +153,11 @@
 /* Ring ragt ueber die Symbolhoehe hinaus, die Beschriftung bleibt auf einer Linie mit den Nachbarn */
 .partie .spielknoepfe .halte-symbol { width: 32px; height: 32px; margin: -4px 0; }
 .partie .spielknoepfe .halte-symbol > .ico { width: 20px; height: 20px; }
+/* Pfeile in der Knopfreihe (Handy-Runde K, 08.11.2026): Zug zurueck und vor als schmale Spalten links und rechts. Nur wo
+   der Zugstreifen unter den Knoepfen liegt (Handy unter 760 px Hoehe, iPad hoch, Regeln weiter unten); dort lag er mit
+   seinen Pfeilen unter dem Bildschirmrand. Sonst unsichtbar. */
+.partie .spielknoepfe > .knopf.sk-pfeil { display: none; }
+.partie .spielknoepfe > .knopf.sk-pfeil:disabled .ico { opacity: .4; }
 /* Halten zum Aufgeben: der Knopf faerbt sich wie im Bauteil (die Knopf-Regel oben ist sonst spezifischer) */
 .partie .spielknoepfe > .knopf.halte-knopf.haelt { background: var(--warn-weich); }
 .partie .spielknoepfe .hinweis-k.stufe-2 { box-shadow: inset 0 0 0 1.5px var(--text), var(--s1); }
@@ -317,6 +325,10 @@
   .partie .p-blase { min-height: 100%; display: flex; align-items: center; padding: 8px 12px; font-size: 14px; line-height: 1.3;
     box-shadow: var(--s1), var(--kante); transform-origin: 0 calc(var(--av) / 2); }
   .partie .p-blase::before { left: -5px; top: calc(var(--av) / 2 - 4px); transform: rotate(-45deg); }
+  /* Name und Unterzeile treten zurueck, solange die Blase spricht: an den runden Ecken der Blase schauten sonst Reste
+     des Namens heraus (Handy-Runde K, 08.11.2026) */
+  .partie .spieler.gegner > .info { transition: opacity calc(160ms * var(--tempo, 1)); }
+  .partie.hat-blase .spieler.gegner > .info { opacity: 0; }
   /* Bewertungsbalken hoch (Handy und iPad) waagrecht ueber dem Brett (--balken hoch, volle Breite, Weiss von links,
      gedreht von rechts), Zahl auf Antippen (js/ui/partie.js) */
   .partie .evalbalken { width: 100%; height: var(--balken); border-radius: var(--r-pille); overflow: visible; cursor: pointer;
@@ -340,9 +352,11 @@
 @media (orientation: portrait) and (max-width: 600px) {
   .partie { --balken: 6px; --spalt: 4px; }
   .partie .p-kopf { padding: 0 10px; gap: 8px; }
-  .partie .p-kopf h2 { font-size: 19px; }
+  .partie .p-kopf h1 { font-size: 19px; }
   .partie .p-kopf .unter { margin-top: 2px; font-size: 12.5px; }
   .partie .p-kopf .p-eroeffnung, .partie .p-kopf .p-eroeffnung + .p-sep, .partie .p-kopf .p-lang { display: none; }
+  /* Kundenblick 09.11. (Befund 9): der Name steht nur einmal, im Kopf. Die Karte zeigt Bild, Elo und Sprechblase. */
+  .partie.handy .spieler.gegner .bot-name { display: none; }
   .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 4px;
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .partie .seite { display: contents; }
@@ -374,6 +388,9 @@
      Uhr drei Zeilen ueber Luecke und Balken, ohne die Figuren zu beruehren. */
   .partie .spieler.gegner > .blase-ort { top: -4px; bottom: -4px; }
   .partie .p-blase { padding: 5px 10px; font-size: 13px; line-height: 1.25; }
+  /* schmale Handys (iPhone SE, 320 px): drei Zeilen passen nur dichter in die Karte, sonst lag die Blase ueber dem
+     Bewertungsbalken (Handy-Runde K, 08.11.2026) */
+  @media (max-width: 360px) { .partie .p-blase { padding: 3px 9px; font-size: 12px; line-height: 1.2; } }
   /* Coach: eine feste Hoehe (das Brett springt nie), Text eine Zeile, ab 760 px Hoehe zwei; bei Platznot nur die
      Kopfzeile (.coach-eng); Antippen zeigt den Rest (.offen, die Spalte scrollt dann) */
   .partie .coach { height: 58px; padding: 8px 12px; border-radius: 16px; align-content: start; overflow: hidden; column-gap: 8px; }
@@ -396,6 +413,16 @@
   .partie:not(.streifen-unten) .coach > .c-text { -webkit-line-clamp: 2; }
   .partie.coach-eng .coach { height: 44px; }
   .partie.coach-eng .coach > .c-text, .partie.coach-eng .coach > .c-zusatz { display: none; }
+  /* R13-G4 kurz: im Leer-Zustand passt ein kurzer Hinweistext in die 44 px, indem das Padding je 2 px kleiner wird */
+  .partie.coach-eng .coach.leer { padding-top: 6px; padding-bottom: 6px; }
+  .partie.coach-eng .coach.leer > .c-kopf::after { content: "Ich bewerte deine Züge";
+    display: block; width: 100%; font-size: 11px; line-height: 1; color: var(--text-2); }
+  /* U-Messrunde 09.11. (iPhone SE mit Safari-Leiste, 548 px): reichen Coach-Zeile und Mindestbrett nicht, ruecken
+     Abstaende und Spielerkarten zusammen (.sehr-eng, layout() in partie.js); die Knoepfe behalten ihre 48 px */
+  .partie.sehr-eng .inhalt { gap: 3px; padding-top: 2px; }
+  .partie.sehr-eng .inhalt > .brettzone { gap: 2px; }
+  .partie.sehr-eng .spieler { min-height: 44px; padding-top: 2px; padding-bottom: 2px; }
+  .partie.sehr-eng .spieler > .ort-gegner-leiste { margin-bottom: 2px; }
   .partie .coach.offen { height: auto; }
   .partie .coach.offen > .c-text { display: block; -webkit-line-clamp: unset; }
   .partie .coach.offen > .coach-knoepfe { display: flex; margin-top: 8px; }
@@ -414,6 +441,23 @@
   .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
   .partie .spielknoepfe .halte-symbol { width: 26px; height: 26px; margin: -3px 0; }
   .partie .spielknoepfe .halte-symbol > .ico { width: 17px; height: 17px; }
+}
+
+/* Pfeile in der Knopfreihe einschalten (Abschnitt "Aktionen" oben): iPad hoch immer, Handy nur mit Streifen unten. Der
+   Zugstreifen behaelt seine Zuege (Antippen, die Spalte scrollt), seine eigenen Pfeile entfallen dort. */
+@media (orientation: portrait) and (min-width: 601px) {
+  .partie .spielknoepfe > .knopf.sk-pfeil { display: flex; }
+  .partie .spielknoepfe { grid-template-columns: var(--tap) repeat(3, minmax(0, 1fr)) var(--tap); }
+  .partie .spielknoepfe[data-aktionen="1"] { grid-template-columns: var(--tap) repeat(4, minmax(0, 1fr)) var(--tap); }
+  .partie .spielknoepfe[data-aktionen="2"] { grid-template-columns: var(--tap) repeat(5, minmax(0, 1fr)) var(--tap); }
+  .partie .zugleiste .zl-pfeil { display: none; }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .partie.streifen-unten .spielknoepfe > .knopf.sk-pfeil { display: flex; }
+  .partie.streifen-unten .spielknoepfe { grid-template-columns: var(--tap) repeat(3, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .spielknoepfe[data-aktionen="1"] { grid-template-columns: var(--tap) repeat(4, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .spielknoepfe[data-aktionen="2"] { grid-template-columns: var(--tap) repeat(5, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .zugleiste .zl-pfeil { display: none; }
 }
 
 /* ---------- Pfeil-Tipp (einmal je Geraet, js/ui/partie.js PFEIL_TIPP_MERKER): ruhige Zeile unter dem Brett ----------

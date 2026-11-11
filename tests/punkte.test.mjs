@@ -20,6 +20,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { alteOrte } from './ohne-host.mjs';
 import { setzeSpeicher, MODUL_BUDGET, speicherePartie, ladeModul } from '../js/storage.js';
 import { hoere, sende, EREIGNISSE } from '../js/ereignisse.js';
 import { fuerOverlay, melde } from '../js/feier.js';
@@ -790,6 +791,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await warte(150);
@@ -888,14 +890,18 @@ function hilfen(seite) {
         await h.warteFlo();
         if (hinweis && i === 1) {
           await h.tippe('.spielknoepfe [data-aktion="hinweis"]');
-          await warte(400);
+          // Der Hinweis zaehlt erst, wenn die Engine geantwortet hat (partie.js hinweis()); wer vorher zieht, aendert die
+          // Stellung und der Hinweis verfaellt. Darum warten, bis das Feld markiert ist, statt fest 400 ms (wackelte in CI).
+          await seite.waitForFunction(() => document.querySelector('.lage.mark-hinweis')
+            && !document.querySelector('.spielknoepfe [data-aktion="hinweis"].rechnet'), null, { timeout: 30000 });
         }
         await h.tippeFeld(zug.slice(0, 2));
         await h.tippeFeld(zug.slice(2, 4));
       }
-      await seite.waitForSelector('.ergebnis-overlay .erg-karte-ort .pk-abr', { timeout: 40000 });
+      // Sieg-Blatt C blendet die Punkte-Zeile nach Siegen aus (css/ergebnis.css), sie steht aber im DOM: darauf warten
+      await seite.waitForSelector('.ergebnis-overlay .erg-karte-ort .pk-abr', { state: 'attached', timeout: 40000 });
       await seite.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 60000 });
-      await seite.waitForSelector('.ergebnis-overlay .pk-abr[data-fertig="1"]:not(.pk-wartet)', { timeout: 15000 }).catch(() => {});
+      await seite.waitForSelector('.ergebnis-overlay .pk-abr[data-fertig="1"]:not(.pk-wartet)', { state: 'attached', timeout: 15000 }).catch(() => {});
       await seite.evaluate(() => { window.__test = {}; });
     },
     stand: () => seite.evaluate(() => window.__punkte.stand()),
@@ -933,8 +939,15 @@ function hilfen(seite) {
       await warte(500);
     },
     async fenster(id) {
-      await seite.locator(`.bl-steuer-fenster .seg[data-wert="${id}"]`).click();
+      await seite.locator('.bl-steuer-fenster select[name="bl-fenster"]').selectOption(id);
       await warte(500);
+    },
+    // Reiter Ich (G-002, eine Zahl): alles Weitere liegt hinter "Alle Partien, Rekorde und Zeitraeume"
+    async ichAlle() {
+      const k = seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-alle');
+      if (await k.getAttribute('aria-expanded') !== 'true') await k.click();
+      await seite.waitForSelector('.bl-ich-mehr:not([hidden]) .bl-spieler');
+      await warte(200);
     },
   };
   return h;
@@ -1008,18 +1021,58 @@ async function testeBrowser(browser) {
   await seite.locator('.reiter-leiste [data-reiter="bestenliste"]').click();
   await seite.waitForSelector('.screen.bl-screen .bl-reiter:not([hidden])');
   await warte(700);
-  pruefe('Reiter öffnet die Bestenliste (Titel, aktiv, #bestenliste)', await seite.evaluate(() => document.title) === 'Bestenliste · Crownmate'
+  pruefe('Reiter öffnet die Bestenliste (Titel, aktiv, #bestenliste)', await seite.evaluate(() => document.title) === 'Liga · Crownmate'
     && await seite.evaluate(() => document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter) === 'bestenliste'
     && await seite.evaluate(() => location.hash) === '#bestenliste');
   const reiterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-reiter .seg')].map((s) => s.dataset.wert + ':' + s.textContent.trim()).join());
-  const fensterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-fenster .seg')].map((s) => s.dataset.wert + (s.getAttribute('aria-checked') === 'true' ? '*' : '')).join());
-  pruefe('Kopf über hauptKopf, Reiter Ich · Bots · Freunde (Ort bestenliste:reiter), Fenster Woche · Monat · Allzeit (Standard Woche)',
-    await seite.locator('.bl-screen .haupt-kopf').count() === 1 && reiterIds === 'ich:Ich,bots:Bots,freunde:Freunde' && fensterIds === 'woche*,monat,allzeit', [reiterIds, fensterIds]);
+  const fensterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-fenster select[name="bl-fenster"] option')].map((o) => o.value + (o.selected ? '*' : '')).join());
+  // seit 07.11.2026 Freunde vor Ich (Reihenfolge 8); die Gruppe (Paket liga) fehlt hier (&kern), dann oeffnet Ich
+  pruefe('Kopf über hauptKopf, Reiter Freunde · Ich · Bots (Ort bestenliste:reiter, Standard Ich ohne Paket liga), Fenster Woche · Monat · Allzeit (Standard Woche)',
+    await seite.locator('.bl-screen .haupt-kopf').count() === 1 && reiterIds === 'freunde:Freunde,ich:Ich,bots:Bots' && fensterIds === 'woche*,monat,allzeit'
+      && await seite.locator('.bl-screen').getAttribute('data-reiter') === 'ich', [reiterIds, fensterIds]);
+  // Flos Wahl U8 und U9 (09.11.2026), gemessen am PC (1180 px): eine Segment-Leiste (die Reiter), der Zeitraum als Auswahlfeld
+  // mit Tipp-Hoehe; der Liga-Kopf zeigt wie am Handy nur die Sternzahl, kein "/ 90" und keinen Pokal-Chip "/ 30"
+  const steuer = await seite.evaluate(() => {
+    const sel = document.querySelector('.bl-steuer-fenster select[name="bl-fenster"]');
+    const sicht = [...document.querySelectorAll('.bl-screen .haupt-kopf .kopf-chips > *')].filter((c) => c.getClientRects().length);
+    return { leisten: document.querySelectorAll('.bl-steuer [role="radiogroup"]').length, segInFenster: document.querySelectorAll('.bl-steuer-fenster .seg').length,
+      hoehe: sel ? Math.round(sel.getBoundingClientRect().height) : 0, name: sel?.labels?.[0]?.textContent.trim() || '',
+      kopf: sicht.map((c) => c.innerText.replace(/\s+/g, ' ').trim()).join(' | ') };
+  });
+  pruefe('U8: eine Segment-Leiste, Zeitraum als Auswahlfeld mit Namen (im Reiter Ich ausgeblendet)',
+    steuer.leisten === 1 && steuer.segInFenster === 0 && steuer.hoehe === 0 && steuer.name.length > 0, steuer);
+  pruefe('U9: Liga-Kopf am PC nur mit Sternen, ohne Zahlen "/ 90" und "/ 30"', !/\//.test(steuer.kopf), steuer.kopf);
   pruefe('Leer: ein ruhiger Satz und „Jetzt spielen“ statt leerer Tabellen, kein leeres Rekordbuch, keine Erklärsätze im Kopf',
-    /Diese Woche noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-gesamt').innerText())
-    && await seite.locator('.bl-reiter[data-reiter="ich"] .bl-spielen').count() === 1 && await seite.locator('.bl-rekordbuch').count() === 0
+    /Diese Woche noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste').innerText())
+    && await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste .bl-spielen').count() === 1 && await seite.locator('.bl-rekordbuch').count() === 0
     && !/ganz ohne Server|Jede Zeile eine echte Partie|wie treu/.test(await seite.locator('.bl-screen').innerText()));
+  pruefe('Leer: keine Bilanz-Karte (T-3, erst ab der ersten Partie)', await seite.locator('.bl-reiter[data-reiter="ich"] .bl-bilanz').count() === 0);
+  // G-002 (Flos Wahl "Ich A"): eine Zahl oben, der Rest hinter einem Knopf; der Zeitraum steht erst im aufgeklappten Teil
+  pruefe('Ich eingeklappt: Knopf „Alle Partien, Rekorde und Zeiträume“, kein Zeitraum-Schalter, keine Zähler und keine Liste',
+    (await seite.locator('.bl-ich-alle').innerText()).trim() === 'Alle Partien, Rekorde und Zeiträume'
+    && await seite.locator('.bl-ich-alle').getAttribute('aria-expanded') === 'false'
+    && await seite.locator('.bl-steuer-fenster').isHidden() && await seite.locator('.bl-spieler:visible').count() === 0
+    && await seite.locator('.bl-gesamt:visible').count() === 0);
+  pruefe('Ohne Konto: Kronen-Karte mit ruhigem Satz und Link zum Konto, keine Kronen-Zahl',
+    await seite.locator('.bl-kronen[data-zustand="ohne-konto"] .bl-kr-konto').getAttribute('href') === '#einstellungen/konto'
+    && await seite.locator('.bl-kr-zahl').count() === 0);
+  await h.ichAlle();
+  pruefe('Ich aufgeklappt: Zeitraum Woche · Monat · Allzeit, Spielerkarte und „Diese Woche noch keine Partie“',
+    await seite.locator('.bl-ich-mehr .bl-ich-zeitraum .seg').count() === 3
+    && await seite.locator('.bl-ich-mehr .bl-ich-zeitraum .seg[aria-checked="true"]').getAttribute('data-wert') === 'woche'
+    && /Diese Woche noch keine Partie/.test(await seite.locator('.bl-ich-mehr .bl-gesamt').innerText()));
+  await seite.locator('.bl-ich-mehr .bl-ich-zeitraum .seg[data-wert="allzeit"]').click();
+  await warte(300);
+  pruefe('Zeitraum im aufgeklappten Teil: Allzeit wechselt die Liste, der Teil bleibt offen',
+    /Noch keine Partie/.test(await seite.locator('.bl-ich-mehr .bl-gesamt').innerText())
+    && await seite.locator('.bl-ich-alle').getAttribute('aria-expanded') === 'true');
+  await seite.locator('.bl-ich-mehr .bl-ich-zeitraum .seg[data-wert="woche"]').click();
+  await seite.locator('.bl-ich-alle').click();
+  await warte(200);
   await h.reiter('bots');
+  // U8: im Reiter Bots ist das Auswahlfeld sichtbar und mindestens so hoch wie ein Tippziel (44 px)
+  const selHoehe = await seite.evaluate(() => Math.round(document.querySelector('.bl-steuer-fenster select[name="bl-fenster"]')?.getBoundingClientRect().height || 0));
+  pruefe('U8: Reiter Bots zeigt das Zeitraum-Auswahlfeld, mindestens 44 px hoch', selHoehe >= 44, selHoehe);
   const leerBots = await seite.locator('.bl-tafel').innerText();
   pruefe('Bots leer: Tafel des nächsten Gegners (Willi) mit Satz und „Erste Partie: Willi, Weiß“', /Willis Tafel/.test(leerBots) && /Noch keine Partie auf Willis Tafel/.test(leerBots)
     && /Erste Partie: Willi, Weiß/.test(leerBots), leerBots);
@@ -1068,24 +1121,34 @@ async function testeBrowser(browser) {
     && (await seite.locator('.pk-abr .pk-satz').innerText()).trim() === 'Erster Eintrag auf Lukas’ Tafel' && e1.erster && e1.tafel === 'bot:benno' && e1.w > 0, e1);
   pruefe('Erster Eintrag: keine Feier-Zeile von punkte, kein Rekord-Klang', await seite.locator('.erg-feier [data-quelle="tafel-rekord"], .erg-feier [data-quelle="rekord"]').count() === 0
     && !(await h.klaenge()).includes('rekord'));
-  await h.tippe('.pk-abr-knopf');
-  const det = await seite.locator('.pk-details').innerText();
-  pruefe('Antippen zeigt die Aufschlüsselung (Züge, Theorie, kurzer Sieg ohne Ergebnis-Bonus, Verwertung) und „Zur Bestenliste“',
+  // Sieg-Blatt C (Flo 09.11.): nach dem Sieg steht die Punkte-Zeile nicht im Blatt, sondern ein Verweis in die Liga
+  pruefe('Sieg-Blatt C: Punkte-Zeile ausgeblendet (kein Überhol-Post), Verweis „Punkte und Wertung stehen in der Liga“ sichtbar',
+    !(await seite.locator('.erg-karte-ort .pk-abr').isVisible()) && await seite.locator('.erg-liga-verweis').isVisible()
+    && (await seite.locator('.erg-liga-verweis').innerText()).trim() === 'Punkte und Wertung stehen in der Liga');
+  // die Aufschluesselung bleibt im DOM und gilt unveraendert fuer Niederlage und Remis: hier per DOM-Klick geprueft
+  await seite.evaluate(() => document.querySelector('.pk-abr-knopf').click());
+  const det = await seite.locator('.pk-details').textContent();
+  pruefe('Antippen zeigt die Aufschlüsselung (Züge, Theorie, kurzer Sieg ohne Ergebnis-Bonus, Verwertung) und „Zur Liga“',
     await seite.locator('.pk-details:not([hidden])').count() === 1 && /Züge \(\d+ offen\)/.test(det) && /Theorie/.test(det)
-    && /Vor dem 10\. eigenen Zug beendet: kein Ergebnis-Bonus/.test(det) && /Verwertung/.test(det) && await seite.locator('.pk-zur-liste').count() === 1, det);
+    && /Vor dem 10\. eigenen Zug beendet: kein Ergebnis-Bonus/.test(det) && /Verwertung/.test(det) && await seite.locator('.pk-zur-liste').count() === 1
+    && (await seite.locator('.pk-zur-liste').innerText()).trim() === 'Zur Liga', det);
   await bild(seite, 'ergebnis-erster-eintrag');
   const fensterGemerkt = () => seite.evaluate(() => (JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:punkte') || '{}') || {}).fenster ?? null);
   const fensterVorher = await fensterGemerkt();
-  await h.tippe('.pk-zur-liste');
+  await h.tippe('.erg-liga-verweis');
   await seite.waitForSelector('.bl-reiter[data-reiter="bots"]:not([hidden])');
   await warte(600);
-  pruefe('„Zur Bestenliste“ öffnet den Reiter Bots mit Lukas’ Tafel', /Lukas’ Tafel/.test(await seite.locator('.bl-tafel h2').innerText())
+  pruefe('Der Verweis öffnet wie „Zur Liga“ den Reiter Bots mit Lukas’ Tafel', /Lukas’ Tafel/.test(await seite.locator('.bl-tafel h2').innerText())
     && await seite.locator('.bl-tafel').getAttribute('data-tafel') === 'bot:benno');
+  // T-3: die Bilanz gegen den Bot steht ueber seiner Tafel (vorher Zeile im Bots-Panel)
+  const botBilanz = (await seite.locator('.bl-tafel .bl-bot-bilanz').textContent().catch(() => '') || '').trim();
+  pruefe('Tafel des Bots: Bilanz „Gegen Lukas: 1 Sieg · 0 Remis · 0 Niederlagen“ unter dem Kopf', botBilanz === 'Gegen Lukas: 1 Sieg · 0 Remis · 0 Niederlagen'
+    && await seite.evaluate(() => document.querySelector('.bl-tafel .bl-bot-bilanz')?.previousElementSibling?.classList.contains('bl-k-kopf')), botBilanz);
   // Pruefer-Befund (klein): der Platz der Abrechnung gilt Allzeit, also oeffnet "Zur Bestenliste" die Tafel in Allzeit
   // (nicht im gemerkten Fenster, Standard Woche); gemerkt wird dabei kein Fenster
-  pruefe('„Zur Bestenliste“ nach „Platz/Erster Eintrag“: Zeitraum Allzeit (wie der Platz der Abrechnung), das gemerkte Fenster bleibt unberührt',
+  pruefe('„Zur Liga“ nach „Platz/Erster Eintrag“: Zeitraum Allzeit (wie der Platz der Abrechnung), das gemerkte Fenster bleibt unberührt',
     await seite.locator('.bl-screen').getAttribute('data-fenster') === 'allzeit'
-    && await seite.locator('.bl-steuer-fenster .seg[aria-checked="true"]').getAttribute('data-wert') === 'allzeit'
+    && await seite.locator('.bl-steuer-fenster select[name="bl-fenster"]').inputValue() === 'allzeit'
     && fensterVorher !== 'allzeit' && await fensterGemerkt() === fensterVorher, { fensterVorher, jetzt: await fensterGemerkt() });
 
   // ---------- 5. Bestenliste mit Daten ----------
@@ -1118,6 +1181,20 @@ async function testeBrowser(browser) {
   pruefe('Zeile antippen springt in die Analyse dieser Partie, an den Moment mit dem größten Ausschlag', an.da && an.hash === '#analyse/' + encodeURIComponent(e1.id)
     && Number.isInteger(mPly) && an.gesehen[0] === mPly, { an, mPly });
   await h.bestenliste({ reiter: 'ich' });
+  const beste = await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste').innerText();
+  pruefe('Reiter Ich oben: „Deine beste Partie diese Woche“ mit Tafel-Punkten, der Rest eingeklappt',
+    /Deine beste Partie diese Woche/i.test(beste) && new RegExp(zahlText(e1.w)).test(beste) && /Tafel-Punkte/.test(beste)
+    && await seite.locator('.bl-ich-alle').getAttribute('aria-expanded') === 'false', beste);
+  // T-3: Bilanz aller wertenden Partien (vorher unter dem Bots-Panel), direkt nach der besten Partie, jede Zahl einmal
+  const bilanz = await seite.evaluate(() => {
+    const k = document.querySelector('.bl-reiter[data-reiter="ich"] .bl-bilanz');
+    return k && { nachBeste: !!k.previousElementSibling?.classList.contains('bl-ich-beste'), titel: k.querySelector('.ueberzeile').textContent.trim(),
+      werte: [...k.querySelectorAll('.bl-bilanz-werte > div')].map((d) => d.querySelector('dt').textContent.trim() + '=' + d.querySelector('dd').textContent.trim()) };
+  });
+  pruefe('Reiter Ich: Karte „Deine Bilanz“ nach der besten Partie mit Partien 1, Siege 1, Ø Genauigkeit in Prozent und Spielstärke',
+    bilanz && bilanz.nachBeste && bilanz.titel === 'Deine Bilanz' && bilanz.werte[0] === 'Partien=1' && bilanz.werte[1] === 'Siege=1'
+    && /^Ø Genauigkeit=([\d,]+ %|–)$/.test(bilanz.werte[2]) && /^Spielstärke=(≈ [\d.]+|–)$/.test(bilanz.werte[3]), bilanz);
+  await h.ichAlle();
   const ich = await seite.locator('.bl-reiter[data-reiter="ich"]').innerText();
   pruefe('Reiter Ich: beste Partie groß („Punkte auf Lukas’ Tafel“), Rekorde, Platz 1, Tafeln und „Deine besten Partien“ über alle Tafeln', /0\s*Rekorde/.test(ich) && /1\s*Tafeln/.test(ich)
     && /Punkte auf Lukas’ Tafel/.test(ich)
@@ -1127,8 +1204,11 @@ async function testeBrowser(browser) {
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'hilde' }));
   await seite.waitForSelector('.screen.arena .detail');
   await warte(500);
+  await alteOrte(seite);   // panel-bot nur im Test (Variante A, tests/ohne-host.mjs)
   const ohnePanel = await seite.locator('.ort-panel-bot .pk-panel').count();
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
+  await warte(500);
+  await alteOrte(seite);
   await seite.waitForSelector('.screen.arena .ort-panel-bot .pk-panel', { timeout: 10000 }).catch(() => {});
   // Seit U5 gleitet das Detail-Panel beim Wechsel des Bots herein (transform): erst messen, wenn es steht
   // (nur endliche Animationen im Panel, die Weltkarte hat Dauer-Animationen)
@@ -1168,6 +1248,7 @@ async function testeBrowser(browser) {
   await bild(seite, 'ergebnis-rekord');
   await h.schliesseErgebnis();
   await h.bestenliste({ reiter: 'ich' });
+  await h.ichAlle();
   pruefe('Rekordbuch: neuer Wert, alter Wert durchgestrichen (Rechenstand steht nur bei alten Regeln dabei)', !/Rechenstand/.test(await seite.locator('.bl-rekordbuch').innerText())
     && (await seite.locator('.bl-rekordbuch s').first().innerText()).trim() === '1.000');
 
@@ -1192,6 +1273,18 @@ async function testeBrowser(browser) {
     && (await seite.locator('.pk-pfeil').innerText()).trim() === '▲ 1');
   await bild(seite, 'ergebnis-platz1');
   // Ueberhol-Post (3.13): einmal still in der Aufschluesselung angeboten, Vorschau mit Text und Code, nichts geht automatisch raus
+  // Sieg-Blatt C: mit Ueberhol-Post bleibt die Punkte-Zeile nach dem Sieg stehen (sonst waere der Post unerreichbar)
+  const abrPost = await seite.evaluate(() => {
+    const z = document.querySelector('.erg-karte-ort .pk-abr');
+    const k2 = z.closest('.ergebnis-karte').getBoundingClientRect();
+    const r = z.getBoundingClientRect();
+    const wert = z.querySelector('.pk-wert').getBoundingClientRect();
+    return { sichtbar: r.height > 0, innen: r.left >= k2.left - 1 && r.right <= k2.right + 1, wert: wert.right <= r.right + 1 && wert.width > 0 };
+  });
+  pruefe('Sieg-Blatt C: mit Überhol-Post bleibt die Punkte-Zeile sichtbar und passt in die Karte (Wert rechts sichtbar)', abrPost.sichtbar && abrPost.innen && abrPost.wert, abrPost);
+  const kwPost = await kontrast(seite, '.pk-wert', '.pk-abr');
+  const ktPost = await kontrast(seite, '.pk-satz', '.pk-abr');
+  pruefe(`Abrechnung lesbar (Wert ${kwPost.toFixed(1)}:1, Satz ${ktPost.toFixed(1)}:1, mindestens 4,5:1)`, kwPost >= 4.5 && ktPost >= 4.5);
   await h.tippe('.pk-abr-knopf');
   pruefe('Überhol-Post: in der Aufschlüsselung „Überhol-Post an Jule“', (await seite.locator('.pk-post').innerText()).trim() === 'Überhol-Post an Jule');
   await h.tippe('.pk-post');
@@ -1206,6 +1299,8 @@ async function testeBrowser(browser) {
   await h.bestenliste({ reiter: 'bots' });
   const gast = await seite.evaluate(() => [...document.querySelectorAll('.bl-tafel .bl-zeile')].map((z) => z.dataset.platz + ':' + z.querySelector('.bl-z-name').textContent.trim()));
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
+  await warte(500);
+  await alteOrte(seite);
   await seite.waitForSelector('.screen.arena .ort-panel-bot .pk-panel', { timeout: 10000 }).catch(() => {});
   pruefe('Bot-Panel mit Gast auf der Tafel: dazu „· Platz 1“', /^Lukas’ Tafel · Bestwert [\d.]+ · Platz 1$/.test((await seite.locator('.ort-panel-bot .pk-panel').textContent()).trim()));
   await h.bestenliste({ reiter: 'bots' });
@@ -1452,17 +1547,18 @@ async function testeBrowser(browser) {
     await s.waitForSelector('.screen.arena');
     await hs.schaefermatt();
     await warte(400);
+    // Sieg-Blatt C (Flo 09.11.): nach dem Sieg (ohne Ueberhol-Post) steht statt der Punkte-Zeile der Liga-Verweis im Blatt;
+    // Lage und Lesbarkeit der Punkte-Zeile misst der Ueberhol-Fall (Gruppe Überholen), nur dort bleibt sie nach Siegen stehen
     const abr = await s.evaluate(() => {
       const z = document.querySelector('.pk-abr');
-      const k2 = z.closest('.ergebnis-karte').getBoundingClientRect();
-      const r = z.getBoundingClientRect();
-      const wert = z.querySelector('.pk-wert').getBoundingClientRect();
-      return { innen: r.left >= k2.left - 1 && r.right <= k2.right + 1, wert: wert.right <= r.right + 1 && wert.width > 0 };
+      const v = document.querySelector('.erg-liga-verweis');
+      const k2 = v.closest('.ergebnis-karte').getBoundingClientRect();
+      const r = v.getBoundingClientRect();
+      return { zeileWeg: !!z && z.getClientRects().length === 0, innen: r.left >= k2.left - 1 && r.right <= k2.right + 1, hoch: r.height >= 43.5 };
     });
-    pruefe(`${name}: Abrechnungszeile passt in die Karte (Wert rechts sichtbar)`, abr.innen && abr.wert, abr);
-    const kw = await kontrast(s, '.pk-wert', '.pk-abr');
-    const kt = await kontrast(s, '.pk-satz', '.pk-abr');
-    pruefe(`${name}: Abrechnung lesbar (Wert ${kw.toFixed(1)}:1, Satz ${kt.toFixed(1)}:1, mindestens 4,5:1)`, kw >= 4.5 && kt >= 4.5);
+    pruefe(`${name}: Sieg-Blatt C: Punkte-Zeile ausgeblendet, Liga-Verweis in der Karte (mindestens 44 px hoch)`, abr.zeileWeg && abr.innen && abr.hoch, abr);
+    const kv = await kontrast(s, '.erg-liga-verweis', '.ergebnis-karte');
+    pruefe(`${name}: Liga-Verweis lesbar (${kv.toFixed(1)}:1, mindestens 4,5:1)`, kv >= 4.5);
     await bild(s, 'ergebnis-' + name);
     await hs.schliesseErgebnis();
     for (const r of ['bots', 'ich', 'freunde']) {
@@ -1500,7 +1596,7 @@ async function testeBrowser(browser) {
     await s.waitForFunction(() => window.__huelle && window.__huelle.bereit === true, null, { timeout: 15000 });
     const r = await s.evaluate(() => ({ anzahl: window.__huelle.anzahl, fehler: window.__huelle.fehler,
       reiter: [...document.querySelectorAll('.huelle-ort > .bl-reiter')].map((x) => x.dataset.reiter + (x.hidden ? '' : '*')).join() }));
-    pruefe('bestenliste:reiter in der Test-Hülle: drei Anbieter, nur Bots gefüllt (Kontext reiter, fenster)', r.anzahl === 3 && r.reiter === 'ich,bots*,freunde'
+    pruefe('bestenliste:reiter in der Test-Hülle: drei Anbieter, nur Bots gefüllt (Kontext reiter, fenster)', r.anzahl === 3 && r.reiter === 'freunde,ich,bots*'
       && r.fehler.length === 0, r);
     pruefe('Test-Hülle: keine Konsolenfehler', f.length === 0, f.join(' | '));
     await k.close();

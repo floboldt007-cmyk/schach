@@ -48,11 +48,13 @@ try {
   const knopf = name => seite.locator(`[data-zz="${name}"]`);
   async function start(tempo = 'ohne', drehen = false) {
     await merke();
-    await seite.evaluate(() => window.__app.gehe('training'));
-    await seite.getByRole('button', { name: 'Zu zweit spielen', exact: true }).click();
+    // Flo 08.11.2026: keine Karte mehr unter Lernen, Einstieg ist die Startseite (heim-zuzweit)
+    await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();
+    // Namen sind eingeklappt (Handy-Runde 08.11.2026), Bedenkzeit sind Pillen (Radio-Knoepfe)
+    await seite.locator('.zz-namen summary').click();
     await seite.locator('[name="weiss"]').fill('Anna');
     await seite.locator('[name="schwarz"]').fill('Ben');
-    await seite.locator('[name="bedenkzeit"]').selectOption(tempo);
+    await seite.locator(`[name="bedenkzeit"][value="${tempo}"]`).check();
     await seite.locator('[name="drehen"]').setChecked(drehen);
     await seite.getByRole('button', { name: 'Los', exact: true }).click();
     if (await seite.getByRole('button', { name: 'Neue Partie', exact: true }).isVisible()) await seite.getByRole('button', { name: 'Neue Partie', exact: true }).click();
@@ -75,11 +77,46 @@ try {
     await seite.locator('.zz-ergebnis:not([hidden])').waitFor();
   }
   await seite.goto('http://127.0.0.1:8886/?test#training');
-  await seite.getByRole('button', { name: 'Zu zweit spielen' }).click();
-  await seite.locator('[name="weiss"]').waitFor();
-  pruefe('Startblatt: Namen, vier Bedenkzeiten, Drehen aus', await seite.evaluate(() => document.querySelector('[name="weiss"]').value === 'Weiß'
+  await seite.waitForFunction(() => !!window.__app);
+  pruefe('Lernen: keine Karte "Zu zweit" mehr (Flo 08.11.2026, Zu zweit ist kein Lernen)', await seite.evaluate(() => !document.querySelector('.zz-karte')));
+  await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();
+  await seite.locator('[name="weiss"]').waitFor({ state: 'attached' });
+  pruefe('Startblatt: Namen, vier Bedenkzeiten (Ohne Uhr gewaehlt), Drehen aus', await seite.evaluate(() => document.querySelector('[name="weiss"]').value === 'Weiß'
     && document.querySelector('[name="schwarz"]').value === 'Schwarz' && document.querySelector('[name="weiss"]').maxLength === 20
-    && document.querySelectorAll('[name="bedenkzeit"] option').length === 4 && !document.querySelector('[name="drehen"]').checked));
+    && document.querySelectorAll('[name="bedenkzeit"]').length === 4 && document.querySelector('[name="bedenkzeit"]:checked')?.value === 'ohne'
+    && !document.querySelector('[name="drehen"]').checked));
+  // Handy-Runde 08.11.2026 (Befund 3): Stil der Startseite, grosser Start oben, Namen eingeklappt, Ziele ab 44 px
+  const blatt = await seite.evaluate(() => {
+    const r = (el) => el.getBoundingClientRect();
+    const los = document.querySelector('.zz-start > .zz-los');
+    const namen = document.querySelector('.zz-namen');
+    const ziele = [...document.querySelectorAll('.zz-startblatt .zz-los, .zz-startblatt .zz-pille span, .zz-startblatt .zz-schalter input, .zz-startblatt .zz-namen summary, .zz-startblatt .kopf-zurueck')]
+      .filter((e) => e.offsetParent).map((e) => ({ k: e.className || e.tagName, w: Math.round(r(e).width), h: Math.round(r(e).height) }));
+    return { los: los ? { t: r(los).top, h: r(los).height, text: los.textContent.trim(), unterNamen: r(los).top >= r(namen).bottom } : null, namenZu: !document.querySelector('.zz-namen').open,
+      zurueck: !!document.querySelector('.zz-startblatt .kopf-zurueck'), koenige: document.querySelectorAll('.zz-paar img').length, ziele,
+      quer: document.scrollingElement.scrollWidth <= innerWidth, ih: innerHeight };
+  });
+  pruefe('Startblatt: "Los" unter den Einstellungen (Flo 08.11.2026) und sichtbar ohne Scrollen, zwei Koenige, Namen eingeklappt, Zurueck-Symbol', blatt.los && blatt.los.text === 'Los'
+    && blatt.los.unterNamen && blatt.los.t + blatt.los.h <= blatt.ih && blatt.koenige === 2 && blatt.namenZu && blatt.zurueck, JSON.stringify(blatt));
+  pruefe('Startblatt: alle Ziele mindestens 44 px hoch und breit (auch der Schalter: Feld 52x44, Spur 52x32)', blatt.ziele.length >= 7
+    && blatt.ziele.every((z) => z.h >= 44 && z.w >= 44), JSON.stringify(blatt.ziele));
+  pruefe('Startblatt: nichts seitlich drueber', blatt.quer);
+  // Punkt 33 (Barrierefreiheit, axe page-has-heading-one): genau eine h1 auf der Seite, der Titel des Startblatts
+  const h1Start = await seite.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => e.className + ':' + e.textContent));
+  pruefe('Startblatt: genau eine h1 (Titel des Startblatts)', h1Start.length === 1 && h1Start[0].startsWith('zz-titel:'), JSON.stringify(h1Start));
+  // U6 (Flo 09.11.2026): "Los" orange wie jeder Hauptknopf; U11: der Uhr-Satz nur, wenn eine Uhr gewaehlt ist
+  const farbe = await seite.evaluate(() => {
+    const p = document.createElement('button'); p.className = 'knopf primaer'; document.body.append(p);
+    const soll = getComputedStyle(p).backgroundColor; p.remove();
+    return { los: getComputedStyle(document.querySelector('.zz-los')).backgroundColor, soll };
+  });
+  pruefe('Startblatt: "Los" hat die Farbe jedes Hauptknopfs (U6)', farbe.los === farbe.soll, farbe);
+  const uhrSatz = () => seite.evaluate(() => { const s = document.querySelector('.zz-hinweis-uhr'); return !!s && !s.hidden && s.offsetParent !== null; });
+  const ohneUhr = await uhrSatz();
+  await seite.locator('[name="bedenkzeit"][value="10"]').check();
+  const mitUhr = await uhrSatz();
+  await seite.locator('[name="bedenkzeit"][value="ohne"]').check();
+  pruefe('Startblatt: Uhr-Satz nur mit gewaehlter Uhr (U11)', !ohneUhr && mitUhr && !(await uhrSatz()), { ohneUhr, mitUhr });
   await start();
   const fortschritt = await seite.evaluate(() => localStorage.getItem('schach-arena:v1:fortschritt'));
   await zug('e2e4'); await zug('e7e5', true); await zug('g1f3'); await zug('b8c6', true);
@@ -87,6 +124,8 @@ try {
   pruefe('Tippen und Ziehen beider Seiten, keine Engine oder Bot-Antwort', await seite.evaluate(() => window.__partie.z.zuege.join(',') === 'e2e4,e7e5,g1f3,b8c6' && window.__workerZahl === 0));
   pruefe('Keine Hilfen, Weiss unten, obere Spielerkarte umgedreht', await seite.evaluate(() => !document.querySelector('.zz-screen .balken, .zz-screen .coach, .zz-screen [data-aktion="hinweis"], .zz-screen [data-aktion="zuruecknahme"]')
     && window.__partie.brett.ausrichtung === 'w' && document.querySelector('.zz-oben').classList.contains('zz-gegenueber')));
+  const h1Partie = await seite.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => e.textContent));
+  pruefe('Partie zu zweit: genau eine h1 im Kopf', h1Partie.length === 1 && await seite.locator('.zz-screen > .kopf h1').count() === 1, JSON.stringify(h1Partie));
   // Flo 30.10. abends: zu zweit darf man einen Zug zuruecknehmen (gegen Bots nicht)
   await zug('f1c4');
   await knopf('zugzurueck').click();

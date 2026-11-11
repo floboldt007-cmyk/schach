@@ -21,6 +21,16 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+// Steckbrief des gewaehlten Bots oeffnen (T-3: Antippen des Gegnerbilds); wartet auf das Blatt
+async function steckbrief(seite) {
+  await seite.locator('.screen.arena .detail-kopf [data-aktion="steckbrief"]').click();
+  await seite.waitForSelector('.sheet-karte.steckbrief', { timeout: 5000 });
+  await warte(400);
+}
+async function steckbriefZu(seite) {
+  await seite.keyboard.press('Escape');
+  await seite.waitForFunction(() => !document.querySelector('.sheet-ort:not(.weg) .steckbrief'), null, { timeout: 5000 });
+}
 import { BOTS as LEITER } from '../js/bots.js';
 
 const require = createRequire(import.meta.url);
@@ -483,7 +493,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -601,11 +611,11 @@ async function browserTeil(browser) {
     const o = await import('/js/orte.js');
     const i = await import('/js/ui/icons.js');
     const b = await import('/js/bots.js');
-    return { gruss: o.angeboten('partie:begruessung?'), panel: o.angeboten('arena:panel-bot'), erg: o.angeboten('ergebnis:karte'),
+    return { gruss: o.angeboten('partie:begruessung?'), panel: o.angeboten('arena:steckbrief'), erg: o.angeboten('ergebnis:karte'),
       icons: i.iconNamen().includes('revanche') && i.iconNamen().includes('erzfeind'), css: !!document.querySelector('link[data-paket="gedaechtnis"]'),
       satz: b.botSatz(b.botNachId('rudi'), 'wiedersehen', () => 0, { tage: 8 }) };
   });
-  pruefe('ueber ?erw geladen: zwei Anbieter an der Begruessung (vorn und hinten), Bot-Panel und Ergebnis, Icons, eigenes CSS, Saetze im Register',
+  pruefe('ueber ?erw geladen: zwei Anbieter an der Begruessung (vorn und hinten), Steckbrief und Ergebnis, Icons, eigenes CSS, Saetze im Register',
     geladen.gruss === 2 && geladen.panel === 1 && geladen.erg === 1 && geladen.icons && geladen.css && /8 Tagen|Burg|Recke/.test(geladen.satz || ''), JSON.stringify(geladen));
 
   // ---------- Gedaechtnis: erster Sieg nach drei Niederlagen (besonderer Anlass, kommt immer) ----------
@@ -724,30 +734,35 @@ async function browserTeil(browser) {
   pruefe('vor dem Nachbar-Paket (10): mutmachen, wiedersehen unter der Sperre (3 Niederlagen gegen Thorsten) und kennenlernen; der Nachbar wird gar nicht gefragt',
     !platzFehler.some((f) => /^(kalle|rudi|benno):/.test(f)), platzFehler);
 
-  // ---------- Erzfeind im Bot-Panel ----------
+  // ---------- Erzfeind im Steckbrief (T-3; vorher im Bot-Panel) ----------
   gruppe = 'Erzfeind';
   await bereite(seite, { partien: [partie('kalle', 'niederlage', 1), partie('kalle', 'niederlage', 2), partie('kalle', 'sieg', 3), partie('kalle', 'niederlage', 4),
     partie('kalle', 'niederlage', 5), partie('benno', 'sieg', 6), partie('benno', 'niederlage', 7), partie('benno', 'niederlage', 8)],
   fortschritt: fortschritt(4, { kalle: { partien: 5, siege: 1, niederlagen: 4 }, benno: { partien: 3, siege: 1, niederlagen: 2 } }) });
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'kalle' }));
   await seite.waitForFunction(() => /Maxi/.test((document.querySelector('.detail h2') || {}).textContent || ''), null, { timeout: 10000 });
+  await steckbrief(seite);
   const ez = await seite.evaluate(() => {
-    const o = document.querySelector('.detail .ort-panel-bot');
+    const o = document.querySelector('.steckbrief .ort-steckbrief');
     const e = o && o.querySelector(':scope > .gd-erzfeind');
     const r = e && e.getBoundingClientRect();
     return { da: !!e, text: e ? e.textContent.trim() : '', sichtbar: !!(o && !o.hidden && r && r.width > 0 && r.height > 0), icon: !!(e && e.querySelector('svg.ico path')),
-      nachZiel: !!(o && o.previousElementSibling && o.previousElementSibling.classList.contains('ziel-sterne')), hoehe: r ? r.height : 0 };
+      nachMerkmalen: !!(o && o.previousElementSibling && o.previousElementSibling.classList.contains('merkmale')), hoehe: r ? r.height : 0,
+      imPanel: !!document.querySelector('.detail .gd-erzfeind') };
   });
-  pruefe('Maxi (1 Sieg, 4 Niederlagen): ruhige Zeile "Dein Erzfeind · 1 Sieg · 4 Niederlagen" nach den Stern-Zielen', ez.da && ez.sichtbar && ez.icon && ez.nachZiel
+  pruefe('Maxi (1 Sieg, 4 Niederlagen): ruhige Zeile "Dein Erzfeind · 1 Sieg · 4 Niederlagen" im Steckbrief nach den Merkmalen, nicht im Panel', ez.da && ez.sichtbar && ez.icon && ez.nachMerkmalen && !ez.imPanel
     && ez.text === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' && ez.hoehe <= 60, JSON.stringify(ez));
   await warte(400);
   await seite.screenshot({ path: path.join(BILDER, 'panel-erzfeind-ipad.png') });
+  await steckbriefZu(seite);
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
   await seite.waitForFunction(() => /Lukas/.test((document.querySelector('.detail h2') || {}).textContent || ''), null, { timeout: 10000 });
-  pruefe('anderer Bot (Lukas, 2 Niederlagen): keine Zeile, Ort versteckt', await seite.evaluate(() => {
-    const o = document.querySelector('.detail .ort-panel-bot');
+  await steckbrief(seite);
+  pruefe('anderer Bot (Lukas, 2 Niederlagen): keine Zeile, Ort im Steckbrief versteckt', await seite.evaluate(() => {
+    const o = document.querySelector('.steckbrief .ort-steckbrief');
     return !o.querySelector('.gd-erzfeind') && o.hidden;
   }));
+  await steckbriefZu(seite);
 
   // ---------- Revanche nach einer echten Niederlage ----------
   gruppe = 'Revanche';
@@ -882,21 +897,12 @@ async function browserTeil(browser) {
       partie('kalle', 'sieg', 4), partie('kalle', 'niederlage', 5)], fortschritt: fortschritt(4, { kalle: { partien: 5, siege: 1, niederlagen: 4 } }),
     einstellungen: { modus: dunkel ? 'dunkel' : 'hell' } });
     await h.seite.evaluate(() => window.__app.gehe('arena', { waehle: 'kalle' }));
-    await h.seite.waitForFunction(() => /Maxi/.test((document.querySelector('.detail h2') || {}).textContent || '') && !!document.querySelector('.detail .gd-erzfeind'),
-      null, { timeout: 10000 });
-    // auf dem Handy stehen Sprechblase und Ort arena:panel-bot hinter "Mehr" (.detail.offen, css/app.css): aufklappen wie Flo,
-    // sonst waeren beide display:none und jede Pruefung der Masse leer
-    // Seit der Weltkarte (U5) gibt es am Handy kein "Mehr" mehr: das Panel zeigt alles und rollt. Den alten Weg gibt es nur
-    // noch, wenn der Knopf da ist.
-    const mehrDa = await h.seite.locator('.detail .mehr-knopf').count() > 0;
-    const zu = mehrDa ? await h.seite.evaluate(() => document.querySelector('.detail .gd-erzfeind').getBoundingClientRect().height === 0) : true;
-    if (mehrDa) await h.seite.locator('.detail .mehr-knopf').click();
-    await h.seite.waitForFunction((m) => (!m || document.querySelector('.detail').classList.contains('offen'))
-      && document.querySelector('.detail .gd-erzfeind').getBoundingClientRect().height > 0, mehrDa, { timeout: 5000 });
-    await h.seite.evaluate(() => document.querySelector('.detail .gd-erzfeind').scrollIntoView({ block: 'center' }));
-    await warte(600);
+    await h.seite.waitForFunction(() => /Maxi/.test((document.querySelector('.detail h2') || {}).textContent || ''), null, { timeout: 10000 });
+    // T-3: die Zeile steht im Steckbrief (Blatt beim Antippen des Gegnerbilds); die Sprechblase bleibt im Panel
+    await steckbrief(h.seite);
+    await warte(400);
     const ezH = await h.seite.evaluate(() => {
-      const e = document.querySelector('.detail .gd-erzfeind');
+      const e = document.querySelector('.steckbrief .gd-erzfeind');
       const r = e.getBoundingClientRect();
       const cs = getComputedStyle(e);
       const bl = document.querySelector('.detail .sprechblase');
@@ -906,9 +912,9 @@ async function browserTeil(browser) {
         blase: bl ? bl.textContent : '', blaseHoehe: rb.height };
     });
     const sollH = await erwartet(h.seite, 'kalle');
-    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Erzfeind-Zeile sichtbar (mit "Mehr": erst zu, dann auf), ganz im Bild (390 px), eine ruhige Zeile, keine waagrechte Rolle`,
-      zu && ezH.hoehe >= 20 && ezH.hoehe <= 60 && ezH.links >= 0 && ezH.rechts <= ezH.breite && ezH.oben >= 0 && ezH.unten <= ezH.hoch && ezH.scroll
-      && ezH.text === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' && ezH.farbe !== ezH.hg, JSON.stringify({ zu, ...ezH }));
+    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Erzfeind-Zeile im Steckbrief sichtbar, ganz im Bild (390 px), eine ruhige Zeile, keine waagrechte Rolle`,
+      ezH.hoehe >= 20 && ezH.hoehe <= 60 && ezH.links >= 0 && ezH.rechts <= ezH.breite && ezH.oben >= 0 && ezH.unten <= ezH.hoch && ezH.scroll
+      && ezH.text === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' && ezH.farbe !== ezH.hg, JSON.stringify(ezH));
     pruefe(`${dunkel ? 'dunkel' : 'hell'}: Panel-Begruessung nach 3 Niederlagen in Folge: Mut-Satz, genau die bestimmte Variante, sichtbar`,
       sollH && sollH.grund === 'mutmachen' && ezH.blase === `„${sollH.text}“` && ezH.blaseHoehe > 0, JSON.stringify({ blase: ezH.blase, hoehe: ezH.blaseHoehe, soll: sollH }));
     await h.seite.screenshot({ path: path.join(BILDER, `panel-erzfeind-handy-${dunkel ? 'dunkel' : 'hell'}.png`) });

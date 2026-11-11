@@ -87,8 +87,11 @@
 /* Feld unten rechts: das Brett-Eck ist abgerundet (--brett-radius), der Buchstabe rueckt nur nach oben ins Rund. Nicht
    nach links: dort stuende er hinter dem Fuss der Figur (Turm auf h1), auf dem Handy unsichtbar. */
 .brett .feld .koord.buchst.ecke { bottom: calc(1px + var(--brett-radius) * .15); }
-.brett .feld.h .koord { color: var(--b-dunkel); }
-.brett .feld.d .koord { color: var(--b-hell); }
+/* Handy-Runde K (08.11.2026): in der Farbe des anderen Feldes waren die Buchstaben auf dunklen Feldern kaum lesbar
+   (Brett "nacht" 2,8:1). Jetzt eine Spur dunkler auf hellen Feldern und weiss mit leichtem Schatten auf dunklen
+   (nacht 4,6:1 und 3,5:1), der Schatten traegt sie auch ueber den Fuss einer Figur. */
+.brett .feld.h .koord { color: color-mix(in srgb, var(--b-dunkel) 72%, #000); }
+.brett .feld.d .koord { color: #fff; text-shadow: 0 0 2px rgba(0, 0, 0, .3); }
 
 /* Koordinaten, Lage "rand": ausserhalb der Felder im Sockel (der Sockel bekommt links und unten --koord-rand Platz,
    css/app.css .brett-rahmen:has(> .brett.koord-rand)) */
@@ -98,7 +101,7 @@
   display: grid;
   place-items: center;
   font-size: 10.5px;
-  color: var(--text-2, #6E6A63);
+  color: var(--text-2, #6A665F);
 }
 .brett-koord-rand .koord.zahl { left: calc(-1 * var(--koord-rand)); width: var(--koord-rand); height: 12.5%; }
 .brett-koord-rand .koord.buchst { top: 100%; width: 12.5%; height: var(--koord-rand); }
@@ -225,6 +228,19 @@
 .brett-nutzer .pfeil { color: var(--b-pfeil-nutzer); opacity: .9; animation: brett-ein var(--b-d-xs) var(--b-sanft) both; }
 .brett-nutzer .marke { fill: var(--b-marke-nutzer); animation: brett-ein var(--b-d-xs) var(--b-sanft) both; }
 .brett-nutzer .vorschau { opacity: .55; animation: none; }
+
+/* ---------- Tastatur (Punkt 34): Fokusring ueber den Figuren, das Feld selbst zeigt keinen (laege unter Toenung und Figur) ---------- */
+.brett .feld:focus-visible { outline: none; }
+.brett > .brett-fokus {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  z-index: 7;
+  pointer-events: none;
+  outline: var(--fokus, 2.5px solid #CC4820);
+  outline-offset: -4px;
+  border-radius: 2px;
+}
 
 /* ---------- W0+a: Striche (Mattnetz) und Koenigsfall ---------- */
 /* im Brett ueber den Figuren, in einer Effekt-Ebene ueber deren ganzer Flaeche (gleiche Lage wie die Felder) */

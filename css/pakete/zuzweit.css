@@ -1,16 +1,77 @@
 /* Zu zweit: Namen und Uhr am gemeinsamen Brett; Farben und Abstaende aus dem Theme. */
 .partie.zz-screen { display: flex; flex-direction: column; min-height: 0; }
 .zz-screen > .kopf { gap: var(--a3); flex-shrink: 0; }
-.zz-screen > .kopf h2 { margin: 0; font-size: var(--fs-h2); }
+.zz-screen > .kopf h1 { margin: 0; font-size: var(--fs-h2); }
 .zz-rumpf { flex: 1; min-height: 0; overflow: auto; padding: var(--a4); }
-.zz-start { display: grid; gap: var(--a4); max-width: 520px; margin: auto; padding: var(--a5); }
-.zz-start h3, .zz-start p { margin: 0; }
-.zz-start label { display: grid; gap: var(--a2); font-weight: var(--gw-stark); }
-.zz-start input:not([type="checkbox"]), .zz-start select { width: 100%; min-height: var(--tipp); padding: var(--a3); border: 1px solid var(--linie-2); border-radius: var(--r-s); background: var(--flaeche); color: var(--text); font: inherit; }
-.zz-start .zz-schalter { display: flex; align-items: center; min-height: var(--tipp); gap: var(--a3); }
-.zz-schalter input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--akzent); }
+
+/* ---------- Startblatt (Stil der Startseite, css/heim.css): Buehne, Pillen, Schalter, Namen eingeklappt ---------- */
+.zz-startblatt { display: flex; flex-direction: column; min-height: 0; }
+.zz-startblatt .zz-rumpf { padding: var(--a3) var(--rand) var(--a5); overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.zz-start { display: flex; flex-direction: column; gap: var(--a4); width: 100%; max-width: 560px; margin: 0 auto; }
+.zz-start p { margin: 0; }
+.zz-buehne { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--a4); align-items: center; padding: var(--a4);
+  border-radius: var(--r-xl); color: var(--auf-buehne, var(--auf-tinte)); container: zzbuehne / inline-size;
+  background: linear-gradient(160deg, var(--buehne, var(--tinte)), var(--buehne-2, var(--tinte))); box-shadow: var(--s2, none), 0 0 0 1px var(--buehne-kante, transparent); }
+.zz-paar { display: flex; align-items: center; }
+.zz-paar img { width: 64px; height: 64px; padding: 8px; box-sizing: border-box; border-radius: 50%; background: var(--feld-hell); box-shadow: 0 0 0 3px var(--gold); }
+.zz-paar img + img { margin-left: -14px; background: var(--feld-dunkel); }
+.zz-buehne-text { display: flex; flex-direction: column; gap: var(--a2); min-width: 0; }
+.zz-ueber { font-size: 13px; font-weight: 600; color: var(--auf-buehne-2, var(--auf-tinte)); }
+.zz-titel { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(20px, 2.4vw, 26px); line-height: 1.2;
+  letter-spacing: -.01em; color: var(--auf-buehne, var(--auf-tinte)); overflow-wrap: anywhere; }
+.zz-einleitung { font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--auf-buehne-2, var(--auf-tinte)); }
+/* Los steht unter den Einstellungen (Flo 08.11.2026: erst waehlen, dann starten); Farbe wie jeder Hauptknopf aus
+   .knopf.primaer (U6, Flo 09.11.2026: "Orange wie ueberall", vorher gold) */
+.zz-los { display: flex; min-height: 52px; padding: 12px 16px; border-radius: var(--r-knopf-gross, var(--r-l)); }
+.zz-los svg { width: 18px; height: 18px; }
+.zz-los:active { transform: scale(.98); }
+.zz-los:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+/* schmal: Koenige ueber dem Text */
+@container zzbuehne (max-width: 420px) {
+  .zz-buehne { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
+  .zz-buehne-text { align-items: center; width: 100%; }
+}
+
+.zz-zeiten { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.zz-zeiten legend { padding: 0; margin-bottom: var(--a2); font-weight: var(--gw-stark); color: var(--text); }
+.zz-pille { position: relative; display: grid; min-width: 0; }
+.zz-pille input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.zz-pille span { display: grid; place-items: center; min-height: var(--tipp); padding: 8px 6px; border: 1px solid var(--linie-2); border-radius: var(--r-pille);
+  background: var(--flaeche); color: var(--text); font-weight: var(--gw-stark); font-size: 14px; text-align: center; line-height: 1.15;
+  transition: background var(--d-s) var(--gleiten), border-color var(--d-s) var(--gleiten); }
+.zz-pille input:checked + span { background: var(--tinte); border-color: var(--tinte); color: var(--auf-tinte); }
+.zz-pille input:focus-visible + span { outline: var(--fokus); outline-offset: 2px; }
+
+.zz-schalter { display: flex; align-items: center; justify-content: space-between; gap: var(--a3); min-height: 56px; padding: 6px 6px 6px var(--a4);
+  border: 1px solid var(--linie); border-radius: var(--r-l); background: var(--flaeche); font-weight: var(--gw-stark); color: var(--text); cursor: pointer; }
+/* G-001: das Feld selbst ist 52x44 (Trefferflaeche), die sichtbare Spur 52x32 zeichnet ::before, der Knopf ::after */
+.zz-schalter input { appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 52px; height: 44px; margin: 0 6px; border-radius: var(--r-pille);
+  background: none; cursor: pointer; }
+.zz-schalter input::before { content: ''; position: absolute; top: 6px; left: 0; width: 52px; height: 32px; border-radius: var(--r-pille);
+  background: var(--linie-2); transition: background var(--d-s) var(--gleiten); }
+.zz-schalter input::after { content: ''; position: absolute; top: 9px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: var(--flaeche);
+  box-shadow: var(--s1, none); transition: transform var(--d-s) var(--feder-weich); }
+.zz-schalter input:checked::before { background: var(--akzent); }
+.zz-schalter input:checked::after { transform: translateX(20px); }
+.zz-schalter input:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+
+.zz-namen { border: 1px solid var(--linie); border-radius: var(--r-l); background: var(--flaeche); }
+.zz-namen summary { display: flex; align-items: center; gap: var(--a2); min-height: 56px; padding: 0 var(--a4); cursor: pointer; font-weight: var(--gw-stark);
+  color: var(--text); list-style: none; }
+.zz-namen summary::-webkit-details-marker { display: none; }
+.zz-namen summary::after { content: ''; margin-left: auto; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-3px); transition: transform var(--d-s) var(--gleiten); }
+.zz-namen[open] summary::after { transform: rotate(-135deg) translateY(-3px); }
+.zz-namen summary small { font-weight: 600; color: var(--text-2); }
+.zz-namen summary:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: var(--r-l); }
+.zz-namen-felder { display: grid; gap: var(--a3); padding: 0 var(--a4) var(--a4); }
+/* zugeklappt ohne Box: Chrome legt den Inhalt geschlossener details sonst unsichtbar unter die Leiste (tests/ansicht "unten frei") */
+.zz-namen:not([open]) .zz-namen-felder { display: none; }
+.zz-namen-felder label { display: grid; gap: var(--a2); font-weight: var(--gw-stark); color: var(--text); }
+.zz-namen-felder input { width: 100%; min-height: var(--tipp); padding: var(--a3); box-sizing: border-box; border: 1px solid var(--linie-2); border-radius: var(--r-s);
+  background: var(--flaeche); color: var(--text); font: inherit; }
 .zz-hinweis { color: var(--text-2); font-size: var(--fs-klein); }
-.zz-spielbereich { display: grid; gap: var(--a3); width: min(100%, 680px, calc(100dvh - 300px)); min-width: min(100%, 280px); margin: auto; }
+@media (max-width: 359px) { .zz-zeiten { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .zz-spieler { display: flex; align-items: center; gap: var(--a3); padding: var(--a2) var(--a3); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
 .zz-spieler > img { width: 44px; height: 44px; flex-shrink: 0; background: var(--feld-hell); border-radius: var(--r-s); }
 .zz-name { display: grid; flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -18,12 +79,68 @@
 .zz-gegenueber { transform: rotate(180deg); }
 .zz-spieler .uhr { flex-shrink: 0; }
 .zz-spieler .uhr[hidden] { display: none; }
-.partie .zz-rahmen { width: 100%; }
 .zz-brett { width: 100%; aspect-ratio: 1; }
 .zz-status { margin: 0; text-align: center; min-height: 1.5em; }
 .zz-aktionen { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--a3); }
 .zz-aktionen .knopf { min-height: var(--tipp); }
-.zz-zuege { max-height: 4em; overflow: auto; color: var(--text-2); font-size: var(--fs-klein); }
+/* hoch feste Hoehe (--zz-zuege, sonst schrumpft das Brett mit jedem Zug), quer fuellt die Liste den Rest der Spalte */
+.zz-zuege { overflow: auto; color: var(--text-2); font-size: var(--fs-klein); line-height: 1.4; }
 .zz-ergebnis { padding: var(--a4); text-align: center; }
 .zz-ergebnis h3 { overflow-wrap: anywhere; }
 .zz-ergebnis[hidden] { display: none; }
+/* Partie (Flo 07.11.2026: "Das ganze Bild kann das Schachbrett sein"): nichts scrollt, das Brett nimmt, was frei ist.
+   Die Brettkante --zz-brett rechnet aus dem Rumpf (Container zz). Hoch eine Spalte in Brettbreite: Schwarz, Brett,
+   Weiss direkt aneinander, die freie Hoehe danach (naeher am Daumen, Konzept Abschnitt 7), unten Status, Knoepfe und
+   Zuege. Dafuer haben diese Zeilen hoch feste Hoehen (--zz-reserve). Quer wie die Bot-Partie (Konzept Abschnitt 8):
+   Brett links so hoch wie der Rumpf, rechts eine Spalte mit Schwarz oben, Status und Zuegen, Weiss und den Knoepfen
+   unten. Das Ergebnis liegt ueber dem Brett, damit am Ende nichts springt. */
+.zz-rumpf:has(> .zz-spielbereich) { overflow: hidden; padding: var(--a2) var(--a4) var(--a3); container: zz / size; }
+.zz-spielbereich { --zz-luecke: var(--a2); --zz-karte: 62px; --zz-zeile: 24px; --zz-knopf: 48px; --zz-zuege: 36px;
+  --zz-reserve: calc(2 * var(--zz-karte) + var(--zz-zeile) + var(--zz-knopf) + var(--zz-zuege) + 6 * var(--zz-luecke));
+  --zz-brett: min(100cqw, calc(100cqh - var(--zz-reserve)));
+  display: grid; gap: var(--zz-luecke); height: 100%; justify-content: center;
+  grid-template-columns: var(--zz-brett); grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "oben" "brett" "unten" "." "status" "aktionen" "zuege"; }
+.zz-oben { grid-area: oben; }
+.zz-unten { grid-area: unten; }
+.zz-feld { grid-area: brett; }
+.zz-status { grid-area: status; }
+.zz-spielbereich > .zz-aktionen { grid-area: aktionen; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.zz-spielbereich > .zz-aktionen .knopf { min-width: 0; padding-left: var(--a2); padding-right: var(--a2); white-space: normal; line-height: 1.15; }
+.zz-zuege { grid-area: zuege; }
+.zz-spielbereich > .zz-ergebnis { grid-area: brett; align-self: end; z-index: 5; margin: var(--a3); box-shadow: var(--s2, var(--s1)); }
+@media (orientation: portrait) {
+  .zz-spielbereich > .zz-spieler { height: var(--zz-karte); }
+  .zz-status { height: var(--zz-zeile); min-height: 0; line-height: var(--zz-zeile); }
+  .zz-spielbereich > .zz-aktionen .knopf { height: var(--zz-knopf); min-height: 0; }
+  .zz-zuege { height: var(--zz-zuege); }
+}
+/* niedrige Hochformate (kleines Handy): Karten knapper, damit das Brett nicht schrumpft */
+@media (orientation: portrait) and (max-height: 720px) {
+  .zz-spielbereich { --zz-karte: 52px; }
+  .zz-spieler { padding-top: var(--a1); padding-bottom: var(--a1); }
+  .zz-spieler > img { width: 36px; height: 36px; }
+}
+@media (orientation: landscape) {
+  .zz-spielbereich { --zz-seite: clamp(220px, 29vw, 400px);
+    --zz-brett: min(100cqh, calc(100cqw - var(--zz-seite) - var(--zz-luecke)));
+    gap: var(--zz-luecke) var(--a4);
+    grid-template-columns: var(--zz-brett) var(--zz-seite); grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "brett oben" "brett status" "brett zuege" "brett unten" "brett aktionen"; }
+  .zz-zuege { min-height: 0; }
+}
+/* niedrige Querfenster (Handy quer): Karten ohne Bild, kleine Uhr, sonst ragten Weiss und die Knoepfe aus dem Bild */
+@media (orientation: landscape) and (max-height: 500px) {
+  .zz-rumpf:has(> .zz-spielbereich) { padding-top: var(--a1); padding-bottom: var(--a2); }
+  .zz-spieler { padding: var(--a1) var(--a2); }
+  .zz-spieler > img { display: none; }
+  .zz-spieler .uhr { min-width: 66px; height: 36px; padding: 0 9px; border-radius: 11px; font-size: 17px; }
+}
+/* Handy hoch: Brett von Rand zu Rand wie in der Bot-Partie, Karten und Knoepfe behalten ihren Rand */
+@media (orientation: portrait) and (max-width: 600px) {
+  .zz-rumpf:has(> .zz-spielbereich) { padding: var(--a2) 0 calc(var(--a2) + env(safe-area-inset-bottom)); }
+  .zz-spielbereich > :not(.zz-feld) { margin-left: var(--rand-brett-handy); margin-right: var(--rand-brett-handy); }
+  .zz-spielbereich > .zz-ergebnis { margin: var(--a3); }
+  .zz-spielbereich > .zz-aktionen { gap: var(--a2); }
+  .zz-spielbereich > .zz-aktionen .knopf { font-size: var(--fs-klein); }
+}

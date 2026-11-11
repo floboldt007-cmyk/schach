@@ -138,8 +138,9 @@ async function nodeTeil() {
   pruefe('App-Huelle (capacitor://localhost, https://localhost) und Dateien: keine Adresse statt einer nutzlosen',
     L.adresseAus('capacitor://localhost/index.html#arena') === '' && L.adresseAus('https://localhost/index.html') === '' && L.adresseAus('http://localhost:8000/') === ''
     && L.adresseAus('file:///C:/Spiele/schach/index.html') === '');
-  pruefe('appAdresse: ohne feste Markenadresse die Adresse der Seite (eine Stelle zum Umstellen: MARKEN_ADRESSE)', L.MARKEN_ADRESSE === ''
-    && L.appAdresse('https://floboldt007-cmyk.github.io/schach/') === L.adresseAus('https://floboldt007-cmyk.github.io/schach/') && L.appAdresse('capacitor://localhost/') === '');
+  const marke = ['https://floboldt007-cmyk.github.io/schach/', 'https://crownmate.de/#arena', 'http://127.0.0.1:9700/', 'capacitor://localhost/'].map(L.appAdresse);
+  pruefe('appAdresse: feste Markenadresse crownmate.de ueberall, auch auf github.io und in der App-Huelle (eine Stelle: MARKEN_ADRESSE)',
+    L.MARKEN_ADRESSE === 'crownmate.de' && marke.every((a) => a === 'crownmate.de'), marke);
   pruefe('Benutzername nur wie im Konto (3 bis 20 Zeichen A-Z, 0-9, _), keine E-Mail, kein Klarname mit Leerzeichen',
     L.gueltigerName('FloTest') === 'FloTest' && L.gueltigerName('flo@example.org') === null && L.gueltigerName('Max Mustermann') === null && L.gueltigerName('ab') === null && L.gueltigerName(42) === null);
 
@@ -159,6 +160,11 @@ async function nodeTeil() {
   const boss = L.bildDaten({ ...sieg, modus: 'boss', botId: 'boss-x' }, { bot: { id: 'boss-x', name: 'Der Eiserne', avatar: 'data:image/svg+xml,<svg/>' } });
   pruefe('Boss: Ueberzeile "Boss · …", keine Sterne (wertet nie)', boss.ueber === 'Boss · Schachmatt im 4. Zug' && boss.sterne === null, boss.ueber);
   pruefe('ohne Bot: "gegen deinen Gegner"', L.bildDaten(sieg, {}).titel === 'Sieg gegen deinen Gegner');
+  // R12-W2 (Flo 10.11., Variante B): beim Teilen eines Sieges steht eine Herausforderung statt der Meldung
+  const herausf = typeof L.teilText === 'function' ? [L.teilText(d), L.teilText(remis), L.teilText(L.bildDaten(sieg, {})), L.teilText({ ...d, zuege: 1 })] : [];
+  pruefe('teilText: Sieg als Herausforderung mit Zugzahl, Remis und unbekannter Gegner behalten den Titel, Einzahl "1 Zug"',
+    herausf[0] === 'Ich habe Kommissar Tobias König in 4 Zügen besiegt. Schaffst du das schneller?' && herausf[1] === 'Remis gegen Kommissar Tobias König'
+    && herausf[2] === 'Sieg gegen deinen Gegner' && herausf[3] === 'Ich habe Kommissar Tobias König in 1 Zug besiegt. Schaffst du das schneller?', herausf);
   pruefe('Schwarz unten bei Partien mit Schwarz', L.bildDaten({ ...sieg, spielerFarbe: 'b' }, { bot }).unten === 'b');
   pruefe('Genauigkeit ausserhalb 0..100 oder kaputt: nicht im Bild', L.bildDaten({ ...sieg, genauigkeit: 140 }, { bot }).genauigkeit === null
     && L.bildDaten({ ...sieg, genauigkeit: 'viel' }, { bot }).genauigkeit === null);
@@ -282,7 +288,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -428,7 +434,7 @@ async function browserTeil(browser) {
     && !nah(p1.h5, [...fh, 255], 6), JSON.stringify({ h5: p1.h5, h5Soll, f7: p1.f7, f7Soll }));
   pruefe('Texte im Bild: Sieg, "gegen Bauer Lukas", Schachmatt im 4. Zug, Genauigkeit, Datum, crownmate, Adresse', z1.texte.includes('Sieg') && z1.texte.includes('gegen Bauer Lukas')
     && z1.texte.includes('SCHACHMATT IM 4. ZUG') && z1.texte.some((t) => /^\d{1,3},\d %$/.test(t)) && z1.texte.some((t) => /^\d\d\.\d\d\.\d{4}$/.test(t))
-    && z1.texte.includes('crownmate') && z1.texte.includes(`127.0.0.1:${PORT}`), z1.texte.join(' | '));
+    && z1.texte.includes('crownmate') && z1.texte.includes((await import('../js/pakete/teilen/logik.js')).MARKEN_ADRESSE || `127.0.0.1:${PORT}`), z1.texte.join(' | '));
   pruefe('Figuren als Bilder gezeichnet (keine Ersatz-Buchstaben)', !z1.texte.includes('D') && !z1.texte.includes('T'), z1.texte.join(' | '));
   const blatt = await seite.evaluate(() => {
     const b = document.querySelector('.tl-blatt');
@@ -470,7 +476,7 @@ async function browserTeil(browser) {
       if (window.__teilenAntwort === 'verboten') throw new DOMException('nicht erlaubt', 'NotAllowedError');
       const f = d.files[0];
       const daten = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); });
-      window.__geteilt.push({ title: d.title, text: d.text, anzahl: d.files.length, name: f.name, type: f.type, size: f.size, daten });
+      window.__geteilt.push({ title: d.title, text: d.text, url: d.url, anzahl: d.files.length, name: f.name, type: f.type, size: f.size, daten });
     } });
   });
   await seite.locator('.erg-karte-ort .tl-teilen').click();
@@ -497,8 +503,14 @@ async function browserTeil(browser) {
   const geteilt = await seite.evaluate(() => window.__geteilt[0]);
   writeFileSync(path.join(BILDER, 'siegesbild-dunkel.png'), Buffer.from(geteilt.daten.split(',')[1], 'base64'));
   pruefe('navigator.share mit genau einer PNG-Datei (crownmate-sieg-<Tag>.png), Titel und Text ohne persoenliche Daten', geteilt.anzahl === 1 && geteilt.type === 'image/png'
-    && /^crownmate-sieg-\d{4}-\d{2}-\d{2}\.png$/.test(geteilt.name) && geteilt.size > 20000 && geteilt.title === 'Crownmate' && geteilt.text === 'Sieg gegen Bauer Lukas',
+    && /^crownmate-sieg-\d{4}-\d{2}-\d{2}\.png$/.test(geteilt.name) && geteilt.size > 20000 && geteilt.title === 'Crownmate' && /^Ich habe Bauer Lukas in \d+ Zügen besiegt\. Schaffst du das schneller\?$/.test(geteilt.text),
   JSON.stringify({ ...geteilt, daten: undefined }));
+  // mit fester Markenadresse (MARKEN_ADRESSE) immer https://<Marke>/, sonst die Adresse dieser Seite
+  const appUrl = await seite.evaluate(async () => {
+    const fest = (await import('/js/pakete/teilen/logik.js')).MARKEN_ADRESSE.trim();
+    return fest ? `https://${fest}/` : location.origin + '/';
+  });
+  pruefe('navigator.share mit Link zur App (zum Antippen im Messenger), dieselbe Adresse wie im Bild', geteilt.url === appUrl, `${geteilt.url} statt ${appUrl}`);
   await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 });
   const nachTeilen = await seite.evaluate(() => ({
     modul: JSON.parse(localStorage.getItem('schach-arena:v1:modul:teilen') || 'null'), einst: JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:teilen') || 'null'),

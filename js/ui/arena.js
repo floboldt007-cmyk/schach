@@ -19,22 +19,21 @@
 // Spielen: js/ui/duell.js spieleDuell() (Duell-Intro nach Einstellung duellIntro: immer | besondere | aus), danach
 // app.gehe('partie', ...). Portraets ueber thema.avatarVon(bot) (Modern-Portraets, sonst bot.avatar).
 //
-// Runde 4 (Anzeige-Orte, js/orte.js): arena:kopf (in .kopf-chips nach den zwei Chips), arena:panel-oben (ganz oben
-// im Panel, davor die Nachlese aus feier.nachlese() "Seit deiner letzten Partie"), arena:panel-bot (nach den
-// Stern-Zielen), arena:start (einmal nach dem ersten Layout, Kontext { app, s, karte, scrolleZu(botId, sanft), neuId }),
+// Variante A (Flo 08.11.2026): das Panel zeigt nur den Gegner (Kopf, Spruch, Stern-Ziele, Farbe, Spielen), oben die
+// Nachlese aus feier.nachlese() "Seit deiner letzten Partie". Die Orte arena:panel-oben, arena:panel-bot und arena:heute
+// bleiben angemeldet, haben aber keinen Host mehr; die Tagesziele stehen auf der Startseite (heim:naechstes).
+// Runde 4 (Anzeige-Orte, js/orte.js): arena:kopf (in .kopf-chips nach den zwei Chips), arena:start (einmal nach dem ersten Layout, Kontext { app, s, karte, scrolleZu(botId, sanft), neuId }),
 // U5 neu: arena:karte-boss (.ort-karte-boss am Zelt des Wochen-Boss) und arena:karte-event (.ort-karte-event an der
 // Fahne) auf der Karte, Kontext { app, fortschritt, karte, scrolleZu }, ohne Anbieter unsichtbar.
+// T-3 (Flo 09.11.2026): Antippen des Gegnerbilds (button.av[data-aktion=steckbrief]) oeffnet den Steckbrief als Blatt
+// (.sheet-karte.steckbrief): Merkmale und der Ort arena:steckbrief (Kontext { app, bot, fortschritt }).
 // Die Begruessung im Panel waehlt wie in der Partie der Wahl-Ort partie:begruessung?.
 // w0c: Fehlt gespeicherten Partien die Analyse (App waehrend der Auswertung beendet), rechnet die Arena sie still nach
 // (js/nachholen.js, Start nach ARENA_NACHHOLEN_MS, Ende mit verlasse()) und zeichnet die Sterne danach ohne Animation neu.
-// W0+a: Host des Orts arena:heute (Heute-Karte): section.heute-karte direkt nach .ort-panel-oben im Panel, Kopfzeile
-// "Heute · <Wochentag>" (Tag mit Grenze 4:00, tag.js), Zeilen der Pakete in .ort-heute. Gefuellt bei jedem zeigeDetail();
-// ohne Anbieter versteckt. Kontext { app, bot, fortschritt, tag, woche }. Die Karte "Offene Partie" und der Dialog vor
-// einer neuen Partie finden auch angemeldete Bots (botNachId, z. B. eine verlassene Boss-Partie).
+// Die Karte "Offene Partie" und der Dialog vor einer neuen Partie finden auch angemeldete Bots (botNachId, z. B. eine verlassene Boss-Partie).
 import { BOTS, WELTEN, botsDerWelt, endgegnerDerWelt, rufname, botSatz, botNachId } from '../bots.js';
-import { tagSchluessel, wochenSchluessel, wochentag } from '../tag.js';
 import {
-  ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, statistik, hoechsterSieg, istWeltFrei, hatWeltsiegel,
+  ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, hoechsterSieg, istWeltFrei, hatWeltsiegel,
   ladeLaufendePartie, loescheLaufendePartie, ladePartien, ladeEinstellungen, speichereEinstellungen,
 } from '../storage.js';
 import { klang } from '../sounds.js';
@@ -44,15 +43,17 @@ import { starteNachholen } from '../nachholen.js';
 import { icon } from './icons.js';
 import { botFarbe, avatarVon, floAvatar } from '../thema.js';
 import { anim, staffel, tempo, reduziert } from '../bewegung.js';
-import { segment } from './bauteile.js';
+import { segment, sheet } from './bauteile.js';
 import { hauptKopf, standardChips, verbindeKopf, kopfEintritt } from './seite.js';
 import { spieleDuell } from './duell.js';
-import { t, zahl } from '../sprache.js';
+import { t } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/arena.js';
 
-// Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche. Hier nur die Figur; die Texte stehen
-// im Woerterbuch (arena.merkmal.<id>.lieblings | .tempo | .schwaeche) und werden beim Zeichnen gelesen (merkmaleVon)
+// Steckbrief (T-3, Flo 09.11.2026): Antippen des Gegnerbilds im Panel oeffnet ein Blatt mit den Merkmal-Kacheln
+// (Lieblingsfigur, Tempo, Schwaeche; aus der Bot-Bio abgeleitet) und dem Ort arena:steckbrief (Kontext { app, bot,
+// fortschritt }, z. B. die Erzfeind-Zeile des Pakets gedaechtnis). Hier nur die Figur der zehn ersten Bots; die Texte stehen
+// im Woerterbuch (arena.merkmal.<id>.lieblings | .tempo | .schwaeche), die anderen Bots bringen merkmale selbst mit
 const MERKMALE = {
   benno: 'P', hilde: 'Q', kalle: 'Q', lisa: 'B', rudi: 'N', turm: 'R', delia: 'Q', koenig: 'K', greta: 'B', stockfisch: 'Q',
 };
@@ -162,9 +163,6 @@ function ladePartieScreen() {
   return partieVorab;
 }
 
-// Wochentage (Montag = 0, tag.js wochentag): Schluessel im Woerterbuch arena.wochentag.<kurz>
-const WOCHENTAGE = ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'];
-
 let letzteFarbe = 'w';   // Farbwahl bleibt waehrend der Sitzung erhalten ('w' | 'zufall' | 'b')
 // Fehlende Analysen erst nachrechnen, wenn die Arena steht (nach der Freischalt-Animation)
 const ARENA_NACHHOLEN_MS = 2500;
@@ -176,11 +174,6 @@ const WELT_MIN_H = 820;
 const FREI_DAUER_MS = 2700;
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-// Prozent mit einer Nachkommastelle in der Schreibweise der Sprache ("85,3 %" | "85.3%")
-function prozent(x) {
-  if (!Number.isFinite(x)) return '-';
-  return t('arena.prozent', { wert: zahl(Math.round(x * 10) / 10, { maximumFractionDigits: 1, useGrouping: false }) });
-}
 const kSterneHtml = (sterne) => sterne.map((x) => icon('stern', x ? 'stern' : 'aus')).join('');
 function zielSterneHtml(sterne) {
   return ZIELE.map((id, i) => {
@@ -305,7 +298,7 @@ export function zeige(root, params, app) {
   // Feier-Momente, die nicht ins Ergebnis passten: einmal holen, gilt fuer diesen Screen
   let feierRest = [];
   try { feierRest = nachlese(); } catch (e) { feierRest = []; }
-  const orte = { kopf: null, oben: null, heute: null, bot: null, start: null, karteBoss: null, karteEvent: null };
+  const orte = { kopf: null, start: null, karteBoss: null, karteEvent: null };
   const neuId = params && params.neuFreigeschaltet && BOTS.some((b) => b.id === params.neuFreigeschaltet) ? params.neuFreigeschaltet : null;
   const naechster = naechsterGegner(fortschritt);
   const alleBesiegt = BOTS.every((b) => fortschritt.bots[b.id].sterne[0]);
@@ -459,10 +452,16 @@ export function zeige(root, params, app) {
   }
   baueKnoten();
 
+  // "Bot 2 von 6" (Flo 08.11.2026): Platz in der eigenen Welt statt "Stufe 8", "Stufe" gehoert allein der Kronen-Liga
+  function platzInWelt(b) {
+    const welt = BOTS.filter((x) => x.welt === b.welt);
+    return { nr: welt.findIndex((x) => x.id === b.id) + 1, anzahl: welt.length };
+  }
+
   function knotenLabel(b, z) {
     const zustand = { besiegt: 'besiegt', aktuell: 'aktuell', offen: neuEingezogen(b) ? 'neu' : b.endgegner ? 'endgegner' : 'offen', gesperrt: 'gesperrt' }[z];
     const sterne = fortschritt.bots[b.id].sterne;
-    const werte = { stufe: b.stufe, name: b.name, elo: b.elo, zustand: t('arena.zustand.' + zustand) };
+    const werte = { ...platzInWelt(b), name: b.name, elo: b.elo, zustand: t('arena.zustand.' + zustand) };
     return z === 'besiegt' ? t('arena.knoten.labelSterne', { ...werte, sterne: sterne.filter(Boolean).length }) : t('arena.knoten.label', werte);
   }
 
@@ -551,14 +550,19 @@ export function zeige(root, params, app) {
       const fMax = Math.max(...ys);
       // Krone und Fahne des Endgegners unter der Weltwahl; kompakt ist die Weltwahl kleiner und die Karte flach
       const oben = kn * 0.65 + (kompakt ? 70 : 118);
-      const unten = kn * 0.61 + (kompakt ? 26 : 36);
+      // kompakt: ist die unterste Station die aktuelle (vergroessert), braucht ihr Schild mehr Rand, sonst schneidet die
+      // runde Ecke der Karte es ab (Handy-Runde 08.11.2026: "Willi 100"); sonst bleibt der Rand knapp, weil jeder Pixel
+      // hier die Stationen enger zusammenrueckt (SE: Sterne auf dem Schild der Station darueber)
+      const untenAktuell = LBOTS[ys.indexOf(fMax)]?.id === aktuellId;
+      const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : 36);
       hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
       y0 = oben - fMin * hy;
     }
     masse = { w, h, s: sk, y0, hy };
     weltEl.style.width = w + 'px';
     weltEl.style.height = h + 'px';
-    weltEl.style.setProperty('--kn-basis', Math.round(76 * sk) + 'px');
+    // mindestens 44 px Tippflaeche je Station (G-001: auf dem iPhone SE massen sie 43 px)
+    weltEl.style.setProperty('--kn-basis', Math.max(44, Math.round(76 * sk)) + 'px');
     const punkte = lage.stationen.map(([fx, fy]) => [fx * w, yVon(fy)]);
     const start = [lage.start[0] * w, yVon(lage.start[1])];
     const neuIdx = neuId ? idx(neuId) : -1;
@@ -570,6 +574,14 @@ export function zeige(root, params, app) {
     lage.stationen.forEach((p, i) => setze(knoten[i], p));
     setze(s.querySelector('.ort-karte-boss'), lage.boss);
     setze(s.querySelector('.ort-karte-event'), lage.event);
+    // die Schilder "Endgegner" und "Naechster Gegner" ganz in der Karte (iPhone SE und iPad quer, 08.11.2026: am
+    // Kartenrand angeschnitten; der Pfeil der Fahne zeigt weiter auf die Station); gerechnet aus Lage und Breite, nicht
+    // aus dem Bild, denn Stationen koennen gerade einschweben
+    lage.stationen.forEach(([fx], i) => knoten[i].querySelectorAll('.boss-krone, .fahne').forEach((krone) => {
+      const halb = krone.offsetWidth / 2, x = fx * w, rand = 6;
+      const dx = Math.max(0, rand + halb - x) - Math.max(0, x + halb - (w - rand));
+      krone.style.setProperty('--krone-dx', dx.toFixed(1) + 'px');
+    }));
     stelleFlo(floPosition());
     // im Querformat (und kompakt) scrollt die Karte nicht: ein Rest aus dem Hochformat wuerde sie verschieben
     if (quer) { karte.scrollTop = 0; s.querySelector('.inhalt').scrollTop = 0; }
@@ -605,6 +617,14 @@ export function zeige(root, params, app) {
     return [fx * masse.w + kn * gross * 0.52, yVon(fy) - kn * gross * 0.28];
   }
   function stelleFlo([x, y]) {
+    // ganz in der Karte (Handy kompakt: am Start ragte die Figur links ueber den Rand)
+    const r = (floFigur.offsetWidth || 36) / 2 + 8;
+    if (masse.w > 2 * r) x = Math.min(masse.w - r, Math.max(r, x));
+    // am Start schob das Einklemmen die Figur auf schmalen Karten halb hinter die erste Station, deren Rand sie
+    // abschnitt (iPhone SE, 08.11.2026): so dicht an ihr bleibt sie unsichtbar
+    const [sx, sy] = LAGEN[lageModus || modus].stationen[0];
+    const rk = 76 * masse.s * (LBOTS[0].id === aktuellId ? 1.22 : 1) / 2;
+    floFigur.classList.toggle('verdeckt', Math.hypot(x - sx * masse.w, y - yVon(sy)) < rk + r - 8);
     floFigur.style.left = x.toFixed(1) + 'px';
     floFigur.style.top = y.toFixed(1) + 'px';
   }
@@ -628,9 +648,7 @@ export function zeige(root, params, app) {
     const lauf = ++panelLauf;
     const b = BOTS.find((x) => x.id === gewaehlt);
     const f = fortschritt.bots[b.id];
-    const mm = b.merkmale || merkmaleVon(b.id);
     const z = b.id === neuId ? 'aktuell' : zustandVon(b);
-    const st = statistik();
     const laufend = ladeLaufendePartie();
     // W0+a: auch angemeldete Bots (z. B. ein Boss), solange ihr Paket geladen ist (sonst gibt es keine laufende Partie)
     const laufBot = laufend ? botNachId(laufend.botId) : null;
@@ -638,14 +656,13 @@ export function zeige(root, params, app) {
       : neuEingezogen(b) ? 'neu' : b.endgegner ? 'endgegner' : 'offen'));
     const satz = begruessung(b);
     detail.style.setProperty('--bf', botFarbe(b));
-    if (orte.oben) orte.oben.verlasse();
-    if (orte.heute) orte.heute.verlasse();
-    if (orte.bot) orte.bot.verlasse();
     const bau = () => {
       if (lauf !== panelLauf || weg) return;
+      // Variante A (Flo 08.11.2026, "so viel Text und so viel Schnickschnack"): das Panel zeigt nur den Gegner (Kopf,
+      // Spruch, Stern-Ziele, Farbe, Spielen). Liga-Karte (Ort arena:panel-oben), Heute-Karte (arena:heute, jetzt auf der
+      // Startseite), Bot-Zeilen (arena:panel-bot), Merkmale und Bilanz entfallen; oben bleibt nur die Nachlese.
       detail.innerHTML = `
       <div class="ort-panel-oben" hidden></div>
-      <section class="heute-karte" aria-label="${esc(t('arena.heute.aria'))}" hidden><div class="hk-kopf"></div><div class="ort-heute"></div></section>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${botFarbe(laufBot)}">
         <span class="avatar"><img src="${esc(avatarVon(laufBot))}" alt=""></span>
@@ -654,9 +671,9 @@ export function zeige(root, params, app) {
       </div>` : ''}
       <div class="detail-links">
         <div class="detail-kopf">
-          <div class="av"><img src="${esc(avatarVon(b))}" alt=""></div>
+          <button class="av dr" type="button" data-aktion="steckbrief" aria-haspopup="dialog" aria-label="${esc(t('allgemein.steckbriefVon', { name: b.name }))}"><img src="${esc(avatarVon(b))}" alt=""></button>
           <div class="detail-name">
-            <div class="ueberzeile detail-ueber${z === 'aktuell' ? ' akz' : ''}">${esc(t('arena.detail.ueber', { stufe: b.stufe, status }))}</div>
+            <div class="ueberzeile detail-ueber${z === 'aktuell' ? ' akz' : ''}">${esc(t('arena.detail.ueber', { ...platzInWelt(b), status }))}</div>
             <div class="detail-welt">${esc(t('arena.detail.welt', { nr: b.welt, name: (WELTEN.find((w) => w.nr === b.welt) || {}).name || '' }))}</div>
             <h2 class="disp">${esc(b.name)}</h2>
             <div class="elo zahl">Elo ${b.elo} · ${esc(b.titel)}</div>
@@ -664,21 +681,14 @@ export function zeige(root, params, app) {
           </div>
         </div>
         <div class="sprechblase spruch${neueBlase ? '' : ' still'}${blaseBesonders ? ' besonders' : ''}">${esc(t('arena.zitat', { satz }))}</div>
-        <div class="merkmale">
-          <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.lieblings'))}</span><span class="m-wert"><span class="m-figur"><img src="assets/pieces/w${mm.figur}.svg" alt=""></span>${esc(mm.lieblings)}</span></div>
-          <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.tempo'))}</span><span class="m-wert">${esc(mm.tempo)}</span></div>
-          <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.schwaeche'))}</span><span class="m-wert">${esc(mm.schwaeche)}</span></div>
-        </div>
       </div>
       <div class="detail-rechts">
         <div class="ziel-sterne" aria-label="${esc(t('arena.ziele.aria'))}">
           ${zielSterneHtml(f.sterne)}
         </div>
-        <div class="ort-panel-bot" hidden></div>
         <div class="wahl wahl-farbe"><div class="wahl-titel">${esc(t('arena.farbe.titel'))}</div><div class="farbwahl-ort"></div></div>
         <div class="ort-tempo" hidden></div>
         <div class="cta-platz"><button class="knopf primaer gross spielen dr" type="button" data-aktion="spielen"><span class="sp-text">${spielenText(b, z === 'besiegt')}</span><span class="pf">${icon('pfeil')}</span></button></div>
-        <div class="bilanz">${bilanzHtml(st)}</div>
       </div>`;
 
       // Farbe als Segment (A): Hooks .farbwahl [data-farbe="w|zufall|b"][aria-checked]
@@ -697,25 +707,16 @@ export function zeige(root, params, app) {
       detail.querySelector('.farbwahl-ort').replaceWith(seg.el);
 
       detail.querySelector('[data-aktion="spielen"]').addEventListener('click', () => spielen(b));
+      detail.querySelector('[data-aktion="steckbrief"]').addEventListener('click', () => zeigeSteckbrief(b));
       const fort = detail.querySelector('[data-aktion="fortsetzen"]');
       if (fort) {
         fort.addEventListener('click', () => app.gehe('partie', { botId: laufend.botId, farbe: laufend.spielerFarbe, fortsetzen: true }));
       }
-      // Orte im Panel: oben (davor die Nachlese) und nach den Stern-Zielen
+      // oben die Nachlese (was nach der letzten Partie nicht mehr ins Ergebnis passte)
       const oben = detail.querySelector('.ort-panel-oben');
       const nl = nachleseKarte();
       if (nl) oben.append(nl);
-      orte.oben = fuelle('arena:panel-oben', oben, { app, bot: b, fortschritt });
-      oben.hidden = !nl && orte.oben.anzahl === 0;
-      // W0+a: Heute-Karte (Ort arena:heute), nur mit Zeilen sichtbar
-      const heute = detail.querySelector('.heute-karte');
-      const tag = tagSchluessel();
-      heute.querySelector('.hk-kopf').textContent = t('arena.heute.kopf', { tag: t('arena.wochentag.' + WOCHENTAGE[wochentag(tag)]) });
-      orte.heute = fuelle('arena:heute', heute.querySelector('.ort-heute'), { app, bot: b, fortschritt, tag, woche: wochenSchluessel() });
-      heute.hidden = orte.heute.anzahl === 0;
-      const botOrt = detail.querySelector('.ort-panel-bot');
-      orte.bot = fuelle('arena:panel-bot', botOrt, { app, bot: b, fortschritt });
-      botOrt.hidden = orte.bot.anzahl === 0;
+      oben.hidden = !nl;
       if (animiert && tempo() > 0) {
         const teile = [...detail.querySelectorAll(':scope > :not([hidden]):not(.detail-links):not(.detail-rechts), .detail-links > *, .detail-rechts > :not([hidden])')];
         staffel(teile, { d: 520, abstand: 38, von: 'translateY(12px)' });
@@ -727,16 +728,27 @@ export function zeige(root, params, app) {
     bau();
   }
 
-  function bilanzHtml(st) {
-    return `
-          <div><b>${st.partien}</b><span>${esc(t('arena.bilanz.partien'))}</span></div>
-          <div><b>${st.siege}</b><span>${esc(t('arena.bilanz.siege'))}</span></div>
-          <div><b>${prozent(st.schnittGenauigkeit)}</b><span>${esc(t('arena.bilanz.genauigkeit'))}</span></div>
-          <div><b>${st.spielstaerke ? '≈ ' + st.spielstaerke : '-'}</b><span>${esc(t('arena.bilanz.staerke'))}</span></div>
-        `;
+  // Steckbrief als Blatt (bauteile.js sheet): Kopf, Merkmale, darunter der Ort arena:steckbrief (ohne Zeilen versteckt)
+  function zeigeSteckbrief(b) {
+    const mm = b.merkmale || merkmaleVon(b.id);
+    const box = document.createElement('div');
+    box.className = 'sb-rumpf';
+    box.innerHTML = `<div class="sb-kopf"><span class="sb-bild" style="--bf:${botFarbe(b)}"><img src="${esc(avatarVon(b))}" alt=""></span>
+        <span class="sb-name"><b>${esc(b.name)}</b><span class="zahl">Elo ${b.elo} · ${esc(b.titel)}</span></span></div>
+      <div class="merkmale">
+        <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.lieblings'))}</span><span class="m-wert"><span class="m-figur"><img src="assets/pieces/w${mm.figur}.svg" alt=""></span>${esc(mm.lieblings)}</span></div>
+        <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.tempo'))}</span><span class="m-wert">${esc(mm.tempo)}</span></div>
+        <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.schwaeche'))}</span><span class="m-wert">${esc(mm.schwaeche)}</span></div>
+      </div>
+      <div class="ort-steckbrief" hidden></div>`;
+    const ort = box.querySelector('.ort-steckbrief');
+    const gefuellt = fuelle('arena:steckbrief', ort, { app, bot: b, fortschritt });
+    ort.hidden = gefuellt.anzahl === 0;
+    sheet({ titel: t('allgemein.steckbrief'), inhalt: box, klasse: 'steckbrief', knoepfe: [{ text: t('allgemein.schliessen'), wert: true }], abbrechen: false })
+      .then(() => gefuellt.verlasse());
   }
 
-  // Nachgeholte Analyse (w0c): Sterne, Kopf-Chip und Bilanz still neu zeichnen, ohne Animation und ohne
+  // Nachgeholte Analyse (w0c): Sterne und Kopf-Chip still neu zeichnen, ohne Animation und ohne
   // das Panel neu aufzubauen. Nur Stern 2 kann sich so aendern (Sieg und Freischaltung sind schon gebucht).
   function sterneNeu() {
     if (weg) return;
@@ -760,8 +772,6 @@ export function zeige(root, params, app) {
     }
     const ziele = detail.querySelector('.ziel-sterne');
     if (f && ziele) ziele.innerHTML = `\n          ${zielSterneHtml(f.sterne)}\n        `;
-    const bilanz = detail.querySelector('.bilanz');
-    if (bilanz) bilanz.innerHTML = bilanzHtml(statistik());
   }
 
   // Begruessung im Panel: dieselbe Wahl wie in der Partie (Wahl-Ort partie:begruessung?)

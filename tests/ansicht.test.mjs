@@ -52,7 +52,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { if ((await fetch(url)).ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -105,7 +105,9 @@ function befundeDerSeite() {
       aus.abgeschnitten.push(`${pfad(el)} "${el.textContent.trim().slice(0, 24)}"`);
     }
   }
-  const knoepfe = alle.filter((el) => el.matches('button, a[href], [role="button"], input:not([type="hidden"]), select, summary, textarea') && !versteckt(el));
+  // Brettfelder sind seit dem Brett per Tastatur role="button", Groesse und Lage gibt das Brett vor (WCAG 2.5.8, Ausnahme
+  // "wesentlich"); vorher zaehlten sie hier nicht, darum bleiben sie draussen
+  const knoepfe = alle.filter((el) => el.matches('button, a[href], [role="button"], input:not([type="hidden"]), select, summary, textarea') && !el.closest('.brett-felder') && !versteckt(el));
   const flaeche = (el) => {
     const r = el.getBoundingClientRect(); let w = r.width, h = r.height;
     for (const ps of ['::before', '::after']) {

@@ -1,0 +1,136 @@
+/* Visitenkarte, Banner, Erfolgs-Stufen und Freischalt-Moment (Etappe 4b, js/ui/visitenkarte.js, js/pakete/sammlung/moment.js).
+   Banner (assets/banner, 1200x300): Motiv mittig-links, ruhige dunkle Flaeche rechts fuer weisse Schrift; Zuschnitt cover,
+   Position 30 % (assets/banner/vorrat.json). Stufenfarben wie die Liga-Rahmen (js/profil.js RAHMEN). */
+:root {
+  --st-bronze: #B06A3A;
+  --st-silber: #A9B0BA;
+  --st-gold: #E0A22B;
+  --vk-schrift: #FFFFFF;
+  --vk-schatten: 0 1px 2px rgba(0, 0, 0, .65);
+}
+
+/* ---------- Karte ---------- */
+.vk { position: relative; display: grid; min-width: 0; overflow: hidden; border-radius: var(--r-l, 18px); background: var(--flaeche);
+  border: 1px solid var(--linie); color: var(--text); box-shadow: var(--s1, none); }
+.vk-banner { display: block; background-color: #14161C; background-size: cover; background-position: 30% center; background-repeat: no-repeat; }
+.vk > .vk-banner { position: absolute; inset: 0 0 auto 0; height: 100px; }
+/* G-001: gemeinsame Regel fuer alle Banner-Flaechen mit Text links (Profilkopf "Ich", Visitenkarte, Spielerzeile online).
+   Alle Banner tragen ihr Motiv bei gut einem Viertel der Breite (x 300 bis 330 von 1200); mit "cover" lag es je nach Breite unter
+   Name und Titel-Schild. Darum feste Hoehe --banner-h (4:1, Vorgabe 120 px, also 480 px breit), so verschoben, dass das Motiv
+   (x 0,267 * Breite = 1,067 * Hoehe) hinter der Mitte des Profilbilds liegt: --banner-motiv setzt jede Flaeche selbst. Der dunkle
+   Verlauf (fuer weisse Schrift) endet deckend in der Grundfarbe, bevor das Bild endet (Bildende = --banner-motiv + 2,93 * Hoehe). */
+.pr-banner, .vk:not([data-groesse="streifen"]) > .vk-banner, .on-spieler.mit-banner > .on-banner { background-color: #14161C; background-repeat: no-repeat;
+  background-size: auto max(var(--banner-h, 120px), 100%);
+  background-position: calc(var(--banner-motiv, 52px) - var(--banner-h, 120px) * 1.067) calc(50% - var(--banner-h, 120px) / 15); }
+.pr-banner::after, .vk > .vk-banner::after, .on-spieler.mit-banner > .on-banner::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(10, 12, 16, .15) 0, rgba(10, 12, 16, .55) calc(var(--banner-h, 120px) * 1.17),
+    rgba(10, 12, 16, .8) calc(var(--banner-h, 120px) * 2.17), #14161C calc(var(--banner-motiv, 52px) + var(--banner-h, 120px) * 2.83)); }
+/* Mitte des Profilbilds ab linker Kante: Visitenkarte 14 + 64 / 2, Spielerzeile 12 + 44 / 2 (Profilkopf: 52, Handy 40 in sammlung.css).
+   Die Spielerzeile ist nur 74 px hoch und ihr Bild 44 px: dort ein kleineres Banner, damit das Motiv hinter der Figur bleibt. */
+.vk { --banner-motiv: 46px; }
+.on-spieler { --banner-motiv: 34px; --banner-h: 76px; }
+.vk-kopf { position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; min-height: 100px; padding: 10px 14px; }
+.vk-av { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 8px rgba(0, 0, 0, .45); background: #2C3038; }
+.vk-av svg, .vk-av img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.vk-text { display: grid; gap: 3px; min-width: 0; color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
+.vk-namenszeile { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vk-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 19px; line-height: 1.15; }
+.vk-titel { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font-size: 13px; font-weight: 700; color: #F2C66B; }
+.vk-titel > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vk-titel svg, .vk-titel .vk-wappen { width: 20px; height: 20px; flex: none; }
+.vk-krone { font-size: 12.5px; font-weight: 600; opacity: .92; }
+.vk-krone.leer { opacity: .75; font-weight: 500; }
+.vk-ki { flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 20px; padding: 0 6px; border-radius: 6px; font-size: 11.5px; font-weight: 800;
+  letter-spacing: .06em; color: #0D1B2A; background: #7FE3FF; text-shadow: none; }
+.vk-orden { list-style: none; margin: 0; padding: 10px 12px 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.vk-orden li { display: grid; justify-items: center; gap: 3px; min-width: 0; padding: 6px 4px; border-radius: var(--r-m, 14px); background: var(--flaeche-2);
+  border: 2px solid var(--linie); text-align: center; }
+.vk-orden li[data-stufe="1"] { border-color: var(--st-bronze); }
+.vk-orden li[data-stufe="2"] { border-color: var(--st-silber); }
+.vk-orden li[data-stufe="3"] { border-color: var(--st-gold); box-shadow: 0 0 10px rgba(224, 162, 43, .3); }
+.vk-orden li.leer { grid-column: 1 / -1; border-style: dashed; color: var(--text-2); font-size: 12.5px; padding: 10px; }
+.vk-orden-bild { display: grid; place-items: center; width: 34px; height: 34px; }
+.vk-orden-bild svg { width: 34px; height: 34px; }
+.vk-orden-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 700; }
+.vk-orden-stufe { font-size: 11px; color: var(--text-2); }
+.vk[data-ki] .vk-kopf { min-height: 100px; }
+
+/* Streifen in der Spielerleiste: kleines Banner, hoechstens so hoch wie der Name */
+.vk[data-groesse="streifen"] { display: inline-flex; align-items: center; gap: 6px; overflow: visible; border: 0; background: none; box-shadow: none; border-radius: 0; }
+.vk[data-groesse="streifen"] > .vk-banner { position: relative; inset: auto; width: 72px; height: 18px; border-radius: 5px; box-shadow: 0 0 0 1px var(--linie); }
+.vk[data-groesse="streifen"] > .vk-banner::after { display: none; }
+.vk[data-groesse="streifen"] .vk-ki { height: 18px; min-width: 22px; font-size: 10.5px; }
+
+/* ---------- Lobby: Gegner gefunden ---------- */
+.lb-karten { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; }
+.lb-karten[hidden] { display: none !important; }
+.lb-karten-vs { font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 18px; color: var(--gold, #E0A22B); }
+.lb-suche:has(.lb-karten:not([hidden])) .lb-radar { display: none; }
+@media (max-width: 640px) {
+  .lb-karten { grid-template-columns: minmax(0, 1fr); justify-items: stretch; gap: 6px; }
+  .lb-karten-vs { justify-self: center; }
+}
+/* nebeneinander braucht jede Karte Platz: das Fenster der Suche wird breiter, solange die Karten stehen */
+@media (min-width: 641px) {
+  .lb-suche-karte:has(.lb-karten:not([hidden])) { width: min(100%, 720px); }
+}
+
+/* ---------- Online-Partie: Banner hinter der Spielerleiste ---------- */
+.on-spieler.mit-banner { position: relative; overflow: hidden; border-radius: var(--r-m, 14px); padding-inline: 10px; }
+.on-spieler.mit-banner > .on-banner { position: absolute; inset: 0; z-index: 0; }
+.on-spieler.mit-banner > :not(.on-banner) { position: relative; z-index: 1; }
+.on-spieler.mit-banner > div { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
+.on-titel { display: block; font-size: 12px; font-weight: 700; color: #F2C66B; }
+
+/* ---------- Profil "Ich": Banner im Kopf der Karte ---------- */
+.pr-karte .pr-kopf { position: relative; overflow: hidden; min-height: 112px; padding: 12px 14px; margin: -14px -14px 0; border-radius: var(--r-l, 18px) var(--r-l, 18px) 0 0; }
+.pr-karte .pr-kopf > :not(.pr-banner) { position: relative; z-index: 1; }
+.pr-banner { position: absolute; inset: 0; z-index: 0; }
+.pr-karte .pr-kopf .pr-av { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 8px rgba(0, 0, 0, .45); }
+.pr-karte .pr-kopf .pr-name b, .pr-karte .pr-kopf .pr-seit { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
+.pr-chip.pr-chip-krone { color: #FFFFFF; background: rgba(255, 255, 255, .16); }
+.pr-knoepfe { display: flex; flex-wrap: wrap; gap: 8px; }
+.pr-knoepfe .knopf { flex: 1 1 140px; }
+.pr-orden[data-stufe="1"] { border-color: var(--st-bronze); }
+.pr-orden[data-stufe="2"] { border-color: var(--st-silber); }
+.pr-orden[data-stufe="3"] { border-color: var(--st-gold); box-shadow: 0 0 10px rgba(224, 162, 43, .3); }
+.pr-orden-stufe { font-size: 11.5px; color: var(--text-2); }
+.pr-orden-knopf[data-stufe="1"] { border-color: var(--st-bronze); }
+.pr-orden-knopf[data-stufe="2"] { border-color: var(--st-silber); }
+.pr-orden-knopf[data-stufe="3"] { border-color: var(--st-gold); }
+
+/* Banner-Wahl im Blatt und in der Sammlung */
+.pr-banner-wahl-liste { display: grid; gap: 10px; }
+.pr-banner-knopf { display: grid; grid-template-columns: 120px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-items: center; min-height: 48px;
+  padding: 8px; border-radius: var(--r-m, 14px); border: 1px solid var(--linie); background: var(--flaeche); color: var(--text); text-align: start; font: inherit; cursor: pointer; }
+.pr-banner-knopf img { grid-row: 1 / 3; width: 120px; height: 30px; object-fit: cover; object-position: 30% center; border-radius: 6px; }
+.pr-banner-knopf small { color: var(--text-2); }
+.pr-banner-knopf[aria-pressed="true"] { border-color: var(--akzent); box-shadow: inset 0 0 0 1px var(--akzent); }
+.pr-banner-knopf:disabled { cursor: default; opacity: .7; }
+.pr-banner-knopf:focus-visible { outline: 3px solid var(--fokus, var(--akzent)); outline-offset: 2px; }
+.sa-bild img.sk-banner { width: 100%; max-width: 168px; height: 42px; object-fit: cover; object-position: 30% center; border-radius: 6px; }
+
+/* ---------- Freischalt-Moment ---------- */
+.st-moment { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; padding: 16px; background: rgba(8, 10, 14, .62); }
+.st-karte { display: grid; justify-items: center; gap: 8px; width: min(340px, 100%); padding: 22px 18px 18px; border-radius: var(--r-l, 18px); background: var(--flaeche);
+  color: var(--text); border: 3px solid var(--linie); box-shadow: 0 12px 40px rgba(0, 0, 0, .45); text-align: center; }
+.st-karte[data-stufe="1"] { border-color: var(--st-bronze); }
+.st-karte[data-stufe="2"] { border-color: var(--st-silber); }
+.st-karte[data-stufe="3"] { border-color: var(--st-gold); box-shadow: 0 0 0 1px var(--st-gold), 0 12px 40px rgba(224, 162, 43, .35); }
+.st-ueber { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); letter-spacing: .02em; }
+/* nur in der Karte: .st-bild heisst auch das Bild der Einfuehrung (js/ui/start.js), dort machte die Regel es 88 x 88 px */
+.st-karte .st-bild { display: grid; place-items: center; width: 88px; height: 88px; }
+.st-karte .st-bild svg { width: 88px; height: 88px; }
+.st-name { font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 22px; }
+.st-stufe { font-weight: 800; font-size: 15px; }
+.st-karte[data-stufe="1"] .st-stufe { color: var(--st-bronze); }
+.st-karte[data-stufe="2"] .st-stufe { color: var(--text); }
+.st-karte[data-stufe="3"] .st-stufe { color: var(--st-gold); }
+.st-ziel { font-size: 13px; color: var(--text-2); }
+.st-lohn { font-size: 14px; font-weight: 700; }
+.st-lohn-gold { color: var(--st-gold); }
+.st-weiter { margin-top: 6px; min-width: 160px; min-height: 44px; }
+/* Bewegung reduzieren: nur weich einblenden, keine Drehung */
+.st-moment.ruhig { animation: st-ein 200ms ease-out both; }
+@keyframes st-ein { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .st-moment.ruhig { animation: none; } }

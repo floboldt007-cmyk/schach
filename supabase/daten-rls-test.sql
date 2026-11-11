@@ -165,6 +165,32 @@ begin
      or not (d ? 'anmeldeprotokoll') then
     raise exception 'FEHLER: meine_daten ohne partien_online, freigabe_widerruf oder anmeldeprotokoll: %', d;
   end if;
+  -- Visitenkarte immer als Objekt mit Listen (leer, wenn karte-schema.sql fehlt)
+  if jsonb_typeof(d -> 'karte') is distinct from 'object' or jsonb_typeof(d -> 'karte' -> 'stufen') is distinct from 'array'
+     or jsonb_typeof(d -> 'karte' -> 'taler') is distinct from 'array' or jsonb_typeof(d -> 'karte' -> 'banner') is distinct from 'array'
+     or not (d -> 'karte' ? 'wahl') then
+    raise exception 'FEHLER: meine_daten ohne karte (stufen, taler, banner, wahl): %', d;
+  end if;
+  -- Liga mit Kronen immer als Objekt mit Listen (leer, wenn kronen-schema.sql fehlt)
+  if jsonb_typeof(d -> 'kronen') is distinct from 'object' or jsonb_typeof(d -> 'kronen' -> 'buchungen') is distinct from 'array'
+     or jsonb_typeof(d -> 'kronen' -> 'gruppen') is distinct from 'array' or jsonb_typeof(d -> 'kronen' -> 'belohnungen') is distinct from 'array'
+     or jsonb_typeof(d -> 'kronen' -> 'ki_belege') is distinct from 'array'
+     or not (d -> 'kronen' ? 'stand') or not (d -> 'kronen' ? 'suche') then
+    raise exception 'FEHLER: meine_daten ohne kronen (stand, buchungen, gruppen, belohnungen, suche, ki_belege): %', d;
+  end if;
+  -- Raetsel-Duell immer als Objekt mit Liste (leer, wenn raetsel-duell-schema.sql fehlt)
+  if jsonb_typeof(d -> 'raetsel_duell') is distinct from 'object' or jsonb_typeof(d -> 'raetsel_duell' -> 'duelle') is distinct from 'array'
+     or not (d -> 'raetsel_duell' ? 'suche') then
+    raise exception 'FEHLER: meine_daten ohne raetsel_duell (duelle, suche): %', d;
+  end if;
+  -- Coach, Schule, Abo- und Editions-Ereignisse (seit 09.11.2026) immer da, leer, wenn das Schema fehlt
+  if jsonb_typeof(d -> 'coach' -> 'nutzung') is distinct from 'array' or jsonb_typeof(d -> 'abo_ereignisse') is distinct from 'array'
+     or jsonb_typeof(d -> 'schule' -> 'geleitete_klassen') is distinct from 'array'
+     or jsonb_typeof(d -> 'schule' -> 'mitgliedschaften') is distinct from 'array'
+     or jsonb_typeof(d -> 'schule' -> 'beitrittsversuche') is distinct from 'array'
+     or jsonb_typeof(d -> 'edition_ereignisse') is distinct from 'array' then
+    raise exception 'FEHLER: meine_daten ohne coach, schule, abo_ereignisse oder edition_ereignisse: %', d;
+  end if;
   -- Zaehler der Mengenbremse (A hat eine Partie und ein Nutzungsereignis geteilt), Fehlversuche immer als Liste
   if jsonb_typeof(d -> 'mengenzaehler') <> 'array'
      or (select coalesce(sum((z ->> 'anzahl')::integer), 0) from jsonb_array_elements(d -> 'mengenzaehler') z

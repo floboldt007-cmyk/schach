@@ -1,0 +1,204 @@
+{
+  "stand": "2026-11-06",
+  "hinweis": "Nur Grafiken, noch nicht in die App eingebaut. Flo gibt jedes Banner frei. Keine Preise: die stehen nur im Vault.",
+  "quelle": "werkzeuge/banner-vorrat.mjs",
+  "format": "1200x300, Motiv mittig-links, ruhige abgedunkelte Flaeche rechts fuer weisse Schrift; Zuschnitt per cover, Position etwa 30% mittig",
+  "arten": {
+    "saison": "Saison-Belohnung je Liga, nie kaeuflich",
+    "erfolg": "Gold-Stufe seltener Erfolge, nie kaeuflich",
+    "start": "fuer neue Spieler",
+    "shop": "Wochen-Shop, Selten bis Exklusiv",
+    "bot": "feste Banner der KI-Gegner mit Zeichen KI"
+  },
+  "banner": [
+    {
+      "id": "saison-holz",
+      "art": "saison",
+      "name": "Saison Holz",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Saison-Belohnung der Liga Holz. Nur erspielbar.",
+      "datei": "assets/banner/saison-holz.svg"
+    },
+    {
+      "id": "saison-bronze",
+      "art": "saison",
+      "name": "Saison Bronze",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Saison-Belohnung der Liga Bronze. Nur erspielbar.",
+      "datei": "assets/banner/saison-bronze.svg"
+    },
+    {
+      "id": "saison-silber",
+      "art": "saison",
+      "name": "Saison Silber",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Saison-Belohnung der Liga Silber. Nur erspielbar.",
+      "datei": "assets/banner/saison-silber.svg"
+    },
+    {
+      "id": "saison-gold",
+      "art": "saison",
+      "name": "Saison Gold",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Saison-Belohnung der Liga Gold. Nur erspielbar.",
+      "datei": "assets/banner/saison-gold.svg"
+    },
+    {
+      "id": "saison-diamant",
+      "art": "saison",
+      "name": "Saison Diamant",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Saison-Belohnung der Liga Diamant. Nur erspielbar.",
+      "datei": "assets/banner/saison-diamant.svg"
+    },
+    {
+      "id": "saison-krone",
+      "art": "saison",
+      "name": "Saison Krone",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Saison-Belohnung der Liga Krone, die hoechste Liga. Nur erspielbar.",
+      "datei": "assets/banner/saison-krone.svg"
+    },
+    {
+      "id": "erfolg-raetselmeister",
+      "art": "erfolg",
+      "name": "Rätselmeister",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Gold-Stufe des Erfolgs fuer viele geloeste Raetsel.",
+      "datei": "assets/banner/erfolg-raetselmeister.svg"
+    },
+    {
+      "id": "erfolg-seriensieger",
+      "art": "erfolg",
+      "name": "Seriensieger",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Gold-Stufe des Erfolgs fuer eine lange Siegesserie.",
+      "datei": "assets/banner/erfolg-seriensieger.svg"
+    },
+    {
+      "id": "erfolg-turmbezwinger",
+      "art": "erfolg",
+      "name": "Turmbezwinger",
+      "seltenheit": "Leistung",
+      "kaeuflich": false,
+      "text": "Gold-Stufe des Erfolgs fuer die ganze Bot-Leiter.",
+      "datei": "assets/banner/erfolg-turmbezwinger.svg"
+    },
+    {
+      "id": "start",
+      "art": "start",
+      "name": "Erster Zug",
+      "seltenheit": "Start",
+      "kaeuflich": false,
+      "text": "Start-Banner, das jeder neue Spieler sofort bekommt.",
+      "datei": "assets/banner/start.svg"
+    },
+    {
+      "id": "shop-abendrot",
+      "art": "shop",
+      "name": "Abendrot",
+      "seltenheit": "Selten",
+      "kaeuflich": true,
+      "text": "Sonne sinkt hinter weichen Huegeln.",
+      "datei": "assets/banner/shop-abendrot.svg"
+    },
+    {
+      "id": "shop-wellenschlag",
+      "art": "shop",
+      "name": "Wellenschlag",
+      "seltenheit": "Selten",
+      "kaeuflich": true,
+      "text": "Wellen rollen quer ueber die Karte.",
+      "datei": "assets/banner/shop-wellenschlag.svg"
+    },
+    {
+      "id": "shop-nordwald",
+      "art": "shop",
+      "name": "Nordwald",
+      "seltenheit": "Selten",
+      "kaeuflich": true,
+      "text": "Tannen unter einem kalten Mond.",
+      "datei": "assets/banner/shop-nordwald.svg"
+    },
+    {
+      "id": "shop-sternenzelt",
+      "art": "shop",
+      "name": "Sternenzelt",
+      "seltenheit": "Episch",
+      "kaeuflich": true,
+      "text": "Ein eigenes Sternbild ueber tiefer Nacht.",
+      "datei": "assets/banner/shop-sternenzelt.svg"
+    },
+    {
+      "id": "shop-neongitter",
+      "art": "shop",
+      "name": "Neongitter",
+      "seltenheit": "Episch",
+      "kaeuflich": true,
+      "text": "Leuchtendes Gitter bis zum Horizont.",
+      "datei": "assets/banner/shop-neongitter.svg"
+    },
+    {
+      "id": "shop-drachenschuppe",
+      "art": "shop",
+      "name": "Drachenschuppe",
+      "seltenheit": "Episch",
+      "kaeuflich": true,
+      "text": "Smaragdgruene Schuppen und ein wachsames Auge.",
+      "datei": "assets/banner/shop-drachenschuppe.svg"
+    },
+    {
+      "id": "shop-kronjuwel",
+      "art": "shop",
+      "name": "Kronjuwel",
+      "seltenheit": "Exklusiv",
+      "kaeuflich": true,
+      "text": "Sonder-Banner zum Set Kronjuwel: Rubin auf Onyx mit Goldrand.",
+      "datei": "assets/banner/shop-kronjuwel.svg"
+    },
+    {
+      "id": "shop-thronsaal",
+      "art": "shop",
+      "name": "Thronsaal",
+      "seltenheit": "Exklusiv",
+      "kaeuflich": true,
+      "text": "Sonder-Banner: Vorhang, Krone und Schachboden.",
+      "datei": "assets/banner/shop-thronsaal.svg"
+    },
+    {
+      "id": "bot-schaltkreis",
+      "art": "bot",
+      "name": "KI Schaltkreis",
+      "seltenheit": "Bot",
+      "kaeuflich": false,
+      "text": "Fester Banner fuer KI-Gegner: Leiterbahnen.",
+      "datei": "assets/banner/bot-schaltkreis.svg"
+    },
+    {
+      "id": "bot-zahnwerk",
+      "art": "bot",
+      "name": "KI Zahnwerk",
+      "seltenheit": "Bot",
+      "kaeuflich": false,
+      "text": "Fester Banner fuer KI-Gegner: Zahnraeder.",
+      "datei": "assets/banner/bot-zahnwerk.svg"
+    },
+    {
+      "id": "bot-datenstrom",
+      "art": "bot",
+      "name": "KI Datenstrom",
+      "seltenheit": "Bot",
+      "kaeuflich": false,
+      "text": "Fester Banner fuer KI-Gegner: fallende Datenpunkte.",
+      "datei": "assets/banner/bot-datenstrom.svg"
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 .tr-karte .tr-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .tr-karte h2 { font-size: 28px; }
 .tr-punkte { color: var(--akzent-text); font-size: 15px; letter-spacing: .12em; white-space: nowrap; }
+.tr-stufe { display: inline-flex; align-items: baseline; gap: 8px; color: var(--text-2); font-size: 13px; font-weight: 700; white-space: nowrap; }
 .tr-karte .t-fuss > span:empty { display: none; }
 .tr-karte .t-fuss { justify-content: flex-end; }
 .tr-los .ico { width: 18px; height: 18px; }

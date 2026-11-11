@@ -7,14 +7,35 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 245;
-const STAND = '1542f9126300';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 296;
+const STAND = '25e60b7b01a5';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  // Etappe 4b: Visitenkarte, Erfolgs-Stufen, Taler; Banner ohne Shop (der kommt spaeter)
+  'js/besitz.js',
+  'js/karte.js',
+  'js/ui/visitenkarte.js',
+  'css/visitenkarte.css',
+  'js/pakete/sammlung/stufen.js',
+  'js/pakete/sammlung/moment.js',
+  'js/pakete/sammlung/karte-texte.js',
+  'assets/banner/bot-datenstrom.svg',
+  'assets/banner/bot-schaltkreis.svg',
+  'assets/banner/bot-zahnwerk.svg',
+  'assets/banner/erfolg-raetselmeister.svg',
+  'assets/banner/erfolg-seriensieger.svg',
+  'assets/banner/erfolg-turmbezwinger.svg',
+  'assets/banner/saison-bronze.svg',
+  'assets/banner/saison-diamant.svg',
+  'assets/banner/saison-gold.svg',
+  'assets/banner/saison-holz.svg',
+  'assets/banner/saison-krone.svg',
+  'assets/banner/saison-silber.svg',
+  'assets/banner/start.svg',
   'js/pakete/lernen/taktik.js',
   'js/pakete/lernen/eroeffnungen.js',
   'daten/boss/spielplan.json',
@@ -35,11 +56,17 @@ const DATEIEN = [
   'js/pakete/lernen/mattbilder.js',
   'js/pakete/lernen/endspiele.js',
   'js/pakete/lernen/texte.js',
+  'js/pakete/lernen/zugang.js',
   'js/ui/lernen.js',
   'css/pakete/lobby.css',
   'js/pakete/lobby/index.js',
   'js/pakete/lobby/texte.js',
   'js/ui/lobby.js',
+  'css/pakete/raetsel-duell.css',
+  'js/pakete/lobby/raetsel-duell.js',
+  'js/pakete/lobby/raetsel-duell-texte.js',
+  'js/ui/raetsel-duell.js',
+  'js/raetsel-duell.js',
   'js/ui/lektion.js',
   'css/pakete/sammlung.css',
   'js/pakete/sammlung/index.js',
@@ -93,6 +120,14 @@ const DATEIEN = [
   'js/pakete/liga/ansicht.js',
   'js/pakete/liga/index.js',
   'js/pakete/liga/wertung.js',
+  'js/pakete/liga/kronen.js',
+  'js/pakete/liga/gruppe.js',
+  'assets/liga/bauer.svg',
+  'assets/liga/springer.svg',
+  'assets/liga/laeufer.svg',
+  'assets/liga/turm.svg',
+  'assets/liga/dame.svg',
+  'assets/liga/koenig.svg',
   // Stufe 2: Spielsysteme (P1 bis P3) und Welle A
   'css/pakete/funken.css',
   'js/pakete/funken/ansicht.js',
@@ -176,6 +211,7 @@ const DATEIEN = [
   'js/feier.js',
   'js/inhalte.js',
   'js/konto-config.js',
+  'js/botschutz.js',
   'js/konto.js',
   'js/umzug.js',
   'js/profil.js', 'js/rahmen-kunst.js', 'js/sammlung-kunst.js', 'js/kreaturen-kunst.js', 'js/emote-kunst.js', 'js/titel-kunst.js',
@@ -191,6 +227,9 @@ const DATEIEN = [
   'js/nachholen.js',
   'js/online.js',
   'js/freunde.js',
+  'js/kronen.js',
+  'js/gegnersuche.js',
+  'js/zaehler.js',
   'js/openings.js',
   'js/orte.js',
   'js/review.js',
@@ -728,15 +767,42 @@ const DATEIEN = [
 async function mitTyp(datei, antwort) {
   if (/\.[a-z0-9]+$/i.test(datei)) return antwort;
   const text = await antwort.text();
-  return new Response(text, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  const kopf = { 'Content-Type': 'text/plain; charset=utf-8' };
+  // das ETag bleibt dran, sonst kommt die Datei bei jedem Update voll neu (holeFrisch)
+  if (antwort.headers.get('ETag')) kopf.ETag = antwort.headers.get('ETag');
+  return new Response(text, { status: 200, headers: kopf });
+}
+
+// Der Cache der Vorgaenger-Version (falls da): unveraenderte Dateien muessen beim Update nicht neu durchs Netz
+async function alterCache() {
+  const namen = (await caches.keys()).filter((n) => n.startsWith(PRAEFIX) && n !== CACHE)
+    .sort((a, b) => Number(b.slice(PRAEFIX.length + 1)) - Number(a.slice(PRAEFIX.length + 1)));
+  return namen.length ? caches.open(namen[0]) : null;
+}
+
+// Eine Datei frisch vom Server, nie ungeprueft aus einem Cache (sonst rutscht eine alte Datei in den neuen Cache):
+//   - liegt sie im alten Cache mit ETag, fragt der Server "geaendert?" (If-None-Match); 304 = die alte Antwort gilt weiter
+//   - sonst prueft der Browser seinen HTTP-Cache beim Server nach ('no-cache'): beim Erstbesuch kommen die Dateien,
+//     die die Seite gerade geladen hat, als 304 ohne zweiten Download
+// Leistungsmessung 09.11.2026: vorher lud jedes Update alle Dateien neu (744 Anfragen, 8,3 MB), auch die
+// unveraenderte Stockfish-Datei (1,8 MB), und der Erstbesuch holte die Dateien der Seite ein zweites Mal.
+async function holeFrisch(datei, alt) {
+  const vorher = alt ? await alt.match(datei) : null;
+  const etag = vorher && vorher.headers.get('ETag');
+  if (etag) {
+    const antwort = await fetch(new Request(datei, { cache: 'no-store', headers: { 'If-None-Match': etag } }));
+    if (antwort.status === 304) return vorher;
+    if (antwort.ok) return antwort;
+  }
+  return fetch(new Request(datei, { cache: 'no-cache' }));
 }
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
+    const alt = await alterCache().catch(() => null);
     await Promise.all(DATEIEN.map(async (datei) => {
-      // am HTTP-Cache vorbei, damit keine alte Datei in den neuen Cache rutscht
-      const antwort = await fetch(new Request(datei, { cache: 'reload' }));
+      const antwort = await holeFrisch(datei, alt);
       if (!antwort.ok) throw new Error(`Vorladen fehlgeschlagen: ${datei} (${antwort.status})`);
       await cache.put(datei, await mitTyp(datei, antwort));
     }));
@@ -767,17 +833,20 @@ self.addEventListener('fetch', (e) => {
 });
 
 async function antworte(req, url) {
-  const cache = await caches.open(CACHE);
+  // Nie caches.open vor dem Treffer: das legt einen fehlenden Cache an. Bis clients.claim() der neuen Fassung beantwortet
+  // die alte noch Anfragen, ihr Cache ist da aber schon geloescht und kaeme so wieder (tests/sw-cache.test.mjs, CI 09.11.2026).
   const navigation = req.mode === 'navigate';
   // "./" und "index.html?test" sind dieselbe Startseite
   const start = url.pathname === BASIS || url.pathname === BASIS + 'index.html';
-  const treffer = start ? await cache.match(BASIS + 'index.html')
-    : await cache.match(req, { ignoreSearch: navigation });
+  const treffer = start ? await caches.match(BASIS + 'index.html', { cacheName: CACHE })
+    : await caches.match(req, { cacheName: CACHE, ignoreSearch: navigation });
   if (treffer) return treffer;
-  // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen
+  // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen, aber nur, solange der eigene Cache noch besteht
   const antwort = await fetch(req);
   if (antwort.status === 200 && antwort.type === 'basic') {
-    cache.put(req, antwort.clone()).catch(() => { /* Speicher voll o. ae.: egal */ });
+    const kopie = antwort.clone();
+    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, kopie))
+      .catch(() => { /* Speicher voll o. ae.: egal */ });
   }
   return antwort;
 }

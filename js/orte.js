@@ -44,8 +44,15 @@ export const ORTE = Object.freeze({
   // Profil (Flo 30.10.2026): Karte oben im Reiter Ich, Vitrine fuer das Duell-Intro
   'ich:kopf': 'dom',
   'duell:profil?': 'wahl',
+  // Visitenkarte (Etappe 4b): die eigene Karte fuer Lobby und Partie (js/ui/visitenkarte.js eigeneKarte), Paket sammlung
+  'karte:eigene?': 'wahl',
+  // dieselbe Karte fuer einen anderen Spieler aus den Server-Daten (Kontext { daten }: karte_von aus supabase/karte-schema.sql)
+  'karte:fremde?': 'wahl',
   'arena:panel-oben': 'dom',
   'arena:panel-bot': 'dom',
+  // Steckbrief eines Bots (T-3, Flo 09.11.2026): Blatt beim Antippen des Gegnerbilds, Host js/ui/arena.js, Kontext
+  // { app, bot, fortschritt }
+  'arena:steckbrief': 'dom',
   'arena:start': 'aufruf',
   'partie:begruessung?': 'wahl',
   'ergebnis:karte': 'dom',
@@ -56,7 +63,11 @@ export const ORTE = Object.freeze({
   'einstellungen:klang': 'dom',
   'app:erster-screen?': 'wahl',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2), Hosts und Kontexte in ARCHITEKTUR.md "W0+a: Spiel-Fundament"
+  // seit Variante A (Flo 08.11.2026) ohne Host: das Bots-Panel zeigt nur noch den Gegner
   'arena:heute': 'dom',
+  // Startseite "Als Naechstes" (Variante A, Flo 08.11.2026): Tagesziele als je eine Zeile unter den Wegen, Host
+  // js/ui/heim.js. Kontext { app, tag, zeile({ symbol, titel, text, label, beiTipp, paket }) -> button.heim-zeile }
+  'heim:naechstes': 'dom',
   'partie:gegner-leiste': 'dom',
   'partie:matt': 'aufruf',
   'ergebnis:abrechnung': 'dom',

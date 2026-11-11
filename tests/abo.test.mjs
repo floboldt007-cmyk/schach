@@ -304,7 +304,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -430,15 +430,15 @@ async function browserTeil(browser) {
     const z = await blattZustand(seite);
     pruefe('Blatt: Dialog, Preis folgt, "Bald verfügbar" aus, Schließen', z.dialog && z.zustand === 'vorschau' && z.preis === 'Preis folgt'
       && JSON.stringify(z.knoepfe) === JSON.stringify(['Bald verfügbar (aus)', 'Schließen']) && /in Vorbereitung/.test(z.stand), z);
-    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 8 unter "In Arbeit" (noch nicht enthalten), 4 immer gratis, jederzeit kündbar',
-      z.vorteile === 0 && z.geplant === 8 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 4
+    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 9 unter "In Arbeit" (noch nicht enthalten), 5 immer gratis, jederzeit kündbar',
+      z.vorteile === 0 && z.geplant === 9 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 5
       && /Jederzeit kündbar/.test(await seite.locator('.trainer-karte').innerText()), z);
     // Luecken-Check 2 (Paragraf 5 UWG): "Immer gratis" nennt nur Gebautes; Wochen-Boss, Raetsel ohne Tageslimit, Lernpfad 1
     // bis 4 und Medaillen stehen gesondert als "Kommt noch, ebenfalls gratis"
     const ungebaut = /Wochen-Boss|ohne Tageslimit|Lernpfad|Medaillen/;
-    pruefe('Blatt: "Immer gratis" nur mit Gebautem (Bots, Schachuhr, Analyse, Kartei, Tagesrätsel, Level, Wertung, Serie)',
+    pruefe('Blatt: "Immer gratis" nur mit Gebautem (Bots, Schachuhr, Analyse, Kartei, Tagesrätsel, Meisterschule leicht, Level, Wertung, Serie)',
       JSON.stringify(z.gratisListe) === JSON.stringify(['Alle 30 Bots in fünf Welten und die Schachuhr', 'Live-Bewertung und Spielanalyse ohne Grenze',
-        'Fehler-Kartei und Tagesrätsel', 'Level, Wertung und Serie']) && !z.gratisListe.some((t) => ungebaut.test(t)), z.gratisListe);
+        'Fehler-Kartei und Tagesrätsel', 'Meisterschule: alle leichten Lektionen und je eine Probe', 'Level, Wertung und Serie']) && !z.gratisListe.some((t) => ungebaut.test(t)), z.gratisListe);
     pruefe('Blatt: Ungebautes unter "Kommt noch, ebenfalls gratis" mit Hinweis "Noch nicht enthalten"',
       JSON.stringify(z.gratisKommtListe) === JSON.stringify(['Wochen-Boss', 'Rätsel ohne Tageslimit', 'Lernpfad: Einheiten 1 bis 4', 'Medaillen'])
       && await seite.evaluate(() => /Kommt noch, ebenfalls gratis/.test(document.querySelector('.trainer-gratis-kommt').textContent)
@@ -461,7 +461,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte').dataset.zustand !== 'laedt');
     const zb = await blattZustand(seite);
     pruefe('gemeldeter Gratis-Teil (wochen-boss) steht unter "Immer gratis", nicht mehr unter "Kommt noch"; kein Kauf dadurch',
-      zb.gratis === 5 && zb.gratisListe.includes('Wochen-Boss') && zb.gratisKommt === 3 && !zb.gratisKommtListe.includes('Wochen-Boss')
+      zb.gratis === 6 && zb.gratisListe.includes('Wochen-Boss') && zb.gratisKommt === 3 && !zb.gratisKommtListe.includes('Wochen-Boss')
       && zb.zustand === 'vorschau' && zb.vorteile === 0, zb);
     await seite.keyboard.press('Escape');
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
@@ -511,7 +511,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => ['vorschau', 'kaufbar'].includes(document.querySelector('.trainer-karte')?.dataset.zustand));
     const ohneVorteil = await blattZustand(seite);
     pruefe('aktives Produkt ohne gebauten Vorteil: "Bald verfügbar" statt Kauf, alle Vorteile "In Arbeit"', ohneVorteil.zustand === 'vorschau'
-      && !ohneVorteil.knoepfe.includes('Trainer abschließen') && ohneVorteil.knoepfe[0] === 'Bald verfügbar (aus)' && ohneVorteil.geplant === 8
+      && !ohneVorteil.knoepfe.includes('Trainer abschließen') && ohneVorteil.knoepfe[0] === 'Bald verfügbar (aus)' && ohneVorteil.geplant === 9
       && ohneVorteil.vorteile === 0, ohneVorteil);
     await seite.keyboard.press('Escape');
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
@@ -520,8 +520,8 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
     const z = await blattZustand(seite);
     pruefe('kaufbar: "Trainer abschließen" zuerst, Preis aus der Tabelle', z.knoepfe[0] === 'Trainer abschließen' && z.preis === PRODUKT.preis_text, z);
-    pruefe('kaufbar: nur der gemeldete Vorteil unter "Im Trainer", die anderen 7 "In Arbeit"', z.vorteile === 1 && /Coach-Erklärungen/.test(z.imAbo[0])
-      && z.geplant === 7, z);
+    pruefe('kaufbar: nur der gemeldete Vorteil unter "Im Trainer", die anderen 8 "In Arbeit"', z.vorteile === 1 && /Coach-Erklärungen/.test(z.imAbo[0])
+      && z.geplant === 8, z);
     pruefe('kaufbar: ruhiger Satz zum Alter sichtbar (Web ab 18, Crownmate ab 16), kein Testmodus-Satz', /Web ab 18/.test(z.alter) && /ab 16/.test(z.alter)
       && z.test === '', z.alter);
     await warte(600);
@@ -685,7 +685,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar', null, { timeout: 5000 }).catch(() => {});
     const z = await blattZustand(seite);
     pruefe('Testmodus-Link: kaufbar fuer den Probekauf (ANLEITUNG Schritt 10), Satz "kein echtes Geld"', z.zustand === 'kaufbar' && /kein echtes Geld/.test(z.test)
-      && z.vorteile === 0 && z.geplant === 8, z);
+      && z.vorteile === 0 && z.geplant === 9, z);
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }

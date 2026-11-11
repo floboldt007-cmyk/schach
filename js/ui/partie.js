@@ -54,7 +54,8 @@
 //   zug:abgelehnt { laufId, von, nach, art, figur, fen }: aus board.js beiAbgelehnt, nur wenn Flo am Zug ist.
 //   ergebnis:karte-Kontext zusaetzlich boss; die Abrechnungs-Huelle (ergebnis:abrechnung) haengt sich dort mit
 //   Reihenfolge 3 ein (js/ui/abrechnung.js).
-//   Buehne zusaetzlich: boss (eingefroren oder null), seed, zeigt(name) -> boolean fuer die Anzeigen
+//   Buehne zusaetzlich: ki (true bei einem KI-Gegner der Liga, params.ki; Etappe 4b: Visitenkarten-Streifen in den
+//   Spielerleisten), boss (eingefroren oder null), seed, zeigt(name) -> boolean fuer die Anzeigen
 //   'zaehlwerk' | 'funkenlinie' | 'lebensleiste' | 'balken' (Einstellungen der App), platz(name) -> HTMLElement
 //   fuer 'zaehlwerk' (.p-zaehlwerk im Kopf) und 'funkenlinie' (.p-funkenlinie unten am Brett-Rahmen); der Platz
 //   ist versteckt, solange die Einstellung aus ist, und folgt ihr. Nach partie:verlassen: platz -> null.
@@ -131,7 +132,7 @@ import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
 import {
   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
-  ladePartien, GENAUIGKEIT_STERN, BESTWERT_MIN_ZUEGE, eigeneZuege, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
+  ladePartien, GENAUIGKEIT_STERN, BESTWERT_MIN_ZUEGE, eigeneZuege, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten, pruefeKiRef,
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle, waehle, angeboten } from '../orte.js';
@@ -330,6 +331,9 @@ export function zeige(root, params, app) {
     boss: modus === 'boss' ? pruefeBoss(quelle.boss) : null,
     liga: pruefeLiga(quelle.liga),
     tempo: pruefeTempo(quelle.tempo),
+    // Etappe B Task 4: Bot als Ersatz aus der Gegnersuche (KI-Gegner), mit Beleg fuer die Kronen (Task 5)
+    ki: quelle.ki === true,
+    kiRef: quelle.ki === true ? pruefeKiRef(quelle.kiRef) : null,
     zeiten: pruefeZeiten(laufend && laufend.zeiten),
     finisher: false,
     effektGemerkt: null,
@@ -428,13 +432,16 @@ export function zeige(root, params, app) {
   s.style.setProperty('--bf', themaBotFarbe(bot));
   const knopf = (aktion, ico, text, extra = '', label = '') =>
     `<button class="knopf aktion dr ${extra}" type="button" data-aktion="${aktion}"${label ? ` aria-label="${esc(label)}"` : ''}>${icon(ico)}<span>${esc(text)}</span></button>`;
+  // Zug zurueck/vor als schmale Spalten der Knopfreihe: nur sichtbar, wo der Zugstreifen unter den Knoepfen liegt (Handy
+  // unter 760 px Hoehe, iPad hoch; css/partie.css "Pfeile in der Knopfreihe"), sonst lag er unter dem Bildschirmrand
+  const pfeilKnopf = (aktion, ico, extra) => `<button class="knopf aktion dr sk-pfeil ${extra}" type="button" data-aktion="${aktion}" aria-label="${esc(t(aktion === 'zug-vor' ? 'partie.zuege.vor' : 'partie.zuege.zurueck'))}">${icon(ico)}</button>`;
   const brettwahl = BRETTER.map(([id, h, d]) => `<button class="dr" type="button" role="radio" data-brett="${id}" aria-label="${esc(t('partie.kopf.brett', { name: t('partie.brett.' + id) }))}" `
     + `aria-checked="${einst.brett === id}"><i style="--h:${h};--d:${d}"><b></b><b></b><b></b><b></b></i></button>`).join('');
   const uhrHtml = (wer) => `<div class="uhr zahl" data-wer="${wer}" hidden>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
   s.innerHTML = `
     <header class="kopf p-kopf">
-      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t('partie.kopf.zurueck'))}">${icon('zurueck')}</button>
-      <div class="titel"><h2>${esc(kopfTitel())}</h2><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
+      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t(rueckZiel() === 'heim' ? 'partie.kopf.zurueckStart' : 'partie.kopf.zurueck'))}">${icon('zurueck')}</button>
+      <div class="titel"><h1>${esc(kopfTitel())}</h1><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
     ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">${esc(t('partie.kopf.stufe', { stufe: bot.stufe }))}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">${esc(t('partie.kopf.duSpielst'))}</span>${esc(farbeName(farbe))}</span></div></div>
       <div class="brettwahl" role="radiogroup" aria-label="${esc(t('partie.kopf.brettfarbe'))}">${brettwahl}</div>
       <button class="icon-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(t('partie.kopf.klang'))}">${icon('klang')}</button>
@@ -450,14 +457,14 @@ export function zeige(root, params, app) {
         <div class="spieler gegner botbox botleiste-hoch botkarte" role="group" aria-label="${esc(bot.name)}">
           <span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span>
           <div class="info"><div class="name bot-name">${esc(bot.name)}</div>
-            <div class="unter bot-meta"><span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
+            <div class="unter bot-meta">${z.ki ? `<span class="ki-abzeichen">${esc(t('partie.kiGegner'))}</span>` : ''}<span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
           ${uhrHtml('bot')}
           <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>
         <div class="coach coach-karte leer"></div>
         <div class="sr zugansage" role="status" aria-live="polite" aria-atomic="true"></div>
-        <div class="zugbox"><div class="zb-kopf"><button class="icon-knopf zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button><span class="zb-titel">${esc(t('partie.zuege.label'))}</span><button class="icon-knopf zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button></div><div class="zugliste" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
-        <div class="zugleiste" aria-label="${esc(t('partie.zuege.label'))}"></div>
+        <div class="zugbox"><div class="zb-kopf"><button class="icon-knopf zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button><span class="zb-titel">${esc(t('partie.zuege.label'))}</span><button class="icon-knopf zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button></div><div class="zugliste" role="region" tabindex="0" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
+        <div class="zugleiste" role="region" tabindex="0" aria-label="${esc(t('partie.zuege.label'))}"></div>
         <div class="pfeil-tipp" role="note" hidden><span class="pt-text"></span><button class="pt-ok dr" type="button" data-aktion="pfeil-tipp">${esc(t('partie.pfeil.ok'))}</button></div>
         <div class="spieler ich spielerleiste spieler-quer spieler-hoch" role="group" aria-label="${esc(meinName())}">
           <span class="av">${floAvatar(farbe)}</span>
@@ -466,8 +473,10 @@ export function zeige(root, params, app) {
           ${uhrHtml('flo')}
         </div>
         <div class="spielknoepfe aktionen">
+          ${pfeilKnopf('zug-zurueck', 'zurueck', 'zl-zurueck')}
           ${knopf('hinweis', 'hinweis', t('partie.knopf.hinweis'), 'hinweis-k')}
           ${knopf('drehen', 'drehen', t('partie.knopf.drehen'))}${knopf('aufgeben', 'flagge', t('partie.knopf.aufgeben'), 'aufgeben')}
+          ${pfeilKnopf('zug-vor', 'vor', 'zl-vor')}
         </div>
       </div>
     </div>`;
@@ -654,8 +663,8 @@ export function zeige(root, params, app) {
     const n = z.verbose.length;
     // Pfeile im Zugstreifen (hoch) und ueber der Zugliste (quer, Flo 01.11.2026: "den letzten Zug ansehen ist auf dem iPad
     // noch nicht frei": quer gab es nur das Antippen in der Liste)
-    for (const b of $$('.zugleiste .zl-zurueck, .zugbox .zl-zurueck')) b.disabled = !n || ansehen.ply === -1;
-    for (const b of $$('.zugleiste .zl-vor, .zugbox .zl-vor')) b.disabled = ansehen.ply == null;
+    for (const b of $$('.zugleiste .zl-zurueck, .zugbox .zl-zurueck, .spielknoepfe .zl-zurueck')) b.disabled = !n || ansehen.ply === -1;
+    for (const b of $$('.zugleiste .zl-vor, .zugbox .zl-vor, .spielknoepfe .zl-vor')) b.disabled = ansehen.ply == null;
     // der angesehene Zug rollt in die Mitte des Streifens
     const an = $('.zugleiste .z.angesehen');
     if (an) { const zl = an.closest('.zugleiste'); zl.scrollLeft = an.offsetLeft - zl.clientWidth / 2 + an.offsetWidth / 2; }
@@ -739,7 +748,7 @@ export function zeige(root, params, app) {
       if (istFlo(i) && liveAn()) {
         const k = z.liveKlassen[i];
         const e = z.live[i];
-        if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_WORT[k])}: </span></span>`;
+        if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_NAME[k])}: </span></span>`;  // Vorlesen: Name ohne Satzzeichen (sonst "Solid.:")
         else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
       }
       return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}${i === ansehen.ply ? ' angesehen' : ''}" data-ply="${i}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
@@ -898,6 +907,9 @@ export function zeige(root, params, app) {
     if (!ruhig.has(coachEl)) reserviereCoach();
     for (const el of [coachEl, s.querySelector('.spieler.gegner'), s.querySelector('.spielknoepfe')]) {
       if (!el || !el.isConnected || el.classList.contains('offen')) continue;
+      // Handy: der Coach hat feste Hoehen, die layout() je nach Platz waehlt (.coach-eng); gemerkt blieben 76 px aus dem
+      // ersten Bild, auf dem iPhone SE lagen die Knoepfe dann unter dem Rand (08.11.2026)
+      if (el === coachEl && istHandy()) continue;
       const h = el.offsetHeight;
       if (h > (ruhig.get(el) || 0)) { ruhig.set(el, h); el.style.minHeight = h + 'px'; }
     }
@@ -1070,6 +1082,13 @@ export function zeige(root, params, app) {
       zug: zugLabel(ply),
       erklaerung: String(erklaerung || '').trim(),
     });
+  }
+  // Punkt 34 (Barrierefreiheit 09.11.): auch der Zug des Bots kommt in die Live-Region ("Benno zieht 1… e5. Schach."),
+  // sonst erfaehrt man ohne Bild nicht, was der Gegner gezogen hat
+  function sageBotZugAn(ply) {
+    if (!zugansageEl) return;
+    const zusatz = z.chess.isCheckmate() ? t('partie.ansage.matt') : z.chess.inCheck() ? t('partie.ansage.schach') : '';
+    zugansageEl.textContent = t('partie.ansage.bot', { name: rufnameVon(bot), zug: zugLabel(ply) }) + zusatz;
   }
 
   function zeigeIdee(ply) {
@@ -1299,7 +1318,10 @@ export function zeige(root, params, app) {
         const info = Object.freeze({ serie: serieBis(ply), serieVorher: serieBis(ply - 1), trivial: z.liveTrivial[ply] === true, ply });
         const w = klassenKlang(k, info);
         const lande = z.landung[ply] || null;
-        const verdraengt = !!(w && (w.name === 'bester' || w.name === 'combo') && lande && (lande.name === 'schach' || lande.name === 'umwandlung'));
+        // Am Partie-Ende hat die Landung keinen Zugklang (name null, siehe spieleKlang), dort fuehrt der Ende-Klang: auch
+        // er verdraengt Praezise/COMBO
+        const verdraengt = !!(w && (w.name === 'bester' || w.name === 'combo') && lande
+          && (lande.name === 'schach' || lande.name === 'umwandlung' || lande.name === null));
         const ms = Math.max(0, Math.round((lande ? lande.um : 0) + BEWERTUNG_NACH_MS - jetzt()));
         if (!verdraengt) spaeter(() => klang.klasse(k, info), ms);
         melde({ typ: 'bewertungsklang', ply, klasse: k, name: w ? w.name : null, ms, still: verdraengt });
@@ -1611,6 +1633,7 @@ export function zeige(root, params, app) {
     sendeZug(ply, m, 'bot');
     spieleKlang(m, brett.gleitDauer(), ply);
     melde({ typ: 'zug', wer: 'bot', uci: m.lan, ply });
+    sageBotZugAn(ply);
     const paar = ply - 1;
     if (m.captured) zeigeBlase('schlagen', paar, { prio: 50 });
     else if (z.chess.inCheck()) zeigeBlase('schach', paar, { prio: 50 });
@@ -1733,11 +1756,16 @@ export function zeige(root, params, app) {
     if (ok && !weg) ende('niederlage', 'aufgabe');
   }
 
+  // Kundenblick 09.11. (Befund 9): zurueck dorthin, woher man kam (Start oder Bots), nicht immer zu den Bots
+  function rueckZiel() {
+    const ort = typeof app.herkunft === 'function' ? app.herkunft() : null;
+    return ort === 'heim' ? 'heim' : 'arena';
+  }
   async function zurueckGedrueckt() {
-    if (z.phase === 'ende') { app.gehe('arena'); return; }
+    if (z.phase === 'ende') { app.gehe(rueckZiel()); return; }
     let floZuege = 0;
     for (let i = 0; i < z.zuege.length; i++) if (istFlo(i)) floZuege++;
-    if (floZuege === 0) { z.verworfen = true; loescheLaufendePartie(); app.gehe('arena'); return; }
+    if (floZuege === 0) { z.verworfen = true; loescheLaufendePartie(); app.gehe(rueckZiel()); return; }
     const w = await app.frage({
       titel: t('partie.pause.titel'),
       text: t('partie.pause.text'),
@@ -1745,7 +1773,7 @@ export function zeige(root, params, app) {
       abbrechen: null,
     });
     if (weg) return;
-    if (w === 'pause') { speichereLaufend(); app.gehe('arena'); }
+    if (w === 'pause') { speichereLaufend(); app.gehe(rueckZiel()); }
     else if (w === 'aufgeben') ende('niederlage', 'aufgabe');
   }
 
@@ -1767,6 +1795,8 @@ export function zeige(root, params, app) {
     if (z.liga) f.liga = { ...z.liga };
     if (z.tempo) f.tempo = { ...z.tempo };
     if (z.zeiten) f.zeiten = z.zeiten.slice();
+    if (z.ki) f.ki = true;
+    if (z.kiRef) f.kiRef = z.kiRef;
     return f;
   }
   function speichereLaufend() {
@@ -2043,6 +2073,7 @@ export function zeige(root, params, app) {
     o.innerHTML = `
       <div class="ergebnis-karte">
         <button class="icon-knopf erg-zu" type="button" aria-label="${esc(t('partie.erg.brettAnsehen'))}">${icon('auge')}</button>
+        <div class="erg-rumpf">
         ${wertend ? kopfWort : `<div class="erg-kopf">${kopfWort}<span class="chip uebung" data-modus="${esc(z.modus)}">${esc(chipText())}</span></div>`}
         <p class="erg-unter">${esc(unter)}</p>
         <div class="erg-mitte">
@@ -2052,18 +2083,53 @@ export function zeige(root, params, app) {
         <div class="erg-feier" hidden></div><div class="erg-karte-ort" hidden></div>
         <div class="erg-bot"><span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span><div class="sprechblase links"></div></div>
         <div class="erg-frei-ort"></div>
+        </div>
         <div class="erg-aktionen"><div class="erg-knoepfe"></div>
           <button class="erg-lobby" type="button" hidden>${icon('haus')}<span>${esc(t('partie.erg.lobby'))}</span></button></div>
       </div>`;
     o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
     // U7: Bot-Sprueche aus: auch kein Spruch im Ergebnis
     o.querySelector('.erg-bot').hidden = app.einstellungen().sprueche === 'aus';
-    o.querySelector('.erg-zu').addEventListener('click', () => {
+    const zeigeBrett = () => {
       o.hidden = true;
       s.classList.remove('mit-ergebnis');
-      $('.ergebnis-zeigen').hidden = false;
+      sperreHintergrund(o, false);
+      const zeigen = $('.ergebnis-zeigen');
+      zeigen.hidden = false;
+      zeigen.focus({ preventScroll: true });
+    };
+    o.querySelector('.erg-zu').addEventListener('click', zeigeBrett);
+    // Punkt 30 (Barrierefreiheit 09.11.): das Blatt haelt den Fokus wie ein Dialog. Tab kreist im Blatt, Escape zeigt
+    // das Brett (wie das Auge oben rechts); der Bildschirm dahinter ist inert (sperreHintergrund).
+    o.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); zeigeBrett(); return; }
+      if (e.key !== 'Tab') return;
+      const ziele = [...o.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')]
+        .filter((x) => !x.disabled && x.getClientRects().length);
+      if (!ziele.length) return;
+      const erst = ziele[0];
+      const letzt = ziele[ziele.length - 1];
+      const jetzt = document.activeElement;
+      if (e.shiftKey && (jetzt === erst || !ziele.includes(jetzt))) { e.preventDefault(); letzt.focus(); }
+      else if (!e.shiftKey && (jetzt === letzt || !ziele.includes(jetzt))) { e.preventDefault(); erst.focus(); }
     });
+    // Sieg-Blatt (Flo 09.11., Variante C): Sterne und darunter der Level-Fortschritt; Punkte und Wertung
+    // blendet css/ergebnis.css aus, ein Verweis fuehrt in die Liga. Nur bei wertenden Partien, sonst gibt es dort nichts.
+    if (ergebnis === 'sieg' && wertend) {
+      const verweis = document.createElement('button');
+      verweis.type = 'button';
+      verweis.className = 'erg-liga-verweis';
+      verweis.textContent = t('partie.erg.ligaVerweis');
+      // fuehrt wie "Zur Liga" der (ausgeblendeten) Punkte-Aufschluesselung zur Tafel des Bots, ohne Punkte-Paket in die Liga
+      verweis.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const zurTafel = o.querySelector('.pk-zur-liste');
+        if (zurTafel) zurTafel.click(); else app.gehe('bestenliste');
+      });
+      o.querySelector('.erg-karte-ort').after(verweis);
+    }
     s.append(o);
+    sperreHintergrund(o, true);
     // U7: der Screen dahinter tritt zurueck (scale .975, nur transform), die Karte federt auf
     s.classList.add('mit-ergebnis');
     const karte = o.querySelector('.ergebnis-karte');
@@ -2232,7 +2298,14 @@ export function zeige(root, params, app) {
           const naechster = !wertet || bot.stufe == null ? null : neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
           // nicht wertend: "Nochmal ab hier" mit denselben Params (Uebung bzw. eigene Stellung), sonst "Nochmal"
           const abHier = z.modus === 'uebung' || (z.modus === 'normal' && !!startFen);
-          knoepfe.innerHTML = `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
+          // R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner leuchtet "Nächster Gegner", die Analyse
+          // steht klein darunter neben "Zu den Bots"; nach Niederlage und Remis bleibt die Analyse vorne
+          const siegVorne = ergebnis === 'sieg' && !!naechster;
+          o.querySelector('.erg-aktionen').classList.toggle('sieg-vorne', siegVorne);
+          knoepfe.innerHTML = siegVorne
+            ? `<button class="knopf primaer gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>
+          <button class="erg-link" type="button" data-ziel="analyse">${icon('analyse')}<span>${esc(t('partie.erg.zurAnalyse'))}</span></button>`
+            : `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
           ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${esc(t(abHier ? 'partie.erg.abHier' : 'partie.erg.nochmal'))}</button>`
             : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>`
               : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
@@ -2257,6 +2330,22 @@ export function zeige(root, params, app) {
           // Flo 30.10. abends: "mich stoert, dass ich nicht von da aus direkt zur Lobby kann (Startseite)"
           const lobby = o.querySelector('.erg-lobby');
           if (lobby) { lobby.hidden = false; lobby.onclick = () => app.gehe('arena'); }
+          // W3 R12: "Freund herausfordern" – nach Sieg den Link zur Bot-Herausforderung teilen
+          if (ergebnis === 'sieg' && !o.querySelector('.erg-freund')) {
+            const freundBtn = document.createElement('button');
+            freundBtn.type = 'button';
+            freundBtn.className = 'knopf erg-freund';
+            freundBtn.innerHTML = `${icon('teilen')} <span>${esc(t('partie.erg.freundHerausfordern'))}</span>`;
+            freundBtn.addEventListener('click', () => {
+              const url = new URL(location.href);
+              url.search = new URLSearchParams({ bot: bot.id }).toString();
+              url.hash = '';
+              const text = t('partie.erg.freundHerausfordern');
+              if (navigator.share) navigator.share({ title: 'Crownmate', text, url: url.href }).catch(() => {});
+              else navigator.clipboard?.writeText(url.href).catch(() => {});
+            });
+            o.querySelector('.erg-aktionen').prepend(freundBtn);
+          }
           // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.
           // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
           const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]');
@@ -2298,7 +2387,15 @@ export function zeige(root, params, app) {
     if (!overlay) return;
     overlay.el.hidden = false;
     s.classList.add('mit-ergebnis');
+    sperreHintergrund(overlay.el, true);
     $('.ergebnis-zeigen').hidden = true;
+    const karte = overlay.el.querySelector('.ergebnis-karte');
+    if (karte) karte.focus({ preventScroll: true });
+  }
+  // Alles im Bildschirm ausser dem Ergebnis-Blatt ist inert, solange das Blatt offen ist (Tab und Screenreader
+  // bleiben im Blatt, wie im Shop seit U4)
+  function sperreHintergrund(blatt, an) {
+    for (const e of s.children) if (e !== blatt) e.inert = an;
   }
 
   // ---------- Begruessung (Wahl-Ort partie:begruessung? -> { anlass, werte }) ----------
@@ -2335,7 +2432,7 @@ export function zeige(root, params, app) {
     return el;
   }
   const buehne = Object.freeze({
-    laufId, bot, farbe, modus: z.modus, ziel: z.ziel ? Object.freeze({ ...z.ziel }) : null,
+    laufId, bot, farbe, modus: z.modus, ki: z.ki === true, ziel: z.ziel ? Object.freeze({ ...z.ziel }) : null,
     boss: z.boss ? Object.freeze({ ...z.boss }) : null, seed: z.seed,
     zeigt, platz,
     el: s, effekte: effekteEl, rahmen, brett, get reduziert() { return reduziert(); },
@@ -2427,6 +2524,11 @@ export function zeige(root, params, app) {
         el.dataset.sek = String(sek);
         anim(el, [{ transform: 'scale(1.045)' }, { transform: 'none' }], { d: 380, k: 'sanft' });
       }
+      // Uhr-Warnung einmal je Partie, sobald Flos laufende Uhr unter 20 s faellt (die Bot-Uhr bleibt still)
+      if (warn && laeuft && wer === 'flo' && !el.dataset.gewarnt) {
+        el.dataset.gewarnt = '1';
+        try { klang.spiele('uhr-warnung'); } catch (e) { /* still */ }
+      }
     },
   });
 
@@ -2449,13 +2551,13 @@ export function zeige(root, params, app) {
     loeseRuhe();
     const handy = istHandy();
     s.classList.toggle('handy', handy);
-    const h2 = $('.kopf h2');
+    const h2 = $('.kopf h1');
     const titel = handy ? kopfKurz() : kopfTitel();
     if (h2 && h2.textContent !== titel) h2.textContent = titel;
     if (!handy) {
       inhaltEl.style.removeProperty('--brett');
       inhaltEl.style.removeProperty('--spalte');
-      s.classList.remove('coach-eng', 'streifen-unten');
+      s.classList.remove('coach-eng', 'sehr-eng', 'streifen-unten');
       passeNamen();
       pruefeCoachRest();
       pruefeSeite();
@@ -2496,12 +2598,19 @@ export function zeige(root, params, app) {
       const rest = untenVon(knoepfe) + 4 - rahmen.offsetHeight;
       return Math.floor((inhaltEl.clientHeight - rest - sockelY) / 8) * 8;
     };
-    s.classList.remove('coach-eng');
+    s.classList.remove('coach-eng', 'sehr-eng');
     let g = breit;
     if (!passt(g)) {
       // vorher schrumpft der Coach auf eine Zeile (Rest auf Antippen), erst dann das Brett (nie unter 280 px)
       s.classList.add('coach-eng');
       if (!passt(g)) g = Math.max(BRETT_MIN, Math.min(breit, hoehe(g)));
+      // U-Messrunde 09.11. (iPhone SE mit Safari-Leiste, 548 px): Brett und Coach stehen schon auf Minimum und die
+      // Knoepfe enden trotzdem unter dem Rand. Dann ruecken Abstaende und Spielerkarten zusammen; erst wenn auch das
+      // nicht reicht, scrollt die Spalte.
+      if (!passt(Math.max(BRETT_MIN, g))) {
+        s.classList.add('sehr-eng');
+        if (g <= BRETT_MIN || !passt(g)) g = Math.max(BRETT_MIN, Math.min(breit, hoehe(g)));
+      }
     }
     setze(Math.max(BRETT_MIN, g));
     passeNamen();
@@ -2726,6 +2835,8 @@ export function zeige(root, params, app) {
       gegnerLeiste, spielerLeiste, aktionen, mattOrt: () => mattOrt, zugBot: () => zugBot,
       // U7: Uhr-Anzeige (W0+b), Groessenrechnung, Duell-Vertrag
       uhr, fmtUhr, layout, duellBereit, halte: () => halte,
+      // Punkt 33: Zugliste neu zeichnen (Vorlesetext je Klasse pruefen)
+      zeichneZugliste,
     };
   }
 

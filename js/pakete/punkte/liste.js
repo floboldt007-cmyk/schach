@@ -2,8 +2,11 @@
 // Optik in css/pakete/punkte.css). Jeder Reiter ist ein section.bl-reiter[data-reiter][data-name]; ist er nicht gewaehlt
 // (kontext.reiter), liefert er nur diese leere Huelle (hidden), damit der Host die Reiterzeile bauen kann.
 //
-//   reiterIch({ app, fenster, jetzt }) -> { el, verlasse() }       Spielerkarte, deine besten Partien ueber alle Tafeln
-//       im Fenster ("Gesamt"), Rekordbuch mit Rechenstand
+//   reiterIch({ app, fenster, jetzt }) -> { el, verlasse() }       eine Zahl (G-002, Flos Wahl "Ich A" 08.11.2026): oben
+//       die Kronen dieser Woche mit Platz und Weg zum Aufstieg (.bl-kronen, vom Server, nur mit Konto), darunter die eine
+//       beste Partie dieser Woche (.bl-ich-beste). Alles andere liegt hinter dem Knopf .bl-ich-alle ("Alle Partien, Rekorde
+//       und Zeitraeume"): eigener Zeitraum-Schalter, Spielerkarte, deine besten Partien im Fenster ("Gesamt"), Rekordbuch.
+//       Der Reiter traegt data-ohne-fenster (der Zeitraum steht im aufgeklappten Teil); offen bleibt gemerkt (ichAlle).
 //   reiterBots({ app, fenster, jetzt }) -> { el, verlasse() }      zuerst die Uebersicht "Deine Gegner" (Flo 31.10.2026:
 //       "Die lange Liste ergibt irgendwie nicht so viel Sinn"): nur freigeschaltete Gegner und Tafeln mit Eintraegen, nach
 //       Welten, je Zeile Portraet, Name und dein Platz; ein Tipp oeffnet die Tafel (hoechstens 10 Zeilen, davon 3 eigene,
@@ -15,11 +18,12 @@
 // Einstellungen (Komfort je Geraet, speichereModulEinstellungen('punkte')): { reiter, fenster, tafel, offen, name }.
 import { anim, staffel, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
-import { wischKanten } from '../../ui/bauteile.js';
+import { wischKanten, segment } from '../../ui/bauteile.js';
 import { BOTS, WELTEN, botNachId } from '../../bots.js';
 import { avatarVon } from '../../thema.js';
 import {
   ladePartie, ladeFortschritt, istFreigeschaltet, naechsterGegner, ladeModulEinstellungen, speichereModulEinstellungen, ladeEinstellungen,
+  statistik,
 } from '../../storage.js';
 import { analysierePartie } from '../../review.js';
 import { tagSchluessel } from '../../tag.js';
@@ -178,24 +182,90 @@ function leerKarte(app, fenster) {
   return k;
 }
 
-// ---------- Reiter Ich: Gesamt und Rekordbuch ----------
-export function reiterIch({ app, fenster = 'woche', jetzt = new Date() } = {}) {
-  const s = huelle('ich', t('p-punkte.reiter.ich'));
-  s.hidden = false;
-  const st = S.lade();
+// ---------- Reiter Ich: eine Zahl, der Rest hinter "Alle Partien" ----------
+// Kronen dieser Woche (kronen_mein_stand). Das Paket liga kommt erst beim Zeichnen dazu (wie js/pakete/liga/gruppe.js);
+// fehlt es oder antwortet der Server nicht, bleibt die Karte weg. Ohne Konto ein ruhiger Satz mit Link zum Konto.
+function kronenKarte() {
+  const k = el('article', 'bl-karte bl-kronen');
+  k.hidden = true;
+  Promise.all([import('../../kronen.js'), import('../liga/kronen.js'), import('../liga/texte.js')]).then(([K, L, LT]) => {
+    if (!K.angemeldet()) {
+      k.dataset.zustand = 'ohne-konto';
+      k.innerHTML = `<span class="ueberzeile">${esc(t('p-punkte.ich.kronenWoche'))}</span>
+        <p class="bl-kr-satz">${esc(t('p-punkte.ich.kronenOhne'))}</p>
+        <a class="knopf bl-kr-konto" href="#einstellungen/konto">${esc(t('p-punkte.ich.kronenKonto'))}</a>`;
+      k.hidden = false;
+      return null;
+    }
+    return K.holeStand().then((d) => {
+      const x = Array.isArray(d) ? d[0] : d;
+      if (!x || typeof x !== 'object') return;
+      const info = L.stufeInfo(Number(x.stufe));
+      const kronen = Number.isFinite(x.kronen) ? Math.max(0, Math.floor(x.kronen)) : 0;
+      const n = Number.isInteger(x.n) && x.n > 0 ? x.n : L.GRUPPE_GROESSE;
+      const platz = Number.isInteger(x.platz) && x.platz > 0 ? x.platz : null;
+      const stufe = LT.stufenName(info.index);
+      // Weg zum Aufstieg: Platz 1 bis 5 steigen auf (nicht in der hoechsten Stufe); der Balken misst die Kronen bis Platz 5
+      const auf = L.naechsteStufe(info.index) != null;
+      const ziel = Number.isFinite(x.ziel) && x.ziel > 0 ? x.ziel : null;
+      const drin = platz != null && platz <= L.AUFSTIEG_PLAETZE;
+      const anteil = !auf ? null : drin ? 1 : ziel ? Math.min(1, kronen / ziel) : null;
+      const zeile = platz == null ? t('p-punkte.ich.kronenLeer', { stufe })
+        : t('p-punkte.ich.kronenPlatz', { platz: zahl(platz), n: zahl(n), stufe })
+          + (auf ? ' · ' + t(drin ? 'p-punkte.ich.kronenAufDrin' : 'p-punkte.ich.kronenAuf', { platz: zahl(L.AUFSTIEG_PLAETZE) }) : '');
+      k.dataset.zustand = 'stand';
+      k.innerHTML = `<img class="bl-kr-wappen" src="${new URL(`../../../assets/liga/${info.liga}.svg`, import.meta.url).href}" alt="" width="64" height="77">
+        <div class="bl-kr-text"><span class="ueberzeile">${esc(t('p-punkte.ich.kronenWoche'))}</span>
+          <p class="bl-kr-zahl"><b class="zahl">${esc(zahl(kronen))}</b><span>${icon('krone')}${esc(t('p-punkte.ich.kronen'))}</span></p>
+          <p class="bl-kr-platz">${esc(zeile)}</p>
+          ${anteil != null ? `<span class="bl-kr-balken" role="img" aria-label="${esc(t('p-punkte.ich.kronenBalken', { n: Math.round(anteil * 100) }))}"><i style="width:${Math.round(anteil * 100)}%"></i></span>` : ''}
+        </div>`;
+      k.hidden = false;
+    });
+  }).catch(() => { k.hidden = true; });
+  return k;
+}
+
+// die eine beste Partie dieser Woche: Bild des Bots, "Sieg gegen Benno", Datum, Zuege, Genauigkeit, Tafel-Punkte
+function besteKarte(app, woche, neu) {
+  const k = el('article', 'bl-karte bl-ich-beste');
+  const r = woche[0];
+  if (!r) {
+    k.innerHTML = `<span class="ueberzeile">${esc(t('p-punkte.ich.besteWoche'))}</span>
+      <p class="bl-leer">${esc(t('p-punkte.ich.besteLeer'))}</p>
+      <button type="button" class="knopf primaer bl-spielen">${esc(t('p-punkte.ich.spielen'))}${icon('pfeil')}</button>`;
+    k.querySelector('.bl-spielen').addEventListener('click', () => { try { app?.gehe?.('arena'); } catch (e) { /* egal */ } });
+    return k;
+  }
+  const bot = botNachId(r.tafel);
+  const tag = ladePartie(r.id) ? 'button' : 'div';
+  const was = r.e === 'sieg' ? t('p-punkte.ich.besteSieg', { name: kurzName(r.tafel) })
+    : r.e === 'remis' ? t('p-punkte.ich.besteRemis', { name: kurzName(r.tafel) }) : nameVon(r.tafel);
+  k.innerHTML = `<span class="ueberzeile">${esc(t('p-punkte.ich.besteWoche'))}</span>
+    <${tag} class="bl-ib-zeile"${tag === 'button' ? ` type="button" data-aktion="analyse" data-id="${esc(r.id)}"${Number.isInteger(r.m) ? ` data-ply="${r.m}"` : ''}` : ''}>
+      ${bot && bot.avatar ? `<img class="bl-ib-bild" src="${esc(avatarVon(bot))}" alt="" draggable="false">` : `<span class="bl-ib-bild">${icon('podest')}</span>`}
+      <span class="bl-ib-mitte"><b>${esc(was)}</b>${neu.has(r.id) ? `<span class="bl-neu">${esc(t('p-punkte.neu'))}</span>` : ''}
+        <span class="bl-z-info">${esc(infoText({ ...r, e: null }))}</span></span>
+      <span class="bl-ib-punkte"><b class="zahl">${zahlText(r.w)}</b><small>${esc(t('p-punkte.ich.tafelPunkte'))}</small></span>
+    </${tag}>`;
+  return k;
+}
+
+// alles Weitere: Zeitraum, Spielerkarte (drei Zahlen), deine besten Partien im Fenster, Rekordbuch
+function alleTeile(st, app, fenster, jetzt, neu) {
+  const teile = [];
   const alle = [];
   for (const tf of Object.values(st.tafeln)) for (const e of T.eigene(tf, fenster, jetzt)) alle.push({ ...e, tafel: tf.id, eigen: true });
   alle.sort(T.vergleiche);
   const beste = alle.slice(0, T.ZEILEN);
   beste.forEach((r, i) => { r.platz = i + 1; });
-  const neu = new Set(st.neu);
   const liste = el('article', 'bl-karte bl-gesamt');
   if (beste.length) {
     liste.innerHTML = `<header class="bl-k-kopf"><div><span class="ueberzeile">${esc(fensterText(fenster))}</span>
       <h2>${esc(t('p-punkte.ich.titel'))}</h2></div></header>
     <ol class="bl-zeilen">${beste.map((r) => zeileHtml(r, { neu: neu.has(r.id), mitTafel: true })).join('')}</ol>`;
   } else liste.append(leerKarte(app, fenster));
-  s.append(spielerkarte(st), liste);
+  teile.push(spielerkarte(st), liste);
   // Rekordbuch nur, wenn es Rekorde gibt; der Rechenstand steht nur dabei, wenn ein Rekord nach alten Regeln zaehlt
   if (st.rekorde.length) {
     const buch = el('article', 'bl-karte bl-rekordbuch');
@@ -203,10 +273,67 @@ export function reiterIch({ app, fenster = 'woche', jetzt = new Date() } = {}) {
     <ol class="bl-buch">${st.rekorde.slice(0, 12).map((r) => `<li><span class="bl-b-name">${esc(nameVon(r.tafel))}</span>`
       + `<span class="bl-b-werte">${r.vorher != null ? `<s class="zahl">${zahlText(r.vorher)}</s>` : ''}<b class="zahl">${zahlText(r.w)}</b></span>`
       + `<span class="bl-b-info">${esc([datumText(r.t), r.stand !== F.STAND ? t('p-punkte.buch.rechenstand', { stand: r.stand }) : '', r.n ? t('p-punkte.buch.nachweis') : ''].filter(Boolean).join(' · '))}</span></li>`).join('')}</ol>`;
-    s.append(buch);
+    teile.push(buch);
   }
+  return { teile, gezeigt: beste };
+}
+
+// Bilanz aller wertenden Partien (T-3, Flo 09.11.2026; vorher unter dem Bots-Panel): Partien, Siege, Genauigkeit im
+// Schnitt, Spielstaerke. Erst ab der ersten Partie; jede dieser Zahlen steht in der Liga nur hier
+function bilanzKarte() {
+  const st = statistik();
+  if (!st.partien) return null;
+  const k = el('article', 'bl-karte bl-bilanz');
+  const prozent = Number.isFinite(st.schnittGenauigkeit)
+    ? t('p-punkte.ich.bilanz.prozent', { wert: zahl(st.schnittGenauigkeit, { maximumFractionDigits: 1, useGrouping: false }) }) : '–';
+  const werte = [['partien', zahlText(st.partien)], ['siege', zahlText(st.siege)], ['genauigkeit', prozent],
+    ['staerke', st.spielstaerke ? '≈ ' + zahlText(st.spielstaerke) : '–']];
+  k.innerHTML = `<span class="ueberzeile">${esc(t('p-punkte.ich.bilanz'))}</span>
+    <dl class="bl-bilanz-werte">${werte.map(([id, w]) => `<div><dt>${esc(t('p-punkte.ich.bilanz.' + id))}</dt><dd class="zahl">${esc(w)}</dd></div>`).join('')}</dl>`;
+  return k;
+}
+
+export function reiterIch({ app, fenster = 'woche', jetzt = new Date() } = {}) {
+  const s = huelle('ich', t('p-punkte.reiter.ich'));
+  s.hidden = false;
+  s.dataset.ohneFenster = '1';
+  const st = S.lade();
+  const neu = new Set(st.neu);
+  const woche = [];
+  for (const tf of Object.values(st.tafeln)) for (const e of T.eigene(tf, 'woche', jetzt)) woche.push({ ...e, tafel: tf.id, eigen: true });
+  woche.sort(T.vergleiche);
+
+  let offen = einstellungen().ichAlle === true;
+  let fw = FENSTER.includes(fenster) ? fenster : 'woche';
+  const knopf = el('button', 'bl-ich-alle');
+  knopf.type = 'button';
+  const bereich = el('div', 'bl-ich-mehr');
+  bereich.id = 'bl-ich-mehr';
+  knopf.setAttribute('aria-controls', bereich.id);
+  knopf.innerHTML = `<span>${esc(t('p-punkte.ich.alle'))}</span>${icon('pfeil')}`;
+
+  function fuelleBereich() {
+    const seg = segment({ name: 'bl-ich-fenster', label: t('rahmen.bestenliste.zeitraum'), wert: fw,
+      optionen: FENSTER.map((id) => ({ id, text: t('rahmen.bestenliste.' + id) })),
+      beiWahl: (id) => { fw = id; merkeEinstellung({ fenster: id }); fuelleBereich(); } });
+    const { teile, gezeigt } = alleTeile(st, app, fw, jetzt, neu);
+    const zeitraum = el('div', 'bl-ich-zeitraum');
+    zeitraum.append(seg.el);
+    bereich.replaceChildren(zeitraum, ...teile);
+    merkeGesehen(gezeigt.filter((r) => neu.has(r.id)).map((r) => r.id));
+  }
+  function setzeOffen(wert) {
+    offen = wert;
+    knopf.setAttribute('aria-expanded', String(offen));
+    bereich.hidden = !offen;
+    if (offen && !bereich.childElementCount) fuelleBereich();
+  }
+  knopf.addEventListener('click', () => { setzeOffen(!offen); merkeEinstellung({ ichAlle: offen }); });
+  setzeOffen(offen);
+
+  s.append(...[kronenKarte(), besteKarte(app, woche, neu), bilanzKarte(), knopf, bereich].filter(Boolean));
   bindeAnalyse(s, app);
-  merkeGesehen(beste.filter((r) => neu.has(r.id)).map((r) => r.id));
+  if (woche[0] && neu.has(woche[0].id)) merkeGesehen([woche[0].id]);
   return { el: s, verlasse() {} };
 }
 
@@ -230,6 +357,16 @@ function chronikHtml(tf) {
   return `<div class="bl-chronik"><span class="ueberzeile">${esc(t('p-punkte.chronik.titel'))}</span><ol aria-label="${esc(t('p-punkte.chronik.label'))}">`
     + w.map(([wo, x]) => `<li title="${esc(t('p-punkte.chronik.woche', { datum: schluesselText(wo), wert: zahlText(x) }))}"><i style="--h:${(x / max).toFixed(3)}"></i>`
       + `<span class="sr">${esc(t('p-punkte.chronik.wocheSr', { datum: wo, wert: zahlText(x) }))}</span></li>`).join('') + '</ol></div>';
+}
+
+// Bilanz gegen den Bot der Tafel (T-3, vorher Zeile im Bots-Panel): nur Leiter-Bots, erst ab der ersten Partie
+function botBilanzHtml(z, bot) {
+  if (!z || z.art !== 'bot' || !bot || bot.stufe == null) return '';
+  const f = ladeFortschritt().bots[bot.id] || {};
+  const n = (x) => (Number.isFinite(x) && x > 0 ? x : 0);
+  if (!n(f.siege) && !n(f.remis) && !n(f.niederlagen)) return '';
+  return `<p class="bl-bot-bilanz">${esc(t('p-punkte.bots.bilanz', { name: kurzName(bot.id), siege: t('p-punkte.bots.siege', { n: n(f.siege) }),
+    remis: t('p-punkte.bots.remis', { n: n(f.remis) }), niederlagen: t('p-punkte.bots.niederlagen', { n: n(f.niederlagen) }) }))}</p>`;
 }
 
 export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) {
@@ -309,6 +446,7 @@ export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) 
       : t('p-punkte.bots.leer', { name: nameVon(id), gegner: bot ? bot.name : t('p-punkte.bots.diesenGegner') }));
     karte.innerHTML = `<header class="bl-k-kopf"><div><span class="ueberzeile">${esc(fensterText(fenster))}</span>
         <h2>${esc(nameVon(id))}</h2></div><span class="bl-k-hinweis">${esc(t('p-punkte.bots.zeilen'))}</span></header>
+      ${botBilanzHtml(z, bot)}
       ${zeilen.length ? `<ol class="bl-zeilen">${zeilen.map((r) => zeileHtml(r, { neu: r.eigen && neu.has(r.id) })).join('')}</ol>` : `<p class="bl-leer">${leerText}</p>`}
       ${chronikHtml(tf)}
       ${kannAngreifen ? `<div class="bl-fuss"><button class="knopf primaer bl-angriff dr" type="button">${icon('play')} `

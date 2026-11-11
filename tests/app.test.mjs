@@ -90,6 +90,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await new Promise((r) => setTimeout(r, 150));
@@ -288,7 +289,7 @@ async function testeArena(seite, h) {
   pruefe('Kopf-Chips 0/90 und 0/30', /0\s*\/ 90/.test(await seite.locator('.kopf .chip').first().innerText()) && /0\s*\/ 30/.test(await seite.locator('.kopf .chip').nth(1).innerText()));
   pruefe('Kopfzeile: "Fünf Welten, 30 Bots"', /Fünf Welten, 30 Bots/.test(await seite.locator('.kopf').innerText()));
   pruefe('Panel zeigt Willi', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
-  pruefe('Panel: drei Merkmal-Kacheln', await seite.locator('.detail .merkmal').count() === 3);
+  pruefe('Panel (Variante A): kein Steckbrief, keine Bilanz', await seite.locator('.detail .merkmal, .detail .bilanz').count() === 0);
   pruefe('Panel: drei Stern-Ziele', await seite.locator('.detail .ziel-sterne > div').count() === 3);
   pruefe('Panel: Begrüßung als Sprechblase', (await seite.locator('.detail .sprechblase').innerText()).length > 5);
 
@@ -332,6 +333,27 @@ async function testePartie(seite, h, fehler) {
     && (await seite.locator('.screen.partie .zugansage[role="status"][aria-live="polite"]').count()) === 1
     && /e4/.test(await seite.locator('.screen.partie .zugansage').textContent()), await seite.locator('.screen.partie .zugansage').textContent());
   pruefe('Zugliste: Symbol an Flos Zug', await seite.locator('.zugliste .z.du .z-sym').count() >= 1);
+  // Punkt 33 (09.11.): Der Vorlesetext der Zugliste ist "<Name>: " ohne Satzzeichen davor (vorher "Solide.:", "Pflichtzug::").
+  // Geprueft am DOM und fuer alle Klassen in beiden Sprachen (Name ohne Satzzeichen am Ende, das Wort darf eins haben)
+  const vorlesen = await seite.evaluate(async () => {
+    const S = await import('/js/sprache.js');
+    const namen = ['de', 'en'].flatMap((s) => Object.entries(S.texte(s)).filter(([k]) => /^analyse\.klasse\.[a-z]+\.name$/.test(k)).map(([k, v]) => s + ' ' + k + ' ' + v));
+    return { sr: [...document.querySelectorAll('.zugliste .z-sym .sr')].map((e) => e.textContent),
+      namenMitZeichen: namen.filter((x) => /[.!:?]$/.test(x)), anzahl: namen.length };
+  });
+  pruefe('Zugliste vorlesen: "<Klasse>: " ohne Satzzeichen davor, alle Klassennamen (DE und EN) ohne Satzzeichen am Ende',
+    vorlesen.sr.length >= 1 && vorlesen.sr.every((x) => /^[^.!:?]+: $/.test(x)) && vorlesen.anzahl >= 22 && vorlesen.namenMitZeichen.length === 0, vorlesen);
+  // Punkt 33, Barrierefreiheit (R8, axe): die scrollbare Zugliste ist per Tab erreichbar (scrollable-region-focusable) und die
+  // Partie hat genau eine h1, den Titel im Kopf (page-has-heading-one)
+  const zugang = await seite.evaluate(() => ({
+    liste: ['.zugliste', '.zugleiste'].map((s) => { const e = document.querySelector('.screen.partie ' + s); return e && e.tabIndex === 0 && e.getAttribute('role') === 'region' && !!e.getAttribute('aria-label'); }),
+    h1: [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => (e.closest('.p-kopf') ? 'kopf:' : 'anders:') + e.textContent),
+  }));
+  pruefe('Partie: Zugliste und Zugleiste per Tab erreichbar (Region mit Namen), genau eine h1 im Kopf',
+    zugang.liste.every(Boolean) && zugang.h1.length === 1 && zugang.h1[0].startsWith('kopf:'), JSON.stringify(zugang));
+  await seite.locator('.screen.partie .zugliste').focus();
+  pruefe('Zugliste nimmt den Fokus an', await seite.evaluate(() => document.activeElement && document.activeElement.classList.contains('zugliste')));
+  await seite.evaluate(() => document.activeElement && document.activeElement.blur());
 
   // Bot antwortet
   await h.warteFlo();
@@ -400,6 +422,8 @@ async function testePartie(seite, h, fehler) {
   await seite.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 30000 });
   pruefe('Overlay: Niederlage', /^Partie verloren$/.test(await seite.locator('.erg-wort').innerText()));
   pruefe('Overlay: Knopf "Zur Analyse"', await seite.locator('.erg-knoepfe [data-ziel="analyse"]').count() === 1);
+  // R12-W1: nach einer Niederlage bleibt die Analyse der leuchtende Hauptknopf (Lernen hilft dann mehr)
+  pruefe('Niederlage: „Zur Analyse“ bleibt der Hauptknopf', await seite.locator('.erg-knoepfe .knopf.primaer[data-ziel="analyse"]').count() === 1);
   pruefe('Overlay: Knopf "Nochmal"', await seite.locator('.erg-knoepfe [data-ziel="nochmal"]').count() === 1);
   const liste = await h.gespeichert();
   const p = liste[0] || {};
@@ -496,6 +520,27 @@ async function testeSchwarz(seite, h, fehler) {
   pruefe('Neuladen setzt die Partie fort', JSON.stringify(await h.zuege()) === JSON.stringify(zuege));
   pruefe('Farbe bleibt Schwarz', await seite.locator('.screen.partie .brett[data-ausrichtung="b"]').count() === 1);
   pruefe('Live-Klassen bleiben', (await seite.locator('.zugliste .z.du .z-sym').count()) >= 1);
+  // Punkt 33: jede Klasse einmal an Flos ersten bewerteten Zug setzen, neu zeichnen und den Vorlesetext lesen; er ist genau
+  // "<Name der Klasse>: ". Die Partie allein bringt nur Klassen ohne Satzzeichen, darum alle Klassen gezielt (Gegenprobe
+  // mit KLASSEN_WORT: "Solide.:", "Pflichtzug::" schlagen an)
+  const srZeilen = await seite.evaluate(async () => {
+    const { KLASSEN_NAME } = await import('/js/zugklassen.js');
+    const p = window.__partie;
+    const i = p.z.liveKlassen.findIndex(Boolean);
+    const alt = p.z.liveKlassen[i];
+    const aus = [];
+    for (const k of Object.keys(KLASSEN_NAME)) {
+      p.z.liveKlassen[i] = k;
+      p.zeichneZugliste();
+      const sr = document.querySelector(`.zugliste .z[data-ply="${i}"] .z-sym .sr`);
+      aus.push({ k, sr: sr && sr.textContent, soll: KLASSEN_NAME[k] + ': ' });
+    }
+    p.z.liveKlassen[i] = alt;
+    p.zeichneZugliste();
+    return aus;
+  });
+  pruefe('Zugliste vorlesen: "<Name>: " fuer jede Klasse (ohne Satzzeichen vor dem Doppelpunkt)',
+    srZeilen.length >= 11 && srZeilen.every((x) => x.sr === x.soll), JSON.stringify(srZeilen.filter((x) => x.sr !== x.soll)));
   // Zurueck: Pausieren
   await h.tippe('.screen.partie [data-aktion="zurueck"]');
   await seite.waitForSelector('.dialog-ort .dialog');
@@ -1443,19 +1488,20 @@ async function testeErweiterungen(browser) {
     const botOrt = d.querySelector('.ort-panel-bot');
     return {
       kopf: chips.length === 3 && chips[2].matches('.w0-test[data-ort="arena:kopf"]') && chips[0].matches('.chip') && chips[1].matches('.chip'),
-      oben: d.firstElementChild === oben && !oben.hidden && !!oben.querySelector('.w0-test[data-ort="arena:panel-oben"]'),
-      bot: !!botOrt && !botOrt.hidden && botOrt.previousElementSibling.matches('.ziel-sterne') && !!botOrt.querySelector('.w0-test[data-ort="arena:panel-bot"]'),
+      // Variante A (08.11.2026): panel-oben (nur noch Nachlese) und panel-bot werden nicht gefuellt
+      oben: d.firstElementChild === oben && !oben.querySelector('.w0-test[data-ort="arena:panel-oben"]'),
+      bot: !botOrt && !d.querySelector('.w0-test[data-ort="arena:panel-bot"]'),
       blase: d.querySelector('.sprechblase').textContent,
       start: window.__w0.start,
       kontexte: window.__w0.kontexte,
     };
   });
   pruefe('Ort arena:kopf: nach den zwei Chips', arena.kopf);
-  pruefe('Ort arena:panel-oben: ganz oben im Panel', arena.oben);
-  pruefe('Ort arena:panel-bot: nach den Stern-Zielen', arena.bot);
+  pruefe('Variante A: Ort arena:panel-oben ohne Host (der Behaelter oben traegt nur die Nachlese)', arena.oben);
+  pruefe('Variante A: Ort arena:panel-bot ohne Host', arena.bot);
   pruefe('Aufruf-Ort arena:start mit kontext { app, karte, neuId, s, scrolleZu }', JSON.stringify(arena.start) === '["app","karte","neuId","s","scrolleZu"]', JSON.stringify(arena.start));
-  pruefe('Kontexte arena:kopf / panel', JSON.stringify(arena.kontexte['arena:kopf']) === '["app","fortschritt"]'
-    && JSON.stringify(arena.kontexte['arena:panel-oben']) === '["app","bot","fortschritt"]', JSON.stringify(arena.kontexte));
+  pruefe('Kontexte arena:kopf; panel-oben wird nicht gerufen', JSON.stringify(arena.kontexte['arena:kopf']) === '["app","fortschritt"]'
+    && !arena.kontexte['arena:panel-oben'], JSON.stringify(arena.kontexte));
   pruefe('Wahl-Ort partie:begruessung? auch im Arena-Panel (mit Platzhalter)', /Hallo Flo, schön dich zu sehen!/.test(arena.blase), arena.blase);
 
   // Wertende Partie (Schaefermatt) mit Hinweis und Zuruecknahme
@@ -1487,7 +1533,8 @@ async function testeErweiterungen(browser) {
   const serieAmScreen = await seite.evaluate(() => document.querySelector('.screen.partie').dataset.serie);
   const ov = await seite.evaluate(() => {
     const k = document.querySelector('.ergebnis-karte');
-    const kinder = [...k.children].map((c) => c.className.split(' ')[0]);
+    // seit Punkt 19 liegt der Inhalt im Scrollbereich .erg-rumpf, die Reihenfolge gilt dort
+    const kinder = [...k.querySelector('.erg-rumpf').children].map((c) => c.className.split(' ')[0]);
     return {
       kinder,
       karte: !!k.querySelector('.erg-karte-ort > .w0-test[data-ort="ergebnis:karte"]'),
@@ -1497,7 +1544,10 @@ async function testeErweiterungen(browser) {
     };
   });
   const iF = ov.kinder.indexOf('erg-feier');
-  pruefe('Ort ergebnis:karte zwischen .erg-feier und .erg-bot', ov.karte && iF >= 0 && ov.kinder[iF + 1] === 'erg-karte-ort' && ov.kinder[iF + 2] === 'erg-bot', ov.kinder.join(' '));
+  // Sieg-Blatt C: nach Siegen steht der Liga-Verweis zwischen Ort und Bot, der Ort folgt weiter direkt auf die Feier
+  const iB = ov.kinder.indexOf('erg-bot');
+  pruefe('Ort ergebnis:karte zwischen .erg-feier und .erg-bot', ov.karte && iF >= 0 && ov.kinder[iF + 1] === 'erg-karte-ort' && iB > iF + 1
+    && ov.kinder.slice(iF + 2, iB).every((k) => k === 'erg-liga-verweis'), ov.kinder.join(' '));
   // W0+a: dazu boss (Modus boss, sonst null)
   pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
   pruefe('Feier im Ergebnis: höchstens 3, höchstens 1 groß, nach prio (doppelte Meldung zählt einmal)', JSON.stringify(ov.feier) === JSON.stringify(['G:GROSS A', 'Zeile C', 'Zeile D']), JSON.stringify(ov.feier));
@@ -1522,8 +1572,8 @@ async function testeErweiterungen(browser) {
   pruefe('zug:bewertet nach zug:gespielt desselben Zugs', p.filter((e) => e.name === 'zug:bewertet').every((b) => pn.indexOf('zug:bewertet') > pn.indexOf('zug:gespielt')
     && p.some((g) => g.name === 'zug:gespielt' && g.ply === b.ply && g.uci === b.uci)));
   pruefe('laufId = "l" + gestartet, gleich in allen Partie-Ereignissen', /^l\d{4}-\d\d-\d\dT/.test(gest.laufId) && p.filter((e) => 'laufId' in e).every((e) => e.laufId === gest.laufId), gest.laufId);
-  // W0+a: dazu boss, seed, zeigt, platz
-  pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'boss', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'laufId',
+  // W0+a: dazu boss, seed, zeigt, platz; Etappe 4b: ki (KI-Gegner der gewerteten Suche, Banner-Streifen)
+  pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'boss', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'ki', 'laufId',
     'liveAn', 'merke', 'modus', 'phase', 'platz', 'rahmen', 'reduziert', 'seed', 'spaeter', 'zeigt', 'ziel']) && gest.fortgesetzt === false && gest.modus === 'normal' && gest.botStufe === 2, JSON.stringify(gest));
   pruefe('partie:gestartet: wertet, hinweise und zuruecknahmen (Stand beim Start)', gest.wertet === true && gest.hinweise === 0 && gest.zuruecknahmen === 0, JSON.stringify(gest));
   const gesp = p.filter((e) => e.name === 'zug:gespielt');
@@ -1605,9 +1655,10 @@ async function testeErweiterungen(browser) {
   const nl = await seite.evaluate(() => {
     const n = document.querySelector('.detail .ort-panel-oben .nachlese');
     return n ? { titel: n.querySelector('.nl-titel').textContent, zeilen: [...n.querySelectorAll('.nl-zeile b')].map((b) => b.textContent),
-      vorDemOrt: n.parentElement.firstElementChild === n && !!n.parentElement.querySelector('.w0-test') && !!n.parentElement.querySelector('.liga-karte') } : null;
+      // Variante A (08.11.2026): oben steht nur noch die Nachlese, keine Paket-Zeile und keine Liga-Karte
+      vorDemOrt: n.parentElement.firstElementChild === n && !n.parentElement.querySelector('.w0-test') && !n.parentElement.querySelector('.liga-karte') } : null;
   });
-  pruefe('Nachlese oben im Arena-Panel „Seit deiner letzten Partie“, vor den Paketen', nl && /Seit deiner letzten Partie/.test(nl.titel)
+  pruefe('Nachlese oben im Arena-Panel „Seit deiner letzten Partie“, allein (Variante A)', nl && /Seit deiner letzten Partie/.test(nl.titel)
     && JSON.stringify(nl.zeilen) === '["GROSS B","Zeile E"]' && nl.vorDemOrt, JSON.stringify(nl));
   await seite.evaluate(() => window.__app.gehe('verlauf'));
   await seite.waitForSelector('.screen.vl-screen');
@@ -1616,7 +1667,8 @@ async function testeErweiterungen(browser) {
   pruefe('Nachlese nur einmal', await seite.locator('.detail .nachlese').count() === 0);
   await h.tippe('.knoten[data-bot="hilde"]');
   await h.tippe('.knoten[data-bot="benno"]');
-  pruefe('Panel neu gezeichnet: Orte je einmal', await seite.locator('.detail .w0-test').count() === 2);
+  pruefe('Panel neu gezeichnet: keine Paket-Elemente im Panel (Variante A), der Kopf-Ort genau einmal', await seite.locator('.detail .w0-test').count() === 0
+    && await seite.locator('.kopf-chips .w0-test').count() === 1);
 
   // Uebungs-Partie: keine Sterne, Chip, Kopf, Knoepfe, extra ueber die Buehne
   gruppe = 'Erweiterungen: Übung';
@@ -2113,7 +2165,8 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const falsch = [];
-    for (const name of ['bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle']) {
+    // lernen und lektion stehen seit 07.11.2026 allen offen (Meisterschule, js/pakete/lernen/zugang.js), tests/lernen.test.mjs
+    for (const name of ['bestenliste', 'raetsel', 'ich', 'spielplan', 'spielhalle']) {
       await seite.goto(BASIS + '#' + name);
       // w0plus-a-fix: nur der Hash aendert sich (gleiches Dokument), die alte Arena steht noch, bis der Router den Import
       // des fehlenden Screens abgeschlossen hat; deshalb auf den Hash warten (vorher Wackler unter Last: "raetsel")
@@ -2122,7 +2175,7 @@ async function testeSpielFundament(browser) {
       const r = await seite.evaluate(() => ({ hash: location.hash, platzhalter: !!document.querySelector('.screen.platzhalter') }));
       if (r.hash !== '#arena' || r.platzhalter) falsch.push(name);
     }
-    pruefe('Neue Paket-Screens (bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle) ohne Datei: still zur Arena, kein Platzhalter', falsch.length === 0, falsch.join());
+    pruefe('Neue Paket-Screens (bestenliste, raetsel, ich, spielplan, spielhalle) ohne Datei: still zur Arena, kein Platzhalter', falsch.length === 0, falsch.join());
     await seite.evaluate(() => window.__app.gehe('spielplan'));
     await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
     pruefe('gehe("spielplan") ohne Paket: Arena', await seite.locator('.screen.platzhalter').count() === 0);
@@ -2158,7 +2211,7 @@ async function testeSpielFundament(browser) {
       && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'arena'));
     // Premium-Umbau U2 (PLAN 2.10): Training ist Kern-Screen (Huelle); seit Etappe A erreicht man es ueber die Startseite
     await seite.locator('.reiter-leiste [data-reiter="heim"]').click();
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     await seite.locator('[data-aktion="heim-raetsel"]').click();
     await seite.waitForSelector('.screen.training-screen');
     pruefe('Leiste: Training ueber die Startseite, Reiter Start bleibt aktiv', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
@@ -2227,25 +2280,15 @@ async function testeSpielFundament(browser) {
     const h = hilfen(seite, { touch: true });
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena .detail');
-    pruefe('Heute-Karte ohne Paket: versteckt (kein Pixel anders)', await seite.evaluate(() => {
-      const k = document.querySelector('.arena .detail > .heute-karte');
-      return !!k && k.hidden && getComputedStyle(k).display === 'none' && k.previousElementSibling.matches('.ort-panel-oben');
-    }));
+    pruefe('Variante A: keine Heute-Karte im Bots-Panel', await seite.evaluate(() => !document.querySelector('.arena .detail .heute-karte')));
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
     await seite.goto(MIT_W0PLUS('wpheute&wpleiste&wpabr') + '#arena');
-    await seite.waitForSelector('.screen.arena .detail .wp-heute');
-    const heute = await seite.evaluate(() => {
-      const k = document.querySelector('.arena .detail > .heute-karte');
-      return { sichtbar: !k.hidden, kopf: k.querySelector('.hk-kopf').textContent, zeile: !!k.querySelector('.ort-heute > .wp-heute'),
-        nachOben: k.previousElementSibling.matches('.ort-panel-oben'), kontext: window.__wp.kontexte['arena:heute'], tag: window.__wp.tag };
-    });
-    const tage = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-    pruefe('arena:heute: Heute-Karte nach .ort-panel-oben, Kopf "Heute · Wochentag", Zeile des Pakets', heute.sichtbar && heute.zeile && heute.nachOben
-      && /^Heute · (Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)$/.test(heute.kopf), JSON.stringify(heute));
-    pruefe('arena:heute: Kontext { app, bot, fortschritt, tag, woche }, Wochentag passt zum Tag', JSON.stringify(heute.kontext) === '["app","bot","fortschritt","tag","woche"]'
-      && /^\d{4}-\d\d-\d\d$/.test(heute.tag) && heute.kopf.endsWith(tage[(new Date(heute.tag + 'T12:00:00').getDay() + 6) % 7]), JSON.stringify(heute));
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(600);
     await seite.locator('.arena .knoten[data-bot="benno"]').click();
-    pruefe('arena:heute: bei jeder Botwahl neu gefüllt (genau eine Zeile)', await seite.locator('.arena .detail .wp-heute').count() === 1);
+    await warte(400);
+    pruefe('Variante A: arena:heute hat keinen Host, die Zeile des Pakets erscheint nirgends und der Anbieter wird nicht gerufen',
+      await seite.locator('.wp-heute').count() === 0 && await seite.evaluate(() => !window.__wp.kontexte['arena:heute']));
 
     // Partie: Gegner-Leiste, Plaetze, abgelehnter Zug
     await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
@@ -2449,7 +2492,7 @@ async function testeSpielFundament(browser) {
       tempo: { grund: 600, zuschlag: 5 }, liga: { saison: 'test-saison', runde: 3 } });
     await h.warteFlo();
     const k = await seite.evaluate(() => ({
-      h2: document.querySelector('.partie .kopf h2').textContent, unter: document.querySelector('.partie .kopf .unter').textContent,
+      h2: document.querySelector('.partie .kopf h1').textContent, unter: document.querySelector('.partie .kopf .unter').textContent,
       meta: document.querySelector('.partie .botkarte .bot-meta').textContent, gest: window.__wp.ereignisse.find((e) => e.name === 'partie:gestartet'),
       zuege: window.__partie.z.zuege.slice(), blase: (document.querySelector('.partie .blase-ort .sprechblase') || {}).textContent,
     }));
@@ -2476,7 +2519,7 @@ async function testeSpielFundament(browser) {
     await seite.evaluate(() => { window.__test = {}; });
     await seite.reload();
     await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
-    const fort = await seite.evaluate(() => ({ g: window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet'), h2: document.querySelector('.partie .kopf h2').textContent }));
+    const fort = await seite.evaluate(() => ({ g: window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet'), h2: document.querySelector('.partie .kopf h1').textContent }));
     pruefe('Boss: Fortsetzen nach Neuladen behält Boss, Stufe und Seed', fort.h2 === 'Testboss · Meister' && fort.g.length === 1 && fort.g[0].fortgesetzt === true
       && fort.g[0].modus === 'boss' && fort.g[0].seed === k.gest.seed && !!fort.g[0].boss && fort.g[0].boss.stufe === 'meister', JSON.stringify(fort));
     await h.warteFlo();
@@ -2533,7 +2576,7 @@ async function testeSpielFundament(browser) {
     const st = await seite.evaluate(async () => {
       const edda = (await import('./js/bots.js')).BOTS.find((b) => b.id === 'edda');
       const zb = window.__partie.zugBot();
-      return { h2: document.querySelector('.partie .kopf h2').textContent, meta: document.querySelector('.partie .botkarte .bot-meta').textContent,
+      return { h2: document.querySelector('.partie .kopf h1').textContent, meta: document.querySelector('.partie .botkarte .bot-meta').textContent,
         wieEdda: JSON.stringify(zb.staerke) === JSON.stringify(edda.staerke), id: zb.id, laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')).boss };
     });
     await seite.evaluate(() => { window.__test = {}; });
@@ -2559,7 +2602,7 @@ async function testeSpielFundament(browser) {
       const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, touch: true, handy: !!vp.handy });
       await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
       await seite.goto(MIT_W0PLUS('wpheute&reiter=bestenliste,ich') + '#arena');
-      await seite.waitForSelector('.screen.arena .detail .wp-heute');
+      await seite.waitForSelector('.screen.arena .detail [data-aktion="spielen"]');
       await warte(400);
       const r = await seite.evaluate(() => {
         const leiste = document.querySelector('.reiter-leiste').getBoundingClientRect();
@@ -2633,7 +2676,7 @@ async function testeSpielFundament(browser) {
       const sl = document.querySelector('.ort-spieler-leiste');
       const ak = document.querySelector('.ort-aktionen');
       return { spieler: sl.hidden && getComputedStyle(sl).display === 'none', aktionen: ak.hidden && getComputedStyle(ak).display === 'none',
-        spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length, attr: reihe.dataset.aktionen === undefined, knoepfe: reihe.querySelectorAll('button').length,
+        spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length, attr: reihe.dataset.aktionen === undefined, knoepfe: reihe.querySelectorAll('button:not(.sk-pfeil)').length,
         klasse: document.querySelector('.screen.partie').classList.contains('mit-gegner-leiste') };
     });
     // Seit 30.10. abends ohne "Zuruecknehmen": drei Grundknoepfe (Hinweis, Drehen, Aufgeben)
@@ -2959,7 +3002,7 @@ async function testeViewport(browser, vp) {
   const brett = await h.innen('.screen.partie .brett');
   pruefe('Brett quadratisch und groß', brett && Math.abs(brett.w - brett.h) < 2 && brett.w >= Math.min(brett.iw, brett.ih) * 0.5, JSON.stringify(brett));
   const knoepfe = await seite.evaluate(() => [...document.querySelectorAll('.screen.partie .spielknoepfe .knopf, .screen.partie .kopf .icon-knopf')]
-    .map((k) => k.getBoundingClientRect()).every((r) => r.width >= 44 && r.height >= 44));
+    .filter((k) => k.getClientRects().length).map((k) => k.getBoundingClientRect()).every((r) => r.width >= 44 && r.height >= 44));
   pruefe('Tippflächen >= 44 px', knoepfe);
   const textUeber = await seite.evaluate(() => [...document.querySelectorAll('.screen.partie .spielknoepfe .knopf span')]
     .filter((s) => s.scrollWidth > s.clientWidth + 1 || s.getBoundingClientRect().right > s.closest('.knopf').getBoundingClientRect().right + 1).map((s) => s.textContent));
@@ -3066,7 +3109,7 @@ const u7Masse = (seite) => seite.evaluate(() => {
       lh: parseFloat(cs.lineHeight), label: document.querySelector('.partie .spieler.gegner').getAttribute('aria-label') },
     spalte: spalte.map((s) => ({ s: s.split(' ').pop(), ...r(s) })), tipp: Math.min(...tipp),
     unten: Math.max(...['.partie .kopf', '.partie .spieler.gegner', '.partie .evalbalken', '.partie .brett-rahmen', '.partie .spieler.ich', '.partie .coach', '.partie .spielknoepfe'].map((s) => r(s).b)),
-    streifen: r('.partie .zugleiste'), knoepfe: r('.partie .spielknoepfe'), coach: r('.partie .coach'), kopfTitel: document.querySelector('.partie .kopf h2').textContent,
+    streifen: r('.partie .zugleiste'), knoepfe: r('.partie .spielknoepfe'), coach: r('.partie .coach'), kopfTitel: document.querySelector('.partie .kopf h1').textContent,
     ueber: { seite: document.documentElement.scrollWidth - innerWidth, screen: sc.scrollWidth - sc.clientWidth, inhalt: inh.scrollWidth - inh.clientWidth },
     eng: sc.classList.contains('coach-eng'), streifenUnten: sc.classList.contains('streifen-unten'), handy: sc.classList.contains('handy'),
     brettwahl: sichtbar('.partie .brettwahl'), scrollt: inh.scrollHeight - inh.clientHeight,
@@ -3131,6 +3174,12 @@ async function testeU7(browser) {
       } else {
         pruefe('Unter 760 px Höhe: Zugstreifen nach den Aktionen, durch Scrollen der Spalte erreichbar', m.streifenUnten && m.streifen.t >= m.knoepfe.b - 0.5 && m.scrollt > 0,
           JSON.stringify([m.streifen, m.knoepfe, m.scrollt]));
+        // Handy-Runde K (08.11.2026): Zug zurueck und vor liegen dann in der Knopfreihe, im Bild und antippbar
+        const pf = await seite.evaluate(() => [...document.querySelectorAll('.partie .spielknoepfe > .sk-pfeil')].map((e) => {
+          const b = e.getBoundingClientRect(); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+          return { a: e.dataset.aktion, w: Math.round(b.width), unten: Math.round(b.bottom), trifft: !!t && e.contains(t) }; }));
+        pruefe('Unter 760 px Höhe: Zug zurück und vor in der Knopfreihe, im Bild', pf.length === 2 && pf.every((p) => p.w >= 44 && p.unten <= m.ih && p.trifft)
+          && pf[0].a === 'zug-zurueck' && pf[1].a === 'zug-vor', JSON.stringify(pf));
       }
       pruefe('Kopf: Rufname „Maxi“, keine Brettwahl auf dem Handy', m.kopfTitel === 'Maxi' && !m.brettwahl, JSON.stringify([m.kopfTitel, m.brettwahl]));
       // unter 700 px Hoehe (390 x 664) reicht die Hoehe nicht ganz: erst wird der Coach einzeilig, dann das Brett hoechstens
@@ -3201,17 +3250,28 @@ async function testeU7(browser) {
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
     await h.starte({ botId: 'kalle', farbe: 'w' });
     const ergebnis = [];
-    for (const hoehe of [655, 600, 540]) {
-      await seite.setViewportSize({ width: 390, height: hoehe });
+    for (const hoehe of [655, 600, 540, 548]) {
+      await seite.setViewportSize({ width: hoehe === 548 ? 375 : 390, height: hoehe });
       await warte(400);
       const m = await u7Masse(seite);
-      ergebnis.push({ hoehe, eng: m.eng, brett: Math.round(m.brett.w), unten: Math.round(m.unten), ih: m.ih, scrollt: m.scrollt });
+      // Rechtecke der Spalte (Karte, Brett, Karte, Coach, Knoepfe) duerfen sich nicht ueberlappen
+      const sp = m.spalte.filter((e) => e.s !== 'zugleiste' && e.s !== 'evalbalken');
+      const ueberlappt = sp.some((a, i) => sp.some((b, j) => j > i && a.t < b.b - 0.5 && b.t < a.b - 0.5));
+      const sehrEng = await seite.evaluate(() => document.querySelector('#app > .screen').classList.contains('sehr-eng'));
+      ergebnis.push({ hoehe, eng: m.eng, sehrEng, brett: Math.round(m.brett.w), unten: Math.round(m.unten), knoepfeUnten: Math.round(m.knoepfe.b), ih: m.ih,
+        scrollt: m.scrollt, ueberlappt, tipp: m.tipp });
     }
-    const [a, b, c] = ergebnis;
+    const [a, b, c, d] = ergebnis;
     pruefe('390 x 655: Coach auf eine Zeile (Rest auf Antippen), das Brett bleibt groß (mindestens 360 px, seit 31.10. ohne Sockel), alles im Bild', a.eng && a.brett >= 360 && a.brett % 8 === 0 && a.unten <= a.ih, JSON.stringify(a));
     pruefe('390 x 600: Coach eine Zeile, erst dann ein kleineres Brett (Vielfaches von 8, mindestens 280), alles im Bild', b.eng && b.brett < 360 && b.brett >= 280 && b.brett % 8 === 0
       && b.unten <= b.ih, JSON.stringify(b));
-    pruefe('390 x 540: das Brett nie unter 280 px (die Spalte scrollt)', c.brett === 280 && c.scrollt > 0, JSON.stringify(c));
+    pruefe('390 x 540: das Brett nie unter 280 px (reicht auch das Zusammenruecken nicht, scrollt die Spalte)', c.brett >= 280 && c.sehrEng
+      && (c.unten <= c.ih || c.scrollt > 0), JSON.stringify(c));
+    // U-Messrunde 09.11.: iPhone SE mit Safari-Leiste (375 x 548), die Knoepfe endeten bei 558 px
+    pruefe('375 x 548 (iPhone SE mit Safari-Leiste): Spielknoepfe ganz im Fenster, nichts ueberlappt, Brett mindestens 280, Knoepfe mindestens 44 px',
+      d.knoepfeUnten <= d.ih && !d.ueberlappt && d.brett >= 280 && d.tipp >= 44, JSON.stringify(d));
+    pruefe('Groessere Handys ruecken nicht zusammen (390 x 655 und 390 x 600 ohne .sehr-eng, nichts ueberlappt)', !a.sehrEng && !b.sehrEng && !a.ueberlappt && !b.ueberlappt,
+      JSON.stringify([a, b]));
     await seite.setViewportSize({ width: 390, height: 600 });
     await warte(300);
     await h.tippe('.partie .coach');
@@ -3230,7 +3290,7 @@ async function testeU7(browser) {
     await warte(400);
     const k = await seite.evaluate(() => {
       const kopf = document.querySelector('.partie .kopf');
-      const h2 = kopf.querySelector('h2');
+      const h2 = kopf.querySelector('h1');
       const bw = document.querySelector('.partie .brettwahl');
       const knoepfe = [...bw.querySelectorAll('button')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); });
       return { brettwahl: getComputedStyle(bw).display !== 'none' && bw.getBoundingClientRect().width > 0, knoepfe, titel: h2.textContent, titelGanz: h2.scrollWidth <= h2.clientWidth + 1,
@@ -3273,7 +3333,7 @@ async function testeU7(browser) {
       const info = r(document.querySelector('.partie .spieler.gegner > .info'));
       const woerter = [...document.querySelectorAll('.partie .spielknoepfe .knopf > span:last-child')].filter((e) => e.getBoundingClientRect().width > 0)
         .map((e) => ({ t: e.textContent.trim(), ganz: e.scrollWidth <= e.clientWidth + 1 && e.getBoundingClientRect().right <= e.parentNode.getBoundingClientRect().right + 0.5 }));
-      const h2 = document.querySelector('.partie .kopf h2');
+      const h2 = document.querySelector('.partie .kopf h1');
       return { spalte: Math.round(seiteEl.getBoundingClientRect().width), teile, uhren, info, woerter, titel: h2.textContent, titelGanz: h2.scrollWidth <= h2.clientWidth + 1 };
     });
     pruefe('Brett mindestens 44 % der kleineren Seite (vorher 184 px)', m.brett.w >= Math.min(m.iw, m.ih) * 0.44, JSON.stringify(m.brett));
@@ -3372,7 +3432,7 @@ async function testeU7(browser) {
         klassen: ['botbox', 'botleiste-hoch', 'botkarte'].every((c) => g.classList.contains(c)), erstes: g.firstElementChild.classList.contains('ort-gegner-leiste'),
         av: !!g.querySelector(':scope > .av img') && !!ich.querySelector(':scope > .av svg'), name: g.querySelector('.bot-name').textContent, meta: g.querySelector('.bot-meta').textContent.trim(),
         uhren: [...document.querySelectorAll('.partie .uhr')].map((u) => u.hidden), leisteNachName: ich.querySelector('.ort-spieler-leiste').previousElementSibling === ich.querySelector(':scope > .name'),
-        ich: ['spielerleiste', 'spieler-quer', 'spieler-hoch'].every((c) => ich.classList.contains(c)), kopf: document.querySelector('.partie .kopf h2').textContent,
+        ich: ['spielerleiste', 'spieler-quer', 'spieler-hoch'].every((c) => ich.classList.contains(c)), kopf: document.querySelector('.partie .kopf h1').textContent,
         unter: document.querySelector('.partie .kopf .unter').textContent, brettwahl: document.querySelectorAll('.partie .brettwahl button').length,
         klang: document.querySelector('.partie .kopf [data-aktion="klang"]').getAttribute('aria-pressed'), lage: window.__partie.gegnerLeiste.dataset.lage,
         rollen: [g.getAttribute('role'), ich.getAttribute('role')], label: g.getAttribute('aria-label'),
@@ -3661,6 +3721,27 @@ async function testeU7(browser) {
     });
     pruefe('Ein führender Klang je Moment: Schach verdrängt Präzise, nicht Genial oder Weit daneben', JSON.stringify(vorrang) === JSON.stringify([
       ['bester', true, true, 'bester'], ['bester', false, false, 'bester'], ['brillant', true, false, 'brillant'], ['patzer', true, false, 'patzer']]), JSON.stringify(vorrang));
+    // Mattzug (Klang-Pruefung U, 09.11.2026): am Partie-Ende hat die Landung keinen Zugklang (der Ende-Klang kommt mit dem
+    // Ergebnis); auch dann verdraengt der Ende-Klang Praezise/COMBO, Genial bleibt
+    const amEnde = await seite.evaluate(() => {
+      const P = window.__partie;
+      const phase = P.z.phase;
+      P.z.phase = 'ende';
+      const r = [];
+      for (const k of ['bester', 'brillant']) {
+        P.z.zuege.length = 1; P.z.liveKlassen[0] = k; P.z.liveTrivial[0] = false;
+        P.z.landung[0] = { name: null, um: performance.now() };
+        P.z.live[0] = { status: 'fertig', erg: { klasse: k, uci: 'e2e4', besterZug: 'e2e4', evalVorher: { cp: 0, mate: null }, evalNachher: { cp: 0, mate: null },
+          analyseNachher: { lines: [{ eval: { cp: 0, mate: null }, pv: [] }] }, coach: 'Test.' } };
+        P.zeigeBewertung(0);
+        const e = P.protokoll.filter((x) => x.typ === 'bewertungsklang').pop();
+        r.push([k, e && e.still, e && e.name]);
+      }
+      P.z.phase = phase;
+      return r;
+    });
+    pruefe('Mattzug: der Ende-Klang verdrängt Präzise, Genial klingt trotzdem', JSON.stringify(amEnde) === JSON.stringify([
+      ['bester', true, 'bester'], ['brillant', false, 'brillant']]), JSON.stringify(amEnde));
     // Weit daneben ruhig: kein Effekt am Brett (kein Wackeln)
     const ruhig = await seite.evaluate(() => { const n = document.querySelectorAll('.partie .effekt-ort').length; window.__partie.effekt('e4', 'patzer'); return document.querySelectorAll('.partie .effekt-ort').length - n; });
     pruefe('Weit daneben bleibt ruhig (kein Brett-Effekt)', ruhig === 0, String(ruhig));
@@ -3798,7 +3879,8 @@ async function testeU7(browser) {
       const wort = document.querySelector('.erg-wort');
       const aus = wort.querySelector('.ausruf');
       const inh = getComputedStyle(document.querySelector('.screen.partie > .inhalt')).transform;
-      const k = [...document.querySelectorAll('.erg-knoepfe .knopf')].map((b) => { const r = b.getBoundingClientRect(); return { ziel: b.dataset.ziel, primaer: b.classList.contains('primaer'), t: r.top, l: r.left }; });
+      const k = [...document.querySelectorAll('.erg-aktionen [data-ziel], .erg-aktionen .erg-lobby')].map((b) => { const r = b.getBoundingClientRect();
+        return { ziel: b.dataset.ziel || 'lobby', primaer: b.classList.contains('primaer'), knopf: b.classList.contains('knopf'), t: r.top, u: r.bottom, l: r.left, w: r.width, hh: r.height }; });
       return { text: wort.textContent, ausruf: aus && getComputedStyle(aus).color, gold: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim(),
         konfetti: document.querySelectorAll('.konfetti').length, schleier: getComputedStyle(o).backgroundColor, filter: getComputedStyle(o).backdropFilter || getComputedStyle(o).webkitBackdropFilter || 'none',
         zurueck: document.querySelector('.screen.partie').classList.contains('mit-ergebnis'), inh, sterne: document.querySelectorAll('.erg-stern .e-stern svg').length, knoepfe: k };
@@ -3807,16 +3889,62 @@ async function testeU7(browser) {
     pruefe('Sieg: „Sieg!“ mit goldenem Ausrufezeichen, kein Konfetti, Sterne als Symbole', sieg.text === 'Sieg!' && hex(sieg.ausruf) === sieg.gold.toUpperCase() && sieg.konfetti === 0 && sieg.sterne === 3, JSON.stringify(sieg));
     pruefe('Schleier ohne Weichzeichner, der Screen dahinter tritt zurück (scale .975)', /rgba?\(/.test(sieg.schleier) && (sieg.filter === 'none' || !sieg.filter) && sieg.zurueck && /matrix\(0\.975/.test(sieg.inh), JSON.stringify(sieg));
     const a = sieg.knoepfe.find((x) => x.ziel === 'analyse');
-    const b = sieg.knoepfe.find((x) => x.ziel !== 'analyse');
-    // Handy seit 01.11.2026 auch nebeneinander, fest am unteren Rand der Karte (Flo: "man sollte direkt die Lobby sehen")
-    pruefe(g.handy ? 'Handy: Knöpfe nebeneinander, „Zur Analyse“ (Zinnober) links' : 'Knöpfe nebeneinander, „Zur Analyse“ in Zinnober', a && b && a.primaer
-      && Math.abs(a.t - b.t) < 2 && a.l < b.l, JSON.stringify(sieg.knoepfe));
+    const b = sieg.knoepfe.find((x) => x.ziel === 'weiter');
+    const lo = sieg.knoepfe.find((x) => x.ziel === 'lobby');
+    // R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner leuchtet "Nächster Gegner" gross ueber die
+    // ganze Breite, "Zur Analyse" und "Zu den Bots" stehen klein darunter nebeneinander (Analyse links), beide antippbar
+    pruefe(g.handy ? 'Handy: „Nächster Gegner“ gross (Zinnober), darunter klein „Zur Analyse“ links, „Zu den Bots“ rechts'
+      : '„Nächster Gegner“ gross (Zinnober), darunter klein „Zur Analyse“ links, „Zu den Bots“ rechts',
+    a && b && lo && b.primaer && b.knopf && !a.knopf && !a.primaer && a.t >= b.u - 1 && Math.abs(a.t - lo.t) < 2 && a.l < lo.l
+      && a.w < b.w && a.hh >= 44 && lo.hh >= 44 && sieg.knoepfe.filter((x) => x.primaer).length === 1, JSON.stringify(sieg.knoepfe));
     if (g.handy) {
       const fest = await seite.evaluate(() => { const k = document.querySelector('.ergebnis-karte').getBoundingClientRect();
         const l = document.querySelector('.erg-lobby').getBoundingClientRect(); const a = document.querySelector('.erg-aktionen');
-        return { pos: getComputedStyle(a).position, lobbyImBild: l.height >= 44 && l.top >= k.top && l.bottom <= k.bottom + 1 && l.bottom <= innerHeight }; });
-      pruefe('Handy: Knopfleiste fest unten, „Zur Lobby“ ohne Scrollen zu sehen', fest.pos === 'sticky' && fest.lobbyImBild, JSON.stringify(fest));
+        return { aussen: !a.closest('.erg-rumpf'), lobbyImBild: l.height >= 44 && l.top >= k.top && l.bottom <= k.bottom + 1 && l.bottom <= innerHeight }; });
+      pruefe('Handy: Knopfleiste fest unten (unter dem Scrollbereich), „Zu den Bots“ ohne Scrollen zu sehen', fest.aussen && fest.lobbyImBild
+        && (await seite.locator('.erg-lobby').innerText()).trim() === 'Zu den Bots', JSON.stringify(fest));
     }
+    // Punkt 19 (Messrunde 09.11.): die Knopfleiste verdeckt nichts. Vorher lag der Bot-Spruch auf iPhone 13 und SE halb unter
+    // ihr (sticky ueber dem Inhalt). Gemessen wird der SICHTBARE Teil jedes Inhaltselements (am Scrollbereich abgeschnitten)
+    // gegen die Leiste, in Ruhe und am Ende des Scrollbereichs; dazu: Zeilen ruecken nicht ineinander, die Leiste liegt im Fenster.
+    // einmal (im Handy-Durchgang) ueber vier Fenster: iPhone 13, SE, iPad quer, PC
+    for (const [w, hh] of g.handy ? [[390, 664], [375, 548], [1180, 746], [1280, 720]] : []) {
+      await seite.setViewportSize({ width: w, height: hh });
+      await warte(300);
+      const platz = async () => seite.evaluate(() => {
+        const o = document.querySelector('.ergebnis-overlay');
+        const rumpf = o.querySelector('.erg-rumpf');
+        const lr = o.querySelector('.erg-aktionen').getBoundingClientRect();
+        const rr = rumpf.getBoundingClientRect();
+        const sicht = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+        const verdeckt = [];
+        for (const e of rumpf.querySelectorAll('*')) {
+          if (e.children.length || !sicht(e)) continue;
+          const r = e.getBoundingClientRect();
+          const t = Math.max(r.top, rr.top, lr.top), u = Math.min(r.bottom, rr.bottom, lr.bottom);
+          const li = Math.max(r.left, lr.left), re = Math.min(r.right, lr.right);
+          if (u - t > 0.5 && re - li > 0.5) verdeckt.push((e.className || e.tagName).toString().split(' ')[0]);
+        }
+        const reihen = [...rumpf.children].filter(sicht).map((e) => {
+          let u = e.getBoundingClientRect().bottom;
+          for (const d of e.querySelectorAll('*')) if (sicht(d) && getComputedStyle(d).position !== 'absolute') u = Math.max(u, d.getBoundingClientRect().bottom);
+          return { top: e.getBoundingClientRect().top, u };
+        }).sort((x, y) => x.top - y.top);
+        const ineinander = reihen.filter((x, i) => i > 0 && x.top < reihen[i - 1].u - 0.5).length;
+        const blase = o.querySelector('.erg-bot .sprechblase').getBoundingClientRect();
+        return { verdeckt, ineinander, leisteImFenster: lr.top >= 0 && lr.bottom <= innerHeight + 0.5, blaseUnten: Math.round(blase.bottom), leisteOben: Math.round(lr.top) };
+      });
+      const ruhe = await platz();
+      await seite.evaluate(() => { const r = document.querySelector('.ergebnis-overlay .erg-rumpf'); r.scrollTop = r.scrollHeight; });
+      await warte(200);
+      const ende = await platz();
+      pruefe(`${w}x${hh}: Knopfleiste im Fenster, verdeckt nichts (Ruhe und Scroll-Ende), Zeilen nicht ineinander, Spruch am Ende über der Leiste`,
+        ruhe.leisteImFenster && ruhe.verdeckt.length === 0 && ende.verdeckt.length === 0 && ruhe.ineinander === 0 && ende.blaseUnten <= ende.leisteOben,
+        JSON.stringify({ ruhe, ende }));
+      await seite.evaluate(() => { document.querySelector('.ergebnis-overlay .erg-rumpf').scrollTop = 0; });
+    }
+    await seite.setViewportSize({ width: g.w, height: g.h });
+    await warte(300);
     await bild(seite, `u7-ergebnis-sieg-${g.w}x${g.h}`);
     await h.tippe('.ergebnis-overlay .erg-zu');
     pruefe('Brett ansehen: der Screen tritt wieder vor', await seite.evaluate(() => !document.querySelector('.screen.partie').classList.contains('mit-ergebnis')));

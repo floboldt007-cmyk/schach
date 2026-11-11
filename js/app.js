@@ -94,12 +94,14 @@ const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
 const SCREENS = ['heim', 'arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
-  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'lobby', 'schule'];
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'lobby',
+  'raetsel-duell', 'schule'];
 const TITEL = {
-  heim: 'Start', arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
-  training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
+  heim: 'Start', arena: 'Bots', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
+  training: 'Lernen', start: 'Willkommen', online: 'Online',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', premium: 'Premium', schule: 'Schulmodus', lobby: 'Online',
+  'raetsel-duell': 'Rätsel-Duell',
 };
 // Englische Version: TITEL bleibt die deutsche Quelle (gleich js/sprachen/rahmen.js 'titel.<screen>'); gezeigt wird
 // titelVon(name) = t('rahmen.titel.<screen>') beim Zeichnen, null fuer einen unbekannten Screen
@@ -109,7 +111,7 @@ function titelVon(name) {
 // Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena. Premium-Umbau U2: 'training' ist
 // Kern-Screen (Huelle fuer training:karten) und steht deshalb nicht mehr hier.
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
-  'werkstatt', 'lobby', 'schule']);
+  'werkstatt', 'lobby', 'raetsel-duell', 'schule']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 // Texte aus den Woerterbuechern in HTML einsetzen
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -385,7 +387,7 @@ const REITER_FEST = new Set(['heim', 'arena']);
 // fruehere Reiter: im Testmodus (?reiter=training oder verlauf) schalten sie nur die Leiste ein, ohne eigenen Reiter
 const REITER_FRUEHER = new Set(['training', 'verlauf']);
 // Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt); verlauf: reiterVon()
-const REITER_VON = { heim: 'heim', arena: 'arena', lobby: 'heim', training: 'heim', raetsel: 'heim', lernen: 'heim', bestenliste: 'bestenliste',
+const REITER_VON = { heim: 'heim', arena: 'arena', lobby: 'heim', 'raetsel-duell': 'heim', training: 'heim', raetsel: 'heim', lernen: 'heim', bestenliste: 'bestenliste',
   ich: 'ich', werkstatt: 'ich' };
 // Querformat ab 1021 px (iPad quer, PC): Seitenleiste links (Entwurf ipad-pc-v2 .nav), sonst schwebt sie unten (.dock)
 const OBEN_MQ = '(min-width: 1021px) and (orientation: landscape)';
@@ -410,9 +412,14 @@ export function reiterListe(suche = typeof location !== 'undefined' ? location.s
   return an ? REITER_ALLE.filter(([n]) => REITER_FEST.has(n) || aus.has(n)).map(([n]) => n) : [];
 }
 
-// Reiter, zu dem ein Screen gehoert (null: keiner, dort ist die Leiste weg)
-export function reiterVon(screen, liste = reiterListe()) {
+// Reiter, zu dem ein Screen gehoert (null: keiner, dort ist die Leiste weg). Handy-Runde 08.11.: Online (ohne laufende
+// Partie) und das Zu-zweit-Startblatt (Partie mit modus zuzweit, ohne Partie und ohne Fortsetzen) gehoeren zu Start;
+// sobald eine Partie laeuft (partieId, zuzweit, fortsetzen), ist die Leiste weg.
+export function reiterVon(screen, liste = reiterListe(), params = {}) {
+  const p = params && typeof params === 'object' ? params : {};
   if (screen === 'verlauf') return liste.includes('ich') ? 'ich' : null;
+  if (screen === 'online') return p.partieId ? null : 'heim';
+  if (screen === 'partie') return p.modus === 'zuzweit' && !p.zuzweit && !p.fortsetzen ? 'heim' : null;
   return Object.prototype.hasOwnProperty.call(REITER_VON, screen) ? REITER_VON[screen] : null;
 }
 
@@ -532,9 +539,9 @@ function versteckeReiter() {
   if (nav.parentNode !== document.body) document.body.append(nav);
 }
 
-function zeigeReiter(screen) {
+function zeigeReiter(screen, params = {}) {
   const liste = reiterListe();
-  const aktiv = screen ? reiterVon(screen, liste) : null;
+  const aktiv = screen ? reiterVon(screen, liste, params) : null;
   if (!liste.length || !aktiv) {
     versteckeReiter();
     return;
@@ -573,9 +580,15 @@ function zeigeReiter(screen) {
 let aktuell = null;    // { name, params, hash, handle }
 let ladeNr = 0;
 let tiefe = 0;         // Anzahl eigener Eintraege im Browser-Verlauf vor dem aktuellen
+// Kundenblick 09.11. (Befund 9): der zuletzt gezeigte Hauptort. Zurueck aus der Partie fuehrt dorthin, woher man kam
+// (Start oder Bots), nicht immer zu den Bots.
+const HEIM_ORTE = new Set(['heim', 'arena', 'lernen', 'bestenliste', 'ich']);
+let herkunft = 'arena';
 
 function hashFuer(name, params) {
   if (name === 'online' && params?.partieId) return '#online/partie/' + encodeURIComponent(params.partieId);
+  // Raetsel-Duell per Freundes-Link: #raetsel-duell/CODE (Etappe 5)
+  if (name === 'raetsel-duell' && typeof params?.code === 'string' && /^[A-Z0-9]{6}$/.test(params.code)) return '#raetsel-duell/' + params.code;
   if (name === 'analyse' && params && params.partieId) return '#analyse/' + encodeURIComponent(params.partieId);
   // Einstellungen auf dem Handy: ein Bereich als eigene Seite (js/ui/einstellungen.js), Zurueck fuehrt zur Liste
   if (name === 'einstellungen' && params && typeof params.seite === 'string' && /^[a-z0-9-]{1,24}$/.test(params.seite)) return '#einstellungen/' + params.seite;
@@ -586,6 +599,7 @@ function ausHash(hash) {
   const h = String(hash || '').replace(/^#\/?/, '');
   const [name, rest] = h.split('/');
   if (name === 'online' && rest === 'partie') return { name, params: { partieId: decodeURIComponent(h.split('/')[2] || '') } };
+  if (name === 'raetsel-duell' && rest && /^[A-Za-z0-9]{6}$/.test(rest)) return { name, params: { code: rest.toUpperCase() } };
   if (name === 'analyse') return rest ? { name, params: { partieId: decodeURIComponent(rest) } } : { name: 'verlauf', params: {} };
   if (name === 'einstellungen' && rest && /^[a-z0-9-]{1,24}$/.test(rest)) return { name, params: { seite: rest } };
   if (SCREENS.includes(name)) return { name, params: {} };
@@ -669,19 +683,73 @@ function freundZiel() {
 }
 
 function beiVerlauf() {
+  // nur ein eigener Verlaufseintrag (Zurueck/Vor) bekommt seine Scrollposition zurueck, ein frischer Link beginnt oben
+  const eigenerEintrag = !!(history.state && history.state.schach);
   const einladung = uebernimmEinladungsLink();
-  const ziel = einladung ? { name: 'online', params: {} } : freundZiel() || ersterScreen() || ausVerlauf();
+  const freund = !einladung && freundZiel();
+  const erster = !einladung && !freund && ersterScreen();
+  const ziel = einladung ? { name: 'online', params: {} } : freund || erster || ausVerlauf();
   const hash = hashFuer(ziel.name, ziel.params);
   if (!einladung && !ziel.freund && aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
+  const wiederherstellen = eigenerEintrag && !einladung && !freund && !erster && hash === location.hash;
   if (hash !== location.hash || !(history.state && history.state.schach)) {
     try { history.replaceState({ schach: true, name: ziel.name, params: sauber(ziel.params), tiefe }, '', hash); } catch (e) { /* egal */ }
   }
-  zeigeScreen(ziel.name, ziel.params, hash);
+  zeigeScreen(ziel.name, ziel.params, hash, { wiederherstellen });
+}
+
+// Scrollposition je Verlaufseintrag (R13 CLS-1, 10.11.2026: nach Zurueck landete man immer oben). Gescrollt wird meist ein
+// inneres Element des Screens (div.inhalt, .ms-rumpf, .pm-rumpf ...), nicht die Seite. Nur im Speicher: nach dem Neuladen
+// beginnt jeder Screen oben, und beim Zurueck ist der verlassene Verlaufseintrag nicht mehr beschreibbar.
+const scrollMerker = new Map();   // 'tiefe|hash' -> { wo, y }
+function scrollerIn(root) {
+  let best = null;
+  let flaeche = 0;
+  for (const el of root.querySelectorAll('*')) {
+    if (el.scrollHeight <= el.clientHeight + 1 || !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) continue;
+    const f = el.clientWidth * el.clientHeight;
+    if (f > flaeche) { best = el; flaeche = f; }
+  }
+  const seite = document.scrollingElement;
+  if (seite && seite.scrollHeight > seite.clientHeight + 1 && (!best || seite.clientWidth * seite.clientHeight > flaeche)) return seite;
+  return best;
+}
+const scrollerKennung = (el) => (el === document.scrollingElement ? 'seite' : el.tagName.toLowerCase() + '.' + [...el.classList].join('.'));
+
+function merkeScroll() {
+  if (!aktuell) return;
+  const schluessel = aktuell.tiefe + '|' + aktuell.hash;
+  const el = scrollerIn(document.getElementById('app'));
+  const y = el ? Math.round(el.scrollTop) : 0;
+  scrollMerker.delete(schluessel);
+  if (y > 0) scrollMerker.set(schluessel, { wo: scrollerKennung(el), y });
+  if (scrollMerker.size > 50) scrollMerker.delete(scrollMerker.keys().next().value);
+}
+
+// Gemerkte Position setzen, sobald der Inhalt hoch genug ist: zuerst synchron vor dem ersten Bild (kein Sprung), laedt der
+// Screen nach, pro Bild hoechstens 1 s lang. Eine eigene Eingabe oder ein neuer Screen beendet das Nachsetzen.
+function stelleScrollHer(root, nr, ziel) {
+  const ende = Date.now() + 1000;
+  const eingaben = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+  let aus = false;
+  const stopp = () => { aus = true; eingaben.forEach((e) => window.removeEventListener(e, stopp, true)); };
+  eingaben.forEach((e) => window.addEventListener(e, stopp, true));
+  const versuch = () => {
+    if (aus || nr !== ladeNr) return stopp();
+    const el = scrollerIn(root);
+    if (el && scrollerKennung(el) === ziel.wo) {
+      el.scrollTop = ziel.y;
+      if (Math.abs(el.scrollTop - ziel.y) <= 1) return stopp();
+    }
+    if (Date.now() > ende) return stopp();
+    requestAnimationFrame(versuch);
+  };
+  versuch();
 }
 
 const NEU_GELADEN = 'schach-arena:neu-geladen';
 let ladeFertig = 0;   // ladeNr des zuletzt gezeigten Screens; ungleich ladeNr = ein Screen laedt gerade
-async function zeigeScreen(name, params, hash) {
+async function zeigeScreen(name, params, hash, { wiederherstellen = false } = {}) {
   const nr = ++ladeNr;
   schliesseDialog();
   let modul = null;
@@ -694,6 +762,7 @@ async function zeigeScreen(name, params, hash) {
     modul = null;
   }
   if (nr !== ladeNr) return;  // inzwischen woanders hin
+  merkeScroll();
   if (aktuell && aktuell.handle) {
     try { aktuell.handle.verlasse(); } catch (e) {
       console.error(e);
@@ -705,7 +774,8 @@ async function zeigeScreen(name, params, hash) {
   schliesseSheet();
   const root = document.getElementById('app');
   root.replaceChildren();
-  aktuell = { name, params, hash, handle: null };
+  aktuell = { name, params, hash, handle: null, tiefe };
+  if (HEIM_ORTE.has(name)) herkunft = name;
   ladeFertig = nr;
   document.documentElement.dataset.screen = name;
   document.title = name === 'arena' || name === 'heim' ? 'Crownmate' : `${titelVon(name)} · Crownmate`;
@@ -742,6 +812,9 @@ async function zeigeScreen(name, params, hash) {
     zeigeReiter(null);
     return;
   }
+  // Leiste VOR dem Zeichnen: Sie bestimmt die Hoehe des Screens (html[data-reiter]). Danach gesetzt, rechnete die Partie
+  // ihr Brett im 88 px kuerzeren Screen und alles wuchs sichtbar nach (R11 Pixel 10.11.2026, iPhone 13: CLS 0,109)
+  zeigeReiter(name, params || {});
   try {
     aktuell.handle = modul.zeige(root, params || {}, app) || { verlasse() {} };
   } catch (e) {
@@ -753,7 +826,8 @@ async function zeigeScreen(name, params, hash) {
     return;
   }
   richteSprunglinkEin(root);
-  zeigeReiter(name);
+  const gemerkt = wiederherstellen && scrollMerker.get(tiefe + '|' + hash);
+  if (gemerkt) stelleScrollHer(root, nr, gemerkt);
   sende('app:screen', { name, params: params || {} });
 }
 
@@ -818,6 +892,7 @@ function zeigePlatzhalter(root, name, kaputt = false) {
 export const app = {
   gehe,
   zurueck,
+  herkunft: () => herkunft,
   engine,
   einstellungen: () => ladeEinstellungen(),
   setzeEinstellungen(teil) {
@@ -855,12 +930,16 @@ function registriereSW() {
   if (TEST && !/[?&]sw\b/.test(location.search)) return;
   const sw = navigator.serviceWorker;
   let wechsel = false;
+  // nur im Test: Ablauf des Versionswechsels fuer die Fehlermeldung von tests/e2e.test.mjs (Update)
+  const swLog = (s) => { if (TEST) console.info('SW-Ablauf ' + s); };
   sw.addEventListener('controllerchange', () => {
+    swLog('controllerchange wechsel=' + wechsel);
     if (!wechsel) return;
     wechsel = false;
     location.reload();
   });
   const aktiviere = (w) => {
+    swLog('aktiviere von ' + String((new Error().stack || '').split('\n')[2] || '').trim().replace(/^.*\/js\//, ''));
     wechsel = true;
     try { sessionStorage.setItem(SW_MERKER, String(Date.now())); } catch (e) { /* egal */ }
     // laufende Partie sichern (verlasse speichert den Stand), dann uebernimmt die neue Version
@@ -873,6 +952,7 @@ function registriereSW() {
   };
   aktiviereSW = aktiviere;
   sw.register('sw.js').then((reg) => {
+    swLog('register wartet=' + !!reg.waiting + ' kuerzlich=' + kuerzlich() + ' screen=' + (aktuell && aktuell.name));
     if (reg.waiting && sw.controller) {
       wartenderSW = reg.waiting;
       const inPartie = (aktuell && aktuell.name === 'partie') || /^#partie/.test(location.hash);

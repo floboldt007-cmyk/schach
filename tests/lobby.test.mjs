@@ -28,7 +28,8 @@ function pruefe(name, wert, info = '') {
 const lager = new Map();
 setzeSpeicher({ getItem: (k) => (lager.has(k) ? lager.get(k) : null), setItem: (k, v) => lager.set(k, String(v)), removeItem: (k) => lager.delete(k),
   key: (i) => [...lager.keys()][i] ?? null, get length() { return lager.size; } });
-const { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, ligaTabelle, LIGA_BEISPIEL, modusLeiste } = await import('../js/pakete/lobby/index.js');
+const lobbyModul = await import('../js/pakete/lobby/index.js');
+const { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, modusLeiste } = lobbyModul;
 const { DE, EN } = await import('../js/pakete/lobby/texte.js');
 
 pruefe('Bedenkzeiten: Blitz, Schnellschach, Klassisch; Standard 3 + 2; gueltig fuer die Partie-Uhr',
@@ -43,18 +44,26 @@ pruefe('Wertung geschaetzt: ohne Sieg 400, sonst der staerkste besiegte Bot (auf
   && schaetzeWertung(sieg([stark.id])) <= 2800);
 const g0 = passenderBot(400, leer);
 pruefe('Vorschau-Gegner: ein freier Bot, nie ein Endgegner (ohne Fortschritt der erste)', g0 && !g0.endgegner && g0.id === BOTS[0].id, g0 && g0.id);
-const tab = ligaTabelle({ name: 'Du', punkte: 9 });
-pruefe('Liga-Vorschau: acht Plaetze, absteigend, drei Aufsteiger und kein Abstieg (Fairness), du bei Gleichstand hinter den anderen',
-  tab.length === 8 && tab.every((z, i) => z.platz === i + 1 && (i === 0 || tab[i - 1].punkte >= z.punkte))
-  && tab.filter((z) => z.zone === 'auf').length === 3 && tab.every((z) => z.zone === 'auf' || z.zone === '')
-  && tab.find((z) => z.du).platz === 5 && tab[3].name === 'Bauernsturm');
-pruefe('Liga-Vorschau: erfundene Namen, keine Elo-Zahl, kein Countdown', LIGA_BEISPIEL.length === 7
-  && !/\d{4}/.test(LIGA_BEISPIEL.map((x) => x.name).join()) && !Object.values(DE).some((x) => /nur noch|endet in|countdown/i.test(x)));
+// Flo 08.11.2026: die Beispiel-Liga mit erfundenen Namen ist weg (sie widersprach der echten Liga im Liga-Reiter)
+pruefe('Keine Beispiel-Liga mehr: weder Tabelle noch erfundene Namen noch "Beispiel"-Text; kein Countdown', !('ligaTabelle' in lobbyModul)
+  && !('LIGA_BEISPIEL' in lobbyModul) && !('beispiel' in DE) && !('liga.titel' in DE)
+  && !Object.values(DE).some((x) => /Turmfalke|Rochade77|nur noch|endet in|countdown/i.test(x)));
 pruefe('Texte: Deutsch und Englisch mit denselben Schluesseln, keine langen Gedankenstriche',
   Object.keys(DE).sort().join() === Object.keys(EN).sort().join() && ![...Object.values(DE), ...Object.values(EN)].some((x) => /[–—]/.test(x)));
 const ZUGWORTE = /brilliant|great move|blunder|inaccuracy|mistake|best move|excellent|book move/i;
 pruefe('Englisch ohne Zugklassen-Woerter', !Object.values(EN).some((x) => ZUGWORTE.test(x)));
 pruefe('Umschalter ohne Labor: nichts (null)', modusLeiste({ gehe() {} }, 'welten') === null);
+{
+  const { BOT_ERSATZ_MS } = await import('../js/kronen.js');
+  const quelle = (await import('node:fs')).readFileSync(path.join(WURZEL, 'js/ui/lobby.js'), 'utf8');
+  // Punkt 40: die Wartezeit nennt der Server (warte_s), ohne neues SQL gelten die 10 s aus js/gegnersuche.js
+  pruefe('KI-Gegner: BOT_ERSATZ_MS 10000 (altes SQL), die Lobby nimmt ohne Testschalter die Wartezeit des Servers',
+    BOT_ERSATZ_MS === 10000 && /window\.__lobbyBotMs : undefined;/.test(quelle));
+  const kern = (await import('node:fs')).readFileSync(path.join(WURZEL, 'js/sprachen/partie.js'), 'utf8');
+  // das Abzeichen steht in den Kern-Texten (partie.kiGegner): der Kern laedt ohne Pakete keine Paket-Datei
+  pruefe('Texte fuer die Gegnersuche: KI-Gegner (Kern) und Anmelde-Hinweis', /kiGegner: 'KI-Gegner'/.test(kern) && /kiGegner: 'AI opponent'/.test(kern) && !('ki' in DE)
+    && DE['suche.anmelden'] === 'Zum Suchen anmelden');
+}
 
 // ---------------------------------------------------------------------------
 // Browser-Teil
@@ -62,7 +71,7 @@ pruefe('Umschalter ohne Labor: nichts (null)', modusLeiste({ gehe() {} }, 'welte
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -78,26 +87,39 @@ const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
 const token = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 9999999999, user: { id: UID, email: 'probe@example.invalid' } };
 
-async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'arena' }) {
+// rpc(name, daten) beantwortet abgefangene Aufrufe von /rest/v1/rpc/<name> (Etappe B: Gegnersuche); jeder Aufruf
+// landet in aufrufe. botMs verkuerzt die Wartezeit bis zum KI-Gegner (window.__lobbyBotMs, sonst 10 s).
+async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'arena', rpc = null, botMs = null }) {
   const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, serviceWorkers: 'block', hasTouch: true });
   const s = await k.newPage();
   const fehlerListe = [];
+  const aufrufe = [];
   s.on('pageerror', (e) => fehlerListe.push(e.message));
   s.on('console', (m) => { if (m.type() === 'error') fehlerListe.push('konsole: ' + m.text()); });
-  await s.route(SUPA + '/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
-    body: JSON.stringify(r.request().url().includes('sonderstuecke') && erfinder ? [{ stueck_id: 'erfinder-titel' }] : []) }));
-  await s.addInitScript(({ sitzung, uid, erfinder }) => {
+  await s.route(SUPA + '/**', (r) => {
+    const name = (r.request().url().match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1];
+    if (name && rpc) {
+      let daten = null;
+      try { daten = r.request().postDataJSON(); } catch (e) { /* ohne Rumpf */ }
+      aufrufe.push({ name, daten, um: Date.now() });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rpc(name, daten) ?? []) });
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(r.request().url().includes('sonderstuecke') && erfinder ? [{ stueck_id: 'erfinder-titel' }] : []) });
+  });
+  await s.addInitScript(({ sitzung, uid, erfinder, botMs }) => {
     try {
       window.__lobbySuche = 300;
+      if (botMs != null) window.__lobbyBotMs = botMs;
       if (sessionStorage.getItem('probe-start')) return;
       sessionStorage.setItem('probe-start', '1');
       localStorage.clear();
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
       if (erfinder) localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: ['erfinder-titel'] }));
     } catch (e) { /* egal */ }
-  }, { sitzung: SITZUNG, uid: UID, erfinder });
+  }, { sitzung: SITZUNG, uid: UID, erfinder, botMs });
   await s.goto(`${BASIS}#${hash}`);
-  return { k, s, fehlerListe };
+  return { k, s, fehlerListe, aufrufe };
 }
 
 async function browserTeil() {
@@ -141,17 +163,20 @@ async function browserTeil() {
         aktiv: document.querySelector('.screen.lobby .lb-modus')?.dataset.aktiv,
         zeiten: [...document.querySelectorAll('.lb-zeit')].map((b) => b.dataset.zeit + (b.getAttribute('aria-checked') === 'true' ? '*' : '')),
         werte: [...document.querySelectorAll('.lb-wert')].map((w) => w.dataset.art + ':' + w.querySelector('b').textContent),
-        liga: document.querySelectorAll('.lb-tabelle li').length, du: document.querySelector('.lb-tabelle li[data-du]')?.textContent.includes('Du'),
-        beispiel: document.querySelector('.lb-beispiel')?.textContent, mehr: [...document.querySelectorAll('.lb-modus-karte')].map((b) => b.dataset.ziel + (b.disabled ? '-' : '+')),
+        liga: document.querySelectorAll('.lb-liga, .lb-tabelle li').length, beispiel: /Beispiel|Turmfalke/.test(document.querySelector('.screen.lobby').textContent), mehr: [...document.querySelectorAll('.lb-modus-karte')].map((b) => b.dataset.ziel + (b.disabled ? '-' : '+')),
         reiter: document.querySelector('.reiter-leiste .reiter[aria-current="page"], .reiter-leiste .reiter.aktiv')?.dataset.reiter || null,
-        hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1,
-        klein: [...document.querySelectorAll('.lb-zeit, .lb-suchen, .lb-modus-karte')].filter((e) => e.getBoundingClientRect().height < 44).length,
+        hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1, zeitenZu: document.querySelector('.lb-zeiten').hidden,
+        klein: [...document.querySelectorAll('.lb-zeit, .lb-suchen, .lb-modus-karte')].filter((e) => e.getClientRects().length && e.getBoundingClientRect().height < 44).length,
       }));
-      pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), Liga mit dir und Beispiel-Schild',
+      pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), keine Beispiel-Liga (Flo 08.11.2026)',
         lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2*,5+0,10+0,15+10,30+0' && lobby.werte.join() === 'blitz:400,schnell:400,klassisch:400'
-        && lobby.liga === 8 && lobby.du && lobby.beispiel === 'Beispiel', lobby);
-      pruefe('Lobby: Gegen Freunde offen, Turniere und Raetsel-Duell bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
-        lobby.mehr.join() === 'online+,turniere-,duell-' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
+        && lobby.liga === 0 && !lobby.beispiel, lobby);
+      // Punkt 40: Ranked (gewertet) hat die feste Zeit 5 + 3, die Wahl gibt es nur fuer Freundschaft
+      pruefe('Lobby: gewertet ohne Bedenkzeit-Wahl (feste Zeit), Freundschaft zeigt sie', lobby.zeitenZu, lobby);
+      pruefe('Lobby: Gegen Freunde und Raetsel-Duell offen, Turniere bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
+        lobby.mehr.join() === 'online+,turniere-,duell+' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
+      // Etappe B Task 4: gewertet sucht jetzt echt auf dem Server; die Vorschau mit Bot bleibt bei Freundschaft
+      await p.s.locator('.lb-spielen [data-wert="freundschaft"]').click();
       await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
       const zeile = await p.s.locator('.lb-zeile').innerText();
       pruefe('Bedenkzeit 10 + 0 waehlen: Haken wandert, Zeile nennt Schnellschach', await p.s.locator('.lb-zeit[aria-checked="true"]').getAttribute('data-zeit') === '10+0'
@@ -208,6 +233,85 @@ async function browserTeil() {
       pruefe('Erfinder: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
       await p.k.close();
     }
+    // Etappe B Task 4: gewertete Gegnersuche ueber den (abgefangenen) Server, KI-Gegner nach der Wartezeit
+    {
+      const KI = '11111111-2222-4333-8444-555555555555';
+      // die Suche fragt den Server je Sekunde (alleMs 1000): erst 1 s nach der Start-Antwort kommt online_suche_stand
+      const BOT_MS = 3000;
+      const antwort = (treffer) => (name, daten) => {
+        if (name === 'online_suche_ende') return daten && daten.ki ? { ki_ref: KI } : {};
+        if (name === 'online_suche_stand' && treffer && treffer()) return { partie: 'p1' };
+        if (name === 'online_suche_start' || name === 'online_suche_stand') return { wartet: true };
+        return [];
+      };
+      const zurLobby = async (p) => { await p.s.waitForSelector('.screen.lobby .lb-spielen', { timeout: 30000 }); await warte(500); };
+      const screen = (p) => p.s.evaluate(() => document.documentElement.dataset.screen);
+
+      // Bot erst nach der Wartezeit
+      {
+        const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(null) });
+        await zurLobby(p);
+        await p.s.locator('.lb-suchen').click();
+        await warte(BOT_MS - 800);
+        const frueh = { suche: await p.s.locator('.lb-suche[data-phase="suche"]').count(), screen: await screen(p), namen: p.aufrufe.map((a) => a.name),
+          kiKnopf: await p.s.evaluate(() => document.querySelector('.lb-ki-jetzt')?.hidden) };
+        // nur die Suche zaehlt: der Karten-Abgleich (karte_melde_stufen, Etappe 4b) darf beim Start davor laufen
+        const sucheAufrufe = p.aufrufe.filter((a) => a.name.startsWith('online_suche'));
+        pruefe('suche: Bot erst nach der Wartezeit (vorher Suche beim Server, kein Bot)', frueh.suche === 1 && frueh.screen === 'lobby'
+          && sucheAufrufe[0]?.name === 'online_suche_start' && sucheAufrufe[0].daten?.zeit === '5+3' && frueh.namen.includes('online_suche_stand')
+          && !frueh.namen.includes('online_suche_ende') && frueh.kiKnopf === true, frueh);
+        await p.s.waitForFunction(() => window.__partie && window.__partie.z, null, { timeout: 15000 });
+        const ki = await p.s.evaluate(() => ({ abz: document.querySelector('.screen.partie .ki-abzeichen')?.textContent, ki: window.__partie.z.ki,
+          ref: window.__partie.z.kiRef, tempo: window.__partie.z.tempo, suche: !!document.querySelector('.lb-suche') }));
+        const enden = p.aufrufe.filter((a) => a.name === 'online_suche_ende');
+        pruefe('suche: danach Partie mit Abzeichen "KI-Gegner", Beleg gemerkt, feste Ranked-Uhr 5 + 3, genau ein Ende mit ki',
+          ki.abz === 'KI-Gegner' && ki.ki === true && ki.ref === KI && ki.tempo?.grund === 300 && ki.tempo?.zuschlag === 3 && !ki.suche
+          && enden.length === 1 && enden[0].daten?.ki === true, { ki, enden });
+        pruefe('suche: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+        await p.k.close();
+      }
+      // Treffer schlaegt Bot
+      {
+        let start = 0;
+        const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(() => start && Date.now() - start > 500) });
+        await zurLobby(p);
+        start = Date.now();
+        await p.s.locator('.lb-suchen').click();
+        await warte(BOT_MS + 1200);
+        const st = { screen: await screen(p), partie: await p.s.evaluate(() => !!(window.__partie && window.__partie.z && window.__partie.z.ki)),
+          namen: p.aufrufe.map((a) => a.name) };
+        pruefe('suche: Treffer schlaegt Bot (Online-Partie offen, kein KI-Gegner, kein Ende-Aufruf)', st.screen === 'online' && !st.partie
+          && !st.namen.includes('online_suche_ende'), st);
+        await p.k.close();
+      }
+      // Abbruch
+      {
+        const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(null) });
+        await zurLobby(p);
+        await p.s.locator('.lb-suchen').click();
+        await warte(300);
+        await p.s.locator('.lb-abbrechen').click();
+        await warte(BOT_MS + 800);
+        const enden = p.aufrufe.filter((a) => a.name === 'online_suche_ende');
+        pruefe('suche: Abbruch ruft genau einmal online_suche_ende (ohne ki), danach kein Bot',
+          enden.length === 1 && enden[0].daten?.ki === false && (await screen(p)) === 'lobby' && await p.s.locator('.lb-suche').count() === 0, enden);
+        await p.k.close();
+      }
+      // ohne Konto
+      {
+        const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(null) });
+        await zurLobby(p);
+        await p.s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+        await p.s.locator('.lb-suchen').click();
+        await warte(BOT_MS + 500);
+        const st = await p.s.evaluate(() => ({ phase: document.querySelector('.lb-suche')?.dataset.phase,
+          titel: document.querySelector('.lb-suche-titel')?.textContent, screen: document.documentElement.dataset.screen }));
+        pruefe('suche: ohne Konto Hinweis "Zum Suchen anmelden", kein Aufruf beim Server, kein Bot',
+          st.phase === 'anmelden' && st.titel === 'Zum Suchen anmelden' && st.screen === 'lobby'
+          && !p.aufrufe.some((a) => a.name.startsWith('online_suche')), { st, aufrufe: p.aufrufe.map((a) => a.name) });
+        await p.k.close();
+      }
+    }
     // iPad quer: zwei Spalten, Welten fuehrt zurueck zur Karte
     {
       const p = await seite(browser, { erfinder: true, breite: 1180, hoehe: 820, hash: 'lobby' });
@@ -221,7 +325,10 @@ async function browserTeil() {
       pruefe('iPad quer: Spielen links, Wertungen rechts daneben', lage.nebeneinander && lage.breit, lage);
       // am Rand gewischt rollt die Lobby (vorher nur die 1040-px-Spalte in der Mitte, Flo 01.11.2026 bei Premium und Lektionen)
       // seit der Seitenleiste (Etappe A) beginnt der Rand des Screens rechts neben ihr
-      await p.s.mouse.move(await p.s.evaluate(() => (document.querySelector('.reiter-leiste[data-lage="seite"]')?.getBoundingClientRect().right ?? 0) + 20), 600);
+      // seit die Beispiel-Liga weg ist (Flo 08.11.2026) passt die Lobby auf 820 px Hoehe: zum Rollen-Test niedriger machen
+      await p.s.setViewportSize({ width: 1180, height: 520 });
+      await warte(300);
+      await p.s.mouse.move(await p.s.evaluate(() => (document.querySelector('.reiter-leiste[data-lage="seite"]')?.getBoundingClientRect().right ?? 0) + 20), 400);
       await p.s.mouse.wheel(0, 4000);
       await warte(500);
       const rollen = await p.s.evaluate(() => { const r = document.querySelector('.lb-rumpf'); return { st: Math.round(r.scrollTop), max: r.scrollHeight - r.clientHeight }; });
