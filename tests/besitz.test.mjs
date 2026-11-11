@@ -41,6 +41,7 @@ pruefe('Gold-Lohn je Familie', goldLohn('raetsel').banner === 'erfolg-raetselmei
 // Buch
 const neu1 = abgleichen({ ...leer, siege: 1 });
 pruefe('Abgleich: erste Stufe gebucht', neu1.length === 1 && neu1[0].familie === 'siege' && neu1[0].stufe === 1 && neu1[0].taler === 20, neu1);
+pruefe('Abgleich: Gold-Ziel fuer den Satz im Moment (R13-G3)', neu1[0].gold === 100, neu1);
 pruefe('Abgleich: zweiter Lauf bucht nichts doppelt', abgleichen({ ...leer, siege: 1 }).length === 0 && talerLokal() === 20);
 const neu2 = abgleichen({ ...leer, siege: 100 });
 pruefe('Sprung auf Gold: Silber und Gold einzeln, Gold mit Lohn', neu2.map((x) => x.stufe).join() === '2,3' && neu2[1].lohn.titel === 'erfolg-siegesbanner', neu2);

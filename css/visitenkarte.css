@@ -126,6 +126,7 @@
 .st-karte[data-stufe="1"] .st-stufe { color: var(--st-bronze); }
 .st-karte[data-stufe="2"] .st-stufe { color: var(--text); }
 .st-karte[data-stufe="3"] .st-stufe { color: var(--st-gold); }
+.st-ziel { font-size: 13px; color: var(--text-2); }
 .st-lohn { font-size: 14px; font-weight: 700; }
 .st-lohn-gold { color: var(--st-gold); }
 .st-weiter { margin-top: 6px; min-width: 160px; min-height: 44px; }

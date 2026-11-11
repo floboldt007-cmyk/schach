@@ -389,11 +389,11 @@ async function shopTeil(browser) {
   }));
   // R5-2 (Kundenblick 09.11.2026): „ab 18“ stand doppelt im Blatt (Hinweis oben und auf der Karte)
   pruefe('Shop abgemeldet: „ab 18“ steht genau einmal im Blatt (R5-2)', (text.match(/ab 18/g) || []).length === 1, text);
-  // R5-3: ausgegraut bleibt, aber das Brett muss als Brett erkennbar sein (vorher Deckkraft .55 = graues Karomuster wie ein kaputtes Bild)
+  // R13-Shop: volle Farben, kein Grau-Filter, aber Brettrand bleibt (Flo 10.11.)
   const vorschau = await p.s.evaluate(() => { const b = document.querySelector('.sh-karte[data-gast] .sh-bild'); const c = getComputedStyle(b);
-    return { opacity: +c.opacity, filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
-  pruefe('Shop abgemeldet: Vorschau ausgegraut, aber kräftig genug und mit Brettrand (R5-3)', /grayscale\(1\)/.test(vorschau.filter)
-    && vorschau.opacity >= 0.8 && vorschau.rand !== 'none', vorschau);
+    return { filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
+  pruefe('Shop abgemeldet: Vorschau zeigt volle Farben, kein Grau-Filter, aber mit Brettrand (R13-Shop)', !/grayscale/.test(vorschau.filter)
+    && vorschau.rand !== 'none', vorschau);
   pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
   // Kundenblick 09.11.2026 (Befund 12): kein leeres "0 / 0" auf "Ich", ohne Partie auch keine Spielzahl im Profil
   const ich = await p.s.evaluate(() => ({ zahlen: [...document.querySelectorAll('.sa-gross .zahl, .sa-platz-zahl')].map((z) => z.textContent.trim()),
@@ -430,6 +430,12 @@ async function shopTeil(browser) {
   await p.s.locator('.sh-anprobieren').click();
   await p.s.waitForSelector('.sheet-karte .sh-brett.gross', { timeout: 5000 }).catch(() => {});
   pruefe('Shop: Anprobieren zeigt das Brett groß im Blatt', await p.s.locator('.sheet-karte .sh-brett.gross').count() === 1);
+  // R11 Pixel: Schliessen der Anprobe fuehrt zurueck in den Shop, nicht auf "Ich" (sheet() kennt nur ein Blatt zugleich)
+  await p.s.locator('.sheet-karte .sheet-knoepfe button').first().click();
+  await p.s.waitForSelector('.sh-anprobe', { state: 'detached', timeout: 5000 }).catch(() => {});
+  await p.s.waitForSelector('.sa-blatt .sh-karte', { timeout: 5000 }).catch(() => {});
+  pruefe('Shop: Schließen der Anprobe führt zurück in den Shop', await p.s.locator('.sa-blatt .sa-bereich[data-bereich="shop"] .sh-karte').count() === 1
+    && await p.s.locator('.sh-anprobe').count() === 0);
   pruefe('Shop angemeldet: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
 

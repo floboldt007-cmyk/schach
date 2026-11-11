@@ -126,6 +126,12 @@ function zeigeIch(root, params = {}, app) {
     zeichneNeu();
   }
   ort.addEventListener('click', beiWahl);
+  // Ein Bereich bittet um sein Blatt zurueck (Shop nach dem Anprobieren: sheet() zeigt nur ein Blatt zugleich, die Vorschau
+  // hat das Shop-Blatt geschlossen und der Bereich liegt wieder hier in .sa-ort)
+  ort.addEventListener('sa:oeffne', (ev) => {
+    const ber = ev.target.closest('.sa-bereich');
+    if (ber && !blatt) oeffne(ber.dataset.bereich);
+  });
 
   const stand = s.querySelector('.sa-stand');
   const zeigeStand = () => {

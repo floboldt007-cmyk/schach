@@ -121,7 +121,7 @@ registriereTexte('p-serie', {
     'pause.label.mehr': 'Pause ab {ab} für {n} Tage ansagen',
     // Regeln im Blatt
     'regeln.titel': 'So zählt der Bauernmarsch',
-    'regeln.tag': 'Ein Tag reicht von 4 Uhr bis 4 Uhr. Er zählt mit einem Tageswerk: eine Partie ab 10 eigenen Zügen (egal welche Art), 3 Karteikarten, 2 Übungen „Ab hier nochmal“, 3 Rätsel oder eine Lektion. Partien mit Hilfe zählen auch. Bloßes Öffnen zählt nie.',
+    'regeln.tag': 'Ein Tag reicht von 4 Uhr bis 4 Uhr. Er zählt mit einem Tageswerk: ein Sieg oder eine Partie ab 10 eigenen Zügen (egal welche Art), 3 Karteikarten, 2 Übungen „Ab hier nochmal“, 3 Rätsel oder eine Lektion. Partien mit Hilfe zählen auch. Bloßes Öffnen zählt nie.',
     'regeln.frei': 'Ein freier Tag ist nie schlimm: Er wird zur Brücke. Erst zwei freie Tage hintereinander lassen die Serie ruhen. Dein Ruhetag und eine angesagte Pause zählen nie als freier Tag. Ruht die Serie, beginnt das nächste Tageswerk ein neues Kapitel; Rekord, Figuren und Spieltage bleiben.',
     'regeln.bauer': 'Jeder Schachtag schiebt deinen Bauern ein Feld vor, nach 6 Feldern wandelt er sich um. Doppelschritt: am ersten Tag nach mindestens zwei Tagen ohne Tageswerk, höchstens einmal im Monat. Der Bauer läuft nie zurück.',
     'regeln.lauf': 'Siegeslauf: Siege in Folge gegen Gegner ab einer Stufe unter deinem höchsten freigeschalteten Bot (später: ab deiner Wertung minus 150). Partien mit Hilfe, gegen schwächere Gegner, Übungen, freie und Boss-Partien zählen nicht und beenden nichts. Ab 3 Siegen eine Flamme.',
@@ -285,7 +285,7 @@ registriereTexte('p-serie', {
     'pause.label.eins': 'Plan a break starting {ab} for {n} day',
     'pause.label.mehr': 'Plan a break starting {ab} for {n} days',
     'regeln.titel': 'How the Pawn March counts',
-    'regeln.tag': 'A day runs from 4 a.m. to 4 a.m. It counts with a daily goal: a game with at least 10 of your own moves (any kind), 3 cards, 2 “Retry from here” practice games, 3 puzzles, or one lesson. Games with help count too. Just opening the app never counts.',
+    'regeln.tag': 'A day runs from 4 a.m. to 4 a.m. It counts with a daily goal: a win or a game with at least 10 of your own moves (any kind), 3 cards, 2 “Retry from here” practice games, 3 puzzles, or one lesson. Games with help count too. Just opening the app never counts.',
     'regeln.frei': 'A day off is never a problem: it becomes a bridge. Only two days off in a row let the streak rest. Your rest day and a planned break never count as a day off. When the streak rests, your next daily goal starts a new chapter; your record, pieces, and chess days stay.',
     'regeln.bauer': 'Every chess day moves your pawn one square forward, and after 6 squares it promotes. Double step: on the first day after at least two days without a daily goal, at most once a month. The pawn never moves backward.',
     'regeln.lauf': 'Winning run: wins in a row against opponents from one level below your highest unlocked bot (later: from your rating minus 150). Games with help, against weaker opponents, practice games, free games, and boss games do not count and do not end the run. At 3 wins, a flame appears.',

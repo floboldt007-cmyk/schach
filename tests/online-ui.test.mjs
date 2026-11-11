@@ -393,9 +393,12 @@ try {
   // zwei Tueren, jeder Suchen-Knopf traegt "gewertet", Freunde-Zeile; alles ohne Scrollen und ohne Beispiel-Liga.
   for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width: 390, height: 844 }); await seite.evaluate(m => window.__app.setzeEinstellungen({ modus: m }), modus);
-    await seite.evaluate(() => window.__app.gehe('online'));
+    // der alte, schon gefuellte Online-Screen steht nach gehe() noch kurz da (zeigeScreen laedt async, seit #223 merkt es sich
+    // vorher die Scrollposition): ihn markieren und erst den neuen Screen pruefen, sonst misst der Test den leeren Platzhalter
+    await seite.evaluate(() => { const s = document.querySelector('.online-screen'); if (s) s.dataset.alt = '1'; window.__app.gehe('online'); });
     // seit #216 steht der Streifen schon als Platzhalter da: warten, bis die Liga-Antwort ihn gefuellt hat
-    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit' && !document.querySelector('.on-liga').hidden
+    await seite.waitForFunction(() => document.querySelector('.online-screen') && !document.querySelector('.online-screen').dataset.alt
+      && document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit' && !document.querySelector('.on-liga').hidden
       && !document.querySelector('.on-liga').hasAttribute('data-laedt'));
     const handy = await seite.evaluate(() => {
       const rumpf = document.querySelector('.online-screen .on-rumpf');

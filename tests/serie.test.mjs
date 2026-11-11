@@ -83,6 +83,11 @@ gruppe = 'Tageswerk';
   const tag = '2026-10-23';
   pruefe('Werte aus 3.14: Partie ab 10 eigenen Zügen, 3 Karten, 2 Übungen, 3 Rätsel, 1 Lektion', T.WERK.partieZuege === 10 && T.WERK.karten === 3
     && T.WERK.uebungen === 2 && T.WERK.raetsel === 3 && T.WERK.lektionen === 1);
+  const zaehlt = (ergebnis, eigeneZuege, modus = 'normal') => T.partieZaehlt({ ergebnis, eigeneZuege, modus });
+  pruefe('Partie fürs Tageswerk: Sieg zählt immer (Matt im 4. Zug), sonst ab 10 eigenen Zügen, Übung nie',
+    zaehlt('sieg', 4) && !zaehlt('niederlage', 4) && !zaehlt('remis', 9) && zaehlt('niederlage', 10) && !zaehlt('sieg', 4, 'uebung')
+    && !T.partieZaehlt(null),
+    [zaehlt('sieg', 4), zaehlt('niederlage', 4), zaehlt('remis', 9), zaehlt('niederlage', 10), zaehlt('sieg', 4, 'uebung')]);
   const k = [T.aktivitaet(st, { tag, art: 'karte' }), T.aktivitaet(st, { tag, art: 'karte' }), T.aktivitaet(st, { tag, art: 'karte' })];
   pruefe('Kartei: die 3. Karte erfüllt das Tageswerk', k[0] === null && k[1] === null && k[2] === 'kartei', k);
   pruefe('Danach liefert dieser Tag keine zweite Quelle', T.aktivitaet(st, { tag, art: 'lektion' }) === null && T.aktivitaet(st, { tag, art: 'partie' }) === null);

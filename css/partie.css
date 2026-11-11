@@ -413,6 +413,10 @@
   .partie:not(.streifen-unten) .coach > .c-text { -webkit-line-clamp: 2; }
   .partie.coach-eng .coach { height: 44px; }
   .partie.coach-eng .coach > .c-text, .partie.coach-eng .coach > .c-zusatz { display: none; }
+  /* R13-G4 kurz: im Leer-Zustand passt ein kurzer Hinweistext in die 44 px, indem das Padding je 2 px kleiner wird */
+  .partie.coach-eng .coach.leer { padding-top: 6px; padding-bottom: 6px; }
+  .partie.coach-eng .coach.leer > .c-kopf::after { content: "Ich bewerte deine Züge";
+    display: block; width: 100%; font-size: 11px; line-height: 1; color: var(--text-2); }
   /* U-Messrunde 09.11. (iPhone SE mit Safari-Leiste, 548 px): reichen Coach-Zeile und Mindestbrett nicht, ruecken
      Abstaende und Spielerkarten zusammen (.sehr-eng, layout() in partie.js); die Knoepfe behalten ihre 48 px */
   .partie.sehr-eng .inhalt { gap: 3px; padding-top: 2px; }
