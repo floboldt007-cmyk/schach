@@ -59,3 +59,18 @@ drop function if exists public.live_bewertung_unbegrenzt(uuid);
 drop table if exists public.live_bewertung_nutzung;
 -- erst nach den Funktionen: raetsel_stand_sichern gibt den Zeilentyp der Tabelle zurueck
 drop table if exists public.raetsel_stand;
+
+-- Haengezeit (11.11.2026): alte Fassung aus online-schema.sql zurueck (10 Minuten fuer jede Partie mit Uhr).
+-- online-schema.sql steht nicht in der Liste oben, darum hier direkt.
+create or replace function public.online_haengt(p public.partien_online, bezug timestamptz)
+returns boolean
+language sql
+volatile
+set search_path = ''
+as $$
+  select p.status = 'laeuft' and p.letzter_zug_am is not null and (
+    (p.bedenkzeit_s is not null and position(' ' in p.zuege) = 0
+      and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp()) - interval '10 minutes')
+    or (p.bedenkzeit_s is null and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp()) - interval '7 days'));
+$$;
+revoke all on function public.online_haengt(public.partien_online, timestamptz) from anon, authenticated, public;

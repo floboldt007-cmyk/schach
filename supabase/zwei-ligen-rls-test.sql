@@ -7,7 +7,8 @@
 -- 9 Raetsel-Elo aendert sich durch ein gewertetes Duell, die Online-Elo nicht; 10 KI-Belege: Vorab-Niederlage, hoechstens
 -- ein offener Beleg, Korrektur auf Sieg und Remis, Abbruch ohne Meldung, volle Tagesgrenze; 11 Riegel gegen eine zweite
 -- gewertete Partie (Suche fuehrt zurueck, Paarung prueft beide Seiten, abgelaufene Uhr macht frei); 12 Kontingent der
--- Live-Bewertung (1 Partie je Tag, je Partie einmal, Premium unbegrenzt falls abo-schema.sql da ist, Rechte).
+-- Live-Bewertung (1 Partie je Tag, je Partie einmal, Premium unbegrenzt falls abo-schema.sql da ist, Rechte);
+-- 13 Riegel im Raetselduell (auch KI-Duelle); 14 Haengezeit (gewertet nach ranked_haengt_s, Freundespartie 10 Minuten).
 -- Auf der echten Datenbank: die Pruefungen beschraenken sich auf die Testkonten. Damit kein echter Suchender mit einem
 -- Testkonto gepaart wird, leert der Test zuerst beide Warteschlangen; das rollt mit zurueck (echte Zeilen bleiben).
 begin;
@@ -859,6 +860,52 @@ begin
      or not has_function_privilege('authenticated', 'public.online_live_bewertung_frei(uuid)', 'execute') then
     raise exception 'FEHLER: Kontingent: Rechte nicht nur fuer authenticated';
   end if;
+end;
+$$;
+
+-- ---------- 14. Haengezeit: gewertet nach ranked_haengt_s ohne ersten Zug, Freundespartie weiter 10 Minuten ----------
+do $$
+declare
+  s integer := (public.kronen_konstanten() ->> 'ranked_haengt_s')::integer;
+  p public.partien_online;
+begin
+  if s is distinct from 60 then
+    raise exception 'FEHLER: Haengezeit: ranked_haengt_s ist nicht 60 (%)', s;
+  end if;
+  insert into public.partien_online (erstellt_von, fen, bedenkzeit_s, inkrement_s)
+  values ('f6000000-0000-4000-8000-000000000006', 'x', 300, 3) returning * into p;
+  update public.partien_online t
+  set weiss = 'f6000000-0000-4000-8000-000000000006', schwarz = 'b8000000-0000-4000-8000-000000000008', gewertet = true,
+      status = 'laeuft', letzter_zug_am = clock_timestamp() - make_interval(secs => s - 5)
+  where t.id = p.id returning * into p;
+  if public.online_haengt(p) then
+    raise exception 'FEHLER: Haengezeit: gewertete Partie haengt schon vor ranked_haengt_s';
+  end if;
+  update public.partien_online t set letzter_zug_am = clock_timestamp() - make_interval(secs => s + 5)
+  where t.id = p.id returning * into p;
+  if not public.online_haengt(p) then
+    raise exception 'FEHLER: Haengezeit: gewertete Partie haengt nach ranked_haengt_s nicht';
+  end if;
+  -- ein Halbzug reicht nicht, die Uhr laeuft erst ab dem zweiten
+  update public.partien_online t set zuege = 'e2e4' where t.id = p.id returning * into p;
+  if not public.online_haengt(p) then
+    raise exception 'FEHLER: Haengezeit: nach einem Halbzug haengt die gewertete Partie nicht';
+  end if;
+  update public.partien_online t set zuege = 'e2e4 e7e5' where t.id = p.id returning * into p;
+  if public.online_haengt(p) then
+    raise exception 'FEHLER: Haengezeit: Partie mit laufender Uhr gilt als haengend';
+  end if;
+  -- Freundespartie: dieselbe Lage haengt erst nach 10 Minuten
+  update public.partien_online t set zuege = '', gewertet = false where t.id = p.id returning * into p;
+  if public.online_haengt(p) then
+    raise exception 'FEHLER: Haengezeit: Freundespartie haengt schon nach ranked_haengt_s';
+  end if;
+  update public.partien_online t set letzter_zug_am = clock_timestamp() - interval '11 minutes'
+  where t.id = p.id returning * into p;
+  if not public.online_haengt(p) then
+    raise exception 'FEHLER: Haengezeit: Freundespartie haengt nach 10 Minuten nicht';
+  end if;
+  delete from public.partien_online t where t.id = p.id;
 end;
 $$;
 

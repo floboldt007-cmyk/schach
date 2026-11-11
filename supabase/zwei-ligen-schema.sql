@@ -112,6 +112,11 @@ as $$
     'ki_frueh_s', 0,
     -- Live-Bewertung in gewerteten Online-Partien: Partien je Kalendertag (Europe/Berlin) ohne Premium (Flo 11.11.2026)
     'live_bewertung_tag', 1,
+    -- Gewertete Partie ohne die ersten 2 Halbzuege (Uhr laeuft noch nicht): nach so vielen Sekunden ohne Zug gilt sie als
+    -- haengend und endet ohne Ergebnis (online_haengt). Freundespartien bleiben bei 10 Minuten. 60 s statt 10 Min, damit
+    -- niemand nach einem sofort gegangenen Gegner lange festsitzt (11.11.2026; Lichess/Chess.com brechen nach etwa
+    -- 20 bis 30 s ab, 60 s lassen Luft fuer ein langsames Handy oder einen kurzen App-Wechsel).
+    'ranked_haengt_s', 60,
     'ligen', jsonb_build_array('online', 'raetsel'),
     'quellen_liga', jsonb_build_object('online', 'online', 'ki', 'online', 'bot', 'online', 'duell', 'raetsel',
       'duell_ki', 'raetsel')
@@ -604,6 +609,24 @@ as $$
 $$;
 
 -- ---------- Sofort-Suche Online ----------
+
+-- Haengt die Partie zum Zeitpunkt bezug? Ersetzt die Fassung aus online-schema.sql (die die Spalte gewertet noch nicht
+-- kennt) und aendert nur gewertete Partien: MIT Uhr und noch keine 2 Halbzuege haengt eine gewertete Partie nach
+-- ranked_haengt_s (60 s) ohne Zug, jede andere wie bisher nach 10 Minuten; OHNE Uhr nach 7 Tagen. Nur intern.
+-- Rueckweg: supabase/zwei-ligen-zurueck.sql stellt die alte Fassung wieder her.
+create or replace function public.online_haengt(p public.partien_online, bezug timestamptz)
+returns boolean
+language sql
+volatile
+set search_path = ''
+as $$
+  select p.status = 'laeuft' and p.letzter_zug_am is not null and (
+    (p.bedenkzeit_s is not null and position(' ' in p.zuege) = 0
+      and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp())
+        - case when p.gewertet then make_interval(secs => coalesce((public.kronen_konstanten() ->> 'ranked_haengt_s')::integer, 600))
+               else interval '10 minutes' end)
+    or (p.bedenkzeit_s is null and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp()) - interval '7 days'));
+$$;
 
 -- Laufende gewertete Partie des Kontos, sonst null (ersetzt die Fassung aus kronen-schema.sql, die nur Partien der
 -- letzten 60 s erkannte). Befund 11.11.2026: live entstanden um 20:09:58 und 20:11:45 zwei laufende Partien derselben
@@ -1259,6 +1282,7 @@ $$;
 -- die neuen Funktionen auch ohne service_role (nur die App ruft sie, als angemeldeter Nutzer)
 revoke all on function public.online_suche_partie(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.duell_suche_duell(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.online_haengt(public.partien_online, timestamptz) from public, anon, authenticated;
 revoke all on function public.live_bewertung_unbegrenzt(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.online_live_bewertung_frei(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.online_live_bewertung_nutzen(uuid) from public, anon, authenticated, service_role;
