@@ -39,6 +39,7 @@ const SUITEN = [
   { name: 'freunde', datei: 'freunde.test.mjs', args: [], was: 'Freunde: Anfrage, Antwort, Einladungslink (Server abgefangen)' },
   // Fester Port: zuzweit wertet PORT noch nicht aus und bleibt deshalb exklusiv (online-ui sicherheitshalber auch).
   { name: 'online-ui', datei: 'online-ui.test.mjs', args: [], exklusiv: 'fester Port 8887', was: 'Online-Oberflaeche mit abgefangenen Server-Anfragen' },
+  { name: 'online-ranked-probe', datei: 'online-ranked-probe.test.mjs', args: [], was: 'Funktionsprobe Ranked: zwei Sitzungen gegen einen nachgebauten Server (harte Befund-Pruefungen nur mit PROBE_STRENG=1)' },
   { name: 'server-online-zug', datei: 'server-online-zug.test.mjs', args: [], was: 'Online-Zuege: Edge Function prueft Regeln und Ende (Server, Anti-Cheat 1a)' },
   { name: 'zuzweit', datei: 'zuzweit.test.mjs', args: [], exklusiv: 'fester Port 8886', was: 'Zu zweit: Namen, Uhr, Ergebnis und neutrale Analyse' },
   { name: 'daten', datei: 'daten.test.mjs', args: [], was: 'Datenfreigabe, Datenauskunft, Konto löschen (DSGVO)' },
