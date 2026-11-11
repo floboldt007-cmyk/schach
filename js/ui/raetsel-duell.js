@@ -146,33 +146,43 @@ export function zeige(root, params, app) {
   const startFehler = (e) => { if (!weg) zeigeStart(fehlerText(e)); };
 
   // ---------- Suche ----------
-  // Restzeit bis zum KI-Gegner sichtbar (Flo 08.11.2026, Frage 2 c): Ring und Satz; die Wartezeit selbst fuehrt der Server
+  // Restzeit bis zum KI-Gegner sichtbar (Flo 08.11.2026, Frage 2 c): Ring, Satz und Suchdauer "0:12"; Wartezeit und Beginn
+  // nennt der Server (js/gegnersuche.js, ohne neues SQL 10 s). "Jetzt gegen KI" gibt es nur, wenn der Server eine
+  // KI-Grenze vor dem Ende nennt (neues SQL), und erst ab da: vorher legt er kein KI-Duell an.
   function starteSuche() {
     aufraeumen();
     phase('suche');
-    const warteMs = Math.max(1, testZahl('__duellKiMs', server.KI_ERSATZ_MS));
-    const beginn = Date.now();
     rumpf.innerHTML = `<section class="rd-karte rd-warten" aria-live="polite"><div class="rd-radar">${ringSvg('rd-ring-bild')}${ichBild()}</div>
-      <h2>${esc(D('suche.titel'))}</h2><p class="rd-text rd-rest"></p>
+      <h2>${esc(D('suche.titel'))} <span class="rd-uhr zahl" aria-hidden="true">0:00</span></h2><p class="rd-text rd-rest"></p>
+      <button type="button" class="knopf primaer dr rd-ki-jetzt" hidden disabled>${esc(D('suche.kiJetzt'))}</button>
       <button type="button" class="knopf dr rd-abbrechen">${esc(D('abbrechen'))}</button></section>`;
     const restEl = rumpf.querySelector('.rd-rest');
     const ringEl = rumpf.querySelector('.rd-ring-rest');
+    const uhrEl = rumpf.querySelector('.rd-uhr');
+    const kiEl = rumpf.querySelector('.rd-ki-jetzt');
     const zeigeRest = () => {
-      if (s.dataset.phase !== 'suche') return;
-      const rest = Math.max(0, warteMs - (Date.now() - beginn));
+      if (s.dataset.phase !== 'suche' || !suche) return;
+      const l = suche.lage();
+      const rest = Math.max(0, l.warteMs - l.vergangenMs);
+      const sek = Math.floor(l.vergangenMs / 1000);
+      uhrEl.textContent = `${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, '0')}`;
       restEl.textContent = D('suche.rest', { s: Math.ceil(rest / 1000) });
-      ringEl.setAttribute('stroke-dashoffset', (RING * (1 - rest / warteMs)).toFixed(2));
+      ringEl.setAttribute('stroke-dashoffset', (RING * (1 - rest / l.warteMs)).toFixed(2));
+      kiEl.hidden = !(l.vomServer && l.kiAbMs < l.warteMs);
+      kiEl.disabled = l.vergangenMs < l.kiAbMs;
+      kiEl.textContent = kiEl.disabled ? D('suche.kiAb', { s: Math.ceil((l.kiAbMs - l.vergangenMs) / 1000) }) : D('suche.kiJetzt');
       if (rest > 0) spaeter(zeigeRest, 250);
     };
-    zeigeRest();
     rumpf.querySelector('.rd-abbrechen').addEventListener('click', () => zeigeStart());
+    kiEl.addEventListener('click', () => { if (suche) suche.jetztKi(); });
     rumpf.querySelector('.rd-abbrechen').focus();
     suche = server.suche({
-      warteMs,
+      warteMs: testZahl('__duellKiMs', undefined),
       beiTreffer: (id) => { suche = null; starteDuell(id); },
       beiKi: (id) => { suche = null; starteDuell(id); },
       beiFehler: (e) => { suche = null; startFehler(e); },
     });
+    zeigeRest();
   }
 
   // ---------- Freundschaft ----------

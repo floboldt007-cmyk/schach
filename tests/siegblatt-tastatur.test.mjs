@@ -44,33 +44,39 @@ const PLAN = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };
 const imBlatt = (s) => s.evaluate(() => !!document.activeElement.closest('.ergebnis-overlay'));
 const offen = (s) => s.evaluate(() => { const o = document.querySelector('.ergebnis-overlay'); return !!o && !o.hidden; });
 
-async function main() {
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const browser = await browserTyp(ladePlaywright()).launch();
-  const k = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
+// Neuer Kontext, Schaefermatt gegen Benno bis das Sieg-Blatt gefuellt ist
+async function siegen(browser, viewport, fehler) {
+  const k = await browser.newContext({ viewport, locale: 'de-DE' });
   await k.addInitScript(() => {
     try { if (!localStorage.getItem('schach-arena:v1:modul:start')) localStorage.setItem('schach-arena:v1:modul:start', JSON.stringify({ v: 1, gesehen: '2026-11-01' })); } catch (e) { /* egal */ }
   });
   const s = await k.newPage();
-  const fehler = [];
   s.on('pageerror', (e) => fehler.push(e.message));
+  await s.goto(`http://127.0.0.1:${server.address().port}/index.html?test#heim`);
+  await s.waitForFunction(() => window.__app, null, { timeout: 30000 });
+  await warte(1200);   // Start erst fertig laden lassen (wie R4-Messrunde/Siegblatt-Laenge), ohne hing der Partiestart gelegentlich
+  await s.evaluate((plan) => {
+    localStorage.removeItem('schach-arena:v1:laufend');
+    window.__test = { botZug: () => { const v = window.__partie.chess().history({ verbose: true }); return plan[v[v.length - 1].lan] || null; } };
+  }, PLAN);
+  await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
+  await s.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+  for (const z of ZUEGE) {
+    await s.waitForFunction(() => window.__partie.phase() === 'flo', null, { timeout: 30000 });
+    for (const f of [z.slice(0, 2), z.slice(2, 4)]) await s.locator(`.screen.partie .brett-felder .feld[data-feld="${f}"]`).click();
+    if (await s.locator('.screen.partie .brett .lage.vorschau').count()) await s.locator(`.screen.partie .brett-felder .feld[data-feld="${z.slice(2, 4)}"]`).click();
+  }
+  await s.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
+  await warte(1500);
+  return s;
+}
+
+async function main() {
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const browser = await browserTyp(ladePlaywright()).launch();
+  const fehler = [];
   try {
-    await s.goto(`http://127.0.0.1:${server.address().port}/index.html?test#heim`);
-    await s.waitForFunction(() => window.__app, null, { timeout: 30000 });
-    await warte(1200);   // Start erst fertig laden lassen (wie R4-Messrunde/Siegblatt-Laenge), ohne hing der Partiestart gelegentlich
-    await s.evaluate((plan) => {
-      localStorage.removeItem('schach-arena:v1:laufend');
-      window.__test = { botZug: () => { const v = window.__partie.chess().history({ verbose: true }); return plan[v[v.length - 1].lan] || null; } };
-    }, PLAN);
-    await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
-    await s.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
-    for (const z of ZUEGE) {
-      await s.waitForFunction(() => window.__partie.phase() === 'flo', null, { timeout: 30000 });
-      for (const f of [z.slice(0, 2), z.slice(2, 4)]) await s.locator(`.screen.partie .brett-felder .feld[data-feld="${f}"]`).click();
-      if (await s.locator('.screen.partie .brett .lage.vorschau').count()) await s.locator(`.screen.partie .brett-felder .feld[data-feld="${z.slice(2, 4)}"]`).click();
-    }
-    await s.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
-    await warte(1500);
+    const s = await siegen(browser, { width: 1280, height: 720 }, fehler);
 
     pruefe('Sieg-Blatt: Fokus liegt im Blatt', await imBlatt(s));
     pruefe('Sieg-Blatt: Bildschirm dahinter ist inert', await s.evaluate(() => {
@@ -91,6 +97,16 @@ async function main() {
     await s.keyboard.press('Enter'); await warte(400);
     pruefe('Enter auf "Ergebnis": Blatt wieder offen, Fokus im Blatt, Hintergrund inert', await offen(s) && await imBlatt(s)
       && await s.evaluate(() => !!document.querySelector('.screen.partie .brett').closest('[inert]')));
+    // R13-1 (Kritik-Messung 10.11.): auf dem iPhone SE war der Rumpf 2 px breiter als sein Kasten, das Blatt liess sich seitlich wischen
+    const se = await siegen(browser, { width: 375, height: 548 }, fehler);
+    await warte(3500);   // Feier-Animationen auslaufen lassen
+    const quer = await se.evaluate(() => {
+      const r = document.querySelector('.ergebnis-overlay .erg-rumpf');
+      const rand = r.getBoundingClientRect().right;
+      const raus = [...r.querySelectorAll('*')].filter((e) => e.getBoundingClientRect().right > rand + 0.5).map((e) => e.className.baseVal ?? e.className).slice(0, 4);
+      return { ueber: r.scrollWidth - r.clientWidth, raus };
+    });
+    pruefe('iPhone SE: Sieg-Blatt ohne seitlichen Ueberlauf (R13-1)', quer.ueber <= 0, JSON.stringify(quer));
     pruefe('Keine Seitenfehler', fehler.length === 0, fehler.join(' | '));
   } catch (e) {
     pruefe('Ablauf ohne Abbruch', false, e.message.split('\n')[0] + ' ' + (e.stack || '').split('\n').find((z) => /siegblatt-tastatur/.test(z)));
