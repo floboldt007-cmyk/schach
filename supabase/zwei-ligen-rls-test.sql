@@ -869,8 +869,8 @@ declare
   s integer := (public.kronen_konstanten() ->> 'ranked_haengt_s')::integer;
   p public.partien_online;
 begin
-  if s is distinct from 60 then
-    raise exception 'FEHLER: Haengezeit: ranked_haengt_s ist nicht 60 (%)', s;
+  if s is distinct from 30 then
+    raise exception 'FEHLER: Haengezeit: ranked_haengt_s ist nicht 30 (%)', s;
   end if;
   insert into public.partien_online (erstellt_von, fen, bedenkzeit_s, inkrement_s)
   values ('f6000000-0000-4000-8000-000000000006', 'x', 300, 3) returning * into p;
