@@ -2795,9 +2795,23 @@ export function zeige(root, params, app) {
 
   layout();
 
+  // Figurensatz wirkt sofort (R3, 12.11.2026, dieselbe Luecke wie in js/ui/online.js vom 11.11.): kommt der Erfinder-Status
+  // erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt Flo einen anderen
+  // Satz, bekommen die stehenden Figuren den neuen Satz. Anders als online.js wird das Brett NICHT neu gebaut: Pakete halten
+  // buehne.brett, und Markierungen, Pfeile, Abzeichen und Vorzug-Nummern bleiben so stehen. Neue Figuren (Umwandlung) nimmt
+  // das Brett aus brett.figurenPfad; der Dateiname je Figur ist <code>.svg wie in Brett._bild (js/board.js).
+  function wendeFigurensatzAn(b, d) {
+    const pfad = figurenPfad(d);
+    if (!b || !pfad || pfad === b.figurenPfad) return;
+    b.figurenPfad = pfad;
+    for (const img of b.el.querySelectorAll('img.figur[data-figur]')) img.src = pfad + img.dataset.figur + '.svg';
+  }
+
   // Einstellungen wirken sofort (U7: alle Komfort-Schalter aus PLAN 4, ohne Neuladen)
   const beiEinstellungen = (e) => {
     const d = e.detail || {};
+    // ohne detail kein Satz-Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto
+    if (e.detail) { wendeFigurensatzAn(brett, d); wendeFigurensatzAn(ansehen.brett, d); }
     brett.koordinaten(!!d.koordinaten);
     const lageVorher = brett.koordLage();
     brett.setzeKoordLage(d.koordLage);
