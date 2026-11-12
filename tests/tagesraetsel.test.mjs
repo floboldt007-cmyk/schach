@@ -448,7 +448,11 @@ async function browserTeil(browser) {
   pruefe('Ein Wort richtig: genau 5 weitere Funken und ein Ereignis mit Tag und richtig', wortBuchung.st.gesamt === funkenVorWort + 5
     && wortBuchung.st.heute.wort === 5 && wortBuchung.ev.length === 1 && wortBuchung.ev[0].tag === heute && wortBuchung.ev[0].richtig === true, wortBuchung);
   await seite.locator('.rs-ende-knoepfe button', { hasText: 'Ein Wort' }).click();
-  pruefe('Zweiter Klick am selben Tag: kein Dialog, kein Ereignis und keine weiteren Funken', await seite.locator('.dialog-ort').count() === 0
+  // Der Wort-Dialog klappt noch 200 ms zu (.dialog-ort.weg, durchklickbar), der zweite Klick kommt also schon durch,
+  // waehrend er noch im DOM steht. Darum auf den Endzustand warten: alle Dialog-Orte weg. Oeffnete der zweite Klick
+  // einen neuen Dialog (ohne Abbrechen), verschwaende er nie, und die Pruefung schlaegt fehl.
+  const keinDialog = await seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false);
+  pruefe('Zweiter Klick am selben Tag: kein Dialog, kein Ereignis und keine weiteren Funken', keinDialog
     && await seite.evaluate((vor) => window.__funken.stand().gesamt === vor + 5 && window.__tr_wort.length === 1, funkenVorWort));
 
   // Teilen
