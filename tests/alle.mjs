@@ -67,6 +67,7 @@ const SUITEN = [
   { name: 'sicherung', datei: 'sicherung.test.mjs', args: [], was: 'Export, Import und Sicherungshinweis' },
   { name: 'review', datei: 'review.test.mjs', args: SCHNELL ? ['--nur-node'] : [], was: 'Zug-Klassen, Genauigkeit, Coach' },
   { name: 'analyse-start', datei: 'analyse-start.test.mjs', args: [], was: 'Analyse: Satz der Start-Karte und Zug beim Oeffnen (kurze Partie)' },
+  { name: 'online-analyse', datei: 'online-analyse.test.mjs', args: [], was: 'Analyse der Online-Partie: Kennzeichen online, Du gegen Gegner, Ende ohne Ergebnis ehrlich' },
   { name: 'ereignisse', datei: 'ereignisse.test.mjs', args: [], was: 'Ereignis-Bus, Anzeige-Orte, Feier-Budget' },
   { name: 'fairness', datei: 'fairness.test.mjs', args: [], was: 'Fairness-Regeln (Runde 4)' },
   { name: 'spiel', datei: 'spiel.test.mjs', args: [], was: 'Spiel-Fundament: Tag, Inhalte, Spielplan, Bot-Register' },

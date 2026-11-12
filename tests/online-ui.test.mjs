@@ -765,8 +765,9 @@ try {
     const p = liste.find(x => x && x.id === 'on-' + id);
     return { unter: document.querySelector('.an-screen .an-unter')?.textContent || '', zuege: p?.zuege?.join(' '), ergebnis: p?.ergebnis, farbe: p?.spielerFarbe, n: liste.length };
   }, r7.id);
-  pruefe('R7 B2: "Zur Analyse" oeffnet .an-screen mit den Zuegen der Online-Partie und beiden Namen',
-    r7An && r7AnDaten.zuege === 'e2e4 e7e5 g1f3 b8c6' && r7AnDaten.ergebnis === 'sieg' && r7AnDaten.farbe === 'w' && /Spieler_1/.test(r7AnDaten.unter) && /Gegner_2/.test(r7AnDaten.unter), r7AnDaten);
+  // W-online-analyse: Kopf wie die Bot-Partie "Du gegen <Gegner>" (vorher "Spieler_1 gegen Gegner_2" wie Zu zweit)
+  pruefe('R7 B2: "Zur Analyse" oeffnet .an-screen mit den Zuegen der Online-Partie, Kopf "Du gegen Gegner_2"',
+    r7An && r7AnDaten.zuege === 'e2e4 e7e5 g1f3 b8c6' && r7AnDaten.ergebnis === 'sieg' && r7AnDaten.farbe === 'w' && /^Du gegen Gegner_2/.test(r7AnDaten.unter), r7AnDaten);
   // Zweimal "Zur Analyse": dieselbe Partie wird ersetzt, nicht doppelt gespeichert
   await oeffne(r7); await r7Warte();
   await seite.locator('.online-screen .ergebnis-overlay [data-online="analyse"]').click({ timeout: 3000 }).catch(() => {});
@@ -781,13 +782,83 @@ try {
   const r7FB = await r7Blatt();
   pruefe('R7 B2: Freundespartie bekommt dasselbe Blatt ohne Kronen-Zeile (Remis, Zur Analyse)',
     r7FDa && /\bremis\b/.test(r7FB?.art) && r7FB?.kronen === '' && r7FB.knoepfe.includes('analyse') && r7FB.knoepfe.includes('revanche'), r7FB);
-  // Strittig: Blatt ohne Zur Analyse (die Zuege passen nicht sicher zur Partie)
+  // Strittig: Blatt "Strittig" ohne Sieg oder Niederlage; seit W-online-analyse mit Zur Analyse (die Analyse rechnet den
+  // nachgespielten, legalen Stand und nennt das Ende ehrlich "Strittig beendet")
   const r7S = partie({ zuege: 'e2e4' }); await oeffne(r7S);
   Object.assign(r7S, { status: 'beendet', grund: 'strittig', ergebnis: null }); aktualisieren(r7S);
   await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
   await r7Warte(); await seite.waitForTimeout(300);
   const r7SB = await r7Blatt();
-  pruefe('R7 B2: strittiges Ende: Blatt "Strittig" ohne Zur Analyse', r7SB?.wort === 'Strittig' && !r7SB.knoepfe.includes('analyse'), r7SB);
+  pruefe('R7 B2: strittiges Ende: Blatt "Strittig", mit Zur Analyse (W-online-analyse)', r7SB?.wort === 'Strittig' && r7SB.knoepfe.includes('analyse'), r7SB);
+  // ---------- W-online-analyse (Flo 13.11.2026: "beim 1 gegen 1 fehlt die Analyse") ----------
+  // Funktionsprobe 1: gewertete Partie, Spieler_1 mit Schwarz verliert durch Schaefermatt. Das Blatt wird nur geschlossen
+  // (Auge, kein Klick auf "Zur Analyse"), danach Meine Partien: die Partie steht dort als "Online" mit dem Gegnernamen und
+  // oeffnet die Analyse mit "Du gegen Gegner_2", eigener Farbe Schwarz unten und am Schluesselmoment (kurze Niederlage).
+  const woaListe = () => seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]'));
+  const woa = partie({ farbe: 'b', gewertet: true, zuege: 'e2e4 e7e5 f1c4 b8c6 d1h5' });
+  await oeffne(woa);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'laeuft');
+  const woaLaufend = (await woaListe()).some(x => x.id === 'on-' + woa.id);
+  pruefe('W-online-analyse: waehrend die gewertete Partie laeuft, liegt nichts fuer die Analyse auf dem Geraet und kein Analyse-Knopf',
+    !woaLaufend && !(await seite.locator('.online-screen [data-online="analyse"]').count()), { woaLaufend });
+  zug(woa, 'g8f6'); zug(woa, 'h5f7');
+  Object.assign(woa, { status: 'beendet', grund: 'matt', ergebnis: '1-0' }); aktualisieren(woa);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
+  await r7Warte(); await seite.waitForTimeout(600);
+  await seite.locator('.online-screen .ergebnis-overlay .erg-zu').click().catch(() => {});
+  const woaGespeichert = (await woaListe()).find(x => x.id === 'on-' + woa.id);
+  pruefe('W-online-analyse: beim Ende ohne Klick abgelegt (Online, Schwarz, Niederlage durch Matt, Gegnername, alle 7 Zuege)',
+    woaGespeichert?.online?.gewertet === true && woaGespeichert.spielerFarbe === 'b' && woaGespeichert.ergebnis === 'niederlage'
+      && woaGespeichert.grund === 'matt' && woaGespeichert.zuzweit?.weiss === 'Gegner_2' && woaGespeichert.zuege?.length === 7, woaGespeichert);
+  await seite.evaluate(() => window.__app.gehe('verlauf'));
+  await seite.waitForFunction(() => document.querySelector('.vl-screen .vl-zeile'), null, { timeout: 8000 }).catch(() => {});
+  const woaZeile = await seite.evaluate(id => {
+    const z = document.querySelector(`.vl-screen .vl-zeile[data-id="on-${id}"]`);
+    return z ? { name: z.querySelector('.vl-name')?.textContent, chip: z.querySelector('.vl-uebung')?.textContent, erg: z.querySelector('.vl-ergebnis')?.textContent,
+      farbe: z.querySelector('.vl-z3')?.textContent } : null;
+  }, woa.id);
+  pruefe('W-online-analyse: Meine Partien zeigt sie mit Kennzeichen "Online", Gegnername, Niederlage und eigener Farbe',
+    woaZeile?.name === 'Gegner_2' && woaZeile.chip === 'Online' && /Niederlage/.test(woaZeile.erg) && /Schwarz/.test(woaZeile.farbe), woaZeile);
+  await seite.locator(`.vl-screen .vl-zeile[data-id="on-${woa.id}"] .vl-oeffnen`).click({ timeout: 3000 }).catch(() => {});
+  const woaAn = await seite.waitForFunction(() => document.querySelector('.an-screen .an-c-kopf'), null, { timeout: 90000 }).then(() => true, () => false);
+  await seite.waitForTimeout(500);
+  const woaAnalyse = await seite.evaluate(() => ({
+    unter: document.querySelector('.an-screen .an-unter')?.textContent || '',
+    unten: document.querySelector('.an-screen .an-evalbalken')?.dataset.unten,
+    zug: document.querySelector('.an-screen .an-c-zug')?.textContent || '',
+    start: !!document.querySelector('.an-screen .an-c-start'),
+    vs: document.querySelector('.an-screen .an-vs-wort')?.textContent || '',
+    zuZweit: /gewinnt/.test(document.querySelector('.an-screen .an-genau')?.textContent || ''),
+    knoepfe: [...document.querySelectorAll('.an-screen .an-kopf-knoepfe [data-aktion]')].map(b => b.dataset.aktion),
+  }));
+  pruefe('W-online-analyse: Analyse "Du gegen Gegner_2", Schwarz unten, "Niederlage" (nicht "<Name> gewinnt"), Start am Schluesselmoment 3... Sf6',
+    woaAn && /^Du gegen Gegner_2/.test(woaAnalyse.unter) && woaAnalyse.unten === 'b' && woaAnalyse.vs === 'Niederlage' && !woaAnalyse.zuZweit
+      && !woaAnalyse.start && /Sf6/.test(woaAnalyse.zug) && woaAnalyse.knoepfe.includes('online') && !woaAnalyse.knoepfe.includes('weiter'), woaAnalyse);
+  // Funktionsprobe 3: Neuladen nach dem Ende und erneutes Oeffnen legen keinen zweiten Eintrag an (die Analyse bleibt)
+  const woaVor = (await woaListe()).length;
+  await seite.reload(); await seite.waitForFunction(() => window.__app?.gehe, null, { timeout: 15000 });
+  await oeffne(woa); await r7Warte(); await seite.waitForTimeout(300);
+  const woaNach = await woaListe();
+  pruefe('W-online-analyse: Neuladen und erneutes Oeffnen nach dem Ende: kein Doppel-Eintrag, Analyse bleibt',
+    woaNach.length === woaVor && woaNach.filter(x => x.id === 'on-' + woa.id).length === 1 && woaNach.find(x => x.id === 'on-' + woa.id)?.analysiert === true,
+    { woaVor, nach: woaNach.length, eintrag: woaNach.find(x => x.id === 'on-' + woa.id) });
+  // Funktionsprobe 2: Abbruch nach einem Zug (Server: abgebrochen, ohne Ergebnis) hat den Analyse-Knopf; abgelegt ehrlich
+  // ohne Ergebnis mit Grund "abgebrochen", die Analyse nennt es so und nie Remis
+  const woaAb = partie({ gewertet: true, zuege: 'e2e4' }); await oeffne(woaAb);
+  Object.assign(woaAb, { status: 'beendet', grund: 'abgebrochen', ergebnis: null }); aktualisieren(woaAb);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
+  await r7Warte(); await seite.waitForTimeout(300);
+  const woaAbB = await r7Blatt();
+  const woaAbE = (await woaListe()).find(x => x.id === 'on-' + woaAb.id);
+  pruefe('W-online-analyse: Abbruch nach einem Zug: Blatt mit "Zur Analyse", abgelegt ohne Ergebnis mit Grund abgebrochen',
+    woaAbB?.knoepfe.includes('analyse') && woaAbE && woaAbE.ergebnis == null && woaAbE.grund === 'abgebrochen' && woaAbE.online?.gewertet === true, { woaAbB, woaAbE });
+  await seite.locator('.online-screen .ergebnis-overlay [data-online="analyse"]').click({ timeout: 3000 }).catch(() => {});
+  await seite.waitForFunction(() => document.querySelector('.an-screen .an-vs-wort'), null, { timeout: 90000 }).catch(() => {});
+  const woaAbA = await seite.evaluate(() => ({ vs: document.querySelector('.an-screen .an-vs-wort')?.textContent || '',
+    grund: document.querySelector('.an-screen .an-vs-grund')?.textContent || '' }));
+  pruefe('W-online-analyse: Analyse des Abbruchs sagt "Ohne Ergebnis" und "Partie abgebrochen", nicht Remis', woaAbA.vs === 'Ohne Ergebnis' && woaAbA.grund === 'Partie abgebrochen', woaAbA);
+  // zurueck zum strittigen Blatt fuer die Bild-Pruefungen B3 unten
+  await oeffne(r7S); await r7Warte(); await seite.waitForTimeout(300);
   // B3: alle Knoepfe des Blatts (und mit geschlossenem Blatt der Knopf "Ergebnis") im Bild, hell und dunkel
   for (const [width, height, name] of [[375, 667, 'iphone-se'], [768, 1024, 'ipad-hoch'], [1280, 800, 'pc']]) {
     for (const modus of ['hell', 'dunkel']) {
