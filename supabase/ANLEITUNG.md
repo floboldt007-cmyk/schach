@@ -16,7 +16,7 @@ ruft die neuen Funktionen nicht auf, das schadet also nicht, aber die neue App b
 | Nr. | Was | Datei oder Ort | Prüfen (Erwartung) |
 | --- | --- | --- | --- |
 | 1 | Zeitplaner einschalten | Dashboard → **Integrations** → **Cron** → die Erweiterung `pg_cron` einschalten (ältere Dashboards: **Database** → **Extensions** → `pg_cron`) | `select extname from pg_extension where extname = 'pg_cron';` ergibt eine Zeile. Geht es im Tarif nicht: weiter, das Duell wertet dann bei der nächsten Suche aus |
-| 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300`. Mit Cron zeigt `select jobname, schedule from cron.job;` auch `liga-alte-wochen-loeschen` mit `17 3 * * *` |
+| 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300`; nach `zwei-ligen-schema.sql` (gilt live seit 11.11.2026) ergibt sie `60`. Mit Cron zeigt `select jobname, schedule from cron.job;` auch `liga-alte-wochen-loeschen` mit `17 3 * * *` |
 | 3 | Tageszähler (bleiben aus) | `zaehler-schema.sql` | `zaehler-rls-test.sql`: kein `FEHLER:`, `ROLLBACK` |
 | 4 | Visitenkarte, Erfolge, Banner | `karte-schema.sql` | `karte-rls-test.sql`: kein `FEHLER:`, der Editor meldet „Success“ |
 | 5 | Rätsel-Duell, Teil 1 | `raetsel-duell-schema.sql` | Mit Cron: `select jobname, schedule from cron.job;` zeigt jetzt zusätzlich `raetsel-duell-auswerten` mit `*/10 * * * *` (ohne Cron meldet diese Abfrage, dass es `cron.job` nicht gibt; das ist dann richtig) |
@@ -378,7 +378,7 @@ nie unter 0. Online zählen nur gewertete Partien aus der Gegnersuche (Freundes-
 nicht unter 4 Halbzügen und höchstens 3 am Tag gegen denselben Gegner. Bot-Leiter höchstens 10, KI-Gegner höchstens 20
 Ergebnisse am Tag (Europe/Berlin); ein KI-Ergebnis zählt nur mit einem eigenen Suchbeleg, frühestens 60 Sekunden nach
 der Ausgabe. **Schummel-Schutz:** Bot- und KI-Ergebnisse meldet das Gerät selbst, deshalb bringen sie zusammen
-höchstens 300 Kronen je Woche und Konto (`bot_ki_wochen_max`, KI-Rätsel-Duelle zählen mit); ab Montag ist der Deckel
+höchstens 60 Kronen je Woche und Konto (`bot_ki_wochen_max`, seit `zwei-ligen-schema.sql`, vorher 300; KI-Rätsel-Duelle zählen mit); ab Montag ist der Deckel
 wieder frei, Online-Kronen und Rätsel-Duelle gegen Menschen zählen nie dagegen. Die Start-Liga (Stufe III der Liga zur Elo, höchstens Läufer III, egal welche Elo das Gerät
 meldet) gilt einmal je Konto und nur vor der
 ersten Partie mit Kronen. Andere sehen in der Gruppe nur Benutzername und Kronen, nie eine Kennung oder E-Mail. Mit dem

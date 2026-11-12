@@ -13,7 +13,13 @@
 //       eine Vitrine, haelt die Vollfassung bis HALTE_VITRINE (4,3 s) statt HALTE_BIS, Titel und Errungenschaften kommen
 //       nacheinander, ein Balken zeigt die Zeit bis zum Start, harte Grenze DAUER_VITRINE (5,3 s). Tippen startet sofort.
 //       Seit 01.11.2026 (Flo, Handy: "zu kurz") haelt sie bis 4,3 s statt 3,3 s.
-//   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
+//   spieleDuell({ bot, farbe, anlass, von, art?, einstellung?, bildschirm?, mitFarbe?, mitVitrine? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
+//       bildschirm: Name des Screens, in dem die Portraets landen (Vorgabe 'partie'; Online nutzt 'online' und ruft das
+//       Intro, wenn die Partie schon dasteht). Ziel ist .screen.<bildschirm>, wenn er .spieler-Leisten mit .av hat
+//       (Raetsel-Duell), sonst .screen.partie. mitFarbe false laesst Weiss/Schwarz aus den Unterzeilen weg (Raetsel-Duell:
+//       die Farbe wechselt mit jedem Raetsel), mitVitrine false laesst die Vitrine weg (nie die lange Fassung, das Intro
+//       muss in den Vorlauf des Raetsel-Duells passen). bot.liga (Text) ersetzt die Stufe im Chip, ohne
+//       Zahl in bot.elo entfaellt "Elo" in der Unterzeile (Gegner aus Fleisch und Blut, js/ui/online.js).
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
 //       duellArt(). bereit erfuellt sich, sobald die Buehne den ganzen Schirm deckt (ihre Animation ist fertig,
@@ -151,13 +157,14 @@ function flieger(html, von, nach, { d = 440, v = 0, k = 'weich', rund = true } =
   return { el, a };
 }
 
-export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art = null, einstellung = 'besondere' } = {}) {
+export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art = null, einstellung = 'besondere', bildschirm = 'partie', mitFarbe = true, mitVitrine = true } = {}) {
   const f = farbe === 'b' ? 'b' : 'w';
   // Vitrine (Flo, 30.10.2026: "beim Matchbeginn kurz flexen"): Titel und bis zu drei Errungenschaften unter Flos Namen,
   // vom Ort duell:profil? (Paket sammlung); ohne Anbieter wie bisher. Wer etwas zu zeigen hat, bekommt die Buehne.
+  // mitVitrine false (Raetsel-Duell): keine Vitrine und damit nie die lange Fassung, das Intro passt in den Vorlauf.
   let profil = null;
   const vorgegeben = ['voll', 'kurz', 'aus'].includes(art);
-  try { profil = (vorgegeben ? art === 'voll' : einstellung !== 'aus' && tempo() !== 0) && bot ? waehle('duell:profil?', {}) : null; } catch (e) { profil = null; }
+  try { profil = mitVitrine && (vorgegeben ? art === 'voll' : einstellung !== 'aus' && tempo() !== 0) && bot ? waehle('duell:profil?', {}) : null; } catch (e) { profil = null; }
   const orden = profil && Array.isArray(profil.orden) ? profil.orden.slice(0, 3) : [];
   const hatVitrine = !!(profil && (profil.titel || orden.length));
   const gewaehlteArt = vorgegeben ? art : duellArt({ einstellung, anlass, reduziert: tempo() === 0, vitrine: hatVitrine });
@@ -216,7 +223,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   ueber.setAttribute('role', voll ? 'dialog' : 'presentation');
   ueber.tabIndex = -1;
   if (voll) ueber.setAttribute('aria-label', t('arena.duell.aria', { name: bot.name }));
-  const stufeText = bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
+  // Online (Ranked gegen Menschen): statt der Bot-Stufe die Liga des Gegners als Text (bot.liga)
+  const stufeText = typeof bot.liga === 'string' && bot.liga ? bot.liga : bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
   const anlassText = ANLASS_TEXT[anlass] ? t(ANLASS_TEXT[anlass]) : '';
   // lange Fassung nur in der Vollfassung mit Vitrine (Zeiten absolut, die Haltephase dehnt sich nicht mit dem Tempo)
   const lang = voll && hatVitrine;
@@ -230,6 +238,10 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
       const selten = ['frei', 'selten', 'episch', 'legende'].includes(o.seltenheit) ? o.seltenheit : 'frei';
       return `<span class="duell-orden${bild ? ' mit-bild' : ''}" data-seltenheit="${selten}">${bild}<span>${esc(o.name)}</span></span>`;
     }).join('')}</div>` : ''}` : '';
+  // Unterzeile des Gegners: Elo (nur mit Zahl) und seine Farbe; ohne Farbe (mitFarbe false, Raetsel-Duell: die Farbe
+  // wechselt mit jedem Raetsel) nur die Elo, ohne beides entfaellt die Zeile
+  const botUnter = [Number.isFinite(Number(bot.elo)) && bot.elo !== null && bot.elo !== '' ? `Elo ${esc(bot.elo)}` : '',
+    mitFarbe ? esc(t(FARBE_NAME[f === 'w' ? 'b' : 'w'])) : ''].filter(Boolean).join(' · ');
   if (voll) {
     ueber.innerHTML = `
       <div class="duell-buehne"></div>
@@ -239,13 +251,13 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
           <div class="duell-seite bot">
             <div class="duell-av" data-rolle="bot"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></div>
             <div class="duell-name">${esc(bot.name)}</div>
-            <div class="duell-unter">Elo ${esc(bot.elo)} · ${esc(t(FARBE_NAME[f === 'w' ? 'b' : 'w']))}</div>
+            ${botUnter ? `<div class="duell-unter">${botUnter}</div>` : ''}
           </div>
           <div class="duell-gegen">${esc(t('arena.duell.gegen'))}</div>
           <div class="duell-seite flo">
             <div class="duell-av" data-rolle="flo">${floAvatar(f)}</div>
             <div class="duell-name">${esc(meinName())}</div>
-            <div class="duell-unter">${esc(t(FARBE_NAME[f]))}</div>${vitrine}
+            ${mitFarbe ? `<div class="duell-unter">${esc(t(FARBE_NAME[f]))}</div>` : ''}${vitrine}
           </div>
         </div>
       </div>
@@ -311,7 +323,9 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     if (zuEnde || phase2Lief) return;
     phase2Lief = true;
     ueber.classList.add('phase-2', 'durch');
-    const partie = document.querySelector('.screen.partie');
+    // Ziel-Screen: der eigene (bildschirm, z. B. 'raetsel-duell' mit .spieler-Leisten), sonst die Partie (Bot und Online)
+    const partie = [/^[a-z-]+$/.test(bildschirm) ? `.screen.${bildschirm}` : null, '.screen.partie'].filter(Boolean)
+      .map((q) => document.querySelector(q)).find((el) => el && el.querySelector('.spieler.gegner .av, .spieler.ich .av')) || null;
     const zielBot = partie ? partie.querySelector('.spieler.gegner .av') : null;
     const zielFlo = partie ? partie.querySelector('.spieler.ich .av') : null;
     const ziele = [zielBot, zielFlo].filter((z) => z && imBild(rect(z)));
@@ -364,7 +378,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const startScreen = html.dataset.screen || null;
   const beiPartie = (d) => {
     if (!d || zuEnde) return;
-    if (d.name !== 'partie') {
+    if (d.name !== bildschirm) {
       if (partieAb != null || d.name !== startScreen) ueberspringe();
       return;
     }
@@ -381,6 +395,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     });
   };
   try { abPartie = hoere('app:screen', beiPartie); } catch (e) { abPartie = null; }
+  // Online ruft das Intro erst, wenn die Partie schon dasteht (bildschirm 'online'): dann gilt sie als angekommen
+  if (bildschirm !== 'partie' && startScreen === bildschirm) beiPartie({ name: bildschirm });
   // haerteste Grenze: hoechstens dauerMax ms (DAUER_MAX, lange Fassung DAUER_VITRINE), auch wenn die Partie nicht kommt
   spaeter(() => { if (!zuEnde) ende(); }, dauerMax);
 

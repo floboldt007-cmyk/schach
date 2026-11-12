@@ -3172,7 +3172,8 @@ async function testeU7(browser) {
         pruefe('Ab 760 px Höhe: Zugstreifen zwischen Coach und Aktionen, im Bild', !m.streifenUnten && m.streifen.t >= m.coach.b - 0.5 && m.streifen.b <= m.knoepfe.t + 0.5 && m.streifen.b <= m.ih,
           JSON.stringify([m.coach, m.streifen, m.knoepfe]));
       } else {
-        pruefe('Unter 760 px Höhe: Zugstreifen nach den Aktionen, durch Scrollen der Spalte erreichbar', m.streifenUnten && m.streifen.t >= m.knoepfe.b - 0.5 && m.scrollt > 0,
+        // R7 (Befund B8, 12.11.2026): der Streifen lag nach den Aktionen unter dem Rand, die Spalte scrollte; jetzt entfaellt er dort
+        pruefe('Unter 760 px Höhe: kein Zugstreifen (Züge über die Pfeile der Knopfreihe), die Spalte scrollt nicht', m.streifenUnten && m.streifen.h === 0 && m.scrollt <= 1,
           JSON.stringify([m.streifen, m.knoepfe, m.scrollt]));
         // Handy-Runde K (08.11.2026): Zug zurueck und vor liegen dann in der Knopfreihe, im Bild und antippbar
         const pf = await seite.evaluate(() => [...document.querySelectorAll('.partie .spielknoepfe > .sk-pfeil')].map((e) => {

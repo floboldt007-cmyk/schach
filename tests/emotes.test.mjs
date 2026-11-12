@@ -245,7 +245,7 @@ async function warteAufServer(url, ms = 10000) {
 }
 async function oeffne(seite, hash) {
   await seite.goto(BASIS + hash);
-  await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="emotes"]') && !!document.querySelector('.screen'), null, { timeout: 20000 });
+  await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="emotes"]') && !!document.documentElement.dataset.screen, null, { timeout: 20000 });
 }
 async function partie(seite, params = { botId: 'benno' }) {
   await seite.evaluate((p) => window.__app.gehe('partie', p), params);
@@ -558,7 +558,7 @@ async function layoutTeil(browser) {
       const kontext = await browser.newContext({ viewport: { width: w, height: h }, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
       const seite = await kontext.newPage();
       await seite.goto(BASIS + (sprache === 'en' ? '&sprache=en' : '') + '#arena');
-      await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="emotes"]') && !!document.querySelector('.screen'), null, { timeout: 20000 });
+      await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="emotes"]') && !!document.documentElement.dataset.screen, null, { timeout: 20000 });
       await seite.evaluate(SCHNELLER_BOT);
       await partie(seite, sprache === 'en' ? { botId: 'benno', tempo: { grund: 600, zuschlag: 0 } } : { botId: 'benno' });
       await warteFlo(seite);

@@ -394,7 +394,7 @@ async function shopTeil(browser) {
     return { filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
   pruefe('Shop abgemeldet: Vorschau zeigt volle Farben, kein Grau-Filter, aber mit Brettrand (R13-Shop)', !/grayscale/.test(vorschau.filter)
     && vorschau.rand !== 'none', vorschau);
-  pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
+  pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} Sammelstücken freigeschaltet`, zaehl);
   // Kundenblick 09.11.2026 (Befund 12): kein leeres "0 / 0" auf "Ich", ohne Partie auch keine Spielzahl im Profil
   const ich = await p.s.evaluate(() => ({ zahlen: [...document.querySelectorAll('.sa-gross .zahl, .sa-platz-zahl')].map((z) => z.textContent.trim()),
     seit: document.querySelector('.pr-seit')?.textContent || '' }));
@@ -656,7 +656,7 @@ async function profilTeil(browser) {
   pruefe('Freischalt-Moment: der erste Sieg zeigt sich beim Öffnen von „Ich“', p.moment >= 1, p.moment);
   const vorher = await p.s.evaluate(() => ({ karte: !!document.querySelector('.pr-karte'), figur: document.querySelector('.pr-av svg')?.dataset.figur,
     leer: document.querySelectorAll('.pr-orden.leer').length, oben: !!document.querySelector('.sa-kopf-ort .pr-karte') }));
-  pruefe('Profil: Karte oben im Reiter „Ich“, Bauer als Bild, drei leere Plätze', vorher.karte && vorher.oben && vorher.figur === 'P' && vorher.leer === 3, vorher);
+  pruefe('Profil: Karte oben im Reiter „Ich“, Bauer als Bild, leere Vitrine als ein schmaler Platz', vorher.karte && vorher.oben && vorher.figur === 'P' && vorher.leer === 1, vorher);
   const rahmen = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="rahmen"] .sa-teil')].map((x) => ({
     id: x.dataset.teil, z: x.dataset.zustand, zeile: x.querySelector('.sa-zeile')?.textContent })));
   const r = (id) => rahmen.find((x) => x.id === 'rahmen-' + id) || {};
@@ -771,9 +771,26 @@ async function browserTeil() {
       const bereiche = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich')].map((x) => x.dataset.bereich).join());
       // ohne Erfinder-Konto keine Finisher (Labor, Flo 01.11.2026)
       pruefe(`${name}: acht Bereiche (Emotes, Titel, Banner, Rahmen, Bretter, Klänge, Erfolge, Shop), keine Finisher`, bereiche === 'emotes,titel,banner,rahmen,bretter,klaenge,erfolge,shop', bereiche);
+      // R4a (Kritik 09.11., pc-ich.jpg): am PC war die Liste "So sehen dich andere" 704 px, die Profilkarte 884 px breit;
+      // eine leere Vitrine (neuer Spieler) war drei grosse Kaesten; die Banner-Vorschau zeigte nur den leeren Teil des Banners
+      const ich = await s.evaluate(() => {
+        const w = (sel) => Math.round(document.querySelector(sel)?.getBoundingClientRect().width || 0);
+        const v = document.querySelector('.pr-vitrine');
+        const bild = document.querySelector('.sa-platz[data-bereich="banner"] .sa-platz-bild img');
+        // der Zaehler (.sa-stand) traegt den Seitenrand als Innenabstand: gemessen wird seine Inhaltsbreite
+        const st = document.querySelector('.sa-stand');
+        const cs = st && getComputedStyle(st);
+        const stand = st ? Math.round(st.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) : 0;
+        return { karte: w('.pr-karte'), liste: w('.sa-platz-liste'), stand, leer: v?.querySelectorAll('.pr-orden.leer').length,
+          vitrineH: Math.round(v?.getBoundingClientRect().height || 0), leerFlag: v?.hasAttribute('data-leer'),
+          bannerPos: bild ? getComputedStyle(bild).objectPosition : '' };
+      });
+      pruefe(`${name}: Profilkarte, Zähler und Liste „So sehen dich andere“ gleich breit`, ich.karte > 0 && ich.karte === ich.liste && ich.stand === ich.liste, ich);
+      pruefe(`${name}: leere Vitrine ist ein schmaler Platz statt drei Kästen (höchstens 48 px hoch)`, ich.leerFlag && ich.leer === 1 && ich.vitrineH <= 48, ich);
+      pruefe(`${name}: Banner-Vorschau zeigt das Motiv (nicht die leere Mitte des Banners)`, /^19% /.test(ich.bannerPos), ich);
       const stand = await s.locator('.sa-stand').innerText();
       const zaehl = await s.evaluate(() => ({ alle: document.querySelectorAll('.sa-teil').length, frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
-      pruefe(`${name}: Zähler „N von M freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
+      pruefe(`${name}: Zähler „N von M Sammelstücken freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} Sammelstücken freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
       await waehle(s, 'titel');
       const tit = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="titel"] .sa-teil')].map((x) => ({
         id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild .sa-frage'), zeile: x.querySelector('.sa-zeile').textContent,
@@ -810,7 +827,7 @@ async function browserTeil() {
     await s.waitForSelector('.sa-screen', { timeout: 30000 });
     await waehle(s, 'titel');
     const text = (await s.locator('.sa-screen').innerText()) + '\n' + (await s.locator('.sa-blatt').innerText());
-    pruefe('Englisch: Me (Reitername), unlocked, From level', /^Me$/m.test(text) && /of \d+ unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
+    pruefe('Englisch: Me (Reitername), unlocked, From level', /^Me$/m.test(text) && /of \d+ collectibles unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
     await k.close();
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);

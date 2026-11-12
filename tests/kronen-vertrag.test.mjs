@@ -31,10 +31,18 @@ const funktionen = [...sql.matchAll(/create or replace function public\.([a-z_]+
   .map((m) => ({ name: m[1], typen: m[2].split(',').map((p) => p.trim()).filter(Boolean).map((p) => p.split(/\s+/)[1]),
     rueckgabe: m[3], kopf: m[4], rumpf: m[5] }));
 const fn = (name) => funktionen.find((f) => f.name === name);
+// kronen_konstanten ersetzt zwei-ligen-schema.sql (wird danach eingespielt, gilt also live); die Zahlen vergleicht der
+// Vertrag deshalb mit der dortigen, zuletzt eingespielten Fassung (Befund 11.11.2026: Deckel 60 live, Client zeigte 300).
+const zweiLigen = ohneKommentare(lies('supabase/zwei-ligen-schema.sql'));
+const zuletzt = (name) => {
+  const m = [...zweiLigen.matchAll(/create or replace function public\.([a-z_]+)\([^)]*\)\s*returns [a-z_.]+[\s\S]*?\$\$([\s\S]*?)\$\$;/g)]
+    .filter((x) => x[1] === name).pop();
+  return m ? { name, rumpf: m[2] } : fn(name);
+};
 
 // ---------- Zahlen: SQL gleich JS ----------
 {
-  const k = fn('kronen_konstanten')?.rumpf || '';
+  const k = zuletzt('kronen_konstanten')?.rumpf || '';
   const zahl = (schluessel) => Number((k.match(new RegExp(`'${schluessel}',\\s*(-?\\d+)`)) || [])[1]);
   pruefe('kronen_konstanten vorhanden', !!k);
   pruefe('Stufen gleich (Stufen je Liga, Anzahl)',
@@ -61,7 +69,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe('Belohnung je Platz gleich', JSON.stringify(belohnung) === JSON.stringify(BELOHNUNG), belohnung);
   const botZiel = ((k.match(/'bot_ziel_max',\s*jsonb_build_array\(([^)]*)\)/) || [])[1] || '').split(',').map((z) => Number(z.trim()));
   pruefe('Bot-Wochenziel je Liga gleich', JSON.stringify(botZiel) === JSON.stringify(BOT_ZIEL_MAX) && botZiel.length === LIGEN.length, botZiel);
-  pruefe('Deckel Bot- und KI-Kronen je Woche gleich (300)', zahl('bot_ki_wochen_max') === BOT_KI_WOCHEN_MAX && BOT_KI_WOCHEN_MAX === 300,
+  pruefe('Deckel Bot- und KI-Kronen je Woche gleich (60)', zahl('bot_ki_wochen_max') === BOT_KI_WOCHEN_MAX && BOT_KI_WOCHEN_MAX === 60,
     zahl('bot_ki_wochen_max'));
   pruefe('Schutz gegen Absprache gleich (Mindest-Halbzuege 4, Paar-Grenze 3)',
     zahl('online_mindest_halbzuege') === ONLINE_MINDEST_HALBZUEGE && zahl('paar_tagesgrenze') === PAAR_TAGESGRENZE
@@ -186,7 +194,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
 
 // ---------- Start-Liga (Task 6) ----------
 {
-  const k = fn('kronen_konstanten')?.rumpf || '';
+  const k = zuletzt('kronen_konstanten')?.rumpf || '';
   const zahl = (schluessel) => Number((k.match(new RegExp(`'${schluessel}',\\s*(-?\\d+)`)) || [])[1]);
   const grenzen = ((k.match(/'klassen_grenzen',\s*jsonb_build_array\(([^)]*)\)/) || [])[1] || '').split(',').map((z) => Number(z.trim()));
   pruefe('Start-Liga: Klassengrenzen, Elo-Grenzen und hoechste Start-Liga gleich',

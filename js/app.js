@@ -334,7 +334,11 @@ function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art
       if (fertig) return;
       fertig = true;
       document.removeEventListener('keydown', taste, true);
+      // zuklappend: nicht mehr bedienbar und fuer Bildschirmleser weg (sonst zwei Dialoge, wenn gleich der naechste kommt);
+      // Klicks gehen per CSS (.dialog-ort.weg) schon durch aufs Brett
       ort.classList.add('weg');
+      ort.inert = true;
+      ort.setAttribute('aria-hidden', 'true');
       setTimeout(() => ort.remove(), 200);
       if (offenerDialog && offenerDialog.ort === ort) offenerDialog = null;
       // Fokus zurueck, wo er vorher war
@@ -1131,6 +1135,9 @@ function pruefeSonderstuecke() {
   const vorher = istErfinder();
   ladeSonderstuecke().then((ids) => {
     if (!ids) { sonderFehlerBis = Date.now() + 60000; return; }
+    // Labor-Brett und Figurensatz haengen am Erfinder-Status: neu anwenden (Feldfarben am html, schach:einstellungen),
+    // damit auch ein Spiel-Screen, der nicht neu gezeigt wird, den eigenen Skin bekommt (Befund 4 vom 11.11.2026)
+    if (istErfinder() !== vorher) wendeEinstellungenAn(ladeEinstellungen());
     // laedt gerade ein Screen, zeigt der schon den neuen Stand
     if (istErfinder() === vorher || !aktuell || SPIEL_SCREENS.has(aktuell.name) || ladeNr !== ladeFertig) return;
     zeigeScreen(aktuell.name, aktuell.params || {}, aktuell.hash);

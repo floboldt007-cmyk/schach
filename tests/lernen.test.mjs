@@ -41,9 +41,9 @@ pruefe('Mattbilder: jede Stellung legal, Weiss am Zug, Schwarz nicht im Schach, 
 pruefe('Stufen laufen nie rueckwaerts (leicht zuerst), in jedem Bereich', BEREICHE.every((b) => b.lektionen.every((l, i) => i === 0
   || STUFEN.indexOf(l.stufe) >= STUFEN.indexOf(b.lektionen[i - 1].stufe) - 1)));
 const mitStellung = ALLE.filter((l) => l.art !== 'folge');
-pruefe('Bereiche: Mattbilder 20, Taktik 16, Endspiele 11, Eroeffnungen 11, alle ids eindeutig, Stellungen (ohne Zugfolgen) verschieden',
-  BEREICHE.map((b) => b.id).join() === 'matt,taktik,end,eroeffnung' && TAKTIK.length === 16 && ENDSPIELE.length === 11 && EROEFFNUNGEN.length === 11
-  && ALLE.length === 58 && new Set(ALLE.map((l) => l.id)).size === 58 && new Set(mitStellung.map((l) => l.fen)).size === mitStellung.length);
+pruefe('Bereiche: Mattbilder 20, Taktik 21, Endspiele 13, Eroeffnungen 11, alle ids eindeutig, Stellungen (ohne Zugfolgen) verschieden',
+  BEREICHE.map((b) => b.id).join() === 'matt,taktik,end,eroeffnung' && TAKTIK.length === 21 && ENDSPIELE.length === 13 && EROEFFNUNGEN.length === 11
+  && ALLE.length === 65 && new Set(ALLE.map((l) => l.id)).size === 65 && new Set(mitStellung.map((l) => l.fen)).size === mitStellung.length);
 // Taktik (31.10.2026): eigene Stellungen, mit Stockfish nachgeprueft; Ziel = Material nach dem Gegenzug
 pruefe('Taktik: Art taktik, gewinn 1 bis 9, ziel 2 oder 3, Opfer 0 bis 5, Stufen leicht bis schwer, Flo Weiss', TAKTIK.every((l) => l.art === 'taktik'
   && Number.isInteger(l.gewinn) && l.gewinn >= 1 && l.gewinn <= 9 && [2, 3].includes(l.ziel) && [0, 5].includes(l.opfer)
@@ -67,6 +67,19 @@ pruefe('Taktik Teil 2: das Opfer erlaubt nur den Turm, eine weitere verschenkte 
   taktikLauf('hinlenkung', ['Rf8+', 'Kxf8', 'Nc6', 'Qxc6', 'h3']) === ',,,,verloren');
 pruefe('Taktik: ein Zug ohne Gewinn ist noch nichts, eine verschenkte Dame ist gescheitert',
   taktikLauf('turm-spiess', ['h3', 'Kb4']) === ',' && taktikLauf('gabel-dame', ['Qd8+', 'Rxd8', 'h3']) === ',,verloren');
+// Feinschliff R5 (11.11.2026): sieben neue Lektionen, je einmal gestartet und mit der Loesung bis "geschafft" gespielt
+pruefe('Neu R5: Figur fangen, Zwischenzug, Verteidiger, Roentgen, Linie oeffnen sind mit der Loesung geschafft',
+  taktikLauf('figur-fangen', ['b3', 'Kf7', 'Kb2', 'Bxb3', 'cxb3', 'Ke6']) === ',,,,,geschafft'
+  && taktikLauf('zwischenzug', ['Rxd8', 'Bd5', 'h3']) === ',geschafft,'
+  && taktikLauf('verteidiger', ['Nxf7', 'Kxf7', 'Rxd5', 'Ke6']) === ',,,geschafft'
+  && taktikLauf('roentgen', ['Qxd5', 'Rxd5', 'Rxd5', 'Kf8']) === ',,,geschafft'
+  && taktikLauf('linie-oeffnen', ['e6', 'f6', 'Bxf6', 'g5', 'Qg7#']) === ',,,,geschafft');
+pruefe('Neu R5: Zwischenzug, sofort zurueckschlagen (gxf3 Txd1+) ist nie geschafft', !taktikLauf('zwischenzug', ['gxf3', 'Rxd1+', 'Kg2', 'Rd2']).includes('geschafft'));
+pruefe('Neu R5: Opposition und Patt vermeiden sind mit der Loesung geschafft (neue Dame steht nach dem Gegenzug)',
+  taktikLauf('opposition', ['Ke4', 'Kd6', 'Kf5', 'Ke7', 'Ke5', 'Kd7', 'Kf6', 'Kc6', 'e4', 'Kd7', 'e5', 'Ke8', 'Ke6', 'Kd8', 'Kf7', 'Kc7',
+    'e6', 'Kb6', 'e7', 'Kc5', 'e8=Q', 'Kd4']).endsWith(',geschafft')
+  && taktikLauf('patt-vermeiden', ['Kd6', 'Kf7', 'Kd7', 'Kf6', 'e8=Q', 'Kf5']) === ',,,,,geschafft');
+pruefe('Neu R5: Patt vermeiden, Ke6 ist sofort Patt', taktikLauf('patt-vermeiden', ['Ke6']) === 'patt');
 // Vollsuche (01.11.2026, Flo: "Doppeldrohung gibt keinen Sinn, in 2 Zuegen geht nicht"): jede Taktik ist gegen JEDE
 // Verteidigung in ziel Zuegen zu schaffen (Matt oder nach dem Gegenzug mindestens gewinn Punkte, wie pruefeZiel), jedes
 // Mattbild bis Matt in 3 ist genau so lang wie angegeben. Schach und Schlagzuege zuerst, damit die Suche schnell findet.
@@ -123,8 +136,8 @@ pruefe('Texte: alle Schluessel in beiden Sprachen, keine langen Gedankenstriche'
   const z = await import('../js/pakete/lernen/zugang.js');
   const { VORTEILE } = await import('../js/pakete/abo/trainer.js');
   const zahl = z.zahlen();
-  pruefe('Zugang: 23 leichte plus 4 Proben gratis, 31 im Trainer', zahl.gratis === 27 && zahl.abo === 31
-    && ALLE.filter((l) => l.stufe === 'leicht').length === 23, JSON.stringify(zahl));
+  pruefe('Zugang: 26 leichte plus 4 Proben gratis, 35 im Trainer', zahl.gratis === 30 && zahl.abo === 35
+    && ALLE.filter((l) => l.stufe === 'leicht').length === 26, JSON.stringify(zahl));
   pruefe('Zugang: je Bereich genau eine Probe, jede eine mittlere Lektion aus ihrem Bereich',
     BEREICHE.every((b) => b.lektionen.filter(z.istProbe).length === 1 && b.lektionen.some((l) => l.id === z.PROBE[b.id] && l.stufe === 'mittel')));
   pruefe('Zugang: ohne Konto offen ist genau, was gratis ist', ALLE.every((l) => z.istOffen(l) === z.istGratis(l)));
@@ -133,10 +146,10 @@ pruefe('Texte: alle Schluessel in beiden Sprachen, keine langen Gedankenstriche'
     z.inWillkommenswoche({ gesehen: '2026-11-07', heute: '2026-11-07' }) && z.inWillkommenswoche({ gesehen: '2026-11-01', heute: '2026-11-07' })
     && !z.inWillkommenswoche({ gesehen: '2026-10-31', heute: '2026-11-07' }) && !z.inWillkommenswoche({ gesehen: null, heute: '2026-11-07' })
     && !z.inWillkommenswoche({ gesehen: '2026-11-08', heute: '2026-11-07' }) && z.willkommenBis('2026-11-07') === '2026-11-13' && z.willkommenBis('kaputt') === null);
-  pruefe('Zugang: Marke „Trainer“ genau für die 31 Lektionen, die nicht gratis sind', ALLE.filter(z.istImTrainer).length === 31
+  pruefe('Zugang: Marke „Trainer“ genau für die 35 Lektionen, die nicht gratis sind', ALLE.filter(z.istImTrainer).length === 35
     && ALLE.every((l) => z.istImTrainer(l) === !z.istGratis(l)));
   const v = VORTEILE.find((x) => x.id === z.VORTEIL);
-  pruefe('Trainer-Blatt: Vorteil Meisterschule nennt die richtige Zahl (31)', !!v && v.text.includes(String(zahl.abo) + ' Lektionen'), v && v.text);
+  pruefe('Trainer-Blatt: Vorteil Meisterschule nennt die richtige Zahl (35)', !!v && v.text.includes(String(zahl.abo) + ' Lektionen'), v && v.text);
 }
 
 // Die Muster stimmen: die bekannten Mattfuehrungen enden in diesen Stellungen wirklich matt
@@ -179,8 +192,8 @@ pruefe('Speicher: kaputte Eintraege fallen still weg', JSON.stringify(stand({ le
 pruefe('Summe: Sterne, Hoechstzahl 60, geschafft', JSON.stringify(summe(merke(st, 'grundreihe', { sterne: 3, zuege: 1 }), 'matt'))
   === '{"sterne":5,"max":60,"geschafft":2}');
 const stE = merke(merke({}, 'quadrat', { sterne: 3, zuege: 5 }), 'grundreihe', { sterne: 2, zuege: 2 });
-pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 58 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":33,"geschafft":1}'
-  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":174,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
+pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 65 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":39,"geschafft":1}'
+  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":195,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
 
 // Ziel-Regeln (pruefeZiel): nach Flos Zug ('flo') und nach dem Gegenzug ('gegner')
 const zielVon = (id, fen, wann, zuege = 1) => pruefeZiel(lektion(id), bilanz(new Chess(lektion(id).fen)), new Chess(fen), { wann, zuege });
@@ -252,7 +265,7 @@ async function seite(browser, { erfinder = true, merker = true, groesse = { widt
   // feste Uhr: der App-Tag beginnt erst um 4:00 (js/tag.js), ein Lauf kurz nach Mitternacht darf nichts kippen
   if (uhr) await s.clock.setFixedTime(uhr);
   await s.goto(BASIS + hash);
-  await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 30000 });
+  await s.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen, null, { timeout: 30000 });
   await warte(600);
   return { k, s, fehlerListe };
 }
@@ -286,8 +299,8 @@ async function erfinderTeil(browser) {
     const k = document.querySelector('.ms-karte');
     return k && { text: k.innerText, erste: document.querySelector('.training-gitter > *')?.classList.contains('ms-karte') };
   });
-  pruefe('Erfinder: Karte „Meisterschule · Mattbilder, Taktik, Endspiele, Eröffnungen“ im Training mit Labor-Schild, 0 von 174 Sternen, 58 Lektionen', !!karte
-    && /Mattbilder, Taktik, Endspiele, Eröffnungen/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 174 Sternen/.test(karte.text) && /58 Lektionen/.test(karte.text), karte);
+  pruefe('Erfinder: Karte „Meisterschule · Mattbilder, Taktik, Endspiele, Eröffnungen“ im Training mit Labor-Schild, 0 von 195 Sternen, 65 Lektionen', !!karte
+    && /Mattbilder, Taktik, Endspiele, Eröffnungen/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 195 Sternen/.test(karte.text) && /65 Lektionen/.test(karte.text), karte);
   await p.s.locator('.ms-karte .ms-oeffnen').click();
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const liste = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
@@ -364,12 +377,12 @@ async function erfinderTeil(browser) {
   const endListe = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
   pruefe('Endspiele: Liste in der Reihenfolge der Daten, Art „Halten“ an der Quadratregel, eigene Sternzahl',
     endListe === ENDSPIELE.map((l) => l.id).join() && /Halten/.test(await p.s.locator('.ms-lektion[data-id="quadrat"]').innerText())
-    && /^0\s*\/\s*33$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), endListe);
+    && /^0\s*\/\s*39$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), endListe);
   await p.s.locator('.ms-lektion[data-id="quadrat"]').click();
   await warteLz(p.s, "z.id === 'quadrat' && z.phase === 'intro'");
   const status = await p.s.locator('.ls-status').innerText();
   pruefe('Endspiel-Lektion: Titel, Art und Ziel „Halte 8 Züge durch“, Nummer im Bereich', /Die Quadratregel/.test(status)
-    && /Halten/.test(status) && /Halte 8 Züge durch/.test(status) && /Lektion 4 von 11/.test(status), status);
+    && /Halten/.test(status) && /Halte 8 Züge durch/.test(status) && /Lektion 4 von 13/.test(status), status);
   await p.s.locator('.ls-aktionen [data-a="los"]').click();
   for (const [i, u] of ['f4e4', 'e4d4', 'd4c4', 'c4b5', 'b5a5'].entries()) {
     await warteLz(p.s, `z.phase === 'flo' && z.zuege === ${i}`);
@@ -388,9 +401,9 @@ async function erfinderTeil(browser) {
   await p.s.locator('.ms-bkarte[data-bereich="taktik"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="gabel-springer"]', { timeout: 8000 }).catch(() => {});
   const taktikListe = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
-  pruefe('Taktik: Liste in der Reihenfolge der Daten, Art „Taktik“, 0 von 48 Sternen', taktikListe === TAKTIK.map((l) => l.id).join()
+  pruefe('Taktik: Liste in der Reihenfolge der Daten, Art „Taktik“, 0 von 63 Sternen', taktikListe === TAKTIK.map((l) => l.id).join()
     && /Taktik/.test(await p.s.locator('.ms-lektion[data-id="gabel-springer"]').innerText())
-    && /^0\s*\/\s*48$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), taktikListe);
+    && /^0\s*\/\s*63$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), taktikListe);
   await p.s.locator('.ms-lektion[data-id="gabel-springer"]').click();
   await warteLz(p.s, "z.id === 'gabel-springer' && z.phase === 'intro'");
   const tStatus = await p.s.locator('.ls-status').innerText();
@@ -555,7 +568,7 @@ async function gratisTeil(browser) {
   const p = await seite(browser, { erfinder: false });
   await p.s.waitForSelector('.ms-karte', { timeout: 15000 }).catch(() => {});
   const karte = await p.s.evaluate(() => document.querySelector('.ms-karte')?.innerText || '');
-  pruefe('Gratis: Meisterschule-Karte im Training, ohne Labor-Schild, „27 davon sind gratis“', /27 davon sind gratis/.test(karte) && !/Labor/i.test(karte), karte);
+  pruefe('Gratis: Meisterschule-Karte im Training, ohne Labor-Schild, „30 davon sind gratis“', /30 davon sind gratis/.test(karte) && !/Labor/i.test(karte), karte);
   await p.s.locator('.ms-karte .ms-oeffnen').click();
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const r = await p.s.evaluate(() => ({
@@ -569,8 +582,8 @@ async function gratisTeil(browser) {
   }));
   pruefe('Gratis: Mattbilder mit 13 Schlössern (20 minus 6 leicht minus Probe), Probe „Ersticktes Matt“ offen mit Marke',
     r.gesperrt.length === 13 && r.schloss === 13 && !r.gesperrt.includes('grundreihe') && r.probeOffen && /Gratis-Probe/.test(r.probe), r);
-  pruefe('Gratis: Kopf zeigt die Sterne der Meisterschule (0 / 174), vier Bereichskarten, Gruppen nach Stufe',
-    /0\s*\/\s*174/.test(r.kopf) && r.karten === 4 && /Leicht · gratis\|Mittel\|Schwer und Meister/.test(r.gruppen), r);
+  pruefe('Gratis: Kopf zeigt die Sterne der Meisterschule (0 / 195), vier Bereichskarten, Gruppen nach Stufe',
+    /0\s*\/\s*195/.test(r.kopf) && r.karten === 4 && /Leicht · gratis\|Mittel\|Schwer und Meister/.test(r.gruppen), r);
   await p.s.locator('.ms-lektion[data-id="anderssen"]').click();
   await p.s.waitForSelector('.ms-liste .premium-hinweis', { timeout: 5000 }).catch(() => {});
   pruefe('Gratis: Tipp aufs Schloss zeigt den Trainer-Hinweis unter der Zeile, keine Lektion',

@@ -15,6 +15,8 @@ export const ENDSPIELE = Object.freeze([
   Object.freeze({ id: 'schluesselfelder', art: 'umwandeln', stufe: 'leicht', fen: '8/8/3k4/8/3K4/8/3P4/8 w - - 0 1', ziel: 9 }),
   Object.freeze({ id: 'quadrat', art: 'halten', stufe: 'leicht', fen: '7k/8/8/p7/5K2/8/8/8 w - - 0 1', ziel: 8 }),
   Object.freeze({ id: 'randbauer', art: 'halten', stufe: 'leicht', fen: '8/8/8/8/7p/6k1/8/4K3 w - - 0 1', ziel: 10 }),
+  Object.freeze({ id: 'opposition', art: 'umwandeln', stufe: 'leicht', fen: '8/8/4k3/8/3K4/8/4P3/8 w - - 0 1', ziel: 9 }),
+  Object.freeze({ id: 'patt-vermeiden', art: 'umwandeln', stufe: 'leicht', fen: '4k3/4P3/8/3K4/8/8/8/8 w - - 0 1', ziel: 3 }),
   Object.freeze({ id: 'springer-bauer', art: 'halten', stufe: 'mittel', fen: '7k/8/8/2N5/8/p7/8/7K w - - 0 1', ziel: 10 }),
   Object.freeze({ id: 'durchbruch', art: 'umwandeln', stufe: 'mittel', fen: '6k1/ppp5/8/PPP5/8/8/8/6K1 w - - 0 1', ziel: 4 }),
   Object.freeze({ id: 'entfernter-freibauer', art: 'umwandeln', stufe: 'mittel', fen: '8/5kpp/8/8/P7/6P1/5PKP/8 w - - 0 1', ziel: 5 }),
