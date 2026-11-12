@@ -68,7 +68,8 @@
 .erg-wort { margin: 0; padding: 0 48px; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(46px, 9vmin, 72px);
   letter-spacing: var(--lw-titel); line-height: 1; color: var(--text);
   animation: erg-titel calc(700ms * var(--tempo)) var(--feder-hupf) calc(140ms * var(--tempo)) both; }
-.erg-wort .ausruf { color: var(--gold); }
+/* --gold pur hatte hell 2,24:1 (Kritik R6, B25; grosse Schrift braucht 3:1): zur Textfarbe hin gemischt, bleibt golden */
+.erg-wort .ausruf { color: color-mix(in srgb, var(--gold) 70%, var(--text)); }
 .niederlage .erg-wort { font-size: clamp(30px, 5vmin, 38px); font-weight: 750; letter-spacing: -.025em; animation-name: overlay-ein; }
 .remis .erg-wort { font-size: clamp(36px, 6.5vmin, 52px); }
 .remis .erg-wort::after { content: ""; display: block; width: 44px; height: 4px; margin: 10px auto 0; border-radius: var(--r-pille); background: var(--gold); }

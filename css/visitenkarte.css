@@ -118,9 +118,11 @@
 .st-karte .st-bild svg { width: 88px; height: 88px; }
 .st-name { font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 22px; }
 .st-stufe { font-weight: 800; font-size: 15px; }
-.st-karte[data-stufe="1"] .st-stufe { color: var(--st-bronze); }
+/* Schrift in Stufenfarbe, zur Textfarbe hin gemischt: Bronze pur hatte 4,23:1 hell und 3,82:1 dunkel, Gold pur 2,24:1 hell
+   (Kritik R6, B25; Soll 4,5:1). Die Mischung mit --text wird hell dunkler und dunkel heller, ohne eigene Dunkel-Regel */
+.st-karte[data-stufe="1"] .st-stufe { color: color-mix(in srgb, var(--st-bronze) 80%, var(--text)); }
 .st-karte[data-stufe="2"] .st-stufe { color: var(--text); }
-.st-karte[data-stufe="3"] .st-stufe { color: var(--st-gold); }
+.st-karte[data-stufe="3"] .st-stufe { color: color-mix(in srgb, var(--st-gold) 60%, var(--text)); }
 .st-ziel { font-size: 13px; color: var(--text-2); }
 .st-lohn { font-size: 14px; font-weight: 700; }
 .st-lohn-gold { color: var(--st-gold); }
