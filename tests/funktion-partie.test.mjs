@@ -162,8 +162,9 @@ try {
       pruefe(`${g.name}: Aufgeben (1 s halten) beendet die Partie, das Niederlage-Blatt erscheint`, halten && niederlage && nBlatt.da, { halten, niederlage, ...nBlatt });
       const nKnoepfe = await bedienbar(s, '.ergebnis-overlay.niederlage :is(.erg-knoepfe [data-ziel], .erg-zu, .erg-lobby, .gd-revanche)');
       const nZiele = nKnoepfe.filter(b => b.ok).map(b => b.ziel);
-      pruefe(`${g.name}: Niederlage-Blatt zeigt bedienbar "Zur Analyse", "Nochmal", "Revanche", "Zu den Bots", "Brett ansehen"`,
-        ['analyse', 'nochmal'].every(z => nZiele.includes(z)) && ['erg-zu', 'erg-lobby', 'gd-revanche'].every(c => nZiele.some(z => z.includes(c))), nKnoepfe);
+      // R7 (B13): "Revanche" ersetzt "Nochmal", ein Knopf fuer dasselbe statt zwei
+      pruefe(`${g.name}: Niederlage-Blatt zeigt bedienbar "Zur Analyse", "Revanche", "Zu den Bots", "Brett ansehen" (ohne zweites "Nochmal")`,
+        nZiele.includes('analyse') && !nZiele.includes('nochmal') && ['erg-zu', 'erg-lobby', 'gd-revanche'].every(c => nZiele.some(z => z.includes(c))), nKnoepfe);
       await s.locator('.ergebnis-overlay.niederlage .erg-knoepfe [data-ziel="analyse"]').click({ timeout: 5000 }).catch(() => {});
       const analyse = await klappt(s.waitForSelector('.screen.an-screen', { timeout: 15000 }));
       await warte(1000);
