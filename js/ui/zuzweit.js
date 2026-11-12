@@ -38,6 +38,19 @@ function anzeigeName(n) {
 // K Q R B N, Rochade mit Nullen)
 const sanText = (san) => sanAnzeige(san);
 
+// Figurensatz wirkt sofort (R4, 12.11.2026, dasselbe Muster wie wendeFigurensatzAn in js/ui/partie.js): kommt der
+// Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt
+// der Spieler einen anderen Satz, bekommen die stehenden Figuren den neuen Satz, ohne das Brett neu zu bauen. Neue Figuren
+// (Umwandlung) nimmt das Brett aus brett.figurenPfad; Dateiname je Figur <code>.svg wie in Brett._bild (js/board.js).
+// Ohne detail kein Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto.
+const satzPfad = (d) => { const p = figurenPfad(d); return p ? new URL(p, WURZEL).href : null; };
+function wendeFigurensatzAn(b, d) {
+  const pfad = satzPfad(d);
+  if (!b || !pfad || pfad === b.figurenPfad) return;
+  b.figurenPfad = pfad;
+  for (const img of b.el.querySelectorAll('img.figur[data-figur]')) img.src = pfad + img.dataset.figur + '.svg';
+}
+
 function stil() {
   if (document.querySelector('link[data-zuzweit]')) return;
   const link = document.createElement('link');
@@ -98,6 +111,13 @@ function startblatt(root, app) {
   zeigeUhrSatz();
   form.addEventListener('change', zeigeUhrSatz);
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  // die beiden Koenige folgen dem Figurensatz sofort (wendeFigurensatzAn oben, hier ohne Brett)
+  const koenige = [...s.querySelectorAll('.zz-paar img')];
+  const beiEinstellungen = (e) => {
+    const p = e.detail ? satzPfad(e.detail) : null;
+    if (p) koenige.forEach((img, i) => { img.src = p + (i ? 'bK' : 'wK') + '.svg'; });
+  };
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (startet) return;
@@ -112,7 +132,7 @@ function startblatt(root, app) {
     speichereModulEinstellungen('zuzweit', { ...zuzweit, bedenkzeit });
     app.gehe('partie', { modus: 'zuzweit', zuzweit, tempo: TEMPI[bedenkzeit] || null });
   });
-  return { verlasse() { weg = true; try { kopf.verlasse(); } catch (e) { /* egal */ } } };
+  return { verlasse() { weg = true; window.removeEventListener('schach:einstellungen', beiEinstellungen); try { kopf.verlasse(); } catch (e) { /* egal */ } } };
 }
 
 function partie(root, quelle, app, fortgesetzt) {
@@ -300,6 +320,8 @@ function partie(root, quelle, app, fortgesetzt) {
   const sichern = () => { tick(); speichere(); };
   window.addEventListener('pagehide', sichern);
   document.addEventListener('visibilitychange', sichern);
+  const beiEinstellungen = (e) => { if (e.detail) wendeFigurensatzAn(brett, e.detail); };
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
   speichere(); zeichne(false);
   if (!pruefeEnde() && z.phase === 'spiel' && tempo) uhrTimer = setInterval(tick, 100);
   if (app.test) window.__partie = { z, brett, bereit: true, chess: () => chess, phase: () => z.phase, uhr: { rest: wert } };
@@ -307,6 +329,7 @@ function partie(root, quelle, app, fortgesetzt) {
     if (weg) return;
     sichern(); weg = true; clearInterval(uhrTimer); drehenAnimation?.cancel();
     window.removeEventListener('pagehide', sichern); document.removeEventListener('visibilitychange', sichern);
+    window.removeEventListener('schach:einstellungen', beiEinstellungen);
     brett.zerstoere();
     if (app.test && window.__partie?.z === z) delete window.__partie;
   } };
