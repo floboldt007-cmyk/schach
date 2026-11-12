@@ -170,7 +170,7 @@ try {
     const fehler = [];
     s.on('pageerror', (e) => fehler.push(e.message));
     await s.goto(BASIS);
-    await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 30000 });
+    await s.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen, null, { timeout: 30000 });
     await warte(1200);
     for (const [ziel, screen, params] of ZIELE) {
       if (NUR && !NUR.includes(ziel)) continue;
