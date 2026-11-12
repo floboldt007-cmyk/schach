@@ -475,6 +475,26 @@ try {
       && !handy.beispiel && handy.klein.length === 0, handy);
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-390-${modus}.png`) });
   }
+  // W-lobby (R6 B21): am PC stand "Partie suchen" 29 px tiefer als "Duell suchen" (365 gegen 336). Nebeneinander sind beide
+  // Karten gleich hoch und beide Knoepfe sitzen am Kartenfuss, also auf gleicher Hoehe; untereinander sitzt der Knopf ebenfalls
+  // am Fuss. Auf allen Geraeten, hell und dunkel, ohne Querscrollen.
+  for (const [geraet, width, height] of [['iPhone 13', 390, 844], ['iPhone SE', 375, 667], ['iPad hoch', 820, 1180], ['iPad quer', 1180, 820],
+    ['PC', 1280, 720], ['PC gross', 1920, 1080]]) for (const modus of ['hell', 'dunkel']) {
+    await seite.setViewportSize({ width, height }); await seite.evaluate(m => window.__app.setzeEinstellungen({ modus: m }), modus);
+    await seite.waitForFunction(m => document.documentElement.dataset.modus === m, modus);
+    await seite.waitForTimeout(80);
+    const t = await seite.evaluate(() => [...document.querySelectorAll('.on-tueren > .on-tuer')].map((k) => {
+      const r = k.getBoundingClientRect(), b = [...k.querySelectorAll('.on-tuer-knopf')].find((x) => x.getClientRects().length).getBoundingClientRect();
+      const pad = parseFloat(getComputedStyle(k).paddingBottom);
+      return { top: Math.round(r.top), unten: Math.round(r.bottom), knopfOben: Math.round(b.top), fuss: Math.round(r.bottom - pad - b.bottom),
+        drin: b.left >= r.left - 1 && b.right <= r.right + 1 };
+    }).concat([{ quer: document.documentElement.scrollWidth <= innerWidth }]));
+    const [a, d, { quer }] = t, nebeneinander = Math.abs(a.top - d.top) <= 1;
+    pruefe(`W-lobby ${geraet} ${modus}: Knoepfe von Partie und Duell am Kartenfuss${nebeneinander ? ', auf gleicher Hoehe' : ''}, kein Ueberlauf`,
+      quer && a.drin && d.drin && Math.abs(a.fuss) <= 1 && Math.abs(d.fuss) <= 1
+      && (!nebeneinander || (Math.abs(a.knopfOben - d.knopfOben) <= 1 && Math.abs(a.unten - d.unten) <= 1)), { a, d, quer, nebeneinander });
+    if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-${width}-${modus}.png`) });
+  }
   // G-005 AC-06: kein Springen beim Laden. iPhone SE, die Liga-Antwort kommt 700 ms spaet; gezaehlt wird jede Verschiebung
   // ohne Eingabe davor (Layout-Shift-API, wie der Web-Vital CLS). Vorher 0,167: Liga-Streifen und Suchkarte wuchsen erst mit der Antwort.
   {
