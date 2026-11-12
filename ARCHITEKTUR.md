@@ -1909,7 +1909,8 @@ gegen Fremde kommt Etappe 1a (Edge Function `online-zug`, die jeden Zug nachrech
   Fehlversuche von vor mehr als 2 Tagen werden geloescht und, wenn `daten-schema.sql` eingespielt ist, Zaehler der
   Mengenbremse, die aelter als 48 Stunden sind (`daten_zaehler_aufraeumen`, dynamisch aufgerufen). `pg_cron` ist nicht
   eingerichtet: Ohne jede Aktivitaet auf dem Server raeumt niemand auf.
-- **Haengende Partien** (`online_haengt`): mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug, ohne Uhr 7 Tage ohne Zug
+- **Haengende Partien** (`online_haengt`): mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug (gewertete Partien nach
+  `ranked_haengt_s`, 30 s, aus `kronen_konstanten` in `zwei-ligen-schema.sql`), ohne Uhr 7 Tage ohne Zug
   (vorlaeufig, Flo entscheidet: `design/runde4/ENTSCHEIDUNGEN.md` Abschnitt 5 Nr. 16).
   Ab dem 2. Halbzug entscheidet bei Partien mit Uhr die Uhr. Geprueft auch in `online_uhr_pruefen` (Zug, Remis,
   Aufgabe, `online_pruefe_zeit`); ein verspaeteter Zug in einer haengenden Partie verfaellt.
@@ -1941,7 +1942,9 @@ die Knoepfe `[data-online="strittig"]` und `[data-online="aufgeben"]` bleiben be
 `ONLINE_PARTIE_BEENDET`), bleibt nur die Meldung des Servers, die Karte zeigt "nicht nachvollziehbar". Ein gemeldetes
 Ende (`matt`, `patt`, `material`, `wiederholung`, `50-zuege`) wird mit chess.js nachgeprueft; stimmt es nicht oder liegt
 ein Widerspruch vor, zeigt die Ergebniskarte "Ergebnis nicht nachvollziehbar" statt Sieg oder Niederlage. Mit Uhr vor dem
-2. Halbzug fragt die Oberflaeche nach 10 Minuten ohne Zug hoechstens einmal je Minute `pruefeZeit`.
+2. Halbzug fragt die Oberflaeche nach 10 Minuten ohne Zug hoechstens einmal je Minute `pruefeZeit`, bei gewerteten
+Partien nach 31 s (eine Sekunde nach `ranked_haengt_s`) und danach hoechstens alle 5 s (Vertrag:
+`tests/online-haengt-vertrag.test.mjs`).
 
 ## Anti-Cheat Etappe 1a, Teil 1 (Edge Function `online-zug`)
 
