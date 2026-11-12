@@ -65,10 +65,10 @@ try {
     const b = [...document.querySelectorAll(sel + ' img.figur')].map(i => i.getAttribute('src'));
     return { n: b.length, blau: b.filter(s => /\/blaupause\//.test(s)).length };
   }, sel);
-  const alleBlau = (sel, ms = 4000) => seite.waitForFunction((sel) => {
+  const alleBlau = (sel) => seite.waitForFunction((sel) => {
     const b = [...document.querySelectorAll(sel + ' img')];
     return b.length > 0 && b.every(i => /\/blaupause\//.test(i.getAttribute('src')));
-  }, sel, { timeout: ms }).catch(() => {});
+  }, sel, { timeout: 4000 }).catch(() => {});
   const warteMerker = () => seite.waitForFunction(() => /erfinder-titel/.test(localStorage.getItem('schach-arena:konto:sonderstuecke') || ''), null, { timeout: 8000 }).catch(() => {});
   const wechsel = async (figuren) => { await seite.evaluate((f) => window.__app.setzeEinstellungen({ figuren: f }), figuren); await seite.waitForTimeout(100); };
 
