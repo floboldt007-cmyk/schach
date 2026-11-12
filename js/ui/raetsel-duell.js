@@ -71,6 +71,25 @@ function kiBild(elo) {
 }
 // Intro nur einmal je Duell (auch nach Neuladen in derselben Sitzung), wie die Online-Partie
 const INTRO_SCHLUESSEL = 'schach-arena:raetsel-duell:intro';
+// Laufendes Duell ueber Neuladen (R7 12.11.2026, B6): nur die Kennung und die Reihe (reine Anzeige) in diesem Tab. Stand,
+// Aufgabe und Uhr kommen nach dem Neuladen wieder vom Server (duell_stand: ende_am, raetsel.bisher), die Zeit laeuft dort
+// weiter. Nach dem gezeigten Ergebnis oder einem unbekannten Duell wird der Eintrag vergessen.
+const LAUF_SCHLUESSEL = 'schach-arena:raetsel-duell:laufend';
+const LAUF_MAX_MS = 15 * 60 * 1000;
+const LAUF_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function merkeLauf(id, reihe) {
+  try { sessionStorage.setItem(LAUF_SCHLUESSEL, JSON.stringify({ id, reihe, um: Date.now() })); } catch (e) { /* nur Komfort */ }
+}
+function ladeLauf() {
+  let x = null;
+  try { x = JSON.parse(sessionStorage.getItem(LAUF_SCHLUESSEL) || 'null'); } catch (e) { x = null; }
+  if (!x || typeof x.id !== 'string' || !LAUF_UUID.test(x.id) || !(Date.now() - Number(x.um) < LAUF_MAX_MS)) return null;
+  const reihe = Array.isArray(x.reihe) ? x.reihe.filter((r) => r === 'g' || r === 'r').slice(0, 60) : [];
+  return { id: x.id, reihe };
+}
+function vergissLauf(id) {
+  try { const x = JSON.parse(sessionStorage.getItem(LAUF_SCHLUESSEL) || 'null'); if (!id || !x || x.id === id) sessionStorage.removeItem(LAUF_SCHLUESSEL); } catch (e) { /* egal */ }
+}
 const ringSvg = (klasse) => `<svg class="${klasse}" viewBox="0 0 100 100" aria-hidden="true"><circle class="rd-ring-spur" cx="50" cy="50" r="44"/>`
   + `<circle class="rd-ring-rest" cx="50" cy="50" r="44" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="0"/></svg>`;
 
@@ -261,7 +280,11 @@ export function zeige(root, params, app) {
 
   function starteDuell(id) {
     aufraeumen();
-    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe: [], gesehen: false });
+    // dasselbe Duell nach dem Neuladen (oder Link): die Reihe dieses Tabs bleibt, ein neues Duell beginnt leer
+    const alt = ladeLauf();
+    const reihe = alt && alt.id === id ? alt.reihe : [];
+    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe, gesehen: false });
+    merkeLauf(id, reihe);
     phase('vorlauf');
     rumpf.innerHTML = `<div class="rd-spiel">
         ${seiteHtml('gegner')}
@@ -276,7 +299,8 @@ export function zeige(root, params, app) {
     hole();
     tick();
   }
-  const zeichneReihe = () => { const ort = rumpf.querySelector('.rd-reihe-ort'); if (ort) ort.innerHTML = reiheHtml(); };
+  // nach dem gezeigten Ende (eine spaete Zug-Antwort) nicht wieder merken, sonst kaeme das Ergebnis beim Neuladen erneut
+  const zeichneReihe = () => { if (d.id && s.dataset.phase !== 'beendet') merkeLauf(d.id, d.reihe); const ort = rumpf.querySelector('.rd-reihe-ort'); if (ort) ort.innerHTML = reiheHtml(); };
 
   // Abfrage alle 1 s: Gegner live, Ende; das eigene Raetsel nur, wenn gerade kein Zug unterwegs ist
   async function hole() {
@@ -440,6 +464,8 @@ export function zeige(root, params, app) {
   // ---------- Ende ----------
   function zeigeEnde(st) {
     aufraeumen();
+    // das Ergebnis ist gezeigt: ein weiteres Neuladen fuehrt zum Start
+    vergissLauf(d.id);
     phase('beendet');
     const g = st.gegner || { geloest: 0 };
     const erg = st.ergebnis || 'remis';
@@ -470,9 +496,25 @@ export function zeige(root, params, app) {
     if (tempo() > 0) anim(rumpf.querySelector('.rd-ende'), [{ opacity: 0, transform: 'translateY(16px) scale(.97)' }, { opacity: 1, transform: 'none' }], { d: 420, k: 'weich' });
   }
 
-  zeigeStart();
-  if (params && params.code && server.angemeldet()) tritteBei(params.code);
-  else if (params && params.suchen && server.angemeldet()) starteSuche();
+  // Beim Oeffnen (auch nach dem Neuladen): ein Code-Link tritt bei (der Server gibt einem Teilnehmer sein Duell zurueck);
+  // sonst geht ein in diesem Tab laufendes Duell vor, auch vor params.suchen aus dem Verlaufseintrag, das sonst eine neue
+  // Suche startete. Kennt der Server das Duell nicht (mehr) oder ist es noch offen, gilt der Start wie bisher; ohne
+  // Antwort (offline) bleibt es beim Duell, die Abfrage versucht es weiter.
+  const lauf = server.angemeldet() && !(params && params.code) ? ladeLauf() : null;
+  const oeffne = () => {
+    zeigeStart();
+    if (params && params.code && server.angemeldet()) tritteBei(params.code);
+    else if (params && params.suchen && server.angemeldet()) starteSuche();
+  };
+  if (lauf) {
+    (async () => {
+      let st;
+      try { st = await server.stand(lauf.id); } catch (e) { st = undefined; }
+      if (weg) return;
+      if (st === undefined || (st && st.status !== 'offen')) starteDuell(lauf.id);
+      else { vergissLauf(lauf.id); oeffne(); }
+    })();
+  } else oeffne();
   return {
     verlasse() {
       weg = true;
