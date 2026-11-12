@@ -5,16 +5,17 @@
 // waehlbar, weil das Konto das Sonderstueck besitzt (Attrappe von /rest/v1/sonderstuecke wie tests/online-ui.test.mjs,
 // dazu der gemerkte Stand im Speicher wie tests/raetsel-duell-ui.test.mjs). Netzwerk ausschliesslich simuliert.
 //
-//   node tests/funktion-shop-skin.test.mjs                      Probe (Zu zweit und Lektion melden sich als ROT-ERWARTET)
-//   PROBE_STRENG=1 node tests/funktion-shop-skin.test.mjs       auch die harten Pruefungen zaehlen (fuer die Reparatur R4-skin2)
+//   node tests/funktion-shop-skin.test.mjs                      Probe (harte Pruefungen melden sich als ROT-ERWARTET)
+//   PROBE_STRENG=1 node tests/funktion-shop-skin.test.mjs       auch die harten Pruefungen zaehlen (fuer eine Reparatur)
 //   PROBE_SKIN=neon node tests/funktion-shop-skin.test.mjs      ein Labor-Satz (nur Erfinder, js/labor.js) statt Blaupause
 //   node tests/funktion-shop-skin.test.mjs --bilder=<ordner>    je Ansicht ein Bild (<ansicht>.png)
 //   PORT=9631 node tests/funktion-shop-skin.test.mjs            eigener Port (Standard 8981)
 //
 // Je Ansicht zwei Pruefungen: der gewaehlte Satz steht im Brett, und ein Wechsel bei offener Ansicht wirkt sofort (spaeter
-// Erfinder-Status, R3/R4). Harte Pruefungen (hart: true): Zu zweit und Lektion, dort baut so/R4-skin2 die Reparatur. Der
-// Wechsel im Raetsel-Duell (Befund F-shop) ist seit der Reparatur F-duell streng. Ohne PROBE_STRENG=1
-// erscheinen sie rot als "ROT-ERWARTET" und blockieren nichts (tests/alle.mjs zaehlt nur "FEHLER" und den Exitcode).
+// Erfinder-Status, R3/R4); im Raetsel-Duell zusaetzlich Koordinaten und Auto-Dame (F-duell2). Seit den Reparaturen
+// R4-skin2 (Zu zweit, Lektion) und F-duell (Raetsel-Duell) ist keine Pruefung mehr hart. Fuer einen neuen Befund ohne
+// Reparatur: pruefe(..., { hart: true }); ohne PROBE_STRENG=1 erscheint er rot als "ROT-ERWARTET" und blockiert nichts
+// (tests/alle.mjs zaehlt nur "FEHLER" und den Exitcode).
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
@@ -113,9 +114,7 @@ const satzAuf = (s, sel) => s.evaluate(({ sel, skin }) => {
 }, { sel, skin: SKIN });
 const imSatz = r => r.da && r.n > 0 && r.imSatz === r.n && r.geladen === r.n;
 async function bild(s, name) { if (BILDER) await s.screenshot({ path: path.join(BILDER, name + '.png') }).catch(e => console.log('Bild ' + name + ': ' + e.message)); }
-// hartWechsel: nur die Wechsel-Pruefung ist hart (frei fuer eine Ansicht, deren Satz-Wechsel noch keine Reparatur hat;
-// das Raetsel-Duell war so bis F-duell 12.11., seither streng)
-async function ansicht(s, name, sel, { hart = false, hartWechsel = hart } = {}) {
+async function ansicht(s, name, sel) {
   // Figuren erscheinen, sobald das Brett steht; der Satz kann noch nachkommen (Einstellungen spaet), darum bis 4 s warten
   await s.waitForFunction(({ sel, skin }) => {
     const i = [...document.querySelectorAll(sel + ' img.figur')];
@@ -125,7 +124,7 @@ async function ansicht(s, name, sel, { hart = false, hartWechsel = hart } = {}) 
   await bild(s, name);
   const gut = imSatz(r);
   ergebnis.push({ ansicht: name, geht: gut, ...r });
-  pruefe(`${name}: das Brett zeigt den gewaehlten Satz "${SKIN}" (alle Figuren, Bilder geladen)`, gut, r, { hart });
+  pruefe(`${name}: das Brett zeigt den gewaehlten Satz "${SKIN}" (alle Figuren, Bilder geladen)`, gut, r);
   // Wechsel bei offener Ansicht (spaeter Erfinder-Status oder neue Wahl, R3/R4): Standard und zurueck, ohne Neuladen
   await s.evaluate(() => window.__app.setzeEinstellungen({ figuren: 'cburnett' }));
   await s.waitForTimeout(150);
@@ -134,7 +133,7 @@ async function ansicht(s, name, sel, { hart = false, hartWechsel = hart } = {}) 
   await s.waitForTimeout(150);
   const zurueck = await satzAuf(s, sel);
   pruefe(`${name}: ein Wechsel bei offener Ansicht wirkt sofort (Standard, dann wieder "${SKIN}")`,
-    standard.n > 0 && standard.imSatz === 0 && imSatz(zurueck), { standard, zurueck }, { hart: hartWechsel });
+    standard.n > 0 && standard.imSatz === 0 && imSatz(zurueck), { standard, zurueck });
   ergebnis.at(-1).wechsel = standard.n > 0 && standard.imSatz === 0 && imSatz(zurueck);
   return r;
 }
@@ -240,7 +239,7 @@ try {
   await s.getByRole('button', { name: 'Los', exact: true }).click();
   if (await s.getByRole('button', { name: 'Neue Partie', exact: true }).isVisible().catch(() => false)) await s.getByRole('button', { name: 'Neue Partie', exact: true }).click();
   await s.waitForFunction(() => window.__partie?.z?.modus === 'zuzweit' && document.querySelectorAll('.zz-brett img.figur').length === 32, null, { timeout: 15000 }).catch(() => {});
-  await ansicht(s, 'zu-zweit', '.zz-brett', { hart: true });
+  await ansicht(s, 'zu-zweit', '.zz-brett');
 
   // 6) Raetsel-Duell (KI-Duell nach kurzer Suche, Brett im Vorlauf)
   await s.evaluate(() => window.__app.gehe('raetsel-duell'));
@@ -248,11 +247,25 @@ try {
   await s.locator('.rd-suchen').click();
   await s.waitForFunction(() => document.querySelectorAll('.screen.raetsel-duell .rd-brett img.figur').length > 0, null, { timeout: 15000 }).catch(() => {});
   await ansicht(s, 'raetsel-duell', '.screen.raetsel-duell .rd-brett');
+  // Koordinaten und Auto-Dame wirken bei offenem Duell ebenso sofort (F-duell2): aus, dann wieder an. Auto-Dame ist nur am
+  // Brett-Objekt sichtbar (window.__duell, nur mit ?test)
+  const duellBrett = () => s.evaluate(() => {
+    const b = window.__duell?.brett?.();
+    return { ohneKoordinaten: b ? b.el.classList.contains('ohne-koordinaten') : null, autoDame: b ? b.autoDame : null };
+  });
+  await s.evaluate(() => window.__app.setzeEinstellungen({ koordinaten: false, autoDame: false }));
+  await s.waitForTimeout(150);
+  const aus = await duellBrett();
+  await s.evaluate(() => window.__app.setzeEinstellungen({ koordinaten: true, autoDame: true }));
+  await s.waitForTimeout(150);
+  const an = await duellBrett();
+  pruefe('raetsel-duell: Koordinaten und Auto-Dame wirken bei offenem Duell sofort (aus, dann wieder an)',
+    aus.ohneKoordinaten === true && aus.autoDame === false && an.ohneKoordinaten === false && an.autoDame === true, { aus, an });
 
   // 7) Meisterschule-Lektion
   await s.evaluate(() => window.__app.gehe('lektion', { id: 'skandinavisch' }));
   await s.waitForFunction(() => document.querySelectorAll('.ls-brett img.figur').length > 0, null, { timeout: AUFBAU_MS }).catch(() => {});
-  await ansicht(s, 'lektion', '.ls-brett', { hart: true });
+  await ansicht(s, 'lektion', '.ls-brett');
 
   pruefe('Kein Kauf: der Shop hat nur Editionen gelesen, keine Kauf-Anfrage', !editionAnfragen.some(b => Object.keys(b).length));
   pruefe('Keine Seitenfehler', fehler.length === 0, fehler);
