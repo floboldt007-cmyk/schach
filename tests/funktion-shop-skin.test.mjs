@@ -137,6 +137,34 @@ async function ansicht(s, name, sel) {
   ergebnis.at(-1).wechsel = standard.n > 0 && standard.imSatz === 0 && imSatz(zurueck);
   return r;
 }
+
+// Gleichheits-Liste (F-einst 12.11.2026): was die Bot-Partie bei schach:einstellungen sofort uebernimmt (js/ui/partie.js
+// beiEinstellungen: Figurensatz, Koordinaten, Koordinaten-Lage, Auto-Dame, Steuerung, Pfeile), uebernimmt jede Ansicht mit
+// Brett bei offener Ansicht. Den Figurensatz misst ansicht(); hier die uebrigen fuenf, gelesen am Brett-Objekt der Ansicht
+// (Test-Haken mit ?test: window.__partie, __duell, __lektion), weil Auto-Dame, Steuerung und Pfeile kein DOM-Merkmal haben.
+// Je Einstellung: umstellen, dann zuruecksetzen; live heisst, das Brett folgt beiden Schritten.
+const UMGESTELLT = { koordinaten: false, koordLage: 'rand', autoDame: true, steuerung: 'tippen', pfeile: false };
+const GRUNDSTAND = { koordinaten: true, koordLage: 'ecke', autoDame: false, steuerung: 'beides', pfeile: true };
+const liveListe = [];
+async function brettLive(s, name, haken) {
+  const lies = () => s.evaluate((haken) => {
+    const b = haken === 'duell' ? window.__duell?.brett?.() : haken === 'lektion' ? window.__lektion?.brett?.() : window.__partie?.brett;
+    return b ? { koordinaten: !b.el.classList.contains('ohne-koordinaten'), koordLage: b.koordLage(), autoDame: b.autoDame,
+      steuerung: b.steuerung, pfeile: b.pfeileErlaubt } : null;
+  }, haken);
+  await s.evaluate(e => window.__app.setzeEinstellungen(e), UMGESTELLT);
+  await s.waitForTimeout(150);
+  const um = await lies();
+  await s.evaluate(e => window.__app.setzeEinstellungen(e), GRUNDSTAND);
+  await s.waitForTimeout(150);
+  const zu = await lies();
+  const zeile = { ansicht: name, figurensatz: ergebnis.find(r => r.ansicht === name)?.wechsel === true };
+  for (const k of Object.keys(UMGESTELLT)) {
+    zeile[k] = !!um && !!zu && um[k] === UMGESTELLT[k] && zu[k] === GRUNDSTAND[k];
+    pruefe(`${name}: ${k} wirkt bei offener Ansicht sofort (umgestellt, dann zurueck)`, zeile[k], { um: um?.[k], zurueck: zu?.[k], soll: [UMGESTELLT[k], GRUNDSTAND[k]] });
+  }
+  liveListe.push(zeile);
+}
 // "Ich" zeigt beim Start gebuchte Stufen als Freischalt-Moment; wegtippen wie ein Spieler (tests/sammlung.test.mjs)
 async function momenteWeg(s) {
   for (let i = 0; i < 12 && await s.locator('.st-moment .st-weiter').count(); i++) { await s.locator('.st-moment .st-weiter').first().click(); await s.waitForTimeout(250); }
@@ -226,6 +254,7 @@ try {
   await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
   await s.waitForFunction((sel) => document.querySelectorAll(sel + ' img.figur').length === 32, BOT, { timeout: AUFBAU_MS }).catch(() => {});
   await ansicht(s, 'bot-partie', BOT);
+  await brettLive(s, 'bot-partie', 'partie');   // Referenz: die Bot-Partie uebernimmt alles
 
   // 4) Online-Partie (laufende Partie aus der Attrappe, direkt geoeffnet wie tests/online-ui.test.mjs)
   await s.evaluate(id => window.__app.gehe('online', { partieId: id }), ONLINE.id);
@@ -240,6 +269,7 @@ try {
   if (await s.getByRole('button', { name: 'Neue Partie', exact: true }).isVisible().catch(() => false)) await s.getByRole('button', { name: 'Neue Partie', exact: true }).click();
   await s.waitForFunction(() => window.__partie?.z?.modus === 'zuzweit' && document.querySelectorAll('.zz-brett img.figur').length === 32, null, { timeout: 15000 }).catch(() => {});
   await ansicht(s, 'zu-zweit', '.zz-brett');
+  await brettLive(s, 'zu-zweit', 'partie');
 
   // 6) Raetsel-Duell (KI-Duell nach kurzer Suche, Brett im Vorlauf)
   await s.evaluate(() => window.__app.gehe('raetsel-duell'));
@@ -247,25 +277,13 @@ try {
   await s.locator('.rd-suchen').click();
   await s.waitForFunction(() => document.querySelectorAll('.screen.raetsel-duell .rd-brett img.figur').length > 0, null, { timeout: 15000 }).catch(() => {});
   await ansicht(s, 'raetsel-duell', '.screen.raetsel-duell .rd-brett');
-  // Koordinaten und Auto-Dame wirken bei offenem Duell ebenso sofort (F-duell2): aus, dann wieder an. Auto-Dame ist nur am
-  // Brett-Objekt sichtbar (window.__duell, nur mit ?test)
-  const duellBrett = () => s.evaluate(() => {
-    const b = window.__duell?.brett?.();
-    return { ohneKoordinaten: b ? b.el.classList.contains('ohne-koordinaten') : null, autoDame: b ? b.autoDame : null };
-  });
-  await s.evaluate(() => window.__app.setzeEinstellungen({ koordinaten: false, autoDame: false }));
-  await s.waitForTimeout(150);
-  const aus = await duellBrett();
-  await s.evaluate(() => window.__app.setzeEinstellungen({ koordinaten: true, autoDame: true }));
-  await s.waitForTimeout(150);
-  const an = await duellBrett();
-  pruefe('raetsel-duell: Koordinaten und Auto-Dame wirken bei offenem Duell sofort (aus, dann wieder an)',
-    aus.ohneKoordinaten === true && aus.autoDame === false && an.ohneKoordinaten === false && an.autoDame === true, { aus, an });
+  await brettLive(s, 'raetsel-duell', 'duell');
 
   // 7) Meisterschule-Lektion
   await s.evaluate(() => window.__app.gehe('lektion', { id: 'skandinavisch' }));
   await s.waitForFunction(() => document.querySelectorAll('.ls-brett img.figur').length > 0, null, { timeout: AUFBAU_MS }).catch(() => {});
   await ansicht(s, 'lektion', '.ls-brett');
+  await brettLive(s, 'lektion', 'lektion');
 
   pruefe('Kein Kauf: der Shop hat nur Editionen gelesen, keine Kauf-Anfrage', !editionAnfragen.some(b => Object.keys(b).length));
   pruefe('Keine Seitenfehler', fehler.length === 0, fehler);
@@ -273,5 +291,10 @@ try {
 finally { await browser?.close(); await new Promise(r => server.close(r)); }
 console.log('\nJe Ansicht (Satz ' + SKIN + '):');
 for (const r of ergebnis) console.log(`  ${r.geht ? 'geht      ' : 'geht nicht'}  ${r.ansicht}  (${r.imSatz}/${r.n} im Satz, ${r.geladen} geladen, Pfade ${r.beispiel.join(' ')}; Wechsel bei offener Ansicht ${r.wechsel ? 'geht' : 'geht nicht'})`);
+if (liveListe.length) {
+  const spalten = ['figurensatz', ...Object.keys(UMGESTELLT)];
+  console.log('\nEinstellung x Ansicht, live bei offener Ansicht (ja/nein):\n  ' + 'ansicht'.padEnd(15) + spalten.map(k => k.padEnd(13)).join(''));
+  for (const z of liveListe) console.log('  ' + z.ansicht.padEnd(15) + spalten.map(k => (z[k] ? 'ja' : 'nein').padEnd(13)).join(''));
+}
 if (rotErwartet) console.log(`\n${rotErwartet} harte Pruefung(en) ROT-ERWARTET (zaehlen erst mit PROBE_STRENG=1): ${rot.join(' | ')}`);
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;

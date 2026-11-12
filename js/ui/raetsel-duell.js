@@ -17,6 +17,7 @@
 // Mit ?test: window.__duell = { brett() -> Brett | null } (nur lesen; z. B. autoDame, das kein DOM-Merkmal hat).
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
+import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
@@ -90,25 +91,15 @@ export function zeige(root, params, app) {
   const stoppeUhren = () => { for (const u of uhren) clearTimeout(u); uhren.clear(); };
   let suche = null;
   let brett = null;
-  // Figurensatz wirkt sofort (F-duell 12.11.2026, dasselbe Muster wie wendeFigurensatzAn in js/ui/partie.js): kommt der
-  // Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt
-  // der Spieler einen anderen Satz, bekommen die stehenden Figuren den neuen Satz, ohne das Brett neu zu bauen; das naechste
-  // Duell auf diesem Bildschirm baut sein Brett mit brettEinst. Dateiname je Figur <code>.svg wie in Brett._bild (js/board.js).
-  // Koordinaten und Auto-Dame ebenso (F-duell2, wie beiEinstellungen in js/ui/partie.js; Vorgaben wie beim Aufbau unten).
-  // Ohne detail kein Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto.
+  // Brett-Einstellungen wirken sofort wie in der Bot-Partie (F-duell Figurensatz, F-duell2 Koordinaten und Auto-Dame,
+  // F-einst alle): kommt der Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen
+  // dann neu an) oder stellt der Spieler etwas um, folgt das stehende Brett ohne Neubau (js/ui/brett-einstellungen.js); das
+  // naechste Duell auf diesem Bildschirm baut sein Brett mit brettEinst. Ohne detail bleibt alles, wie es ist.
   let brettEinst = einst;
   const beiEinstellungen = (e) => {
     if (!e.detail) return;
     brettEinst = e.detail;
-    if (brett) {
-      brett.koordinaten(e.detail.koordinaten !== false);
-      brett.setzeAutoDame(e.detail.autoDame !== false);
-    }
-    const p = figurenPfad(e.detail);
-    const pfad = p ? new URL(p, WURZEL).href : null;
-    if (!brett || !pfad || pfad === brett.figurenPfad) return;
-    brett.figurenPfad = pfad;
-    for (const img of brett.el.querySelectorAll('img.figur[data-figur]')) img.src = pfad + img.dataset.figur + '.svg';
+    wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
   };
   window.addEventListener('schach:einstellungen', beiEinstellungen);
   const testHaken = app && app.test ? { brett: () => brett } : null;
@@ -280,7 +271,7 @@ export function zeige(root, params, app) {
         <div class="rd-reihe-ort">${reiheHtml()}</div>
       </div>`;
     brett = new Brett(rumpf.querySelector('.rd-brett'), {
-      ausrichtung: 'w', figurenPfad: new URL(figurenPfad(brettEinst), WURZEL).href, beiZug, koordinaten: brettEinst.koordinaten !== false, autoDame: brettEinst.autoDame !== false,
+      ausrichtung: 'w', figurenPfad: new URL(figurenPfad(brettEinst), WURZEL).href, beiZug, ...brettOptionen(brettEinst),
     });
     hole();
     tick();
