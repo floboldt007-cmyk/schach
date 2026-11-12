@@ -587,6 +587,9 @@ async function browserTeil(browser) {
   const zworte = await zw.seite.evaluate(() => [...document.querySelectorAll('.dialog-ort .dialog-knoepfe button')].map((b) => b.textContent));
   pruefe('Ein Wort am Sonntag: kein falsches Wort ist das Motiv eines Teils', zworte.length === 3 && zworte.includes('Matt') && !zworte.includes('Grundreihe'), zworte);
   await zw.seite.keyboard.press('Escape');
+  // Escape klappt den Dialog zu (200 ms .dialog-ort.weg, durchklickbar). Erst wenn er weg ist, den naechsten oeffnen,
+  // sonst stehen zwei Dialoge mit denselben Knoepfen im DOM.
+  pruefe('Escape schliesst den Wort-Dialog', await zw.seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false));
   const falschVor = await zw.seite.evaluate(() => window.__funken.stand().gesamt);
   await zw.seite.locator('.rs-ende-knoepfe button', { hasText: 'Ein Wort' }).click();
   await zw.seite.locator('.dialog-ort .dialog-knoepfe button', { hasText: zworte.find((w) => w !== 'Matt') }).click();
