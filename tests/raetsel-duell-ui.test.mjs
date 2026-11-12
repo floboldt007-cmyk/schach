@@ -436,6 +436,75 @@ async function nebenwege(browser) {
   }
 }
 
+// R7 (12.11.2026, Gesamtdurchgang B6 "geht nicht"): Neuladen waehrend eines laufenden Duells fuehrt zurueck ins Duell,
+// mit derselben Aufgabe, demselben Stand (auch halb geloest) und der Restzeit vom Server (nie zurueck auf 3:00, sonst
+// waere Neuladen ein Zeit-Trick), ohne neue Suche. Ist das Duell inzwischen beendet, kommt das Ergebnis statt des Starts;
+// danach (und fuer ein neues Duell) wieder der Start.
+async function neuladen(browser) {
+  gruppe = 'Neuladen im Duell';
+  const srv = neuerServer({ vorlaufMs: 300 });
+  const p = await seite(browser, { breite: 390, hoehe: 844, srv, rpc: (name, daten) => {
+    if (name === 'duell_suche_start' || name === 'duell_suche_stand') return {};
+    if (name === 'duell_suche_ende') { if (daten && daten.ki === true) { srv.anlegen(); return { duell: DUELL }; } return {}; }
+    return undefined;
+  } });
+  const { s } = p;
+  const sek = () => s.evaluate(() => { const [m, x] = (document.querySelector('.rd-seite[data-wer="ich"] .rd-uhr')?.textContent || '9:99').split(':').map(Number); return m * 60 + x; });
+  const lage = () => s.evaluate(() => ({ phase: document.querySelector('.screen.raetsel-duell')?.dataset.phase || null,
+    nr: document.querySelector('.rd-nr')?.textContent || '', g8: !!document.querySelector('.rd-brett img.figur[data-feld="g8"]'),
+    geloest: (document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest')?.textContent || '').split(' ')[0],
+    reihe: [...document.querySelectorAll('.rd-spiel .rd-reihe li')].map((li) => li.dataset.art || '-').slice(0, 4).join(''), hash: location.hash }));
+  try {
+    await s.waitForSelector('.screen.raetsel-duell[data-phase="start"] .rd-suchen', { timeout: 30000 });
+    // ueber die Online-Tuer (params.suchen): der Verlaufseintrag traegt suchen, Neuladen darf trotzdem keine neue Suche starten
+    await s.evaluate(() => window.__app.gehe('raetsel-duell', { suchen: true }));
+    await s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"]', { timeout: 8000 });
+    await warteBis(s, () => /1/.test(document.querySelector('.rd-nr')?.textContent || ''));
+    await zieh(s, 'a1a8');
+    await warteBis(s, () => document.querySelector('.screen.raetsel-duell').dataset.seite === 'b');
+    await zieh(s, 'b8b1');
+    await warteBis(s, () => document.querySelector('.screen.raetsel-duell').dataset.seite === 'w' && /3/.test(document.querySelector('.rd-nr').textContent));
+    // Raetsel 3 halb: erster Zug richtig, die Gegenantwort Kg8 steht
+    await zieh(s, 'b5b7');
+    await warteBis(s, () => !!document.querySelector('.rd-brett img.figur[data-feld="g8"]'));
+    await warte(1100);
+    const vorher = { ...(await lage()), sek: await sek() };
+    const suchenVorher = p.aufrufe.filter((a) => a.name === 'duell_suche_start').length;
+
+    await s.reload();
+    await s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"] .rd-brett .feld', { timeout: 15000 });
+    await warteBis(s, () => !!document.querySelector('.rd-brett img.figur[data-feld="g8"]') && /3/.test(document.querySelector('.rd-nr')?.textContent || ''));
+    await warte(300);
+    const nachher = { ...(await lage()), sek: await sek() };
+    pruefe('Neuladen: zurueck im laufenden Duell, Raetsel 3 halb geloest (Kg8 steht), 2 geloest, Reihe gruen-gruen',
+      nachher.phase === 'laeuft' && /3/.test(nachher.nr) && nachher.g8 && nachher.geloest === '2' && nachher.reihe === 'gg--', { vorher, nachher });
+    pruefe('Neuladen: Restzeit nicht groesser als vorher (Uhr vom Server, kein Zuruecksetzen auf 3:00)',
+      nachher.sek <= vorher.sek && nachher.sek < 180, { vorher: vorher.sek, nachher: nachher.sek });
+    pruefe('Neuladen: keine neue Gegnersuche', p.aufrufe.filter((a) => a.name === 'duell_suche_start').length === suchenVorher,
+      p.aufrufe.filter((a) => /^duell_suche/.test(a.name)).map((a) => a.name));
+    // weiterspielen nach dem Neuladen: der zweite Zug von Raetsel 3 geht an denselben Server-Stand
+    await zieh(s, 'a6a8');
+    await warteBis(s, () => /^3 /.test(document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent));
+    pruefe('Nach dem Neuladen: Raetsel 3 fertig loesbar, Zaehler 3', srv.geloest === 3);
+
+    // Ende waehrend des Neuladens: Abfrage anhalten, damit die Seite das Ende nicht vorher sieht, dann neu laden
+    await s.evaluate(() => { window.__duellAbfrageMs = 1e9; });
+    await warte(600);
+    srv.beendet = true;
+    await s.reload();
+    await s.waitForSelector('.screen.raetsel-duell[data-phase="beendet"] .rd-ende', { timeout: 15000 });
+    const ende = await s.evaluate(() => ({ erg: document.querySelector('.rd-ende').dataset.ergebnis, stand: document.querySelector('.rd-ende-stand').textContent }));
+    pruefe('Neuladen nach dem Ende: Ergebnis statt Start (Gewonnen 3 zu 2)', ende.erg === 'sieg' && ende.stand === '3 zu 2 gelöst', ende);
+    // das gezeigte Ergebnis ist vergessen: ein weiteres Neuladen geht den gewohnten Weg (hier Online-Tuer: neue Suche)
+    pruefe('Nach dem gezeigten Ergebnis ist das laufende Duell vergessen', await s.evaluate(() => sessionStorage.getItem('schach-arena:raetsel-duell:laufend') === null));
+    pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  } catch (e) {
+    console.log('  Screen: ' + await lage().then(JSON.stringify).catch(() => '?') + ' | Seitenfehler: ' + p.fehlerListe.join(' | '));
+    throw e;
+  } finally { await p.k.close(); }
+}
+
+const NUR = (process.argv.find((a) => a.startsWith('--nur=')) || '').slice(6) || null;
 const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
 try {
@@ -450,8 +519,11 @@ try {
   ];
   if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'light' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' });
-  for (const l of laeufe) await duellGegenKi(browser, l);
-  await nebenwege(browser);
+  if (NUR !== 'laden') {
+    for (const l of laeufe) await duellGegenKi(browser, l);
+    await nebenwege(browser);
+  }
+  await neuladen(browser);
 } catch (e) {
   fehler++;
   console.log('FEHLER Ablauf ' + (gruppe ? '(' + gruppe + ') ' : '') + (e && e.stack || e));

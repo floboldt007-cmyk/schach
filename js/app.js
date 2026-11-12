@@ -334,7 +334,11 @@ function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art
       if (fertig) return;
       fertig = true;
       document.removeEventListener('keydown', taste, true);
+      // zuklappend: nicht mehr bedienbar und fuer Bildschirmleser weg (sonst zwei Dialoge, wenn gleich der naechste kommt);
+      // Klicks gehen per CSS (.dialog-ort.weg) schon durch aufs Brett
       ort.classList.add('weg');
+      ort.inert = true;
+      ort.setAttribute('aria-hidden', 'true');
       setTimeout(() => ort.remove(), 200);
       if (offenerDialog && offenerDialog.ort === ort) offenerDialog = null;
       // Fokus zurueck, wo er vorher war
