@@ -265,7 +265,7 @@ async function seite(browser, { erfinder = true, merker = true, groesse = { widt
   // feste Uhr: der App-Tag beginnt erst um 4:00 (js/tag.js), ein Lauf kurz nach Mitternacht darf nichts kippen
   if (uhr) await s.clock.setFixedTime(uhr);
   await s.goto(BASIS + hash);
-  await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 30000 });
+  await s.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen, null, { timeout: 30000 });
   await warte(600);
   return { k, s, fehlerListe };
 }

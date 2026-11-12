@@ -77,7 +77,7 @@ try {
     await seite.locator('.zz-ergebnis:not([hidden])').waitFor();
   }
   await seite.goto('http://127.0.0.1:8886/?test#training');
-  await seite.waitForFunction(() => !!window.__app);
+  await seite.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen);
   pruefe('Lernen: keine Karte "Zu zweit" mehr (Flo 08.11.2026, Zu zweit ist kein Lernen)', await seite.evaluate(() => !document.querySelector('.zz-karte')));
   await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();
   await seite.locator('[name="weiss"]').waitFor({ state: 'attached' });

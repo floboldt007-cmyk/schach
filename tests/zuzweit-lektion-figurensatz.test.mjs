@@ -76,7 +76,7 @@ try {
   // Einstieg wie tests/zuzweit.test.mjs: die Pakete (Zu zweit, Meisterschule) laden nur ohne ?kern
   sonderVerzug = 3000;
   await seite.goto(`http://127.0.0.1:${PORT}/?test#training`);
-  await seite.waitForFunction(() => !!window.__app);
+  await seite.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen);
   await seite.evaluate(() => { localStorage.removeItem('schach-arena:konto:sonderstuecke'); window.__app.gehe('heim'); });
   await seite.locator('[data-aktion="heim-zuzweit"]').click();
   await seite.waitForSelector(KOENIGE + ' img');
