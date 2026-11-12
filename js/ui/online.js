@@ -11,6 +11,7 @@
 import { Chess } from '../../vendor/chess/chess.js';
 import { t } from '../sprache.js';
 import '../sprachen/online.js';
+import '../sprachen/partie.js';
 const O = (k, w) => t('online.' + k, w);
 import { Brett, zielKarte } from '../board.js';
 import { icon } from './icons.js';
@@ -27,6 +28,7 @@ import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { hoere } from '../ereignisse.js';
 import { spieleDuell } from './duell.js';
+import { speicherePartie } from '../storage.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -101,6 +103,9 @@ export function zeige(root, params, app) {
   // introGelaufen: Duell-Intro dieser Ansicht schon entschieden; neuerGeprueft: Partie, fuer die nach einer neueren gefragt wurde
   let introGelaufen = false, introUhr = null, neuerGeprueft = null, layoutRo = null, layoutBild = 0;
   let live = null, liveFuer = null;
+  // R7 Ergebnisblatt: blattFuer = Partie, fuer die das Blatt gebaut ist; kronenVor/kronenNach = kronen_mein_stand waehrend
+  // der laufenden Partie und nach dem gesehenen Ende (nur gewertet; daraus die Aenderung, sonst keine Kronen-Zeile)
+  let blattFuer = null, kronenFuer = null, kronenVor = null, kronenNach = null;
   const handyMq = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(orientation: portrait) and (max-width: 600px)') : null;
   // Klang: gehoert = Halbzuege, die schon geklungen haben; uhrGewarnt = Uhr-Warnung dieser Partie gespielt
   let gehoert = 0, uhrGewarnt = false;
@@ -378,6 +383,7 @@ export function zeige(root, params, app) {
     const alt = p;
     p = neu; chess = r.chess; widerspruch = !r.passt;
     klingt(alt);
+    merkeKronen(alt);
     if (neuerWiderspruch && p.status === 'laeuft') { melde(O('stellungFehler')); strittigFaellig = true; }
     if (p.status === 'offen') {
       inhalt.innerHTML = `<section class="on-karte on-einladung flaeche"><h3>${esc(O('einladungTitel'))}</h3><p class="on-code zahl">${esc(p.code)}</p>
@@ -485,14 +491,17 @@ export function zeige(root, params, app) {
     const breit = Math.floor((spiel.clientWidth - sockelX) / 8) * 8;
     const setze = (g) => { spiel.style.setProperty('--brett', g + 'px'); spiel.style.setProperty('--spalte', (g + sockelX) + 'px'); };
     // unterstes Element, das sichtbar bleiben soll: die Knoepfe, nach dem Ende die Ergebniskarte
+    // R7 (B3): nach dem Ende das unterste von eigener Leiste und Ergebniskarte (hoch steht die Karte unter der Leiste)
     const knoepfe = spiel.querySelector('.spielknoepfe');
-    const ziel = knoepfe.childElementCount ? knoepfe : spiel.querySelector('.on-unten');
+    const erg = spiel.querySelector('.on-ergebnis');
+    const ziele = knoepfe.childElementCount ? [knoepfe] : [spiel.querySelector('.on-unten'), ...(erg && !erg.hidden ? [erg] : [])];
     const untenVon = (el) => { let y = el.offsetHeight, x = el; while (x && x !== spiel) { y += x.offsetTop; x = x.offsetParent; } return y; };
-    const passt = () => untenVon(ziel) + 4 <= spiel.clientHeight + 0.5;
+    const unten = () => Math.max(...ziele.map(untenVon));
+    const passt = () => unten() + 4 <= spiel.clientHeight + 0.5;
     setze(breit);
     if (!passt()) s.classList.add('eng');
     if (!passt()) {
-      const rest = untenVon(ziel) + 4 - rahmen.offsetHeight;
+      const rest = unten() + 4 - rahmen.offsetHeight;
       setze(Math.max(BRETT_MIN, Math.min(breit, Math.floor((spiel.clientHeight - rest - sockelY) / 8) * 8)));
     }
   }
@@ -567,6 +576,103 @@ export function zeige(root, params, app) {
     if (alt.status !== 'laeuft' || p.status !== 'beendet' || !p.ergebnis || p.grund === 'strittig') return;
     if (widerspruch || !endePasst(p, chess)) return;
     try { klang.ende(p.ergebnis === '1/2-1/2' ? null : (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p)); } catch (e) { /* still */ }
+  }
+  // R7: Kronen-Aenderung einer gewerteten Partie, nur aus dem, was der Server schon liefert. Die Online-Antworten tragen
+  // keine Kronen; die Buchung macht der Trigger am Partie-Ende (supabase/kronen-schema.sql). Darum: kronen_mein_stand
+  // waehrend die Partie laeuft und noch einmal nach dem Ende, das diese Ansicht selbst gesehen hat; die Differenz ist die
+  // Aenderung. Andere Woche, unbrauchbare Antwort oder ein schon beendet geoeffnetes Spiel: keine Kronen-Zeile.
+  const kronenStand = d => { const st = Array.isArray(d) ? d[0] : d;
+    return st && Number.isFinite(Number(st.kronen)) ? { kronen: Math.trunc(Number(st.kronen)), woche: String(st.woche ?? '') } : null; };
+  function merkeKronen(alt) {
+    if (!p.gewertet) return;
+    const id = p.id;
+    if (p.status === 'laeuft' && kronenFuer !== id) {
+      kronenFuer = id;
+      holeStand().then(d => { const st = kronenStand(d); if (st && !weg && p && p.id === id && p.status === 'laeuft') kronenVor = { id, ...st }; }).catch(() => {});
+    }
+    if (alt && alt.id === id && alt.status === 'laeuft' && p.status === 'beendet') {
+      holeStand().then(d => { const st = kronenStand(d); if (st && !weg && p && p.id === id) { kronenNach = { id, ...st }; zeigeKronen(); } }).catch(() => {});
+    }
+  }
+  function zeigeKronen() {
+    const el = s.querySelector('.on-erg-kronen');
+    if (!el || !p) return;
+    const ok = p.gewertet && kronenVor?.id === p.id && kronenNach?.id === p.id && kronenVor.woche === kronenNach.woche;
+    el.hidden = !ok;
+    if (!ok) { el.textContent = ''; return; }
+    const d = kronenNach.kronen - kronenVor.kronen;
+    el.innerHTML = `${icon('krone')}<b class="zahl">${d > 0 ? '+' + d : d < 0 ? '−' + Math.abs(d) : '±0'}</b>`
+      + `<span>${esc(O('liga.kronen', { n: kronenNach.kronen }))}</span>`;
+  }
+  // R7 (Gleichheits-Liste R6, B2): das Ende zeigt das Ergebnisblatt der Bot-Partie (css/ergebnis.css, Aufbau wie baueOverlay
+  // in js/ui/partie.js): Kopfwort, Grund, bei gewerteten Partien die Kronen-Aenderung, "Zur Analyse", Revanche und Meine
+  // Partien. Das Auge zeigt das Brett, "Ergebnis" in der Spalte holt das Blatt zurueck. Ohne Spruch (die Bot-Partie hat dort
+  // den Satz des Bots, online gibt es keinen).
+  const ANALYSE_GRUND = { matt: 'matt', aufgabe: 'aufgabe', patt: 'patt', material: 'material', wiederholung: 'wiederholung',
+    '50-zuege': '50-zuege', zeit: 'zeit', remis: 'vereinbart' };
+  // zaehlt: das Ende hat ein Ergebnis, das am Brett stimmt (wie endeTexte); nur dann Sieg/Niederlage/Remis und Analyse
+  const endeZaehlt = () => !!p && !!p.ergebnis && p.grund !== 'strittig' && !widerspruch && endePasst(p, chess);
+  const kannAnalyse = () => endeZaehlt() && chess.history().length > 0;
+  const blattEl = () => s.querySelector(':scope > .ergebnis-overlay');
+  function zeigeBlatt(an) {
+    const o = blattEl(); if (!o) return;
+    o.hidden = !an;
+    for (const e of s.children) if (e !== o) e.inert = an;
+    if (an) o.querySelector('.ergebnis-karte').focus({ preventScroll: true });
+    else s.querySelector('[data-online="ergebnis-zeigen"]')?.focus({ preventScroll: true });
+  }
+  function baueBlatt() {
+    if (blattFuer === p.id) return;
+    blattFuer = p.id;
+    blattEl()?.remove();
+    const [titel, grund] = endeTexte();
+    const eigen = online.meineFarbe(p);
+    const art = !endeZaehlt() ? '' : p.ergebnis === '1/2-1/2' ? 'remis' : (p.ergebnis === '1-0' ? 'w' : 'b') === eigen ? 'sieg' : 'niederlage';
+    const wort = esc(titel) + (art === 'sieg' ? '<span class="ausruf">!</span>' : '');
+    const analyse = kannAnalyse();
+    const o = document.createElement('div');
+    o.className = `ergebnis-overlay on-erg ${art}`.trim();
+    o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-labelledby', 'on-erg-wort');
+    o.innerHTML = `<div class="ergebnis-karte" tabindex="-1">
+        <button class="icon-knopf erg-zu" type="button" data-online="brett" aria-label="${esc(t('partie.erg.brettAnsehen'))}">${icon('auge')}</button>
+        <div class="erg-rumpf"><h2 class="erg-wort disp" id="on-erg-wort">${wort}</h2><p class="erg-unter">${esc(grund)}</p>
+          ${p.gewertet ? '<p class="on-erg-kronen" hidden></p>' : ''}</div>
+        <div class="erg-aktionen"><div class="erg-knoepfe">
+          ${analyse ? `<button class="knopf primaer gross" type="button" data-online="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>` : ''}
+          <button class="knopf gross${analyse ? '' : ' primaer'}" type="button" data-online="revanche">${icon('nochmal')} ${esc(O('revanche'))}</button></div>
+          <button class="erg-lobby" type="button" data-online="liste-zurueck">${icon('verlauf')}<span>${esc(O('meine'))}</span></button></div>
+      </div>`;
+    // wie das Blatt der Bot-Partie: Tab kreist im Blatt, Escape zeigt das Brett
+    o.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); zeigeBlatt(false); return; }
+      if (e.key !== 'Tab') return;
+      const ziele = [...o.querySelectorAll('button')].filter(x => !x.disabled && x.getClientRects().length);
+      if (!ziele.length) return;
+      const jetzt = document.activeElement;
+      if (e.shiftKey && (jetzt === ziele[0] || !ziele.includes(jetzt))) { e.preventDefault(); ziele.at(-1).focus(); }
+      else if (!e.shiftKey && (jetzt === ziele.at(-1) || !ziele.includes(jetzt))) { e.preventDefault(); ziele[0].focus(); }
+    });
+    s.append(o);
+    zeigeKronen();
+    zeigeBlatt(true);
+  }
+  // "Zur Analyse": die Spielanalyse (js/ui/analyse.js) liest nur Partien vom Geraet. Die Online-Partie wird dafuer einmal als
+  // Partie zweier Menschen abgelegt (modus 'zuzweit': wertet nie, kein Bot, beide Namen im Kopf), aus Sicht der eigenen Farbe.
+  // Feste ID je Online-Partie: ein zweites Oeffnen ersetzt den Eintrag statt ihn zu verdoppeln.
+  function zurAnalyse() {
+    if (!kannAnalyse()) return;
+    const zuege = chess.history({ verbose: true });
+    const eigen = online.meineFarbe(p);
+    const ergebnis = p.ergebnis === '1/2-1/2' ? 'remis' : (p.ergebnis === '1-0' ? 'w' : 'b') === eigen ? 'sieg' : 'niederlage';
+    const tempo = p.bedenkzeit_s == null ? null : { grund: p.bedenkzeit_s, zuschlag: p.inkrement_s || 0 };
+    let gespeichert;
+    try {
+      gespeichert = speicherePartie({ id: 'on-' + p.id, modus: 'zuzweit', botId: null, spielerFarbe: eigen,
+        zuzweit: { weiss: spielerDaten('w').name, schwarz: spielerDaten('b').name, drehen: false },
+        zuege: zuege.map(m => m.lan), san: zuege.map(m => m.san), tempo, ergebnis, grund: ANALYSE_GRUND[p.grund] || null,
+        datum: p.aktualisiert_am || undefined, hinweise: 0, zuruecknahmen: 0, liveKlassen: [], genauigkeit: null, genauigkeitBot: null });
+    } catch (e) { melde(O('fehler')); return; }
+    app.gehe('analyse', { partieId: gespeichert.partie.id });
   }
   // Etappe 4b: die Visitenkarten beider Spieler (js/karte.js, nur fuer die Teilnehmer dieser Partie) bringen Banner, Name
   // und Titel in die Spielerleisten; bis sie da sind (oder ohne Antwort) bleibt es bei "Ich" und "Freund"
@@ -674,7 +780,10 @@ export function zeige(root, params, app) {
     ergebnis.hidden = p.status !== 'beendet';
     if (!ergebnis.hidden) {
       const [titel, text] = endeTexte();
-      ergebnis.innerHTML = `<h3>${esc(titel)}</h3><p>${esc(text)}</p><div class="on-aktionen"><button class="knopf primaer" type="button" data-online="revanche">${esc(O('revanche'))}</button><button class="knopf" type="button" data-online="liste-zurueck">${esc(O('meine'))}</button></div>`;
+      // R7: Revanche, Meine Partien und Zur Analyse stehen im Ergebnisblatt; hier nur das Ergebnis und der Weg zurueck dorthin
+      const html = `<h3>${esc(titel)}</h3><p>${esc(text)}</p><div class="on-aktionen"><button class="knopf primaer" type="button" data-online="ergebnis-zeigen">${icon('pokal')} ${esc(t('partie.knopf.ergebnis'))}</button></div>`;
+      if (ergebnis._html !== html) { ergebnis._html = html; ergebnis.innerHTML = html; }
+      baueBlatt();
     }
     sperre();
   }
@@ -729,6 +838,9 @@ export function zeige(root, params, app) {
     if (a === 'liste-zurueck') { app.gehe('online', { freunde: true }); return; }
     if (a === 'konto') { kontoFreigeschaltet('#konto'); app.gehe('einstellungen', { seite: 'konto' }); return; }
     if (a === 'liste') { ladeListe(); return; }
+    if (a === 'brett') { zeigeBlatt(false); return; }
+    if (a === 'ergebnis-zeigen') { zeigeBlatt(true); return; }
+    if (a === 'analyse') { zurAnalyse(); return; }
     if (a === 'teilen' && p) {
       const url = online.einladungsLink(p.code);
       try {

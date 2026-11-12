@@ -690,6 +690,134 @@ try {
   const erstes = await seite.evaluate(() => window.__erstesBild);
   pruefe('Fortsetzen mit Bewegung: im ersten sichtbaren Bild stehen alle 32 Figuren voll da, kein leeres Brett', erstes.n === 32 && erstes.blass === 0, erstes);
   await seite.evaluate(() => sessionStorage.removeItem('test:einstellungen'));
+  // R7 (Gesamtdurchgang R6, Gleichheits-Liste B2/B3/B5): Das Ende einer Online-Partie zeigt dasselbe Ergebnisblatt wie die
+  // Bot-Partie (css/ergebnis.css): Kopfwort, Grund, Kronen-Aenderung (nur gewertet, aus kronen_mein_stand vor und nach dem
+  // Ende), "Zur Analyse" mit den Zuegen der Partie, Revanche und Meine Partien; alle Knoepfe im Bild auf iPhone SE und iPad
+  // hoch; die ruhende Uhr in der Leiste mit Banner ist im hellen Modus lesbar. Eigene Route mit Vorrang (Playwright fragt
+  // die zuletzt angelegte zuerst), damit sich der Kronen-Stand zwischen Start und Ende aendern laesst.
+  let r7Kronen = 140, r7Rufe = 0;
+  const r7Stand = route => { r7Rufe++; return route.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ stufe: 7, kronen: r7Kronen, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' }) }); };
+  await kontext.route('**/rest/v1/rpc/kronen_mein_stand', r7Stand);
+  const r7Bild = async name => { if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `r7-${name}.png`) }); };
+  const r7Modus = async modus => {
+    await seite.evaluate(m => window.__app.setzeEinstellungen({ modus: m }), modus);
+    await seite.waitForFunction(m => document.documentElement.dataset.modus === m, modus, { timeout: 5000 }).catch(() => {});
+  };
+  const r7Blatt = () => seite.evaluate(() => {
+    const o = document.querySelector('.online-screen .ergebnis-overlay');
+    if (!o || o.hidden) return null;
+    return { art: o.className, wort: o.querySelector('.erg-wort')?.textContent.trim(), unter: o.querySelector('.erg-unter')?.textContent.trim(),
+      kronen: o.querySelector('.on-erg-kronen')?.textContent.replace(/\s+/g, ' ').trim() || '',
+      knoepfe: [...o.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => b.dataset.online || b.className) };
+  });
+  const r7Warte = () => seite.waitForFunction(() => { const o = document.querySelector('.online-screen .ergebnis-overlay'); return o && !o.hidden; }, null, { timeout: 6000 }).then(() => true, () => false);
+  await seite.setViewportSize({ width: 1180, height: 820 });
+  const r7 = partie({ gewertet: true, zuege: 'e2e4 e7e5 g1f3 b8c6' });
+  await oeffne(r7);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'laeuft');
+  await seite.waitForTimeout(400);
+  const r7RufeVor = r7Rufe;
+  // Gegner gibt auf: der Server bucht die Kronen (Trigger in supabase/kronen-schema.sql), der Stand steigt auf 170
+  r7Kronen = 170; Object.assign(r7, { status: 'beendet', grund: 'aufgabe', ergebnis: '1-0' }); aktualisieren(r7);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
+  const r7Da = await r7Warte();
+  await seite.waitForTimeout(600);
+  await r7Bild('ende-gewertet-1180x820-hell');
+  const r7B = await r7Blatt();
+  pruefe('R7 B2: gewertetes Ende zeigt das Ergebnisblatt der Bot-Partie (Sieg!, Grund, Zur Analyse, Revanche, Meine Partien)',
+    r7Da && /\bsieg\b/.test(r7B?.art) && r7B?.wort === 'Sieg!' && r7B?.unter === 'Aufgabe'
+      && ['analyse', 'revanche', 'liste-zurueck'].every(k => r7B.knoepfe.includes(k)), r7B);
+  pruefe('R7 B2: Kronen-Aenderung aus kronen_mein_stand (vor dem Ende 140, danach 170): "+30" und der neue Wochenstand',
+    r7RufeVor >= 1 && /\+30/.test(r7B?.kronen || '') && /170/.test(r7B?.kronen || ''), { kronen: r7B?.kronen, r7RufeVor });
+  // Auge: Brett ansehen; das Blatt kommt ueber "Ergebnis" in der Spalte zurueck
+  await seite.locator('.online-screen .ergebnis-overlay .erg-zu').click().catch(() => {});
+  const r7Zu = await seite.evaluate(() => ({ blatt: document.querySelector('.online-screen .ergebnis-overlay')?.hidden,
+    zeigen: !!document.querySelector('.online-screen [data-online="ergebnis-zeigen"]')?.getClientRects().length }));
+  await seite.locator('.online-screen [data-online="ergebnis-zeigen"]').click().catch(() => {});
+  const r7Auf = await r7Warte();
+  pruefe('R7 B2: Auge zeigt das Brett, "Ergebnis" holt das Blatt zurueck', r7Zu.blatt === true && r7Zu.zeigen && r7Auf, { r7Zu, r7Auf });
+  // "Zur Analyse" oeffnet die Spielanalyse (.an-screen) mit genau den Zuegen der Online-Partie und beiden Namen
+  await seite.locator('.online-screen .ergebnis-overlay [data-online="analyse"]').click({ timeout: 3000 }).catch(() => {});
+  const r7An = await seite.waitForFunction(() => document.querySelector('.an-screen'), null, { timeout: 8000 }).then(() => true, () => false);
+  const r7AnDaten = await seite.evaluate(id => {
+    const liste = JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]');
+    const p = liste.find(x => x && x.id === 'on-' + id);
+    return { unter: document.querySelector('.an-screen .an-unter')?.textContent || '', zuege: p?.zuege?.join(' '), ergebnis: p?.ergebnis, farbe: p?.spielerFarbe, n: liste.length };
+  }, r7.id);
+  pruefe('R7 B2: "Zur Analyse" oeffnet .an-screen mit den Zuegen der Online-Partie und beiden Namen',
+    r7An && r7AnDaten.zuege === 'e2e4 e7e5 g1f3 b8c6' && r7AnDaten.ergebnis === 'sieg' && r7AnDaten.farbe === 'w' && /Spieler_1/.test(r7AnDaten.unter) && /Gegner_2/.test(r7AnDaten.unter), r7AnDaten);
+  // Zweimal "Zur Analyse": dieselbe Partie wird ersetzt, nicht doppelt gespeichert
+  await oeffne(r7); await r7Warte();
+  await seite.locator('.online-screen .ergebnis-overlay [data-online="analyse"]').click({ timeout: 3000 }).catch(() => {});
+  await seite.waitForFunction(() => document.querySelector('.an-screen'), null, { timeout: 8000 }).catch(() => {});
+  const r7Zweimal = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]').length);
+  pruefe('R7 B2: zweimal Zur Analyse legt die Partie nur einmal ab', r7AnDaten.n >= 1 && r7Zweimal === r7AnDaten.n, { vorher: r7AnDaten.n, nachher: r7Zweimal });
+  // Freundespartie: dasselbe Blatt ohne Kronen-Zeile
+  const r7F = partie({ zuege: 'e2e4 e7e5' }); await oeffne(r7F);
+  Object.assign(r7F, { status: 'beendet', grund: 'remis', ergebnis: '1/2-1/2' }); aktualisieren(r7F);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
+  const r7FDa = await r7Warte(); await seite.waitForTimeout(300);
+  const r7FB = await r7Blatt();
+  pruefe('R7 B2: Freundespartie bekommt dasselbe Blatt ohne Kronen-Zeile (Remis, Zur Analyse)',
+    r7FDa && /\bremis\b/.test(r7FB?.art) && r7FB?.kronen === '' && r7FB.knoepfe.includes('analyse') && r7FB.knoepfe.includes('revanche'), r7FB);
+  // Strittig: Blatt ohne Zur Analyse (die Zuege passen nicht sicher zur Partie)
+  const r7S = partie({ zuege: 'e2e4' }); await oeffne(r7S);
+  Object.assign(r7S, { status: 'beendet', grund: 'strittig', ergebnis: null }); aktualisieren(r7S);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
+  await r7Warte(); await seite.waitForTimeout(300);
+  const r7SB = await r7Blatt();
+  pruefe('R7 B2: strittiges Ende: Blatt "Strittig" ohne Zur Analyse', r7SB?.wort === 'Strittig' && !r7SB.knoepfe.includes('analyse'), r7SB);
+  // B3: alle Knoepfe des Blatts (und mit geschlossenem Blatt der Knopf "Ergebnis") im Bild, hell und dunkel
+  for (const [width, height, name] of [[375, 667, 'iphone-se'], [768, 1024, 'ipad-hoch'], [1280, 800, 'pc']]) {
+    for (const modus of ['hell', 'dunkel']) {
+      await seite.setViewportSize({ width, height });
+      await r7Modus(modus);
+      await oeffne(r7); await r7Warte(); await seite.waitForTimeout(700);
+      await r7Bild(`ende-${name}-${modus}`);
+      const mass = await seite.evaluate(() => {
+        const o = document.querySelector('.online-screen .ergebnis-overlay');
+        const knoepfe = o && !o.hidden ? [...o.querySelectorAll('button')].filter(b => b.getClientRects().length) : [];
+        const sp = knoepfe.map(b => { const r = b.getBoundingClientRect(); return { k: b.dataset.online || b.className, oben: Math.round(r.top), unten: Math.round(r.bottom) }; });
+        return { innen: innerHeight, knoepfe: sp, raus: sp.filter(x => x.unten > innerHeight + 0.5 || x.oben < -0.5) };
+      });
+      pruefe(`R7 B3 ${width}x${height} ${modus}: alle Knoepfe des Ergebnisblatts im Bild (Revanche, Meine Partien, Zur Analyse)`,
+        mass.knoepfe.length >= 4 && !mass.raus.length && ['revanche', 'liste-zurueck', 'analyse'].every(k => mass.knoepfe.some(x => x.k === k)), mass);
+      if (modus === 'hell') {
+        await seite.locator('.online-screen .ergebnis-overlay .erg-zu').click().catch(() => {});
+        await seite.waitForTimeout(400);
+        await r7Bild(`brett-${name}-${modus}`);
+        const z = await seite.evaluate(() => { const b = document.querySelector('.online-screen [data-online="ergebnis-zeigen"]'); const r = b?.getBoundingClientRect();
+          return b && b.getClientRects().length ? { oben: Math.round(r.top), unten: Math.round(r.bottom), innen: innerHeight } : null; });
+        pruefe(`R7 B3 ${width}x${height}: Blatt zu, der Knopf "Ergebnis" steht im Bild`, !!z && z.unten <= z.innen + 0.5 && z.oben >= 0, z);
+      }
+    }
+  }
+  // B5: ruhende Uhr in der Leiste mit Banner (visitenkarte.css setzt dort weisse Schrift) im hellen und dunklen Modus
+  const r7Kontrast = () => seite.evaluate(() => {
+    const rgb = s => { const m = String(s).match(/[\d.]+/g)?.map(Number) || []; return /^color\(srgb/.test(s) ? { r: m[0] * 255, g: m[1] * 255, b: m[2] * 255, a: m[3] ?? 1 } : { r: m[0], g: m[1], b: m[2], a: m[3] ?? 1 }; };
+    const ueber = (o, u) => ({ r: o.r * o.a + u.r * (1 - o.a), g: o.g * o.a + u.g * (1 - o.a), b: o.b * o.a + u.b * (1 - o.a), a: 1 });
+    const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+    return [...document.querySelectorAll('.online-screen .spieler .uhr[data-farbe]')].filter(u => !u.hidden && !u.classList.contains('laeuft')).map(u => {
+      const bg = rgb(getComputedStyle(u).backgroundColor);
+      const vg = ueber(rgb(getComputedStyle(u.querySelector('.uhr-zeit')).color), bg);
+      const [x, y] = [lum(vg), lum(bg)].sort((p, q) => q - p);
+      return { farbe: u.dataset.farbe, deckend: bg.a >= 1, banner: u.parentElement.classList.contains('mit-banner'), kontrast: Math.round((x + 0.05) / (y + 0.05) * 100) / 100 };
+    });
+  });
+  await seite.setViewportSize({ width: 1180, height: 820 });
+  for (const modus of ['hell', 'dunkel']) {
+    await r7Modus(modus);
+    const r7U = partie({ zuege: 'e2e4 e7e5', zeit: 300 }); await oeffne(r7U);
+    await seite.waitForFunction(() => document.querySelectorAll('.online-screen .spieler.mit-banner .uhr-zeit').length === 2, null, { timeout: 8000 }).catch(() => {});
+    await seite.waitForTimeout(300);
+    await r7Bild(`uhr-1180x820-${modus}`);
+    const k = await r7Kontrast();
+    pruefe(`R7 B5 ${modus}: ruhende Uhr in der Leiste mit Banner hat Kontrast mindestens 3:1 (gemessen)`, k.length >= 1 && k.every(x => x.deckend && x.banner && x.kontrast >= 3), k);
+    Object.assign(r7U, { status: 'beendet', grund: 'aufgabe', ergebnis: '1-0' }); aktualisieren(r7U);
+  }
+  await r7Modus('system');
+  await kontext.unroute('**/rest/v1/rpc/kronen_mein_stand', r7Stand);
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet });
 } catch (e) {
   pruefe('Ablauf ohne Abbruch', false, e.stack);
