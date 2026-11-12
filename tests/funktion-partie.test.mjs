@@ -99,7 +99,7 @@ try {
     const bild = name => s.screenshot({ path: path.join(BILDER, `${g.name}-${name}.png`) }).catch(() => {});
     try {
       await s.goto(`http://127.0.0.1:${server.address().port}/index.html?test#heim`);
-      await s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function', null, { timeout: 30000 });
+      await s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.documentElement.dataset.screen, null, { timeout: 30000 });
       await warte(1200);   // Start fertig laden lassen (wie tests/siegblatt-tastatur.test.mjs)
 
       // 1) Partie gegen den ersten Bot starten

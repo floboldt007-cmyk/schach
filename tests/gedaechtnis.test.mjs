@@ -528,7 +528,7 @@ async function bereite(seite, { partien = [], fortschritt = null, einstellungen 
   await seite.goto(BASIS + hash);
   await seite.reload();
   // window.__app gibt es schon vor dem Laden der Pakete; der erste Screen kommt erst danach
-  await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="gedaechtnis"]') && !!document.querySelector('.screen'), null, { timeout: 20000 });
+  await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="gedaechtnis"]') && !!document.documentElement.dataset.screen, null, { timeout: 20000 });
 }
 
 // Fortschritt mit freien Bots bis Stufe "bis" und Zaehlern
