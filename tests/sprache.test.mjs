@@ -411,7 +411,7 @@ async function schrittZwei(browser) {
       await seite.evaluate(() => localStorage.clear());
       await seite.goto('about:blank');
       await seite.goto(basis + '#konto');
-      await seite.waitForFunction(() => !!window.__app && localStorage.getItem('schach-arena:konto:sichtbar') === '1');
+      await seite.waitForFunction(() => !!window.__app && localStorage.getItem('schach-arena:konto:sichtbar') === '1' && !!document.documentElement.dataset.screen);
       // Handy: Konto, Schule und Abo sind eigene Seiten der Einstellungen (#einstellungen/<seite>, 31.10.2026)
       await seite.evaluate(() => window.__app.gehe('einstellungen', { seite: 'konto' }));
       await seite.waitForSelector('.konto-gruppe');

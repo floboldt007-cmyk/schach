@@ -448,7 +448,11 @@ async function browserTeil(browser) {
   pruefe('Ein Wort richtig: genau 5 weitere Funken und ein Ereignis mit Tag und richtig', wortBuchung.st.gesamt === funkenVorWort + 5
     && wortBuchung.st.heute.wort === 5 && wortBuchung.ev.length === 1 && wortBuchung.ev[0].tag === heute && wortBuchung.ev[0].richtig === true, wortBuchung);
   await seite.locator('.rs-ende-knoepfe button', { hasText: 'Ein Wort' }).click();
-  pruefe('Zweiter Klick am selben Tag: kein Dialog, kein Ereignis und keine weiteren Funken', await seite.locator('.dialog-ort').count() === 0
+  // Der Wort-Dialog klappt noch 200 ms zu (.dialog-ort.weg, durchklickbar), der zweite Klick kommt also schon durch,
+  // waehrend er noch im DOM steht. Darum auf den Endzustand warten: alle Dialog-Orte weg. Oeffnete der zweite Klick
+  // einen neuen Dialog (ohne Abbrechen), verschwaende er nie, und die Pruefung schlaegt fehl.
+  const keinDialog = await seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false);
+  pruefe('Zweiter Klick am selben Tag: kein Dialog, kein Ereignis und keine weiteren Funken', keinDialog
     && await seite.evaluate((vor) => window.__funken.stand().gesamt === vor + 5 && window.__tr_wort.length === 1, funkenVorWort));
 
   // Teilen
@@ -583,6 +587,9 @@ async function browserTeil(browser) {
   const zworte = await zw.seite.evaluate(() => [...document.querySelectorAll('.dialog-ort .dialog-knoepfe button')].map((b) => b.textContent));
   pruefe('Ein Wort am Sonntag: kein falsches Wort ist das Motiv eines Teils', zworte.length === 3 && zworte.includes('Matt') && !zworte.includes('Grundreihe'), zworte);
   await zw.seite.keyboard.press('Escape');
+  // Escape klappt den Dialog zu (200 ms .dialog-ort.weg, durchklickbar). Erst wenn er weg ist, den naechsten oeffnen,
+  // sonst stehen zwei Dialoge mit denselben Knoepfen im DOM.
+  pruefe('Escape schliesst den Wort-Dialog', await zw.seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false));
   const falschVor = await zw.seite.evaluate(() => window.__funken.stand().gesamt);
   await zw.seite.locator('.rs-ende-knoepfe button', { hasText: 'Ein Wort' }).click();
   await zw.seite.locator('.dialog-ort .dialog-knoepfe button', { hasText: zworte.find((w) => w !== 'Matt') }).click();

@@ -5,16 +5,17 @@
 // waehlbar, weil das Konto das Sonderstueck besitzt (Attrappe von /rest/v1/sonderstuecke wie tests/online-ui.test.mjs,
 // dazu der gemerkte Stand im Speicher wie tests/raetsel-duell-ui.test.mjs). Netzwerk ausschliesslich simuliert.
 //
-//   node tests/funktion-shop-skin.test.mjs                      Probe (Zu zweit und Lektion melden sich als ROT-ERWARTET)
-//   PROBE_STRENG=1 node tests/funktion-shop-skin.test.mjs       auch die harten Pruefungen zaehlen (fuer die Reparatur R4-skin2)
+//   node tests/funktion-shop-skin.test.mjs                      Probe (harte Pruefungen melden sich als ROT-ERWARTET)
+//   PROBE_STRENG=1 node tests/funktion-shop-skin.test.mjs       auch die harten Pruefungen zaehlen (fuer eine Reparatur)
 //   PROBE_SKIN=neon node tests/funktion-shop-skin.test.mjs      ein Labor-Satz (nur Erfinder, js/labor.js) statt Blaupause
 //   node tests/funktion-shop-skin.test.mjs --bilder=<ordner>    je Ansicht ein Bild (<ansicht>.png)
 //   PORT=9631 node tests/funktion-shop-skin.test.mjs            eigener Port (Standard 8981)
 //
 // Je Ansicht zwei Pruefungen: der gewaehlte Satz steht im Brett, und ein Wechsel bei offener Ansicht wirkt sofort (spaeter
-// Erfinder-Status, R3/R4). Harte Pruefungen (hart: true): Zu zweit und Lektion, dort baut so/R4-skin2 die Reparatur. Der
-// Wechsel im Raetsel-Duell (Befund F-shop) ist seit der Reparatur F-duell streng. Ohne PROBE_STRENG=1
-// erscheinen sie rot als "ROT-ERWARTET" und blockieren nichts (tests/alle.mjs zaehlt nur "FEHLER" und den Exitcode).
+// Erfinder-Status, R3/R4); im Raetsel-Duell zusaetzlich Koordinaten und Auto-Dame (F-duell2). Seit den Reparaturen
+// R4-skin2 (Zu zweit, Lektion) und F-duell (Raetsel-Duell) ist keine Pruefung mehr hart. Fuer einen neuen Befund ohne
+// Reparatur: pruefe(..., { hart: true }); ohne PROBE_STRENG=1 erscheint er rot als "ROT-ERWARTET" und blockiert nichts
+// (tests/alle.mjs zaehlt nur "FEHLER" und den Exitcode).
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
@@ -113,9 +114,7 @@ const satzAuf = (s, sel) => s.evaluate(({ sel, skin }) => {
 }, { sel, skin: SKIN });
 const imSatz = r => r.da && r.n > 0 && r.imSatz === r.n && r.geladen === r.n;
 async function bild(s, name) { if (BILDER) await s.screenshot({ path: path.join(BILDER, name + '.png') }).catch(e => console.log('Bild ' + name + ': ' + e.message)); }
-// hartWechsel: nur die Wechsel-Pruefung ist hart (frei fuer eine Ansicht, deren Satz-Wechsel noch keine Reparatur hat;
-// das Raetsel-Duell war so bis F-duell 12.11., seither streng)
-async function ansicht(s, name, sel, { hart = false, hartWechsel = hart } = {}) {
+async function ansicht(s, name, sel) {
   // Figuren erscheinen, sobald das Brett steht; der Satz kann noch nachkommen (Einstellungen spaet), darum bis 4 s warten
   await s.waitForFunction(({ sel, skin }) => {
     const i = [...document.querySelectorAll(sel + ' img.figur')];
@@ -125,7 +124,7 @@ async function ansicht(s, name, sel, { hart = false, hartWechsel = hart } = {}) 
   await bild(s, name);
   const gut = imSatz(r);
   ergebnis.push({ ansicht: name, geht: gut, ...r });
-  pruefe(`${name}: das Brett zeigt den gewaehlten Satz "${SKIN}" (alle Figuren, Bilder geladen)`, gut, r, { hart });
+  pruefe(`${name}: das Brett zeigt den gewaehlten Satz "${SKIN}" (alle Figuren, Bilder geladen)`, gut, r);
   // Wechsel bei offener Ansicht (spaeter Erfinder-Status oder neue Wahl, R3/R4): Standard und zurueck, ohne Neuladen
   await s.evaluate(() => window.__app.setzeEinstellungen({ figuren: 'cburnett' }));
   await s.waitForTimeout(150);
@@ -134,9 +133,37 @@ async function ansicht(s, name, sel, { hart = false, hartWechsel = hart } = {}) 
   await s.waitForTimeout(150);
   const zurueck = await satzAuf(s, sel);
   pruefe(`${name}: ein Wechsel bei offener Ansicht wirkt sofort (Standard, dann wieder "${SKIN}")`,
-    standard.n > 0 && standard.imSatz === 0 && imSatz(zurueck), { standard, zurueck }, { hart: hartWechsel });
+    standard.n > 0 && standard.imSatz === 0 && imSatz(zurueck), { standard, zurueck });
   ergebnis.at(-1).wechsel = standard.n > 0 && standard.imSatz === 0 && imSatz(zurueck);
   return r;
+}
+
+// Gleichheits-Liste (F-einst 12.11.2026): was die Bot-Partie bei schach:einstellungen sofort uebernimmt (js/ui/partie.js
+// beiEinstellungen: Figurensatz, Koordinaten, Koordinaten-Lage, Auto-Dame, Steuerung, Pfeile), uebernimmt jede Ansicht mit
+// Brett bei offener Ansicht. Den Figurensatz misst ansicht(); hier die uebrigen fuenf, gelesen am Brett-Objekt der Ansicht
+// (Test-Haken mit ?test: window.__partie, __duell, __lektion), weil Auto-Dame, Steuerung und Pfeile kein DOM-Merkmal haben.
+// Je Einstellung: umstellen, dann zuruecksetzen; live heisst, das Brett folgt beiden Schritten.
+const UMGESTELLT = { koordinaten: false, koordLage: 'rand', autoDame: true, steuerung: 'tippen', pfeile: false };
+const GRUNDSTAND = { koordinaten: true, koordLage: 'ecke', autoDame: false, steuerung: 'beides', pfeile: true };
+const liveListe = [];
+async function brettLive(s, name, haken) {
+  const lies = () => s.evaluate((haken) => {
+    const b = haken === 'duell' ? window.__duell?.brett?.() : haken === 'lektion' ? window.__lektion?.brett?.() : window.__partie?.brett;
+    return b ? { koordinaten: !b.el.classList.contains('ohne-koordinaten'), koordLage: b.koordLage(), autoDame: b.autoDame,
+      steuerung: b.steuerung, pfeile: b.pfeileErlaubt } : null;
+  }, haken);
+  await s.evaluate(e => window.__app.setzeEinstellungen(e), UMGESTELLT);
+  await s.waitForTimeout(150);
+  const um = await lies();
+  await s.evaluate(e => window.__app.setzeEinstellungen(e), GRUNDSTAND);
+  await s.waitForTimeout(150);
+  const zu = await lies();
+  const zeile = { ansicht: name, figurensatz: ergebnis.find(r => r.ansicht === name)?.wechsel === true };
+  for (const k of Object.keys(UMGESTELLT)) {
+    zeile[k] = !!um && !!zu && um[k] === UMGESTELLT[k] && zu[k] === GRUNDSTAND[k];
+    pruefe(`${name}: ${k} wirkt bei offener Ansicht sofort (umgestellt, dann zurueck)`, zeile[k], { um: um?.[k], zurueck: zu?.[k], soll: [UMGESTELLT[k], GRUNDSTAND[k]] });
+  }
+  liveListe.push(zeile);
 }
 // "Ich" zeigt beim Start gebuchte Stufen als Freischalt-Moment; wegtippen wie ein Spieler (tests/sammlung.test.mjs)
 async function momenteWeg(s) {
@@ -227,6 +254,7 @@ try {
   await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
   await s.waitForFunction((sel) => document.querySelectorAll(sel + ' img.figur').length === 32, BOT, { timeout: AUFBAU_MS }).catch(() => {});
   await ansicht(s, 'bot-partie', BOT);
+  await brettLive(s, 'bot-partie', 'partie');   // Referenz: die Bot-Partie uebernimmt alles
 
   // 4) Online-Partie (laufende Partie aus der Attrappe, direkt geoeffnet wie tests/online-ui.test.mjs)
   await s.evaluate(id => window.__app.gehe('online', { partieId: id }), ONLINE.id);
@@ -240,7 +268,8 @@ try {
   await s.getByRole('button', { name: 'Los', exact: true }).click();
   if (await s.getByRole('button', { name: 'Neue Partie', exact: true }).isVisible().catch(() => false)) await s.getByRole('button', { name: 'Neue Partie', exact: true }).click();
   await s.waitForFunction(() => window.__partie?.z?.modus === 'zuzweit' && document.querySelectorAll('.zz-brett img.figur').length === 32, null, { timeout: 15000 }).catch(() => {});
-  await ansicht(s, 'zu-zweit', '.zz-brett', { hart: true });
+  await ansicht(s, 'zu-zweit', '.zz-brett');
+  await brettLive(s, 'zu-zweit', 'partie');
 
   // 6) Raetsel-Duell (KI-Duell nach kurzer Suche, Brett im Vorlauf)
   await s.evaluate(() => window.__app.gehe('raetsel-duell'));
@@ -248,11 +277,13 @@ try {
   await s.locator('.rd-suchen').click();
   await s.waitForFunction(() => document.querySelectorAll('.screen.raetsel-duell .rd-brett img.figur').length > 0, null, { timeout: 15000 }).catch(() => {});
   await ansicht(s, 'raetsel-duell', '.screen.raetsel-duell .rd-brett');
+  await brettLive(s, 'raetsel-duell', 'duell');
 
   // 7) Meisterschule-Lektion
   await s.evaluate(() => window.__app.gehe('lektion', { id: 'skandinavisch' }));
   await s.waitForFunction(() => document.querySelectorAll('.ls-brett img.figur').length > 0, null, { timeout: AUFBAU_MS }).catch(() => {});
-  await ansicht(s, 'lektion', '.ls-brett', { hart: true });
+  await ansicht(s, 'lektion', '.ls-brett');
+  await brettLive(s, 'lektion', 'lektion');
 
   pruefe('Kein Kauf: der Shop hat nur Editionen gelesen, keine Kauf-Anfrage', !editionAnfragen.some(b => Object.keys(b).length));
   pruefe('Keine Seitenfehler', fehler.length === 0, fehler);
@@ -260,5 +291,10 @@ try {
 finally { await browser?.close(); await new Promise(r => server.close(r)); }
 console.log('\nJe Ansicht (Satz ' + SKIN + '):');
 for (const r of ergebnis) console.log(`  ${r.geht ? 'geht      ' : 'geht nicht'}  ${r.ansicht}  (${r.imSatz}/${r.n} im Satz, ${r.geladen} geladen, Pfade ${r.beispiel.join(' ')}; Wechsel bei offener Ansicht ${r.wechsel ? 'geht' : 'geht nicht'})`);
+if (liveListe.length) {
+  const spalten = ['figurensatz', ...Object.keys(UMGESTELLT)];
+  console.log('\nEinstellung x Ansicht, live bei offener Ansicht (ja/nein):\n  ' + 'ansicht'.padEnd(15) + spalten.map(k => k.padEnd(13)).join(''));
+  for (const z of liveListe) console.log('  ' + z.ansicht.padEnd(15) + spalten.map(k => (z[k] ? 'ja' : 'nein').padEnd(13)).join(''));
+}
 if (rotErwartet) console.log(`\n${rotErwartet} harte Pruefung(en) ROT-ERWARTET (zaehlen erst mit PROBE_STRENG=1): ${rot.join(' | ')}`);
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;
