@@ -154,6 +154,9 @@ async function oeffneBereich(s, id) {
   await s.waitForTimeout(300);
 }
 const BOT = '.screen.partie:not(.online-screen) .brett-rahmen > .brett';
+// Erster Aufbau eines Screens (Pakete, Engine) dauert unter Last laenger: am 12.11. lief der erste Bot-Aufbau bei 41
+// parallelen Browser-/Node-Prozessen ueber 20 s
+const AUFBAU_MS = 45000;
 
 let browser;
 try {
@@ -182,7 +185,7 @@ try {
 
   // 0) Gegenprobe vor der Wahl: mit dem Standardsatz zeigt das Bot-Brett KEINE Figur aus dem Satz (sonst misst die Probe nichts)
   await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
-  await s.waitForFunction((sel) => document.querySelectorAll(sel + ' img.figur').length === 32, BOT, { timeout: 20000 });
+  await s.waitForFunction((sel) => document.querySelectorAll(sel + ' img.figur').length === 32, BOT, { timeout: AUFBAU_MS });
   const vorher = await satzAuf(s, BOT);
   pruefe(`Gegenprobe: vor der Wahl steht im Bot-Brett der Standardsatz, keine Figur aus "${SKIN}"`, vorher.n === 32 && vorher.imSatz === 0, vorher);
 
@@ -220,7 +223,7 @@ try {
 
   // 3) Bot-Partie
   await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
-  await s.waitForFunction((sel) => document.querySelectorAll(sel + ' img.figur').length === 32, BOT, { timeout: 20000 }).catch(() => {});
+  await s.waitForFunction((sel) => document.querySelectorAll(sel + ' img.figur').length === 32, BOT, { timeout: AUFBAU_MS }).catch(() => {});
   await ansicht(s, 'bot-partie', BOT);
 
   // 4) Online-Partie (laufende Partie aus der Attrappe, direkt geoeffnet wie tests/online-ui.test.mjs)
@@ -246,7 +249,7 @@ try {
 
   // 7) Meisterschule-Lektion
   await s.evaluate(() => window.__app.gehe('lektion', { id: 'skandinavisch' }));
-  await s.waitForFunction(() => document.querySelectorAll('.ls-brett img.figur').length > 0, null, { timeout: 20000 }).catch(() => {});
+  await s.waitForFunction(() => document.querySelectorAll('.ls-brett img.figur').length > 0, null, { timeout: AUFBAU_MS }).catch(() => {});
   await ansicht(s, 'lektion', '.ls-brett', { hart: true });
 
   pruefe('Kein Kauf: der Shop hat nur Editionen gelesen, keine Kauf-Anfrage', !editionAnfragen.some(b => Object.keys(b).length));
