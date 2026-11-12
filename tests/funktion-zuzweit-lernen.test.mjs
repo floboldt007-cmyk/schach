@@ -362,8 +362,8 @@ async function zuZweit(s, bot) {
 
 // ---- Meisterschule ----
 const lz = s => s.evaluate(() => (window.__lektion ? window.__lektion.zustand() : { offen: false }));
-const warteLz = (s, bedingung, ms = 10000) => s.waitForFunction(b => new Function('z', 'return ' + b)(window.__lektion ? window.__lektion.zustand() : { offen: false }),
-  bedingung, { timeout: ms }).then(() => true, () => false);
+const warteLz = (s, bedingung) => s.waitForFunction(b => new Function('z', 'return ' + b)(window.__lektion ? window.__lektion.zustand() : { offen: false }),
+  bedingung, { timeout: 10000 }).then(() => true, () => false);
 const setzeVerteidigung = s => s.evaluate(async () => {
   const { Chess: C } = await import('/vendor/chess/chess.js');
   window.__test = window.__test || {};
