@@ -688,13 +688,20 @@ async function kleinTeil(browser) {
         const r = los ? los.getBoundingClientRect() : null;
         return { n: k.length, los: r ? { top: Math.round(r.top), bottom: Math.round(r.bottom) } : null, ih: innerHeight,
           alle: k.every((x) => { const b = x.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight && b.height >= 44; }),
-          quer: document.documentElement.scrollWidth <= innerWidth + 1 };
+          quer: document.documentElement.scrollWidth <= innerWidth + 1,
+          // R8 (13.11.2026): die stehende Leiste legt kein Band in Seitenfarbe ueber die Karte (sonst Kante und Farbsprung
+          // mitten in der weissen bzw. dunklen Karte, Bilder R8): weder eigener Grund noch Verlauf davor
+          band: (() => { const a = document.querySelector('.ls-screen .ls-aktionen'); if (!a) return 'fehlt';
+            const leer = (c) => c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c);
+            const vor = getComputedStyle(a, '::before');
+            return leer(getComputedStyle(a).backgroundColor) && getComputedStyle(a).backgroundImage === 'none'
+              && (vor.content === 'none' || vor.content === 'normal' || vor.backgroundImage === 'none') ? '' : 'band'; })() };
       });
       const ueber = m.los ? m.los.bottom - m.ih : 999;
       if (!schlimmste || ueber > schlimmste.ueber) schlimmste = { id: l.id, ueber };
-      if (!m.los || m.los.bottom > m.ih || m.los.top < 0 || !m.alle || !m.quer) schlecht.push(`${l.id}:${ueber}`);
+      if (!m.los || m.los.bottom > m.ih || m.los.top < 0 || !m.alle || !m.quer || m.band) schlecht.push(`${l.id}:${ueber}${m.band ? ':' + m.band : ''}`);
     }
-    pruefe(`${geraet}: „Los geht's“ (und jeder Knopf der Idee-Phase) in allen ${ALLE.length} Lektionen ganz im Bild (B9)`, schlecht.length === 0,
+    pruefe(`${geraet}: „Los geht's“ (und jeder Knopf der Idee-Phase) in allen ${ALLE.length} Lektionen ganz im Bild, ohne Band ueber der Karte (B9, R8)`, schlecht.length === 0,
       { schlecht: schlecht.join(' '), schlimmste });
     if (process.env.BILDER && schlimmste) {
       for (const modus of ['hell', 'dunkel']) {
