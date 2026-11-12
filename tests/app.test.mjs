@@ -798,7 +798,9 @@ async function testePruefrunde(browser) {
     await seite.waitForSelector('.dialog-ort .dialog');
     await seite.waitForSelector('.ergebnis-overlay', { timeout: 15000 });
     await warte(400);
-    pruefe('Bot setzt matt: Rückfrage "Aufgeben?" ist zu', await seite.locator('.dialog-ort').count() === 0);
+    // Die Rueckfrage klappt beim Matt 200 ms zu (.dialog-ort.weg) und steht so lange noch im DOM: auf den Endzustand
+    // warten statt nach fester Pause zu zaehlen. Bliebe sie offen, verschwaende sie nie, und die Pruefung schlaegt fehl.
+    pruefe('Bot setzt matt: Rückfrage "Aufgeben?" ist zu', await seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false));
     pruefe('Bot setzt matt: Ergebnis Niederlage durch Matt', /matt/i.test(await seite.locator('.erg-unter').innerText()));
     await seite.evaluate(() => { window.__test = {}; });
 
@@ -917,7 +919,9 @@ async function testePruefrunde(browser) {
     await seite.waitForFunction(() => window.__partie && window.__partie.z.zuege.length === 2, null, { timeout: 20000 }).catch(() => {});
     const dauer = Date.now() - t0;
     pruefe('Kaputte Engine-Datei: Bot zieht ohne langes Warten', dauer < 6000, dauer + ' ms');
-    pruefe('Kaputte Engine-Datei: nur eine Meldung', await seite.locator('.dialog-ort').count() === 0);
+    // Die weggetippte Meldung klappt 200 ms zu (.dialog-ort.weg): auf den Endzustand warten statt auf die Pausen davor
+    // zu bauen. Eine zweite Meldung bliebe offen, verschwaende nie, und die Pruefung schlaegt fehl.
+    pruefe('Kaputte Engine-Datei: nur eine Meldung', await seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false));
     await kontext.close();
   }
   {
