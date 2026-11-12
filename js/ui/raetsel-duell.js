@@ -299,7 +299,8 @@ export function zeige(root, params, app) {
     hole();
     tick();
   }
-  const zeichneReihe = () => { if (d.id) merkeLauf(d.id, d.reihe); const ort = rumpf.querySelector('.rd-reihe-ort'); if (ort) ort.innerHTML = reiheHtml(); };
+  // nach dem gezeigten Ende (eine spaete Zug-Antwort) nicht wieder merken, sonst kaeme das Ergebnis beim Neuladen erneut
+  const zeichneReihe = () => { if (d.id && s.dataset.phase !== 'beendet') merkeLauf(d.id, d.reihe); const ort = rumpf.querySelector('.rd-reihe-ort'); if (ort) ort.innerHTML = reiheHtml(); };
 
   // Abfrage alle 1 s: Gegner live, Ende; das eigene Raetsel nur, wenn gerade kein Zug unterwegs ist
   async function hole() {
