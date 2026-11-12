@@ -129,6 +129,11 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .pr-orden-bild svg { width: 24px; height: 24px; }
 .pr-orden-bild svg.sk-erfolg, .pr-orden-knopf .pr-orden-bild svg.sk-erfolg { width: 40px; height: 40px; }   /* eigene Abzeichen (js/sammlung-kunst.js) */
 .pr-plus { font-size: 26px; line-height: 40px; }
+/* R4a (Kritik 09.11.): leere Vitrine (neuer Spieler) als EIN schmaler Platz in einer Zeile statt drei grosser leerer Kaesten */
+.pr-vitrine[data-leer] { grid-template-columns: minmax(0, 1fr); }
+.pr-vitrine[data-leer] .pr-orden { grid-auto-flow: column; justify-content: center; align-items: center; gap: 8px; min-height: 44px; padding: 4px 12px; }
+.pr-vitrine[data-leer] .pr-plus { font-size: 20px; line-height: 1; }
+.pr-vitrine[data-leer] .pr-orden small { font-size: 14px; font-weight: 600; }
 .pr-hilfe { margin: 0; font-size: 13px; color: var(--text-2); }
 .pr-wahl h4 { margin: 4px 0 8px; font-size: 13px; color: var(--text-2); }
 .pr-figuren { display: grid; grid-template-columns: repeat(var(--n, 6), minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
@@ -282,6 +287,9 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 /* Ausruestung mit Plaetzen (G-002, Sammlung B): Plaetze untereinander, Auswahl als Blatt, Erfolge und Shop als grosse Knoepfe */
 .sa-ort[hidden] { display: none; }
 .sa-plaetze { display: grid; gap: 20px; min-width: 0; max-width: 760px; padding: 0 var(--rand) 24px; }
+/* R4a (Kritik 09.11., pc-ich.jpg): Profilkarte und Zaehler stehen in derselben Spalte wie die Plaetze; vorher war die Karte am
+   PC bis 1624 px breit, die Liste darunter 704 px */
+.sa-kopf-ort, .sa-stand { max-width: 760px; }
 .sa-platz-gruppe { display: grid; gap: 10px; min-width: 0; }
 .sa-platz-titel { margin: 0; padding: 0 4px; font-size: 13px; font-weight: var(--gw-stark); letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
 .sa-platz-liste { display: grid; gap: 10px; min-width: 0; }

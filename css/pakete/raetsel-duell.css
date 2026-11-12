@@ -73,40 +73,60 @@
 .rd-ring-rest { stroke: var(--akzent); stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
 .rd-code-gross { font-size: 40px; font-weight: 800; letter-spacing: .14em; color: var(--text); }
 
-/* ---------- Duell ---------- */
-.rd-spiel { --rd-b: min(calc(100cqw - 2 * var(--rand)), calc(100cqh - 200px), 640px); display: flex; flex-direction: column; align-items: center; gap: 12px; }
-/* Kopf an Kopf: Avatar, Zahl | Ring-Uhr | Zahl, Avatar; beide Seiten gleich hoch */
-.rd-leiste { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; width: var(--rd-b); min-width: 0;
-  padding: 10px 12px; border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
-/* Reihe 1 Avatar und Zahl, darunter Name (ganze Breite, damit "KI-Gegner · 1200" nicht dreifach umbricht), Fehler, Balken */
-.rd-seite { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 8px; row-gap: 2px; min-width: 0; }
-.rd-zahlen { display: contents; }
-.rd-seite .rd-av { width: 44px; height: 44px; grid-row: 1; grid-column: 1; box-shadow: 0 0 0 2px var(--gold, var(--akzent)); }
-.rd-seite .rd-geloest { grid-row: 1; grid-column: 2; }
-.rd-seite .rd-name, .rd-seite .rd-fehlerzahl { grid-column: 1 / -1; }
-.rd-seite[data-wer="gegner"] { grid-template-columns: minmax(0, 1fr) auto; text-align: right; }
-.rd-seite[data-wer="gegner"] .rd-av { grid-column: 2; }
-.rd-seite[data-wer="gegner"] .rd-geloest { grid-column: 1; justify-self: end; }
-.rd-geloest { font-size: 26px; font-weight: 900; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+/* ---------- Duell (R3, 12.11.2026: Gerippe der Bot-Partie, css/partie.css) ----------
+   Hochformat: Gegner-Leiste, Brett, eigene Leiste mit Uhr, Zeile, Reihe. Handy: Brett von Rand zu Rand ohne Sockel,
+   Leisten 10 px vom Rand (--rand-brett-handy); iPad hoch: Sockel 4 px. Querformat: Brett links, rechts die Spalte
+   (Gegner, Zeile, Reihe, unten die eigene Leiste) wie die Partie quer. Waehrend des Spiels keine Reiter-Leiste. */
+html[data-reiter="unten"]:has(.screen.raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"])) .reiter-leiste { display: none; }
+html[data-reiter="unten"] #app > .screen.raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) { height: 100vh; height: 100dvh; }
+.raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) .rd-rumpf {
+  padding: 4px 0 calc(12px + env(safe-area-inset-bottom, 0px)); align-content: safe center; }
+/* --rd-reserve: zwei Leisten 66, Zeile 44, Reihe 8, vier Luecken 10, Sockel */
+.rd-spiel { --rd-rahmen: 4px; --rd-rand: var(--rand-brett-handy, 10px); --rd-reserve: calc(2 * 66px + 44px + 8px + 4 * 10px + 2 * var(--rd-rahmen));
+  --rd-b: min(calc(100cqw - 2 * var(--rd-rahmen)), calc(100cqh - var(--rd-reserve)), 720px);
+  display: grid; grid-template-columns: minmax(0, calc(var(--rd-b) + 2 * var(--rd-rahmen))); justify-content: center; row-gap: 10px; min-width: 0; }
+/* Leisten, Zeile und Reihe: so breit wie Brett und Sockel, auf dem Handy 10 px vom Rand */
+.rd-spiel > .rd-seite, .rd-zeile, .rd-reihe-ort { margin-inline: max(0px, calc(var(--rd-rand) - (100cqw - var(--rd-b) - 2 * var(--rd-rahmen)) / 2)); min-width: 0; }
+.rd-brettzone { justify-self: center; }
+.rd-rahmen { --rahmen: var(--rd-rahmen); width: calc(var(--rd-b) + 2 * var(--rd-rahmen)); }
+.raetsel-duell[data-phase="zeit_um"] .rd-brettzone, .raetsel-duell[data-phase="vorlauf"] .rd-brettzone { opacity: .6; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .rd-spiel { --rd-rahmen: 0px; }
+  .rd-rahmen { border-radius: 0; box-shadow: none; background: none; }
+  .rd-rahmen > .rd-brett { --brett-radius: 0px; }
+}
+
+/* Leiste wie .partie .spieler: Karte 66 px, Avatar 46 px (Radius 15), Name 16 px; rechts die Zahl der geloesten
+   Raetsel, bei Flo dazu die Uhr; unten ein duenner Balken (Anteil am gemeinsamen Stand) */
+.rd-seite { --av: 46px; position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av info zahl";
+  align-items: center; column-gap: 12px; min-height: 66px; padding: 10px 10px 10px 12px; border-radius: 20px;
+  background-color: var(--flaeche); background-image: var(--textur-flaeche, none); box-shadow: var(--s1), var(--kante); }
+.rd-seite.ich { grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "av info zahl uhr"; }
+.rd-seite > .av { grid-area: av; display: grid; place-items: center; width: var(--av); height: var(--av); border-radius: 15px; overflow: hidden;
+  background: var(--flaeche-2); color: var(--text-2); box-shadow: none; }
+.rd-seite.ich > .av { background: var(--flo-grund); }
+.rd-seite > .av > svg, .rd-seite > .av > img { display: block; width: 100%; height: 100%; }
+.rd-seite > .av > .ico { width: 55%; height: 55%; }
+.rd-frage { font-size: 22px; font-weight: 800; color: var(--text-2); }
+.rd-info { grid-area: info; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 /* bricht um statt abzuschneiden: "KI-Gegner · 1200" muss auf dem Handy ganz lesbar bleiben (Kennzeichnung) */
-.rd-name { font-size: 12.5px; font-weight: 750; line-height: 1.25; color: var(--text-2); overflow-wrap: anywhere; text-wrap: balance; }
-.rd-seite[data-ki="ja"] .rd-name { color: var(--akzent-text, var(--text-2)); }
-.rd-fehlerzahl { font-size: 11.5px; color: var(--text-2); }
+.rd-name { font-size: 16px; font-weight: 800; line-height: 1.25; color: var(--text); overflow-wrap: anywhere; }
+.rd-fehlerzahl { font-size: 13.5px; font-weight: 650; color: var(--text-2); }
 .rd-fehlerzahl:empty { display: none; }
-.rd-balken { grid-column: 1 / -1; display: block; height: 4px; border-radius: var(--r-pille); background: var(--linie-2); overflow: hidden; }
+.rd-geloest { grid-area: zahl; min-width: 1.2ch; font-size: 28px; font-weight: 900; line-height: 1; text-align: right; color: var(--text);
+  font-variant-numeric: tabular-nums; }
+/* eigene Uhr wie .partie .uhr: ruhend grau, laufend dunkel, die letzten 30 Sekunden in Warnfarbe */
+.rd-seite .rd-uhr { grid-area: uhr; display: flex; align-items: center; justify-content: center; min-width: 84px; height: 46px; padding: 0 12px;
+  border-radius: 14px; font-weight: 800; font-size: 21px; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+  background: var(--flaeche-3); color: var(--text-2); transition: background-color var(--d-m) var(--sanft), color var(--d-m) var(--sanft); }
+.rd-seite .rd-uhr.laeuft { background: var(--tinte); color: var(--auf-tinte); }
+.rd-seite .rd-uhr.warn { background: var(--warn); color: var(--grund); }
+.rd-balken { position: absolute; left: 12px; right: 12px; bottom: 5px; height: 3px; border-radius: var(--r-pille); background: var(--linie-2); overflow: hidden; }
 .rd-balken > i { display: block; height: 100%; background: var(--gut); transform: scaleX(0); transform-origin: 0 50%;
   transition: transform var(--d-m, .3s) var(--sanft, ease); }
-.rd-seite[data-wer="gegner"] .rd-balken > i { background: var(--akzent); transform-origin: 100% 50%; }
-.rd-ring { position: relative; display: grid; place-items: center; width: 78px; height: 78px; }
-.rd-uhr { position: relative; font-size: 19px; font-weight: 850; color: var(--text); font-variant-numeric: tabular-nums; }
-.raetsel-duell[data-phase="zeit_um"] .rd-uhr, .raetsel-duell[data-phase="vorlauf"] .rd-uhr { color: var(--text-2); }
-.raetsel-duell[data-phase="vorlauf"] .rd-ring-rest { stroke: var(--linie-2); }
+.rd-seite.gegner .rd-balken > i { background: var(--akzent); }
 
-.rd-brettzone { width: var(--rd-b); }
-.rd-rahmen { width: var(--rd-b); }
-.raetsel-duell[data-phase="zeit_um"] .rd-brettzone, .raetsel-duell[data-phase="vorlauf"] .rd-brettzone { opacity: .6; }
-
-.rd-zeile { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; width: var(--rd-b); min-height: 44px; margin: 0; font-size: 14.5px; color: var(--text-2); }
+.rd-zeile { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 44px; margin-block: 0; font-size: 14.5px; color: var(--text-2); }
 .rd-nr { font-weight: 800; color: var(--text); }
 /* Rueckmeldung als Schild mit Farbpunkt, nicht unterstrichen (sah aus wie ein Link) */
 .rd-meldung { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-weight: 750; color: var(--text); }
@@ -115,11 +135,34 @@
 .rd-meldung[data-art="falsch"]::before { background: var(--warn); }
 
 /* Reihe der eigenen Raetsel: gruen geloest, rot Fehler, leer noch offen */
-.rd-reihe-ort { width: var(--rd-b); }
 .rd-reihe { display: grid; grid-template-columns: repeat(auto-fill, minmax(24px, 1fr)); gap: 6px; width: 100%; margin: 0; padding: 0; list-style: none; }
 .rd-reihe li { height: 8px; border-radius: var(--r-pille); background: var(--linie-2); }
 .rd-reihe li[data-art="g"] { background: var(--gut); }
 .rd-reihe li[data-art="r"] { background: var(--warn); }
+
+/* Querformat (iPad quer, PC, Handy quer): Brett links ueber die ganze Hoehe, rechts die Spalte wie bei der Partie */
+@media (orientation: landscape) {
+  .raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) .rd-rumpf {
+    padding: 12px clamp(12px, 2.5vw, 24px) calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .rd-spiel { --rd-seite: clamp(248px, 31cqw, 400px); --rd-luecke: clamp(12px, 2vw, 20px);
+    --rd-b: min(calc(100cqh - 2 * var(--rd-rahmen)), calc(100cqw - var(--rd-seite) - var(--rd-luecke) - 2 * var(--rd-rahmen)), 760px);
+    grid-template-columns: calc(var(--rd-b) + 2 * var(--rd-rahmen)) var(--rd-seite); grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "brett gegner" "brett zeile" "brett reihe" "brett ." "brett ich"; column-gap: var(--rd-luecke); row-gap: 12px;
+    height: calc(var(--rd-b) + 2 * var(--rd-rahmen)); }
+  .rd-spiel > .rd-seite, .rd-zeile, .rd-reihe-ort { margin-inline: 0; }
+  .rd-brettzone { grid-area: brett; align-self: start; }
+  .rd-spiel > .gegner { grid-area: gegner; }
+  .rd-spiel > .ich { grid-area: ich; }
+  .rd-zeile { grid-area: zeile; }
+  .rd-reihe-ort { grid-area: reihe; }
+  .rd-meldung { margin-left: 0; }
+}
+/* Handy quer (wenig Hoehe): Leisten straffen */
+@media (orientation: landscape) and (max-height: 480px) {
+  .rd-seite { --av: 36px; min-height: 54px; padding-top: 6px; padding-bottom: 6px; }
+  .rd-seite .rd-uhr { height: 38px; min-width: 70px; font-size: 18px; }
+  .rd-geloest { font-size: 24px; }
+}
 
 /* ---------- Ende ---------- */
 .rd-ende-paar { align-items: flex-end; }
@@ -136,14 +179,6 @@
 .rd-ende .rd-reihe li[data-art="r"] { background: var(--warn); }
 .rd-ende .rd-knoepfe .knopf { background: rgba(255, 255, 255, .1); color: var(--auf-buehne); border-color: transparent; }
 .rd-ende .rd-knoepfe .knopf:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
-
-/* Handy quer und kleine Hoehe: Leiste kompakter */
-@container rd (max-height: 560px) {
-  .rd-spiel { --rd-b: min(calc(100cqw - 2 * var(--rand)), calc(100cqh - 150px), 640px); gap: 8px; }
-  .rd-leiste { padding: 6px 10px; }
-  .rd-ring { width: 60px; height: 60px; }
-  .rd-uhr { font-size: 16px; }
-}
 
 html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > i { transition: none; }
 @media (prefers-reduced-motion: reduce) {
