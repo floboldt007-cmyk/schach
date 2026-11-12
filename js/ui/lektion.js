@@ -123,6 +123,19 @@ export function zeige(root, params, app) {
     ausrichtung: flo, figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug,
     koordinaten: einst.koordinaten !== false, autoDame: einst.autoDame !== false,
   });
+  // Figurensatz wirkt sofort (R4, 12.11.2026, dasselbe Muster wie wendeFigurensatzAn in js/ui/partie.js): kommt der
+  // Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt
+  // der Spieler einen anderen Satz, bekommen die stehenden Figuren den neuen Satz, ohne das Brett neu zu bauen. Neue Figuren
+  // (Umwandlung) nimmt das Brett aus brett.figurenPfad; Dateiname je Figur <code>.svg wie in Brett._bild (js/board.js).
+  // Ohne detail kein Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto.
+  const beiEinstellungen = (e) => {
+    const p = e.detail ? figurenPfad(e.detail) : null;
+    const pfad = p ? new URL(p, WURZEL).href : null;
+    if (!pfad || pfad === brett.figurenPfad) return;
+    brett.figurenPfad = pfad;
+    for (const img of brett.el.querySelectorAll('img.figur[data-figur]')) img.src = pfad + img.dataset.figur + '.svg';
+  };
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
   const schach = () => (st.chess.inCheck() ? true : null);
   const zeichne = (m, animieren = false) => brett.setzeStellung(st.chess.fen(), { animieren, letzterZug: m ? [m.from, m.to] : null, schach: schach() });
   const erlaube = () => brett.erlaubeZuege(st.phase === 'flo' ? zielKarte(st.chess) : null);
@@ -427,6 +440,7 @@ export function zeige(root, params, app) {
       aktiv = null;
       for (const id of timer) clearTimeout(id);
       timer.clear();
+      window.removeEventListener('schach:einstellungen', beiEinstellungen);
       try { kopf.verlasse(); } catch (e) { /* egal */ }
       try { brett.zerstoere(); } catch (e) { /* egal */ }
     },

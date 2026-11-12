@@ -371,6 +371,25 @@ try {
     && haengt.grund === 'abgebrochen' && (await seite.locator('.on-ergebnis h3').innerText()) === 'Partie beendet'
     && (await seite.locator('.on-ergebnis').innerText()).includes('zu lange kein Zug'));
   await seite.evaluate(() => { window.__versatz = 0; });
+  // R4 (12.11.2026, d8d128e): gewertet beendet der Server eine Partie ohne 2. Halbzug nach 30 s, die Oberflaeche fragt nach
+  // 31 s (HAENGT_RANKED_MS); Freundespartien bleiben bei 10 Minuten. Gegenfall zuerst: Freundespartie nach 32 s noch offen
+  const freundHaengt = partie({ zuege: 'e2e4', zeit: 300 }); await oeffne(freundHaengt);
+  await seite.evaluate(() => { window.__versatz += 32 * 1000; });
+  await seite.waitForTimeout(1500);
+  pruefe('Freundespartie ohne 2. Halbzug: nach 32 s keine Abfrage, die Partie laeuft weiter', freundHaengt.status === 'laeuft'
+    && !calls.some(c => c.pfad.endsWith('online_pruefe_zeit') && c.body.partie === freundHaengt.id) && await seite.locator('.on-ergebnis').isHidden());
+  await seite.evaluate(() => { window.__versatz = 0; });
+  const rankedHaengt = partie({ zuege: 'e2e4', zeit: 300, gewertet: true }); await oeffne(rankedHaengt);
+  await seite.evaluate(() => { window.__versatz += 20 * 1000; });
+  await seite.waitForTimeout(1500);
+  const rankedZuFrueh = calls.some(c => c.pfad.endsWith('online_pruefe_zeit') && c.body.partie === rankedHaengt.id);
+  await seite.evaluate(() => { window.__versatz += 12 * 1000; });
+  const rankedEnde = await seite.locator('.on-ergebnis:not([hidden])').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  pruefe('Gewertete Partie ohne 2. Halbzug: nach 20 s noch keine Abfrage, nach 32 s abgebrochen mit Blatt "Partie beendet"', !rankedZuFrueh && rankedEnde
+    && calls.filter(c => c.pfad.endsWith('online_pruefe_zeit') && c.body.partie === rankedHaengt.id).length === 1
+    && rankedHaengt.grund === 'abgebrochen' && (await seite.locator('.on-ergebnis h3').innerText()) === 'Partie beendet'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('zu lange kein Zug'), { rankedZuFrueh, rankedEnde, p: rankedHaengt });
+  await seite.evaluate(() => { window.__versatz = 0; });
   const aufgabe = partie(); await oeffne(aufgabe);
   await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
   await seite.locator('.on-ergebnis:not([hidden])').waitFor();
