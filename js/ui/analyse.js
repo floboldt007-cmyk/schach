@@ -163,6 +163,40 @@ function ergebnisInfo(partie, letzteNummer) {
   return { stand, grund, wort, art: e === 'sieg' ? 'sieg' : e === 'niederlage' ? 'niederlage' : 'remis' };
 }
 
+// Satz der Start-Karte. kurz: weniger als BESTWERT_MIN_ZUEGE eigene Zuege (dieselbe Grenze wie "zu kurz" in der
+// Genauigkeit). Eine kurze Partie bekommt einen Satz fuer das schnelle Ende: warKnapp() sieht in einer Kurve aus vier
+// Stellungen nur offene Stellungen und meldete nach Matt im 2. Zug "Knapp!" (R7, Befund B14).
+export function startSatz({ art, zuzweit = false, kurz = false, knapp = false, momente = 0 }) {
+  if (zuzweit) return { schluessel: 'analyse.an.start.zuzweit' };
+  if (kurz && art === 'niederlage') return { schluessel: 'analyse.an.start.schnellNiederlage' };
+  if (kurz && art === 'sieg') return { schluessel: 'analyse.an.start.schnellSieg' };
+  if (art === 'sieg') return { schluessel: 'analyse.an.start.sieg' };
+  if (art !== 'niederlage') return { schluessel: 'analyse.an.start.remis' };
+  // Mehrzahl ueber n: ...Momente.eins (den Schluesselmoment) / ...Momente.mehr (die n Schluesselmomente)
+  if (momente) return { schluessel: knapp ? 'analyse.an.start.knappMomente' : 'analyse.an.start.kopfHochMomente', werte: { n: momente } };
+  return { schluessel: knapp ? 'analyse.an.start.knapp' : 'analyse.an.start.kopfHoch' };
+}
+
+// Halbzug, bei dem die Analyse oeffnet (-1 = Startstellung). Ein ausdruecklicher Zug (Liga-Zeile, Verlauf) gewinnt. Eine
+// lange Partie oeffnet an der Startstellung zum Durchgehen, ein kurzer Sieg auch (seine Start-Karte zeigt auf den
+// entscheidenden Zug; tests/app.test.mjs "analyse:gesehen beim Zugwechsel" geht so durch das Schaefermatt). Eine kurze
+// Niederlage oeffnet am entscheidenden Zug, dem mit dem groessten Ausschlag der Gewinnchance (wie eine Zeile der Liga,
+// punkte/stand.js), ohne Kurve an der Schlussstellung: nach Matt im 2. Zug zeigt die Startstellung nichts (R7, B14).
+// kurve: Gewinnchance Sicht Weiss je Stellung (Laenge zuege + 1)
+export function startPly({ kurve, zuege, kurz, art, ply = null }) {
+  if (ply != null && Number.isFinite(Number(ply))) return Number(ply);
+  if (!kurz || art !== 'niederlage' || !(zuege > 0)) return -1;
+  let best = zuege - 1;
+  if (Array.isArray(kurve) && kurve.length === zuege + 1) {
+    let max = -1;
+    for (let i = 0; i < zuege; i++) {
+      const v = Math.abs(kurve[i + 1] - kurve[i]);
+      if (Number.isFinite(v) && v > max + 1e-9) { max = v; best = i; }
+    }
+  }
+  return best;
+}
+
 export function zeige(root, params = {}, app) {
   const ac = new AbortController();
   let beendet = false;
@@ -175,6 +209,8 @@ export function zeige(root, params = {}, app) {
   const einst = (() => { try { return app.einstellungen(); } catch (e) { return {}; } })();
   const orte = { oben: null, coach: null };   // Fuellungen der Anzeige-Orte (verlasse vor dem Neuzeichnen)
   const zuzweit = () => st.partie?.modus === 'zuzweit';
+  // zu kurz fuer eine verlaessliche Bewertung: dieselbe Grenze wie der Bestwert und "zu kurz" in der Genauigkeit
+  const istKurz = () => eigeneZuege(st.partie) < BESTWERT_MIN_ZUEGE;
   const personenName = (f) => pruefeZuzweit(st.partie?.zuzweit)[f === 'w' ? 'weiss' : 'schwarz'];
   const personenBild = (f) => `<div class="an-avatar" aria-hidden="true"><img src="${pfad('assets/pieces/' + f + 'K.svg')}" alt=""></div>`;
 
@@ -494,9 +530,8 @@ export function zeige(root, params = {}, app) {
     verbindeWischen();
     lausche(document, 'keydown', taste);
 
-    let start0 = -1;
-    if (params.ply != null && Number.isFinite(Number(params.ply))) start0 = Number(params.ply);
-    springe(start0, { animieren: false });
+    springe(startPly({ kurve: st.kurve, zuege: st.zuege.length, kurz: istKurz(), art: zuzweit() ? null : st.partie.ergebnis, ply: params.ply }),
+      { animieren: false });
   }
 
   // ---------- Bausteine rechts ----------
@@ -828,14 +863,8 @@ export function zeige(root, params = {}, app) {
       const anzahlMomente = (st.review.schluesselmomente || []).length;
       // "Knapp!" nur, wenn die Partie bis spaet offen war
       const knapp = warKnapp(st.kurve, st.sf);
-      // Mehrzahl ueber n: ...Momente.eins (den Schluesselmoment) / ...Momente.mehr (die n Schluesselmomente)
-      const satz = zuzweit() ? t('analyse.an.start.zuzweit') : info.art === 'sieg'
-        ? t('analyse.an.start.sieg')
-        : info.art === 'niederlage'
-          ? (anzahlMomente
-            ? t(knapp ? 'analyse.an.start.knappMomente' : 'analyse.an.start.kopfHochMomente', { n: anzahlMomente })
-            : t(knapp ? 'analyse.an.start.knapp' : 'analyse.an.start.kopfHoch'))
-          : t('analyse.an.start.remis');
+      const s = startSatz({ art: info.art, zuzweit: zuzweit(), kurz: istKurz(), knapp, momente: anzahlMomente });
+      const satz = t(s.schluessel, s.werte);
       el.innerHTML = `
         <div class="an-c-symbol an-c-start">${icon('ziel')}</div>
         <div class="an-c-kopf"><span class="an-c-klasse">${esc(info.wort)}</span><span class="an-c-zug">${esc(t('analyse.an.startstellung'))}</span></div>

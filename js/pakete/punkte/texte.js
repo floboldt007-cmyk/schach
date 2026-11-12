@@ -39,6 +39,7 @@ registriereTexte('p-punkte', {
     fast: 'So nah wie noch nie: {prozent} % deines Rekords auf {name}',
     wochePlatz: 'Diese Woche: Platz {platz} auf {name}',
     bestwert: '{name}: dein Bestwert {wert}',
+    kurz: 'Zu kurz für die volle Wertung: vor dem 10. eigenen Zug kein Ergebnis-Bonus',
     // Aufschluesselung (ansicht.posten)
     'posten.zuege': 'Züge ({offen} offen)',
     'posten.theorie': 'Theorie',
@@ -312,6 +313,7 @@ registriereTexte('p-punkte', {
     fast: 'Closer than ever: {prozent}% of your record on {name}',
     wochePlatz: 'This week: #{platz} on {name}',
     bestwert: '{name}: your best is {wert}',
+    kurz: 'Too short for full scoring: no result bonus before your 10th move',
     'posten.zuege': 'Moves ({offen} in open play)',
     'posten.theorie': 'Theory',
     'posten.kurz': 'Ended before your 10th move: no result bonus',
