@@ -12,8 +12,8 @@
 //   PORT=9631 node tests/funktion-shop-skin.test.mjs            eigener Port (Standard 8981)
 //
 // Je Ansicht zwei Pruefungen: der gewaehlte Satz steht im Brett, und ein Wechsel bei offener Ansicht wirkt sofort (spaeter
-// Erfinder-Status, R3/R4). Harte Pruefungen (hart: true): Zu zweit und Lektion, dort baut so/R4-skin2 die Reparatur, dazu
-// der Wechsel im Raetsel-Duell (Befund F-shop, noch ohne Reparatur). Ohne PROBE_STRENG=1
+// Erfinder-Status, R3/R4). Harte Pruefungen (hart: true): Zu zweit und Lektion, dort baut so/R4-skin2 die Reparatur. Der
+// Wechsel im Raetsel-Duell (Befund F-shop) ist seit der Reparatur F-duell streng. Ohne PROBE_STRENG=1
 // erscheinen sie rot als "ROT-ERWARTET" und blockieren nichts (tests/alle.mjs zaehlt nur "FEHLER" und den Exitcode).
 import http from 'node:http';
 import { createRequire } from 'node:module';
@@ -113,8 +113,8 @@ const satzAuf = (s, sel) => s.evaluate(({ sel, skin }) => {
 }, { sel, skin: SKIN });
 const imSatz = r => r.da && r.n > 0 && r.imSatz === r.n && r.geladen === r.n;
 async function bild(s, name) { if (BILDER) await s.screenshot({ path: path.join(BILDER, name + '.png') }).catch(e => console.log('Bild ' + name + ': ' + e.message)); }
-// hartWechsel: nur die Wechsel-Pruefung ist hart (Raetsel-Duell, Befund F-shop 12.11.: der Satz folgt dort nicht, solange
-// das Duell offen ist; noch ohne Reparatur, nicht Teil von so/R4-skin2)
+// hartWechsel: nur die Wechsel-Pruefung ist hart (frei fuer eine Ansicht, deren Satz-Wechsel noch keine Reparatur hat;
+// das Raetsel-Duell war so bis F-duell 12.11., seither streng)
 async function ansicht(s, name, sel, { hart = false, hartWechsel = hart } = {}) {
   // Figuren erscheinen, sobald das Brett steht; der Satz kann noch nachkommen (Einstellungen spaet), darum bis 4 s warten
   await s.waitForFunction(({ sel, skin }) => {
@@ -181,7 +181,9 @@ try {
   const s = await kontext.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', e => fehler.push(e.message));
   await s.goto(`http://127.0.0.1:${PORT}/index.html?test#heim`);
-  await s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function');
+  // erst wenn die Startseite steht: sonst kann die Start-Navigation den Sprung in die Partie ueberholen, und ohne laufende
+  // Partie landet sie auf der Bot-Auswahl (F-duell 12.11.: 2 von 3 Laeufen; wie tests/partie-figurensatz.test.mjs)
+  await s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('.screen.heim-screen'), null, { timeout: AUFBAU_MS });
 
   // 0) Gegenprobe vor der Wahl: mit dem Standardsatz zeigt das Bot-Brett KEINE Figur aus dem Satz (sonst misst die Probe nichts)
   await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
@@ -245,7 +247,7 @@ try {
   await s.waitForSelector('.screen.raetsel-duell[data-phase="start"] .rd-suchen', { timeout: 30000 });
   await s.locator('.rd-suchen').click();
   await s.waitForFunction(() => document.querySelectorAll('.screen.raetsel-duell .rd-brett img.figur').length > 0, null, { timeout: 15000 }).catch(() => {});
-  await ansicht(s, 'raetsel-duell', '.screen.raetsel-duell .rd-brett', { hartWechsel: true });
+  await ansicht(s, 'raetsel-duell', '.screen.raetsel-duell .rd-brett');
 
   // 7) Meisterschule-Lektion
   await s.evaluate(() => window.__app.gehe('lektion', { id: 'skandinavisch' }));
