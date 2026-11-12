@@ -501,10 +501,21 @@ export function zeige(root, params, app) {
   // Suche startete. Kennt der Server das Duell nicht (mehr) oder ist es noch offen, gilt der Start wie bisher; ohne
   // Antwort (offline) bleibt es beim Duell, die Abfrage versucht es weiter.
   const lauf = server.angemeldet() && !(params && params.code) ? ladeLauf() : null;
+  // Die Online-Tuer startet ihre Suche genau einmal: danach traegt der Verlaufseintrag kein suchen mehr, sonst startete
+  // ein Neuladen nach dem gezeigten Ergebnis (der Lauf ist dann vergessen) eine neue Suche ohne Klick (wie js/ui/lobby.js)
+  const suchenVerbraucht = () => {
+    try {
+      const h = history.state;
+      if (!h || !h.schach || h.name !== 'raetsel-duell' || !h.params || !h.params.suchen) return;
+      const rest = { ...h.params };
+      delete rest.suchen;
+      history.replaceState({ ...h, params: rest }, '', location.hash);
+    } catch (e) { /* egal */ }
+  };
   const oeffne = () => {
     zeigeStart();
     if (params && params.code && server.angemeldet()) tritteBei(params.code);
-    else if (params && params.suchen && server.angemeldet()) starteSuche();
+    else if (params && params.suchen && server.angemeldet()) { suchenVerbraucht(); starteSuche(); }
   };
   if (lauf) {
     (async () => {
