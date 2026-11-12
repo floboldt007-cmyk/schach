@@ -18,8 +18,9 @@
 // ("Läufer II") und "Platz 3 von 30" bzw. "Spiel eine Partie für deine Gruppe", Balken bis Platz 5. Erst der gemerkte
 // Stand (Modul kronen, nur fuer dasselbe Konto), dann der Server-Stand (js/kronen.js holeStand), gemerkt. Ohne Konto
 // oder ohne jeden Stand entfaellt die Zeile still.
-// DOM: section.screen.heim-screen > header.haupt-kopf, .heim-rumpf > .heim-links (.heim-gruss, .heim-buehne[data-art]),
-// .heim-rechts (.heim-naechstes?, .heim-wege > button.heim-modus[data-aktion]). Optik: css/heim.css, nur Tokens.
+// DOM: section.screen.heim-screen > header.haupt-kopf, .heim-rumpf > .heim-links (.heim-gruss, .heim-buehne[data-art],
+// .heim-leiter? ohne Partie), .heim-rechts (.heim-naechstes?, .heim-wege > button.heim-modus[data-aktion]). Optik:
+// css/heim.css, nur Tokens.
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
 import { Brett } from '../board.js';
@@ -28,7 +29,7 @@ import { anim, tempo } from '../bewegung.js';
 import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen, ladePartien } from '../storage.js';
 import { BOTS, botNachId, rufname } from '../bots.js';
 import { eigenerName, sitzung } from '../konto.js';
-import { holeStand, angemeldet } from '../kronen.js';
+import { holeStand, angemeldet, RANKED_ZEIT } from '../kronen.js';
 import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js';
 import { stufeInfo, kronenSpeicher, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../pakete/liga/kronen.js';
 import * as serieStand from '../pakete/serie/stand.js';
@@ -40,6 +41,8 @@ import { t, zahl, registriereTexte } from '../sprache.js';
 import { stufenName } from '../pakete/liga/texte.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
+// Art der Online-Partie ("Blitz", online.zeit.*): der Weg Online nennt sie wie die Online-Seite (Feinschliff R6, B26)
+import '../sprachen/online.js';
 
 registriereTexte('heim', {
   de: {
@@ -50,8 +53,10 @@ registriereTexte('heim', {
     'gruss.name': '{gruss}, {name}',
     'titel.partie': 'Deine Partie wartet.',
     'titel.leer': 'Bereit für die nächste Partie?',
-    serie: '{n} Tage',
-    serieTitel: '{n} Tage in Folge gespielt',
+    'serie.eins': '{n:zahl} Tag',
+    'serie.mehr': '{n:zahl} Tage',
+    'serieTitel.eins': '{n:zahl} Tag in Folge gespielt',
+    'serieTitel.mehr': '{n:zahl} Tage in Folge gespielt',
     gegen: 'gegen {name} · Bot {elo}',
     zuzweit: '{weiss} gegen {schwarz} · Zu zweit',
     weiss: 'Weiß',
@@ -82,7 +87,7 @@ registriereTexte('heim', {
     'liga.ohneGruppe': 'Spiel eine Partie für deine Gruppe',
     'liga.label': '{stufe}, {zeile}, {kronen} Kronen diese Woche',
     'online.titel': 'Online',
-    'online.text': 'Schnellpartie',
+    'online.text': '{art} {zeit}',
     'raetsel.titel': 'Lernen',
     'raetsel.text': 'Rätsel und Meisterschule',
     'zuzweit.titel': 'Zu zweit',
@@ -103,8 +108,10 @@ registriereTexte('heim', {
     'gruss.name': '{gruss}, {name}',
     'titel.partie': 'Your game is waiting.',
     'titel.leer': 'Ready for the next game?',
-    serie: '{n} days',
-    serieTitel: '{n} days in a row',
+    'serie.eins': '{n:zahl} day',
+    'serie.mehr': '{n:zahl} days',
+    'serieTitel.eins': '{n:zahl} day in a row',
+    'serieTitel.mehr': '{n:zahl} days in a row',
     gegen: 'vs {name} · Bot {elo}',
     zuzweit: '{weiss} vs {schwarz} · Two players',
     weiss: 'White',
@@ -135,7 +142,7 @@ registriereTexte('heim', {
     'liga.ohneGruppe': 'Play a game to join your group',
     'liga.label': '{stufe}, {zeile}, {kronen} crowns this week',
     'online.titel': 'Online',
-    'online.text': 'Quick game',
+    'online.text': '{art} {zeit}',
     'raetsel.titel': 'Learn',
     'raetsel.text': 'Puzzles and master school',
     'zuzweit.titel': 'Two players',
@@ -152,6 +159,9 @@ registriereTexte('heim', {
 
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const WEGE = [['online', 'blitz'], ['raetsel', 'ziel'], ['zuzweit', 'personen']];
+// Untertitel des Wegs Online: Art und Bedenkzeit der gewerteten Partie aus RANKED_ZEIT, wie die Online-Seite sie nennt
+// ("Bedenkzeit 5 + 3 · Blitz", js/ui/online.js); vorher stand hier "Schnellpartie" (Feinschliff R6, B26)
+const wegWerte = () => ({ art: t('online.zeit.' + RANKED_ZEIT.art), zeit: RANKED_ZEIT.id.replace('+', ' + ') });
 const BEWERTUNG_TIEFE = 10;
 
 // Punkte und Stufe der laufenden Saison; jeder Fehler ergibt Holz und 0. vorhanden: es gibt einen Liga-Stand
@@ -400,7 +410,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
   const bot = partie ? null : naechsterGegner();
   const tage = serieTage(jetzt);
   const chips = tage > 0
-    ? `<span class="chip zahl heim-serie" title="${esc(t('heim.serieTitel', { n: zahl(tage) }))}"><i class="heim-punkt" aria-hidden="true"></i>${esc(t('heim.serie', { n: zahl(tage) }))}</span>`
+    ? `<span class="chip zahl heim-serie" title="${esc(t('heim.serieTitel', { n: tage }))}"><i class="heim-punkt" aria-hidden="true"></i>${esc(t('heim.serie', { n: tage }))}</span>`
     : '';
   const s = document.createElement('section');
   s.className = 'screen heim-screen';
@@ -410,13 +420,13 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
       <div class="heim-links">
         <div class="heim-gruss"><small>${esc(gruss(jetzt))}</small><h1>${esc(t(partie ? 'heim.titel.partie' : 'heim.titel.leer'))}</h1></div>
         <div class="heim-buehne" data-art="${partie ? 'partie' : 'gegner'}">${partie ? buehnePartie(laufend, st) : buehneGegner(bot)}</div>
+        ${partie ? '' : leiterZeile(bot)}
       </div>
       <div class="heim-rechts">
-        ${partie ? '' : leiterZeile(bot)}
         <div class="heim-wege">
           ${WEGE.map(([id, ic]) => `<button class="heim-modus dr" type="button" data-aktion="heim-${id}" data-weg="${id}">
             <span class="heim-symbol" aria-hidden="true">${icon(ic)}</span>
-            <span class="heim-text"><b>${esc(t('heim.' + id + '.titel'))}</b><span>${esc(t('heim.' + id + '.text'))}</span></span>
+            <span class="heim-text"><b>${esc(t('heim.' + id + '.titel'))}</b><span>${esc(t('heim.' + id + '.text', wegWerte()))}</span></span>
           </button>`).join('')}
         </div>
         <section class="heim-naechstes" aria-labelledby="heim-naechstes-titel" hidden>

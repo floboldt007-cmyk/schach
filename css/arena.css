@@ -473,7 +473,17 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
    beginnt. Mit der 300-px-Karte begann das Panel bei 416 px, der Knopf lag halb unter der Reiter-Leiste (432 bis 488,
    Leiste ab 468). Auf kurzen Handys laesst die Karte deshalb immer Platz fuer den Knopf (92 px); hoehere Handys behalten
    die 300 px. */
-.arena.karte-kompakt .karte { height: max(min(300px, calc(100% - 92px)), calc(100% - var(--panel-kompakt))); }
+.arena.karte-kompakt .karte { height: max(min(300px, calc(100% - 92px - var(--blase-platz, 0px))), calc(100% - var(--panel-kompakt) - var(--blase-platz, 0px))); }
+/* Feinschliff R6 (B20): steht ein besonderer Satz da (Regel unten), gibt die Karte seine zwei Zeilen ab; sonst schob er die
+   Farbwahl unter den klebenden Spielen-Knopf. Unter 720 px Fensterhoehe (iPhone 13 in Safari, SE) passt er nicht ueber
+   den Knopf, ohne dass die Karte unter 300 px faellt und die Stationen einander ueberdecken: dort tritt er zurueck wie
+   die gewoehnliche Begruessung (er lag dort ganz unter dem Knopf; die Partie zeigt denselben Satz zum Start). */
+@media (min-height: 720px) {
+  .arena.karte-kompakt:has(.detail .sprechblase.besonders) { --blase-platz: 64px; }
+}
+@media (max-height: 719px) {
+  .arena.karte-kompakt .detail .sprechblase.besonders { display: none; }
+}
 .arena.karte-kompakt .knoten .fahne { display: none; }
 .arena.karte-kompakt .detail { gap: 10px; padding: 10px 14px 0; }
 .arena.karte-kompakt .detail .elo, .arena.karte-kompakt .detail .mini-sterne { display: inline-flex; vertical-align: middle; }
@@ -492,8 +502,10 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 /* Die gewoehnliche Begruessung entfaellt kompakt (Karte, Gegner, Farbe und Knopf passen so ohne Scrollen). Ein besonderer
    Satz (Mutmacher nach Niederlagen, Erzfeind) bleibt, knapp in hoechstens zwei Zeilen */
 .arena.karte-kompakt .detail .sprechblase:not(.besonders) { display: none; }
-.arena.karte-kompakt .detail .sprechblase { order: 2; padding: 8px 12px; font-size: 13.5px; line-height: 1.35;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+/* gekuerzt wird der Text in der Blase, nicht die Blase: sonst ragte die dritte Zeile in den Innenabstand und war halb
+   zu sehen (Feinschliff R6, B20) */
+.arena.karte-kompakt .detail .sprechblase { order: 2; padding: 8px 12px; font-size: 13.5px; line-height: 1.35; }
+.arena.karte-kompakt .detail .spruch-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .arena.karte-kompakt .fortsetzen { order: 0; }
 .arena.karte-kompakt .detail-kopf { order: 1; }
 .arena.karte-kompakt .wahl-farbe { order: 3; }
