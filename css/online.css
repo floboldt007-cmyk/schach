@@ -148,3 +148,23 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .online-partie .spielknoepfe { order: 4; }
   .online-partie .on-zuege { order: 6; max-height: 4.2em; }
 }
+/* R7 (Gleichheits-Liste R6, B2): Ergebnisblatt wie die Bot-Partie (.ergebnis-overlay aus css/ergebnis.css). Hier nur die
+   Kronen-Zeile gewerteter Partien und ein einzelner Hauptknopf (ohne Analyse) ueber die ganze Breite. */
+.on-erg .erg-knoepfe > :only-child { grid-column: 1 / -1; }
+.on-erg-kronen { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; font-weight: 650; color: var(--text-2); }
+.on-erg-kronen[hidden] { display: none; }
+.on-erg-kronen .ico { width: 22px; height: 22px; color: var(--gold); }
+.on-erg-kronen b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px; color: var(--text); font-variant-numeric: tabular-nums; }
+/* R7 (B5): in der Leiste mit Banner faerbt css/visitenkarte.css jedes Kind-div weiss, auch die Uhr; die ruhende Uhr auf
+   --flaeche-3 hatte so im hellen Modus 1,16:1. Die Uhr behaelt die Farben aus css/partie.css (ruhend, laeuft, warn). */
+.online-partie .spieler.mit-banner > .uhr { color: var(--text-2); text-shadow: none; }
+.online-partie .spieler.mit-banner > .uhr.laeuft { color: var(--auf-tinte); }
+.online-partie .spieler.mit-banner > .uhr.warn { color: var(--warn); }
+.online-partie .spieler.mit-banner > .uhr.warn.laeuft { color: var(--grund); }
+/* R7 (B3): nach dem Ende steht in der Spalte nur noch eine flache Zeile (Ergebnis, Grund, Knopf "Ergebnis" zurueck zum
+   Blatt), damit sie auf iPhone SE und iPad hoch unter der eigenen Leiste Platz hat; Revanche und Analyse sind im Blatt */
+.online-partie .on-ergebnis { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; padding: 8px 12px; }
+.online-partie .on-ergebnis[hidden] { display: none; }
+.online-partie .on-ergebnis h3 { font-size: 17px; }
+.online-partie .on-ergebnis p { color: var(--text-2); font-weight: 650; }
+.online-partie .on-ergebnis .on-aktionen .knopf { min-height: 44px; }

@@ -238,7 +238,7 @@ const ABLAUF = {
   },
   async online(s, ctx) {
     await s.goto(BASIS + '#online');
-    await s.waitForFunction(() => window.__app && document.querySelector('.screen'), null, { timeout: 30000 });
+    await s.waitForFunction(() => window.__app && document.documentElement.dataset.screen, null, { timeout: 30000 });
     await s.evaluate(() => window.__app.gehe('online', { partieId: 'gleich-1' }));
     await s.waitForFunction(() => window.__online?.brett() && !window.__online.busy() && document.querySelectorAll('.screen').length === 1
       && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100, null, { timeout: 20000 });
@@ -282,7 +282,7 @@ const ABLAUF = {
   },
   async lektion(s, ctx) {
     await s.goto(BASIS + '#training');
-    await s.waitForFunction(() => window.__app && document.querySelector('.screen'), null, { timeout: 30000 });
+    await s.waitForFunction(() => window.__app && document.documentElement.dataset.screen, null, { timeout: 30000 });
     await s.evaluate(() => window.__app.gehe('lektion', { id: 'grundreihe' }));
     await s.waitForSelector('.ls-screen .brett-felder .feld', { timeout: 20000 });
     await introWeg(s); await warte(600);
