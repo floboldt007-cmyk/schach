@@ -53,7 +53,7 @@ async function siegen(browser, viewport, fehler) {
   const s = await k.newPage();
   s.on('pageerror', (e) => fehler.push(e.message));
   await s.goto(`http://127.0.0.1:${server.address().port}/index.html?test#heim`);
-  await s.waitForFunction(() => window.__app, null, { timeout: 30000 });
+  await s.waitForFunction(() => window.__app && document.documentElement.dataset.screen, null, { timeout: 30000 });
   await warte(1200);   // Start erst fertig laden lassen (wie R4-Messrunde/Siegblatt-Laenge), ohne hing der Partiestart gelegentlich
   await s.evaluate((plan) => {
     localStorage.removeItem('schach-arena:v1:laufend');

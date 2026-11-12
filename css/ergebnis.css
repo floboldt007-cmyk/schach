@@ -171,7 +171,9 @@
   .erg-bot .av { width: 42px; height: 42px; border-radius: 14px; }
   .erg-lichtblick { padding: 12px 14px; gap: 12px; }
 }
-@media (max-height: 700px) {
+/* R7 (Befund B10, 12.11.2026): bis 760 px Hoehe (vorher 700), sonst scrollte das Sieg-Blatt auf dem PC 1280 x 720 innen
+   (+33 px) und die Bot-Sprechblase lag halb unter dem Knopf-Fuss */
+@media (max-height: 760px) {
   .ergebnis-karte { gap: 10px; padding-top: 18px; }
   .erg-wort { font-size: 44px; }
   .niederlage .erg-wort { font-size: 30px; }
@@ -205,6 +207,20 @@
      95 px und "Zu den Bots" brach in drei Zeilen um; mit eigener Zeile sind beide Spalten gleich breit */
   .erg-aktionen.sieg-vorne .erg-freund { grid-column: 1 / -1; }
 }
+/* R7 (Befund B10, 12.11.2026): kleine Handys (iPhone SE 375 x 667) - das Sieg-Blatt scrollte innen (+51 px), die
+   Bot-Sprechblase lag unter dem Knopf-Fuss. Weniger Rand ueber und unter der Karte, engere Luecken, kleinere Sterne;
+   alle Knoepfe behalten ihre Hoehe (mindestens 44 px). */
+@media (max-width: 600px) and (max-height: 700px) {
+  .ergebnis-overlay { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .ergebnis-karte { gap: 8px; padding-top: 14px; }
+  .erg-aktionen { padding-top: 8px; padding-bottom: 6px; }
+  .erg-sterne { margin-top: 2px; }
+  .e-stern { width: 40px; height: 40px; }
+  .erg-stern:nth-child(2) .e-stern { width: 48px; height: 48px; margin-top: -4px; }
+}
+/* R7 (B10): der leere Ort fuer "Neu freigeschaltet" (js/ui/partie.js fuellt ihn nur bei einer Freischaltung) nahm im
+   Raster eine Luecke ein, ohne etwas zu zeigen */
+.erg-frei-ort:empty { display: none; }
 
 /* ---------- Sieg-Blatt (Flo 09.11., Variante C; .erg-liga-verweis aus js/ui/partie.js) ---------- */
 /* die Wertungs-Zeile bekommt denselben Innenabstand wie Punkte und Funken (klebte am Rand; Niederlage, Remis) */
