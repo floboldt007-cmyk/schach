@@ -816,6 +816,97 @@ try {
     pruefe(`R7 B5 ${modus}: ruhende Uhr in der Leiste mit Banner hat Kontrast mindestens 3:1 (gemessen)`, k.length >= 1 && k.every(x => x.deckend && x.banner && x.kontrast >= 3), k);
     Object.assign(r7U, { status: 'beendet', grund: 'aufgabe', ergebnis: '1-0' }); aktualisieren(r7U);
   }
+  // R7 Kopf (Befund B12 aus R6, Vorbild Bot-Partie): Zugliste als Karte mit Pfeilen zum Blaettern (quer) bzw. Zugstreifen
+  // mit Pfeilen (hoch), die rechte Spalte ohne leeren Block, im Kopf der Gegner als Titel statt "Crownmate", die Brettwahl
+  // im Kopf (quer). Fairness (Muss): waehrend einer laufenden gewerteten Partie keine Bewertungsleiste.
+  const kopfBild = async name => { if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `kopf-${name}.png`) }); };
+  const kopfMass = () => seite.evaluate(() => {
+    const sc = document.querySelector('.online-screen');
+    const sicht = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const seiteEl = sc.querySelector('.seite');
+    // groesste senkrechte Luecke ohne sichtbaren Inhalt in der Spalte: Text, Bilder und Flaechen mit Hintergrund oder Schatten
+    const r0 = seiteEl.getBoundingClientRect();
+    const stuecke = [];
+    for (const el of seiteEl.querySelectorAll('*')) {
+      if (!sicht(el)) continue;
+      const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+      if (r.height < 1 || r.width < 1) continue;
+      // Text zaehlt mit seiner Zeilenhoehe, nicht mit der Hoehe des Kastens (ein gestreckter Absatz mit einer Zeile ist leer)
+      for (const n of el.childNodes) {
+        if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+        const rg = document.createRange(); rg.selectNodeContents(n);
+        for (const q of rg.getClientRects()) if (q.height >= 1) stuecke.push([q.top, q.bottom]);
+      }
+      const flaeche = !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor) || cs.boxShadow !== 'none' || cs.backgroundImage !== 'none';
+      if (flaeche || /^(IMG|svg)$/i.test(el.tagName)) stuecke.push([r.top, r.bottom]);
+    }
+    stuecke.sort((a, b) => a[0] - b[0]);
+    let luecke = 0, bis = r0.top;
+    for (const [o, u] of stuecke) { luecke = Math.max(luecke, o - bis); bis = Math.max(bis, u); }
+    luecke = Math.round(Math.max(luecke, r0.bottom - bis));
+    const pfeile = [...sc.querySelectorAll('[data-online="zug-zurueck"], [data-online="zug-vor"]')].filter(sicht).length;
+    return { titel: sc.querySelector('.haupt-kopf .marke-titel')?.textContent.trim(), unter: sc.querySelector('.haupt-kopf .logo-unter')?.textContent.trim() || '',
+      luecke, quer: matchMedia('(orientation: landscape)').matches, pfeile,
+      zellen: [...sc.querySelectorAll('.zugliste .z[data-ply], .zugleiste .z[data-ply]')].filter(sicht).length,
+      brettwahl: [...sc.querySelectorAll('.haupt-kopf .brettwahl button[data-brett]')].filter(sicht).length,
+      balken: [...sc.querySelectorAll('.evalbalken')].filter(sicht).length, scroll: document.documentElement.scrollWidth <= innerWidth + 1 };
+  });
+  for (const [width, height, name] of [[390, 844, 'iphone13'], [1180, 820, 'ipad-quer'], [1920, 1080, 'pc']]) {
+    for (const modus of ['hell', 'dunkel']) {
+      await seite.setViewportSize({ width, height });
+      await r7Modus(modus);
+      const kp = partie({ gewertet: true, zuege: 'e2e4 e7e5 g1f3 b8c6', zeit: 300 }); await oeffne(kp);
+      await seite.waitForFunction(() => document.querySelectorAll('.online-screen .spieler.mit-banner').length === 2, null, { timeout: 8000 }).catch(() => {});
+      await seite.waitForTimeout(500);
+      await kopfBild(`${name}-${modus}`);
+      const m = await kopfMass();
+      if (modus === 'hell') {
+        pruefe(`R7 Kopf ${name}: Titel ist der Gegner (wie die Bot-Partie), nicht "Crownmate"`, m.titel === 'Gegner_2' && /Du spielst Weiß/.test(m.unter), m);
+        pruefe(`R7 Kopf ${name}: Zuege mit Pfeilen zum Blaettern sichtbar`, m.pfeile >= 2 && m.zellen >= 4, m);
+        pruefe(`R7 Kopf ${name}: laufende gewertete Partie ohne Bewertungsleiste (Fairness), kein waagrechtes Scrollen`, m.balken === 0 && m.scroll, m);
+        if (m.quer) {
+          pruefe(`R7 Kopf ${name}: rechte Spalte ohne leeren Block (Luecke <= 200 px)`, m.luecke <= 200, m);
+          pruefe(`R7 Kopf ${name}: Brettwahl im Kopf (drei Brettfarben)`, m.brettwahl === 3, m);
+        }
+      }
+      Object.assign(kp, { status: 'beendet', grund: 'aufgabe', ergebnis: '1-0' }); aktualisieren(kp);
+    }
+  }
+  // Blaettern quer (iPad): zurueck zeigt die Stellung davor auf einem Ansichts-Brett, vor geht weiter, "Zur Partie" schliesst;
+  // ein Zug des Gegners waehrend der Ansicht fuehrt zur Partie zurueck. Brettwahl wirkt sofort.
+  await seite.setViewportSize({ width: 1180, height: 820 }); await r7Modus('hell');
+  const kb = partie({ farbe: 'b', gewertet: true, zuege: 'e2e4 e7e5 g1f3 b8c6' }); await oeffne(kb);
+  const ansicht = () => seite.evaluate(() => { const a = document.querySelector('.online-screen .zug-ansicht');
+    return a ? { schild: a.querySelector('.za-schild')?.textContent.trim(),
+      vorZu: document.querySelector('.online-screen .zugbox [data-online="zug-vor"]')?.disabled } : null; });
+  const tippeKopf = async sel => { await seite.locator(sel).click(); await seite.waitForTimeout(250); };
+  await tippeKopf('.online-screen .zugbox [data-online="zug-zurueck"]');
+  const a1 = await ansicht();
+  await tippeKopf('.online-screen .zugbox [data-online="zug-zurueck"]');
+  const a2 = await ansicht();
+  await tippeKopf('.online-screen .zugbox [data-online="zug-vor"]');
+  const a3 = await ansicht();
+  pruefe('R7 Kopf Blaettern: zurueck zeigt 2. Sf3, nochmal 1… e5, vor wieder 2. Sf3; vor ist in der Ansicht frei',
+    a1?.schild === '2. Sf3' && a2?.schild === '1… e5' && a3?.schild === '2. Sf3' && a3.vorZu === false, { a1, a2, a3 });
+  await tippeKopf('.online-screen .zug-ansicht [data-online="zug-live"]');
+  pruefe('R7 Kopf Blaettern: "Zur Partie" schliesst die Ansicht', await ansicht() === null);
+  await tippeKopf('.online-screen .zugliste .z[data-ply="1"]');
+  const a4 = await ansicht();
+  zug(kb, 'f1c4');
+  await seite.waitForFunction(() => window.__online?.chess()?.history().length === 5, null, { timeout: 8000 }).catch(() => {});
+  await seite.waitForTimeout(300);
+  pruefe('R7 Kopf Blaettern: Zug in der Liste antippen zeigt ihn, ein neuer Zug des Gegners fuehrt zur Partie zurueck', a4?.schild === '1… e5' && await ansicht() === null, a4);
+  await seite.keyboard.press('ArrowLeft'); await seite.waitForTimeout(250);
+  const a5 = await ansicht();
+  await seite.keyboard.press('Escape'); await seite.waitForTimeout(250);
+  pruefe('R7 Kopf Blaettern: Pfeiltaste links blaettert, Escape schliesst', a5?.schild === '2… Sc6' && await ansicht() === null, a5);
+  await tippeKopf('.online-screen .haupt-kopf .brettwahl button[data-brett="holz"]');
+  const bw = await seite.evaluate(() => ({ brett: document.documentElement.dataset.brett,
+    an: document.querySelector('.online-screen .brettwahl button[aria-checked="true"]')?.dataset.brett }));
+  await tippeKopf('.online-screen .haupt-kopf .brettwahl button[data-brett="nacht"]');
+  pruefe('R7 Kopf Brettwahl: Holz wirkt sofort und ist markiert', bw.brett === 'holz' && bw.an === 'holz', bw);
+  Object.assign(kb, { status: 'beendet', grund: 'aufgabe', ergebnis: '0-1' }); aktualisieren(kb);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 }).catch(() => {});
   await r7Modus('system');
   await kontext.unroute('**/rest/v1/rpc/kronen_mein_stand', r7Stand);
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet });
