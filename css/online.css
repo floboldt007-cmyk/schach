@@ -20,7 +20,9 @@
 .on-tuer-ueber { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--akzent-text, var(--akzent)); }
 .on-tuer h2 { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; text-wrap: balance; }
 .on-tuer-text p { margin: 0; font-size: 13.5px; line-height: 1.35; color: var(--text-2); }
-.on-tuer-knopf { min-height: 48px; justify-content: center; }
+/* Knopf am Kartenfuss (R6 B21): nebeneinander sind beide Karten gleich hoch (Grid), so stehen "Partie suchen" und
+   "Duell suchen" auf einer Hoehe, auch wenn die Partie-Karte die Zeile mit der Bedenkzeit mehr hat */
+.on-tuer-knopf { min-height: 48px; justify-content: center; margin-top: auto; }
 /* kleines Brett als Bild (nur Deko): 8 x 8 Felder in den Brettfarben, Figuren aus dem Standardsatz */
 .on-bild { position: relative; display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr); width: 76px; aspect-ratio: 1; border-radius: 10px;
   overflow: hidden; box-shadow: var(--kante);
