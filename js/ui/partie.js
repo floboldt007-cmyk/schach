@@ -2090,6 +2090,9 @@ export function zeige(root, params, app) {
     o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
     // U7: Bot-Sprueche aus: auch kein Spruch im Ergebnis
     o.querySelector('.erg-bot').hidden = app.einstellungen().sprueche === 'aus';
+    // R7 (Befund B13): der Spruch zieht ins Blatt um und steht nur noch dort; die Blase am Brett war bis hierher sein
+    // Moment beim Matt und wuerde ihn sonst daneben wiederholen (am PC sichtbar in der Spalte neben dem Blatt)
+    versteckeBlase();
     const zeigeBrett = () => {
       o.hidden = true;
       s.classList.remove('mit-ergebnis');
@@ -2218,7 +2221,14 @@ export function zeige(root, params, app) {
         const p = erg.partie;
         const wertet = erg.wertet !== false && wertend;
         zeigeFeier(p.id);
+        // der Nachtrag baut den Ort ergebnis:karte neu: stand der Fokus auf der Revanche (Folgeaktion statt "Nochmal",
+        // R7), wandert er auf den neuen Knopf, statt mit dem alten zu verschwinden
+        const revancheFokus = !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('.erg-karte-ort .gd-revanche'));
         const karten = fuelleKarte(erg, review, rechnet, nachtrag, wertet);
+        if (revancheFokus && !karteOrtEl.contains(document.activeElement)) {
+          const r = karteOrtEl.querySelector('.gd-revanche');
+          if (r) r.focus({ preventScroll: true });
+        }
         const sterne = p.sterne || [false, false, false];
         const neueSterne = erg.neueSterne || [false, false, false];
         const gen = p.genauigkeit;
@@ -2301,6 +2311,9 @@ export function zeige(root, params, app) {
           // R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner leuchtet "Nächster Gegner", die Analyse
           // steht klein darunter neben "Zu den Bots"; nach Niederlage und Remis bleibt die Analyse vorne
           const siegVorne = ergebnis === 'sieg' && !!naechster;
+          // R7 (Befund B13): zeigt ein Paket im Ort ergebnis:karte schon die Revanche (gleicher Bot, Farben getauscht, wie
+          // in der Online-Partie), entfaellt "Nochmal": ein Knopf fuer dasselbe statt zwei
+          const revanche = karteOrtEl.querySelector('.gd-revanche');
           o.querySelector('.erg-aktionen').classList.toggle('sieg-vorne', siegVorne);
           knoepfe.innerHTML = siegVorne
             ? `<button class="knopf primaer gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>
@@ -2308,7 +2321,10 @@ export function zeige(root, params, app) {
             : `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
           ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${esc(t(abHier ? 'partie.erg.abHier' : 'partie.erg.nochmal'))}</button>`
             : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>`
-              : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
+              : revanche ? ''
+                : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
+          // steht "Zur Analyse" allein in der zweispaltigen Reihe (neben der Revanche), nimmt es die ganze Breite
+          if (!siegVorne && knoepfe.children.length === 1) knoepfe.firstElementChild.style.gridColumn = '1 / -1';
           // aktuellErg: nach dem Nachtrag zaehlt auch ein neuer Stern 2
           knoepfe.querySelector('[data-ziel="analyse"]').addEventListener('click', () => app.gehe('analyse', {
             partieId: p.id, neuFreigeschaltet: neu ? neu.id : undefined, neueSterne: aktuellErg.neueSterne,
@@ -2348,7 +2364,7 @@ export function zeige(root, params, app) {
           }
           // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.
           // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
-          const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]');
+          const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]') || revanche;
           if (folge) folge.focus({ preventScroll: true });
         }
         o.classList.add(rechnet ? 'vorlaeufig' : 'gefuellt');

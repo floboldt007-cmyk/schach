@@ -76,6 +76,7 @@ const SUITEN = [
   { name: 'partie-figurensatz', datei: 'partie-figurensatz.test.mjs', args: [], was: 'Bot-Partie: Figurensatz wechselt ohne Neuladen (spaeter Erfinder-Status, Wahl in den Einstellungen)' },
   { name: 'zuzweit-lektion-figurensatz', datei: 'zuzweit-lektion-figurensatz.test.mjs', args: [], was: 'Zu zweit und Meisterschule-Lektion: Figurensatz wechselt ohne Neuladen (spaeter Erfinder-Status, Wahl in den Einstellungen)' },
   { name: 'funktion-partie', datei: 'funktion-partie.test.mjs', args: [], was: 'Funktionsprobe Bot-Partie: Start, Zug, Hinweis, Sieg, Aufgeben, Ergebnisblatt (iPhone 13 + PC)' },
+  { name: 'ergebnis-einmal', datei: 'ergebnis-einmal.test.mjs', args: [], was: 'Ergebnisblatt der Bot-Partie: Spruch einmal, ein Nochmal-Knopf (Revanche), Knoepfe ab 44 px (iPhone 13 + PC)' },
   { name: 'partie-hoehe', datei: 'partie-hoehe.test.mjs', args: [], was: 'Bot-Partie ohne Seitenueberlauf und Sieg-Blatt ohne Innen-Scrollen, Brett nicht kleiner (7 Geraete, R7 B8/B10)' },
   { name: 'funktion-shop-skin', datei: 'funktion-shop-skin.test.mjs', args: [], exklusiv: 'fester Port 8981', was: 'Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht' },
   { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], exklusiv: 'fester Port 8947', was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
