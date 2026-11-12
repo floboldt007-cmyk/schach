@@ -16,6 +16,7 @@ import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
+import '../pakete/zuzweit/texte.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -23,6 +24,12 @@ const TEMPI = { ohne: null, '5': { grund: 300, zuschlag: 0 }, '10': { grund: 600
 // Texte beim Zeichnen (js/sprachen/einstellungen.js, Schluessel zz.*)
 const GRUENDE = ['matt', 'patt', 'material', 'wiederholung', '50-zuege', 'aufgabe', 'zeit', 'vereinbart'];
 function Z(k, w) { return t('einstellungen.zz.' + k, w); }
+const P = (k) => t('p-zuzweit.' + k);
+// Zurueck und "Fertig" fuehren zum Start: dort liegt der Einstieg (Flo 08.11.2026, Zu zweit ist kein Lernen)
+const ZIEL = 'heim';
+// R6-Befund B11: Knoepfe mit Symbol und Text wie die Spielknoepfe der Bot-Partie (js/ui/partie.js knopf)
+const zzKnopf = (aktion, ico, text, extra = '') =>
+  `<button class="knopf dr ${extra}" type="button" data-zz="${aktion}">${icon(ico)}<span>${esc(text)}</span></button>`;
 function grundText(grund) {
   return GRUENDE.includes(grund) ? Z('grund.' + grund) : '';
 }
@@ -163,13 +170,17 @@ function partie(root, quelle, app, fortgesetzt) {
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
   s.setAttribute('aria-label', Z('amBrett'));
-  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.training')}</button><h1>${Z('titel')}</h1></header>
+  // R6-Befund B11: der Zurueck-Knopf heisst wie sein Ziel (Start, dort liegt der Einstieg) und traegt das Symbol; der
+  // Klang-Schalter ist derselbe wie im Kopf der Bot-Partie (js/ui/partie.js klangUmschalten)
+  s.innerHTML = `<header class="kopf"><button class="knopf zz-zurueck dr" type="button" data-zz="zurueck" aria-label="${esc(P('zurueckStart'))}">${icon('zurueck')}<span>${esc(P('start'))}</span></button>`
+    + `<div class="titel"><h1>${Z('titel')}</h1></div>`
+    + `<button class="icon-knopf knopf-klang dr" type="button" data-zz="klang" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(P('klang'))}">${icon('klang')}</button></header>
     <div class="zz-rumpf"><div class="zz-spielbereich">
       <div class="zz-spieler zz-oben" role="group"></div>
       <div class="zz-feld"><div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div></div>
       <div class="zz-spieler zz-unten" role="group"></div>
       <p class="zz-status" role="status"></p>
-      <div class="zz-aktionen"><button class="knopf" type="button" data-zz="zugzurueck">${Z('zugZurueck')}</button><button class="knopf" type="button" data-zz="remis">${Z('remisAnbieten')}</button><button class="knopf" type="button" data-zz="aufgeben">${Z('aufgeben')}</button></div>
+      <div class="zz-aktionen">${zzKnopf('zugzurueck', 'undo', Z('zugZurueck'))}${zzKnopf('remis', 'personen', Z('remisAnbieten'))}${zzKnopf('aufgeben', 'flagge', Z('aufgeben'))}</div>
       <div class="zz-zuege" aria-label="${Z('zuege')}"></div>
       <section class="zz-ergebnis flaeche" aria-label="${Z('ergebnis')}" hidden></section>
     </div></div>`;
@@ -191,9 +202,11 @@ function partie(root, quelle, app, fortgesetzt) {
     const unten = brett.ausrichtung, oben = andere(unten);
     for (const [lage, f] of [['oben', oben], ['unten', unten]]) {
       const el = s.querySelector('.zz-' + lage);
-      el.dataset.farbe = f; el.setAttribute('aria-label', `${name(f)} · ${farbwort(f)}`);
+      // R6-Befund B11: ohne eigenen Namen ist der Name schon die Farbe, dann steht sie nur einmal da (nicht "Weiß / Weiß")
+      const eigen = name(f) !== farbwort(f);
+      el.dataset.farbe = f; el.setAttribute('aria-label', eigen ? `${name(f)} · ${farbwort(f)}` : name(f));
       el.classList.toggle('zz-gegenueber', lage === 'oben' && !namen.drehen);
-      el.innerHTML = `<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div class="zz-name"><b>${esc(name(f))}</b><span>${farbwort(f)}</span></div>
+      el.innerHTML = `<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div class="zz-name"><b>${esc(name(f))}</b>${eigen ? `<span>${esc(farbwort(f))}</span>` : ''}</div>
         <div class="uhr zahl" data-farbe="${f}"${tempo ? '' : ' hidden'}><span class="uhr-zeit"></span></div>`;
     }
   }
@@ -277,13 +290,14 @@ function partie(root, quelle, app, fortgesetzt) {
     s.querySelector('.zz-status').textContent = Z('beendet');
     const el = s.querySelector('.zz-ergebnis');
     el.innerHTML = `<h3>${gewinner ? Z('gewinnt', { name: esc(name(gewinner)) }) : t('allgemein.remis')}</h3><p>${grundText(grund)}</p>
-      <div class="zz-aktionen"><button class="knopf primaer" data-zz="analyse">${t('allgemein.analyse')}</button><button class="knopf" data-zz="revanche">${Z('revanche')}</button><button class="knopf" data-zz="fertig">${t('allgemein.fertig')}</button></div>`;
+      <div class="zz-aktionen">${zzKnopf('analyse', 'analyse', t('allgemein.analyse'), 'primaer')}${zzKnopf('revanche', 'nochmal', Z('revanche'))}${zzKnopf('fertig', 'haus', t('allgemein.fertig'))}</div>`;
     el.hidden = false; el.scrollIntoView({ block: 'nearest' });
   }
   s.addEventListener('click', async (e) => {
     const aktion = e.target.closest('[data-zz]')?.dataset.zz;
     if (!aktion || weg) return;
-    if (aktion === 'zurueck' || aktion === 'fertig') { app.gehe('training'); return; }
+    if (aktion === 'zurueck' || aktion === 'fertig') { app.gehe(ZIEL); return; }
+    if (aktion === 'klang') { klangUmschalten(e.target.closest('[data-zz]')); return; }
     if (aktion === 'analyse' && gespeichert) { app.gehe('analyse', { partieId: gespeichert.partie.id }); return; }
     if (aktion === 'revanche' && gespeichert) {
       app.gehe('partie', { modus: 'zuzweit', zuzweit: { weiss: namen.schwarz, schwarz: namen.weiss, drehen: namen.drehen }, tempo }); return;
@@ -310,11 +324,25 @@ function partie(root, quelle, app, fortgesetzt) {
     if (ok) ende(aktion === 'remis' ? null : andere(amZug), aktion === 'remis' ? 'vereinbart' : 'aufgabe');
     else zeichne(false);
   });
+  // Klang-Schalter im Kopf wie in der Bot-Partie: stumm/an, die Lautstaerke bleibt
+  function klangUmschalten(k) {
+    const an = app.einstellungen().klang === false;
+    app.setzeEinstellungen({ klang: an });
+    k.setAttribute('aria-pressed', an ? 'true' : 'false');
+    const svg = k.querySelector('svg');
+    if (svg) anim(svg, [{ transform: 'scale(.7)' }, { transform: 'none' }], { d: 520, k: 'hupf' });
+    if (an) { try { klang.spiele('schalter'); } catch (f) { /* still */ } }
+    app.meldung(P(an ? 'klangAn' : 'klangAus'), { dauer: 1600 });
+  }
   const sichern = () => { tick(); speichere(); };
   window.addEventListener('pagehide', sichern);
   document.addEventListener('visibilitychange', sichern);
   // alle Brett-Einstellungen wirken sofort, wie in der Bot-Partie (F-einst)
-  const beiEinstellungen = (e) => wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
+  const klangKnopf = s.querySelector('[data-zz="klang"]');
+  const beiEinstellungen = (e) => {
+    wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
+    if (e.detail) klangKnopf.setAttribute('aria-pressed', e.detail.klang !== false ? 'true' : 'false');
+  };
   window.addEventListener('schach:einstellungen', beiEinstellungen);
   speichere(); zeichne(false);
   if (!pruefeEnde() && z.phase === 'spiel' && tempo) uhrTimer = setInterval(tick, 100);

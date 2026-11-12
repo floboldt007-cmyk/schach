@@ -126,6 +126,25 @@ try {
     && window.__partie.brett.ausrichtung === 'w' && document.querySelector('.zz-oben').classList.contains('zz-gegenueber')));
   const h1Partie = await seite.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => e.textContent));
   pruefe('Partie zu zweit: genau eine h1 im Kopf', h1Partie.length === 1 && await seite.locator('.zz-screen > .kopf h1').count() === 1, JSON.stringify(h1Partie));
+  // R6-Befund B11 (12.11.2026): Leisten mit eingegebenem Namen und Farbe je einmal; Klang-Knopf wie in der Bot-Partie
+  const leisten = () => seite.evaluate(() => [...document.querySelectorAll('.zz-screen .zz-spieler')].map((e) => e.querySelector('.zz-name').innerText.replace(/\s+/g, ' ').trim()));
+  const mitNamen = await leisten();
+  pruefe('Leisten (B11): eingegebene Namen mit Farbe, je einmal', mitNamen.join('|') === 'Ben Schwarz|Anna Weiß', mitNamen);
+  const klangKnopf = seite.locator('.zz-screen > .kopf [data-aktion="klang"]');
+  const klangVorher = await klangKnopf.count() === 1 && await klangKnopf.getAttribute('aria-pressed') === 'false' && /Klang/.test(await klangKnopf.getAttribute('aria-label') || '');
+  let klangNachher = false, klangZurueck = false;
+  if (klangVorher) {
+    await seite.evaluate(() => { const alt = window.__app.meldung; window.__meldungen = []; window.__app.meldung = (text, o) => { window.__meldungen.push(text); return alt(text, o); }; });
+    await klangKnopf.click();
+    klangNachher = await seite.evaluate(() => window.__app.einstellungen().klang === true) && await klangKnopf.getAttribute('aria-pressed') === 'true'
+      && await seite.evaluate(() => window.__meldungen.join('|') === 'Klang an');
+    await klangKnopf.click();
+    klangZurueck = await seite.evaluate(() => window.__app.einstellungen().klang === false) && await klangKnopf.getAttribute('aria-pressed') === 'false';
+  }
+  pruefe('Klang-Knopf im Kopf (B11): da, zeigt den Stand, schaltet an und wieder aus (wie die Bot-Partie)', klangVorher && klangNachher && klangZurueck,
+    { klangVorher, klangNachher, klangZurueck });
+  const kopfKnoepfe = await seite.evaluate(() => [...document.querySelectorAll('.zz-screen > .kopf button')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); }));
+  pruefe('Kopf zu zweit (B11): alle Knoepfe mindestens 44 px', kopfKnoepfe.length >= 2 && kopfKnoepfe.every((x) => x >= 44), kopfKnoepfe);
   // Flo 30.10. abends: zu zweit darf man einen Zug zuruecknehmen (gegen Bots nicht)
   await zug('f1c4');
   await knopf('zugzurueck').click();
@@ -137,6 +156,9 @@ try {
   pruefe('Remis abgelehnt: Partie laeuft weiter', await seite.evaluate(() => window.__partie.phase() === 'spiel'));
   await knopf('remis').click(); await seite.getByRole('button', { name: 'Annehmen', exact: true }).click();
   pruefe('Remis angenommen, Ergebnis ohne Sterne', (await seite.locator('.zz-ergebnis').innerText()).startsWith('Remis') && !(await seite.locator('.zz-ergebnis').innerText()).includes('Stern'));
+  // R6-Befund B11: auch die Knoepfe nach der Partie tragen Symbole wie die Bot-Partie
+  const endeKnoepfe = await seite.evaluate(() => [...document.querySelectorAll('.zz-ergebnis .zz-aktionen button')].map((b) => b.dataset.zz + ':' + !!b.querySelector('svg')));
+  pruefe('Knoepfe nach der Partie (B11): Analyse, Revanche, Fertig mit Symbol', endeKnoepfe.join() === 'analyse:true,revanche:true,fertig:true', endeKnoepfe);
   pruefe('Keine Wertung oder Freischaltung', await seite.evaluate(v => localStorage.getItem('schach-arena:v1:fortschritt') === v, fortschritt));
   await merke(); await knopf('revanche').click(); await wartePartie();
   pruefe('Revanche tauscht Namen und startet leeres Brett', await seite.evaluate(() => window.__partie.z.zuzweit.weiss === 'Ben' && window.__partie.z.zuzweit.schwarz === 'Anna' && !window.__partie.z.zuege.length));
@@ -180,7 +202,7 @@ try {
   await klasse.click(); const erster = await seite.locator('.an-c-kopf').innerText();
   await klasse.click(); const zweiter = await seite.locator('.an-c-kopf').innerText();
   pruefe('Klassen-Tabelle springt zu beiden Seiten', erster !== zweiter && /Anna|Ben/.test(erster + zweiter), { erster, zweiter });
-  for (const [width, height] of [[1180, 820], [820, 1180], [390, 844]]) for (const modus of ['hell', 'dunkel']) {
+  for (const [width, height] of [[1180, 820], [820, 1180], [390, 844], [375, 667]]) for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width, height });
     await seite.evaluate(modus => window.__app.setzeEinstellungen({ modus }), modus);
     await start('5');
@@ -188,12 +210,32 @@ try {
     const masse = await seite.evaluate(() => {
       const b = document.querySelector('.zz-brett').getBoundingClientRect();
       return { quer: document.documentElement.scrollWidth <= innerWidth, brett: b.x >= 0 && b.right <= innerWidth + 1 && b.y >= 0 && b.bottom <= innerHeight + 1,
-        knoepfe: [...document.querySelectorAll('.zz-screen button')].every(b => b.getBoundingClientRect().height >= 44), namen: document.querySelectorAll('.zz-name b').length === 2 };
+        knoepfe: [...document.querySelectorAll('.zz-screen button')].every(b => b.getBoundingClientRect().height >= 44), namen: document.querySelectorAll('.zz-name b').length === 2,
+        // R6-Befund B11: die Spielknoepfe tragen Symbole wie in der Bot-Partie, und kein Text laeuft aus seinem Knopf
+        symbole: [...document.querySelectorAll('.zz-spielbereich > .zz-aktionen button')].map((b) => b.dataset.zz + ':' + !!b.querySelector('svg')).join() === 'zugzurueck:true,remis:true,aufgeben:true',
+        passt: [...document.querySelectorAll('.zz-screen button')].every((b) => b.scrollWidth <= b.clientWidth + 1 && b.scrollHeight <= b.clientHeight + 1) };
     });
-    pruefe(`${width}x${height} ${modus}: Brett sichtbar, kein Ueberlauf, Namen und Tippflaechen`, Object.values(masse).every(Boolean), masse);
+    pruefe(`${width}x${height} ${modus}: Brett sichtbar, kein Ueberlauf, Namen, Tippflaechen und Symbole`, Object.values(masse).every(Boolean), masse);
     if (process.env.BILDER) { mkdirSync(process.env.BILDER, { recursive: true }); await seite.screenshot({ path: path.join(process.env.BILDER, `zuzweit-${width}-${modus}.png`) }); }
     await aufgeben();
   }
+  // R6-Befund B11: der Einstieg liegt auf Start (Flo 08.11.: Zu zweit ist kein Lernen); "Fertig" und Zurueck fuehren
+  // dorthin, und der Zurueck-Knopf heisst wie sein Ziel
+  await knopf('fertig').click();
+  await seite.waitForFunction(() => document.documentElement.dataset.screen !== 'partie');
+  pruefe('Fertig nach der Partie fuehrt zum Start (B11)', await seite.evaluate(() => document.documentElement.dataset.screen === 'heim'),
+    await seite.evaluate(() => document.documentElement.dataset.screen));
+  await merke();
+  await seite.evaluate(() => window.__app.gehe('partie', { modus: 'zuzweit', zuzweit: { weiss: 'Weiß', schwarz: 'Schwarz', drehen: false }, tempo: null }));
+  await wartePartie();
+  const ohneNamen = await leisten();
+  pruefe('Leisten ohne eigene Namen (B11): "Schwarz" und "Weiß" je einmal, nicht doppelt', ohneNamen.join('|') === 'Schwarz|Weiß', ohneNamen);
+  const zk = await seite.evaluate(() => { const b = document.querySelector('.zz-screen > .kopf [data-zz="zurueck"]'); return b && { text: b.innerText.trim(), label: b.getAttribute('aria-label') || '', symbol: !!b.querySelector('svg') }; });
+  await knopf('zurueck').click();
+  await seite.waitForFunction(() => document.documentElement.dataset.screen !== 'partie');
+  const ziel = await seite.evaluate(() => document.documentElement.dataset.screen);
+  pruefe('Zurueck-Knopf (B11): heisst wie sein Ziel (Start, nicht "Training"), mit Symbol, und fuehrt dorthin', !!zk && zk.text === 'Start'
+    && zk.label === 'Zurück zum Start' && zk.symbol && ziel === 'heim', { zk, ziel });
   pruefe('Keine Konsolen- oder Seitenfehler', fehler.length === 0, fehler);
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
 finally { await kontext?.close(); await browser?.close(); await new Promise(r => server.close(r)); }
