@@ -77,7 +77,7 @@ const editionAnfragen = [];
 async function bediene(route) {
   const req = route.request(), url = new URL(req.url());
   let body = {}; try { body = req.postDataJSON() || {}; } catch (e) { body = {}; }
-  const antwort = (d, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(d) });
+  const antwort = d => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
   if (url.pathname.startsWith('/auth/v1/')) return antwort({ id: UID, email: 'spieler@example.invalid' });
   if (url.pathname === '/rest/v1/sonderstuecke') return antwort(STUECKE.map(stueck_id => ({ stueck_id })));
   if (url.pathname === '/rest/v1/altersangaben') return antwort([{ ab18: true }]);
