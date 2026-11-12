@@ -761,7 +761,7 @@ try {
   const kontext = nodeTeil();
   await nodeTeilAsync(kontext);
   if (!NUR_NODE) {
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(START);
     const { chromium } = ladePlaywright();
     browser = await chromium.launch();

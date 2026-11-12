@@ -670,7 +670,7 @@ async function neuesGeraetTeil(browser) {
 const LEKTIONEN_IDS = LEKTIONEN.map((l) => l.id).join();
 
 async function browserTeil() {
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser = null;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);

@@ -4036,7 +4036,7 @@ async function testeU7(browser) {
 }
 
 // ---------- Ablauf ----------
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
 let code = 1;
 const t0 = Date.now();

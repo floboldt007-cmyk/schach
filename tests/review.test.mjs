@@ -768,7 +768,7 @@ async function browserTests() {
     return;
   }
   const tiefe = Number((process.argv.find((a) => a.startsWith('--tiefe=')) || '--tiefe=14').slice(8));
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/js/review.js`);
