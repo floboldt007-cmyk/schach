@@ -2,6 +2,7 @@
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
+import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { anim } from '../bewegung.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { sanAnzeige } from '../review.js';
@@ -38,18 +39,11 @@ function anzeigeName(n) {
 // K Q R B N, Rochade mit Nullen)
 const sanText = (san) => sanAnzeige(san);
 
-// Figurensatz wirkt sofort (R4, 12.11.2026, dasselbe Muster wie wendeFigurensatzAn in js/ui/partie.js): kommt der
-// Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt
-// der Spieler einen anderen Satz, bekommen die stehenden Figuren den neuen Satz, ohne das Brett neu zu bauen. Neue Figuren
-// (Umwandlung) nimmt das Brett aus brett.figurenPfad; Dateiname je Figur <code>.svg wie in Brett._bild (js/board.js).
+// Figurensatz wirkt sofort (R4, 12.11.2026): kommt der Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke
+// wendet die Einstellungen dann neu an) oder waehlt der Spieler einen anderen Satz, folgen die Koenige des Startblatts und
+// das Spielbrett (dort mit allen Brett-Einstellungen, wendeBrettEinstellungenAn in js/ui/brett-einstellungen.js).
 // Ohne detail kein Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto.
 const satzPfad = (d) => { const p = figurenPfad(d); return p ? new URL(p, WURZEL).href : null; };
-function wendeFigurensatzAn(b, d) {
-  const pfad = satzPfad(d);
-  if (!b || !pfad || pfad === b.figurenPfad) return;
-  b.figurenPfad = pfad;
-  for (const img of b.el.querySelectorAll('img.figur[data-figur]')) img.src = pfad + img.dataset.figur + '.svg';
-}
 
 function stil() {
   if (document.querySelector('link[data-zuzweit]')) return;
@@ -111,7 +105,7 @@ function startblatt(root, app) {
   zeigeUhrSatz();
   form.addEventListener('change', zeigeUhrSatz);
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
-  // die beiden Koenige folgen dem Figurensatz sofort (wendeFigurensatzAn oben, hier ohne Brett)
+  // die beiden Koenige folgen dem Figurensatz sofort (satzPfad oben, hier ohne Brett)
   const koenige = [...s.querySelectorAll('.zz-paar img')];
   const beiEinstellungen = (e) => {
     const p = e.detail ? satzPfad(e.detail) : null;
@@ -182,8 +176,7 @@ function partie(root, quelle, app, fortgesetzt) {
   root.append(s);
   const brettEl = s.querySelector('.brett');
   const brett = new Brett(brettEl, { figurenPfad: new URL(figurenPfad(), WURZEL).href, beiZug,
-    koordinaten: einst.koordinaten !== false, koordLage: einst.koordLage, autoDame: einst.autoDame !== false,
-    turmRochade: einst.turmRochade === true, steuerung: einst.steuerung, pfeile: einst.pfeile !== false });
+    ...brettOptionen(einst), turmRochade: einst.turmRochade === true });
   brett.setzeDauer(300);
   const wert = (f, jetzt = Date.now()) => Math.max(0, rest[f] - (tempo && z.phase === 'spiel' && chess.turn() === f ? Math.max(0, jetzt - seit) : 0));
   const uhrText = (ms) => { const sec = Math.ceil(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
@@ -320,7 +313,8 @@ function partie(root, quelle, app, fortgesetzt) {
   const sichern = () => { tick(); speichere(); };
   window.addEventListener('pagehide', sichern);
   document.addEventListener('visibilitychange', sichern);
-  const beiEinstellungen = (e) => { if (e.detail) wendeFigurensatzAn(brett, e.detail); };
+  // alle Brett-Einstellungen wirken sofort, wie in der Bot-Partie (F-einst)
+  const beiEinstellungen = (e) => wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
   window.addEventListener('schach:einstellungen', beiEinstellungen);
   speichere(); zeichne(false);
   if (!pruefeEnde() && z.phase === 'spiel' && tempo) uhrTimer = setInterval(tick, 100);

@@ -14,8 +14,10 @@
 //   | .rd-spiel (.spieler.gegner.rd-seite[data-wer="gegner"]; .rd-brettzone .rd-brett; .spieler.ich.rd-seite[data-wer="ich"]
 //   mit .rd-uhr; .rd-zeile; .rd-reihe) | .rd-ende. Optik: css/pakete/raetsel-duell.css.
 // Tests: window.__duellKiMs verkuerzt die 10 s bis zum KI-Gegner, window.__duellAbfrageMs die Abfrage (Standard 1 s).
+// Mit ?test: window.__duell = { brett() -> Brett | null } (nur lesen; z. B. autoDame, das kein DOM-Merkmal hat).
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
+import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
@@ -89,22 +91,19 @@ export function zeige(root, params, app) {
   const stoppeUhren = () => { for (const u of uhren) clearTimeout(u); uhren.clear(); };
   let suche = null;
   let brett = null;
-  // Figurensatz wirkt sofort (F-duell 12.11.2026, dasselbe Muster wie wendeFigurensatzAn in js/ui/partie.js): kommt der
-  // Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt
-  // der Spieler einen anderen Satz, bekommen die stehenden Figuren den neuen Satz, ohne das Brett neu zu bauen; das naechste
-  // Duell auf diesem Bildschirm baut sein Brett mit satzEinst. Dateiname je Figur <code>.svg wie in Brett._bild (js/board.js).
-  // Ohne detail kein Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto.
-  let satzEinst = einst;
+  // Brett-Einstellungen wirken sofort wie in der Bot-Partie (F-duell Figurensatz, F-duell2 Koordinaten und Auto-Dame,
+  // F-einst alle): kommt der Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen
+  // dann neu an) oder stellt der Spieler etwas um, folgt das stehende Brett ohne Neubau (js/ui/brett-einstellungen.js); das
+  // naechste Duell auf diesem Bildschirm baut sein Brett mit brettEinst. Ohne detail bleibt alles, wie es ist.
+  let brettEinst = einst;
   const beiEinstellungen = (e) => {
     if (!e.detail) return;
-    satzEinst = e.detail;
-    const p = figurenPfad(e.detail);
-    const pfad = p ? new URL(p, WURZEL).href : null;
-    if (!brett || !pfad || pfad === brett.figurenPfad) return;
-    brett.figurenPfad = pfad;
-    for (const img of brett.el.querySelectorAll('img.figur[data-figur]')) img.src = pfad + img.dataset.figur + '.svg';
+    brettEinst = e.detail;
+    wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
   };
   window.addEventListener('schach:einstellungen', beiEinstellungen);
+  const testHaken = app && app.test ? { brett: () => brett } : null;
+  if (testHaken) window.__duell = testHaken;
   // laufendes Duell; reihe: eigene Raetsel in Reihenfolge, 'g' geloest, 'r' Fehler (nur dieses Geraet, nur Anzeige)
   const d = { id: null, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe: [] };
 
@@ -272,7 +271,7 @@ export function zeige(root, params, app) {
         <div class="rd-reihe-ort">${reiheHtml()}</div>
       </div>`;
     brett = new Brett(rumpf.querySelector('.rd-brett'), {
-      ausrichtung: 'w', figurenPfad: new URL(figurenPfad(satzEinst), WURZEL).href, beiZug, koordinaten: einst.koordinaten !== false, autoDame: einst.autoDame !== false,
+      ausrichtung: 'w', figurenPfad: new URL(figurenPfad(brettEinst), WURZEL).href, beiZug, ...brettOptionen(brettEinst),
     });
     hole();
     tick();
@@ -478,6 +477,7 @@ export function zeige(root, params, app) {
     verlasse() {
       weg = true;
       window.removeEventListener('schach:einstellungen', beiEinstellungen);
+      if (testHaken && window.__duell === testHaken) delete window.__duell;
       aufraeumen();
       kopf.verlasse();
     },
