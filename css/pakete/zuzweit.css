@@ -192,3 +192,18 @@
   .zz-spielbereich > .zz-aktionen { gap: var(--a2); }
   .zz-spielbereich > .zz-aktionen .knopf { font-size: var(--fs-klein); }
 }
+/* R9 Lobby mittig (Vorbau, Auswahlseite R9-LobbyLeere B): auf hohen Hochkant-Fenstern steht das Startblatt mittig statt oben
+   mit bis zu 560 px Leere darunter. Die Abstaende wachsen gedeckelt (Buehne | Bedenkzeit, Schalter, Namen | Los bis 60 px,
+   innerhalb der Einstellungen bis 32 px), den Rest teilen sich oben und unten. Passt der Inhalt nicht, schrumpfen oben und
+   unten auf 0 und der Rumpf scrollt wie bisher. iPhone SE und quer bleiben wie bisher; gemessen in tests/layout-r8.test.mjs (LM). */
+@media (orientation: portrait) and (min-height: 740px) {
+  .zz-startblatt .zz-rumpf { display: grid; }
+  .zz-startblatt .zz-start { display: grid; gap: 0; grid-template-rows: minmax(0, 1fr) auto minmax(16px, 60px) auto minmax(16px, 32px) auto
+    minmax(16px, 32px) auto minmax(16px, 60px) auto 16px auto minmax(0, 1fr); }
+  .zz-start > .zz-buehne { grid-row: 2; }
+  .zz-start > .zz-zeiten { grid-row: 4; }
+  .zz-start > .zz-schalter { grid-row: 6; }
+  .zz-start > .zz-namen { grid-row: 8; }
+  .zz-start > .zz-los { grid-row: 10; }
+  .zz-start > .zz-hinweis { grid-row: 12; }
+}
