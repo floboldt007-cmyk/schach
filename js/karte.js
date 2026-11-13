@@ -107,7 +107,8 @@ async function abgleichEinmal(titel) {
 // bisher keinen Sondertitel. Ein gewaehlter normaler Titel geht beim Server vor.
 let sonderGemeldet = null;
 async function meldeSondertitel(uid) {
-  if (!sonderstueckeBekannt()) await ladeSonderstuecke();
+  // hoechstens 1,5 s warten: ein haengender Abruf darf spaetere Abgleiche (Banner, Titel, Rahmen) nicht aufhalten
+  if (!sonderstueckeBekannt()) await Promise.race([ladeSonderstuecke(), new Promise((r) => setTimeout(r, 1500))]);
   const titel = istErfinder() ? 'erfinder' : pionierNummer() ? 'pionier' : null;
   if (!titel || sonderGemeldet === uid + ':' + titel) return;
   sonderGemeldet = uid + ':' + titel;

@@ -47,6 +47,8 @@ const KONTEN = {
   u4: { name: 'Ohne_Elo_B', elo: null, stufe: 2, banner: 'erfolg-raetselmeister', titel: 'erfolg-feuertaufe', stuecke: [], vitrine: [] },
 };
 const MIT_ELO = new Set(['u1', 'u2']);
+// Hochformat-Handys und Tablet wie gleichheit-ansichten; dort quetschten Banner und Vitrine das Portraet (Kalt-Review)
+const FENSTER = { u1: { width: 375, height: 667 }, u2: { width: 390, height: 844 }, u3: { width: 1180, height: 820 }, u4: { width: 768, height: 1024 } };
 const START_FEN = new Chess().fen();
 
 let ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0;
@@ -141,7 +143,7 @@ async function bediene(route) {
 // ---- Browser ----
 let browser;
 async function neuerKontext(uid) {
-  const k = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, serviceWorkers: 'block', locale: 'de-DE', timezoneId: 'Europe/Berlin', colorScheme: 'light' });
+  const k = await browser.newContext({ viewport: FENSTER[uid], hasTouch: true, serviceWorkers: 'block', locale: 'de-DE', timezoneId: 'Europe/Berlin', colorScheme: 'light' });
   await k.route('**/*.supabase.co/**', bediene);
   await k.addInitScript(({ s }) => {
     localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(s));
@@ -154,7 +156,7 @@ async function neuerKontext(uid) {
       for (const m of ms) for (const n of m.addedNodes) {
         if (!(n instanceof HTMLElement) || !n.classList.contains('duell')) continue;
         const bot = n.querySelector('.duell-seite.bot');
-        window.__intros.push({
+        const rec = {
           art: n.dataset.art, html: n.innerHTML,
           name: bot?.querySelector('.duell-name')?.textContent.trim() || '',
           unter: bot?.querySelector('.duell-unter')?.textContent.trim() || '',
@@ -162,7 +164,14 @@ async function neuerKontext(uid) {
           titel: bot?.querySelector('.duell-titel')?.textContent.trim() || '',
           orden: [...(bot?.querySelectorAll('.duell-orden') || [])].map(o => o.textContent.trim()),
           banner: [...(bot ? [bot, ...bot.querySelectorAll('*')] : [])].map(e => e.getAttribute('style') || '').join(' '),
-        });
+          lang: n.classList.contains('lang'), av: null,
+        };
+        window.__intros.push(rec);
+        // Hoehe des Gegner-Portraets, wenn das Layout steht (offsetHeight ohne die Flug-Transformation)
+        setTimeout(() => {
+          rec.av = n.querySelector('.duell-av[data-rolle="bot"]')?.offsetHeight ?? null;
+          rec.bannerSichtbar = (n.querySelector('.duell-seite.bot .duell-banner')?.offsetHeight || 0) > 0;
+        }, 1200);
       }
     }).observe(document, { childList: true, subtree: true });
   }, { s: sitzungVon(uid) });
@@ -222,6 +231,17 @@ async function paar(ua, ub, { elo }) {
     pruefe(`${ich.seite.uid}: Intro zeigt den Titel von ${du} ("${erwartTitel}")`, intro.titel.includes(erwartTitel), intro.titel);
     if (g.vitrine.length) pruefe(`${ich.seite.uid}: Intro zeigt die Erfolge von ${du}`, intro.orden.length === g.vitrine.length && intro.orden.every(Boolean), intro.orden);
     pruefe(`${ich.seite.uid}: Intro zeigt das Banner von ${du}`, intro.banner.includes(g.banner + '.svg'), intro.banner.slice(0, 300));
+    // ein Titel allein (fast jeder Gegner traegt einen Level-Titel) macht keine lange Fassung, die die Uhr aufhaelt
+    if (!g.vitrine.length) pruefe(`${ich.seite.uid}: ohne Erfolge von ${du} keine lange Fassung`, !intro.lang, { lang: intro.lang });
+    const av = await ich.seite.waitForFunction(() => window.__intros[0]?.av, null, { timeout: 4000 }).then(h => h.jsonValue()).catch(() => null);
+    const f = FENSTER[ich.seite.uid];
+    // zum Ansehen: R15_BILDER=<ordner> legt je Konto ein Bild des stehenden Intros ab
+    if (process.env.R15_BILDER) await ich.seite.screenshot({ path: path.join(process.env.R15_BILDER, `intro-${ich.seite.uid}-${f.width}x${f.height}.png`) });
+    pruefe(`${ich.seite.uid} (${f.width}x${f.height}): Portraet von ${du} im Intro nicht gequetscht (mind. 56 px)`, av >= 56, { av });
+    // quer steht das Banner sichtbar im Intro; hochkant fehlt der Platz, dort zeigt es nur die Leiste (oben geprueft)
+    const sichtbar = await ich.seite.evaluate(() => window.__intros[0]?.bannerSichtbar);
+    const quer = f.width > f.height;
+    pruefe(`${ich.seite.uid} (${quer ? 'quer' : 'hochkant'}): Banner von ${du} im Intro ${quer ? 'sichtbar' : 'ausgeblendet'}`, sichtbar === quer, { sichtbar });
   }
   return [a, b];
 }

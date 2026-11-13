@@ -29,7 +29,8 @@ try {
 
 const ATTRAPPE = `
 create schema if not exists auth;
-create table auth.users (id uuid primary key, email text, created_at timestamptz not null default now());
+create table auth.users (id uuid primary key, email text, created_at timestamptz not null default now(),
+  last_sign_in_at timestamptz, raw_app_meta_data jsonb not null default '{}', raw_user_meta_data jsonb not null default '{}');
 create or replace function auth.uid() returns uuid language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
     (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid;
@@ -141,7 +142,7 @@ const waehle = (db, uid, titel) => als(db, uid, `select public.karte_sondertitel
     pruefe('Konto ohne Stueck meldet "pionier": KARTE_TITEL', /KARTE_TITEL/.test(r2?.fehler || ''), JSON.stringify(r2));
     const r3 = await waehle(db, C, 'level-100');
     pruefe('Freitext/anderer Titel: KARTE_TITEL', /KARTE_TITEL/.test(r3?.fehler || ''), JSON.stringify(r3));
-    const r4 = await db.query(`select count(*)::int as n from public.karte_sondertitel where user_id = '${C}'`);
+    const r4 = await db.query(`select count(*)::int as n from public.karte_wahl where user_id = '${C}' and sondertitel is not null`);
     pruefe('abgelehnte Meldungen schreiben nichts', r4.rows[0].n === 0, JSON.stringify(r4.rows[0]));
   }
   {
@@ -167,8 +168,10 @@ const waehle = (db, uid, titel) => als(db, uid, `select public.karte_sondertitel
   {
     const k = await karte(db, C, 'ab');
     pruefe('Unbeteiligter wird weiter abgewiesen', /KARTE_KEINE_PARTIE/.test(k?.fehler || ''), JSON.stringify(k));
-    const r = await als(db, C, `select count(*)::int as n from public.karte_sondertitel`);
-    pruefe('Tabelle karte_sondertitel ist fuer Nutzer zu', /permission denied/.test(r?.fehler || ''), JSON.stringify(r));
+    const r = await als(db, C, `select count(*)::int as n from public.karte_wahl`);
+    pruefe('Tabelle karte_wahl bleibt fuer Nutzer zu', /permission denied/.test(r?.fehler || ''), JSON.stringify(r));
+    const d = await als(db, A, `select public.meine_daten() as d`);
+    pruefe('Datenauskunft (meine_daten) zeigt die eigene Meldung', d?.d?.karte?.wahl?.sondertitel === 'erfinder', JSON.stringify(d?.fehler || d?.d?.karte?.wahl));
     const a = await db.query('select public.karte_sondertitel_waehle(null) as r').catch((e) => ({ fehler: e.message }));
     pruefe('ohne Anmeldung: KARTE_ANMELDUNG', /KARTE_ANMELDUNG/.test(a?.fehler || ''), JSON.stringify(a));
   }
@@ -195,8 +198,9 @@ const waehle = (db, uid, titel) => als(db, uid, `select public.karte_sondertitel
     pruefe('Rueckweg laeuft', !x, x);
     const k = await karte(db, B, 'ab');
     pruefe('nach dem Rueckweg: kein Sondertitel, Karte geht weiter', k?.w && k.w.titel === null && k.w.name !== undefined, JSON.stringify(k));
-    const t = await db.query(`select to_regclass('public.karte_sondertitel') as t, to_regprocedure('public.karte_sondertitel_waehle(text)') as f`);
-    pruefe('nach dem Rueckweg: Tabelle und Funktion weg', t.rows[0].t === null && t.rows[0].f === null, JSON.stringify(t.rows[0]));
+    const t = await db.query(`select (select count(*)::int from information_schema.columns where table_schema = 'public'
+      and table_name = 'karte_wahl' and column_name = 'sondertitel') as t, to_regprocedure('public.karte_sondertitel_waehle(text)') as f`);
+    pruefe('nach dem Rueckweg: Spalte und Funktion weg', t.rows[0].t === 0 && t.rows[0].f === null, JSON.stringify(t.rows[0]));
     const y = await lauf(db, 'karte-rls-test.sql', lies('supabase/karte-rls-test.sql'));
     pruefe('karte-rls-test.sql laeuft nach dem Rueckweg', !y, y);
     const z = await lauf(db, 'karte-sondertitel-schema.sql', lies('supabase/karte-sondertitel-schema.sql'));

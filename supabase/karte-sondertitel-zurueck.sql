@@ -1,6 +1,6 @@
 -- Rueckweg zu supabase/karte-sondertitel-schema.sql (R15, 13.11.2026): karte_von wieder wie in karte-schema.sql,
--- Funktionen und Tabelle karte_sondertitel weg (verloren geht nur die Meldung des Sondertitels; die Stuecke in
--- sonderstuecke bleiben). Einspielen nur Flo. Test: tests/server-karte-sondertitel.test.mjs. Wiederholbar.
+-- Funktionen und Spalte karte_wahl.sondertitel weg (verloren geht nur die Meldung des Sondertitels; die Stuecke in
+-- sonderstuecke und die uebrige Wahl der Karte bleiben). Einspielen nur Flo. Test: tests/server-karte-sondertitel.test.mjs. Wiederholbar.
 
 create or replace function public.karte_von(uid uuid)
 returns jsonb
@@ -34,4 +34,5 @@ $$;
 revoke all on function public.karte_von(uuid) from public, anon, authenticated;
 drop function if exists public.karte_sondertitel_waehle(text);
 drop function if exists public.karte_sonderstueck(uuid, text);
-drop table if exists public.karte_sondertitel;
+alter table public.karte_wahl drop constraint if exists karte_wahl_sondertitel;
+alter table public.karte_wahl drop column if exists sondertitel;

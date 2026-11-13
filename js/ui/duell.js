@@ -186,7 +186,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const gOrden = gk && Array.isArray(gk.orden) ? gk.orden.slice(0, 3) : [];
   const gTitel = gk && gk.titel && typeof gk.titel.name === 'string' ? gk.titel : null;
   const gBanner = gk && typeof gk.bannerBild === 'string' && /^(https?:\/\/[^\s'"()\\]+|[^\s'"():\\]+)\.svg$/.test(gk.bannerBild) ? gk.bannerBild : '';
-  const hatVitrine = !!(profil && (profil.titel || orden.length)) || !!(gTitel || gOrden.length);
+  // beim Gegner machen nur Erfolge die lange Fassung: fast jeder traegt einen Level-Titel, und die Uhr laeuft schon
+  const hatVitrine = !!(profil && (profil.titel || orden.length)) || gOrden.length > 0;
   const gewaehlteArt = vorgegeben ? art : duellArt({ einstellung, anlass, reduziert: tempo() === 0, vitrine: hatVitrine });
   const t0 = jetzt();
   // Zeitfaktor: hoechstens normales Tempo (das Intro muss in DAUER_MAX passen). A() bewegt mit diesem Faktor statt mit
@@ -264,7 +265,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
       <div class="duell-flo"><i></i><span class="naht"></span></div>
       <div class="duell-inhalt">
         <div class="duell-paar">
-          <div class="duell-seite bot">
+          <div class="duell-seite bot${gVitrine ? ' mit-karte' : ''}">
             <div class="duell-av" data-rolle="bot"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></div>
             <div class="duell-name">${esc(bot.name)}</div>
             ${botUnter ? `<div class="duell-unter">${botUnter}</div>` : ''}${gBannerHtml}${gVitrine}
@@ -453,8 +454,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   // Titel und Vitrine kommen kurz nach Flos Namen; in der langen Fassung die Errungenschaften nacheinander, gut lesbar
   if (!lang) ueber.querySelectorAll('.duell-titel, .duell-vitrine').forEach((t) => A(t, [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { d: 400, v: 360, k: 'weich' }));
   else {
-    const titelEl = ueber.querySelector('.duell-titel');
-    if (titelEl) A(titelEl, [{ opacity: 0, transform: 'translateY(10px) scale(.92)' }, { opacity: 1, transform: 'none' }], { d: 420, v: 520, k: 'hupf' });
+    // online steht auch beim Gegner ein Titel: beide bekommen ihren Auftritt
+    ueber.querySelectorAll('.duell-titel').forEach((el, i) => A(el, [{ opacity: 0, transform: 'translateY(10px) scale(.92)' }, { opacity: 1, transform: 'none' }], { d: 420, v: 520 + i * 160, k: 'hupf' }));
     ueber.querySelectorAll('.duell-orden').forEach((o, i) => anim(o, [{ opacity: 0, transform: 'translateY(12px) scale(.7)' }, { opacity: 1, transform: 'none' }],
       { d: absolut(420 * zf), v: absolut((ORDEN_AB + i * ORDEN_TAKT) * zf), k: 'hupf', fill: 'backwards' }));
     const zeit = ueber.querySelector('.duell-zeit i');
