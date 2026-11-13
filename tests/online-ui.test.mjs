@@ -167,9 +167,12 @@ try {
   const knopf = a => seite.locator(`[data-online="${a}"]`);
   // Seit 11.11. misst sich das Brett wie in der Bot-Partie an der Hoehe des Screens: solange der alte Screen beim Wechsel
   // noch daneben steht, ist das neue Brett einen Moment 0 px gross. Erst tippen, wenn genau ein Brett Flaeche hat.
-  const bereit = () => seite.waitForFunction(() => window.__online?.brett() && !window.__online.busy()
-    && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100);
-  async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(); }
+  // R8 (13.11.2026): mit id erst, wenn genau diese Partie geladen ist. Beim Wechsel von Partie zu Partie stand sonst unter
+  // Last kurz noch der alte Screen bereit, und die Pruefung las die alte Partie (__online.partie() war null oder alt).
+  const bereit = (id = null) => seite.waitForFunction((id) => window.__online?.brett() && !window.__online.busy()
+    && (id == null || window.__online.partie()?.id === id)
+    && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100, id);
+  async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(p.id); }
   async function tippe(uci) {
     for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
       const r = await seite.locator(`.on-brett .feld[data-feld="${f}"]`).boundingBox();
@@ -409,27 +412,25 @@ try {
     return { status: p.status, zuege: c.history().length, liste: document.querySelectorAll('.zugliste .z[data-ply]').length, falsch: falsch.slice(0, 6) };
   });
   const stehtEnde = (s) => s.falsch.length === 0 && s.zuege > 0 && s.liste === s.zuege;
-  // wie oeffne, wartet aber auf genau diese Partie (sonst misst die Probe kurz noch den alten Screen)
-  const oeffneEnde = async (q) => { await oeffne(q); await seite.waitForFunction(id => window.__online?.partie()?.id === id && !window.__online.busy(), q.id, { timeout: 15000 }); };
   for (const [w, h] of [[1280, 720], [1180, 820]]) {
     await seite.setViewportSize({ width: w, height: h });
-    const aufg = partie({ zuege: 'e2e4 e7e5 g1f3', zeit: 300 }); await oeffneEnde(aufg);
+    const aufg = partie({ zuege: 'e2e4 e7e5 g1f3', zeit: 300 }); await oeffne(aufg);
     const vorher = await endstand();
     pruefe(`Endstand ${w}x${h}: Gegenprobe laufende Partie (Brett und Zugliste wie die Zuege des Servers)`, stehtEnde(vorher) && vorher.status === 'laeuft', vorher);
     await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
     await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
     const nachAufgabe = await endstand();
     pruefe(`Endstand ${w}x${h} nach Aufgabe: Endstellung und Zugliste bleiben`, stehtEnde(nachAufgabe) && nachAufgabe.status === 'beendet', nachAufgabe);
-    const matt = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4' }); await oeffneEnde(matt);
+    const matt = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4' }); await oeffne(matt);
     await tippe('d8h4'); await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
     const nachMatt = await endstand();
     pruefe(`Endstand ${w}x${h} nach Matt: Endstellung und Zugliste bleiben`, stehtEnde(nachMatt) && nachMatt.zuege === 4, nachMatt);
-    const remis = partie({ zuege: 'd2d4 d7d5 c2c4 e7e6', zeit: 300 }); await oeffneEnde(remis);
+    const remis = partie({ zuege: 'd2d4 d7d5 c2c4 e7e6', zeit: 300 }); await oeffne(remis);
     remis.remis_angebot = 'b'; aktualisieren(remis);
     await knopf('annehmen').click(); await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
     const nachRemis = await endstand();
     pruefe(`Endstand ${w}x${h} nach Remis: Endstellung und Zugliste bleiben`, stehtEnde(nachRemis) && nachRemis.status === 'beendet', nachRemis);
-    const zeit = partie({ zuege: 'd2d4 d7d5 c2c4', zeit: 1 }); await oeffneEnde(zeit);
+    const zeit = partie({ zuege: 'd2d4 d7d5 c2c4', zeit: 1 }); await oeffne(zeit);
     await seite.evaluate(() => { window.__versatz += 10000; });
     await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
     const nachZeit = await endstand();
