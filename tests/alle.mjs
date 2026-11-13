@@ -80,6 +80,7 @@ const SUITEN = [
   { name: 'liga-kontrast', datei: 'liga-kontrast.test.mjs', args: [], was: 'Kritik R6: Marke "neu" als Chip, Code-Teilen als Knopf, Kontraste Bronze/Gold/Aufstieg/"!", Knoepfe hinter dem Ergebnis-Blatt gesperrt (Browser)' },
   { name: 'liga-wertung-text', datei: 'liga-wertung-text.test.mjs', args: [], was: 'Liga-Texte: die Wertung heisst Liga-Wertung / League rating, nie Arena' },
   { name: 'partie-hoehe', datei: 'partie-hoehe.test.mjs', args: [], was: 'Bot-Partie ohne Seitenueberlauf und Sieg-Blatt ohne Innen-Scrollen, Brett nicht kleiner (7 Geraete, R7 B8/B10)' },
+  { name: 'layout-r8', datei: 'layout-r8.test.mjs', args: [], was: 'Kritik R8: Liga-Platzzahl deckend ueber dem Banner, Sieg-Blatt SE/PC ohne Innen-Scrollen, Fertig im Bereichs-Blatt volle Breite (Browser)' },
   { name: 'funktion-shop-skin', datei: 'funktion-shop-skin.test.mjs', args: [], exklusiv: 'fester Port 8981', was: 'Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht' },
   { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], exklusiv: 'fester Port 8947', was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], exklusiv: 'fester Port 8977', was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
