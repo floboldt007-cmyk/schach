@@ -48,7 +48,9 @@ const KONTEN = {
 };
 const MIT_ELO = new Set(['u1', 'u2']);
 // Hochformat-Handys und Tablet wie gleichheit-ansichten; dort quetschten Banner und Vitrine das Portraet (Kalt-Review)
-const FENSTER = { u1: { width: 375, height: 667 }, u2: { width: 390, height: 844 }, u3: { width: 1180, height: 820 }, u4: { width: 768, height: 1024 } };
+// u1 kleinstes Handy, u2 iPhone 13 (beide lange Fassung hochkant), u3 hochkant kurze Fassung (Gegner ohne Erfolge),
+// u4 quer lange Fassung
+const FENSTER = { u1: { width: 360, height: 640 }, u2: { width: 390, height: 844 }, u3: { width: 390, height: 844 }, u4: { width: 1180, height: 820 } };
 const START_FEN = new Chess().fen();
 
 let ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0;
@@ -103,7 +105,11 @@ async function bediene(route) {
   const absage = (status, message) => antwort({ message, fehler: message }, status);
   if (url.pathname.startsWith('/auth/v1/')) return antwort(uid ? { id: uid, email: uid + '@example.invalid' } : {});
   if (url.pathname === '/rest/v1/spielstaende') return antwort([]);
-  if (url.pathname === '/rest/v1/sonderstuecke') return antwort(uid ? KONTEN[uid].stuecke.map(stueck_id => ({ stueck_id })) : []);
+  if (url.pathname === '/rest/v1/sonderstuecke') {
+    // die Erfinderin bekommt ihre Stuecke langsam (3 s): die Meldung des Sondertitels darf dabei nicht verloren gehen
+    if (uid === 'u1') await new Promise(r => setTimeout(r, 3000));
+    return antwort(uid ? KONTEN[uid].stuecke.map(stueck_id => ({ stueck_id })) : []);
+  }
   if (url.pathname === '/rest/v1/profile') return antwort(uid ? [{ user_id: uid, benutzername: KONTEN[uid].name }] : []);
   if (/freigabe/.test(url.pathname)) return antwort([]);
   if (url.pathname === '/rest/v1/partien_online') {
@@ -170,6 +176,12 @@ async function neuerKontext(uid) {
         // Hoehe des Gegner-Portraets, wenn das Layout steht (offsetHeight ohne die Flug-Transformation)
         setTimeout(() => {
           rec.av = n.querySelector('.duell-av[data-rolle="bot"]')?.offsetHeight ?? null;
+          rec.avFlo = n.querySelector('.duell-av[data-rolle="flo"]')?.offsetHeight ?? null;
+          // Lage ohne die Flug-Transformation: Abstand zur Seitenoberkante ueber die offsetParent-Kette
+          const oben = (e) => { let y = 0; for (; e; e = e.offsetParent) y += e.offsetTop; return y; };
+          const av = n.querySelector('.duell-av[data-rolle="bot"]'), chip = n.querySelector('.duell-chip');
+          rec.avOben = av ? oben(av) : null;
+          rec.chipUnten = chip ? oben(chip) + chip.offsetHeight : null;
           rec.bannerSichtbar = (n.querySelector('.duell-seite.bot .duell-banner')?.offsetHeight || 0) > 0;
         }, 1200);
       }
@@ -203,6 +215,9 @@ async function paar(ua, ub, { elo }) {
   await Promise.all([a, b].map(async ({ seite }) => { await seite.goto(START() + '#online'); await sucheBereit(seite); }));
   // die Karte meldet sich beim Start (app:bereit); erst danach suchen, wie ein Spieler, der die Seite offen hat
   await Promise.all([a, b].map(({ seite }) => seite.waitForTimeout(800)));
+  // Besitzer melden ihren Sondertitel; bei u1 kommen die Stuecke erst nach 3 s (laenger als die 1,5 s, die der Abgleich
+  // wartet): die Meldung muss trotzdem ankommen, bevor gesucht wird
+  for (let i = 0; i < 80 && [a, b].some(({ seite }) => KONTEN[seite.uid].stuecke.length && !sondertitel.has(seite.uid)); i++) await new Promise(r => setTimeout(r, 100));
   const t0 = Date.now();
   await Promise.all([a, b].map(({ seite }) => seite.locator('[data-online="suchen"]').click()));
   const ids = await Promise.all([a, b].map(({ seite }) => imSpiel(seite).then(id => ({ id, ms: Date.now() - t0 }))));
@@ -238,10 +253,14 @@ async function paar(ua, ub, { elo }) {
     // zum Ansehen: R15_BILDER=<ordner> legt je Konto ein Bild des stehenden Intros ab
     if (process.env.R15_BILDER) await ich.seite.screenshot({ path: path.join(process.env.R15_BILDER, `intro-${ich.seite.uid}-${f.width}x${f.height}.png`) });
     pruefe(`${ich.seite.uid} (${f.width}x${f.height}): Portraet von ${du} im Intro nicht gequetscht (mind. 56 px)`, av >= 56, { av });
-    // quer steht das Banner sichtbar im Intro; hochkant fehlt der Platz, dort zeigt es nur die Leiste (oben geprueft)
-    const sichtbar = await ich.seite.evaluate(() => window.__intros[0]?.bannerSichtbar);
+    const m = await ich.seite.evaluate(() => window.__intros[0]);
+    pruefe(`${ich.seite.uid} (${f.width}x${f.height}): Portraet von ${du} im Bild und unter dem Liga-Chip`, m.avOben >= 0 && m.avOben >= m.chipUnten, { avOben: m.avOben, chipUnten: m.chipUnten });
+    // kurze Fassung: das Portraet des Gegners so gross wie das eigene (die Verkleinerung gilt nur der langen hochkant)
+    if (!m.lang) pruefe(`${ich.seite.uid}: kurze Fassung, Portraet von ${du} so gross wie das eigene`, m.av >= m.avFlo * 0.9, { av: m.av, avFlo: m.avFlo });
+    // Banner im Intro: immer, nur in der langen Fassung hochkant zeigt es allein die Leiste (oben geprueft)
     const quer = f.width > f.height;
-    pruefe(`${ich.seite.uid} (${quer ? 'quer' : 'hochkant'}): Banner von ${du} im Intro ${quer ? 'sichtbar' : 'ausgeblendet'}`, sichtbar === quer, { sichtbar });
+    const erwartet = quer || !m.lang;
+    pruefe(`${ich.seite.uid} (${quer ? 'quer' : 'hochkant'}, ${m.lang ? 'lang' : 'kurz'}): Banner von ${du} im Intro ${erwartet ? 'sichtbar' : 'ausgeblendet'}`, m.bannerSichtbar === erwartet, { sichtbar: m.bannerSichtbar });
   }
   return [a, b];
 }

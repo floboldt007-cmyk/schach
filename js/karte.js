@@ -106,9 +106,14 @@ async function abgleichEinmal(titel) {
 // Lesen. Nur Besitzer melden, je Konto einmal je Sitzung; ohne das SQL scheitert der Aufruf still und der Gegner sieht wie
 // bisher keinen Sondertitel. Ein gewaehlter normaler Titel geht beim Server vor.
 let sonderGemeldet = null;
-async function meldeSondertitel(uid) {
-  // hoechstens 1,5 s warten: ein haengender Abruf darf spaetere Abgleiche (Banner, Titel, Rahmen) nicht aufhalten
-  if (!sonderstueckeBekannt()) await Promise.race([ladeSonderstuecke(), new Promise((r) => setTimeout(r, 1500))]);
+async function meldeSondertitel(uid, spaet = false) {
+  // hoechstens 1,5 s warten: ein haengender Abruf darf spaetere Abgleiche (Banner, Titel, Rahmen) nicht aufhalten;
+  // kommt die Antwort spaeter, wird danach EINMAL gemeldet (spaet: ohne neuen Abruf, also keine Schleife)
+  if (!spaet && !sonderstueckeBekannt()) {
+    const laden = ladeSonderstuecke();
+    const rechtzeitig = await Promise.race([laden.then(() => true, () => true), new Promise((r) => setTimeout(() => r(false), 1500))]);
+    if (!rechtzeitig) { laden.then(() => meldeSondertitel(uid, true), () => {}); return; }
+  }
   const titel = istErfinder() ? 'erfinder' : pionierNummer() ? 'pionier' : null;
   if (!titel || sonderGemeldet === uid + ':' + titel) return;
   sonderGemeldet = uid + ':' + titel;

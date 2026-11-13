@@ -120,11 +120,14 @@
   .duell.lang .duell-name { font-size: clamp(22px, 4vh, 38px); font-size: clamp(22px, 4svh, 38px); }
   .duell.lang .duell-unter { font-size: 13px; }
   .duell.lang .duell-titel { margin-top: 0; }
-  /* hochkant fehlt der Gegnerhaelfte der Platz fuer das Banner (schob Portraet und Chip uebereinander); die Leiste
-     zeigt es gleich danach */
-  .duell-seite.bot .duell-banner { display: none; }
-  /* Titel und Erfolge des Gegners brauchen die Hoehe: sein Portraet wird kleiner, statt oben aus dem Bild zu ragen */
-  .duell-seite.bot.mit-karte .duell-av { width: clamp(56px, 9vh, 128px); width: clamp(56px, 9svh, 128px); }  .duell.lang .duell-vitrine { flex-wrap: nowrap; width: 100%; max-width: 420px; gap: 6px; margin-top: 2px; }
+  /* Lange Fassung hochkant mit Karte des Gegners (R15): Titel und Erfolge brauchen die Hoehe der Gegnerhaelfte. Das
+     Banner zeigt dort die Leiste gleich danach (in der kurzen Fassung steht es im Intro), die Erfolge kommen ohne
+     Abzeichen-Bild, und das Portraet wird kleiner, statt oben unter den Chip zu ragen */
+  .duell.lang .duell-seite.bot.mit-karte .duell-banner { display: none; }
+  .duell.lang .duell-seite.bot.mit-karte .duell-orden.mit-bild > svg { display: none; }
+  .duell.lang .duell-seite.bot.mit-karte .duell-av { width: clamp(56px, 9vh, 128px); width: clamp(56px, 9svh, 128px); }
+  .duell.lang .duell-paar .duell-seite.bot.mit-karte { gap: clamp(2px, .5vh, 8px); gap: clamp(2px, .5svh, 8px); }
+  .duell.lang .duell-vitrine { flex-wrap: nowrap; width: 100%; max-width: 420px; gap: 6px; margin-top: 2px; }
   .duell.lang .duell-orden { min-width: 0; }
   .duell.lang .duell-orden.mit-bild { flex: 1 1 0; min-width: 0; max-width: 136px; padding: 6px 4px 7px; font-size: 12px; }
   .duell.lang .duell-orden.mit-bild > svg { width: clamp(30px, 6vh, 54px); height: clamp(30px, 6vh, 54px); width: clamp(30px, 6svh, 54px); height: clamp(30px, 6svh, 54px); }
