@@ -765,6 +765,60 @@ async function kleinTeil(browser) {
 
 const LEKTIONEN_IDS = LEKTIONEN.map((l) => l.id).join();
 
+// R9 (13.11.2026, Befund 1 der Gleichheits-Messung): das Lektions-Brett ist auf jeder Groesse mindestens so gross wie in
+// der Bot-Partie (gemessen wie tests/gleichheit-ansichten.test.mjs ueber tests/gleichheit-messung.mjs: Feldraster, Bot nach
+// dem Intro, Lektion nach "Los geht's"), und nichts laeuft ueber oder scrollt. Am PC 1280 x 800 waren es 686 gegen 718 px.
+const BRETT_GROESSEN = [['PC 1280x800', 1280, 800], ['PC 1440x900', 1440, 900], ['PC 1920x1080', 1920, 1080], ['iPad quer', 1180, 820],
+  ['PC 1280x720', 1280, 720], ['iPhone 13', 390, 664], ['iPhone SE', 375, 667]];
+async function brettGroesseTeil(browser) {
+  const { messeAnsicht, introWeg } = await import('./gleichheit-messung.mjs');
+  for (const [name, width, height] of BRETT_GROESSEN) {
+    const p = await seite(browser, { groesse: { width, height } });
+    await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno' }));
+    await p.s.waitForFunction(() => window.__partie?.bereit && document.querySelector('.brett-rahmen > .brett .feld'), null, { timeout: 30000 }).catch(() => {});
+    await introWeg(p.s); await warte(1200);
+    const bot = await messeAnsicht(p.s, '.screen.partie');
+    await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'grundreihe' }));
+    await warteLz(p.s, "z.id === 'grundreihe' && z.phase === 'intro'");
+    await p.s.locator('.ls-aktionen [data-a="los"]').click();
+    await warteLz(p.s, "z.phase === 'flo'");
+    await warte(600);
+    const ls = await messeAnsicht(p.s, '.ls-screen');
+    const platz = await p.s.evaluate(() => {
+      const r = document.querySelector('.ls-screen .ls-rumpf'), d = document.documentElement;
+      const unten = Math.max(...[...document.querySelectorAll('.ls-screen .ls-rahmen, .ls-screen .ls-seite')].map((e) => e.getBoundingClientRect().bottom));
+      return { rumpfRollt: r ? r.scrollHeight - r.clientHeight : null, seiteRollt: d.scrollHeight - innerHeight, quer: d.scrollWidth - innerWidth,
+        unten: Math.round(unten), hoehe: innerHeight };
+    });
+    pruefe(`Brettgröße ${name}: Lektion mindestens so groß wie die Bot-Partie (Feldraster), ohne Überlauf und ohne Scrollen`,
+      !bot.fehlt && !ls.fehlt && ls.brett >= bot.brett - 2 && platz.rumpfRollt <= 1 && platz.seiteRollt <= 1 && platz.quer <= 1 && platz.unten <= platz.hoehe + 1,
+      { lektion: ls.brett ?? ls.fehlt, bot: bot.brett ?? bot.fehlt, ...platz });
+    await p.k.close();
+  }
+}
+
+// R9-2 (Layout-Messung 13.11.2026): vor dem Start blieb unter "Los geht's" eine Leere bis zum Rand, iPhone 13 146 px,
+// iPad hoch 76 px. Wie in der Bot-Partie sitzen die Knoepfe unten fuer den Daumen; hoechstens 60 px bleiben frei.
+const LEERE_GROESSEN = [['iPhone 13', 390, 844], ['iPad hoch', 820, 1180], ['iPhone SE', 375, 667]];
+async function leereTeil(browser) {
+  for (const [name, width, height] of LEERE_GROESSEN) {
+    const p = await seite(browser, { groesse: { width, height } });
+    await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'grundreihe' }));
+    await warteLz(p.s, "z.id === 'grundreihe' && z.phase === 'intro'");
+    await warte(600);
+    const m = await p.s.evaluate(() => {
+      const los = document.querySelector('.ls-aktionen [data-a="los"]')?.getBoundingClientRect();
+      const brett = document.querySelector('.ls-screen .ls-rahmen')?.getBoundingClientRect();
+      const d = document.documentElement;
+      return { leere: los ? Math.round(innerHeight - los.bottom) : null, losOben: los ? Math.round(los.top) : null,
+        brett: brett ? Math.round(brett.width) : null, seiteRollt: d.scrollHeight - innerHeight, hoehe: innerHeight };
+    });
+    pruefe(`Leere ${name}: unter "Los geht's" höchstens 60 px bis zum Rand, Knopf ganz sichtbar, nichts scrollt`,
+      m.leere !== null && m.leere >= 0 && m.leere <= 60 && m.seiteRollt <= 1, m);
+    await p.k.close();
+  }
+}
+
 async function browserTeil() {
   const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser = null;
@@ -776,6 +830,8 @@ async function browserTeil() {
     await willkommenTeil(browser);
     await neuesGeraetTeil(browser);
     await kleinTeil(browser);
+    await brettGroesseTeil(browser);
+    await leereTeil(browser);
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);
   } finally {

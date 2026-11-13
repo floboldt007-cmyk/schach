@@ -108,8 +108,8 @@
   --zz-reserve: calc(2 * var(--zz-karte) + var(--zz-zeile) + var(--zz-knopf) + var(--zz-zuege) + 6 * var(--zz-luecke));
   --zz-brett: min(100cqw, calc(100cqh - var(--zz-reserve)));
   display: grid; gap: var(--zz-luecke); height: 100%; justify-content: center;
-  grid-template-columns: var(--zz-brett); grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto;
-  grid-template-areas: "oben" "brett" "unten" "." "status" "aktionen" "zuege"; }
+  grid-template-columns: var(--zz-brett); grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "oben" "brett" "unten" "status" "aktionen" "zuege"; }
 .zz-oben { grid-area: oben; }
 .zz-unten { grid-area: unten; }
 .zz-feld { grid-area: brett; }
@@ -120,7 +120,9 @@
 .zz-spielbereich > .zz-ergebnis { grid-area: brett; align-self: end; z-index: 5; margin: var(--a3); box-shadow: var(--s2, var(--s1)); }
 @media (orientation: portrait) {
   .zz-spielbereich > .zz-spieler { height: var(--zz-karte); }
-  .zz-status { height: var(--zz-zeile); min-height: 0; line-height: var(--zz-zeile); }
+  /* R9-1: die freie Hoehe ist die Statuszeile selbst, der Satz steht in ihrer Mitte (vorher lag die ganze Leere ueber ihm,
+     iPhone 13 126 px). Knoepfe und Zugstreifen bleiben unten am Daumen (Flo 05.11.). */
+  .zz-status { height: var(--zz-zeile); min-height: 0; line-height: var(--zz-zeile); align-self: center; }
   .zz-spielbereich > .zz-aktionen .knopf { height: var(--zz-knopf); min-height: 0; }
   .zz-zuege { height: var(--zz-zuege); }
 }
@@ -136,7 +138,12 @@
 @media (orientation: portrait) and (min-width: 601px) { .zz-rumpf:has(> .zz-spielbereich) { padding-left: 12px; padding-right: 12px; } }
 /* R8 (L3/L6): Handy hoch steht der Zugstreifen wie in der Bot-Partie ueber den Knoepfen, iPad hoch darunter (dort auch) */
 @media (orientation: portrait) and (max-width: 600px) {
-  .zz-spielbereich { grid-template-areas: "oben" "brett" "unten" "." "status" "zuege" "aktionen"; }
+  .zz-spielbereich { grid-template-areas: "oben" "brett" "unten" "status" "zuege" "aktionen"; }
+}
+/* R9-1: hohe Handys (ab 800 px, wie das Band der Bot-Partie in css/partie.css) Zugstreifen 44 px wie dort und eine
+   hoehere Statuszeile; das Brett hat dort schon die volle Breite, es wird nicht kleiner */
+@media (orientation: portrait) and (max-width: 600px) and (min-height: 800px) {
+  .zz-spielbereich { --zz-zeile: 32px; --zz-zuege: 44px; }
 }
 @media (orientation: landscape) and (min-height: 501px) { .zz-rumpf:has(> .zz-spielbereich) { padding-top: 6px; padding-bottom: 8px; } }
 /* Querformat: dieselben Stufen wie .partie .spieler in css/partie.css (@container partie), hier am Container zz */
