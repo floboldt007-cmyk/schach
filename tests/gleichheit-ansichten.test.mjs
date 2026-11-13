@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
 import { browserTyp } from './browser.mjs';
+import { messeAnsicht, introWeg } from './gleichheit-messung.mjs';
 
 const require = createRequire(import.meta.url);
 let pw;
@@ -168,41 +169,7 @@ function bediener(z) {
 }
 
 // ---- Messen in der Seite ----
-// Brettbreite aus dem Feldraster (a- bis h-Linie) UND als Gegenprobe aus .brett-felder; Leisten mit Lage zum Brett
-const messe = (s, screen) => s.evaluate((screen) => {
-  const sichtbar = (e) => !!e && !e.hidden && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && e.getBoundingClientRect().width > 0;
-  const wurzel = document.querySelector(screen) || document;
-  const felder = [...wurzel.querySelectorAll('.brett-felder .feld[data-feld]')].filter(sichtbar).map((f) => f.getBoundingClientRect());
-  if (felder.length < 64) return { fehlt: `nur ${felder.length} Felder in ${screen}` };
-  const b = { links: Math.min(...felder.map((r) => r.left)), rechts: Math.max(...felder.map((r) => r.right)),
-    oben: Math.min(...felder.map((r) => r.top)), unten: Math.max(...felder.map((r) => r.bottom)) };
-  const raster = wurzel.querySelector('.brett-felder');
-  const leisten = [...wurzel.querySelectorAll('.spieler, .zz-spieler')].filter(sichtbar).map((e) => {
-    const r = e.getBoundingClientRect();
-    const lage = r.bottom <= b.oben + 4 ? 'oben' : r.top >= b.unten - 4 ? 'unten' : 'seite';
-    const nameEl = e.querySelector('.name, .bot-name, .rd-name, .zz-name b');
-    const uhr = [...e.querySelectorAll('.uhr')].find(sichtbar);
-    return { lage, wer: e.classList.contains('ich') || e.classList.contains('zz-unten') ? 'ich' : 'gegner', name: (nameEl?.textContent || '').trim(),
-      avatar: !!e.querySelector('.av, .rd-av, .avatar, img, svg'), uhr: !!uhr, imBild: r.top >= -0.5 && r.bottom <= innerHeight + 0.5 };
-  });
-  const knoepfe = {};
-  for (const k of ['aufgeben', 'remis', 'hinweis']) {
-    const el = [...wurzel.querySelectorAll(`[data-aktion="${k}"], [data-online="${k}"], [data-zz="${k}"], [data-a="${k}"]`)].find(sichtbar);
-    const r = el?.getBoundingClientRect();
-    knoepfe[k] = el ? { da: true, imBild: r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5 } : { da: false, imBild: false };
-  }
-  // R8 (L3): Zugstreifen (hoch) oder Zugliste (quer): Lage zu den Knoepfen und ganz im Bild
-  const zuege = [...wurzel.querySelectorAll('.zugleiste')].find(sichtbar) || [...wurzel.querySelectorAll('.zugbox')].find(sichtbar);
-  const kn = [...wurzel.querySelectorAll('.spielknoepfe, .zz-aktionen')].find(sichtbar);
-  let zugStreifen = 'keiner';
-  if (zuege) {
-    const r = zuege.getBoundingClientRect(), k = kn?.getBoundingClientRect();
-    zugStreifen = (zuege.matches('.zugleiste') ? 'streifen' : 'liste') + (!k ? '' : r.bottom <= k.top + 1 ? ' ueber Knoepfen' : r.top >= k.bottom - 1 ? ' unter Knoepfen' : ' neben Knoepfen')
-      + (r.top >= -0.5 && r.bottom <= innerHeight + 0.5 ? '' : ' ausserhalb');
-  }
-  return { zugStreifen, brett: Math.round(b.rechts - b.links), brettRaster: raster ? Math.round(raster.getBoundingClientRect().width) : null,
-    leisten, knoepfe, seiteScrollt: document.documentElement.scrollHeight - innerHeight > 1 || window.scrollY > 0 };
-}, screen);
+// Brett, Leisten, Knoepfe und Zugstreifen: messeAnsicht aus tests/gleichheit-messung.mjs (eine Messung fuer alle Gleichheits-Proben)
 
 // R8 (13.11.2026, B4): Aussehen der Spielerleisten je Farbmodus, verglichen mit der Bot-Partie. Die Uhr wird fuer die
 // Messung kurz eingeblendet (ohne Bedenkzeit ist sie in jeder Ansicht verborgen), danach sofort wieder verborgen.
@@ -280,7 +247,6 @@ async function bestaetige(s) {
   const knoepfe = s.locator('.dialog-ort:not(.weg) .dialog-knoepfe button');
   if (await knoepfe.first().waitFor({ timeout: 3000 }).then(() => true).catch(() => false)) await knoepfe.last().click();
 }
-const introWeg = (s) => s.waitForFunction(() => !document.querySelector('.duell'), null, { timeout: 12000 }).catch(() => {});
 const sichtbarDa = (s, sel, ms = 10000) => s.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((e) => !e.hidden && e.getClientRects().length > 0), sel, { timeout: ms })
   .then(() => true).catch(() => false);
 
@@ -369,7 +335,7 @@ const ABLAUF = {
 };
 // ctx = { datei, zustand }: Bildname und Server-Zustand (das Duell-Ende setzt der Ablauf am Server)
 const messeK = async (s, ctx, screen) => {
-  const m = Object.assign(await messe(s, screen), ctx);
+  const m = Object.assign(await messeAnsicht(s, screen), ctx);
   if (m.fehlt) return m;
   m.stil = { hell: await messeLeistenStil(s, screen) };
   await s.emulateMedia({ colorScheme: 'dark' }); await warte(1000); // Farbuebergaenge (--d-m) abwarten

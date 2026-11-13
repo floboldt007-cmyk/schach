@@ -13,6 +13,7 @@
 //   node tests/ansicht.test.mjs                    alles
 //   node tests/ansicht.test.mjs --nur=arena,ich    nur diese Ziele
 //   BILDER=/pfad node tests/ansicht.test.mjs       dazu je Ziel und Groesse ein Foto (fuer Flo)
+//   KONTRAST=1 node tests/ansicht.test.mjs         dazu je Ziel die Kontrast-Befunde als INFO (zaehlt nicht, Feinschliff R9)
 //   PORT=8961 node tests/ansicht.test.mjs          eigener Port (Standard: frei)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
@@ -22,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
-import { befundeDerSeite, untenFrei } from './ansicht-befunde.mjs';
+import { befundeDerSeite, untenFrei, kontrastBefunde } from './ansicht-befunde.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -87,6 +88,11 @@ try {
       await warte(screen === 'partie' ? 3000 : 1200);
       const b = await s.evaluate(befundeDerSeite);
       b.unten = await s.evaluate(untenFrei);
+      if (process.env.KONTRAST) {
+        const kb = await kontrastBefunde(s);
+        console.log(`INFO Kontrast ${ziel} @ ${gname}: ${kb.befunde.length} Befunde, ${kb.pixel} per Pixel, ${kb.unklar.length} unklar, ${kb.gemessen} Texte`
+          + (kb.befunde.length ? ' ' + JSON.stringify(kb.befunde.slice(0, 4)) : ''));
+      }
       const name = `${ziel} @ ${gname} (${w}x${h})`;
       pruefe(`${name}: nichts laeuft seitlich raus`, b.ueberlauf <= 1 && !b.rand.length, b.rand.slice(0, 3).join('; ') || `+${b.ueberlauf}px`);
       pruefe(`${name}: Schrift ab 12 px`, !b.klein.length, b.klein.slice(0, 3).join('; '));
