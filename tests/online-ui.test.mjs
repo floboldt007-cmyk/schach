@@ -167,9 +167,12 @@ try {
   const knopf = a => seite.locator(`[data-online="${a}"]`);
   // Seit 11.11. misst sich das Brett wie in der Bot-Partie an der Hoehe des Screens: solange der alte Screen beim Wechsel
   // noch daneben steht, ist das neue Brett einen Moment 0 px gross. Erst tippen, wenn genau ein Brett Flaeche hat.
-  const bereit = () => seite.waitForFunction(() => window.__online?.brett() && !window.__online.busy()
-    && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100);
-  async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(); }
+  // R8 (13.11.2026): mit id erst, wenn genau diese Partie geladen ist. Beim Wechsel von Partie zu Partie stand sonst unter
+  // Last kurz noch der alte Screen bereit, und die Pruefung las die alte Partie (__online.partie() war null oder alt).
+  const bereit = (id = null) => seite.waitForFunction((id) => window.__online?.brett() && !window.__online.busy()
+    && (id == null || window.__online.partie()?.id === id)
+    && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100, id);
+  async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(p.id); }
   async function tippe(uci) {
     for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
       const r = await seite.locator(`.on-brett .feld[data-feld="${f}"]`).boundingBox();
