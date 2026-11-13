@@ -58,6 +58,7 @@ function pruefe(name, gut, detail = '', { hart = false } = {}) {
 // Gleichheits-Liste: nur Feststellung, zaehlt nie. gewollt = Abweichung mit Beleg (GEWOLLT), zaehlt nicht als Abweichung
 function befund(name, gleich, detail, gewollt = null) {
   befunde.push({ name, gleich, detail, gewollt });
+  // INTENTIONAL-SLOP[T4]: die Konsole ist der Ausgabeweg dieser Probe (tests/alle.mjs liest sie)
   console.log(`BEFUND ${!gleich ? 'ABWEICHUNG' : gewollt ? 'gewollt' : 'gleich'}: ${name} ${JSON.stringify(detail)}${gewollt ? ' | ' + gewollt : ''}`);
 }
 
@@ -473,6 +474,7 @@ finally { await browser?.close(); await new Promise(r => server.close(r)); }
 console.log(`\nBilder: ${BILDER}`);
 const abweichungen = befunde.filter(b => !b.gleich);
 const gewollte = befunde.filter(b => b.gleich && b.gewollt);
+// INTENTIONAL-SLOP[T4]: Zusammenfassung der Probe, Ausgabeweg wie alle Zeilen hier
 console.log(`Gleichheits-Liste: ${befunde.length - abweichungen.length} gleich (davon ${gewollte.length} gewollt mit Beleg), ${abweichungen.length} Abweichung(en)${abweichungen.length ? ': ' + abweichungen.map(b => b.name).join(' | ') : ''}`);
 if (rotErwartet) console.log(`${rotErwartet} harte Pruefung(en) ROT-ERWARTET (zaehlen erst mit PROBE_STRENG=1): ${rot.join(' | ')}`);
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;
