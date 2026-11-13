@@ -94,15 +94,22 @@
   .zz-zuege > .zb-kopf, .zz-zuege > .zugliste { display: none; }
   .zz-zuege > .zugleiste { height: 100%; min-height: 0; }
 }
-.zz-ergebnis { padding: var(--a4); text-align: center; }
-.zz-ergebnis h3 { overflow-wrap: anywhere; }
-.zz-ergebnis[hidden] { display: none; }
+/* ---------- Ergebnisblatt (R9, 13.11.2026) ----------
+   Optik ganz aus css/ergebnis.css (wie Bot-Partie, Online und Lektion); hier nur, was Zu zweit anders hat. Der Screen
+   dahinter tritt zurueck wie .partie.mit-ergebnis (Kopf dort schon erfasst). Der Titel nennt einen Namen (bis 20 Zeichen)
+   und "gewinnt", darum kleiner als "Sieg!" und mit Umbruch an jeder Stelle. */
+.zz-screen > .zz-rumpf { transform-origin: 50% 40%; transition: transform var(--d-l) var(--gleiten); }
+.zz-screen.mit-ergebnis > .zz-rumpf { transform: scale(.975); }
+.zz-erg.sieg .erg-wort { font-size: clamp(30px, 6vmin, 44px); overflow-wrap: anywhere; }
+/* in der Spalte steht nach dem Ende nur "Ergebnis", ueber die ganze Breite */
+.zz-spielbereich > .zz-aktionen.nach-ende { grid-template-columns: minmax(0, 1fr); }
+.zz-spielbereich > .zz-aktionen.nach-ende .knopf { flex-direction: row; gap: var(--a2); }
 /* Partie (Flo 07.11.2026: "Das ganze Bild kann das Schachbrett sein"): nichts scrollt, das Brett nimmt, was frei ist.
    Die Brettkante --zz-brett rechnet aus dem Rumpf (Container zz). Hoch eine Spalte in Brettbreite: Schwarz, Brett,
    Weiss direkt aneinander, die freie Hoehe danach (naeher am Daumen, Konzept Abschnitt 7), unten Status, Knoepfe und
    Zuege. Dafuer haben diese Zeilen hoch feste Hoehen (--zz-reserve). Quer wie die Bot-Partie (Konzept Abschnitt 8):
    Brett links so hoch wie der Rumpf, rechts eine Spalte mit Schwarz oben, Status und Zuegen, Weiss und den Knoepfen
-   unten. Das Ergebnis liegt ueber dem Brett, damit am Ende nichts springt. */
+   unten. Das Ergebnisblatt liegt als Schleier ueber dem ganzen Screen, damit am Ende nichts springt. */
 .zz-rumpf:has(> .zz-spielbereich) { overflow: hidden; padding: var(--a2) var(--a4) var(--a3); container: zz / size; }
 .zz-spielbereich { --zz-luecke: var(--a2); --zz-karte: 50px; --zz-zeile: 24px; --zz-knopf: 48px; --zz-zuege: 36px;
   --zz-reserve: calc(2 * var(--zz-karte) + var(--zz-zeile) + var(--zz-knopf) + var(--zz-zuege) + 6 * var(--zz-luecke));
@@ -117,7 +124,6 @@
 .zz-spielbereich > .zz-aktionen { grid-area: aktionen; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .zz-spielbereich > .zz-aktionen .knopf { min-width: 0; padding-left: var(--a2); padding-right: var(--a2); white-space: normal; line-height: 1.15; }
 .zz-zuege { grid-area: zuege; }
-.zz-spielbereich > .zz-ergebnis { grid-area: brett; align-self: end; z-index: 5; margin: var(--a3); box-shadow: var(--s2, var(--s1)); }
 @media (orientation: portrait) {
   .zz-spielbereich > .zz-spieler { height: var(--zz-karte); }
   /* R9-1: die freie Hoehe ist die Statuszeile selbst, der Satz steht in ihrer Mitte (vorher lag die ganze Leere ueber ihm,
@@ -183,7 +189,6 @@
 @media (orientation: portrait) and (max-width: 600px) {
   .zz-rumpf:has(> .zz-spielbereich) { padding: var(--a2) 0 calc(var(--a2) + env(safe-area-inset-bottom)); }
   .zz-spielbereich > :not(.zz-feld) { margin-left: var(--rand-brett-handy); margin-right: var(--rand-brett-handy); }
-  .zz-spielbereich > .zz-ergebnis { margin: var(--a3); }
   .zz-spielbereich > .zz-aktionen { gap: var(--a2); }
   .zz-spielbereich > .zz-aktionen .knopf { font-size: var(--fs-klein); }
 }
