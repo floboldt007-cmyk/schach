@@ -11,7 +11,7 @@ import net from 'node:net';
 import path from 'node:path';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8839);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}`;
 
 let ok = 0, gesamt = 0;
@@ -38,6 +38,19 @@ const portFrei = () => new Promise((fertig) => {
   s.once('connect', () => { s.destroy(); fertig(false); });
   s.once('error', () => fertig(true));
 });
+
+// freierPort (tests/freier-port.mjs): gleichzeitig angefragt verschiedene Ports, jeder danach sofort belegbar
+{
+  const { freierPort } = await import('./freier-port.mjs');
+  const ports = await Promise.all(Array.from({ length: 20 }, () => freierPort()));
+  const belegbar = await Promise.all(ports.map((p) => new Promise((fertig) => {
+    const s = net.createServer();
+    s.once('error', () => fertig(false));
+    s.listen(p, '127.0.0.1', () => s.close(() => fertig(true)));
+  })));
+  pruefe('freierPort: 20 gleichzeitige Anfragen, 20 verschiedene Ports ueber 1024, jeder belegbar',
+    new Set(ports).size === 20 && ports.every((p) => Number.isInteger(p) && p > 1024) && belegbar.every(Boolean), ports);
+}
 
 // genau so gestartet wie in den Suiten
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });

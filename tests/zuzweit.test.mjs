@@ -20,7 +20,7 @@ const server = http.createServer((req, res) => {
   try { const inhalt = readFileSync(p); res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(inhalt); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-await new Promise(r => server.listen(8886, '127.0.0.1', r));
+await new Promise(r => server.listen(Number(process.env.PORT || 0), '127.0.0.1', r));
 let browser, kontext, ok = 0, gesamt = 0;
 const fehler = [];
 function pruefe(name, gut, detail = '') {
@@ -76,7 +76,7 @@ try {
     await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
     await seite.locator('.zz-ergebnis:not([hidden])').waitFor();
   }
-  await seite.goto('http://127.0.0.1:8886/?test#training');
+  await seite.goto(`http://127.0.0.1:${server.address().port}/?test#training`);
   await seite.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen);
   pruefe('Lernen: keine Karte "Zu zweit" mehr (Flo 08.11.2026, Zu zweit ist kein Lernen)', await seite.evaluate(() => !document.querySelector('.zz-karte')));
   await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();

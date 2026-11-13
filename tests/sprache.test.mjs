@@ -22,7 +22,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8881);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // --pakete: mit allen Paketen aus PAKETE (Englisch Teil 2), sonst nur der Kern (?kern)
 const PAKETE_MODUS = process.argv.includes('--pakete');
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test${PAKETE_MODUS ? '' : '&kern'}`;

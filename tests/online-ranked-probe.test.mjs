@@ -4,7 +4,7 @@
 //
 //   node tests/online-ranked-probe.test.mjs                  Probe (bekannte Luecken melden sich als ROT, ohne Abbruch)
 //   PROBE_STRENG=1 node tests/online-ranked-probe.test.mjs   auch die harten Pruefungen zaehlen (fuer die Reparatur)
-//   PORT=9631 node tests/online-ranked-probe.test.mjs        eigener Port (Standard 8899)
+//   PORT=9631 node tests/online-ranked-probe.test.mjs        eigener Port (Standard: frei)
 //
 // Harte Pruefungen (hart: true) stehen fuer die Befunde vom 11.11. abends (Laufzettel Feinschliff 2026-11-11, Befund 1, 3,
 // 4, 5): zweite Partie, Zurueckkehren, Skin, Brettgroesse. Auf dem Stand live 297 sind sie rot. Ohne PROBE_STRENG
@@ -39,7 +39,7 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8899);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 
 // Regel "laufende Partie statt neuer" aus dem SQL (siehe Kopf)

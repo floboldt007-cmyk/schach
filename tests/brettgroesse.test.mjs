@@ -4,7 +4,7 @@
 //
 //   node tests/brettgroesse.test.mjs                 alles
 //   BROWSER=webkit node tests/brettgroesse.test.mjs  mit Safari-Engine
-//   PORT=8963 node tests/brettgroesse.test.mjs       eigener Port (Standard 8963)
+//   PORT=8963 node tests/brettgroesse.test.mjs       eigener Port (Standard: frei)
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { createRequire } from 'node:module';
@@ -18,7 +18,7 @@ const GROESSEN = [['handy-klein', 375, 667], ['handy', 390, 844], ['handy-quer',
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8963);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 

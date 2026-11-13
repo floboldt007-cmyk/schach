@@ -1,5 +1,5 @@
 // Netzwerk ausschliesslich simuliert: kein Test schreibt ins echte Supabase-Projekt.
-//   PORT=9620 node tests/online-ui.test.mjs   eigener Port (Standard 8887)
+//   PORT=9620 node tests/online-ui.test.mjs   eigener Port (Standard: frei)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
@@ -22,7 +22,7 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8887);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'u1' })).toString('base64url') + '.x', refresh_token: 'test-r', expires_at: 9999999999, user: { id: 'u1', email: 'spieler@example.invalid' } };
 let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehnen = false, veraltet = false;

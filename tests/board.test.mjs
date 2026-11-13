@@ -17,7 +17,7 @@ import { browserTyp, fingerTreiber } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8823);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const URL_DEMO = `http://127.0.0.1:${PORT}/tests/board-demo.html`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || '';

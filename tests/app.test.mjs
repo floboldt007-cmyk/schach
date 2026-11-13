@@ -22,7 +22,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8831);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // Kern-Gruppen laufen mit ?test&kern: ohne die Spielpakete aus PAKETE (js/erweiterungen.js), damit sie den Kern
 // pruefen und nicht mit jedem neuen Paket umgeschrieben werden muessen. Die echte Paketliste pruefen die
 // Erweiterungs-Gruppen hier (MIT_PAKET, MIT_W0PLUS) sowie e2e, arena, navigation und screens.

@@ -6,7 +6,7 @@
 //
 //   node tests/daten.test.mjs              beides
 //   node tests/daten.test.mjs --nur-node   nur Teil 1
-//   PORT=9500 node tests/daten.test.mjs    Port des Testservers (sonst 8840)
+//   PORT=9500 node tests/daten.test.mjs    Port des Testservers (sonst: frei)
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +15,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8840);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') {

@@ -28,7 +28,7 @@ import * as S from '../js/pakete/funken/stand.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8866);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const NUR_NODE = process.argv.includes('--nur-node');
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(os.tmpdir(), 'crownmate-funken-bilder');

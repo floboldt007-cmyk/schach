@@ -12,7 +12,7 @@
 // aus; ohne Service Worker (iOS-Huelle) und unter file:// nur Neuladen; ohne CSS und dunkel.
 //
 //   node tests/notfall.test.mjs
-//   PORT=9740 node tests/notfall.test.mjs    eigener Port (Standard 8879)
+//   PORT=9740 node tests/notfall.test.mjs    eigener Port (Standard: frei)
 //   BROWSER=webkit node tests/notfall.test.mjs
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
@@ -26,7 +26,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8879);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const PRAEFIX = '/schach/';
 const START = `http://127.0.0.1:${PORT}${PRAEFIX}`;
 const KURZ = 1200;   // ?test&notfall=<ms>: Wartezeit im Test statt 15 s

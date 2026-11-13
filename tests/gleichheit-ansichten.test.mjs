@@ -6,7 +6,7 @@
 //   node tests/gleichheit-ansichten.test.mjs                   Probe: Abweichungen melden sich als ROT-ERWARTET, Exit 0
 //   PROBE_STRENG=1 node tests/gleichheit-ansichten.test.mjs    Abweichungen zaehlen als FEHLER (fuer die Reparatur)
 //   ... --bilder=<ordner> --tabelle=<datei.md>                 dazu je Geraet und Ansicht ein Bild und die Tabelle
-//   PORT=8977 node tests/gleichheit-ansichten.test.mjs         eigener Port (Standard 8977)
+//   PORT=8977 node tests/gleichheit-ansichten.test.mjs         eigener Port (Standard: frei)
 //
 // Massstab ist die Bot-Partie (ueber die Arena gestartet, wie Flo sie beginnt, damit ihr Duell-Intro mitzaehlt). Je
 // Ansicht und Geraet: Brettbreite (aus dem Feldraster), Spielerleisten (Lage zum Brett, Name, Avatar, Uhr), die
@@ -43,7 +43,7 @@ const server = http.createServer((req, res) => {
   try { const d = readFileSync(p); res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(d); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8977);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
