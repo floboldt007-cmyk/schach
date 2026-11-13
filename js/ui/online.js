@@ -51,6 +51,7 @@ const BRETT_MIN = 280;
 // Brettwahl im Kopf (R7, wie BRETTER in js/ui/partie.js, dort nicht exportiert): id, helles und dunkles Feld des Musters
 const BRETTER = Object.freeze([['nacht', '#e4e8f6', '#7c87b6'], ['gruen', '#eeeed2', '#769656'], ['holz', '#f0d9b5', '#b58863']]);
 const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+const STREIFEN_AB = 760; // wie js/ui/partie.js
 const UHR_SYMBOL = '<svg class="ico uhr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
   + 'stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>';
 const REMIS_SYMBOL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><text x="12" y="18" text-anchor="middle" '
@@ -624,6 +625,9 @@ export function zeige(root, params, app) {
     const handy = !!(handyMq && handyMq.matches);
     s.classList.toggle('handy', handy);
     s.classList.remove('eng');
+    // R8 (L3): Zugstreifen wie in der Bot-Partie (js/ui/partie.js STREIFEN_AB): ab 760 px Hoehe ueber den Knoepfen, darunter
+    // entfaellt er und die Pfeile stehen in der Knopfreihe (css/partie.css .streifen-unten, css/online.css)
+    s.classList.toggle('streifen-unten', handy && s.clientHeight < STREIFEN_AB);
     if (!handy) { spiel.style.removeProperty('--brett'); spiel.style.removeProperty('--spalte'); return; }
     const rahmen = spiel.querySelector('.brett-rahmen');
     const rs = getComputedStyle(rahmen);
@@ -910,6 +914,9 @@ export function zeige(root, params, app) {
       const f = el.dataset.farbe, r = rest(f), zeit = el.querySelector('.uhr-zeit');
       if (zeit) zeit.textContent = uhrText(r);
       el.classList.toggle('laeuft', p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2);
+      // R8 (B4): die Uhr dessen am Zug ist dunkel wie in der Bot-Partie (js/ui/partie.js zeichneKnoepfe), auch vor dem
+      // 2. Halbzug, wenn sie noch steht
+      el.classList.toggle('am-zug', p.status === 'laeuft' && p.am_zug === f);
       el.classList.toggle('warn', p.status === 'laeuft' && r < 20000);
     }
     // Uhr-Warnung einmal je Partie, sobald die eigene laufende Uhr unter 20 s faellt (wie in der Partie)

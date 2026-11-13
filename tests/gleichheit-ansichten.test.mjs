@@ -14,6 +14,8 @@
 // Zug (Protokoll von js/sounds.js, im Testmodus fuehrt es auch stille Klaenge mit Grund).
 // Harte Pruefungen (hart: true) sind die Gleichheits-Punkte; ohne PROBE_STRENG blockieren sie die CI nicht
 // (tests/alle.mjs zaehlt nur Zeilen mit "FEHLER" und den Exitcode), wie tests/online-ranked-probe.test.mjs.
+// Seit R8 (13.11.2026) zaehlen die Punkte von Online-Partie und Zu zweit immer (ausser dem Duell-Intro vor Zu zweit),
+// dazu das Aussehen der Spielerleisten hell und dunkel (messeLeistenStil) und die Lage der Zuege zu den Knoepfen.
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -186,8 +188,48 @@ const messe = (s, screen) => s.evaluate((screen) => {
     const r = el?.getBoundingClientRect();
     knoepfe[k] = el ? { da: true, imBild: r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5 } : { da: false, imBild: false };
   }
-  return { brett: Math.round(b.rechts - b.links), brettRaster: raster ? Math.round(raster.getBoundingClientRect().width) : null,
+  // R8 (L3): Zugstreifen (hoch) oder Zugliste (quer): Lage zu den Knoepfen und ganz im Bild
+  const zuege = [...wurzel.querySelectorAll('.zugleiste')].find(sichtbar) || [...wurzel.querySelectorAll('.zugbox')].find(sichtbar);
+  const kn = [...wurzel.querySelectorAll('.spielknoepfe, .zz-aktionen')].find(sichtbar);
+  let zugStreifen = 'keiner';
+  if (zuege) {
+    const r = zuege.getBoundingClientRect(), k = kn?.getBoundingClientRect();
+    zugStreifen = (zuege.matches('.zugleiste') ? 'streifen' : 'liste') + (!k ? '' : r.bottom <= k.top + 1 ? ' ueber Knoepfen' : r.top >= k.bottom - 1 ? ' unter Knoepfen' : ' neben Knoepfen')
+      + (r.top >= -0.5 && r.bottom <= innerHeight + 0.5 ? '' : ' ausserhalb');
+  }
+  return { zugStreifen, brett: Math.round(b.rechts - b.links), brettRaster: raster ? Math.round(raster.getBoundingClientRect().width) : null,
     leisten, knoepfe, seiteScrollt: document.documentElement.scrollHeight - innerHeight > 1 || window.scrollY > 0 };
+}, screen);
+
+// R8 (13.11.2026, B4): Aussehen der Spielerleisten je Farbmodus, verglichen mit der Bot-Partie. Die Uhr wird fuer die
+// Messung kurz eingeblendet (ohne Bedenkzeit ist sie in jeder Ansicht verborgen), danach sofort wieder verborgen.
+const messeLeistenStil = (s, screen) => s.evaluate((screen) => {
+  const sichtbar = (e) => !!e && !e.hidden && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && e.getBoundingClientRect().width > 0;
+  const wurzel = document.querySelector(screen) || document;
+  const px = (v) => Math.round(parseFloat(v) * 10) / 10;
+  // Sprechblase des Bots (quer unter dem Namen): gehoert nur zur Bot-Partie, ihre Hoehe zaehlt beim Vergleich nicht mit
+  const blaseAnteil = (e) => { const b = e.querySelector(':scope > .blase-ort');
+    return b && sichtbar(b) && getComputedStyle(b).position !== 'absolute' ? Math.round(b.getBoundingClientRect().height + parseFloat(getComputedStyle(b).marginTop)) : 0; };
+  return [...wurzel.querySelectorAll('.spieler, .zz-spieler')].filter(sichtbar).map((e) => {
+    const c = getComputedStyle(e), r = e.getBoundingClientRect();
+    const av = e.querySelector(':scope > .av, :scope > img');
+    const avR = av?.getBoundingClientRect(), avC = av && getComputedStyle(av);
+    const nameEl = e.querySelector('.name, .zz-name b');
+    const nC = nameEl && getComputedStyle(nameEl);
+    const uhr = e.querySelector('.uhr');
+    let uhrStil = null;
+    if (uhr) {
+      const war = uhr.hidden; uhr.hidden = false;
+      const u = getComputedStyle(uhr), ur = uhr.getBoundingClientRect();
+      uhrStil = { hoehe: Math.round(ur.height), breiteMin: px(u.minWidth), schrift: px(u.fontSize), radius: px(u.borderTopLeftRadius), grund: u.backgroundColor, farbe: u.color };
+      uhr.hidden = war;
+    }
+    return { wer: e.classList.contains('ich') || e.classList.contains('zz-unten') ? 'ich' : 'gegner', banner: e.classList.contains('mit-banner'),
+      hoehe: Math.round(r.height), radius: px(c.borderTopLeftRadius), grund: c.backgroundColor, polsterL: px(c.paddingLeft),
+      av: av ? { breite: Math.round(avR.width), hoehe: Math.round(avR.height), radius: px(avC.borderTopLeftRadius) } : null,
+      name: nC ? { schrift: px(nC.fontSize), gewicht: nC.fontWeight, farbe: nC.color } : null,
+      unterzeile: !!e.querySelector('.unter'), geschlagen: !!e.querySelector('.geschlagen-ort'), uhr: uhrStil, blase: blaseAnteil(e) };
+  });
 }, screen);
 
 const klangStand = (s) => s.evaluate(async () => (await import('./js/sounds.js')).klang.protokoll().map((e) => ({ nr: e.nr, name: e.name, aktion: e.aktion || 'spielt', grund: e.grund || '' })));
@@ -299,7 +341,15 @@ const ABLAUF = {
   },
 };
 // ctx = { datei, zustand }: Bildname und Server-Zustand (das Duell-Ende setzt der Ablauf am Server)
-const messeK = async (s, ctx, screen) => Object.assign(await messe(s, screen), ctx);
+const messeK = async (s, ctx, screen) => {
+  const m = Object.assign(await messe(s, screen), ctx);
+  if (m.fehlt) return m;
+  m.stil = { hell: await messeLeistenStil(s, screen) };
+  await s.emulateMedia({ colorScheme: 'dark' }); await warte(1000); // Farbuebergaenge (--d-m) abwarten
+  m.stil.dunkel = await messeLeistenStil(s, screen);
+  await s.emulateMedia({ colorScheme: 'light' }); await warte(1000);
+  return m;
+};
 async function bild(s, m) { if (BILDER) await s.screenshot({ path: path.join(BILDER, `${m.datei}.png`) }); }
 
 function initSkript({ sitzung, erfinder }) {
@@ -354,6 +404,23 @@ try {
 finally { await browser?.close(); await new Promise((r) => server.close(r)); }
 
 // ---- Auswertung gegen die Bot-Partie ----
+// R8 (B4): Aussehen einer Leiste gegen dieselbe Leiste der Bot-Partie; Liste der Abweichungen (leer = gleich). Gewollt
+// anders: die Namensfarbe auf dem Banner der Visitenkarte (Online, css/online.css: helle Schrift mit Schatten) und die
+// Sprechblase des Bots: quer haelt die Gegnerkarte ihre groesste Hoehe mit Blase (js/ui/partie.js ruhig), dort ist
+// die eigene Leiste der Bot-Partie der Massstab fuer die Hoehe.
+function leistenAbweichung(l, v, vIch) {
+  const a = [];
+  const gleich = (n, x, y, tol = 0) => { if (typeof x === 'number' ? !(typeof y === 'number' && Math.abs(x - y) <= tol) : x !== y) a.push(`${n} ${x} statt ${y}`); };
+  gleich('Hoehe', l.hoehe, v.blase && vIch ? vIch.hoehe : v.hoehe, 2);
+  gleich('Ecke', l.radius, v.radius); gleich('Grund', l.grund, v.grund); gleich('Polster links', l.polsterL, v.polsterL, 0.5);
+  gleich('Bild', l.av ? `${l.av.breite}x${l.av.hoehe}/${l.av.radius}` : 'keins', v.av ? `${v.av.breite}x${v.av.hoehe}/${v.av.radius}` : 'keins');
+  gleich('Name Schrift', l.name?.schrift, v.name?.schrift); gleich('Name Gewicht', l.name?.gewicht, v.name?.gewicht);
+  if (!l.banner) gleich('Name Farbe', l.name?.farbe, v.name?.farbe);
+  gleich('Unterzeile', l.unterzeile, v.unterzeile); gleich('geschlagene Figuren', l.geschlagen, v.geschlagen);
+  if (!l.uhr || !v.uhr) gleich('Uhr', !!l.uhr, !!v.uhr);
+  else for (const k of ['hoehe', 'breiteMin', 'schrift', 'radius', 'grund', 'farbe']) gleich(`Uhr ${k}`, l.uhr[k], v.uhr[k], k === 'hoehe' ? 1 : 0);
+  return a;
+}
 const leistenMuster = (m) => m.leisten.map((l) => `${l.wer}:${l.lage}`).sort().join(' ');
 const zeilen = [];
 for (const [geraet, je] of Object.entries(ergebnisse)) {
@@ -366,12 +433,22 @@ for (const [geraet, je] of Object.entries(ergebnisse)) {
     pruefe(`${geraet} ${NAME[a]}: Ablauf ohne Abbruch, Brett gemessen`, lauf, m);
     if (!lauf || !botOk) { zeilen.push({ geraet, a, m, abw: ['nicht gemessen'] }); continue; }
     const abw = [];
-    const hart = (name, gut, detail) => { if (!pruefe(`${geraet} ${NAME[a]}: ${name}`, gut, detail, { hart: true })) abw.push(name); };
+    // R8 (13.11.2026): Online-Partie und Zu zweit sind angeglichen, ihre Gleichheits-Punkte zaehlen jetzt immer (FEHLER statt
+    // ROT-ERWARTET). Offen bleibt nur das Duell-Intro vor Zu zweit (zwei Menschen am selben Geraet, Geschmacksfrage).
+    const gezogen = (name) => (a === 'online' || a === 'zuzweit') && !(a === 'zuzweit' && name.startsWith('Duell-Intro'));
+    const hart = (name, gut, detail) => { if (!pruefe(`${geraet} ${NAME[a]}: ${name}`, gut, detail, { hart: !gezogen(name) })) abw.push(name); };
     pruefe(`${geraet} ${NAME[a]}: Gegenprobe Brett (Feldraster ${m.brett} px gegen .brett-felder ${m.brettRaster} px)`, m.brettRaster != null && Math.abs(m.brett - m.brettRaster) <= 1, m);
     if (a !== 'bot') {
       hart(`Brett mindestens so gross wie in der Bot-Partie (${m.brett} gegen ${bot.brett} px, Toleranz ${TOLERANZ_PX} px)`, m.brett >= bot.brett - TOLERANZ_PX, { brett: m.brett, bot: bot.brett });
       hart(`Leisten wie in der Bot-Partie (${leistenMuster(m) || 'keine'} gegen ${leistenMuster(bot)})`, leistenMuster(m) === leistenMuster(bot), m.leisten);
       hart(`Duell-Intro wie in der Bot-Partie (${m.intro ? 'ja' : 'nein'} gegen ${bot.intro ? 'ja' : 'nein'})`, m.intro === bot.intro, { intro: m.intro, ideePhase: m.ideePhase });
+    }
+    if (a === 'online' || a === 'zuzweit') hart(`Zuege wie in der Bot-Partie (${m.zugStreifen} gegen ${bot.zugStreifen})`, m.zugStreifen === bot.zugStreifen, { hier: m.zugStreifen, bot: bot.zugStreifen });
+    if (a === 'online' || a === 'zuzweit') for (const modus of ['hell', 'dunkel']) for (const wer of ['gegner', 'ich']) {
+      const v = bot.stil?.[modus]?.find((l) => l.wer === wer), l = m.stil?.[modus]?.find((x) => x.wer === wer);
+      const vIch = bot.stil?.[modus]?.find((x) => x.wer === 'ich');
+      const diff = v && l ? leistenAbweichung(l, v, vIch) : null;
+      hart(`Leiste ${wer} (${modus}) wie in der Bot-Partie`, !!diff && diff.length === 0, diff || { bot: v, hier: l });
     }
     const ohneName = m.leisten.filter((l) => !l.name || !l.avatar);
     hart('jede Leiste mit Name und Avatar', m.leisten.length > 0 && ohneName.length === 0, m.leisten);
@@ -410,5 +487,6 @@ if (TABELLE) {
   writeFileSync(TABELLE, t.join('\n'), 'utf8');
   console.log(`Tabelle: ${TABELLE}`);
 }
+if (arg('stil')) { writeFileSync(arg('stil'), JSON.stringify(Object.fromEntries(Object.entries(ergebnisse).map(([g, je]) => [g, Object.fromEntries(Object.entries(je).map(([a, m]) => [a, m.stil || null]))])), null, 1), 'utf8'); console.log(`Stil: ${arg('stil')}`); }
 if (rotErwartet) console.log(`\n${rotErwartet} harte Pruefung(en) ROT-ERWARTET (zaehlen erst mit PROBE_STRENG=1): ${rot.join(' | ')}`);
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;

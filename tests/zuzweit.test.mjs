@@ -117,6 +117,9 @@ try {
   const mitUhr = await uhrSatz();
   await seite.locator('[name="bedenkzeit"][value="ohne"]').check();
   pruefe('Startblatt: Uhr-Satz nur mit gewaehlter Uhr (U11)', !ohneUhr && mitUhr && !(await uhrSatz()), { ohneUhr, mitUhr });
+  // R8 (L6): Kopf wie Bot-Partie, Raetsel-Duell und Lektion: Klang UND Einstellungen
+  const kopfStart = await seite.evaluate(() => ['klang', 'einstellungen'].map((a) => !!document.querySelector(`.zz-startblatt > .kopf [data-aktion="${a}"]`)));
+  pruefe('Startblatt-Kopf (L6): Klang und Einstellungen', kopfStart.every(Boolean), kopfStart);
   await start();
   const fortschritt = await seite.evaluate(() => localStorage.getItem('schach-arena:v1:fortschritt'));
   await zug('e2e4'); await zug('e7e5', true); await zug('g1f3'); await zug('b8c6', true);
@@ -124,10 +127,25 @@ try {
   pruefe('Tippen und Ziehen beider Seiten, keine Engine oder Bot-Antwort', await seite.evaluate(() => window.__partie.z.zuege.join(',') === 'e2e4,e7e5,g1f3,b8c6' && window.__workerZahl === 0));
   pruefe('Keine Hilfen, Weiss unten, obere Spielerkarte umgedreht', await seite.evaluate(() => !document.querySelector('.zz-screen .balken, .zz-screen .coach, .zz-screen [data-aktion="hinweis"], .zz-screen [data-aktion="zuruecknahme"]')
     && window.__partie.brett.ausrichtung === 'w' && document.querySelector('.zz-oben').classList.contains('zz-gegenueber')));
+  // R8 (L6): Kopf der Partie mit Klang und Einstellungen; Einstellungen und zurueck setzen die Partie fort (wie die
+  // Bot-Partie: vorher sichern, zurueck ueber den Verlauf)
+  const kopfPartie = await seite.evaluate(() => ['klang', 'einstellungen'].map((a) => !!document.querySelector(`.zz-screen > .kopf [data-aktion="${a}"]`)));
+  await merke();
+  await seite.locator('.zz-screen > .kopf [data-aktion="einstellungen"]').click();
+  await seite.waitForFunction(() => document.documentElement.dataset.screen === 'einstellungen');
+  await seite.evaluate(() => window.__app.zurueck());
+  await wartePartie();
+  const nachEinst = await seite.evaluate(() => window.__partie.z.zuege.join(','));
+  pruefe('Partie-Kopf (L6): Klang und Einstellungen; Einstellungen und zurueck setzt die Partie fort', kopfPartie.every(Boolean) && nachEinst === 'e2e4,e7e5,g1f3,b8c6', { kopfPartie, nachEinst });
+  // R8 (B4/L6): Zuege als Zugliste bzw. Zugstreifen wie in der Bot-Partie, Leisten mit Unterzeile und geschlagenen Figuren
+  const zuegeBau = await seite.evaluate(() => ({ nr: document.querySelectorAll('.zz-zuege .zugleiste .nr').length, z: document.querySelectorAll('.zz-zuege .zugleiste .z').length,
+    aktuell: document.querySelector('.zz-zuege .zugleiste .z.aktuell')?.textContent, orte: document.querySelectorAll('.zz-spieler .unter .geschlagen-ort').length }));
+  pruefe('Zuege und Leisten wie Bot-Partie (B4/L6): 2 Nummern, 4 Zuege, letzter hervorgehoben, Orte fuer geschlagene Figuren', zuegeBau.nr === 2 && zuegeBau.z === 4 && zuegeBau.orte === 2 && /c6/.test(zuegeBau.aktuell || ''), zuegeBau);
   const h1Partie = await seite.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => e.textContent));
   pruefe('Partie zu zweit: genau eine h1 im Kopf', h1Partie.length === 1 && await seite.locator('.zz-screen > .kopf h1').count() === 1, JSON.stringify(h1Partie));
   // R6-Befund B11 (12.11.2026): Leisten mit eingegebenem Namen und Farbe je einmal; Klang-Knopf wie in der Bot-Partie
-  const leisten = () => seite.evaluate(() => [...document.querySelectorAll('.zz-screen .zz-spieler')].map((e) => e.querySelector('.zz-name').innerText.replace(/\s+/g, ' ').trim()));
+  const leisten = () => seite.evaluate(() => [...document.querySelectorAll('.zz-screen .zz-spieler')].map((e) => [e.querySelector('.zz-name'), e.querySelector('.p-meta')]
+    .map((x) => x?.innerText || '').join(' ').replace(/\s+/g, ' ').trim()));
   const mitNamen = await leisten();
   pruefe('Leisten (B11): eingegebene Namen mit Farbe, je einmal', mitNamen.join('|') === 'Ben Schwarz|Anna Weiß', mitNamen);
   const klangKnopf = seite.locator('.zz-screen > .kopf [data-aktion="klang"]');
@@ -234,7 +252,8 @@ try {
   await knopf('zurueck').click();
   await seite.waitForFunction(() => document.documentElement.dataset.screen !== 'partie');
   const ziel = await seite.evaluate(() => document.documentElement.dataset.screen);
-  pruefe('Zurueck-Knopf (B11): heisst wie sein Ziel (Start, nicht "Training"), mit Symbol, und fuehrt dorthin', !!zk && zk.text === 'Start'
+  // R8 (L6): Symbol-Knopf wie in der Bot-Partie (js/ui/partie.js), die Ansage nennt weiter das Ziel (B11)
+  pruefe('Zurueck-Knopf (B11/L6): Symbol wie in der Bot-Partie, Ansage nennt das Ziel (Start), fuehrt dorthin', !!zk && zk.text === ''
     && zk.label === 'Zurück zum Start' && zk.symbol && ziel === 'heim', { zk, ziel });
   pruefe('Keine Konsolen- oder Seitenfehler', fehler.length === 0, fehler);
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
