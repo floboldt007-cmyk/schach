@@ -224,3 +224,15 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
 /* Sofort-Suche (Punkt 40): Suchdauer neben dem Titel, "Jetzt gegen KI" erst ab der KI-Grenze des Servers */
 .rd-uhr { font-variant-numeric: tabular-nums; color: var(--text-2); }
 .rd-ki-jetzt[hidden] { display: none; }
+/* R9 Lobby mittig (Vorbau, Auswahlseite R9-LobbyLeere B): auf hohen Hochkant-Fenstern steht der Start mittig statt oben mit
+   bis zu 490 px Leere darunter. Zwischen Buehne und Freund-Karte waechst der Abstand bis 60 px, den Rest teilen sich oben
+   und unten (iPhone 13 je etwa 60 px, der goldene Knopf rueckt zum Daumen). Der Rumpf endet hier ueber der Reiterleiste,
+   darum unten derselbe Polster wie oben statt 24 px + Leistenhoehe, sonst stuende der Block 60 px zu hoch. Passt der
+   Inhalt nicht, schrumpfen oben und unten auf 0 und der Rumpf scrollt wie bisher. iPhone SE (667 px hoch) und quer
+   bleiben oben ausgerichtet; gemessen in tests/layout-r8.test.mjs (LM). */
+@media (orientation: portrait) and (min-height: 740px) {
+  .raetsel-duell[data-phase="start"] .rd-rumpf { align-content: stretch; padding-bottom: 6px; }
+  .raetsel-duell[data-phase="start"] .rd-start { gap: 0; grid-template-rows: minmax(0, 1fr) auto minmax(14px, 60px) auto minmax(0, 1fr); }
+  .raetsel-duell[data-phase="start"] .rd-buehne { grid-row: 2; }
+  .raetsel-duell[data-phase="start"] .rd-freund { grid-row: 4; }
+}

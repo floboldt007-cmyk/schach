@@ -6,6 +6,9 @@
 //       tests/funktion-partie.test.mjs; der erste Sieg zeigt zusaetzlich die Feier und darf scrollen).
 //   L9  Blatt eines Ich-Bereichs (Shop, Erfolge) auf PC und iPad quer: "Fertig" stand halb breit links, auf dem Handy
 //       volle Breite. Geprueft am echten sheet() aus js/ui/bauteile.js mit klasse 'sa-blatt' wie js/ui/ich.js.
+//   LM  R9 Lobby mittig (Vorbau, Auswahlseite R9-LobbyLeere, Empfehlung B): Duell-Start, Online-Lobby und Zu-zweit-Start
+//       liessen auf hohen Hochkant-Fenstern 160 bis 670 px Leere unter dem Inhalt. Dort steht der Inhalt jetzt mittig,
+//       keine Leere ueber 60 px am Stueck auf dem iPhone 13; iPhone SE und quer bleiben oben ausgerichtet.
 // Netzwerk: nur 127.0.0.1, Supabase leer beantwortet.
 //
 //   node tests/layout-r8.test.mjs
@@ -282,6 +285,80 @@ try {
     pruefe(`${g.name}: keine Seitenfehler (Sieg-Blatt)`, fehler.length === 0, fehler);
     await k.close();
   }
+
+  // LM: Startansichten mit angemeldeter Test-Sitzung (ohne Sitzung zeigt das Duell nur die Konto-Karte)
+  const LOBBYS = {
+    'Duell-Start': { warte: '.screen.raetsel-duell[data-phase="start"] .rd-suchen', rumpf: '.rd-rumpf', knopf: '.rd-suchen',
+      geh: () => window.__app.gehe('raetsel-duell') },
+    'Online-Lobby': { warte: '.screen.online-screen .on-tuer-knopf', rumpf: '.on-rumpf', knopf: '.on-tuer[data-art="partie"] .on-tuer-knopf',
+      geh: () => window.__app.gehe('online') },
+    'Zu-zweit-Start': { warte: '.screen.zz-startblatt .zz-los', rumpf: '.zz-rumpf', knopf: '.zz-los',
+      geh: () => window.__app.gehe('partie', { modus: 'zuzweit' }) },
+    // ohne Liga-Streifen (Liga laedt nicht): 270 px frei auf dem iPhone 13, vier Luecken, unter 68 px geht es rechnerisch nicht
+    'Online-Lobby ohne Liga': { warte: '.screen.online-screen .on-tuer-knopf', rumpf: '.on-rumpf', knopf: '.on-tuer[data-art="partie"] .on-tuer-knopf',
+      geh: () => window.__app.gehe('online'), ohneLiga: true, leere: 80 },
+  };
+  // Leere = laengstes senkrechtes Stueck zwischen Rumpf-Oberkante und Reiterleiste (bzw. Rumpf-Unterkante), in dem kein
+  // sichtbares Element mit Flaeche, Rahmen, Schatten, Bild oder Text liegt; oben = Abstand Rumpf-Oberkante bis Inhalt
+  const MISS_LOBBY = ({ rumpf, knopf }) => {
+    const ru = document.querySelector('.screen ' + rumpf), rr = ru.getBoundingClientRect();
+    const l = document.querySelector('nav.reiter-leiste'), lr = l && l.checkVisibility() ? l.getBoundingClientRect() : null;
+    const unten = Math.min(rr.bottom, lr && lr.top > innerHeight / 2 ? lr.top : Infinity);
+    // nur fuer Vorleseprogramme (1 x 1 px wie der Seitenkopf auf dem Handy, css/navigation.css) zaehlt nicht
+    const nurVorlesen = (el) => { for (let a = el; a && a !== ru; a = a.parentElement) { const r = a.getBoundingClientRect(); if (r.width <= 1 && r.height <= 1) return true; } return false; };
+    const zaehlt = (el) => {
+      if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) || nurVorlesen(el)) return false;
+      const st = getComputedStyle(el);
+      return st.backgroundColor !== 'rgba(0, 0, 0, 0)' || st.backgroundImage !== 'none' || st.boxShadow !== 'none'
+        || parseFloat(st.borderTopWidth) > 0 || el.tagName === 'IMG' || el.tagName === 'svg'
+        || [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() !== '');
+    };
+    // ein sichtbarer Seitenkopf (iPad, Online) ist Kopf und bleibt oben: gemessen wird darunter
+    const sk = [...ru.querySelectorAll('.seiten-kopf')].find((e) => zaehlt(e) || [...e.querySelectorAll('*')].some(zaehlt));
+    const start = sk ? sk.getBoundingClientRect().bottom : rr.top;
+    const iv = [...ru.querySelectorAll('*')].filter((e) => zaehlt(e) && !(sk && sk.contains(e))).map((e) => e.getBoundingClientRect())
+      .filter((r) => r.height > 0 && r.bottom > start && r.top < unten)
+      .map((r) => [Math.max(r.top, start), Math.min(r.bottom, unten)]).sort((a, b) => a[0] - b[0]);
+    let pos = start, leere = 0;
+    const luecken = [];   // [ab y, Hoehe] jeder Luecke ueber 20 px, fuer die Fehlermeldung
+    for (const [a, b] of iv) { if (a - pos > 20) luecken.push([Math.round(pos), Math.round(a - pos)]); leere = Math.max(leere, a - pos); pos = Math.max(pos, b); }
+    const k = document.querySelector('.screen ' + knopf).getBoundingClientRect();
+    return { leere: Math.round(Math.max(leere, unten - pos)), oben: Math.round(iv[0][0] - start), untenFrei: Math.round(unten - pos),
+      knopf: +((k.top + k.height / 2 - rr.top) / (unten - rr.top)).toFixed(2), innen: ru.scrollHeight - ru.clientHeight,
+      seite: document.documentElement.scrollHeight - innerHeight, luecken };
+  };
+  for (const g of [{ name: 'iPhone 13', viewport: { width: 390, height: 844 }, hoch: true, leere: 64 },
+    { name: 'iPad hoch', viewport: { width: 820, height: 1180 }, hoch: true }, { name: 'iPhone SE', viewport: { width: 375, height: 667 } },
+    { name: 'iPad quer', viewport: { width: 1180, height: 820 } }]) {
+    const { k, s, fehler } = await seite(browser, g.viewport);
+    await s.evaluate(() => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: 'a.eyJzdWIiOiJ1MSJ9.x',
+      refresh_token: 'r', expires_at: 9999999999, user: { id: 'u1', email: 'u1@example.invalid' } })));
+    let liga = true;   // Liga-Streifen wie bei einem echten Konto (js/ui/online.js zeigeLiga)
+    await k.route('**/kronen_mein_stand**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(liga ? [{ stufe: 3, platz: 3, n: 30, kronen: 140 }] : []) }));
+    for (const [name, a] of Object.entries(LOBBYS)) {
+      liga = !a.ohneLiga;
+      await s.evaluate(a.geh);
+      await s.waitForSelector(a.warte);
+      await s.waitForTimeout(900);   // Eingangs-Animation und Nachladen (Liga-Zeile) fertig
+      if (name === 'Online-Lobby') pruefe(`${g.name}: LM Liga-Streifen sichtbar (Nachbau eines Kontos)`, await s.locator('.on-liga:not([hidden])').count() === 1);
+      const m = await s.evaluate(MISS_LOBBY, { rumpf: a.rumpf, knopf: a.knopf });
+      if (g.hoch) {
+        const grenze = a.leere || g.leere;
+        pruefe(`${g.name}: LM ${name} mittig (Rand oben und unten unterscheiden sich um hoechstens 60 px)`, Math.abs(m.oben - m.untenFrei) <= 60, m);
+        if (g.leere) pruefe(`${g.name}: LM ${name} keine Leere ueber ${grenze} px am Stueck`, m.leere <= grenze, m);
+        pruefe(`${g.name}: LM ${name} kein Scrollen, kein Ueberlauf`, m.innen <= 1 && m.seite <= 0, m);
+      } else {
+        // wie heute: Inhalt oben (das Duell scrollt auf dem SE schon heute, das bleibt unangetastet)
+        pruefe(`${g.name}: LM ${name} bleibt oben ausgerichtet (Inhalt beginnt hoechstens 20 px unter dem Rumpf)`, m.oben <= 20, m);
+      }
+      await s.evaluate(() => window.__app.gehe('heim'));
+      await s.waitForTimeout(300);
+    }
+    pruefe(`${g.name}: keine Seitenfehler (LM)`, fehler.length === 0, fehler);
+    await k.close();
+  }
+
   // R9-4 (WIDERLEGT, 13.11.2026): auf Ich und Liga schienen Listenzeilen unter der unteren Leiste zu haengen. Die Seite
   // endet aber ueber der Leiste (navigation.css: Hoehe 100dvh minus --reiter-h, darin der Safe-Area-Abstand), die Zeilen
   // waren vom Scroller abgeschnitten, nicht verdeckt. Pin: Seite endet ueber der Leiste, am Ende des Scrollens liegt

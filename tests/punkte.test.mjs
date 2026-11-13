@@ -479,6 +479,33 @@ gruppe = 'Speicher';
   pruefe('lade: kaputtes JSON ergibt den Standard', JSON.stringify(S.lade()) === JSON.stringify(S.standard()));
 }
 
+// R9-PunkteKurz (Variante A): vor dem 10. eigenen Zug (formel.MIN_ZUEGE) zaehlt nur ein Sieg ("Ein Sieg zaehlt immer",
+// R12-F2). Niederlage, Remis und Abbruch bekommen keinen Tafeleintrag (grund kurz) und damit keinen Wochenwert, den
+// freunde.wochenwertung aus den Tafeln meldet. Die Formel bleibt unveraendert (formel.STAND).
+gruppe = 'Kurze Partien ohne Sieg';
+{
+  setzeSpeicher(fakeSpeicher());
+  const st = S.lade();
+  const eigene = (n) => [...z('buch', Math.min(2, n)), ...z('gut', Math.max(0, n - 2))];
+  const kurz = (id, o) => S.bewerte(st, analysiert(bauePartie(id, { zuege: 4, ...o }), eigene(o.zuege || 4)), { jetzt });
+  const nieder = kurz('k1', { ergebnis: 'niederlage' });
+  const remis = kurz('k2', { ergebnis: 'remis' });
+  const abbruch = kurz('k3', { ergebnis: null });
+  pruefe('Niederlage, Remis und Abbruch vor dem 10. eigenen Zug: kein Tafeleintrag, Grund „kurz“',
+    [nieder, remis, abbruch].every((x) => x && x.tafel === null && x.grund === 'kurz') && !st.tafeln['bot:rudi'], [nieder, remis, abbruch].map((x) => x && [x.tafel, x.grund]));
+  pruefe('… und damit kein Wochenwert (wochenwertung liest nur Tafeln)', Object.values(st.tafeln).every((tf) => T.eigene(tf, 'woche', new Date(jetzt)).length === 0));
+  const sieg = kurz('k4', { ergebnis: 'sieg' });
+  pruefe('Sieg im 4. Zug: Tafeleintrag wie bisher (ein Sieg zählt immer)', sieg.tafel === 'bot:rudi' && sieg.grund === null && st.tafeln['bot:rudi'].eintraege.length === 1, sieg);
+  const lang = kurz('k5', { ergebnis: 'niederlage', zuege: F.MIN_ZUEGE });
+  pruefe(`Niederlage mit ${F.MIN_ZUEGE} eigenen Zügen: Tafeleintrag (Grenze wie formel.MIN_ZUEGE)`, lang.tafel === 'bot:rudi' && st.tafeln['bot:rudi'].eintraege.length === 2, lang);
+  const hilfe = kurz('k6', { ergebnis: 'niederlage', hinweise: 1 });
+  pruefe('Kurz und mit Hinweis: Grund bleibt „hilfe“', hilfe.tafel === null && hilfe.grund === 'hilfe');
+  const boss = kurz('k7', { ergebnis: 'remis', modus: 'boss', botId: 'baron-gambit', boss: { id: 'baron-gambit', stufe: 'meister', staerke: 1100 } });
+  pruefe('Boss-Partie kurz und ohne Sieg: kein Eintrag auf der Wochen-Tafel des Bosses', boss.tafel === null && boss.grund === 'kurz' && !st.tafeln['boss:baron-gambit:meister']);
+  pruefe('Satz der Abrechnung: „Zu kurz für die Wertung“', A.unterText({ ...nieder, tafel: null, grund: 'kurz' }) === 'Zu kurz für die Wertung: vor dem 10. eigenen Zug zählt nur ein Sieg',
+    A.unterText({ ...nieder }));
+}
+
 gruppe = 'Speicher-Budget';
 {
   setzeSpeicher(fakeSpeicher());
@@ -1144,6 +1171,19 @@ async function testeBrowser(browser) {
   pruefe('Rechnet die Analyse noch: „Punkte werden gezählt …“ mit ruhigem Schimmer; ohne Analyse: „Punkte folgen mit der Analyse“; Übung und ohne eigenen Zug: keine Zeile',
     wartend.t.length === 2 && /pk-schimmer/.test(wartend.t[0]) && /Punkte werden gezählt …/.test(wartend.t[0]) && !/pk-schimmer/.test(wartend.t[1])
     && /Punkte folgen mit der Analyse/.test(wartend.t[1]) && wartend.u === 0 && wartend.n === 0, wartend);
+  // R9-PunkteKurz: kurze Partie ohne Sieg (grund kurz) zeigt keine Zahl, nur den Satz; die Rueckgabe bleibt { el, beende, verlasse }
+  const kurzZeile = await seite.evaluate(async () => {
+    const A = await import('./js/pakete/punkte/ansicht.js');
+    let gemerkt = 0;
+    const z = A.abrechnungsZeile({ ergebnis: { id: 'kurz1', w: 100, erg: 'niederlage', tafel: null, grund: 'kurz', posten: { kurz: true } }, merke: () => { gemerkt++; } });
+    const aus = { el: !!(z && z.el), fn: typeof z.beende === 'function' && typeof z.verlasse === 'function', wert: z.el.querySelectorAll('.pk-wert, .pk-alt').length,
+      label: z.el.querySelector('.pk-label')?.textContent, text: z.el.querySelector('.pk-satz')?.textContent, kurz: z.el.dataset.kurz, gemerkt };
+    z.beende(); z.verlasse();
+    return aus;
+  });
+  pruefe('Kurze Partie ohne Sieg: Zeile ohne Punktzahl, nur „Zu kurz für die Wertung …“, Rückgabe { el, beende, verlasse }',
+    kurzZeile.el && kurzZeile.fn && kurzZeile.wert === 0 && kurzZeile.kurz === '1' && kurzZeile.gemerkt === 1
+    && kurzZeile.label === 'Punkte' && kurzZeile.text === 'Zu kurz für die Wertung: vor dem 10. eigenen Zug zählt nur ein Sieg', kurzZeile);
 
   // ---------- 4. Erste Partie: Abrechnung "Erster Eintrag" ----------
   await h.klangSpion();
