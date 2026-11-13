@@ -181,6 +181,8 @@ registriereTexte('einstellungen', {
     'zz.beendet': 'Partie beendet',
     'zz.gewinnt': '{name} gewinnt',
     'zz.revanche': 'Revanche',
+    // Kopf der laufenden Partie (R6-Befund B11): Zurueck zum Start, Klang-Schalter wie in der Bot-Partie
+    'zz.start': 'Start', 'zz.zurueckStart': 'Zurück zum Start', 'zz.klang': 'Klang', 'zz.klangAn': 'Klang an', 'zz.klangAus': 'Klang aus',
     'zz.bietetRemis': '{name} bietet Remis',
     'zz.entscheidet': '{name} entscheidet.',
     'zz.weiterspielen': 'Weiterspielen',
@@ -585,6 +587,7 @@ registriereTexte('einstellungen', {
     'zz.beendet': 'Game finished',
     'zz.gewinnt': '{name} wins',
     'zz.revanche': 'Rematch',
+    'zz.start': 'Home', 'zz.zurueckStart': 'Back to home', 'zz.klang': 'Sound', 'zz.klangAn': 'Sound on', 'zz.klangAus': 'Sound off',
     'zz.bietetRemis': '{name} offers a draw',
     'zz.entscheidet': '{name} decides.',
     'zz.weiterspielen': 'Keep playing',

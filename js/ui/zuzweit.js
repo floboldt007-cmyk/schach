@@ -16,7 +16,6 @@ import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
-import '../pakete/zuzweit/texte.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -24,7 +23,6 @@ const TEMPI = { ohne: null, '5': { grund: 300, zuschlag: 0 }, '10': { grund: 600
 // Texte beim Zeichnen (js/sprachen/einstellungen.js, Schluessel zz.*)
 const GRUENDE = ['matt', 'patt', 'material', 'wiederholung', '50-zuege', 'aufgabe', 'zeit', 'vereinbart'];
 function Z(k, w) { return t('einstellungen.zz.' + k, w); }
-const P = (k) => t('p-zuzweit.' + k);
 // Zurueck und "Fertig" fuehren zum Start: dort liegt der Einstieg (Flo 08.11.2026, Zu zweit ist kein Lernen)
 const ZIEL = 'heim';
 // R6-Befund B11: Knoepfe mit Symbol und Text wie die Spielknoepfe der Bot-Partie (js/ui/partie.js knopf)
@@ -172,9 +170,9 @@ function partie(root, quelle, app, fortgesetzt) {
   s.setAttribute('aria-label', Z('amBrett'));
   // R6-Befund B11: der Zurueck-Knopf heisst wie sein Ziel (Start, dort liegt der Einstieg) und traegt das Symbol; der
   // Klang-Schalter ist derselbe wie im Kopf der Bot-Partie (js/ui/partie.js klangUmschalten)
-  s.innerHTML = `<header class="kopf"><button class="knopf zz-zurueck dr" type="button" data-zz="zurueck" aria-label="${esc(P('zurueckStart'))}">${icon('zurueck')}<span>${esc(P('start'))}</span></button>`
+  s.innerHTML = `<header class="kopf"><button class="knopf zz-zurueck dr" type="button" data-zz="zurueck" aria-label="${esc(Z('zurueckStart'))}">${icon('zurueck')}<span>${esc(Z('start'))}</span></button>`
     + `<div class="titel"><h1>${Z('titel')}</h1></div>`
-    + `<button class="icon-knopf knopf-klang dr" type="button" data-zz="klang" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(P('klang'))}">${icon('klang')}</button></header>
+    + `<button class="icon-knopf knopf-klang dr" type="button" data-zz="klang" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(Z('klang'))}">${icon('klang')}</button></header>
     <div class="zz-rumpf"><div class="zz-spielbereich">
       <div class="zz-spieler zz-oben" role="group"></div>
       <div class="zz-feld"><div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div></div>
@@ -332,7 +330,7 @@ function partie(root, quelle, app, fortgesetzt) {
     const svg = k.querySelector('svg');
     if (svg) anim(svg, [{ transform: 'scale(.7)' }, { transform: 'none' }], { d: 520, k: 'hupf' });
     if (an) { try { klang.spiele('schalter'); } catch (f) { /* still */ } }
-    app.meldung(P(an ? 'klangAn' : 'klangAus'), { dauer: 1600 });
+    app.meldung(Z(an ? 'klangAn' : 'klangAus'), { dauer: 1600 });
   }
   const sichern = () => { tick(); speichere(); };
   window.addEventListener('pagehide', sichern);
