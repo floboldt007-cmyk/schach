@@ -166,15 +166,23 @@ export function zeige(root, params, app) {
   }
   const blattKnopf = (k) => `<button class="knopf gross${k.primaer ? ' primaer' : ''}" type="button" data-a="${k.a}">`
     + `${k.icon ? icon(k.icon) + ' ' : ''}${esc(k.text)}${k.vor ? ' ' + icon('vor') : ''}</button>`;
+  // Zeile unter den Sternen wie die Zeilen unter den Sternen der Bot-Partie: woraus die Sterne entstehen (Zuege, bei
+  // Eroeffnungen auch Fehler, und Hinweise; js/pakete/lernen/mattbilder.js sterne, sterneFolge)
+  function zeileText() {
+    const zahl = (n, eins, viele, null_) => (n === 0 && null_ ? S(null_) : n === 1 ? S(eins) : S(viele, { n }));
+    return [zahl(st.zuege, 'erg.zugEins', 'erg.zuege'),
+      ...(folge ? [zahl(st.fehler, 'erg.fehlerEins', 'erg.fehler', 'erg.ohneFehler')] : []),
+      zahl(st.hinweise, 'erg.hinweisEins', 'erg.hinweise', 'erg.ohneHinweis')].join(' · ');
+  }
   // art 'sieg' (geschafft, mit Sternen) oder 'niederlage' (gescheitert, ruhig); liste wie bei knoepfe(), "uebersicht" wird
-  // zum Weg unter den Knoepfen (wie "Zu den Bots")
-  function baueBlatt(art, kopfText, text, liste, sternZahl) {
+  // zum Weg unter den Knoepfen (wie "Zu den Bots"); zeile steht unter den Sternen
+  function baueBlatt(art, { kopfText, text, liste, sternZahl = 0, zeile = '' }) {
     entferneBlatt();
     const haupt = liste.filter((k) => k.a !== 'uebersicht');
     const wort = esc(kopfText).replace(/!$/, '<span class="ausruf">!</span>');
     const sterneTeil = art !== 'sieg' ? '' : `<div class="erg-mitte"><div class="erg-sterne" role="img" aria-label="${esc(S('sterne', { n: sternZahl, max: 3 }))}">`
       + [0, 1, 2].map((i) => `<div class="erg-stern ${i < sternZahl ? 'an' : 'aus'}" style="--i:${i}"><span class="e-stern" aria-hidden="true">${icon('stern')}</span></div>`).join('')
-      + '</div></div>';
+      + `</div>${zeile ? `<p class="erg-tipp ls-erg-zeile">${esc(zeile)}</p>` : ''}</div>`;
     const o = document.createElement('div');
     o.className = `ergebnis-overlay ls-erg ${art}`;
     o.setAttribute('role', 'dialog');
@@ -186,7 +194,7 @@ export function zeige(root, params, app) {
         <div class="erg-rumpf"><h2 class="erg-wort disp" id="ls-erg-wort">${wort}</h2>
           <p class="erg-unter"><b class="ls-erg-titel">${esc(titel)}</b>${text ? ` · ${esc(text)}` : ''}</p>${sterneTeil}</div>
         <div class="erg-aktionen"><div class="erg-knoepfe">${haupt.map(blattKnopf).join('')}</div>
-          <button class="erg-lobby" type="button" data-a="uebersicht">${icon('zurueck')}<span>${esc(S('uebersicht'))}</span></button></div>
+          <button class="erg-lobby" type="button" data-a="uebersicht">${icon('haus')}<span>${esc(S('uebersicht'))}</span></button></div>
       </div>`;
     // ungerade Zahl: der letzte Knopf nimmt die ganze Reihe (wie "Zur Analyse" allein in der Bot-Partie)
     const kn = o.querySelector('.erg-knoepfe');
@@ -455,7 +463,7 @@ export function zeige(root, params, app) {
         : st.zuege === 1 ? S('geschafftEins') : S('geschafftText', { n: st.zuege, ziel: l.ziel });
     meldung('geschafft', kopfText, text, sterneHtml(st.sterne));
     if (tempo() > 0) staffel(meldungEl.querySelectorAll('.ms-sterne > i.an'), { d: 460, v: 120, abstand: 110, von: 'scale(0) rotate(-30deg)', k: 'hupf' });
-    baueBlatt('sieg', kopfText, text, gezeigt ? [
+    baueBlatt('sieg', { kopfText, text, sternZahl: st.sterne, zeile: zeileText(), liste: gezeigt ? [
       { a: 'los', text: S('folge.ohneHilfe'), primaer: true, vor: true },
       { a: 'zeigen', text: S('folge.nochmalZeigen'), icon: 'nochmal' },
       { a: 'uebersicht', text: S('uebersicht') },
@@ -464,7 +472,7 @@ export function zeige(root, params, app) {
       { a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: !naechste },
       ...(folgtImTrainer ? [{ a: 'trainer', text: S('naechsteImTrainer'), icon: 'schloss' }] : []),
       { a: 'uebersicht', text: S('uebersicht') },
-    ], st.sterne);
+    ] });
   }
 
   function gescheitert(grund) {
@@ -474,8 +482,8 @@ export function zeige(root, params, app) {
     erlaube();
     spielKlang('raetsel-falsch');
     meldung('fehler', S('fehler.' + grund), S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }), `<span class="ls-symbol">${icon('kreuz')}</span>`);
-    baueBlatt('niederlage', S('fehler.' + grund), S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }),
-      [{ a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: true }, { a: 'uebersicht', text: S('uebersicht') }], 0);
+    baueBlatt('niederlage', { kopfText: S('fehler.' + grund), text: S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }),
+      liste: [{ a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: true }, { a: 'uebersicht', text: S('uebersicht') }] });
   }
 
   // Knoepfe der Spalte und des Ergebnisblatts
