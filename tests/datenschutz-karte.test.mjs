@@ -39,6 +39,11 @@ for (const f of FAELLE) {
   pruefe(`${f.sprache}: Gegner sieht in gewerteten Partien die Online-Elo`, f.elo.test(karte), karte.slice(0, 400));
   pruefe(`${f.sprache}: Freundespartien bleiben ohne Elo`, f.freunde.test(karte), karte.slice(0, 400));
   pruefe(`${f.sprache}: Erfinder und Pionier nur auf der eigenen Karte`, f.titel.test(karte), karte.slice(0, 400));
+  // karte-sondertitel-schema.sql (so/R15-online-suche) speichert den Sondertitel in karte_wahl.sondertitel: nicht aus der festen Liste
+  const gespeichert = f.sprache === 'de'
+    ? /Titel aus einer festen Liste oder ein besonderer Titel wie „Erfinder“ oder „Pionier“, den du besitzt/
+    : /a title from a fixed list or a special title such as "Creator" or "Pioneer" that you own/;
+  pruefe(`${f.sprache}: gespeicherte Karte nennt auch den besonderen Titel`, gespeichert.test(karte), karte.slice(0, 400));
   pruefe(`${f.sprache}: Rechtsgrundlage weiter Art. 6 Abs. 1 lit. b`, /Art\. 6 Abs\. 1 lit\. b/.test(karte));
   const liga = abschnitt(html, f.liga);
   pruefe(`${f.sprache}: Liga-Abschnitt gefunden`, liga.length > 0, f.liga);
