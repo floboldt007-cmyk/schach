@@ -242,6 +242,12 @@ try {
         lg1: getComputedStyle(document.querySelector('.zz-oben')).transform.startsWith('matrix(-1') === !(innerWidth > innerHeight && innerHeight > 500) };
     });
     pruefe(`${width}x${height} ${modus}: Brett sichtbar, kein Ueberlauf, Namen, Tippflaechen und Symbole`, Object.values(masse).every(Boolean), masse);
+    // R9-1: hoch keine Leere ueber 60 px zwischen den Zeilen der Spalte (iPhone 13 hatte 126 px unter "Weiß", iPad hoch 64)
+    if (height > width) {
+      const luecke = await seite.evaluate(() => { const z = [...document.querySelectorAll('.zz-spielbereich > *')].filter((e) => e.getClientRects().length && !e.matches('.zz-ergebnis'))
+        .map((e) => e.getBoundingClientRect()).sort((a, b) => a.top - b.top); let m = 0; for (let i = 1; i < z.length; i++) m = Math.max(m, z[i].top - z[i - 1].bottom); return Math.round(m); });
+      pruefe(`${width}x${height} ${modus}: hoch keine Luecke ueber 60 px in der Spalte (R9-1)`, luecke <= 60, { luecke });
+    }
     if (process.env.BILDER) { mkdirSync(process.env.BILDER, { recursive: true }); await seite.screenshot({ path: path.join(process.env.BILDER, `zuzweit-${width}-${modus}.png`) }); }
     await aufgeben();
     const erg = await seite.evaluate(() => [...document.querySelectorAll('.zz-ergebnis, .zz-ergebnis button')].every((e) => { const r = e.getBoundingClientRect();

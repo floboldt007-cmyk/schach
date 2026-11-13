@@ -69,11 +69,14 @@
   letter-spacing: var(--lw-titel); line-height: 1; color: var(--text);
   animation: erg-titel calc(700ms * var(--tempo)) var(--feder-hupf) calc(140ms * var(--tempo)) both; }
 /* --gold pur hatte hell 2,24:1 (Kritik R6, B25; grosse Schrift braucht 3:1): zur Textfarbe hin gemischt, bleibt golden */
-.erg-wort .ausruf { color: color-mix(in srgb, var(--gold) 70%, var(--text)); }
+/* inline-block: als Inline-Spanne meldete das "!" die volle Schrift-Hoehe und ragte 3 px unter die Zeile (line-height 1)
+   in den Untertitel (margin -4px); app.test U7 "Zeilen nicht ineinander". So ist seine Box genau 1em hoch, sichtbar gleich */
+.erg-wort .ausruf { display: inline-block; color: color-mix(in srgb, var(--gold) 70%, var(--text)); }
 .niederlage .erg-wort { font-size: clamp(30px, 5vmin, 38px); font-weight: 750; letter-spacing: -.025em; animation-name: overlay-ein; }
 .remis .erg-wort { font-size: clamp(36px, 6.5vmin, 52px); }
 .remis .erg-wort::after { content: ""; display: block; width: 44px; height: 4px; margin: 10px auto 0; border-radius: var(--r-pille); background: var(--gold); }
-.erg-unter { margin: -4px 0 0; font-size: 15px; font-weight: 650; color: var(--text-2);
+/* Seitenabstand wie .erg-wort: beim kleinen Niederlage-Titel lag der Untertitel unter dem Auge-Knopf (R9-3, SE bis PC) */
+.erg-unter { margin: -4px 0 0; padding: 0 48px; font-size: 15px; font-weight: 650; color: var(--text-2);
   animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(240ms * var(--tempo)) both; }
 @keyframes erg-titel { from { opacity: 0; transform: translateY(18px) scale(.92); } to { opacity: 1; transform: none; } }
 @keyframes erg-zeile { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -158,6 +161,7 @@
 @media (max-width: 600px) {
   .ergebnis-karte { gap: 12px; padding: 20px 16px 18px; border-radius: 26px; }
   .erg-wort { padding: 0 44px; font-size: 46px; }
+  .erg-unter { padding: 0 44px; }
   .niederlage .erg-wort { font-size: 30px; }
   .remis .erg-wort { font-size: 38px; }
   .erg-zu { top: 8px; right: 8px; }
