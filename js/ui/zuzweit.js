@@ -4,6 +4,7 @@ import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { anim, tempo as bewegungsTempo } from '../bewegung.js';
+import { spieleMiniIntro } from './duell.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { sanAnzeige, materialBilanz } from '../review.js';
 import { sende } from '../ereignisse.js';
@@ -170,6 +171,7 @@ function partie(root, quelle, app, fortgesetzt) {
   let seit = gespeichertUhr && Number.isFinite(gespeichertUhr.seit) ? Math.min(Date.now(), gespeichertUhr.seit) : Date.now();
   let weg = false, fragt = false, gespeichert = null, drehenAnimation = null;
   let uhrTimer;
+  let intro = null;     // laufendes Mini-Intro (spieleMiniIntro), bis es fertig ist
   const gewarnt = {};   // Uhr-Warnung schon gespielt je Farbe
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
@@ -283,6 +285,7 @@ function partie(root, quelle, app, fortgesetzt) {
   }
   function beiZug(von, nach, umwandlung) {
     if (weg || fragt || z.phase !== 'spiel') return false;
+    intro?.ueberspringe();
     tick(); if (z.phase !== 'spiel') return false;
     const f = chess.turn(), jetzt = Date.now();
     const verbraucht = Math.max(0, jetzt - seit);
@@ -438,11 +441,19 @@ function partie(root, quelle, app, fortgesetzt) {
   };
   window.addEventListener('schach:einstellungen', beiEinstellungen);
   speichere(); zeichne(false);
-  if (!pruefeEnde() && z.phase === 'spiel' && tempo) uhrTimer = setInterval(tick, 100);
+  const uhrAn = () => { if (!weg && z.phase === 'spiel' && tempo && !uhrTimer) uhrTimer = setInterval(tick, 100); };
+  // R8-IntroZuzweit (Vorbau B): vor einer neuen Partie 1 s "Weiss beginnt" ueber dem Brett (js/ui/duell.js
+  // spieleMiniIntro, Einstellung duellIntro wie in der Arena). Die Uhr startet erst danach; ein Tipp oder Zug beendet es.
+  if (!fortgesetzt && !z.zuege.length && z.phase === 'spiel') {
+    const eigen = name('w') !== farbwort('w');
+    intro = spieleMiniIntro({ ziel: s.querySelector('.zz-rahmen'), titel: Z('introTitel'), unter: eigen ? Z('introUnter', { name: name('w') }) : '',
+      bild: `<img src="${new URL('assets/pieces/wK.svg', WURZEL).href}" alt="" draggable="false">`, einstellung: einst.duellIntro || 'besondere' });
+    intro.fertig.then(() => { intro = null; if (!weg && !z.zuege.length) seit = Date.now(); uhrAn(); });
+  } else if (!pruefeEnde()) uhrAn();
   if (app.test) window.__partie = { z, brett, bereit: true, chess: () => chess, phase: () => z.phase, uhr: { rest: wert } };
   return { verlasse() {
     if (weg) return;
-    sichern(); weg = true; clearInterval(uhrTimer); drehenAnimation?.cancel();
+    sichern(); weg = true; clearInterval(uhrTimer); drehenAnimation?.cancel(); intro?.ueberspringe();
     window.removeEventListener('pagehide', sichern); document.removeEventListener('visibilitychange', sichern);
     window.removeEventListener('schach:einstellungen', beiEinstellungen);
     brett.zerstoere();

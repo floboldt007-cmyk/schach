@@ -32,6 +32,8 @@
 //       Tempo: die Vollfassung laeuft hoechstens im normalen Tempo (Bewegung "langsam" dehnt sie nicht, sie muss in
 //       1,4 s passen), "schnell" verkuerzt sie.
 //   aktivesDuell() -> { fertig } | null     laeuft gerade ein Intro (fuer die Partie: Uhr und Bot-Zug erst danach)
+//   spieleMiniIntro({ ziel, titel, unter, bild, einstellung }) -> { fertig, ueberspringe(), art }   Mini-Intro vor Zu zweit
+//       (R8-IntroZuzweit B): eine Pille ueber dem Brett, 1 s, gleicher Vertrag; Beschreibung bei der Funktion
 //
 // Vertrag mit der Partie (U7 baut die andere Seite): solange das Intro laeuft, steht
 // document.documentElement.dataset.duell = 'laeuft'; beim Ende (auch beim Ueberspringen) wird das Attribut entfernt
@@ -467,4 +469,57 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   spaeter(meldeBereit, HALTE_BIS * zf);
 
   return { bereit, fertig, ueberspringe, art: gewaehlteArt };
+}
+
+// Mini-Intro (R8-IntroZuzweit, Variante B, Vorbau): vor einer Partie zu zweit steht MINI_DAUER lang eine Pille ueber dem
+// kurz abgedunkelten Brett ("Weiss beginnt", darunter wer zuerst zieht). Gleicher Vertrag wie spieleDuell: solange es
+// laeuft, steht dataset.duell = 'laeuft' und aktivesDuell() liefert es; am Ende kommt duell:fertig (art 'mini'). Tippen
+// ueberspringt, der Tipp geht ans Brett durch (pointer-events none, css/duell.css). Einstellung duellIntro 'aus' oder
+// reduzierte Bewegung (Tempo 0): kein Intro, fertig ist sofort erfuellt.
+//   spieleMiniIntro({ ziel, titel, unter?, bild?, einstellung? }) -> { fertig: Promise, ueberspringe(), art: 'mini' | 'aus' }
+//       ziel: das Element, ueber dem die Pille liegt (Brett-Rahmen, position relative); bild: fertiges HTML (Figur)
+export const MINI_DAUER = 1000;
+export function spieleMiniIntro({ ziel = null, titel = '', unter = '', bild = '', einstellung = 'besondere' } = {}) {
+  if (einstellung === 'aus' || tempo() === 0 || !ziel || typeof document === 'undefined') {
+    protokolliere({ art: 'aus', mini: true, uebersprungen: false, dauer: 0 });
+    return { fertig: Promise.resolve(), ueberspringe() {}, art: 'aus' };
+  }
+  if (aktiv) aktiv.ueberspringe();
+  const t0 = jetzt();
+  const html = document.documentElement;
+  html.dataset.duell = 'laeuft';
+  const ueber = document.createElement('div');
+  ueber.className = 'duell duell-mini';
+  ueber.dataset.art = 'mini';
+  ueber.setAttribute('role', 'status');
+  ueber.innerHTML = `<div class="duell-pille">${bild ? `<span class="duell-pille-av">${bild}</span>` : ''}`
+    + `<span class="duell-pille-text"><b>${esc(titel)}</b>${unter ? `<small>${esc(unter)}</small>` : ''}</span></div>`;
+  ziel.append(ueber);
+  let fertigLoes = null;
+  const fertig = new Promise((r) => { fertigLoes = r; });
+  let zuEnde = false;
+  let uebersprungen = false;
+  let uhr = null;
+  const ende = () => {
+    if (zuEnde) return;
+    zuEnde = true;
+    clearTimeout(uhr);
+    try { document.removeEventListener('pointerdown', tipp, true); } catch (e) { /* egal */ }
+    try { ueber.remove(); } catch (e) { /* egal */ }
+    if (aktiv && aktiv.ueber === ueber) aktiv = null;
+    if (html.dataset.duell === 'laeuft' && !aktiv) { delete html.dataset.duell; delete html.dataset.duellMax; }
+    protokolliere({ art: 'mini', mini: true, uebersprungen, dauer: Math.round(jetzt() - t0) });
+    fertigLoes();
+    try { document.dispatchEvent(new CustomEvent('duell:fertig', { detail: { art: 'mini', uebersprungen } })); } catch (e) { /* egal */ }
+  };
+  const ueberspringe = () => { if (zuEnde) return; uebersprungen = true; ende(); };
+  const tipp = () => ueberspringe();
+  document.addEventListener('pointerdown', tipp, { capture: true, passive: true });
+  aktiv = { ueber, fertig, ueberspringe };
+  // nur opacity und transform; die Zeit ist absolut (anim rechnet mit dem Tempo, daher geteilt), das Intro dehnt sich nicht
+  const absolut = (x) => x / Math.max(tempo(), 0.01);
+  anim(ueber, [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { d: absolut(MINI_DAUER), k: 'linear', fill: 'forwards' });
+  anim(ueber.querySelector('.duell-pille'), [{ transform: 'scale(.92)' }, { transform: 'none' }], { d: absolut(260), k: 'hupf' });
+  uhr = setTimeout(ende, MINI_DAUER);
+  return { fertig, ueberspringe, art: 'mini' };
 }
