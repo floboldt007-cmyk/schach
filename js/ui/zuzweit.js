@@ -5,7 +5,7 @@ import { figurenPfad } from '../figurensatz.js';
 import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { anim } from '../bewegung.js';
 import { klang, zugKlangName } from '../sounds.js';
-import { sanAnzeige } from '../review.js';
+import { sanAnzeige, materialBilanz } from '../review.js';
 import { sende } from '../ereignisse.js';
 import {
   pruefeZuzweit, pruefeTempo, ladeModulEinstellungen, speichereModulEinstellungen,
@@ -16,6 +16,7 @@ import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
+import '../sprachen/partie.js'; // partie.zuege.leer (Zugliste wie in der Bot-Partie)
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -32,6 +33,11 @@ function grundText(grund) {
   return GRUENDE.includes(grund) ? Z('grund.' + grund) : '';
 }
 const andere = (farbe) => farbe === 'w' ? 'b' : 'w';
+// R8 (B4, Gleichheits-Liste): Leisten wie in der Bot-Partie (js/ui/partie.js): Bild, Name, Unterzeile mit Farbe und
+// geschlagenen Figuren, Uhr mit Symbol fuer die Warnung. Wert der Figuren fuer die Reihenfolge wie dort.
+const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+const UHR_SYMBOL = '<svg class="ico uhr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+  + 'stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>';
 function farbwort(farbe) {
   return farbe === 'w' ? t('allgemein.weiss') : t('allgemein.schwarz');
 }
@@ -76,7 +82,7 @@ function startblatt(root, app) {
   const s = document.createElement('section');
   s.className = 'screen zz-screen zz-startblatt';
   s.setAttribute('aria-label', Z('amBrett'));
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: Z('titel'), chips: '', klang: false })}
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: Z('titel'), chips: '' })}
     <div class="zz-rumpf"><form class="zz-start">
       <div class="zz-buehne">
         <div class="zz-paar" aria-hidden="true"><img src="${esc(pfad)}wK.svg" alt="" draggable="false"><img src="${esc(pfad)}bK.svg" alt="" draggable="false"></div>
@@ -168,18 +174,19 @@ function partie(root, quelle, app, fortgesetzt) {
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
   s.setAttribute('aria-label', Z('amBrett'));
-  // R6-Befund B11: der Zurueck-Knopf heisst wie sein Ziel (Start, dort liegt der Einstieg) und traegt das Symbol; der
-  // Klang-Schalter ist derselbe wie im Kopf der Bot-Partie (js/ui/partie.js klangUmschalten)
-  s.innerHTML = `<header class="kopf"><button class="knopf zz-zurueck dr" type="button" data-zz="zurueck" aria-label="${esc(Z('zurueckStart'))}">${icon('zurueck')}<span>${esc(Z('start'))}</span></button>`
-    + `<div class="titel"><h1>${Z('titel')}</h1></div>`
-    + `<button class="icon-knopf knopf-klang dr" type="button" data-zz="klang" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(Z('klang'))}">${icon('klang')}</button></header>
+  // R8 (L6, Gleichheits-Liste): Kopf wie in der Bot-Partie (js/ui/partie.js .p-kopf): Zurueck als Symbol (die Ansage
+  // nennt das Ziel, B11), Titel mit Unterzeile, Klang und Einstellungen
+  s.innerHTML = `<header class="kopf p-kopf"><button class="icon-knopf zz-zurueck dr" type="button" data-zz="zurueck" aria-label="${esc(Z('zurueckStart'))}">${icon('zurueck')}</button>`
+    + `<div class="titel"><h1>${Z('titel')}</h1><div class="unter"><span class="zz-kopf-namen">${esc(name('w'))} – ${esc(name('b'))}</span></div></div>`
+    + `<button class="icon-knopf knopf-klang dr" type="button" data-zz="klang" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(Z('klang'))}">${icon('klang')}</button>`
+    + `<button class="icon-knopf dr" type="button" data-zz="einstellungen" data-aktion="einstellungen" aria-label="${esc(t('allgemein.einstellungen'))}">${icon('einst')}</button></header>
     <div class="zz-rumpf"><div class="zz-spielbereich">
-      <div class="zz-spieler zz-oben" role="group"></div>
+      <div class="spieler gegner zz-spieler zz-oben" role="group"></div>
       <div class="zz-feld"><div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div></div>
-      <div class="zz-spieler zz-unten" role="group"></div>
+      <div class="spieler ich zz-spieler zz-unten" role="group"></div>
       <p class="zz-status" role="status"></p>
       <div class="zz-aktionen">${zzKnopf('zugzurueck', 'undo', Z('zugZurueck'))}${zzKnopf('remis', 'personen', Z('remisAnbieten'))}${zzKnopf('aufgeben', 'flagge', Z('aufgeben'))}</div>
-      <div class="zz-zuege" aria-label="${Z('zuege')}"></div>
+      <div class="zz-zuege zugbox" role="region" aria-label="${Z('zuege')}"><div class="zb-kopf"><span class="zb-titel">${esc(Z('zuege'))}</span></div><div class="zugliste"></div><div class="zugleiste"></div></div>
       <section class="zz-ergebnis flaeche" aria-label="${Z('ergebnis')}" hidden></section>
     </div></div>`;
   root.append(s);
@@ -204,8 +211,43 @@ function partie(root, quelle, app, fortgesetzt) {
       const eigen = name(f) !== farbwort(f);
       el.dataset.farbe = f; el.setAttribute('aria-label', eigen ? `${name(f)} · ${farbwort(f)}` : name(f));
       el.classList.toggle('zz-gegenueber', lage === 'oben' && !namen.drehen);
-      el.innerHTML = `<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div class="zz-name"><b>${esc(name(f))}</b>${eigen ? `<span>${esc(farbwort(f))}</span>` : ''}</div>
-        <div class="uhr zahl" data-farbe="${f}"${tempo ? '' : ' hidden'}><span class="uhr-zeit"></span></div>`;
+      // Gitter aus css/partie.css: oben Bild, Feld info (Name, Unterzeile), Uhr; unten Bild, Name, Unterzeile, Uhr
+      const av = `<span class="av"><img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt="" draggable="false"></span>`;
+      const kopf = `<div class="name zz-name"><b>${esc(name(f))}</b></div>`;
+      const unter = `<div class="unter bot-meta"><span class="p-meta">${eigen ? esc(farbwort(f)) : ''}</span><span class="geschlagen-ort" data-wer="${f}"></span></div>`;
+      const uhr = `<div class="uhr zahl" data-farbe="${f}"${tempo ? '' : ' hidden'}>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
+      el.innerHTML = lage === 'oben' ? `${av}<div class="info">${kopf}${unter}</div>${uhr}` : `${av}${kopf}${unter}${uhr}`;
+    }
+    zeichneGeschlagen();
+  }
+  // R8 (L6): Zuege wie in der Bot-Partie: quer die Zugliste im Kasten (Nummer, Weiss, Schwarz), hoch der Zugstreifen
+  // (css/partie.css .zugliste und .zugleiste); der letzte Zug ist hervorgehoben
+  function zeichneZuege() {
+    const zelle = (i) => (i < z.san.length ? `<span class="z${i === z.san.length - 1 ? ' aktuell' : ''}">${esc(sanText(z.san[i]))}</span>` : '<span class="z leer"></span>');
+    let liste = '', leiste = '';
+    for (let i = 0; i < z.san.length; i += 2) {
+      liste += `<span class="nr">${i / 2 + 1}.</span>${zelle(i)}${zelle(i + 1)}`;
+      leiste += `<span class="nr">${i / 2 + 1}.</span>${zelle(i)}${i + 1 < z.san.length ? zelle(i + 1) : ''}`;
+    }
+    const leer = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
+    const listeEl = s.querySelector('.zz-zuege .zugliste'), leisteEl = s.querySelector('.zz-zuege .zugleiste');
+    listeEl.innerHTML = liste || leer; listeEl.scrollTop = listeEl.scrollHeight;
+    leisteEl.innerHTML = leiste || leer; leisteEl.scrollLeft = leisteEl.scrollWidth;
+  }
+  // geschlagene Figuren je Seite und Materialvorsprung "+n" (wie zeichneGeschlagen in js/ui/partie.js und js/ui/online.js)
+  function zeichneGeschlagen() {
+    const von = { w: [], b: [] };
+    for (const m of chess.history({ verbose: true })) if (m.captured) von[m.color].push(m.captured);
+    const bilanz = materialBilanz(chess.fen());
+    for (const ort of s.querySelectorAll('.geschlagen-ort')) {
+      const f = ort.dataset.wer;
+      const plus = bilanz * (f === 'w' ? 1 : -1);
+      const liste = von[f].sort((a, b) => WERT[b] - WERT[a]);
+      let vor = null;
+      const imgs = liste.map((x) => { const neu = vor !== null && vor !== x; vor = x;
+        return `<img${neu ? ' class="neu-gruppe"' : ''} src="${new URL(`assets/pieces/${andere(f)}${x.toUpperCase()}.svg`, WURZEL).href}" alt="" decoding="sync">`; }).join('');
+      ort.innerHTML = !liste.length && plus <= 0 ? '<span class="geschlagen leer"></span>'
+        : `<span class="geschlagen">${imgs}${plus > 0 ? `<span class="plus zahl">+${plus}</span>` : ''}</span>`;
     }
   }
   function tick() {
@@ -215,6 +257,7 @@ function partie(root, quelle, app, fortgesetzt) {
       const f = el.dataset.farbe, ms = wert(f);
       el.querySelector('.uhr-zeit').textContent = uhrText(ms);
       el.classList.toggle('laeuft', !!tempo && chess.turn() === f);
+      el.classList.toggle('am-zug', chess.turn() === f); // dunkel wie in der Bot-Partie, auch ohne laufende Uhr
       el.classList.toggle('warn', !!tempo && ms < 20000);
       el.setAttribute('aria-label', `${name(f)}: ${uhrText(ms)}`);
       // einmal je Seite, wenn ihre laufende Uhr unter 20 s faellt
@@ -237,7 +280,7 @@ function partie(root, quelle, app, fortgesetzt) {
     s.querySelector('.zz-status').textContent = z.phase === 'spiel' ? Z(chess.inCheck() ? 'amZugSchach' : 'amZug', { name: name(chess.turn()) }) : Z('beendet');
     const zurueckKnopf = s.querySelector('[data-zz="zugzurueck"]');
     if (zurueckKnopf) zurueckKnopf.disabled = z.phase !== 'spiel' || !z.zuege.length;
-    s.querySelector('.zz-zuege').textContent = z.san.map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanText(san)}`).join(' ');
+    zeichneZuege();
   }
   function beiZug(von, nach, umwandlung) {
     if (weg || fragt || z.phase !== 'spiel') return false;
@@ -283,7 +326,7 @@ function partie(root, quelle, app, fortgesetzt) {
       neueSterne: [false, false, false], neuFreigeschaltet: null, extra: {}, datum: gespeichert.partie.datum });
     for (const el of s.querySelectorAll('.zz-aktionen button')) el.disabled = true;
     for (const el of s.querySelectorAll('.uhr')) {
-      el.classList.remove('laeuft'); el.querySelector('.uhr-zeit').textContent = uhrText(rest[el.dataset.farbe]);
+      el.classList.remove('laeuft', 'am-zug'); el.querySelector('.uhr-zeit').textContent = uhrText(rest[el.dataset.farbe]);
     }
     s.querySelector('.zz-status').textContent = Z('beendet');
     const el = s.querySelector('.zz-ergebnis');
@@ -295,6 +338,8 @@ function partie(root, quelle, app, fortgesetzt) {
     const aktion = e.target.closest('[data-zz]')?.dataset.zz;
     if (!aktion || weg) return;
     if (aktion === 'zurueck' || aktion === 'fertig') { app.gehe(ZIEL); return; }
+    // wie die Bot-Partie: erst sichern, die Einstellungen kehren ueber den Verlauf in die laufende Partie zurueck
+    if (aktion === 'einstellungen') { if (z.phase === 'spiel') { tick(); speichere(); } app.gehe('einstellungen'); return; }
     if (aktion === 'klang') { klangUmschalten(e.target.closest('[data-zz]')); return; }
     if (aktion === 'analyse' && gespeichert) { app.gehe('analyse', { partieId: gespeichert.partie.id }); return; }
     if (aktion === 'revanche' && gespeichert) {

@@ -25,7 +25,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8833);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const PRAEFIX = '/schach/';
 const START = `http://127.0.0.1:${PORT}${PRAEFIX}`;
 const APP = START + '?test&sw';

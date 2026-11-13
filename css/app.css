@@ -220,6 +220,8 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
   display: flex; align-items: center; padding: 0 var(--a4); border-radius: var(--r-m); color: var(--text);
   background: var(--flaeche); box-shadow: var(--s2), var(--kante); transform: translateY(calc(-100% - var(--a4))); }
 .zum-inhalt:focus { transform: none; }
+/* R9 G-3: geparkt reichte der Schatten (--s2) 20 px ins Bild, auf jeder Seite ein blasser Streifen oben links */
+.zum-inhalt:not(:focus) { box-shadow: none; }
 
 /* ---------- Coach-Zeile: seit U7 die Coach-Karte in css/bauteile.css ---------- */
 /* ---------- Zugliste, Zugleiste, Spielknoepfe, Spielerleiste: seit U7 in css/partie.css ---------- */

@@ -6,7 +6,7 @@
 //   node tests/gleichheit-ansichten.test.mjs                   Probe: Abweichungen melden sich als ROT-ERWARTET, Exit 0
 //   PROBE_STRENG=1 node tests/gleichheit-ansichten.test.mjs    Abweichungen zaehlen als FEHLER (fuer die Reparatur)
 //   ... --bilder=<ordner> --tabelle=<datei.md>                 dazu je Geraet und Ansicht ein Bild und die Tabelle
-//   PORT=8977 node tests/gleichheit-ansichten.test.mjs         eigener Port (Standard 8977)
+//   PORT=8977 node tests/gleichheit-ansichten.test.mjs         eigener Port (Standard: frei)
 //
 // Massstab ist die Bot-Partie (ueber die Arena gestartet, wie Flo sie beginnt, damit ihr Duell-Intro mitzaehlt). Je
 // Ansicht und Geraet: Brettbreite (aus dem Feldraster), Spielerleisten (Lage zum Brett, Name, Avatar, Uhr), die
@@ -14,6 +14,8 @@
 // Zug (Protokoll von js/sounds.js, im Testmodus fuehrt es auch stille Klaenge mit Grund).
 // Harte Pruefungen (hart: true) sind die Gleichheits-Punkte; ohne PROBE_STRENG blockieren sie die CI nicht
 // (tests/alle.mjs zaehlt nur Zeilen mit "FEHLER" und den Exitcode), wie tests/online-ranked-probe.test.mjs.
+// Seit R8 (13.11.2026) zaehlen die Punkte von Online-Partie und Zu zweit immer (ausser dem Duell-Intro vor Zu zweit),
+// dazu das Aussehen der Spielerleisten hell und dunkel (messeLeistenStil) und die Lage der Zuege zu den Knoepfen.
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -21,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
 import { browserTyp } from './browser.mjs';
+import { messeAnsicht, introWeg } from './gleichheit-messung.mjs';
 
 const require = createRequire(import.meta.url);
 let pw;
@@ -43,7 +46,7 @@ const server = http.createServer((req, res) => {
   try { const d = readFileSync(p); res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(d); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8977);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -61,7 +64,10 @@ const KNOEPFE = {
   online: { erwartet: ['aufgeben', 'remis'], ohne: { hinweis: 'gewollt: "kein bester Zug" (js/ui/online.js:426)' } },
   duell: { erwartet: [], ohne: { aufgeben: 'annahme: Zeitrennen, endet ueber die Uhr', remis: 'annahme: kein Gegner am Brett', hinweis: 'annahme: Hilfe waere Betrug im Wettlauf' } },
   zuzweit: { erwartet: ['aufgeben', 'remis'], ohne: { hinweis: 'annahme: zwei Menschen, kein Trainer' } },
-  lektion: { erwartet: ['hinweis'], ohne: { aufgeben: 'annahme: Lektion hat Neu starten statt Aufgeben', remis: 'annahme: Uebung ohne Gegner' } },
+  lektion: { erwartet: ['hinweis'], ohne: { aufgeben: 'annahme: Lektion hat Neu starten statt Aufgeben', remis: 'annahme: Uebung ohne Gegner' },
+    // R8 (13.11.2026): was die Lektion bewusst anders macht, wird nicht gegen die Bot-Partie gemessen, sondern genannt
+    anders: { leisten: 'gewollt: Uebung ohne Gegner und ohne Uhr, Name und Ziel stehen in der Karte (js/ui/lektion.js .ls-status)',
+      intro: 'gewollt: statt des Duell-Intros die Idee-Phase mit dem Knopf Los geht (js/ui/lektion.js phase intro)' } },
 };
 
 let ok = 0, gesamt = 0, rotErwartet = 0;
@@ -163,41 +169,71 @@ function bediener(z) {
 }
 
 // ---- Messen in der Seite ----
-// Brettbreite aus dem Feldraster (a- bis h-Linie) UND als Gegenprobe aus .brett-felder; Leisten mit Lage zum Brett
-const messe = (s, screen) => s.evaluate((screen) => {
+// Brett, Leisten, Knoepfe und Zugstreifen: messeAnsicht aus tests/gleichheit-messung.mjs (eine Messung fuer alle Gleichheits-Proben)
+
+// R8 (13.11.2026, B4): Aussehen der Spielerleisten je Farbmodus, verglichen mit der Bot-Partie. Die Uhr wird fuer die
+// Messung kurz eingeblendet (ohne Bedenkzeit ist sie in jeder Ansicht verborgen), danach sofort wieder verborgen.
+const messeLeistenStil = (s, screen) => s.evaluate((screen) => {
   const sichtbar = (e) => !!e && !e.hidden && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && e.getBoundingClientRect().width > 0;
   const wurzel = document.querySelector(screen) || document;
-  const felder = [...wurzel.querySelectorAll('.brett-felder .feld[data-feld]')].filter(sichtbar).map((f) => f.getBoundingClientRect());
-  if (felder.length < 64) return { fehlt: `nur ${felder.length} Felder in ${screen}` };
-  const b = { links: Math.min(...felder.map((r) => r.left)), rechts: Math.max(...felder.map((r) => r.right)),
-    oben: Math.min(...felder.map((r) => r.top)), unten: Math.max(...felder.map((r) => r.bottom)) };
-  const raster = wurzel.querySelector('.brett-felder');
-  const leisten = [...wurzel.querySelectorAll('.spieler, .zz-spieler')].filter(sichtbar).map((e) => {
-    const r = e.getBoundingClientRect();
-    const lage = r.bottom <= b.oben + 4 ? 'oben' : r.top >= b.unten - 4 ? 'unten' : 'seite';
-    const nameEl = e.querySelector('.name, .bot-name, .rd-name, .zz-name b');
-    const uhr = [...e.querySelectorAll('.uhr')].find(sichtbar);
-    return { lage, wer: e.classList.contains('ich') || e.classList.contains('zz-unten') ? 'ich' : 'gegner', name: (nameEl?.textContent || '').trim(),
-      avatar: !!e.querySelector('.av, .rd-av, .avatar, img, svg'), uhr: !!uhr, imBild: r.top >= -0.5 && r.bottom <= innerHeight + 0.5 };
+  const px = (v) => Math.round(parseFloat(v) * 10) / 10;
+  // Sprechblase des Bots (quer unter dem Namen): gehoert nur zur Bot-Partie, ihre Hoehe zaehlt beim Vergleich nicht mit
+  const blaseAnteil = (e) => { const b = e.querySelector(':scope > .blase-ort');
+    return b && sichtbar(b) && getComputedStyle(b).position !== 'absolute' ? Math.round(b.getBoundingClientRect().height + parseFloat(getComputedStyle(b).marginTop)) : 0; };
+  return [...wurzel.querySelectorAll('.spieler, .zz-spieler')].filter(sichtbar).map((e) => {
+    const c = getComputedStyle(e), r = e.getBoundingClientRect();
+    const av = e.querySelector(':scope > .av, :scope > img');
+    const avR = av?.getBoundingClientRect(), avC = av && getComputedStyle(av);
+    const nameEl = e.querySelector('.name, .zz-name b');
+    const nC = nameEl && getComputedStyle(nameEl);
+    const uhr = e.querySelector('.uhr');
+    let uhrStil = null;
+    if (uhr) {
+      const war = uhr.hidden; uhr.hidden = false;
+      const u = getComputedStyle(uhr), ur = uhr.getBoundingClientRect();
+      uhrStil = { hoehe: Math.round(ur.height), breiteMin: px(u.minWidth), schrift: px(u.fontSize), radius: px(u.borderTopLeftRadius), grund: u.backgroundColor, farbe: u.color };
+      uhr.hidden = war;
+    }
+    return { wer: e.classList.contains('ich') || e.classList.contains('zz-unten') ? 'ich' : 'gegner', banner: e.classList.contains('mit-banner'),
+      hoehe: Math.round(r.height), radius: px(c.borderTopLeftRadius), grund: c.backgroundColor, polsterL: px(c.paddingLeft),
+      av: av ? { breite: Math.round(avR.width), hoehe: Math.round(avR.height), radius: px(avC.borderTopLeftRadius) } : null,
+      name: nC ? { schrift: px(nC.fontSize), gewicht: nC.fontWeight, farbe: nC.color } : null,
+      unterzeile: !!e.querySelector('.unter'), geschlagen: !!e.querySelector('.geschlagen-ort'), uhr: uhrStil, blase: blaseAnteil(e) };
   });
-  const knoepfe = {};
-  for (const k of ['aufgeben', 'remis', 'hinweis']) {
-    const el = [...wurzel.querySelectorAll(`[data-aktion="${k}"], [data-online="${k}"], [data-zz="${k}"], [data-a="${k}"]`)].find(sichtbar);
-    const r = el?.getBoundingClientRect();
-    knoepfe[k] = el ? { da: true, imBild: r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5 } : { da: false, imBild: false };
-  }
-  return { brett: Math.round(b.rechts - b.links), brettRaster: raster ? Math.round(raster.getBoundingClientRect().width) : null,
-    leisten, knoepfe, seiteScrollt: document.documentElement.scrollHeight - innerHeight > 1 || window.scrollY > 0 };
 }, screen);
 
 const klangStand = (s) => s.evaluate(async () => (await import('./js/sounds.js')).klang.protokoll().map((e) => ({ nr: e.nr, name: e.name, aktion: e.aktion || 'spielt', grund: e.grund || '' })));
-async function klangBeimZug(s, zug) {
+// Klang des EIGENEN Zugs: hoechstens 800 ms, und das Fenster endet, sobald eine Figur des Gegners auf einem neuen Feld
+// steht (R9: der Antwortzug des Bots fiel sonst je nach Zeitpunkt mal hinein, mal nicht). Die Seite schaut in jedem Bild
+// und alle 5 ms nach; gezaehlt wird, was beim letzten Blick VOR dem Gegnerzug im Protokoll stand.
+async function klangBeimZug(s, brettSel, uci) {
   const vorher = await klangStand(s);
   const letzte = vorher.length ? vorher[vorher.length - 1].nr : 0;
-  await zug();
+  await s.evaluate(async ([sel, von]) => {
+    const { klang } = await import('./js/sounds.js');
+    const brett = document.querySelector(`${sel} .feld[data-feld="${von}"]`)?.closest('.brett');
+    const ich = brett?.querySelector(`img.figur[data-feld="${von}"]:not(.geht)`)?.dataset.figur?.[0];
+    const gegner = () => new Set([...(brett?.querySelectorAll('img.figur:not(.geht)') || [])]
+      .filter((f) => ich && f.dataset.figur?.[0] !== ich).map((f) => f.dataset.feld + f.dataset.figur));
+    const start = gegner();
+    const stand = () => { const p = klang.protokoll(); return p.length ? p[p.length - 1].nr : 0; };
+    const w = { bis: stand(), gegnerZog: false, aus: false };
+    w.blick = () => {
+      if (w.aus) return;
+      if ([...gegner()].some((x) => !start.has(x))) { w.gegnerZog = true; w.aus = true; clearInterval(w.takt); return; }
+      w.bis = stand();
+    };
+    const bild = () => { w.blick(); if (!w.aus) requestAnimationFrame(bild); };
+    w.takt = setInterval(w.blick, 5);
+    window.__klangFenster = w;
+    requestAnimationFrame(bild);
+  }, [brettSel, uci.slice(0, 2)]);
+  await tippe(s, brettSel, uci);
   await warte(800);
-  // nur die ersten 800 ms nach dem eigenen Zug: der Antwortzug eines Bots kaeme spaeter und zaehlt nicht
-  return (await klangStand(s)).filter((e) => e.nr > letzte).map((e) => `${e.name}:${e.aktion}${e.grund ? '/' + e.grund : ''}`);
+  // Schluss im selben Schritt: ein letzter Blick, dann zaehlt der Stand JETZT (ein Bot-Zug zwischen Schluss und Auslesen
+  // zaehlt nicht mehr mit)
+  const bis = await s.evaluate(() => { const w = window.__klangFenster; w.blick(); w.aus = true; clearInterval(w.takt); return w.bis; });
+  return (await klangStand(s)).filter((e) => e.nr > letzte && e.nr <= bis).map((e) => `${e.name}:${e.aktion}${e.grund ? '/' + e.grund : ''}`);
 }
 async function tippe(s, brettSel, uci) {
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
@@ -211,7 +247,6 @@ async function bestaetige(s) {
   const knoepfe = s.locator('.dialog-ort:not(.weg) .dialog-knoepfe button');
   if (await knoepfe.first().waitFor({ timeout: 3000 }).then(() => true).catch(() => false)) await knoepfe.last().click();
 }
-const introWeg = (s) => s.waitForFunction(() => !document.querySelector('.duell'), null, { timeout: 12000 }).catch(() => {});
 const sichtbarDa = (s, sel, ms = 10000) => s.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((e) => !e.hidden && e.getClientRects().length > 0), sel, { timeout: ms })
   .then(() => true).catch(() => false);
 
@@ -229,7 +264,7 @@ const ABLAUF = {
     const m = await messeK(s, ctx, '.screen.partie');
     m.ueberArena = ueberArena;
     const weiss = await s.evaluate(() => window.__partie.chess().turn() === 'w' && window.__partie.chess().history().length === 0);
-    m.klang = weiss ? await klangBeimZug(s, () => tippe(s, '.brett-rahmen > .brett', 'e2e4')) : null;
+    m.klang = weiss ? await klangBeimZug(s, '.brett-rahmen > .brett', 'e2e4') : null;
     await bild(s, m);
     await s.locator('.spielknoepfe > [data-aktion="aufgeben"]').click();
     await bestaetige(s);
@@ -245,7 +280,7 @@ const ABLAUF = {
     await warte(2000); // Visitenkarten, dann (nach hoechstens 1,5 s) das Intro
     await introWeg(s); await warte(800);
     const m = await messeK(s, ctx, '.screen');
-    m.klang = await klangBeimZug(s, () => tippe(s, '.on-brett', 'e2e4'));
+    m.klang = await klangBeimZug(s, '.on-brett', 'e2e4');
     await bild(s, m);
     await s.locator('[data-online="aufgeben"]').filter({ visible: true }).first().click();
     await bestaetige(s);
@@ -260,7 +295,7 @@ const ABLAUF = {
     await s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"] .rd-brett .feld', { timeout: 15000 });
     await introWeg(s); await warte(800);
     const m = await messeK(s, ctx, '.screen.raetsel-duell');
-    m.klang = await klangBeimZug(s, () => tippe(s, '.rd-brett', 'a1a8'));
+    m.klang = await klangBeimZug(s, '.rd-brett', 'a1a8');
     await bild(s, m);
     m.zustand.duell.beendet = true;
     m.ergebnis = await s.waitForSelector('.screen.raetsel-duell[data-phase="beendet"]', { timeout: 10000 }).then(() => true).catch(() => false);
@@ -273,7 +308,7 @@ const ABLAUF = {
     await s.waitForSelector('.zz-brett .feld', { timeout: 20000 });
     await introWeg(s); await warte(1200);
     const m = await messeK(s, ctx, '.screen');
-    m.klang = await klangBeimZug(s, () => tippe(s, '.zz-brett', 'e2e4'));
+    m.klang = await klangBeimZug(s, '.zz-brett', 'e2e4');
     await bild(s, m);
     await s.locator('[data-zz="aufgeben"]').filter({ visible: true }).first().click();
     await bestaetige(s);
@@ -292,14 +327,22 @@ const ABLAUF = {
     await warte(600);
     const m = await messeK(s, ctx, '.ls-screen');
     m.ideePhase = ideePhase;
-    m.klang = await klangBeimZug(s, () => tippe(s, '.ls-screen .brett-felder', 'a1a8'));
+    m.klang = await klangBeimZug(s, '.ls-screen .brett-felder', 'a1a8');
     await bild(s, m);
     m.ergebnis = await sichtbarDa(s, '.ls-meldung[data-art="geschafft"]');
     return m;
   },
 };
 // ctx = { datei, zustand }: Bildname und Server-Zustand (das Duell-Ende setzt der Ablauf am Server)
-const messeK = async (s, ctx, screen) => Object.assign(await messe(s, screen), ctx);
+const messeK = async (s, ctx, screen) => {
+  const m = Object.assign(await messeAnsicht(s, screen), ctx);
+  if (m.fehlt) return m;
+  m.stil = { hell: await messeLeistenStil(s, screen) };
+  await s.emulateMedia({ colorScheme: 'dark' }); await warte(1000); // Farbuebergaenge (--d-m) abwarten
+  m.stil.dunkel = await messeLeistenStil(s, screen);
+  await s.emulateMedia({ colorScheme: 'light' }); await warte(1000);
+  return m;
+};
 async function bild(s, m) { if (BILDER) await s.screenshot({ path: path.join(BILDER, `${m.datei}.png`) }); }
 
 function initSkript({ sitzung, erfinder }) {
@@ -354,6 +397,23 @@ try {
 finally { await browser?.close(); await new Promise((r) => server.close(r)); }
 
 // ---- Auswertung gegen die Bot-Partie ----
+// R8 (B4): Aussehen einer Leiste gegen dieselbe Leiste der Bot-Partie; Liste der Abweichungen (leer = gleich). Gewollt
+// anders: die Namensfarbe auf dem Banner der Visitenkarte (Online, css/online.css: helle Schrift mit Schatten) und die
+// Sprechblase des Bots: quer haelt die Gegnerkarte ihre groesste Hoehe mit Blase (js/ui/partie.js ruhig), dort ist
+// die eigene Leiste der Bot-Partie der Massstab fuer die Hoehe.
+function leistenAbweichung(l, v, vIch) {
+  const a = [];
+  const gleich = (n, x, y, tol = 0) => { if (typeof x === 'number' ? !(typeof y === 'number' && Math.abs(x - y) <= tol) : x !== y) a.push(`${n} ${x} statt ${y}`); };
+  gleich('Hoehe', l.hoehe, v.blase && vIch ? vIch.hoehe : v.hoehe, 2);
+  gleich('Ecke', l.radius, v.radius); gleich('Grund', l.grund, v.grund); gleich('Polster links', l.polsterL, v.polsterL, 0.5);
+  gleich('Bild', l.av ? `${l.av.breite}x${l.av.hoehe}/${l.av.radius}` : 'keins', v.av ? `${v.av.breite}x${v.av.hoehe}/${v.av.radius}` : 'keins');
+  gleich('Name Schrift', l.name?.schrift, v.name?.schrift); gleich('Name Gewicht', l.name?.gewicht, v.name?.gewicht);
+  if (!l.banner) gleich('Name Farbe', l.name?.farbe, v.name?.farbe);
+  gleich('Unterzeile', l.unterzeile, v.unterzeile); gleich('geschlagene Figuren', l.geschlagen, v.geschlagen);
+  if (!l.uhr || !v.uhr) gleich('Uhr', !!l.uhr, !!v.uhr);
+  else for (const k of ['hoehe', 'breiteMin', 'schrift', 'radius', 'grund', 'farbe']) gleich(`Uhr ${k}`, l.uhr[k], v.uhr[k], k === 'hoehe' ? 1 : 0);
+  return a;
+}
 const leistenMuster = (m) => m.leisten.map((l) => `${l.wer}:${l.lage}`).sort().join(' ');
 const zeilen = [];
 for (const [geraet, je] of Object.entries(ergebnisse)) {
@@ -366,15 +426,28 @@ for (const [geraet, je] of Object.entries(ergebnisse)) {
     pruefe(`${geraet} ${NAME[a]}: Ablauf ohne Abbruch, Brett gemessen`, lauf, m);
     if (!lauf || !botOk) { zeilen.push({ geraet, a, m, abw: ['nicht gemessen'] }); continue; }
     const abw = [];
-    const hart = (name, gut, detail) => { if (!pruefe(`${geraet} ${NAME[a]}: ${name}`, gut, detail, { hart: true })) abw.push(name); };
+    // R8 (13.11.2026): Online-Partie, Zu zweit und Raetsel-Duell sind angeglichen, ihre Gleichheits-Punkte zaehlen jetzt immer
+    // (FEHLER statt ROT-ERWARTET). Offen bleibt nur das Duell-Intro vor Zu zweit (zwei Menschen am selben Geraet, Geschmacksfrage).
+    const gezogen = (name) => (a === 'online' || a === 'zuzweit' || a === 'duell') && !(a === 'zuzweit' && name.startsWith('Duell-Intro'));
+    const hart = (name, gut, detail) => { if (!pruefe(`${geraet} ${NAME[a]}: ${name}`, gut, detail, { hart: !gezogen(name) })) abw.push(name); };
     pruefe(`${geraet} ${NAME[a]}: Gegenprobe Brett (Feldraster ${m.brett} px gegen .brett-felder ${m.brettRaster} px)`, m.brettRaster != null && Math.abs(m.brett - m.brettRaster) <= 1, m);
+    const anders = KNOEPFE[a].anders || {};
     if (a !== 'bot') {
       hart(`Brett mindestens so gross wie in der Bot-Partie (${m.brett} gegen ${bot.brett} px, Toleranz ${TOLERANZ_PX} px)`, m.brett >= bot.brett - TOLERANZ_PX, { brett: m.brett, bot: bot.brett });
-      hart(`Leisten wie in der Bot-Partie (${leistenMuster(m) || 'keine'} gegen ${leistenMuster(bot)})`, leistenMuster(m) === leistenMuster(bot), m.leisten);
-      hart(`Duell-Intro wie in der Bot-Partie (${m.intro ? 'ja' : 'nein'} gegen ${bot.intro ? 'ja' : 'nein'})`, m.intro === bot.intro, { intro: m.intro, ideePhase: m.ideePhase });
+      if (anders.leisten) pruefe(`${geraet} ${NAME[a]}: keine Spielerleisten (${anders.leisten})`, m.leisten.length === 0, m.leisten);
+      else hart(`Leisten wie in der Bot-Partie (${leistenMuster(m) || 'keine'} gegen ${leistenMuster(bot)})`, leistenMuster(m) === leistenMuster(bot), m.leisten);
+      if (anders.intro) pruefe(`${geraet} ${NAME[a]}: Idee-Phase statt Duell-Intro (${anders.intro})`, m.ideePhase === true && !m.intro, { intro: m.intro, ideePhase: m.ideePhase });
+      else hart(`Duell-Intro wie in der Bot-Partie (${m.intro ? 'ja' : 'nein'} gegen ${bot.intro ? 'ja' : 'nein'})`, m.intro === bot.intro, { intro: m.intro, ideePhase: m.ideePhase });
+    }
+    if (a === 'online' || a === 'zuzweit') hart(`Zuege wie in der Bot-Partie (${m.zugStreifen} gegen ${bot.zugStreifen})`, m.zugStreifen === bot.zugStreifen, { hier: m.zugStreifen, bot: bot.zugStreifen });
+    if (a === 'online' || a === 'zuzweit') for (const modus of ['hell', 'dunkel']) for (const wer of ['gegner', 'ich']) {
+      const v = bot.stil?.[modus]?.find((l) => l.wer === wer), l = m.stil?.[modus]?.find((x) => x.wer === wer);
+      const vIch = bot.stil?.[modus]?.find((x) => x.wer === 'ich');
+      const diff = v && l ? leistenAbweichung(l, v, vIch) : null;
+      hart(`Leiste ${wer} (${modus}) wie in der Bot-Partie`, !!diff && diff.length === 0, diff || { bot: v, hier: l });
     }
     const ohneName = m.leisten.filter((l) => !l.name || !l.avatar);
-    hart('jede Leiste mit Name und Avatar', m.leisten.length > 0 && ohneName.length === 0, m.leisten);
+    if (!anders.leisten) hart('jede Leiste mit Name und Avatar', m.leisten.length > 0 && ohneName.length === 0, m.leisten);
     hart('Leisten ganz im Fenster', m.leisten.every((l) => l.imBild), m.leisten);
     for (const kn of KNOEPFE[a].erwartet) hart(`Knopf ${kn} sichtbar ohne Scrollen`, m.knoepfe[kn].da && m.knoepfe[kn].imBild && !m.seiteScrollt, { knopf: m.knoepfe[kn], seiteScrollt: m.seiteScrollt });
     hart('Ergebnis am Ende sichtbar', m.ergebnis === true, m.ergebnis);
@@ -410,5 +483,6 @@ if (TABELLE) {
   writeFileSync(TABELLE, t.join('\n'), 'utf8');
   console.log(`Tabelle: ${TABELLE}`);
 }
+if (arg('stil')) { writeFileSync(arg('stil'), JSON.stringify(Object.fromEntries(Object.entries(ergebnisse).map(([g, je]) => [g, Object.fromEntries(Object.entries(je).map(([a, m]) => [a, m.stil || null]))])), null, 1), 'utf8'); console.log(`Stil: ${arg('stil')}`); }
 if (rotErwartet) console.log(`\n${rotErwartet} harte Pruefung(en) ROT-ERWARTET (zaehlen erst mit PROBE_STRENG=1): ${rot.join(' | ')}`);
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;

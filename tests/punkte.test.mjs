@@ -36,7 +36,7 @@ import * as L from '../js/pakete/punkte/liste.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8868);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const NUR_NODE = process.argv.includes('--nur-node');
 const SCHNELL = process.argv.includes('--schnell');
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
@@ -1641,7 +1641,7 @@ async function testeBrowser(browser) {
 
 if (!NUR_NODE) {
   mkdirSync(BILDER, { recursive: true });
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser;
   try {
     await warteAufServer(BASIS);

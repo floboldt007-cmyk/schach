@@ -21,7 +21,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8893);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/start/index`;
 const BILDER = process.env.BILDER ? path.join(process.env.BILDER, 'einfuehrung-rand') : '';
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));

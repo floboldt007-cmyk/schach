@@ -18,7 +18,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8944);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : null;
@@ -225,6 +225,25 @@ const geometrie = (s) => s.evaluate(() => ({
     .filter((e) => e.offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.className),
 }));
 
+// Leere im laufenden Duell (Kritik R8, LG5): Teile der Spalte .rd-spiel von oben nach unten, oben begrenzt vom Kopf
+// (Oberkante des Rumpfs), unten von der Reiterleiste (falls sichtbar) bzw. dem Fensterrand; luecke = groesste freie
+// Hoehe zwischen zwei Nachbarn
+async function leereImSpiel(s) {
+  return s.evaluate(() => {
+    const sp = document.querySelector('.screen.raetsel-duell .rd-spiel');
+    const kopf = Math.round(document.querySelector('.screen.raetsel-duell .rd-rumpf').getBoundingClientRect().top);
+    const teile = [...sp.children].map((e) => ({ k: e.className.split(' ')[0], r: e.getBoundingClientRect() }))
+      .filter((t) => t.r.height > 1).map((t) => ({ k: t.k, oben: Math.round(t.r.top), unten: Math.round(t.r.bottom) }))
+      .sort((a, b) => a.oben - b.oben);
+    const l = document.querySelector('.reiter-leiste');
+    const lr = l && getComputedStyle(l).display !== 'none' ? l.getBoundingClientRect() : null;
+    const leiste = lr && lr.height > 0 && lr.top > teile[teile.length - 1].unten ? Math.round(lr.top) : null;
+    const grenzen = [{ k: 'kopf', oben: kopf, unten: kopf }, ...teile, { k: 'ende', oben: leiste ?? innerHeight, unten: leiste ?? innerHeight }];
+    const luecke = Math.max(0, ...grenzen.slice(1).map((t, i) => t.oben - grenzen[i].unten));
+    return { teile, kopf, leiste, fenster: innerHeight, luecke };
+  });
+}
+
 async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
   gruppe = `KI-Duell ${geraet} ${schema === 'dark' ? 'dunkel' : 'hell'}`;
   const srv = neuerServer();
@@ -271,6 +290,10 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
     await warteBis(s, () => document.querySelector('.rd-nr')?.textContent.length > 0);
     pruefe('Laeuft: Raetsel 1, Weiss am Zug, Brett von Weiss aus', await s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.seite === 'w'
       && /1/.test(document.querySelector('.rd-nr').textContent) && /Weiß/.test(document.querySelector('.rd-amzug').textContent)));
+    const leer = await leereImSpiel(s);
+    console.log(`  ${geraet}: Kopf bis ${leer.kopf} · Spalte ${leer.teile.map((t) => `${t.k} ${t.oben}-${t.unten}`).join(' | ')} · Leiste ${leer.leiste} · Fenster ${leer.fenster}`);
+    // Hochkant-Handys: hoechstens 60 px Leere wie die Bot-Partie (tests/partie-hoehe.test.mjs, Kritik R8 LG3/LG5)
+    if (breite <= 600 && hoehe > breite) pruefe(`Laeuft: keine grosse Leere ueber, zwischen oder unter den Teilen (${leer.luecke} <= 60 px)`, leer.luecke <= 60, leer);
 
     // 1: richtig (Matt in einem)
     await zieh(s, 'a1a8');
@@ -577,7 +600,7 @@ async function neuladen(browser) {
 }
 
 const NUR = (process.argv.find((a) => a.startsWith('--nur=')) || '').slice(6) || null;
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
 try {
   if (BILDER) fs.mkdirSync(BILDER, { recursive: true });

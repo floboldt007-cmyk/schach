@@ -150,6 +150,18 @@ html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: s
 .rd-reihe li[data-art="r"] { background: var(--warn); }
 
 /* Querformat (iPad quer, PC, Handy quer): Brett links ueber die ganze Hoehe, rechts die Spalte wie bei der Partie */
+/* hohe Handys (iPhone 13 und groesser, ab 800 px) wie die Bot-Partie (css/partie.css, Feinschliff R8 LG3): das Brett hat
+   schon die volle Breite, ueber und unter der Spalte blieben 85 und 93 px leer (Kritik R8, LG5). Leisten, Zeile und Reihe
+   werden groesser, die Luecken etwas weiter; --rd-reserve rechnet die neuen Hoehen mit, damit das Brett nie schrumpft */
+@media (orientation: portrait) and (max-width: 600px) and (min-height: 800px) {
+  .rd-spiel { row-gap: 18px; --rd-reserve: calc(2 * 82px + 56px + 12px + 4 * 18px); }
+  .rd-seite { --av: 56px; min-height: 82px; border-radius: 22px; }
+  .rd-seite > .av { border-radius: 17px; }
+  .rd-seite .rd-uhr { height: 54px; min-width: 92px; }
+  .rd-geloest { font-size: 32px; }
+  .rd-zeile { min-height: 56px; font-size: 15.5px; }
+  .rd-spiel .rd-reihe li { height: 12px; }
+}
 @media (orientation: landscape) {
   .raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) .rd-rumpf {
     padding: 12px clamp(12px, 2.5vw, 24px) calc(12px + env(safe-area-inset-bottom, 0px)); }
@@ -165,6 +177,22 @@ html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: s
   .rd-zeile { grid-area: zeile; }
   .rd-reihe-ort { grid-area: reihe; }
   .rd-meldung { margin-left: 0; }
+}
+/* Kopf und Brett wie in der Bot-Partie (R8, 13.11.2026: iPad hoch 720 statt 788 px, PC 606 statt 638 px). Kopf so hoch wie
+   .p-kopf (--kopf-hoehe-partie, css/tokens.css; 60 px quer ab 1000 px und hoch ab 601 px wie css/partie.css), wie die
+   Online-Partie (css/online.css). iPad hoch: Brett ohne 720-px-Deckel ueber die ganze Breite mit 12 px Rand, Leisten so
+   breit wie das Brett; quer ab 1000 px oben 6 und unten 8 px Luft wie .partie .inhalt. */
+.screen.raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) > .kopf.haupt-kopf {
+  height: var(--kopf-hoehe-partie); min-height: 0; padding-top: 0; }
+@media (orientation: landscape) and (min-width: 1000px) {
+  .raetsel-duell { --kopf-hoehe-partie: 60px; }
+  .raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) .rd-rumpf {
+    padding-top: 6px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (orientation: portrait) and (min-width: 601px) {
+  .raetsel-duell { --kopf-hoehe-partie: 60px; }
+  .raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) .rd-rumpf { padding-inline: 12px; }
+  .rd-spiel { --rd-rand: 0px; --rd-b: min(calc(100cqw - 2 * var(--rd-rahmen)), calc(100cqh - var(--rd-reserve))); }
 }
 /* Handy quer (wenig Hoehe): Leisten straffen */
 @media (orientation: landscape) and (max-height: 480px) {

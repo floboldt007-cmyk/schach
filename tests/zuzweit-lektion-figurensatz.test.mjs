@@ -3,7 +3,7 @@
 // pruefeSonderstuecke wendet die Einstellungen dann neu an) oder der Spieler waehlt einen anderen Satz. Vorher blieb bis zum
 // Neuladen der alte Satz stehen (R4, 12.11.2026; dieselbe Luecke wie in der Bot-Partie, tests/partie-figurensatz.test.mjs).
 // Netzwerk ausschliesslich simuliert: kein Test schreibt ins echte Supabase-Projekt.
-//   PORT=9632 node tests/zuzweit-lektion-figurensatz.test.mjs   eigener Port (Standard 8936)
+//   PORT=9632 node tests/zuzweit-lektion-figurensatz.test.mjs   eigener Port (Standard: frei)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8936);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'u1' })).toString('base64url') + '.x', refresh_token: 'test-r', expires_at: 9999999999, user: { id: 'u1', email: 'spieler@example.invalid' } };
 let browser, ok = 0, gesamt = 0, sonderVerzug = 0, sonderAntworten = 0;

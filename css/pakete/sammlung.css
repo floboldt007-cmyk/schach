@@ -315,7 +315,8 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   overscroll-behavior: contain; text-align: start; }
 .sa-blatt h3 { padding: 0 2px; }
 .sa-blatt-inhalt { margin-top: 14px; min-width: 0; }
-.sa-blatt .sheet-knoepfe { position: sticky; bottom: -22px; padding: 12px 0 0; background: inherit; }
+/* R8 (L9, 13.11.2026): eine Spalte auch breit, sonst stand der einzige Knopf "Fertig" auf PC und iPad halb breit links */
+.sa-blatt .sheet-knoepfe { position: sticky; bottom: -22px; padding: 12px 0 0; background: inherit; grid-template-columns: 1fr; }
 @media (max-width: 420px) { .sa-gross-reihe { grid-template-columns: minmax(0, 1fr); } }
 /* Shop ohne Konto (G-002): Stuecke ausgegraut, nur zum Ansehen; Text bleibt in --text-2 lesbar, nur das Bild ist entsaettigt */
 .sh-gast { display: grid; gap: 12px; margin-top: 14px; }

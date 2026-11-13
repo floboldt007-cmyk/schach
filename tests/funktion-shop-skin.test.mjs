@@ -9,7 +9,7 @@
 //   PROBE_STRENG=1 node tests/funktion-shop-skin.test.mjs       auch die harten Pruefungen zaehlen (fuer eine Reparatur)
 //   PROBE_SKIN=neon node tests/funktion-shop-skin.test.mjs      ein Labor-Satz (nur Erfinder, js/labor.js) statt Blaupause
 //   node tests/funktion-shop-skin.test.mjs --bilder=<ordner>    je Ansicht ein Bild (<ansicht>.png)
-//   PORT=9631 node tests/funktion-shop-skin.test.mjs            eigener Port (Standard 8981)
+//   PORT=9631 node tests/funktion-shop-skin.test.mjs            eigener Port (Standard: frei)
 //
 // Je Ansicht zwei Pruefungen: der gewaehlte Satz steht im Brett, und ein Wechsel bei offener Ansicht wirkt sofort (spaeter
 // Erfinder-Status, R3/R4); im Raetsel-Duell zusaetzlich Koordinaten und Auto-Dame (F-duell2). Seit den Reparaturen
@@ -43,7 +43,7 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8981);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 
 const UID = 'u1';

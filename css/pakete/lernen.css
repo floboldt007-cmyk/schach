@@ -114,12 +114,20 @@
 .ms-zeile:not(:has(*)) { display: none; }
 
 /* ---------- Lektion ---------- */
+/* R8 Gleichheit (13.11.2026): Kopf so hoch wie der Kopf der Bot-Partie (--kopf-hoehe-partie, css/tokens.css und
+   css/partie.css; wie css/online.css), sonst fehlen dem Brett auf dem PC 36 px */
+.ls-screen > .kopf.haupt-kopf { height: var(--kopf-hoehe-partie); min-height: 0; padding-top: 0; }
+@media (orientation: landscape) and (min-width: 1000px) { .ls-screen { --kopf-hoehe-partie: 60px; } }
+@media (orientation: portrait) and (min-width: 601px) { .ls-screen { --kopf-hoehe-partie: 60px; } }
+@media (orientation: portrait) and (max-width: 600px) { .ls-screen > .kopf.haupt-kopf { padding: 0 10px; gap: 8px; } }
 .ls-screen .ls-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; container: ls / size; }
-.ls-inhalt { --ls-seite: 380px; --ls-luft: 28px;
-  --ls-b: min(calc(100cqh - 40px), calc(100cqw - 2 * var(--rand) - var(--ls-seite) - var(--ls-luft)), 700px);
+.ls-inhalt { --ls-seite: clamp(300px, 28cqw, 380px); --ls-luft: clamp(16px, 2cqw, 28px);
+  /* R9 Befund 1: kein fester Deckel mehr (frueher 700px), die Bot-Partie hat auch keinen.
+     Leiste und Luft schrumpfen wie bei der Partie mit, sonst bleibt das Brett auf dem iPad quer kleiner. */
+  --ls-b: min(calc(100cqh - 8px), calc(100cqw - 2 * var(--rand) - var(--ls-seite) - var(--ls-luft)));
   display: grid; grid-template-columns: var(--ls-b) var(--ls-seite); column-gap: var(--ls-luft); row-gap: 14px;
-  justify-content: center; align-content: center; min-height: 100%; padding: 8px var(--rand) 20px; }
+  justify-content: center; align-content: center; min-height: 100%; padding: 4px var(--rand) 4px; }
 .ls-brettzone { min-width: 0; }
 .ls-rahmen { width: var(--ls-b); }
 .ls-screen .brett > .figur { filter: drop-shadow(0 2px 1.5px var(--linie-2)); }
@@ -155,30 +163,51 @@
 .ls-aktionen .knopf { flex: 1 1 150px; min-height: 52px; }
 
 @container ls (max-width: 860px) {
-  .ls-inhalt { --ls-b: min(calc(100cqw - 2 * var(--rand)), max(calc(100cqh - 300px), 300px), 620px);
-    grid-template-columns: var(--ls-b); align-content: start; row-gap: 12px; padding-top: 4px; }
-  .ls-seite { align-self: start; gap: 12px; }
+  /* R8: Brett so breit wie in der Bot-Partie (iPad hoch: 9 px Rand), die Hoehe laesst der Karte darunter 300 px.
+     Die Flaeche rollt nicht: Brett, Karte (ihr Text rollt bei Platznot in sich), Meldung und Knoepfe darunter; die
+     Idee steht nur vor dem Start (danach steht sie im Weg, wie auf dem Handy) */
+  .ls-inhalt { --ls-b: min(calc(100cqw - 18px), max(calc(100cqh - 300px), 300px));
+    grid-template-columns: var(--ls-b); align-content: start; row-gap: 12px; padding: 4px 9px 8px;
+    height: 100%; min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
+  .ls-seite { align-self: stretch; min-height: 0; gap: 12px; }
+  .ls-status { flex: 0 1 auto; min-height: min(100%, 96px); overflow-y: auto; overscroll-behavior: contain; }
+  .ls-meldung, .ls-aktionen { flex: none; }
+  /* R9-2: die Knoepfe sitzen unten fuer den Daumen wie in der Bot-Partie, statt unter sich eine Leere zu lassen
+     (vor dem Start auf dem iPhone 13 147 px, iPad hoch 76 px) */
+  .ls-aktionen { margin-top: auto; }
+  .ls-screen:not([data-phase="intro"]) .ls-idee { display: none; }
   .ls-status { padding: 14px 16px; }
   .ls-status h2 { font-size: 22px; }
 }
 /* Handy (Flo 31.10.2026: "Bei den Lektionen ist das Spielfeld noch zu klein"): Brett ueber die ganze Breite wie in der
    Partie, die Erklaerung zum Zug direkt darunter, die Idee nur vor dem Start (danach steht sie im Weg) */
 @container ls (max-width: 520px) {
-  .ls-inhalt { --ls-b: min(calc(100cqw - 2 * var(--rand-brett-handy)), 620px); padding-left: 0; padding-right: 0; }
+  /* R8: von Rand zu Rand ohne Sockel und Rundung wie die Bot-Partie (Flo 31.10.); Karte und Knoepfe darunter behalten
+     ihren Rand */
+  .ls-inhalt { --ls-b: calc(100cqw - 6px); padding: 4px 0 10px; }
+  .ls-seite { width: calc(100cqw - 2 * var(--rand-brett-handy)); justify-self: center; }
   .ls-screen:not([data-phase="intro"]) .ls-meldung { order: -1; }
-  .ls-screen:not([data-phase="intro"]) .ls-idee { display: none; }
-  .ls-rahmen { padding: 3px; border-radius: 14px; }
-  .ls-rahmen::after { inset: 2px; border-radius: 12px; }
-  .ls-rahmen > .brett { --brett-radius: 11px; }
+  .ls-rahmen { padding: 0; border-radius: 0; box-shadow: none; background: none; }
+  .ls-rahmen > .brett { --brett-radius: 0px; }
   .ls-meldung { padding: 12px 14px; gap: 12px; }
   .ls-symbol { width: 38px; height: 38px; }
-  /* R6-Befund B9 (12.11.2026): auf dem iPhone SE lag "Los geht's" in 65 von 65 Lektionen unter dem Rand (bis 94 px). Die Knoepfe bleiben am
-     unteren Rand der Flaeche stehen, solange der Rest rollt; passt alles, aendert sich nichts. Der Verlauf deckt Text ab,
-     der darunter weiterrollt. */
-  .ls-aktionen { position: sticky; bottom: 0; z-index: 2; padding-bottom: 10px; background: var(--grund); }
-  .ls-aktionen::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: 12px; pointer-events: none;
-    background: linear-gradient(to bottom, transparent, var(--grund)); }
+  /* B9 (12.11.2026): "Los geht's" lag auf dem iPhone SE unter dem Rand; die stehende Leiste von R7 verdeckte dafuer die
+     Karte (R8 L4). Jetzt rollt nur der Text der Karte, die Knoepfe stehen im Fluss darunter und verdecken nichts. */
 }
+/* ---------- Ergebnisblatt (R8 Gleichheit, 13.11.2026) ----------
+   Optik ganz aus css/ergebnis.css (wie Bot-Partie und Online); hier nur, was die Lektion anders hat. Der Screen dahinter
+   tritt zurueck wie .partie.mit-ergebnis. In der Spalte bleiben nach dem Ende Meldung und "Ergebnis". */
+/* kleines Handy (iPhone SE): neben Meldung und "Ergebnis" wuerde die Karte mit Titel und Zugzahl zum Streifen gequetscht und
+   "Ergebnis" ragte unter den Rand (Bild R8 lektion-ende); der Name der Lektion steht im Ergebnisblatt */
+@container ls (max-width: 520px) and (max-height: 640px) {
+  .ls-screen[data-phase="ende"] .ls-status { display: none; }
+}
+.ls-screen > .kopf, .ls-screen > .ls-rumpf { transform-origin: 50% 40%; transition: transform var(--d-l) var(--gleiten); }
+.ls-screen.mit-ergebnis > .kopf, .ls-screen.mit-ergebnis > .ls-rumpf { transform: scale(.975); }
+.ls-erg .erg-unter .ls-erg-titel { font-weight: 800; color: var(--text); }
+/* Zeile unter den Sternen (Zuege, Fehler, Hinweise): immer eine Zeile, auch auf dem iPhone SE (Auftrag R8 Texte) */
+.ls-erg .ls-erg-zeile { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) { .ls-erg .ls-erg-zeile { font-size: 14px; } }
 
 /* ---------- Bereichswahl und Art (Endspiele) ---------- */
 .ms-steuer { display: flex; justify-content: flex-start; }

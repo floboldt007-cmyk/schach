@@ -680,7 +680,7 @@ export function zeige(root, params, app) {
             <div class="mini-sterne" aria-label="${esc(t('arena.sterne.von', { anzahl: f.sterne.filter(Boolean).length }))}">${kSterneHtml(f.sterne)}</div>
           </div>
         </div>
-        <div class="sprechblase spruch${neueBlase ? '' : ' still'}${blaseBesonders ? ' besonders' : ''}">${esc(t('arena.zitat', { satz }))}</div>
+        <div class="sprechblase spruch${neueBlase ? '' : ' still'}${blaseBesonders ? ' besonders' : ''}"><span class="spruch-text">${esc(t('arena.zitat', { satz }))}</span></div>
       </div>
       <div class="detail-rechts">
         <div class="ziel-sterne" aria-label="${esc(t('arena.ziele.aria'))}">

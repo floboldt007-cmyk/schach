@@ -557,6 +557,16 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function pruefeKiRef(r) {
   return typeof r === 'string' && UUID_RE.test(r) ? r : null;
 }
+// W-online-analyse (13.11.2026): Kennzeichen einer Online-Partie auf dem Geraet. Sie liegt als Partie zweier Menschen
+// (modus 'zuzweit': wertet nie, kein Bot, die Namen in zuzweit) und traegt online { gewertet }; die Analyse und
+// "Meine Partien" zeigen sie damit aus der eigenen Sicht (spielerFarbe) statt als "Zu zweit".
+export function pruefeOnline(o) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  return { gewertet: o.gewertet === true };
+}
+export function istOnline(p) {
+  return !!p && p.modus === 'zuzweit' && !!pruefeOnline(p.online);
+}
 // Felder setzen oder (falsch/leer) entfernen
 function setzeOderWeg(p, feld, wert) {
   if (wert == null) delete p[feld];
@@ -564,6 +574,7 @@ function setzeOderWeg(p, feld, wert) {
 }
 function normalisiereSpiel(p) {
   setzeOderWeg(p, 'zuzweit', p.modus === 'zuzweit' ? pruefeZuzweit(p.zuzweit) : null);
+  setzeOderWeg(p, 'online', p.modus === 'zuzweit' ? pruefeOnline(p.online) : null);
   setzeOderWeg(p, 'seed', pruefeSeed(p.seed));
   setzeOderWeg(p, 'tempo', pruefeTempo(p.tempo));
   setzeOderWeg(p, 'zeiten', pruefeZeiten(p.zeiten, Array.isArray(p.zuege) ? p.zuege.length : 2000));

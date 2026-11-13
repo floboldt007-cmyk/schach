@@ -5,7 +5,7 @@
 //
 //   node tests/thema.test.mjs              alles
 //   node tests/thema.test.mjs --nur-node   ohne Browser
-//   PORT=8951 node tests/thema.test.mjs    eigener Port (Standard 8834)
+//   PORT=8951 node tests/thema.test.mjs    eigener Port (Standard: frei)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn } from 'node:child_process';
@@ -23,7 +23,7 @@ import { STANDARD_EINSTELLUNGEN, EINSTELLUNG_WERTE } from '../js/storage.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8834);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const START = `http://127.0.0.1:${PORT}/index.html?test`;
 const NUR_NODE = process.argv.includes('--nur-node');
 
@@ -761,7 +761,7 @@ try {
   const kontext = nodeTeil();
   await nodeTeilAsync(kontext);
   if (!NUR_NODE) {
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(START);
     const { chromium } = ladePlaywright();
     browser = await chromium.launch();
