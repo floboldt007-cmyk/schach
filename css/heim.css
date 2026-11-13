@@ -247,6 +247,12 @@
     .heim-buehne[data-art="partie"] { --heim-brett: max(220px, min(100cqw - 2 * var(--a5), 100dvh - 430px)); }
   }
 }
+/* R9-StartQuer (Auswahlseite, Variante A): am iPad quer blieb unter beiden Spalten ein Streifen frei (1180 x 820: 112 px).
+   Beide Spalten ruecken zusammen senkrecht in die Mitte, nichts wird groesser. Nur Touch mit genug Hoehe, der PC bleibt
+   oben buendig (eigene Frage R13-G1); "safe" haelt den Anfang erreichbar, falls der Inhalt doch hoeher wird */
+@media (min-width: 900px) and (orientation: landscape) and (min-height: 700px) and (pointer: coarse) {
+  .heim-screen .heim-rumpf { align-content: safe center; }
+}
 
 /* ---------- Willkommen zurueck (Feinschliff 09.11., js/ui/heim.js rueckkehr) ----------
    erste Zeile unter "Als Naechstes" am Tag der Rueckkehr: dieselbe Form wie die anderen Zeilen, rechts statt des Pfeils
