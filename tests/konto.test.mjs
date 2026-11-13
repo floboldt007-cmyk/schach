@@ -116,6 +116,12 @@ for (const [kennung, msg] of [['signup_disabled', 'Signups not allowed for this 
 mitAntwort(429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' });
 serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
 pruefe('Mail-Grenze (429 over_email_send_rate_limit): gleich nochmal oder mit Google', /gleich noch einmal/.test(serverFehler) && /Google/.test(serverFehler) && !/rate limit/.test(serverFehler), serverFehler);
+// Kaltreview 13.11.: geerbte Eigenschaften des Objekts sind keine Kennungen
+for (const kennung of ['toString', '__proto__', 'constructor']) {
+  mitAntwort(400, { code: 400, error_code: kennung, msg: 'x' });
+  serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+  pruefe(`Kennung ${kennung}: Sammeltext, kein Objekt-Text`, /^Serverfehler \(400/.test(serverFehler) && !/function|\[object|einstellungen\./.test(serverFehler), serverFehler);
+}
 mitAntwort(429, { msg: 'Too many requests' });
 serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
 pruefe('429 ohne Kennung: Text "Zu viele Versuche" statt Serverfehler', /Zu viele Versuche/.test(serverFehler), serverFehler);

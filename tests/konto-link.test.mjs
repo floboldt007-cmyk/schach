@@ -396,6 +396,30 @@ try {
       await k.close();
     }
   }
+  { // 11. Kaltreview 13.11.: Kennungen wie toString aus der Adresse ergeben den normalen Link-Text, nie einen Objekt-Text
+    for (const kennung of ['toString', '__proto__', 'constructor']) {
+      const { k, zustand } = await speicher();
+      const s = await seite(k, zustand, BASIS + `#error=access_denied&error_code=${kennung}&error_description=x`);
+      await s.waitForTimeout(1200);
+      const st = await status(s);
+      pruefe(`Link mit #error_code=${kennung}: Text „abgelaufen oder schon benutzt“, kein Objekt-Text`,
+        /abgelaufen oder schon benutzt/.test(st.text) && !/function|\[object|einstellungen\.konto/.test(st.text) && st.fehler === 'ja', st);
+      await k.close();
+    }
+  }
+  { // 12. Kaltreview 13.11.: Ein Serverfehler landet ohne den Server-Text in der Konsole (darin kann die E-Mail stehen)
+    const { k, zustand } = await speicher({ lokal: OHNE_HINWEIS,
+      otpAntwort: { status: 500, body: { code: 500, error_code: 'unexpected_failure', msg: 'Error sending magic link email to neu@example.invalid' } } });
+    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    const konsole = [];
+    s.on('console', (m) => konsole.push(m.text()));
+    await s.waitForTimeout(1000);
+    await s.locator('.konto-email').fill('neu@example.invalid'); await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
+    const zeile = konsole.find((z) => z.includes('Konto-Serverfehler')) || '';
+    pruefe('Serverfehler in der Konsole: Status und Kennung, keine E-Mail, kein Server-Text',
+      /500/.test(zeile) && /unexpected_failure/.test(zeile) && !konsole.some((z) => /example\.invalid|magic link/.test(z)), konsole);
+    await k.close();
+  }
 } finally {
   await browser.close(); server.close();
 }

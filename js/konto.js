@@ -66,9 +66,11 @@ const KENNUNG_TEXT = Object.freeze({
   email_address_not_authorized: 'emailNichtFreigegeben', captcha_failed: 'botschutzFehler',
   signup_disabled: 'anmeldungGeschlossen', otp_disabled: 'anmeldungGeschlossen',
 });
+// Nur eigene Schluessel: Kennungen kommen vom Server oder aus der Adresse, "toString" darf keinen Objekt-Text ergeben
+const kennungText = (code) => (Object.prototype.hasOwnProperty.call(KENNUNG_TEXT, code) ? KENNUNG_TEXT[code] : undefined);
 function fehlerText(d, status) {
   const code = String(d?.error_code || (typeof d?.code === 'string' ? d.code : '') || d?.error || '');
-  const bekannt = SITZUNG_TOT.has(code) ? 'sitzungAbgelaufen' : KENNUNG_TEXT[code] || (status === 429 ? 'codeZuOft' : undefined);
+  const bekannt = SITZUNG_TOT.has(code) ? 'sitzungAbgelaufen' : kennungText(code) || (status === 429 ? 'codeZuOft' : undefined);
   const kennung = /^[a-z0-9_]{1,60}$/.test(code) ? code : '';
   const e = new Error(bekannt ? K(bekannt) : K('serverfehler', { status: kennung ? `${status}, ${kennung}` : status }));
   e.status = status; e.code = d?.code; e.kennung = kennung; e.serverDetails = d; return e;
@@ -426,7 +428,7 @@ export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = global
     } catch (e) { /* unvollstaendiger Link: ignorieren */ }
   } else {
     // otp_expired heisst hier "Link abgelaufen", nicht "Code falsch"; unbekannte Kennungen ebenso
-    const text = KENNUNG_TEXT[p.get('error_code')];
+    const text = kennungText(p.get('error_code'));
     linkFehler = text && text !== 'codeUngueltig' ? text : 'linkUngueltig';
   }
   // zur Konto-Seite der Einstellungen (Handy: eigene Seite, iPad: dorthin gerollt), dort steht "Angemeldet als ..."
@@ -560,7 +562,10 @@ export function kontoGruppe({ app } = {}) {
       }
       if (a === 'google') { melden(K('zuGoogle')); meldeMitGoogleAn(); }
       if (a === 'apple') { melden(K('zuApple')); meldeMitAnbieterAn('apple'); }
-    } catch (f) { if (f?.serverDetails) console.error('Konto-Serverfehler', f.serverDetails); melden(f.message || t('einstellungen.nichtGeklappt'), true); }
+    } catch (f) {
+      // Nur Status und Kennung: der Server-Text (msg) kann die E-Mail-Adresse enthalten
+      if (f?.serverDetails) console.error('Konto-Serverfehler', f.status, f.kennung || '');
+      melden(f.message || t('einstellungen.nichtGeklappt'), true); }
   });
   el.addEventListener('input', (e) => {
     const z = e.target.closest('.konto-ziffern input'); if (!z) return;
