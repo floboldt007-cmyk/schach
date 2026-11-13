@@ -397,6 +397,49 @@ try {
   await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
   await seite.locator('.on-ergebnis:not([hidden])').waitFor();
   pruefe('Aufgabe mit Rueckfrage und Niederlage', aufgabe.grund === 'aufgabe' && (await seite.locator('.on-ergebnis h3').innerText()) === 'Niederlage');
+  // R8 (13.11.2026, Bild online-pc-hell-ergebnis): nach dem Ende bleiben Endstellung und Zugliste stehen, am PC wie am iPad.
+  // Je Ende (Aufgabe, Matt, Remis, Zeit): jedes Feld des Bretts gegen die Zuege des Servers, dazu die Zahl der Eintraege
+  // in der Zugliste. Gegenprobe vor dem Ende, damit die Messung selbst stimmt.
+  const endstand = () => seite.evaluate(async () => {
+    const { Chess } = await import('/vendor/chess/chess.js');
+    const o = window.__online, p = o.partie(), b = o.brett(), c = new Chess();
+    for (const u of String(p.zuege || '').split(' ').filter(Boolean)) c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
+    const falsch = [];
+    for (const f of 'abcdefgh') for (let r = 1; r <= 8; r++) {
+      const x = c.get(f + r), soll = x ? x.color + x.type.toUpperCase() : null, ist = b.figurAuf(f + r);
+      if (soll !== ist) falsch.push(`${f + r}:${ist}/${soll}`);
+    }
+    return { status: p.status, zuege: c.history().length, liste: document.querySelectorAll('.zugliste .z[data-ply]').length, falsch: falsch.slice(0, 6) };
+  });
+  const stehtEnde = (s) => s.falsch.length === 0 && s.zuege > 0 && s.liste === s.zuege;
+  // wie oeffne, wartet aber auf genau diese Partie (sonst misst die Probe kurz noch den alten Screen)
+  const oeffneEnde = async (q) => { await oeffne(q); await seite.waitForFunction(id => window.__online?.partie()?.id === id && !window.__online.busy(), q.id, { timeout: 15000 }); };
+  for (const [w, h] of [[1280, 720], [1180, 820]]) {
+    await seite.setViewportSize({ width: w, height: h });
+    const aufg = partie({ zuege: 'e2e4 e7e5 g1f3', zeit: 300 }); await oeffneEnde(aufg);
+    const vorher = await endstand();
+    pruefe(`Endstand ${w}x${h}: Gegenprobe laufende Partie (Brett und Zugliste wie die Zuege des Servers)`, stehtEnde(vorher) && vorher.status === 'laeuft', vorher);
+    await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
+    await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
+    const nachAufgabe = await endstand();
+    pruefe(`Endstand ${w}x${h} nach Aufgabe: Endstellung und Zugliste bleiben`, stehtEnde(nachAufgabe) && nachAufgabe.status === 'beendet', nachAufgabe);
+    const matt = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4' }); await oeffneEnde(matt);
+    await tippe('d8h4'); await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
+    const nachMatt = await endstand();
+    pruefe(`Endstand ${w}x${h} nach Matt: Endstellung und Zugliste bleiben`, stehtEnde(nachMatt) && nachMatt.zuege === 4, nachMatt);
+    const remis = partie({ zuege: 'd2d4 d7d5 c2c4 e7e6', zeit: 300 }); await oeffneEnde(remis);
+    remis.remis_angebot = 'b'; aktualisieren(remis);
+    await knopf('annehmen').click(); await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
+    const nachRemis = await endstand();
+    pruefe(`Endstand ${w}x${h} nach Remis: Endstellung und Zugliste bleiben`, stehtEnde(nachRemis) && nachRemis.status === 'beendet', nachRemis);
+    const zeit = partie({ zuege: 'd2d4 d7d5 c2c4', zeit: 1 }); await oeffneEnde(zeit);
+    await seite.evaluate(() => { window.__versatz += 10000; });
+    await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
+    const nachZeit = await endstand();
+    pruefe(`Endstand ${w}x${h} nach Zeit: Endstellung und Zugliste bleiben`, stehtEnde(nachZeit) && zeit.grund === 'zeit', nachZeit);
+    await seite.evaluate(() => { window.__versatz = 0; });
+  }
+  await seite.setViewportSize({ width: 1180, height: 820 });
   await knopf('liste-zurueck').click(); await seite.getByRole('button', { name: /Beendet/ }).first().waitFor();
   pruefe('Meine Partien zeigt auch beendete Serverpartien', await seite.getByRole('button', { name: /Beendet/ }).count() >= 3);
   // Angemeldeter Einladungslink ohne Umweg ueber Einstellungen.
