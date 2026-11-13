@@ -56,14 +56,19 @@ export function sitzung() { return jsonLies(SITZUNG_SCHLUESSEL); }
 // Kennungen von Supabase Auth (GoTrue) in eigenen Worten. Nie den Server-Text (msg) zeigen: Darin kann die E-Mail-Adresse
 // stehen. Unbekannte Kennungen erscheinen im Sammeltext ("Serverfehler (400, kennung)"), damit Flo sie im Tester-Bericht
 // sieht. Ein falscher und ein abgelaufener Code liefern beide otp_expired, darum ein Text fuer beides.
+// Neue Konten gesperrt ("Allow new users to sign up" aus): /otp legt Konten ueber Signup an und meldet signup_disabled,
+// mit create_user:false otp_disabled; die Google-Rueckkehr traegt signup_disabled als #error_code (supabase/auth
+// internal/api signup.go, otp.go, external.go getErrorQueryString, gelesen 13.11.2026).
 const SITZUNG_TOT = new Set(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'session_expired', 'bad_jwt']);
+const KENNUNG_TEXT = Object.freeze({
+  email_address_invalid: 'emailUngueltig', otp_expired: 'codeUngueltig',
+  over_email_send_rate_limit: 'mailZuOft', over_request_rate_limit: 'codeZuOft', user_banned: 'kontoGesperrt',
+  email_address_not_authorized: 'emailNichtFreigegeben', captcha_failed: 'botschutzFehler',
+  signup_disabled: 'anmeldungGeschlossen', otp_disabled: 'anmeldungGeschlossen',
+});
 function fehlerText(d, status) {
   const code = String(d?.error_code || (typeof d?.code === 'string' ? d.code : '') || d?.error || '');
-  const bekannt = SITZUNG_TOT.has(code) ? 'sitzungAbgelaufen' : {
-    email_address_invalid: 'emailUngueltig', otp_expired: 'codeUngueltig',
-    over_email_send_rate_limit: 'codeZuOft', over_request_rate_limit: 'codeZuOft', user_banned: 'kontoGesperrt',
-    email_address_not_authorized: 'emailNichtFreigegeben', captcha_failed: 'botschutzFehler',
-  }[code];
+  const bekannt = SITZUNG_TOT.has(code) ? 'sitzungAbgelaufen' : KENNUNG_TEXT[code] || (status === 429 ? 'codeZuOft' : undefined);
   const kennung = /^[a-z0-9_]{1,60}$/.test(code) ? code : '';
   const e = new Error(bekannt ? K(bekannt) : K('serverfehler', { status: kennung ? `${status}, ${kennung}` : status }));
   e.status = status; e.code = d?.code; e.kennung = kennung; e.serverDetails = d; return e;
@@ -397,7 +402,7 @@ export function neuLaden() {
 // Rueckfall, solange Supabase ohne eigenen SMTP-Versand einen Anmelde-Link statt des Codes schickt:
 // Der Link fuehrt mit #access_token=...&refresh_token=... zurueck auf die Seite (redirect_to aus fordereCodeAn).
 let abgleichOffen = false;
-let linkFehler = false;     // abgelaufener oder schon benutzter Link (#error=...): Meldung beim ersten Zeichnen
+let linkFehler = false;     // Textschluessel zu #error=... (abgelaufener Link, Google abgelehnt): Meldung beim ersten Zeichnen
 let sitzungTot = false;     // die Sitzung ist auf dem Server abgelaufen: Meldung bleibt ueber das Neuzeichnen stehen
 // Auch direkt nach dem Neuladen wegen eines geladenen Stands: dann kein Installations-Hinweis darueber
 let frischGeladen = false;
@@ -420,7 +425,9 @@ export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = global
       abgleichOffen = true;
     } catch (e) { /* unvollstaendiger Link: ignorieren */ }
   } else {
-    linkFehler = true;
+    // otp_expired heisst hier "Link abgelaufen", nicht "Code falsch"; unbekannte Kennungen ebenso
+    const text = KENNUNG_TEXT[p.get('error_code')];
+    linkFehler = text && text !== 'codeUngueltig' ? text : 'linkUngueltig';
   }
   // zur Konto-Seite der Einstellungen (Handy: eigene Seite, iPad: dorthin gerollt), dort steht "Angemeldet als ..."
   try { verlauf.replaceState(null, '', ort.pathname + ort.search + '#einstellungen/konto'); } catch (e) { /* egal */ }
@@ -479,6 +486,7 @@ export function kontoGruppe({ app } = {}) {
     gezeichnetMit = !!s;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
       <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
+      <p class="es-hilfe konto-name-hinweis" hidden>${K('nameWaehlen')}</p>
       <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>${verdraengtZeile()}` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <div class="konto-botschutz" hidden></div><button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
@@ -488,10 +496,26 @@ export function kontoGruppe({ app } = {}) {
       <p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>
       <p class="es-hilfe">${K('gespeichert')}${s ? ' ' + K('datenHinweis') : ''}</p>`;
     zeigeWege();
+    if (s) zeigeName();
     if (!s) {
       schutz = botschutz(el.querySelector('.konto-botschutz'), { modus: aufgeloesterModus(), sprache: sprache() });
       if (schutz) el.querySelector('.konto-status').insertAdjacentHTML('beforebegin', `<p class="es-hilfe konto-botschutz-hinweis">${K('botschutzHinweis')} <a href="${datenschutzBotschutz()}" target="_blank" rel="noopener">${K('botschutzMehr')}</a></p>`);
     }
+  };
+  // Eigener Name im Feld; ein Konto ohne Namen (neues Konto) bekommt den Hinweis, einen zu waehlen. Erst nach der
+  // Profil-Abfrage, sonst sieht ein bestehendes Konto den Hinweis kurz, bevor sein Name da ist. Nur das Feld und den
+  // Hinweis anfassen, nie neu zeichnen: Die Statuszeile (z. B. "Geraetestand hochgeladen") bleibt stehen.
+  let profilFuer = null; let profilLaeuft = null;   // Konto-ID, deren Profil schon abgefragt ist bzw. gerade abgefragt wird
+  const zeigeName = () => {
+    const id = userId(sitzung()); if (!id) return;
+    const feld = el.querySelector('.konto-name'); const name = eigenerName();
+    if (feld && !feld.value && name) feld.value = name;
+    const hinweis = el.querySelector('.konto-name-hinweis'); if (hinweis) hinweis.hidden = !!name || profilFuer !== id;
+    if (name || profilFuer === id || profilLaeuft === id) return;
+    profilLaeuft = id;
+    // offline oder Serverfehler: kein Hinweis (der Name koennte existieren), beim naechsten Zeichnen neu fragen
+    ladeProfil().then(() => { if (userId(sitzung()) === id) { profilFuer = id; zeigeName(); } }, () => {})
+      .finally(() => { if (profilLaeuft === id) profilLaeuft = null; });
   };
   const verdraengtZeile = () => {
     const d = verdraengterStand(); if (!d) return '';
@@ -585,7 +609,7 @@ export function kontoGruppe({ app } = {}) {
     }).catch((f) => melden(f.message || t('einstellungen.nichtGeklappt'), true)).finally(() => { abgleichLaeuft = false; });
   };
   render();
-  if (linkFehler) { linkFehler = false; melden(K('linkUngueltig'), true); }
+  if (linkFehler) { const text = linkFehler; linkFehler = false; melden(K(text), true); }
   abgleichOffen = false;
   gleicheAb();
   // Abmelden von aussen (Konto loeschen in der Gruppe "Daten") oder Anmeldung in einem anderen Tab: neu zeichnen

@@ -599,6 +599,32 @@ Datenschutz: Der Abschnitt „Bot-Schutz bei der Anmeldung“ in `datenschutz.ht
 Dienst. Er gilt ab Schritt 4; die Datenschutzerklärung ist insgesamt noch ein Entwurf (Prüfung durch eine fachkundige
 Person steht aus).
 
+### Prüfliste für den Start der Anmeldung (Stand 13.11.2026)
+
+Zum Abhaken, in dieser Reihenfolge. Jeder Punkt ist ein Häkchen, kein Schritt darf übersprungen werden.
+
+- [ ] Widget „Crownmate Anmeldung“ für `crownmate.de` steht, den Site Key hat Claude (Schritt 2). Der Key gilt nur auf
+      crownmate.de, nicht auf `localhost`. Die alte Adresse floboldt007-cmyk.github.io/schach leitet auf crownmate.de um.
+- [ ] Der Site Key ist live: crownmate.de → Einstellungen → Konto zeigt über der Statuszeile „Die Anmeldung schützt
+      Cloudflare Turnstile vor Bots“ und dem Link „Mehr dazu in der Datenschutzerklärung“ (Schritt 3).
+- [ ] CAPTCHA in Supabase an, Secret Key nur dort eingetragen (Schritt 4).
+- [ ] Probe mit einem bestehenden Konto im privaten Fenster: Code kommt an, Anmeldung klappt (Schritt 5).
+- [ ] **Mail-Versand geklärt** (siehe unten). Ohne eigenen SMTP-Versand bekommen fremde neue Nutzer keinen Code.
+- [ ] „Allow new users to sign up“ an (Schritt 6).
+- [ ] Probe mit einer neuen Adresse: Code kommt an, nach der Anmeldung steht „Wähle jetzt einen Benutzernamen…“, Name
+      eingeben → „Jetzt sichern“ → der Name steht im Feld.
+- [ ] Probe Google mit einem neuen Google-Konto: Rückkehr auf die Konto-Seite, derselbe Namens-Hinweis.
+- [ ] Gegenprobe: Steht die Anmeldung noch auf „aus“, sagt die App „Neue Konten sind gerade noch nicht freigeschaltet“
+      (bei Code und bei Google), nicht „Serverfehler“ und nicht „Link abgelaufen“.
+
+**Eigener Mail-Versand (SMTP).** Der eingebaute Versand von Supabase ist nur zum Ausprobieren da. Er schickt nur an
+Adressen aus dem eigenen Supabase-Team (sonst `email_address_not_authorized`, die App sagt dann „…noch keinen Code
+schicken (Testphase)“) und nur sehr wenige Mails pro Stunde (dann `over_email_send_rate_limit`, die App sagt „Gerade
+wurden zu viele Codes verschickt. Versuche es gleich noch einmal oder melde dich mit Google an“). Für fremde Nutzer
+per Code deshalb vorher einen eigenen SMTP-Anbieter eintragen: **Authentication → Emails → SMTP Settings** (Zugangsdaten
+trägt nur der Besitzer ein, nie in einen Chat), danach die Code-Vorlage und die Grenzen wie oben im Abschnitt
+im Abschnitt „Supabase für „Konto light“ einrichten“, Schritte 4 („Code-Mail einrichten“) und 6 („Versandgrenzen prüfen“). Bis dahin ist Google der Weg für neue Nutzer, der ohne Mail auskommt.
+
 ## Abo „Crownmate Trainer“ mit Stripe
 
 Das Abo verkauft Lehrer und Lernstoff, nie den Zugang zum Spiel (`design/runde4/SPIELKONZEPT.md` 2b.5). Bezahlt wird im

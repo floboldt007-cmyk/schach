@@ -105,6 +105,20 @@ pruefe('Ohne Kennung nur der Status', serverFehler === 'Serverfehler (500)', ser
 mitAntwort(400, { code: 400, error_code: 'captcha_failed', msg: 'captcha protection: request disallowed (no captcha_token found)' });
 serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
 pruefe('Bot-Schutz abgelehnt (captcha_failed): eigener Text statt Serverfehler', /Bot-Schutz/.test(serverFehler) && !/captcha/i.test(serverFehler), serverFehler);
+// Neue Konten gesperrt (Supabase "Allow new users to sign up" aus): /otp legt das Konto ueber Signup an und meldet
+// signup_disabled, mit create_user:false kaeme otp_disabled (supabase/auth internal/api/signup.go, otp.go)
+for (const [kennung, msg] of [['signup_disabled', 'Signups not allowed for this instance'], ['otp_disabled', 'Signups not allowed for otp']]) {
+  mitAntwort(422, { code: 422, error_code: kennung, msg });
+  serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+  pruefe(`Neue Konten gesperrt (${kennung}): eigener Text statt Serverfehler, nie der Server-Text`,
+    /noch nicht freigeschaltet/.test(serverFehler) && !/Signups|Serverfehler/.test(serverFehler), serverFehler);
+}
+mitAntwort(429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('Mail-Grenze (429 over_email_send_rate_limit): gleich nochmal oder mit Google', /gleich noch einmal/.test(serverFehler) && /Google/.test(serverFehler) && !/rate limit/.test(serverFehler), serverFehler);
+mitAntwort(429, { msg: 'Too many requests' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('429 ohne Kennung: Text "Zu viele Versuche" statt Serverfehler', /Zu viele Versuche/.test(serverFehler), serverFehler);
 localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
 mitAntwort(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' });
 serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }

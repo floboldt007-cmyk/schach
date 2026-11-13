@@ -35,14 +35,18 @@ const partienJson = (n, vor) => JSON.stringify(Array.from({ length: n }, (_, i) 
 const cloudZeile = () => ({ user_id: 'u1', format_version: 1, aktualisiert_am: '2026-10-20T10:00:00Z', geraet: 'iPadOS Safari',
   stand: { 'schach-arena:v1:partien': partienJson(7, 'app-'), 'schach-arena:v1:fortschritt': JSON.stringify({ level: 5 }) } });
 
+// Konto-Gruppe sichtbar, Hinweis „Zum Home-Bildschirm“ (js/app.js) schon gesehen, sonst verdeckt er die Anmeldung
+const OHNE_HINWEIS = { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' };
 let ok = 0, gesamt = 0;
 function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`${gut ? 'OK' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`); }
 const browser = await browserTyp(pw).launch({ headless: true });
 
 // Ein Browser-Speicher (Kontext) mit simuliertem Supabase. lokal: Eintraege, die vor dem ersten Laden im Speicher stehen.
-async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, neuBereit = false, botschutz = null } = {}) {
+// otpAntwort / verifyAntwort: { status, body } statt der Erfolgsantwort; profil: Zeile in /rest/v1/profile (null = neues Konto)
+async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, neuBereit = false, botschutz = null,
+  otpAntwort = null, verifyAntwort = null, profil = null } = {}) {
   const k = await browser.newContext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'block' });
-  const zustand = { cloud, uploads: [], otp: [], otpBody: [], fehler: [], neu: [], cf: [] };
+  const zustand = { cloud, uploads: [], otp: [], otpBody: [], fehler: [], neu: [], cf: [], profil, profilPost: [], otpAntwort, verifyAntwort };
   await k.addInitScript((vorbelegt) => {
     try { Object.defineProperty(Navigator.prototype, 'standalone', { configurable: true, get: () => false }); } catch (e) { /* egal */ }
     // Meldungen (Toasts) mitschreiben: sie verschwinden nach gut 3 Sekunden wieder
@@ -54,20 +58,21 @@ async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, 
       localStorage.setItem('test:vorbelegt', '1');
     }
   }, lokal);
-  // Bot-Schutz (js/botschutz.js): ein Test-Site-Key und ein nachgebautes Turnstile statt Cloudflare. 'ok' liefert Tokens
-  // tok-1, tok-2 (neu nach reset), 'fehler' ruft den error-callback
-  if (botschutz) await k.addInitScript(() => { window.__botschutzTestKey = '1x00000000000000000000AA'; });
-  const turnstileNachbau = (art) => `window.turnstile = { n: 0, resets: 0, opt: null,
-    render(el, o) { this.opt = o; el.dataset.gerendert = o.theme + '|' + o.language; const t = this;
-      setTimeout(() => { ${art === 'fehler' ? "o['error-callback']('110200')" : "o.callback('tok-' + (++t.n))"}; }, 50); return 'w1'; },
-    reset() { this.resets++; const t = this; setTimeout(() => t.opt.callback('tok-' + (++t.n)), 50); }, remove() {} };`;
+  // Bot-Schutz (js/botschutz.js): botschutz ist der Test-Site-Key, das nachgebaute Turnstile verhaelt sich wie die
+  // Test-Keys von Cloudflare (developers.cloudflare.com/turnstile/troubleshooting/testing): 1x…AA besteht immer und
+  // liefert tok-1, tok-2 (neu nach reset), 2x…AB scheitert immer (error-callback).
+  if (botschutz) await k.addInitScript((key) => { window.__botschutzTestKey = key; }, botschutz);
+  const turnstileNachbau = () => `window.turnstile = { n: 0, resets: 0, opt: null,
+    gib() { const o = this.opt; if (/^2x/.test(o.sitekey)) o['error-callback']('600010'); else o.callback('tok-' + (++this.n)); },
+    render(el, o) { this.opt = o; el.dataset.gerendert = o.theme + '|' + o.language; setTimeout(() => this.gib(), 50); return 'w1'; },
+    reset() { this.resets++; setTimeout(() => this.gib(), 50); }, remove() {} };`;
   await k.route('**/*', async (route) => {
     const req = route.request(); const url = new URL(req.url());
     if (url.hostname === '127.0.0.1') return route.continue();
     if (url.hostname === 'challenges.cloudflare.com') {
       zustand.cf.push(url.pathname + url.search);
       if (!botschutz) return route.abort();
-      return route.fulfill({ status: 200, contentType: 'text/javascript', body: turnstileNachbau(botschutz) });
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: turnstileNachbau() });
     }
     // Umzug (js/umzug.js): crownmate.de liefert die App erst, wenn neuBereit gesetzt ist
     if (url.hostname === 'crownmate.de') {
@@ -78,7 +83,18 @@ async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, 
     }
     if (!url.hostname.endsWith('.supabase.co')) return route.abort();
     const antwort = (d, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(d) });
-    if (url.pathname === '/auth/v1/otp') { zustand.otp.push(url.search); zustand.otpBody.push(req.postDataJSON()); return antwort({}); }
+    if (url.pathname === '/auth/v1/otp') {
+      zustand.otp.push(url.search); zustand.otpBody.push(req.postDataJSON());
+      return zustand.otpAntwort ? antwort(zustand.otpAntwort.body, zustand.otpAntwort.status) : antwort({});
+    }
+    if (url.pathname === '/auth/v1/verify') {
+      if (zustand.verifyAntwort) return antwort(zustand.verifyAntwort.body, zustand.verifyAntwort.status);
+      return antwort({ access_token: TOKEN, refresh_token: 'r1', expires_in: 3600, user: { id: 'u1', email: 'flo@example.invalid' } });
+    }
+    if (url.pathname === '/rest/v1/profile' && req.method() === 'GET') return antwort(zustand.profil ? [zustand.profil] : []);
+    if (url.pathname === '/rest/v1/profile' && req.method() === 'POST') {
+      const body = req.postDataJSON(); zustand.profilPost.push(body); zustand.profil = { ...body }; return antwort(null, 201);
+    }
     if (url.pathname === '/rest/v1/spielstaende' && req.method() === 'GET') {
       await new Promise(r => setTimeout(r, verzoegerung)); return antwort(zustand.cloud ? [zustand.cloud] : []);
     }
@@ -246,7 +262,7 @@ try {
   }
   { // 6. Bot-Schutz an (Test-Site-Key): Skript erst mit der Anmeldung, Token im Body, danach ein neues Token
     // Hinweis „Zum Home-Bildschirm“ (js/app.js, kommt 1,2 s nach dem Start) als schon gesehen, sonst verdeckt er die Anmeldung
-    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: 'ok' });
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: '1x00000000000000000000AA' });
     const s = await seite(k, zustand, BASIS + '#arena');
     await s.waitForTimeout(1000);
     pruefe('Bot-Schutz: beim Start der App lädt nichts von Cloudflare', zustand.cf.length === 0, zustand.cf);
@@ -273,15 +289,112 @@ try {
     await k.close();
   }
   { // 7. Bot-Schutz schlaegt fehl: kein Code anfordern, eigener Text
-    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: 'fehler' });
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: '2x00000000000000000000AB' });
     const s = await seite(k, zustand, BASIS + '#einstellungen');
     await s.waitForTimeout(1200);
     await s.locator('.konto-email').fill('flo@example.invalid');
     await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
     const st = await status(s);
-    pruefe('Bot-Schutz fehlgeschlagen: keine Anfrage an /auth/v1/otp, Meldung „Bot-Schutz hat nicht geklappt“ als Fehler',
+    pruefe('Bot-Schutz fehlgeschlagen (Test-Key 2x…AB): keine Anfrage an /auth/v1/otp, Meldung „Bot-Schutz hat nicht geklappt“ als Fehler',
       zustand.otp.length === 0 && /Bot-Schutz hat nicht geklappt/.test(st.text) && st.fehler === 'ja', { st, otp: zustand.otp });
     await k.close();
+  }
+  { // 7b. Widget besteht (1x…AA), aber Supabase lehnt das Token ab (captcha_failed): klarer Text, neues Token fuer den naechsten Versuch
+    const { k, zustand } = await speicher({ lokal: OHNE_HINWEIS, botschutz: '1x00000000000000000000AA',
+      otpAntwort: { status: 400, body: { code: 400, error_code: 'captcha_failed', msg: 'captcha protection: request disallowed (captcha verification failed)' } } });
+    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
+    await s.locator('.konto-email').fill('flo@example.invalid');
+    await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
+    const st = await status(s);
+    pruefe('Bot-Schutz vom Server abgelehnt: Token ging mit, Meldung „Bot-Schutz hat nicht geklappt“ als Fehler, Widget zurückgesetzt',
+      zustand.otpBody[0]?.gotrue_meta_security?.captcha_token === 'tok-1' && /Bot-Schutz hat nicht geklappt/.test(st.text) && st.fehler === 'ja'
+        && await s.evaluate(() => window.turnstile.resets) >= 1 && !/captcha/i.test(st.text), { st, body: zustand.otpBody });
+    await k.close();
+  }
+  // Anmeldung per Code bis "Anmelden" (Ziffern einzeln, wie getippt)
+  const meldeMitCodeAn = async (s, code = '123456') => {
+    await s.locator('.konto-email').fill('flo@example.invalid');
+    await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(500);
+    const felder = s.locator('.konto-ziffern input');
+    for (let i = 0; i < 6; i++) await felder.nth(i).fill(code[i]);
+    await s.locator('[data-konto="pruefen"]').click(); await s.waitForTimeout(1200);
+  };
+  const nameHinweis = (s) => s.evaluate(() => { const h = document.querySelector('.konto-name-hinweis'); return h && !h.hidden ? h.textContent : ''; });
+  const nameFeld = (s) => s.evaluate(() => document.querySelector('.konto-name')?.value ?? null);
+  { // 8. Erstanmeldung per Code, neues Konto ohne Cloud-Daten: Geraetestand hochladen, Benutzername waehlen, sauberer Start
+    const { k, zustand } = await speicher({ lokal: { ...OHNE_HINWEIS, 'schach-arena:v1:partien': partienJson(2, 'neu-') }, cloud: null });
+    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    await s.waitForTimeout(1000);
+    await meldeMitCodeAn(s);
+    pruefe('Erstanmeldung Code: angemeldet, Gerätestand (2 Partien) in die leere Cloud hochgeladen, Riegel offen, kein Dialog',
+      zustand.uploads.length >= 1 && JSON.parse(zustand.cloud.stand['schach-arena:v1:partien']).length === 2
+        && (await s.evaluate(() => localStorage.getItem('schach-arena:konto:abgeglichen'))) === 'u1' && (await dialogTitel(s)) === ''
+        && /hochgeladen/.test((await status(s)).text), { uploads: zustand.uploads.length, st: await status(s), dialog: await dialogTitel(s) });
+    pruefe('Erstanmeldung Code: neues Konto ohne Namen bekommt den Hinweis „Benutzernamen wählen“, Feld leer',
+      /Benutzernamen/.test(await nameHinweis(s)) && (await nameFeld(s)) === '', { hinweis: await nameHinweis(s), feld: await nameFeld(s) });
+    await s.locator('.konto-name').fill('Neuling_1');
+    await s.locator('[data-konto="sichern"]').click(); await s.waitForTimeout(1000);
+    pruefe('Erstanmeldung Code: Name gespeichert (POST /rest/v1/profile), Feld zeigt ihn, Hinweis weg, Merker fürs Spiel gesetzt',
+      zustand.profilPost[0]?.benutzername === 'Neuling_1' && zustand.profilPost[0]?.user_id === 'u1' && (await nameFeld(s)) === 'Neuling_1'
+        && (await nameHinweis(s)) === '' && JSON.parse(await s.evaluate(() => localStorage.getItem('schach-arena:konto:name')) || '{}').name === 'Neuling_1',
+      { post: zustand.profilPost, feld: await nameFeld(s), hinweis: await nameHinweis(s) });
+    pruefe('Erstanmeldung Code: keine Seitenfehler', zustand.fehler.length === 0, zustand.fehler);
+    await k.close();
+  }
+  { // 9. Erstanmeldung mit Google (Rueckkehr #konto#access_token=...): neues Konto -> Hinweis, bestehendes Konto -> Name vorbelegt
+    const GOOGLE = `${BASIS}#konto#access_token=${TOKEN}&expires_at=9999999999&expires_in=3600&refresh_token=r1&token_type=bearer&provider_token=g`;
+    for (const profil of [null, { user_id: 'u1', benutzername: 'Flo_Test' }]) {
+      const { k, zustand } = await speicher({ lokal: OHNE_HINWEIS, cloud: null, profil });
+      const s = await seite(k, zustand, GOOGLE);
+      await s.waitForTimeout(2500);
+      const wer = profil ? 'bestehendes Konto' : 'neues Konto';
+      pruefe(`Google (${wer}): angemeldet auf der Konto-Seite, Adresse ohne Token, kein Dialog, keine Seitenfehler`,
+        (await s.evaluate(() => localStorage.getItem('schach-arena:konto:sitzung')))?.includes('r1') && !(await s.evaluate(() => location.hash)).includes('token')
+          && (await s.locator('[data-konto="abmelden"]').count()) === 1 && (await dialogTitel(s)) === '' && zustand.fehler.length === 0,
+        { hash: await s.evaluate(() => location.hash), fehler: zustand.fehler, dialog: await dialogTitel(s) });
+      if (profil) pruefe('Google (bestehendes Konto): Namensfeld mit „Flo_Test“ vorbelegt, kein Hinweis', (await nameFeld(s)) === 'Flo_Test' && (await nameHinweis(s)) === '',
+        { feld: await nameFeld(s), hinweis: await nameHinweis(s) });
+      else pruefe('Google (neues Konto): Hinweis „Benutzernamen wählen“', /Benutzernamen/.test(await nameHinweis(s)), await nameHinweis(s));
+      await k.close();
+    }
+  }
+  { // 10. Klare Texte: neue Konten gesperrt (Code und Google), Mail-Grenze 429, falscher oder abgelaufener Code; dazu Englisch
+    const gesperrt = { status: 422, body: { code: 422, error_code: 'signup_disabled', msg: 'Signups not allowed for this instance' } };
+    const grenze = { status: 429, body: { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' } };
+    const sendeCode = async (s) => { await s.locator('.konto-email').fill('neu@example.invalid'); await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600); return status(s); };
+    for (const sprache of ['de', 'en']) {
+      const lokal = sprache === 'en' ? { ...OHNE_HINWEIS, 'schach-arena:v1:einstellungen': JSON.stringify({ sprache: 'en', spracheGewaehlt: true, fassung: 3 }) } : OHNE_HINWEIS;
+      const { k, zustand } = await speicher({ lokal, otpAntwort: gesperrt });
+      const s = await seite(k, zustand, BASIS + '#einstellungen');
+      await s.waitForTimeout(1000);
+      let st = await sendeCode(s);
+      pruefe(`[${sprache}] Code, neue Konten gesperrt (422 signup_disabled): eigener Text als Fehler, kein Server-Text`,
+        (sprache === 'de' ? /noch nicht freigeschaltet/ : /not open yet/).test(st.text) && st.fehler === 'ja' && !/Signups|422|Serverfehler|Server error/.test(st.text), st);
+      zustand.otpAntwort = grenze; st = await sendeCode(s);
+      pruefe(`[${sprache}] Code, Mail-Grenze (429): gleich nochmal oder Google`,
+        (sprache === 'de' ? /gleich noch einmal.*Google/ : /again in a moment.*Google/).test(st.text) && st.fehler === 'ja' && !/rate limit/i.test(st.text), st);
+      if (sprache === 'de') {
+        zustand.otpAntwort = null;
+        zustand.verifyAntwort = { status: 403, body: { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' } };
+        await meldeMitCodeAn(s, '000000'); st = await status(s);
+        pruefe('[de] Falscher oder abgelaufener Code: ein klarer Text als Fehler, nicht angemeldet',
+          /stimmt nicht oder ist abgelaufen/.test(st.text) && st.fehler === 'ja' && (await s.evaluate(() => localStorage.getItem('schach-arena:konto:sitzung'))) === null, st);
+      }
+      pruefe(`[${sprache}] Texte: keine Seitenfehler`, zustand.fehler.length === 0, zustand.fehler);
+      await k.close();
+    }
+    for (const sprache of ['de', 'en']) {
+      const lokal = sprache === 'en' ? { 'schach-arena:v1:einstellungen': JSON.stringify({ sprache: 'en', spracheGewaehlt: true, fassung: 3 }) } : {};
+      const { k, zustand } = await speicher({ lokal });
+      const s = await seite(k, zustand, BASIS + '#konto#error=access_denied&error_code=signup_disabled&error_description=Signups+not+allowed+for+this+instance');
+      await s.waitForTimeout(1200);
+      const st = await status(s);
+      pruefe(`[${sprache}] Google, neue Konten gesperrt (#error_code=signup_disabled): eigener Text statt „Link abgelaufen“, Adresse ohne #error`,
+        (sprache === 'de' ? /noch nicht freigeschaltet/ : /not open yet/).test(st.text) && !/abgelaufen|expired/.test(st.text) && st.fehler === 'ja'
+          && !(await s.evaluate(() => location.hash)).includes('error'), st);
+      await k.close();
+    }
   }
 } finally {
   await browser.close(); server.close();
