@@ -166,9 +166,11 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .online-partie.partie .spielknoepfe { margin-top: auto; }
   /* R8 (L3): ab 760 px Hoehe (ohne .streifen-unten, js/ui/online.js layout) steht der Zugstreifen wie in der Bot-Partie
      UEBER Remis/Aufgeben, mit eigenen Pfeilen; darunter entfaellt er (css/partie.css) und die Pfeile bleiben in der
-     Knopfreihe. Vorher lag er hoch immer unter den Knoepfen, auf dem iPhone SE 44 px unter dem Rand. */
-  .online-partie.partie:not(.streifen-unten) .zugleiste { order: 3; margin-top: auto; }
-  .online-partie.partie:not(.streifen-unten) .spielknoepfe { order: 5; margin-top: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+     Knopfreihe. Vorher lag er hoch immer unter den Knoepfen, auf dem iPhone SE 44 px unter dem Rand.
+     R9 (G-4, Variante A): der Streifen steht direkt unter den Hinweisen, die freie Hoehe liegt ueber den Knoepfen
+     (vorher 74 bis 99 px leer ueber dem Streifen am iPhone 13); die Knoepfe bleiben unten am Daumen. */
+  .online-partie.partie:not(.streifen-unten) .zugleiste { order: 3; margin-top: 0; }
+  .online-partie.partie:not(.streifen-unten) .spielknoepfe { order: 5; margin-top: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .online-partie.partie:not(.streifen-unten) .spielknoepfe > .knopf.sk-pfeil { display: none; }
   .online-partie.partie:not(.streifen-unten) .zugleiste .zl-pfeil { display: grid; }
 }
@@ -199,3 +201,24 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .online-partie .on-ergebnis h3 { font-size: 17px; }
 .online-partie .on-ergebnis p { color: var(--text-2); font-weight: 650; }
 .online-partie .on-ergebnis .on-aktionen .knopf { min-height: 44px; }
+/* R9 Lobby mittig (Vorbau, Auswahlseite R9-LobbyLeere B): auf hohen Hochkant-Fenstern steht die Lobby samt Liga-Streifen
+   mittig statt oben mit bis zu 670 px Leere darunter. Zwischen den Tueren und der Freunde-Zeile waechst der
+   Abstand bis 60 px (48 px Raster + 12 px Rand), auf dem Handy ebenso zwischen den zwei Tueren; den Rest teilen sich oben
+   und unten (iPhone 13 mit Liga-Streifen etwa 40 px). Die Freunde-Zeile verliert ihren Rand unten, damit unten nicht mehr
+   frei bleibt als oben. Passt der Inhalt nicht, schrumpfen die Abstaende auf 0 und der Rumpf scrollt wie bisher. iPhone SE
+   und quer bleiben wie bisher; gemessen in tests/layout-r8.test.mjs (LM). */
+@media (orientation: portrait) and (min-height: 740px) {
+  .online-screen:not(.im-spiel) .on-rumpf:has(> .on-inhalt > .on-tueren) { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  .on-rumpf > .on-meldung { grid-row: 1; }
+  .on-rumpf > .on-inhalt:has(> .on-tueren) { grid-row: 2; display: grid; width: 100%;
+    grid-template-rows: auto minmax(0, 1fr) auto auto minmax(0, 48px) auto minmax(0, 1fr); }
+  .on-inhalt > .seiten-kopf { grid-row: 1; }
+  .on-inhalt > .on-liga { grid-row: 3; }
+  .on-inhalt > .on-tueren { grid-row: 4; }
+  .on-inhalt > .on-freunde { grid-row: 6; margin-bottom: 0; }
+}
+@media (orientation: portrait) and (min-height: 740px) and (max-width: 759px) {
+  .on-inhalt > .on-tueren { grid-template-rows: auto minmax(0, 36px) auto; }   /* + zweimal 12 px Rasterluecke = 60 px */
+  .on-tueren > .on-tuer:first-child { grid-row: 1; }
+  .on-tueren > .on-tuer + .on-tuer { grid-row: 3; }
+}
