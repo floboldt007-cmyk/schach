@@ -180,6 +180,7 @@ async function browserTeil() {
     pruefe('abgemeldet: Satz und „Zum Konto“, Codes offen, keine Server-Anfrage', /Mit einem Konto/.test(text) && /Zum Konto/.test(text)
       && await p.s.locator('details.bl-fr-codes[open]').count() === 1 && !p.anfragen.some((a) => a.url.includes('/rpc/'))
       && await p.s.locator('.bl-steuer-fenster').isHidden(), text);
+    pruefe('abgemeldet: Codes-Kopf nennt „Ohne Konto“', (await p.s.locator('details.bl-fr-codes > summary').innerText()).trim() === 'Ohne Konto: Partie als Code teilen');
     pruefe('abgemeldet: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     await p.k.close();
 
@@ -191,6 +192,9 @@ async function browserTeil() {
       && z[1].du && z[1].av && /Flo \(du\)/.test(z[1].text) && /9 gewertete Partien/.test(z[1].text), z);
     pruefe('Hinweis „Anfragen an dich: 1“, Codes zu, Zeitfenster sichtbar', /Anfragen an dich: 1/.test(await p.s.locator('.bl-fr').innerText())
       && await p.s.locator('details.bl-fr-codes[open]').count() === 0 && await p.s.locator('.bl-steuer-fenster').isVisible());
+    // R8 (13.11.2026): angemeldet steht ueber den zugeklappten Codes kein "Ohne Konto: …" mehr, sondern ein passender Satz
+    const codesKopf = (await p.s.locator('details.bl-fr-codes > summary').innerText()).trim();
+    pruefe('angemeldet: Codes-Kopf ohne „Ohne Konto“, heisst „Partie als Code teilen“', codesKopf === 'Partie als Code teilen', codesKopf);
     const melden = p.anfragen.find((a) => a.url.includes('/rpc/wochenpunkte_melden'));
     const mb = melden && JSON.parse(melden.body);
     pruefe('Wochenwertung gemeldet: Montag dieser Woche, ganze Zahlen', !!mb && /^\d{4}-\d{2}-\d{2}$/.test(mb.woche) && new Date(mb.woche + 'T12:00:00Z').getUTCDay() === 1

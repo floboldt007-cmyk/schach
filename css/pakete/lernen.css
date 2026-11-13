@@ -173,11 +173,10 @@
   .ls-meldung { padding: 12px 14px; gap: 12px; }
   .ls-symbol { width: 38px; height: 38px; }
   /* R6-Befund B9 (12.11.2026): auf dem iPhone SE lag "Los geht's" in 65 von 65 Lektionen unter dem Rand (bis 94 px). Die Knoepfe bleiben am
-     unteren Rand der Flaeche stehen, solange der Rest rollt; passt alles, aendert sich nichts. Der Verlauf deckt Text ab,
-     der darunter weiterrollt. */
-  .ls-aktionen { position: sticky; bottom: 0; z-index: 2; padding-bottom: 10px; background: var(--grund); }
-  .ls-aktionen::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: 12px; pointer-events: none;
-    background: linear-gradient(to bottom, transparent, var(--grund)); }
+     unteren Rand der Flaeche stehen, solange der Rest rollt; passt alles, aendert sich nichts. R8 (13.11.2026): ohne eigenen
+     Grund und ohne Verlauf, der Knopf schwebt mit seinem Schatten ueber der Karte. Ein Band in Seitenfarbe schnitt die
+     Karte sonst mitten durch (Kante und Farbsprung, Bilder R8). */
+  .ls-aktionen { position: sticky; bottom: 0; z-index: 2; padding-bottom: 10px; }
 }
 
 /* ---------- Bereichswahl und Art (Endspiele) ---------- */
