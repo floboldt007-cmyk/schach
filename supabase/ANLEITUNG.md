@@ -537,8 +537,10 @@ nur in Stripe. Taler, Kronen, Liga und Sonderstücke bleiben unberührt.
    einfügen und **Run** drücken. Die Datei darf mehrfach laufen.
 3. Dein Konto eintragen (deine ID steht unter **Authentication → Users**):
    `insert into public.verwalter (user_id) values ('<deine id>');`
-4. `notify pgrst, 'reload schema';` ausführen.
-5. Prüfen: den Inhalt von `supabase/verwaltung-rls-test.sql` ausführen. Am Ende steht „Verwaltung-RLS-Test
+4. `supabase/daten-schema.sql` noch einmal ausführen: Ab dann zeigt die Datenauskunft jedem Konto, was die Verwaltung
+   an ihm geändert hat (Art. 15). Rückweg nur für diesen Teil: `supabase/daten-verwaltung-zurueck.sql`.
+5. `notify pgrst, 'reload schema';` ausführen.
+6. Prüfen: den Inhalt von `supabase/verwaltung-rls-test.sql` ausführen. Am Ende steht „Verwaltung-RLS-Test
    erfolgreich“, und nichts bleibt zurück.
 
 **Was der Server sicherstellt:** Jede Verwaltungsfunktion prüft zuerst, ob das angemeldete Konto in `verwalter` steht.

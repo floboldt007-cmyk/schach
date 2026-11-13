@@ -317,6 +317,7 @@ registriereTexte('einstellungen', {
       + 'karte: deine Erfolgs-Stufen, Taler-Buchungen, Banner und die gewählte Visitenkarte. '
       + 'online_versuche: falsch eingegebene Einladungscodes je Tag. mengenzaehler: wie viele Zeilen dein Konto je Stunde geteilt hat '
       + '(nur Zahlen, für die Mengenbremse, nach 48 Stunden gelöscht). '
+      + 'verwaltung: was der Betreiber über die Verwaltung an deinem Konto geändert hat (Premium, Name, Banner, mit vorher und nachher). '
       + 'geraet: der Spielstand in diesem Browser. noch_nicht_gesendet: geteilte Daten, die noch auf diesem Gerät warten. '
       + 'zustimmung: wann du das Teilen eingeschaltet hast. widerruf_offen: ein Widerruf, der den Server noch nicht erreicht hat.',
     'daten.teilenTitel': 'Crownmate: meine Daten',
@@ -724,6 +725,7 @@ registriereTexte('einstellungen', {
       + 'karte: your achievement tiers, thaler entries, banners and the business card you chose. '
       + 'online_versuche: wrong invitation codes entered per day. mengenzaehler: how many rows your account shared per hour '
       + '(numbers only, for the rate limit, deleted after 48 hours). '
+      + 'verwaltung: what the operator changed on your account through the admin tools (Premium, name, banner, with before and after). '
       + 'geraet: the progress in this browser. noch_nicht_gesendet: shared data that is still waiting on this device. '
       + 'zustimmung: when you turned on sharing. widerruf_offen: a withdrawal of consent that has not reached the server yet.',
     'daten.teilenTitel': 'Crownmate: my data',
