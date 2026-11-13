@@ -46,7 +46,9 @@ try {
   const merke = () => seite.evaluate(() => { window.__altesZ = window.__partie?.z || null; });
   const wartePartie = () => seite.waitForFunction(() => window.__partie?.z?.modus === 'zuzweit' && window.__partie.z !== window.__altesZ);
   const knopf = name => seite.locator(`[data-zz="${name}"]`);
-  async function start(tempo = 'ohne', drehen = false) {
+  // introWarten: eine neue Partie zeigt erst 1 s das Mini-Intro (R8-IntroZuzweit B), die Uhr startet danach; die Pruefungen
+  // beginnen wie ein Mensch nach dem Intro ("reduziert" ist keine Bewegungsstufe, das Intro laeuft hier also)
+  async function start(tempo = 'ohne', drehen = false, introWarten = true) {
     await merke();
     // Flo 08.11.2026: keine Karte mehr unter Lernen, Einstieg ist die Startseite (heim-zuzweit)
     await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();
@@ -59,6 +61,7 @@ try {
     await seite.getByRole('button', { name: 'Los', exact: true }).click();
     if (await seite.getByRole('button', { name: 'Neue Partie', exact: true }).isVisible()) await seite.getByRole('button', { name: 'Neue Partie', exact: true }).click();
     await wartePartie();
+    if (introWarten) await seite.waitForFunction(() => !document.documentElement.dataset.duell, null, { timeout: 4000 });
   }
   async function feld(f) {
     const r = await seite.locator(`.zz-brett .feld[data-feld="${f}"]`).boundingBox();
@@ -272,6 +275,33 @@ try {
   // R8 (L6): Symbol-Knopf wie in der Bot-Partie (js/ui/partie.js), die Ansage nennt weiter das Ziel (B11)
   pruefe('Zurueck-Knopf (B11/L6): Symbol wie in der Bot-Partie, Ansage nennt das Ziel (Start), fuehrt dorthin', !!zk && zk.text === ''
     && zk.label === 'Zurück zum Start' && zk.symbol && ziel === 'heim', { zk, ziel });
+  // R8-IntroZuzweit (Vorbau B): mit Bewegung zeigt eine neue Partie 1 s "Weiss beginnt" (js/ui/duell.js spieleMiniIntro);
+  // die Uhr laeuft erst danach, ein Zug waehrend des Intros beendet es ohne Zeitabzug, Einstellung "aus" zeigt nichts
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'normal', duellIntro: 'besondere' }));
+  await start('15', false, false);
+  const mini = await seite.waitForSelector('.zz-screen .duell-mini', { timeout: 3000 }).then(() => seite.evaluate(() => ({
+    text: document.querySelector('.duell-mini').innerText.replace(/\s+/g, ' ').trim(), html: document.documentElement.dataset.duell }))).catch(() => null);
+  await seite.evaluate(() => { window.__versatz += 5000; });
+  const miniWeg = await seite.waitForFunction(() => !document.querySelector('.duell-mini') && !document.documentElement.dataset.duell, null, { timeout: 4000 }).then(() => true).catch(() => false);
+  const restNach = await seite.evaluate(() => window.__partie.uhr.rest('w'));
+  pruefe('Mini-Intro: "Weiß beginnt / Anna zieht zuerst" ueber dem Brett, verschwindet von selbst, die Uhr zaehlt die Intro-Zeit nicht',
+    !!mini && mini.text === 'Weiß beginnt Anna zieht zuerst' && mini.html === 'laeuft' && miniWeg && restNach > 899000, { mini, miniWeg, restNach });
+  await aufgeben(); await knopf('fertig').click(); await seite.waitForFunction(() => document.documentElement.dataset.screen === 'heim');
+  await seite.evaluate(() => { window.__miniEnde = null; document.addEventListener('duell:fertig', (e) => { window.__miniEnde = e.detail; }); });
+  await start('15', false, false);
+  await seite.waitForSelector('.zz-screen .duell-mini', { timeout: 3000 });
+  await seite.evaluate(() => { window.__versatz += 5000; });
+  await zug('e2e4');
+  const imIntro = await seite.evaluate(() => ({ mini: !!document.querySelector('.duell-mini'), ende: window.__miniEnde, w: window.__partie.uhr.rest('w') }));
+  pruefe('Mini-Intro: ein Zug waehrend des Intros ueberspringt es, Weiss verliert dabei keine Intro-Zeit (15 min + 10 s Zuschlag)',
+    !imIntro.mini && imIntro.ende?.art === 'mini' && imIntro.ende.uebersprungen === true && imIntro.w > 909000, imIntro);
+  await aufgeben(); await knopf('fertig').click(); await seite.waitForFunction(() => document.documentElement.dataset.screen === 'heim');
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ duellIntro: 'aus' }));
+  await start('15');
+  await seite.waitForTimeout(400);
+  const aus = await seite.evaluate(() => ({ mini: !!document.querySelector('.duell-mini'), html: document.documentElement.dataset.duell || null }));
+  pruefe('Mini-Intro: Einstellung Duell-Intro "aus" zeigt keins', !aus.mini && !aus.html, aus);
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'reduziert', duellIntro: 'besondere' }));
   pruefe('Keine Konsolen- oder Seitenfehler', fehler.length === 0, fehler);
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
 finally { await kontext?.close(); await browser?.close(); await new Promise(r => server.close(r)); }
