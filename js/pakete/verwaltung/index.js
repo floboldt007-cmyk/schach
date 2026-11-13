@@ -146,5 +146,6 @@ export function verwaltungGruppe() {
 try {
   anbieten('einstellungen:gruppen', verwaltungGruppe, { reihenfolge: 8, paket: 'verwaltung' });
 } catch (e) {
+  // INTENTIONAL-SLOP[F2]: ein Paket haelt die App nie an (js/erweiterungen.js), die Konsole ist der Meldeweg
   console.error('Paket verwaltung nicht eingehaengt', e);
 }

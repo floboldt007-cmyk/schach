@@ -56,6 +56,7 @@ async function rpc(name, daten = {}) {
     const f = new Error(V('f.offline')); f.offline = true; throw f;
   }
   let d = null;
+  // INTENTIONAL-SLOP[F1]: leere oder kaputte Antwort heisst d = null; den Fehler meldet danach r.ok mit Status
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leer */ } }
   if (!r.ok) throw fehlerAus(d, r.status);
   return d;
