@@ -436,9 +436,9 @@ for (const [geraet, je] of Object.entries(ergebnisse)) {
     pruefe(`${geraet} ${NAME[a]}: Ablauf ohne Abbruch, Brett gemessen`, lauf, m);
     if (!lauf || !botOk) { zeilen.push({ geraet, a, m, abw: ['nicht gemessen'] }); continue; }
     const abw = [];
-    // R8 (13.11.2026): Online-Partie und Zu zweit sind angeglichen, ihre Gleichheits-Punkte zaehlen jetzt immer (FEHLER statt
-    // ROT-ERWARTET). Offen bleibt nur das Duell-Intro vor Zu zweit (zwei Menschen am selben Geraet, Geschmacksfrage).
-    const gezogen = (name) => (a === 'online' || a === 'zuzweit') && !(a === 'zuzweit' && name.startsWith('Duell-Intro'));
+    // R8 (13.11.2026): Online-Partie, Zu zweit und Raetsel-Duell sind angeglichen, ihre Gleichheits-Punkte zaehlen jetzt immer
+    // (FEHLER statt ROT-ERWARTET). Offen bleibt nur das Duell-Intro vor Zu zweit (zwei Menschen am selben Geraet, Geschmacksfrage).
+    const gezogen = (name) => (a === 'online' || a === 'zuzweit' || a === 'duell') && !(a === 'zuzweit' && name.startsWith('Duell-Intro'));
     const hart = (name, gut, detail) => { if (!pruefe(`${geraet} ${NAME[a]}: ${name}`, gut, detail, { hart: !gezogen(name) })) abw.push(name); };
     pruefe(`${geraet} ${NAME[a]}: Gegenprobe Brett (Feldraster ${m.brett} px gegen .brett-felder ${m.brettRaster} px)`, m.brettRaster != null && Math.abs(m.brett - m.brettRaster) <= 1, m);
     const anders = KNOEPFE[a].anders || {};
