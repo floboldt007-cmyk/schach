@@ -345,7 +345,8 @@ try {
   { // 9. Erstanmeldung mit Google (Rueckkehr #konto#access_token=...): neues Konto -> Hinweis, bestehendes Konto -> Name vorbelegt
     const GOOGLE = `${BASIS}#konto#access_token=${TOKEN}&expires_at=9999999999&expires_in=3600&refresh_token=r1&token_type=bearer&provider_token=g`;
     for (const profil of [null, { user_id: 'u1', benutzername: 'Flo_Test' }]) {
-      const { k, zustand } = await speicher({ lokal: OHNE_HINWEIS, cloud: null, profil });
+      const lokal = profil ? OHNE_HINWEIS : { ...OHNE_HINWEIS, 'schach-arena:v1:partien': partienJson(2, 'neu-') };
+      const { k, zustand } = await speicher({ lokal, cloud: null, profil });
       const s = await seite(k, zustand, GOOGLE);
       await s.waitForTimeout(2500);
       const wer = profil ? 'bestehendes Konto' : 'neues Konto';
@@ -355,7 +356,12 @@ try {
         { hash: await s.evaluate(() => location.hash), fehler: zustand.fehler, dialog: await dialogTitel(s) });
       if (profil) pruefe('Google (bestehendes Konto): Namensfeld mit „Flo_Test“ vorbelegt, kein Hinweis', (await nameFeld(s)) === 'Flo_Test' && (await nameHinweis(s)) === '',
         { feld: await nameFeld(s), hinweis: await nameHinweis(s) });
-      else pruefe('Google (neues Konto): Hinweis „Benutzernamen wählen“', /Benutzernamen/.test(await nameHinweis(s)), await nameHinweis(s));
+      else {
+        pruefe('Google (neues Konto): Hinweis „Benutzernamen wählen“', /Benutzernamen/.test(await nameHinweis(s)), await nameHinweis(s));
+        pruefe('Google (neues Konto): Gerätestand (2 Partien) in die leere Cloud hochgeladen, Riegel offen',
+          zustand.uploads.length >= 1 && JSON.parse(zustand.cloud?.stand?.['schach-arena:v1:partien'] || '[]').length === 2
+            && (await s.evaluate(() => localStorage.getItem('schach-arena:konto:abgeglichen'))) === 'u1', { uploads: zustand.uploads.length });
+      }
       await k.close();
     }
   }
@@ -374,13 +380,12 @@ try {
       zustand.otpAntwort = grenze; st = await sendeCode(s);
       pruefe(`[${sprache}] Code, Mail-Grenze (429): gleich nochmal oder Google`,
         (sprache === 'de' ? /gleich noch einmal.*Google/ : /again in a moment.*Google/).test(st.text) && st.fehler === 'ja' && !/rate limit/i.test(st.text), st);
-      if (sprache === 'de') {
-        zustand.otpAntwort = null;
-        zustand.verifyAntwort = { status: 403, body: { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' } };
-        await meldeMitCodeAn(s, '000000'); st = await status(s);
-        pruefe('[de] Falscher oder abgelaufener Code: ein klarer Text als Fehler, nicht angemeldet',
-          /stimmt nicht oder ist abgelaufen/.test(st.text) && st.fehler === 'ja' && (await s.evaluate(() => localStorage.getItem('schach-arena:konto:sitzung'))) === null, st);
-      }
+      zustand.otpAntwort = null;
+      zustand.verifyAntwort = { status: 403, body: { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' } };
+      await meldeMitCodeAn(s, '000000'); st = await status(s);
+      pruefe(`[${sprache}] Falscher oder abgelaufener Code: ein klarer Text als Fehler, nicht angemeldet`,
+        (sprache === 'de' ? /stimmt nicht oder ist abgelaufen/ : /wrong or has expired/).test(st.text) && st.fehler === 'ja'
+          && !/Token has expired/.test(st.text) && (await s.evaluate(() => localStorage.getItem('schach-arena:konto:sitzung'))) === null, st);
       pruefe(`[${sprache}] Texte: keine Seitenfehler`, zustand.fehler.length === 0, zustand.fehler);
       await k.close();
     }

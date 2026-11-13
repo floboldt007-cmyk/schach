@@ -7,6 +7,7 @@ import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudSta
   SYNC_SCHLUESSEL, VERDRAENGT_SCHLUESSEL, synchronisiere, standHash, verdraengterStand, holeVerdraengtZurueck, gemerkterStand, cloudStand,
  } from '../js/konto.js';
 import { SUPABASE_URL } from '../js/konto-config.js';
+import { setzeSprache } from '../js/sprache.js';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') { gesamt++; if (wert) ok++; else console.error('FEHLER ' + name, extra); }
@@ -125,6 +126,18 @@ for (const kennung of ['toString', '__proto__', 'constructor']) {
 mitAntwort(429, { msg: 'Too many requests' });
 serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
 pruefe('429 ohne Kennung: Text "Zu viele Versuche" statt Serverfehler', /Zu viele Versuche/.test(serverFehler), serverFehler);
+// Kaltreview 13.11. (K2): dieselben Faelle auf Englisch, nie der Server-Text
+setzeSprache('en');
+for (const [name, status, body, fn, muster] of [
+  ['falscher Code', 403, { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' }, () => pruefeCode('a@b.de', '123456'), /wrong or has expired/],
+  ['signup_disabled', 422, { code: 422, error_code: 'signup_disabled', msg: 'Signups not allowed for this instance' }, () => fordereCodeAn('a@b.de'), /not open yet/],
+  ['429 Mail-Grenze', 429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' }, () => fordereCodeAn('a@b.de'), /again in a moment.*Google/],
+]) {
+  mitAntwort(status, body);
+  serverFehler = ''; try { await fn(); } catch (e) { serverFehler = e.message; }
+  pruefe(`[en] ${name}: englischer Text, kein Server-Text`, muster.test(serverFehler) && !serverFehler.includes(body.msg), serverFehler);
+}
+setzeSprache('de');
 localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
 mitAntwort(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' });
 serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
