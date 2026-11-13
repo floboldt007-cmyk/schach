@@ -61,7 +61,10 @@ const KNOEPFE = {
   online: { erwartet: ['aufgeben', 'remis'], ohne: { hinweis: 'gewollt: "kein bester Zug" (js/ui/online.js:426)' } },
   duell: { erwartet: [], ohne: { aufgeben: 'annahme: Zeitrennen, endet ueber die Uhr', remis: 'annahme: kein Gegner am Brett', hinweis: 'annahme: Hilfe waere Betrug im Wettlauf' } },
   zuzweit: { erwartet: ['aufgeben', 'remis'], ohne: { hinweis: 'annahme: zwei Menschen, kein Trainer' } },
-  lektion: { erwartet: ['hinweis'], ohne: { aufgeben: 'annahme: Lektion hat Neu starten statt Aufgeben', remis: 'annahme: Uebung ohne Gegner' } },
+  lektion: { erwartet: ['hinweis'], ohne: { aufgeben: 'annahme: Lektion hat Neu starten statt Aufgeben', remis: 'annahme: Uebung ohne Gegner' },
+    // R8 (13.11.2026): was die Lektion bewusst anders macht, wird nicht gegen die Bot-Partie gemessen, sondern genannt
+    anders: { leisten: 'gewollt: Uebung ohne Gegner und ohne Uhr, Name und Ziel stehen in der Karte (js/ui/lektion.js .ls-status)',
+      intro: 'gewollt: statt des Duell-Intros die Idee-Phase mit dem Knopf Los geht (js/ui/lektion.js phase intro)' } },
 };
 
 let ok = 0, gesamt = 0, rotErwartet = 0;
@@ -368,13 +371,16 @@ for (const [geraet, je] of Object.entries(ergebnisse)) {
     const abw = [];
     const hart = (name, gut, detail) => { if (!pruefe(`${geraet} ${NAME[a]}: ${name}`, gut, detail, { hart: true })) abw.push(name); };
     pruefe(`${geraet} ${NAME[a]}: Gegenprobe Brett (Feldraster ${m.brett} px gegen .brett-felder ${m.brettRaster} px)`, m.brettRaster != null && Math.abs(m.brett - m.brettRaster) <= 1, m);
+    const anders = KNOEPFE[a].anders || {};
     if (a !== 'bot') {
       hart(`Brett mindestens so gross wie in der Bot-Partie (${m.brett} gegen ${bot.brett} px, Toleranz ${TOLERANZ_PX} px)`, m.brett >= bot.brett - TOLERANZ_PX, { brett: m.brett, bot: bot.brett });
-      hart(`Leisten wie in der Bot-Partie (${leistenMuster(m) || 'keine'} gegen ${leistenMuster(bot)})`, leistenMuster(m) === leistenMuster(bot), m.leisten);
-      hart(`Duell-Intro wie in der Bot-Partie (${m.intro ? 'ja' : 'nein'} gegen ${bot.intro ? 'ja' : 'nein'})`, m.intro === bot.intro, { intro: m.intro, ideePhase: m.ideePhase });
+      if (anders.leisten) pruefe(`${geraet} ${NAME[a]}: keine Spielerleisten (${anders.leisten})`, m.leisten.length === 0, m.leisten);
+      else hart(`Leisten wie in der Bot-Partie (${leistenMuster(m) || 'keine'} gegen ${leistenMuster(bot)})`, leistenMuster(m) === leistenMuster(bot), m.leisten);
+      if (anders.intro) pruefe(`${geraet} ${NAME[a]}: Idee-Phase statt Duell-Intro (${anders.intro})`, m.ideePhase === true && !m.intro, { intro: m.intro, ideePhase: m.ideePhase });
+      else hart(`Duell-Intro wie in der Bot-Partie (${m.intro ? 'ja' : 'nein'} gegen ${bot.intro ? 'ja' : 'nein'})`, m.intro === bot.intro, { intro: m.intro, ideePhase: m.ideePhase });
     }
     const ohneName = m.leisten.filter((l) => !l.name || !l.avatar);
-    hart('jede Leiste mit Name und Avatar', m.leisten.length > 0 && ohneName.length === 0, m.leisten);
+    if (!anders.leisten) hart('jede Leiste mit Name und Avatar', m.leisten.length > 0 && ohneName.length === 0, m.leisten);
     hart('Leisten ganz im Fenster', m.leisten.every((l) => l.imBild), m.leisten);
     for (const kn of KNOEPFE[a].erwartet) hart(`Knopf ${kn} sichtbar ohne Scrollen`, m.knoepfe[kn].da && m.knoepfe[kn].imBild && !m.seiteScrollt, { knopf: m.knoepfe[kn], seiteScrollt: m.seiteScrollt });
     hart('Ergebnis am Ende sichtbar', m.ergebnis === true, m.ergebnis);
