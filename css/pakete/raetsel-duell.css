@@ -150,6 +150,18 @@ html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: s
 .rd-reihe li[data-art="r"] { background: var(--warn); }
 
 /* Querformat (iPad quer, PC, Handy quer): Brett links ueber die ganze Hoehe, rechts die Spalte wie bei der Partie */
+/* hohe Handys (iPhone 13 und groesser, ab 800 px) wie die Bot-Partie (css/partie.css, Feinschliff R8 LG3): das Brett hat
+   schon die volle Breite, ueber und unter der Spalte blieben 85 und 93 px leer (Kritik R8, LG5). Leisten, Zeile und Reihe
+   werden groesser, die Luecken etwas weiter; --rd-reserve rechnet die neuen Hoehen mit, damit das Brett nie schrumpft */
+@media (orientation: portrait) and (max-width: 600px) and (min-height: 800px) {
+  .rd-spiel { row-gap: 18px; --rd-reserve: calc(2 * 82px + 56px + 12px + 4 * 18px); }
+  .rd-seite { --av: 56px; min-height: 82px; border-radius: 22px; }
+  .rd-seite > .av { border-radius: 17px; }
+  .rd-seite .rd-uhr { height: 54px; min-width: 92px; }
+  .rd-geloest { font-size: 32px; }
+  .rd-zeile { min-height: 56px; font-size: 15.5px; }
+  .rd-spiel .rd-reihe li { height: 12px; }
+}
 @media (orientation: landscape) {
   .raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) .rd-rumpf {
     padding: 12px clamp(12px, 2.5vw, 24px) calc(12px + env(safe-area-inset-bottom, 0px)); }
