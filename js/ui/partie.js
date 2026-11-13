@@ -2118,7 +2118,8 @@ export function zeige(root, params, app) {
     });
     // Sieg-Blatt (Flo 09.11., Variante C): Sterne und darunter der Level-Fortschritt; Punkte und Wertung
     // blendet css/ergebnis.css aus, ein Verweis fuehrt in die Liga. Nur bei wertenden Partien, sonst gibt es dort nichts.
-    if (ergebnis === 'sieg' && wertend) {
+    // Das Niederlage-Blatt verweist ebenso in die Liga, statt die Zahlen zu zeigen (R7 Ergebnis A, 13.11.2026).
+    if ((ergebnis === 'sieg' || ergebnis === 'niederlage') && wertend) {
       const verweis = document.createElement('button');
       verweis.type = 'button';
       verweis.className = 'erg-liga-verweis';
@@ -2196,13 +2197,29 @@ export function zeige(root, params, app) {
     // ---------- Ort ergebnis:karte (bei jedem fuelle neu) ----------
     const karteOrtEl = o.querySelector('.erg-karte-ort');
     let karteOrt = null;
+    // W3 R12: "Freund herausfordern" teilt nach einem Sieg den Link zur Bot-Herausforderung. R14-G2: der Ort bekommt die
+    // Handlung als herausfordern { text, teile }; ein Paket, das daraus mit dem Siegesbild EINEN Knopf "Teilen …" macht,
+    // markiert ihn mit data-mit-freund, dann entfaellt der eigene Knopf (fuelle unten)
+    const herausfordern = ergebnis === 'sieg' ? Object.freeze({
+      text: t('partie.erg.freundHerausfordern'),
+      teile() {
+        const url = new URL(location.href);
+        url.search = new URLSearchParams({ bot: bot.id }).toString();
+        url.hash = '';
+        const text = t('partie.erg.freundHerausfordern');
+        if (navigator.share) navigator.share({ title: 'Crownmate', text, url: url.href }).catch(() => {});
+        else navigator.clipboard?.writeText(url.href).catch(() => {});
+      },
+    }) : null;
     function fuelleKarte(erg, review, rechnet, nachtrag, wertet) {
       if (karteOrt) karteOrt.verlasse();
       karteOrt = fuelle('ergebnis:karte', karteOrtEl, {
         app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus: z.modus, ziel: z.ziel,
-        boss: z.boss ? Object.freeze({ ...z.boss }) : null,
+        boss: z.boss ? Object.freeze({ ...z.boss }) : null, herausfordern,
       });
       karteOrtEl.hidden = karteOrt.anzahl === 0;
+      // teilt ein Paket den Freund-Link schon mit (auch erst nach dem Nachtrag), steht er nicht doppelt im Blatt
+      if (karteOrtEl.querySelector('[data-mit-freund]')) o.querySelector('.erg-freund')?.remove();
       return karteOrt.anzahl;
     }
 
@@ -2346,20 +2363,14 @@ export function zeige(root, params, app) {
           // Flo 30.10. abends: "mich stoert, dass ich nicht von da aus direkt zur Lobby kann (Startseite)"
           const lobby = o.querySelector('.erg-lobby');
           if (lobby) { lobby.hidden = false; lobby.onclick = () => app.gehe('arena'); }
-          // W3 R12: "Freund herausfordern" – nach Sieg den Link zur Bot-Herausforderung teilen
-          if (ergebnis === 'sieg' && !o.querySelector('.erg-freund')) {
+          // W3 R12: "Freund herausfordern" als eigener Knopf nur, wenn kein Paket ihn in "Teilen …" mitfuehrt (R14-G2:
+          // ohne Siegesbild, etwa in der Uebung, bleibt es ein direkter Knopf)
+          if (herausfordern && !o.querySelector('.erg-freund') && !karteOrtEl.querySelector('[data-mit-freund]')) {
             const freundBtn = document.createElement('button');
             freundBtn.type = 'button';
             freundBtn.className = 'knopf erg-freund';
-            freundBtn.innerHTML = `${icon('teilen')} <span>${esc(t('partie.erg.freundHerausfordern'))}</span>`;
-            freundBtn.addEventListener('click', () => {
-              const url = new URL(location.href);
-              url.search = new URLSearchParams({ bot: bot.id }).toString();
-              url.hash = '';
-              const text = t('partie.erg.freundHerausfordern');
-              if (navigator.share) navigator.share({ title: 'Crownmate', text, url: url.href }).catch(() => {});
-              else navigator.clipboard?.writeText(url.href).catch(() => {});
-            });
+            freundBtn.innerHTML = `${icon('teilen')} <span>${esc(herausfordern.text)}</span>`;
+            freundBtn.addEventListener('click', () => herausfordern.teile());
             o.querySelector('.erg-aktionen').prepend(freundBtn);
           }
           // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.

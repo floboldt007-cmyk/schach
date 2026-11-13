@@ -380,6 +380,18 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
       fokus: document.activeElement?.classList.contains('rd-nochmal') }));
     pruefe('Ende: Gewonnen 3 zu 2, +20 Kronen, Fokus auf Nochmal', ende.erg === 'sieg' && ende.titel === 'Gewonnen' && ende.stand === '3 zu 2 gelöst'
       && ende.kronen === '+20 Kronen' && ende.fokus, ende);
+    // R7 Duellknopf A (13.11.): "Nochmal" startet dieselbe Suche wie "Gegner suchen" und traegt dessen Farbe (Akzent)
+    const nochmalFarbe = await s.evaluate(() => {
+      const n = document.querySelector('.rd-ende .rd-nochmal');
+      const probe = document.createElement('button');
+      probe.className = 'rd-los dr rd-suchen';
+      n.parentElement.append(probe);
+      const f = (e) => { const st = getComputedStyle(e); return st.backgroundColor + ' / ' + st.color; };
+      const erg = { nochmal: f(n), suchen: f(probe) };
+      probe.remove();
+      return erg;
+    });
+    pruefe('Ende: Nochmal in der Farbe des Suchknopfs', nochmalFarbe.nochmal === nochmalFarbe.suchen, nochmalFarbe);
     const g2 = await geometrie(s);
     pruefe('Ende: nichts breiter, Tippflaechen ab 44 px', g2.breit && g2.klein.length === 0, g2);
     await bild(s, bildName(geraet, schema, '4-ende'));
