@@ -183,11 +183,21 @@
 @media (max-width: 560px) and (orientation: portrait) and (max-height: 720px) {
   .heim-screen .heim-rumpf, .heim-links, .heim-rechts { gap: var(--a2); }
   .heim-modus { flex-direction: row; align-items: center; gap: 6px; padding: 6px 8px; min-height: 48px; }
+  /* LG2 A (Feinschliff R8): der Serien-Chip rechts neben dem Gruss statt als eigene Zeile unter dem Kopf; der Kopf der
+     Startseite traegt nur diesen Chip, sein Chip-Platz faellt hier weg */
+  .screen.heim-screen .haupt-kopf .kopf-chips { display: none; }
+  .heim-gruss { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: center; }
+  .heim-gruss h1 { grid-column: 1 / -1; }
+  .heim-serie-gruss { display: inline-flex; grid-column: 2; grid-row: 1; justify-self: end; }
+}
+/* sonst steht der Serien-Chip im Kopf */
+@media not all and (max-width: 560px) and (orientation: portrait) and (max-height: 720px) {
+  .heim-serie-gruss { display: none; }
 }
 /* iPhone SE: Gruss eine Zeile, ohne Spielweise des Bots */
 @media (max-width: 560px) and (orientation: portrait) and (max-height: 620px) {
   .heim-gruss small { display: none; }
-  .heim-gruss h1 { margin-top: 0; font-size: 20px; }
+  .heim-gruss h1 { margin-top: 0; font-size: 20px; grid-column: 1; grid-row: 1; }
   .heim-spielweise { display: none; }
   .heim-symbol { width: 28px; height: 28px; border-radius: 9px; }
   .heim-symbol svg { width: 16px; height: 16px; }

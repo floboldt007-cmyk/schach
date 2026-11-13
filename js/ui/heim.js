@@ -409,16 +409,18 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
   const partie = !!(laufend && st);
   const bot = partie ? null : naechsterGegner();
   const tage = serieTage(jetzt);
-  const chips = tage > 0
-    ? `<span class="chip zahl heim-serie" title="${esc(t('heim.serieTitel', { n: tage }))}"><i class="heim-punkt" aria-hidden="true"></i>${esc(t('heim.serie', { n: tage }))}</span>`
-    : '';
+  // der Serien-Chip steht im Kopf; auf kurzen Handys zeigt css/heim.css stattdessen den zweiten neben dem Gruss (LG2 A)
+  const serieChip = (extra = '') => (tage > 0
+    ? `<span class="chip zahl heim-serie${extra}" title="${esc(t('heim.serieTitel', { n: tage }))}"><i class="heim-punkt" aria-hidden="true"></i>${esc(t('heim.serie', { n: tage }))}</span>`
+    : '');
+  const chips = serieChip();
   const s = document.createElement('section');
   s.className = 'screen heim-screen';
   s.setAttribute('aria-label', t('heim.aria'));
   s.innerHTML = `${hauptKopf({ titelElement: 'div', premium: true, klang: false, chips })}
     <div class="heim-rumpf">
       <div class="heim-links">
-        <div class="heim-gruss"><small>${esc(gruss(jetzt))}</small><h1>${esc(t(partie ? 'heim.titel.partie' : 'heim.titel.leer'))}</h1></div>
+        <div class="heim-gruss"><small>${esc(gruss(jetzt))}</small>${serieChip(' heim-serie-gruss')}<h1>${esc(t(partie ? 'heim.titel.partie' : 'heim.titel.leer'))}</h1></div>
         <div class="heim-buehne" data-art="${partie ? 'partie' : 'gegner'}">${partie ? buehnePartie(laufend, st) : buehneGegner(bot)}</div>
         ${partie ? '' : leiterZeile(bot)}
       </div>
