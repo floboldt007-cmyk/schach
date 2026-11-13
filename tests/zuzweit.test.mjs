@@ -176,15 +176,52 @@ try {
   await seite.getByRole('button', { name: 'Weiterspielen', exact: true }).click();
   pruefe('Remis abgelehnt: Partie laeuft weiter', await seite.evaluate(() => window.__partie.phase() === 'spiel'));
   await knopf('remis').click(); await seite.getByRole('button', { name: 'Annehmen', exact: true }).click();
+  await seite.locator('.zz-ergebnis:not([hidden])').waitFor();
   pruefe('Remis angenommen, Ergebnis ohne Sterne', (await seite.locator('.zz-ergebnis').innerText()).startsWith('Remis') && !(await seite.locator('.zz-ergebnis').innerText()).includes('Stern'));
-  // R6-Befund B11: auch die Knoepfe nach der Partie tragen Symbole wie die Bot-Partie
-  const endeKnoepfe = await seite.evaluate(() => [...document.querySelectorAll('.zz-ergebnis .zz-aktionen button')].map((b) => b.dataset.zz + ':' + !!b.querySelector('svg')));
-  pruefe('Knoepfe nach der Partie (B11): Analyse, Revanche, Fertig mit Symbol', endeKnoepfe.join() === 'analyse:true,revanche:true,fertig:true', endeKnoepfe);
+  // R9 (13.11.2026): das Ende ist das Ergebnisblatt der Bot-Partie (css/ergebnis.css, gebaut wie baueBlatt in
+  // js/ui/lektion.js): Schleier ueber dem Screen, Fokus in der Karte, der Screen dahinter inert, Karte 540 px breit.
+  // Knoepfe mit Symbol wie die Bot-Partie (B11).
+  const blattInfo = await seite.evaluate(() => {
+    const o = document.querySelector('.zz-screen > .ergebnis-overlay'), k = o?.querySelector('.ergebnis-karte');
+    return { da: !!o && !o.hidden && o.classList.contains('remis'), dialog: o?.getAttribute('role') === 'dialog' && o?.getAttribute('aria-modal') === 'true',
+      karteZz: !!k?.classList.contains('zz-ergebnis'), fokus: !!k && document.activeElement === k, breite: k ? k.offsetWidth : 0, // ohne die Feder-Animation der Karte (transform)
+      inert: [...document.querySelector('.zz-screen').children].filter((e) => e !== o).every((e) => e.inert),
+      knoepfe: [...(o?.querySelectorAll('.erg-knoepfe button') || [])].map((b) => b.dataset.zz + ':' + !!b.querySelector('svg')).join(),
+      primaer: o?.querySelector('.erg-knoepfe .primaer')?.dataset.zz, lobby: o?.querySelector('.erg-lobby')?.dataset.zz,
+      spalte: [...document.querySelectorAll('.zz-spielbereich > .zz-aktionen button')].map((b) => b.dataset.zz).join() };
+  });
+  pruefe('Ergebnisblatt wie Bot-Partie (R9): Schleier als Dialog, Fokus in der Karte, Screen dahinter inert, Karte 540 px',
+    blattInfo.da && blattInfo.dialog && blattInfo.karteZz && blattInfo.fokus && blattInfo.inert && blattInfo.breite === 540, blattInfo);
+  pruefe('Knoepfe im Blatt (R9/B11): Nochmal vorne, Revanche, Analyse mit Symbol, darunter der Weg zum Start; in der Spalte nur "Ergebnis"',
+    blattInfo.knoepfe === 'nochmal:true,revanche:true,analyse:true' && blattInfo.primaer === 'nochmal' && blattInfo.lobby === 'fertig' && blattInfo.spalte === 'ergebnis', blattInfo);
+  // Tab kreist im Blatt (der Screen dahinter ist inert)
+  for (let i = 0; i < 7; i++) await seite.keyboard.press('Tab');
+  pruefe('Tab bleibt im Ergebnisblatt', await seite.evaluate(() => !!document.activeElement?.closest('.zz-screen > .ergebnis-overlay')));
+  const blattZu = () => seite.evaluate(() => ({ zu: document.querySelector('.zz-screen > .ergebnis-overlay').hidden,
+    inert: [...document.querySelector('.zz-screen').children].some((e) => e.inert), fokus: document.activeElement?.dataset.zz || null }));
+  await seite.keyboard.press('Escape');
+  const nachEsc = await blattZu();
+  pruefe('Escape zeigt das Brett, der Fokus liegt auf "Ergebnis"', nachEsc.zu && !nachEsc.inert && nachEsc.fokus === 'ergebnis', nachEsc);
+  const blattOffen = () => seite.evaluate(() => { const o = document.querySelector('.zz-screen > .ergebnis-overlay');
+    return !o.hidden && document.activeElement === o.querySelector('.ergebnis-karte'); });
+  await knopf('ergebnis').click();
+  pruefe('"Ergebnis" holt das Blatt zurueck, Fokus wieder in der Karte', await blattOffen());
+  await seite.locator('.zz-screen .erg-zu').click();
+  const nachAuge = await blattZu();
+  pruefe('Das Auge im Blatt zeigt das Brett wie Escape', nachAuge.zu && !nachAuge.inert && nachAuge.fokus === 'ergebnis', nachAuge);
+  await knopf('ergebnis').click();
+  pruefe('Blatt wieder offen', await blattOffen());
   pruefe('Keine Wertung oder Freischaltung', await seite.evaluate(v => localStorage.getItem('schach-arena:v1:fortschritt') === v, fortschritt));
   await merke(); await knopf('revanche').click(); await wartePartie();
   pruefe('Revanche tauscht Namen und startet leeres Brett', await seite.evaluate(() => window.__partie.z.zuzweit.weiss === 'Ben' && window.__partie.z.zuzweit.schwarz === 'Anna' && !window.__partie.z.zuege.length));
   await aufgeben();
   pruefe('Aufgabe der Seite am Zug: benannter Sieger', (await seite.locator('.zz-ergebnis h3').innerText()) === 'Anna gewinnt');
+  pruefe('Ein Sieg zeigt das Blatt im Sieg-Look mit dem Grund', await seite.evaluate(() => document.querySelector('.zz-screen > .ergebnis-overlay').classList.contains('sieg')
+    && document.querySelector('.zz-ergebnis .erg-unter').textContent.trim() !== ''));
+  // R9: "Nochmal" startet mit denselben Namen (Revanche tauscht sie, siehe oben)
+  await merke(); await knopf('nochmal').click(); await wartePartie();
+  pruefe('Nochmal behaelt die Namen und startet ein leeres Brett', await seite.evaluate(() => window.__partie.z.zuzweit.weiss === 'Ben'
+    && window.__partie.z.zuzweit.schwarz === 'Anna' && !window.__partie.z.zuege.length));
   await start('15', true);
   await seite.evaluate(() => { window.__versatz += 2500; });
   await zug('d2d4');
