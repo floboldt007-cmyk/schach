@@ -364,11 +364,18 @@ async function erfinderTeil(browser) {
       neben: [...o.querySelectorAll('.erg-knoepfe .knopf:not(.primaer)')].map((b) => b.dataset.a).join(),
       lobby: o.querySelector('.erg-lobby')?.dataset.a || null, fokus: !!k && k.contains(document.activeElement),
       inert: [...document.querySelector('.ls-screen').children].filter((e) => e !== o).every((e) => e.inert),
-      breite: k ? Math.round(k.getBoundingClientRect().width) : 0 };
+      breite: k ? Math.round(k.getBoundingClientRect().width) : 0,
+      // R8 Texte: Weg "Zur Meisterschule" mit dem Haus der Bot-Partie (icons.js haus), Zeile aus Zuegen und Hinweisen
+      lobbyText: (o.querySelector('.erg-lobby')?.textContent || '').trim(),
+      haus: /M4 11\.5 12 5l8 6\.5/.test(o.querySelector('.erg-lobby svg')?.innerHTML || ''),
+      zeile: (() => { const z = o.querySelector('.ls-erg-zeile'); if (!z) return null;
+        return { text: z.textContent.trim(), eineZeile: z.scrollWidth <= z.clientWidth + 1 && z.getClientRects().length === 1 }; })() };
   });
   pruefe('Ergebnisblatt wie in der Bot-Partie: „Matt!“, drei Sterne, Hauptknopf „Nächste Lektion“, „Nochmal“, Weg zur Übersicht',
     lsBlatt.da && lsBlatt.sieg && lsBlatt.dialog && lsBlatt.wort === 'Matt!' && lsBlatt.sterne === 3 && lsBlatt.haupt === 'weiter'
     && lsBlatt.neben === 'nochmal' && lsBlatt.lobby === 'uebersicht' && lsBlatt.fokus && lsBlatt.inert, lsBlatt);
+  pruefe('Ergebnisblatt: Weg „Zur Meisterschule“ mit dem Haus der Bot-Partie, unter den Sternen „In 1 Zug · ohne Hinweis“ in einer Zeile',
+    lsBlatt.lobbyText === 'Zur Meisterschule' && lsBlatt.haus && !!lsBlatt.zeile && lsBlatt.zeile.text === 'In 1 Zug · ohne Hinweis' && lsBlatt.zeile.eineZeile, lsBlatt);
   // Auge zeigt das Brett, "Ergebnis" holt das Blatt zurueck (wie in der Bot-Partie)
   await p.s.locator('.ls-screen > .ergebnis-overlay .erg-zu').click();
   const brettSicht = await p.s.evaluate(() => ({ zu: document.querySelector('.ls-screen > .ergebnis-overlay')?.hidden === true,
@@ -544,6 +551,9 @@ async function erfinderTeil(browser) {
   pruefe('Zeig sie mir: geschafft mit einem Stern, „Züge gelernt!“, weiter mit „Ohne Hilfe spielen“', z.sterne === 1
     && /Züge gelernt!/.test(await p.s.locator('.ls-meldung').innerText()) && /Ohne Hilfe spielen/.test(await p.s.locator('.ergebnis-overlay [data-a="los"].primaer').innerText())
     && await p.s.locator('.ergebnis-overlay .erg-stern.an').count() === 1, z);
+  // R8 Texte: bei Eroeffnungen zaehlen auch die Fehler (sterneFolge), deshalb stehen sie mit in der Zeile
+  const folgeZeile = (await p.s.locator('.ergebnis-overlay .ls-erg-zeile').textContent().catch(() => '')).trim();
+  pruefe('Zeig sie mir: Zeile unter dem Stern „In 4 Zügen · 1 Fehler · ohne Hinweis“', folgeZeile === 'In 4 Zügen · 1 Fehler · ohne Hinweis', { folgeZeile, z });
   await p.s.locator('.ergebnis-overlay [data-a="los"]').click();
   await warteLz(p.s, "z.phase === 'flo' && z.modus === 'selbst'");
   pruefe('Ohne Hilfe: kein Pfeil, Hinweis-Knopf wieder da', await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() === 0

@@ -168,13 +168,21 @@ export function zeige(root, params, app) {
     + `${k.icon ? icon(k.icon) + ' ' : ''}${esc(k.text)}${k.vor ? ' ' + icon('vor') : ''}</button>`;
   // art 'sieg' (geschafft, mit Sternen) oder 'niederlage' (gescheitert, ruhig); liste wie bei knoepfe(), "uebersicht" wird
   // zum Weg unter den Knoepfen (wie "Zu den Bots")
-  function baueBlatt(art, kopfText, text, liste, sternZahl) {
+  // Zeile unter den Sternen wie die Zeilen unter den Sternen der Bot-Partie: woraus die Sterne entstehen (Zuege, bei
+  // Eroeffnungen auch Fehler, und Hinweise; js/pakete/lernen/mattbilder.js sterne, sterneFolge)
+  function zeileText() {
+    const zahl = (n, eins, viele, null_) => (n === 0 && null_ ? S(null_) : n === 1 ? S(eins) : S(viele, { n }));
+    return [zahl(st.zuege, 'erg.zugEins', 'erg.zuege'),
+      ...(folge ? [zahl(st.fehler, 'erg.fehlerEins', 'erg.fehler', 'erg.ohneFehler')] : []),
+      zahl(st.hinweise, 'erg.hinweisEins', 'erg.hinweise', 'erg.ohneHinweis')].join(' · ');
+  }
+  function baueBlatt(art, kopfText, text, liste, sternZahl, zeile = '') {
     entferneBlatt();
     const haupt = liste.filter((k) => k.a !== 'uebersicht');
     const wort = esc(kopfText).replace(/!$/, '<span class="ausruf">!</span>');
     const sterneTeil = art !== 'sieg' ? '' : `<div class="erg-mitte"><div class="erg-sterne" role="img" aria-label="${esc(S('sterne', { n: sternZahl, max: 3 }))}">`
       + [0, 1, 2].map((i) => `<div class="erg-stern ${i < sternZahl ? 'an' : 'aus'}" style="--i:${i}"><span class="e-stern" aria-hidden="true">${icon('stern')}</span></div>`).join('')
-      + '</div></div>';
+      + `</div>${zeile ? `<p class="erg-tipp ls-erg-zeile">${esc(zeile)}</p>` : ''}</div>`;
     const o = document.createElement('div');
     o.className = `ergebnis-overlay ls-erg ${art}`;
     o.setAttribute('role', 'dialog');
@@ -186,7 +194,7 @@ export function zeige(root, params, app) {
         <div class="erg-rumpf"><h2 class="erg-wort disp" id="ls-erg-wort">${wort}</h2>
           <p class="erg-unter"><b class="ls-erg-titel">${esc(titel)}</b>${text ? ` · ${esc(text)}` : ''}</p>${sterneTeil}</div>
         <div class="erg-aktionen"><div class="erg-knoepfe">${haupt.map(blattKnopf).join('')}</div>
-          <button class="erg-lobby" type="button" data-a="uebersicht">${icon('zurueck')}<span>${esc(S('uebersicht'))}</span></button></div>
+          <button class="erg-lobby" type="button" data-a="uebersicht">${icon('haus')}<span>${esc(S('uebersicht'))}</span></button></div>
       </div>`;
     // ungerade Zahl: der letzte Knopf nimmt die ganze Reihe (wie "Zur Analyse" allein in der Bot-Partie)
     const kn = o.querySelector('.erg-knoepfe');
@@ -464,7 +472,7 @@ export function zeige(root, params, app) {
       { a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: !naechste },
       ...(folgtImTrainer ? [{ a: 'trainer', text: S('naechsteImTrainer'), icon: 'schloss' }] : []),
       { a: 'uebersicht', text: S('uebersicht') },
-    ], st.sterne);
+    ], st.sterne, zeileText());
   }
 
   function gescheitert(grund) {
