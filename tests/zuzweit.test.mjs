@@ -220,7 +220,9 @@ try {
   await klasse.click(); const erster = await seite.locator('.an-c-kopf').innerText();
   await klasse.click(); const zweiter = await seite.locator('.an-c-kopf').innerText();
   pruefe('Klassen-Tabelle springt zu beiden Seiten', erster !== zweiter && /Anna|Ben/.test(erster + zweiter), { erster, zweiter });
-  for (const [width, height] of [[1180, 820], [820, 1180], [390, 844], [375, 667]]) for (const modus of ['hell', 'dunkel']) {
+  // R8-quer (13.11.2026): dazu Handy quer (844 x 390, 667 x 375): Brett, Leisten und Knoepfe ganz im Bild ohne Scrollen,
+  // auch das Ergebnis nach dem Aufgeben; LG1: oben kopfueber nur auf Handy und iPad hoch, am grossen Schirm quer aufrecht
+  for (const [width, height] of [[1180, 820], [820, 1180], [390, 844], [375, 667], [844, 390], [667, 375]]) for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width, height });
     await seite.evaluate(modus => window.__app.setzeEinstellungen({ modus }), modus);
     await start('5');
@@ -231,11 +233,20 @@ try {
         knoepfe: [...document.querySelectorAll('.zz-screen button')].every(b => b.getBoundingClientRect().height >= 44), namen: document.querySelectorAll('.zz-name b').length === 2,
         // R6-Befund B11: die Spielknoepfe tragen Symbole wie in der Bot-Partie, und kein Text laeuft aus seinem Knopf
         symbole: [...document.querySelectorAll('.zz-spielbereich > .zz-aktionen button')].map((b) => b.dataset.zz + ':' + !!b.querySelector('svg')).join() === 'zugzurueck:true,remis:true,aufgeben:true',
-        passt: [...document.querySelectorAll('.zz-screen button')].every((b) => b.scrollWidth <= b.clientWidth + 1 && b.scrollHeight <= b.clientHeight + 1) };
+        passt: [...document.querySelectorAll('.zz-screen button')].every((b) => b.scrollWidth <= b.clientWidth + 1 && b.scrollHeight <= b.clientHeight + 1),
+        // R8-quer: ohne Scrollen alles erreichbar (nicht erst nach scrollIntoView)
+        imBild: [...document.querySelectorAll('.zz-spielbereich > .zz-spieler, .zz-spielbereich > .zz-aktionen button, .zz-brett')].every((e) => { const r = e.getBoundingClientRect();
+          return r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5; }),
+        keinScroll: document.documentElement.scrollHeight <= innerHeight + 1 && window.scrollY === 0,
+        uhren: [...document.querySelectorAll('.zz-spieler .uhr')].filter((u) => !u.hidden && u.getClientRects().length).length === 2,
+        lg1: getComputedStyle(document.querySelector('.zz-oben')).transform.startsWith('matrix(-1') === !(innerWidth > innerHeight && innerHeight > 500) };
     });
     pruefe(`${width}x${height} ${modus}: Brett sichtbar, kein Ueberlauf, Namen, Tippflaechen und Symbole`, Object.values(masse).every(Boolean), masse);
     if (process.env.BILDER) { mkdirSync(process.env.BILDER, { recursive: true }); await seite.screenshot({ path: path.join(process.env.BILDER, `zuzweit-${width}-${modus}.png`) }); }
     await aufgeben();
+    const erg = await seite.evaluate(() => [...document.querySelectorAll('.zz-ergebnis, .zz-ergebnis button')].every((e) => { const r = e.getBoundingClientRect();
+      return r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5; }) && document.documentElement.scrollHeight <= innerHeight + 1);
+    pruefe(`${width}x${height} ${modus}: Ergebnis und seine Knoepfe ganz im Bild`, erg);
   }
   // R6-Befund B11: der Einstieg liegt auf Start (Flo 08.11.: Zu zweit ist kein Lernen); "Fertig" und Zurueck fuehren
   // dorthin, und der Zurueck-Knopf heisst wie sein Ziel

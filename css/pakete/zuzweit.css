@@ -162,7 +162,16 @@
   .partie .zz-spieler { min-height: 0; padding-top: 4px; padding-bottom: 4px; }
   .partie .zz-spieler > .av { display: none; }
   .partie .zz-spieler .uhr { min-width: 66px; height: 36px; padding: 0 9px; border-radius: 11px; font-size: 17px; }
+  /* R8-quer (13.11.2026): drei Knoepfe in der schmalen Spalte (um 80 px): Symbol ueber dem Text wie die Spielknoepfe der
+     Bot-Partie, sonst lag der zweizeilige Text auf dem Symbol und ragte aus dem Knopf (667 x 375 gemessen) */
+  .zz-spielbereich > .zz-aktionen { gap: var(--a1); }
+  .zz-spielbereich > .zz-aktionen .knopf { flex-direction: column; justify-content: center; gap: 2px; height: 48px; min-height: 0;
+    padding: 2px 4px; font-size: 11.5px; line-height: 1.1; text-align: center; }
+  .zz-spielbereich > .zz-aktionen .knopf .ico { width: 18px; height: 18px; flex: none; }
 }
+/* R8-quer, LG1 (Empfehlung A): am grossen Schirm quer (PC, iPad quer) sitzt niemand gegenueber, die Leiste oben steht
+   aufrecht; Handy (hoch und quer) und iPad hoch bleiben kopfueber (.zz-gegenueber aus js/ui/zuzweit.js) */
+@media (orientation: landscape) and (min-height: 501px) { .zz-gegenueber { transform: none; } }
 /* Handy hoch: Brett von Rand zu Rand wie in der Bot-Partie, Karten und Knoepfe behalten ihren Rand */
 @media (orientation: portrait) and (max-width: 600px) {
   .zz-rumpf:has(> .zz-spielbereich) { padding: var(--a2) 0 calc(var(--a2) + env(safe-area-inset-bottom)); }
