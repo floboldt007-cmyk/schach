@@ -170,6 +170,82 @@ try {
     await k.close();
   }
 
+  // U7 (app.test "Zeilen nicht ineinander"): erstes Sieg-Blatt, Fenster danach auf die Hoehe ohne Safari-Leiste verkleinert
+  // (390 x 664, 375 x 548). Keine Zeile des Scrollbereichs darf in die vorige ragen; gemessen wie in tests/app.test.mjs
+  // (Unterkante einer Zeile = tiefster sichtbarer, nicht absolut gesetzter Nachfahre).
+  for (const g of [{ name: 'iPhone 13', viewport: { width: 390, height: 844 } }, { name: 'iPhone SE', viewport: { width: 375, height: 667 } }]) {
+    const { k, s, fehler } = await seite(browser, g.viewport);
+    if (!pruefe(`${g.name}: U7 erster Sieg gegen Fridolin`, await sieg(s))) { await k.close(); continue; }
+    for (const [w, hh] of [[390, 664], [375, 548]]) {
+      await s.setViewportSize({ width: w, height: hh });
+      await s.waitForTimeout(300);
+      const r = await s.evaluate(() => {
+        const rumpf = document.querySelector('.ergebnis-overlay .erg-rumpf');
+        const sicht = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+        const name = (e) => (e.className || e.tagName).toString().split(' ')[0];
+        const reihen = [...rumpf.children].filter(sicht).map((e) => {
+          let u = e.getBoundingClientRect().bottom, tief = name(e);
+          for (const d of e.querySelectorAll('*')) {
+            if (!sicht(d) || getComputedStyle(d).position === 'absolute') continue;
+            const b = d.getBoundingClientRect().bottom;
+            if (b > u) { u = b; tief = name(d); }
+          }
+          return { n: name(e), top: Math.round(e.getBoundingClientRect().top * 10) / 10, unten: Math.round(e.getBoundingClientRect().bottom * 10) / 10, u: Math.round(u * 10) / 10, tief };
+        }).sort((x, y) => x.top - y.top);
+        const ineinander = reihen.filter((x, i) => i > 0 && x.top < reihen[i - 1].u - 0.5).map((x) => x.n);
+        return { ineinander, reihen };
+      });
+      if (process.env.U7_BILDER) await s.screenshot({ path: path.join(process.env.U7_BILDER, `u7-${g.viewport.width}x${g.viewport.height}-${w}x${hh}.png`) });
+      pruefe(`${g.name}: U7 bei ${w} x ${hh} ruecken die Zeilen des Sieg-Blatts nicht ineinander`, r.ineinander.length === 0, r);
+    }
+    pruefe(`${g.name}: keine Seitenfehler (U7)`, fehler.length === 0, fehler);
+    await k.close();
+  }
+
+  // R9-3: Niederlage-Blatt (Aufgeben ueber den Halte-Knopf wie tests/funktion-partie.test.mjs). Am iPhone SE lag der
+  // Untertitel unter dem runden Auge-Knopf oben rechts. Kein Text darf ihn beruehren, auf keinem Geraet, auch nicht mit dem
+  // laengsten Untertitel (alle Bot-Namen x "Aufgegeben gegen ..." und "... setzt dich im 120. Zug matt", wie js/ui/partie.js).
+  for (const g of [{ name: 'iPhone SE', viewport: { width: 375, height: 667 } }, { name: 'iPhone 13', viewport: { width: 390, height: 844 } },
+    { name: 'iPad quer', viewport: { width: 1180, height: 820 } }, { name: 'PC 1280 x 720', viewport: { width: 1280, height: 720 } }]) {
+    const { k, s, fehler } = await seite(browser, g.viewport);
+    await s.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w' }); });
+    const bereit = await klappt(s.waitForFunction((sel) => window.__partie && window.__partie.bereit === true && window.__partie.phase() === 'flo'
+      && document.querySelectorAll(sel + ' .brett img.figur').length === 32, SCREEN, { timeout: 30000 }));
+    const knopf = s.locator(`${SCREEN} .spielknoepfe > [data-aktion="aufgeben"]`);
+    const r = bereit ? await knopf.boundingBox() : null;
+    if (r) { await s.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await s.mouse.down(); await s.waitForTimeout(1400); await s.mouse.up(); }
+    if (!pruefe(`${g.name}: R9-3 Aufgeben fuehrt zum Niederlage-Blatt`, !!r && await klappt(s.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 20000 })))) { await k.close(); continue; }
+    await s.waitForTimeout(1500);
+    const unterAuge = () => s.evaluate(() => {
+      const o = document.querySelector('.ergebnis-overlay'), auge = o.querySelector('.erg-zu').getBoundingClientRect();
+      const treffer = [];
+      const w = document.createTreeWalker(o.querySelector('.ergebnis-karte'), NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        if (!n.textContent.trim() || n.parentElement.closest('.erg-zu, [hidden]')) continue;
+        const b = document.createRange(); b.selectNodeContents(n);
+        for (const z of b.getClientRects()) {
+          if (z.right > auge.left + 0.5 && z.left < auge.right - 0.5 && z.bottom > auge.top + 0.5 && z.top < auge.bottom - 0.5) treffer.push(n.textContent.trim().slice(0, 40));
+        }
+      }
+      return { treffer, auge: [Math.round(auge.left), Math.round(auge.top), Math.round(auge.right), Math.round(auge.bottom)] };
+    });
+    const echt = await unterAuge();
+    pruefe(`${g.name}: R9-3 kein Text unter dem Auge-Knopf (echter Untertitel)`, echt.treffer.length === 0, echt);
+    const laengster = await s.evaluate(async () => {
+      const { BOTS } = await import('./js/bots.js'), { t } = await import('./js/sprache.js');
+      const kandidaten = BOTS.flatMap((b) => [t('partie.erg.aufgabe', { name: b.name }), t('partie.erg.mattNiederlage', { nr: 120, name: b.name })]);
+      const l = kandidaten.sort((a, b) => b.length - a.length)[0];
+      document.querySelector('.ergebnis-overlay .erg-unter').textContent = l;
+      return l;
+    });
+    await s.waitForTimeout(100);
+    const lang = await unterAuge();
+    pruefe(`${g.name}: R9-3 kein Text unter dem Auge-Knopf (laengster Untertitel "${laengster}")`, lang.treffer.length === 0, lang);
+    if (process.env.U7_BILDER) await s.screenshot({ path: path.join(process.env.U7_BILDER, `r93-${g.viewport.width}x${g.viewport.height}.png`) });
+    pruefe(`${g.name}: keine Seitenfehler (R9-3)`, fehler.length === 0, fehler);
+    await k.close();
+  }
+
   // L5: echtes Sieg-Blatt; der erste Sieg zeigt die Feier, gemessen wird der zweite (das gewoehnliche Sieg-Blatt)
   for (const g of [{ name: 'iPhone SE', viewport: { width: 375, height: 667 } }, { name: 'PC 1280 x 720', viewport: { width: 1280, height: 720 } },
     { name: 'iPhone 13', viewport: { width: 390, height: 844 } }]) {
