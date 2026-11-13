@@ -449,6 +449,14 @@
   .partie .spielknoepfe .halte-symbol { width: 26px; height: 26px; margin: -3px 0; }
   .partie .spielknoepfe .halte-symbol > .ico { width: 17px; height: 17px; }
 }
+/* hohe Handys (iPhone 13 und groesser, ab 800 px): das Brett hat schon die volle Breite, zwischen Coach und Zugstreifen
+   blieben 100 px leer (Feinschliff R8, LG3 Variante 1). Der Coach zeigt drei Zeilen, die Spielerkarten werden groesser;
+   Zugstreifen und Knoepfe bleiben unten am Daumen (Flo 05.11.). Bei Platznot (.coach-eng, .sehr-eng) gilt das Band nicht. */
+@media (orientation: portrait) and (max-width: 600px) and (min-height: 800px) {
+  .partie:not(.sehr-eng) .spieler { --av: 44px; min-height: 60px; }
+  .partie:not(.streifen-unten):not(.coach-eng) .coach { height: 96px; }
+  .partie:not(.streifen-unten):not(.coach-eng) .coach > .c-text { -webkit-line-clamp: 3; }
+}
 
 /* Pfeile in der Knopfreihe einschalten (Abschnitt "Aktionen" oben): iPad hoch immer, Handy nur mit Streifen unten. Der
    Zugstreifen behaelt auf dem iPad seine Zuege (Antippen), seine eigenen Pfeile entfallen dort; auf dem Handy unter 760 px
