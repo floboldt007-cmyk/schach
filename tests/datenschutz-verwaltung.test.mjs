@@ -23,8 +23,8 @@ function abschnitt(html, titel) {
 
 const FAELLE = [
   { sprache: 'de', datei: 'datenschutz.html', titel: 'Verwaltung durch den Betreiber', dauer: 'Rechtsgrundlage und Dauer',
-    daten: /E-Mail-Adresse, Zeitpunkt von Anlage und letzter Anmeldung, Anmeldeart, Benutzername, Premium-Stand und Käufe/,
-    aenderungen: /Premium freischalten oder zurücknehmen, deinen Benutzernamen ändern und Banner vergeben oder entfernen/,
+    daten: /E-Mail-Adresse, Zeitpunkt von Anlage und letzter Anmeldung, Anmeldeart, Benutzername, Premium- und Abo-Stand, Käufe, Sonderstücke und Banner samt Herkunft/,
+    aenderungen: /Premium freischalten oder zurücknehmen, deinen Benutzernamen ändern, Banner vergeben und die dort vergebenen Banner wieder entfernen/,
     stripe: /Abo über Stripe, das nicht endgültig beendet ist, ändert die Verwaltung nicht/,
     protokoll: /mit dem Stand vorher und nachher und dem Zeitpunkt in einem Protokoll/,
     fremde: /Andere Nutzer haben darauf keinen Zugriff/,
@@ -35,8 +35,8 @@ const FAELLE = [
     loeschliste: /das Anmeldeprotokoll und das Protokoll der Verwaltung/,
     sie: /\b(Sie|Ihr|Ihre|Ihnen)\b/ },
   { sprache: 'en', datei: 'datenschutz-en.html', titel: 'Administration by the operator', dauer: 'Legal basis and retention',
-    daten: /email address, time of creation and last sign-in, sign-in method, username, premium status and purchases/,
-    aenderungen: /grant or revoke premium, change your username and grant or remove banners/,
+    daten: /email address, time of creation and last sign-in, sign-in method, username, premium and subscription status, purchases, special items and banners with their origin/,
+    aenderungen: /grant or revoke premium, change your username, grant banners and remove banners it granted/,
     stripe: /subscription through Stripe that has not been finally ended is never changed by the admin tool/,
     protokoll: /with the state before and after and the time in a log/,
     fremde: /Other users have no access to it/,
