@@ -200,6 +200,9 @@
 .ls-screen > .kopf, .ls-screen > .ls-rumpf { transform-origin: 50% 40%; transition: transform var(--d-l) var(--gleiten); }
 .ls-screen.mit-ergebnis > .kopf, .ls-screen.mit-ergebnis > .ls-rumpf { transform: scale(.975); }
 .ls-erg .erg-unter .ls-erg-titel { font-weight: 800; color: var(--text); }
+/* Zeile unter den Sternen (Zuege, Fehler, Hinweise): immer eine Zeile, auch auf dem iPhone SE (Auftrag R8 Texte) */
+.ls-erg .ls-erg-zeile { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) { .ls-erg .ls-erg-zeile { font-size: 14px; } }
 
 /* ---------- Bereichswahl und Art (Endspiele) ---------- */
 .ms-steuer { display: flex; justify-content: flex-start; }

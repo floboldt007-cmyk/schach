@@ -96,6 +96,7 @@ const SUITEN = [
   { name: 'navigation', datei: 'navigation.test.mjs', args: [], was: 'Reiter-Leiste, Kopf, Bauteile, Training-Hülle' },
   { name: 'arena', datei: 'arena.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], exklusiv: 'Animations-Zeitfenster unter CPU-Last', was: 'Arena als Weltkarte, Detail-Panel, Duell-Intro, Porträts' },
   { name: 'ansicht', datei: 'ansicht.test.mjs', args: [], was: 'Ansicht: jeder Bildschirm in 7 Größen (Schrift, Knöpfe, Überlauf, Überlappung)' },
+  { name: 'ansicht-befunde', datei: 'ansicht-befunde.test.mjs', args: [], was: 'Ansichts-Befunde an Probe-Seiten: nichts unter [inert] oder unsichtbarem Vorfahren zaehlt, Offenes wird gefunden (Browser)' },
   { name: 'funken', datei: 'funken.test.mjs', args: [], was: 'Paket Funken und Level: Rechnung, Speicher, Orte, Aufstieg' },
   { name: 'punkte', datei: 'punkte.test.mjs', args: SCHNELL ? ['--schnell'] : [], exklusiv: 'Zeitfenster unter CPU-Last', was: 'Paket Punkte und Bestenliste: Formel, Tafeln, Codes, Abrechnung' },
   { name: 'serie', datei: 'serie.test.mjs', args: [], was: 'Paket Serie: Bauernmarsch und Siegeslauf (Tageswerk, Meilensteine, Orte)' },
