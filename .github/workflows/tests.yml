@@ -63,6 +63,8 @@ jobs:
         run: node tests/server-karte.test.mjs
       - name: Karte-Elo-Vorschlag pruefen (nicht eingespielt)
         run: node tests/server-karte-elo.test.mjs
+      - name: Karte-Sondertitel-Vorschlag pruefen (nicht eingespielt)
+        run: node tests/server-karte-sondertitel.test.mjs
       - name: Liga-Bild-SQL ausfuehren (vorbereitet, nicht eingespielt)
         run: node tests/server-liga-bild.test.mjs
       - name: Raetsel-Duell-SQL ausfuehren

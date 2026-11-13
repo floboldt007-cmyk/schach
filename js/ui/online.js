@@ -666,6 +666,11 @@ export function zeige(root, params, app) {
     const eigen = online.meineFarbe(p);
     const roh = kartenDaten && (f === 'w' ? kartenDaten.w : kartenDaten.s);
     const k = roh ? fremdeKarte(roh) : null;
+    // Sondertitel (supabase/karte-sondertitel-schema.sql, nur mit Besitz im Server): die Sammlung kennt sie nur fuer
+    // das eigene Konto, deshalb hier benannt
+    const pionier = k && !k.titel && typeof roh.titel === 'string' ? /^pionier-(\d{3})$/.exec(roh.titel) : null;
+    if (k && !k.titel && roh.titel === 'erfinder') k.titel = { name: O('titel.erfinder') };
+    else if (pionier && Number(pionier[1]) >= 1 && Number(pionier[1]) <= 100) k.titel = { name: O('titel.pionier', { n: Number(pionier[1]) }) };
     const name = k && roh.name ? k.name : f === eigen ? profil?.benutzername || O('ich') : p.gewertet ? O('gegnerName') : O('freund');
     const elo = roh && Number.isInteger(roh.elo) && roh.elo >= 100 && roh.elo <= 4000 ? roh.elo : null;
     const liga = k && Number.isInteger(k.kronenStufe) ? stufenName(k.kronenStufe) : '';
@@ -687,8 +692,10 @@ export function zeige(root, params, app) {
     const eigen = online.meineFarbe(p);
     const g = spielerDaten(andere(eigen));
     const avatar = g.k?.avatar ? 'data:image/svg+xml,' + encodeURIComponent(g.k.avatar) : '';
+    // R15: Titel, Erfolge und Banner des Gegners auch im Intro (nur mit Visitenkarte vom Server)
+    const karte = g.k ? { titel: g.k.titel, orden: g.k.orden, bannerBild: bannerUrl(g.k.banner) } : null;
     try {
-      spieleDuell({ bot: { id: 'online', name: g.name, elo: g.elo, liga: g.liga, avatar }, farbe: eigen, anlass: 'liga',
+      spieleDuell({ bot: { id: 'online', name: g.name, elo: g.elo, liga: g.liga, avatar, karte }, farbe: eigen, anlass: 'liga',
         einstellung: app.einstellungen().duellIntro || 'besondere', bildschirm: 'online' });
     } catch (e) { /* das Intro ist Schmuck, nie ein Grund fuer einen Fehler */ }
   }

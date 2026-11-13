@@ -72,6 +72,9 @@
 .duell-titel { margin-top: 6px; font-size: 13px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--flo-grund); color: var(--gold);
   box-shadow: 0 0 0 1px var(--gold); }
 .duell-vitrine { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; max-width: min(92vw, 420px); }
+/* Banner des menschlichen Gegners (Online, R15): Band im Seitenverhaeltnis der Banner (4:1) unter seinem Namen */
+.duell-banner { display: block; width: min(72%, 260px); aspect-ratio: 4 / 1; flex: none; border-radius: 10px; background-color: color-mix(in srgb, currentColor 14%, transparent);
+  background-size: cover; background-position: 30% center; background-repeat: no-repeat; box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent), var(--s2); }
 .duell-orden { font-size: 12px; font-weight: 800; padding: 5px 9px; border-radius: 10px; background: color-mix(in srgb, currentColor 14%, transparent); color: inherit; }
 /* Lange Fassung (Flo 30.10.2026: lesbar): Titel und Errungenschaften groesser, Balken bis zum Start */
 .duell.lang .duell-titel { font-size: 14px; padding: 5px 12px; }

@@ -42,6 +42,7 @@ const SUITEN = [
   { name: 'freunde', datei: 'freunde.test.mjs', args: [], was: 'Freunde: Anfrage, Antwort, Einladungslink (Server abgefangen)' },
   { name: 'online-ui', datei: 'online-ui.test.mjs', args: [], was: 'Online-Oberflaeche mit abgefangenen Server-Anfragen' },
   { name: 'online-ranked-probe', datei: 'online-ranked-probe.test.mjs', args: [], was: 'Funktionsprobe Ranked: zwei Sitzungen gegen einen nachgebauten Server (harte Befund-Pruefungen nur mit PROBE_STRENG=1)' },
+  { name: 'online-suche-gleichzeitig', datei: 'online-suche-gleichzeitig.test.mjs', args: [], was: 'Feinschliff R15: zwei Konten suchen gleichzeitig, sofort gepaart, Visitenkarte, Elo und Sondertitel in Leiste und Duell-Intro (Browser)' },
   { name: 'server-online-zug', datei: 'server-online-zug.test.mjs', args: [], was: 'Online-Zuege: Edge Function prueft Regeln und Ende (Server, Anti-Cheat 1a)' },
   { name: 'zuzweit', datei: 'zuzweit.test.mjs', args: [], was: 'Zu zweit: Namen, Uhr, Ergebnis und neutrale Analyse' },
   { name: 'daten', datei: 'daten.test.mjs', args: [], was: 'Datenfreigabe, Datenauskunft, Konto löschen (DSGVO)' },

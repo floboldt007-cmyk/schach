@@ -100,6 +100,18 @@ export function aktivesDuell() {
   return aktiv ? { fertig: aktiv.fertig } : null;
 }
 
+// Titel (mit Wappen, wenn es eines aus js/titel-kunst.js ist) und bis zu drei Errungenschaften unter einem Namen
+function vitrineHtml(titel, titelBild, orden) {
+  const wappen = typeof titelBild === 'string' && titelBild.startsWith('<svg class="titel-wappen') ? titelBild : '';
+  return `${titel ? `<div class="duell-titel">${wappen}<span>${esc(titel)}</span></div>` : ''}${orden.length
+    ? `<div class="duell-vitrine">${orden.map((o) => {
+      // Abzeichen nur, wenn es eines aus js/sammlung-kunst.js ist (eigenes SVG); sonst nur der Name wie bisher
+      const bild = typeof o.bild === 'string' && o.bild.startsWith('<svg viewBox="0 0 120 120" class="sk-erfolg"') ? o.bild : '';
+      const selten = ['frei', 'selten', 'episch', 'legende'].includes(o.seltenheit) ? o.seltenheit : 'frei';
+      return `<span class="duell-orden${bild ? ' mit-bild' : ''}" data-seltenheit="${selten}">${bild}<span>${esc(o.name)}</span></span>`;
+    }).join('')}</div>` : ''}`;
+}
+
 function protokolliere(eintrag) {
   if (!TEST || typeof window === 'undefined') return;
   (window.__duellProtokoll = window.__duellProtokoll || []).push(eintrag);
@@ -168,7 +180,13 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const vorgegeben = ['voll', 'kurz', 'aus'].includes(art);
   try { profil = mitVitrine && (vorgegeben ? art === 'voll' : einstellung !== 'aus' && tempo() !== 0) && bot ? waehle('duell:profil?', {}) : null; } catch (e) { profil = null; }
   const orden = profil && Array.isArray(profil.orden) ? profil.orden.slice(0, 3) : [];
-  const hatVitrine = !!(profil && (profil.titel || orden.length));
+  // Online gegen Menschen (R15, Flo 13.11.: "Elo sieht und die Banner sieht"): bot.karte ist die Visitenkarte des
+  // Gegners (js/ui/visitenkarte.js fremdeKarte) mit Titel, Erfolgen und Banner-Bild; Bots haben keine
+  const gk = mitVitrine && bot && bot.karte && typeof bot.karte === 'object' ? bot.karte : null;
+  const gOrden = gk && Array.isArray(gk.orden) ? gk.orden.slice(0, 3) : [];
+  const gTitel = gk && gk.titel && typeof gk.titel.name === 'string' ? gk.titel : null;
+  const gBanner = gk && typeof gk.bannerBild === 'string' && /^(https?:\/\/[^\s'"()\\]+|[^\s'"():\\]+)\.svg$/.test(gk.bannerBild) ? gk.bannerBild : '';
+  const hatVitrine = !!(profil && (profil.titel || orden.length)) || !!(gTitel || gOrden.length);
   const gewaehlteArt = vorgegeben ? art : duellArt({ einstellung, anlass, reduziert: tempo() === 0, vitrine: hatVitrine });
   const t0 = jetzt();
   // Zeitfaktor: hoechstens normales Tempo (das Intro muss in DAUER_MAX passen). A() bewegt mit diesem Faktor statt mit
@@ -233,13 +251,9 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const halteBis = lang ? HALTE_VITRINE : HALTE_BIS;
   const dauerMax = lang ? DAUER_VITRINE : DAUER_MAX;
   if (lang) { ueber.classList.add('lang'); html.dataset.duellMax = String(dauerMax); }
-  const vitrine = voll && profil ? `${profil.titel ? `<div class="duell-titel">${typeof profil.titelBild === 'string' && profil.titelBild.startsWith('<svg class="titel-wappen') ? profil.titelBild : ''}<span>${esc(profil.titel)}</span></div>` : ''}${orden.length
-    ? `<div class="duell-vitrine">${orden.map((o) => {
-      // Abzeichen nur, wenn es eines aus js/sammlung-kunst.js ist (eigenes SVG); sonst nur der Name wie bisher
-      const bild = typeof o.bild === 'string' && o.bild.startsWith('<svg viewBox="0 0 120 120" class="sk-erfolg"') ? o.bild : '';
-      const selten = ['frei', 'selten', 'episch', 'legende'].includes(o.seltenheit) ? o.seltenheit : 'frei';
-      return `<span class="duell-orden${bild ? ' mit-bild' : ''}" data-seltenheit="${selten}">${bild}<span>${esc(o.name)}</span></span>`;
-    }).join('')}</div>` : ''}` : '';
+  const vitrine = voll && profil ? vitrineHtml(profil.titel, profil.titelBild, orden) : '';
+  const gVitrine = voll && gk ? vitrineHtml(gTitel && gTitel.name, gTitel && gTitel.bild, gOrden) : '';
+  const gBannerHtml = voll && gBanner ? `<span class="duell-banner" aria-hidden="true" style="background-image:url('${esc(gBanner)}')"></span>` : '';
   // Unterzeile des Gegners: Elo (nur mit Zahl) und seine Farbe; ohne Farbe (mitFarbe false, Raetsel-Duell: die Farbe
   // wechselt mit jedem Raetsel) nur die Elo, ohne beides entfaellt die Zeile
   const botUnter = [Number.isFinite(Number(bot.elo)) && bot.elo !== null && bot.elo !== '' ? `Elo ${esc(bot.elo)}` : '',
@@ -253,7 +267,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
           <div class="duell-seite bot">
             <div class="duell-av" data-rolle="bot"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></div>
             <div class="duell-name">${esc(bot.name)}</div>
-            ${botUnter ? `<div class="duell-unter">${botUnter}</div>` : ''}
+            ${botUnter ? `<div class="duell-unter">${botUnter}</div>` : ''}${gBannerHtml}${gVitrine}
           </div>
           <div class="duell-gegen">${esc(t('arena.duell.gegen'))}</div>
           <div class="duell-seite flo">
