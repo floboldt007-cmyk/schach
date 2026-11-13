@@ -244,7 +244,8 @@ const TOLERANZ_PX = 2;   // wie tests/gleichheit-ansichten.test.mjs: gerundete F
 const leistenText = (m) => m.leisten.map((l) => `${l.wer}:${l.lage}`).join(' ') || 'keine';
 function vergleiche(geraet, was, bot, m, erg) {
   if (m.fehlt) { befund(`${geraet}: ${was} nicht messbar`, false, m.fehlt); return; }
-  befund(`${geraet}: ${was} Brettgroesse wie Bot-Partie`, Math.abs(m.brett - bot.brett) <= TOLERANZ_PX, { [was]: m.brett, bot: bot.brett });
+  // wie gleichheit-ansichten: mindestens so gross wie in der Bot-Partie (ein groesseres Brett ist keine Abweichung)
+  befund(`${geraet}: ${was} Brett mindestens so gross wie Bot-Partie`, m.brett >= bot.brett - TOLERANZ_PX, { [was]: m.brett, bot: bot.brett });
   befund(`${geraet}: ${was} Spielerleisten wie Bot-Partie`, leistenText(m) === leistenText(bot), { [was]: leistenText(m), bot: leistenText(bot) });
   // Knoepfe wie in gleichheit-ansichten: die Rollen aufgeben, remis, hinweis (da oder nicht), nicht Beschriftung und Hoehe
   const anders = ROLLEN.filter((k) => !!m.knoepfe[k]?.da !== !!bot.knoepfe[k]?.da);
