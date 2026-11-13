@@ -305,6 +305,50 @@ try {
     pruefe(`${g.name}: keine Seitenfehler (Ich, Liga)`, fehler.length === 0, fehler);
     await k.close();
   }
+  // R9 G-3 (13.11.2026): auf Liga und Ich schien der .seiten-kopf beim Laden angeschnitten (32 von 59 px).
+  // Gemessen war die Breite des absichtlich versteckten Seitentitels: am Handy steht der Name im Kopf (.kopf-seite),
+  // der h1 bleibt nur fuer Vorleseprogramme (css/navigation.css, max-width 520px). Pin: Name im Kopf ganz sichtbar,
+  // h1 mit demselben Namen im Dokument und unsichtbar.
+  for (const g of [{ name: 'iPhone 13', viewport: { width: 390, height: 844 } }, { name: 'iPhone SE', viewport: { width: 375, height: 667 } }]) {
+    const { k, s, fehler } = await seite(browser, g.viewport);
+    for (const [ziel, titel] of [['bestenliste', 'Liga'], ['ich', 'Ich']]) {
+      await s.evaluate((z) => window.__app.gehe(z), ziel);
+      await s.waitForTimeout(1500);
+      const m = await s.evaluate(() => {
+        const sk = document.querySelector('#app > .screen .haupt-kopf .kopf-seite'), h1 = document.querySelector('#app > .screen .seiten-kopf h1');
+        const r = sk && sk.getBoundingClientRect();
+        return { kopf: sk ? sk.textContent.trim() : null, kopfGanz: !!r && r.width > 0 && r.top >= 0 && r.left >= 0 && r.right <= innerWidth && sk.scrollWidth <= sk.clientWidth + 1,
+          h1: h1 ? h1.textContent.trim() : null, h1Versteckt: !!h1 && getComputedStyle(h1.parentElement).clipPath.includes('inset(50%)') };
+      });
+      pruefe(`${g.name} ${ziel}: G-3 Name "${titel}" im Kopf ganz da, Seitentitel nur fuer Vorleseprogramme`,
+        m.kopf === titel && m.kopfGanz && m.h1 === titel && m.h1Versteckt, m);
+      // Der blasse Streifen oben links im R9-Bild war der Schatten des versteckten Links "Zum Inhalt" (oberhalb des
+      // Bildes geparkt, sein Schatten reichte bis y=8). Unfokussiert darf kein Schatten ins Bild reichen.
+      const z = await s.evaluate(() => {
+        const a = document.querySelector('.zum-inhalt'); if (!a) return { fehlt: true };
+        const r = a.getBoundingClientRect(), sh = getComputedStyle(a).boxShadow;
+        let reichweite = 0;
+        if (sh !== 'none') for (const t of sh.split(/,(?![^(]*\))/)) {
+          if (/\binset\b/.test(t)) continue;
+          const n = (t.replace(/(rgba?|color|oklch|hsla?)\([^)]*\)/g, '').match(/-?\d*\.?\d+px/g) || []).map(parseFloat);
+          reichweite = Math.max(reichweite, (n[1] || 0) + (n[2] || 0) + (n[3] || 0));
+        }
+        return { fokus: document.activeElement === a, unten: Math.round(r.bottom), reichweite: Math.round(reichweite) };
+      });
+      pruefe(`${g.name} ${ziel}: G-3 kein Schatten von "Zum Inhalt" oben im Bild`, !z.fehlt && !z.fokus && z.unten + z.reichweite <= 0, z);
+      // Gegenrichtung: mit echtem Tab ist der Link ganz sichtbar und hat seinen Schatten wie vorher
+      // Startpunkt der Tab-Reihe an den Dokumentanfang (sonst laeuft Tab vom zuletzt fokussierten Element weiter)
+      await s.evaluate(() => { const h = document.documentElement; h.tabIndex = -1; h.focus(); h.removeAttribute('tabindex'); });
+      await s.keyboard.press('Tab');
+      await s.waitForTimeout(400);
+      const f = await s.evaluate(() => { const a = document.querySelector('.zum-inhalt'), r = a.getBoundingClientRect();
+        return { fokus: document.activeElement === a, aktiv: document.activeElement?.className || document.activeElement?.tagName, oben: Math.round(r.top), unten: Math.round(r.bottom), schatten: getComputedStyle(a).boxShadow !== 'none' }; });
+      pruefe(`${g.name} ${ziel}: G-3 "Zum Inhalt" per Tab sichtbar, mit Schatten`, f.fokus && f.oben >= 0 && f.unten <= g.viewport.height && f.schatten, f);
+      await s.evaluate(() => document.activeElement?.blur());
+    }
+    pruefe(`${g.name}: keine Seitenfehler (G-3)`, fehler.length === 0, fehler);
+    await k.close();
+  }
 } catch (e) {
   pruefe('Lauf ohne Abbruch', false, String(e && e.stack || e));
 } finally {
