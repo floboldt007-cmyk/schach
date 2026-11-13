@@ -524,6 +524,29 @@ Nummer hat, sieht den Titel gar nicht.
 Nummer genau einmal, höchstens 100. Ein gelöschtes Konto gibt seine Nummer nicht frei. Geht bei der Vergabe etwas
 schief, klappt die Anmeldung trotzdem (nur ohne Nummer).
 
+## Verwaltung für Flo (Stand 13.11.2026, vorbereitet, noch nicht eingespielt)
+
+In der App unter Einstellungen erscheint dann die Gruppe „Verwaltung“, aber nur für dein Konto: Konten mit E-Mail und
+letzter Anmeldung ansehen, Premium freischalten oder zurücknehmen, Käufe ansehen, Benutzername ändern, Banner vergeben
+oder wegnehmen. Jede Änderung steht im Protokoll. Ein laufendes Stripe-Abo kann die Verwaltung nicht ändern, das geht
+nur in Stripe. Taler, Kronen, Liga und Sonderstücke bleiben unberührt.
+
+1. Vorher müssen `schema.sql`, `abo-schema.sql`, `werkstatt-schema.sql`, `pionier-schema.sql` und `karte-schema.sql`
+   eingespielt sein.
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/verwaltung-schema.sql`
+   einfügen und **Run** drücken. Die Datei darf mehrfach laufen.
+3. Dein Konto eintragen (deine ID steht unter **Authentication → Users**):
+   `insert into public.verwalter (user_id) values ('<deine id>');`
+4. `notify pgrst, 'reload schema';` ausführen.
+5. Prüfen: den Inhalt von `supabase/verwaltung-rls-test.sql` ausführen. Am Ende steht „Verwaltung-RLS-Test
+   erfolgreich“, und nichts bleibt zurück.
+
+**Was der Server sicherstellt:** Jede Verwaltungsfunktion prüft zuerst, ob das angemeldete Konto in `verwalter` steht.
+Kein Konto kann sich selbst eintragen oder die Liste lesen. Ohne Anmeldung gibt es gar keinen Aufruf.
+
+**Rückweg:** `supabase/verwaltung-zurueck.sql` (vorher die Sicherungszeilen oben in der Datei lesen). Freigeschaltetes
+Premium und geänderte Namen bleiben dabei, die Banner aus der Verwaltung und das Protokoll sind danach weg.
+
 ## Google-Anmeldung einrichten
 
 Die App hat in der Konto-Gruppe den Knopf „Mit Google anmelden“. Er leitet zu Supabase
