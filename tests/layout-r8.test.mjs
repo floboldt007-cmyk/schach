@@ -206,6 +206,29 @@ try {
     pruefe(`${g.name}: keine Seitenfehler (Sieg-Blatt)`, fehler.length === 0, fehler);
     await k.close();
   }
+  // R9-4 (WIDERLEGT, 13.11.2026): auf Ich und Liga schienen Listenzeilen unter der unteren Leiste zu haengen. Die Seite
+  // endet aber ueber der Leiste (navigation.css: Hoehe 100dvh minus --reiter-h, darin der Safe-Area-Abstand), die Zeilen
+  // waren vom Scroller abgeschnitten, nicht verdeckt. Pin: Seite endet ueber der Leiste, am Ende des Scrollens liegt
+  // jedes Ziel ganz darueber.
+  for (const g of [{ name: 'iPhone SE', viewport: { width: 375, height: 667 } }, { name: 'iPad hoch', viewport: { width: 820, height: 1180 } }]) {
+    const { k, s, fehler } = await seite(browser, g.viewport);
+    for (const ziel of ['ich', 'bestenliste']) {
+      await s.evaluate((z) => window.__app.gehe(z), ziel);
+      await s.waitForTimeout(1500);
+      const m = await s.evaluate(() => {
+        const nav = document.querySelector('nav.reiter-leiste'), screen = document.querySelector('#app > .screen');
+        for (const e of screen.querySelectorAll('*')) if (/auto|scroll/.test(getComputedStyle(e).overflowY)) e.scrollTop = e.scrollHeight;
+        const navOben = nav.getBoundingClientRect().top, unten = screen.getBoundingClientRect().bottom;
+        const ziele = [...screen.querySelectorAll('button, a[href]')].filter((e) => e.getClientRects().length && !e.closest('[inert]'))
+          .map((e) => e.getBoundingClientRect()).filter((r) => r.height && r.top < unten);
+        return { navOben: Math.round(navOben), seiteUnten: Math.round(unten), tiefstes: Math.round(Math.max(0, ...ziele.map((r) => Math.min(r.bottom, unten)))), ziele: ziele.length };
+      });
+      pruefe(`${g.name} ${ziel}: R9-4 Seite endet ueber der unteren Leiste, am Ende kein Ziel darunter`,
+        m.ziele > 0 && m.seiteUnten <= m.navOben && m.tiefstes <= m.navOben, m);
+    }
+    pruefe(`${g.name}: keine Seitenfehler (Ich, Liga)`, fehler.length === 0, fehler);
+    await k.close();
+  }
 } catch (e) {
   pruefe('Lauf ohne Abbruch', false, String(e && e.stack || e));
 } finally {
