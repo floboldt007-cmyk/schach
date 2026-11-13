@@ -103,7 +103,8 @@ heißen.
    wird: nicht die App auf dem Home-Bildschirm (iPad, iPhone) und nicht den Browser eines anderen Geräts. Vor Testern
    mit iPad deshalb zuerst SMTP und die Code-Vorlage einrichten.
 5. **Adressen setzen:** Unter **Authentication > URL Configuration** als **Site URL** exakt
-   `https://floboldt007-cmyk.github.io/schach/` eintragen. Dieselbe exakte Adresse bei **Redirect URLs** hinzufügen.
+   `https://crownmate.de/` eintragen (die App läuft dort; floboldt007-cmyk.github.io/schach leitet per 301 dorthin um).
+   Dieselbe exakte Adresse bei **Redirect URLs** hinzufügen. Alte github.io-Einträge erst nach der Probe entfernen.
    Keine pauschale Wildcard für die Produktionsseite verwenden.
 6. **Versandgrenzen prüfen:** Unter **Authentication > Rate Limits** das Mindestintervall zwischen zwei Code-Mails
    und die OTP-Grenze kontrollieren. Erst vorsichtig testen und die Grenzen nicht unnötig erhöhen. Der
@@ -533,19 +534,19 @@ Besitzer im Supabase-Dashboard ein, **nie** in App-Dateien, Git, Screenshots ode
 
 1. **Google Cloud Console** (console.cloud.google.com) öffnen, ein Projekt anlegen oder wählen.
 2. **OAuth-Zustimmungsbildschirm** (Google Auth Platform > Branding/Zielgruppe) einrichten: App-Name `Crownmate`,
-   Support-E-Mail, Link zur Datenschutzerklärung (`https://floboldt007-cmyk.github.io/schach/datenschutz.html`, erst wenn
+   Support-E-Mail, Link zur Datenschutzerklärung (`https://crownmate.de/datenschutz.html`, erst wenn
    sie fertig geprüft ist) und zum Impressum. Nur die Standard-Bereiche `openid`, `email` und `profile` verwenden, keine
    weiteren. Zum Ausprobieren reicht der Testmodus mit eingetragenen Testnutzern; für alle Nutzer die App veröffentlichen.
 3. **Anmeldedaten > Anmeldedaten erstellen > OAuth-Client-ID**, Anwendungstyp **Webanwendung**.
-   - **Autorisierte JavaScript-Quellen:** `https://floboldt007-cmyk.github.io`
+   - **Autorisierte JavaScript-Quellen:** `https://crownmate.de`
    - **Autorisierte Weiterleitungs-URIs:** genau `https://usaamcqypmvgqmsbfecb.supabase.co/auth/v1/callback`
    Erstellen. Google zeigt Client-ID und Client-Secret.
 4. **Supabase-Dashboard > Authentication > Sign In / Providers > Google:** einschalten, Client-ID und Client-Secret dort
    einfügen, speichern. Diese beiden Werte gehören nirgendwo sonst hin. Ein versehentlich veröffentlichtes Secret sofort
    in der Google Cloud Console ersetzen und in Supabase neu eintragen.
 5. **Rückkehr-Adresse:** Unter **Authentication > URL Configuration** muss die Site URL
-   `https://floboldt007-cmyk.github.io/schach/` sein (Schritt 5 oben). Die App schickt als Rückkehr-Adresse dieselbe
-   Adresse mit `#konto`. Sicherheitshalber genau `https://floboldt007-cmyk.github.io/schach/#konto` zusätzlich unter
+   `https://crownmate.de/` sein (Schritt 5 oben). Die App schickt als Rückkehr-Adresse dieselbe
+   Adresse mit `#konto`. Sicherheitshalber genau `https://crownmate.de/#konto` zusätzlich unter
    **Redirect URLs** eintragen (keine Wildcard). Lehnt Supabase die Rückkehr-Adresse ab, landet man auf der Site URL; die
    App übernimmt die Anmeldung auch dort. Zum lokalen Testen die Testadresse (zum Beispiel `http://localhost:8000/`)
    vorübergehend unter **Redirect URLs** eintragen und danach wieder entfernen.
@@ -610,6 +611,11 @@ Zum Abhaken, in dieser Reihenfolge. Jeder Punkt ist ein Häkchen, kein Schritt d
 - [ ] CAPTCHA in Supabase an, Secret Key nur dort eingetragen (Schritt 4).
 - [ ] Probe mit einem bestehenden Konto im privaten Fenster: Code kommt an, Anmeldung klappt (Schritt 5).
 - [ ] **Mail-Versand geklärt** (siehe unten). Ohne eigenen SMTP-Versand bekommen fremde neue Nutzer keinen Code.
+- [ ] **Authentication → URL Configuration:** Site URL `https://crownmate.de/`, Redirect URLs genau `https://crownmate.de/`
+      und `https://crownmate.de/#konto` (keine Wildcard; die github.io-Einträge erst nach den Proben unten entfernen).
+- [ ] **Google Auth Platform:** App veröffentlicht (nicht Testmodus, sonst kommen nur eingetragene Testnutzer durch und
+      alle anderen bekommen „access_denied“), Datenschutz- und Impressum-Link auf crownmate.de. Ob Google für
+      `openid`, `email` und `profile` eine Prüfung verlangt, in der Console nachsehen.
 - [ ] „Allow new users to sign up“ an (Schritt 6).
 - [ ] Probe mit einer neuen Adresse: Code kommt an, nach der Anmeldung steht „Wähle jetzt einen Benutzernamen…“, Name
       eingeben → „Jetzt sichern“ → der Name steht im Feld.
@@ -623,7 +629,7 @@ schicken (Testphase)“) und nur sehr wenige Mails pro Stunde (dann `over_email_
 wurden zu viele Codes verschickt. Versuche es gleich noch einmal oder melde dich mit Google an“). Für fremde Nutzer
 per Code deshalb vorher einen eigenen SMTP-Anbieter eintragen: **Authentication → Emails → SMTP Settings** (Zugangsdaten
 trägt nur der Besitzer ein, nie in einen Chat), danach die Code-Vorlage und die Grenzen wie oben im Abschnitt
-im Abschnitt „Supabase für „Konto light“ einrichten“, Schritte 4 („Code-Mail einrichten“) und 6 („Versandgrenzen prüfen“). Bis dahin ist Google der Weg für neue Nutzer, der ohne Mail auskommt.
+„Supabase für „Konto light“ einrichten“, Schritte 4 („Code-Mail einrichten“) und 6 („Versandgrenzen prüfen“). Bis dahin ist Google der Weg für neue Nutzer, der ohne Mail auskommt.
 
 ## Abo „Crownmate Trainer“ mit Stripe
 
