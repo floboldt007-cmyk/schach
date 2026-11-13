@@ -173,7 +173,7 @@ async function teilPartie(browser, port) {
   const fehler = [];
   s.on('pageerror', (e) => fehler.push(e.message));
   await s.goto(`http://127.0.0.1:${port}/index.html?test#heim`);
-  await s.waitForFunction(() => window.__app, null, { timeout: 30000 });
+  await s.waitForFunction(() => window.__app && document.documentElement.dataset.screen, null, { timeout: 30000 });
   await warte(1200);   // wie siegblatt-tastatur: Start erst fertig laden lassen
   await s.evaluate(() => {
     localStorage.removeItem('schach-arena:v1:laufend');

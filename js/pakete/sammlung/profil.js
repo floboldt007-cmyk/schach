@@ -307,26 +307,6 @@ function waehleOrden(app, platz) {
   }).catch(() => {});
 }
 
-// Banner der Karte waehlen: nur Eigenes ist waehlbar, Gesperrtes nennt seinen Weg (Gold-Erfolg, Saison)
-function waehleBanner(app) {
-  const inhalt = document.createElement('div');
-  inhalt.className = 'pr-banner-wahl-liste';
-  inhalt.innerHTML = bannerTeile().map((b) => `<button type="button" class="pr-banner-knopf" data-banner="${esc(b.id.slice(7))}" aria-pressed="${b.an}"
-    ${b.frei ? '' : 'disabled'}>${b.bild}<b>${esc(b.name)}</b><small>${esc(b.zeile)}</small></button>`).join('')
-    + `<p class="pr-hilfe">${esc(KT('banner.hinweis'))}</p>`;
-  inhalt.addEventListener('click', (ev) => {
-    const b = ev.target.closest('.pr-banner-knopf');
-    if (!b || b.disabled) return;
-    setzeProfilWahl({ banner: b.dataset.banner });
-    for (const x of inhalt.querySelectorAll('.pr-banner-knopf')) {
-      x.setAttribute('aria-pressed', String(x === b));
-      if (!x.disabled) x.querySelector('small').textContent = x === b ? KT('karte.bannerAn') : KT('karte.bannerFrei');
-    }
-  });
-  sheet({ titel: KT('karte.banner'), inhalt, klasse: 'pr-blatt', knoepfe: [{ text: S('profil.fertig'), wert: true, art: 'primaer' }], abbrechen: true })
-    .then(() => neuZeichnen(app)).catch(() => {});
-}
-
 // "Dabei seit Okt. 2026" (Flo 31.10.2026: "soll man im Profil sehen koennen, wie lange jemand dabei ist")
 export function seitText(tag = dabeiSeit()) {
   let monat = tag.slice(0, 7);
@@ -348,19 +328,20 @@ export function profilKarte({ app } = {}) {
   const krone = kronenText(eigeneKronenStufe());
   // Kundenblick 09.11.2026 (Befund 12): "Ich" zeigt wenigstens eine Spielzahl
   const partienZahl = ladePartien().filter(wertet).length;
+  // R4a (Kritik 09.11.): ganz leer zeigt die Vitrine einen schmalen Platz (waehlt Platz 1) statt drei grosser leerer Kaesten
+  const leer = vitrine.every((e) => !e);
+  const plaetze = leer ? vitrine.slice(0, 1) : vitrine;
   k.innerHTML = `<div class="pr-kopf"><span class="pr-banner" aria-hidden="true" style="background-image:url('${bannerUrl(banner)}')"></span>
       <span class="pr-av">${floAvatar('w')}</span>
       <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone">${esc(krone)}</span>` : ''}</div>
         <small class="pr-seit">${esc(seitText())}${partienZahl ? ' · ' + esc(S(partienZahl === 1 ? 'profil.partieEine' : 'profil.partien', { zahl: partienZahl })) : ''}</small></div></div>
-    <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
-      <button type="button" class="knopf pr-banner-wahl">${esc(KT('karte.banner'))}</button></div>
+    <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button></div>
     <h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>
-    <div class="pr-vitrine">${vitrine.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"${e && e.stufe ? ` data-stufe="${e.stufe}"` : ''}
+    <div class="pr-vitrine"${leer ? ' data-leer' : ''}>${plaetze.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"${e && e.stufe ? ` data-stufe="${e.stufe}"` : ''}
       aria-label="${esc(e ? (e.stufe ? `${e.name}, ${KT('stufe.' + e.stufe)}` : e.name) : S('profil.leer'))}">${e ? `<span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b>${e.stufe ? `<small class="pr-orden-stufe">${esc(KT('stufe.' + e.stufe))}</small>` : ''}`
       : `<span class="pr-plus" aria-hidden="true">+</span><small>${esc(S('profil.leer'))}</small>`}</button>`).join('')}</div>
     <p class="pr-hilfe">${esc(S('profil.vitrineHilfe'))}</p>`;
   k.querySelector('.pr-aendern').addEventListener('click', () => waehleAussehen(app));
-  k.querySelector('.pr-banner-wahl').addEventListener('click', () => waehleBanner(app));
   for (const b of k.querySelectorAll('.pr-orden')) b.addEventListener('click', () => waehleOrden(app, Number(b.dataset.platz)));
   return k;
 }

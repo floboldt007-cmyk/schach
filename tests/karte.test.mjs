@@ -72,6 +72,20 @@ const w2 = aufrufe.filter((a) => a.name === 'karte_waehle');
 pruefe('Nach Absage: zweite Wahl ohne Titel, Banner und Rahmen auf Standard, Vitrine nur Besitz', w2.length === 2 && w2[1].daten.titel === null
   && w2[1].daten.banner === 'start' && w2[1].daten.rahmen === 'ohne' && w2[1].daten.vitrine.join() === 'stufe-siege', w2.map((x) => x.daten));
 
+// KARTE_TITEL live 11.11.2026 20:09: Erfinder und Pionier ohne eigene Wahl bekommen den Titel "erfinder" bzw. "pionier"
+// (titelListe), den der Server mit Absicht nicht kennt (karte-vertrag: "kein Erfinder, kein Pionier"). Gesendet wird er
+// nicht: die erste Wahl geht ohne Titel raus, mit Banner und Rahmen wie gewaehlt, und es gibt keine Absage.
+for (const titel of ['erfinder', 'pionier']) {
+  setzeProfilWahl({ banner: 'saison-bronze', rahmen: 'liga-2' });
+  antworten = { karte_melde_stufen: stand(),
+    karte_waehle: (d) => (d.titel ? { __status: 400, message: 'KARTE_TITEL' } : stand({ wahl: { banner: d.banner } })) };
+  aufrufe = [];
+  await K.abgleichKonto({ titel });
+  const w = aufrufe.filter((a) => a.name === 'karte_waehle');
+  pruefe(`Titel "${titel}" geht nicht an den Server: eine Wahl ohne Titel, Banner und Rahmen bleiben`, w.length === 1 && w[0].daten.titel === null
+    && w[0].daten.banner === 'saison-bronze' && w[0].daten.rahmen === 'liga-2', w.map((x) => x.daten));
+}
+
 // offline: null, nichts gemerkt
 netzFehlt = true;
 const vorher = JSON.stringify(serverStand(UID));

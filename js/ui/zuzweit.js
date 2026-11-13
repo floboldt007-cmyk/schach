@@ -2,6 +2,7 @@
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
+import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { anim } from '../bewegung.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { sanAnzeige } from '../review.js';
@@ -37,6 +38,12 @@ function anzeigeName(n) {
 // Zugliste: in der eingestellten Sprache wie in Partie und Analyse (review.sanAnzeige: Deutsch K D T L S, Englisch
 // K Q R B N, Rochade mit Nullen)
 const sanText = (san) => sanAnzeige(san);
+
+// Figurensatz wirkt sofort (R4, 12.11.2026): kommt der Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke
+// wendet die Einstellungen dann neu an) oder waehlt der Spieler einen anderen Satz, folgen die Koenige des Startblatts und
+// das Spielbrett (dort mit allen Brett-Einstellungen, wendeBrettEinstellungenAn in js/ui/brett-einstellungen.js).
+// Ohne detail kein Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto.
+const satzPfad = (d) => { const p = figurenPfad(d); return p ? new URL(p, WURZEL).href : null; };
 
 function stil() {
   if (document.querySelector('link[data-zuzweit]')) return;
@@ -98,6 +105,13 @@ function startblatt(root, app) {
   zeigeUhrSatz();
   form.addEventListener('change', zeigeUhrSatz);
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  // die beiden Koenige folgen dem Figurensatz sofort (satzPfad oben, hier ohne Brett)
+  const koenige = [...s.querySelectorAll('.zz-paar img')];
+  const beiEinstellungen = (e) => {
+    const p = e.detail ? satzPfad(e.detail) : null;
+    if (p) koenige.forEach((img, i) => { img.src = p + (i ? 'bK' : 'wK') + '.svg'; });
+  };
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (startet) return;
@@ -112,7 +126,7 @@ function startblatt(root, app) {
     speichereModulEinstellungen('zuzweit', { ...zuzweit, bedenkzeit });
     app.gehe('partie', { modus: 'zuzweit', zuzweit, tempo: TEMPI[bedenkzeit] || null });
   });
-  return { verlasse() { weg = true; try { kopf.verlasse(); } catch (e) { /* egal */ } } };
+  return { verlasse() { weg = true; window.removeEventListener('schach:einstellungen', beiEinstellungen); try { kopf.verlasse(); } catch (e) { /* egal */ } } };
 }
 
 function partie(root, quelle, app, fortgesetzt) {
@@ -162,8 +176,7 @@ function partie(root, quelle, app, fortgesetzt) {
   root.append(s);
   const brettEl = s.querySelector('.brett');
   const brett = new Brett(brettEl, { figurenPfad: new URL(figurenPfad(), WURZEL).href, beiZug,
-    koordinaten: einst.koordinaten !== false, koordLage: einst.koordLage, autoDame: einst.autoDame !== false,
-    turmRochade: einst.turmRochade === true, steuerung: einst.steuerung, pfeile: einst.pfeile !== false });
+    ...brettOptionen(einst), turmRochade: einst.turmRochade === true });
   brett.setzeDauer(300);
   const wert = (f, jetzt = Date.now()) => Math.max(0, rest[f] - (tempo && z.phase === 'spiel' && chess.turn() === f ? Math.max(0, jetzt - seit) : 0));
   const uhrText = (ms) => { const sec = Math.ceil(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
@@ -300,6 +313,9 @@ function partie(root, quelle, app, fortgesetzt) {
   const sichern = () => { tick(); speichere(); };
   window.addEventListener('pagehide', sichern);
   document.addEventListener('visibilitychange', sichern);
+  // alle Brett-Einstellungen wirken sofort, wie in der Bot-Partie (F-einst)
+  const beiEinstellungen = (e) => wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
   speichere(); zeichne(false);
   if (!pruefeEnde() && z.phase === 'spiel' && tempo) uhrTimer = setInterval(tick, 100);
   if (app.test) window.__partie = { z, brett, bereit: true, chess: () => chess, phase: () => z.phase, uhr: { rest: wert } };
@@ -307,6 +323,7 @@ function partie(root, quelle, app, fortgesetzt) {
     if (weg) return;
     sichern(); weg = true; clearInterval(uhrTimer); drehenAnimation?.cancel();
     window.removeEventListener('pagehide', sichern); document.removeEventListener('visibilitychange', sichern);
+    window.removeEventListener('schach:einstellungen', beiEinstellungen);
     brett.zerstoere();
     if (app.test && window.__partie?.z === z) delete window.__partie;
   } };

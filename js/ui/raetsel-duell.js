@@ -3,21 +3,25 @@
 // (params.suchen startet die gewertete Suche sofort), die Lobby-Karte im Labor und der Link #raetsel-duell/CODE
 // (Freundschaft). Der Server entscheidet alles (js/raetsel-duell.js); dieser Screen zeigt nur:
 // Start (dunkle Buehne "Kopf an Kopf": beide Avatare, 3:00, drei Kacheln, Gegner suchen; darunter Mit einem Freund),
-// Warten (Suche mit sichtbarer Restzeit bis zum KI-Gegner, Einladung), Duell (Avatar, Zahl, Uhr als Ring, Zahl, Avatar;
-// darunter das Brett und die Reihe der eigenen Raetsel: gruen geloest, rot Fehler) und Ende (Krone ueber dem Sieger,
+// Warten (Suche mit sichtbarer Restzeit bis zum KI-Gegner, Einladung), Duell (seit R3 12.11.2026 wie die Bot-Partie:
+// Gegner-Leiste, Brett, eigene Leiste mit Uhr, darunter die Zeile und die Reihe der eigenen Raetsel: gruen geloest, rot
+// Fehler; im Vorlauf das Duell-Intro, waehrend des Spiels ohne Reiter-Leiste) und Ende (Krone ueber dem Sieger,
 // grosser Stand, Kronen-Schild, dieselbe Reihe, Nochmal und Fertig). params: { code } aus dem Link, { suchen }.
 //
 //   zeige(root, params, app) -> { verlasse() }
 // DOM: section.screen.raetsel-duell[data-phase="start"|"konto"|"suche"|"einladung"|"vorlauf"|"laeuft"|"zeit_um"|"beendet"]
 //   > header.haupt-kopf, .rd-rumpf > .rd-start (.rd-buehne > .rd-regeln li x3, .rd-suchen; .rd-freund) | .rd-warten
-//   | .rd-spiel (.rd-leiste > .rd-seite[data-wer="ich"|"gegner"], .rd-ring > .rd-uhr; .rd-brettzone .rd-brett; .rd-zeile;
-//   .rd-reihe) | .rd-ende. Optik: css/pakete/raetsel-duell.css.
+//   | .rd-spiel (.spieler.gegner.rd-seite[data-wer="gegner"]; .rd-brettzone .rd-brett; .spieler.ich.rd-seite[data-wer="ich"]
+//   mit .rd-uhr; .rd-zeile; .rd-reihe) | .rd-ende. Optik: css/pakete/raetsel-duell.css.
 // Tests: window.__duellKiMs verkuerzt die 10 s bis zum KI-Gegner, window.__duellAbfrageMs die Abfrage (Standard 1 s).
+// Mit ?test: window.__duell = { brett() -> Brett | null } (nur lesen; z. B. autoDame, das kein DOM-Merkmal hat).
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
+import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
+import { spieleDuell } from './duell.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { anim, tempo } from '../bewegung.js';
 import { ladeEinstellungen } from '../storage.js';
@@ -55,12 +59,36 @@ function fehlerText(e) {
 }
 
 // Bild des KI-Gegners: der Leiter-Bot mit der naechsten Staerke (nur das Gesicht, die Staerke steht als Zahl daneben)
-function kiBild(elo) {
+function kiBot(elo) {
   const leiter = BOTS.filter((b) => !b.endgegner && Number.isFinite(Number(b.elo)));
-  if (!leiter.length) return '';
+  if (!leiter.length) return null;
   const ziel = Number.isInteger(elo) ? elo : 1200;
-  const bot = leiter.reduce((a, b) => (Math.abs(b.elo - ziel) < Math.abs(a.elo - ziel) ? b : a));
-  return `<img src="${esc(avatarVon(bot))}" alt="">`;
+  return leiter.reduce((a, b) => (Math.abs(b.elo - ziel) < Math.abs(a.elo - ziel) ? b : a));
+}
+function kiBild(elo) {
+  const bot = kiBot(elo);
+  return bot ? `<img src="${esc(avatarVon(bot))}" alt="">` : '';
+}
+// Intro nur einmal je Duell (auch nach Neuladen in derselben Sitzung), wie die Online-Partie
+const INTRO_SCHLUESSEL = 'schach-arena:raetsel-duell:intro';
+// Laufendes Duell ueber Neuladen (R7 12.11.2026, B6): nur die Kennung und die Reihe (reine Anzeige) in diesem Tab. Stand,
+// Aufgabe und Uhr kommen nach dem Neuladen wieder vom Server (duell_stand: ende_am, raetsel.bisher), die Zeit laeuft dort
+// weiter. Nach dem gezeigten Ergebnis oder einem unbekannten Duell wird der Eintrag vergessen.
+const LAUF_SCHLUESSEL = 'schach-arena:raetsel-duell:laufend';
+const LAUF_MAX_MS = 15 * 60 * 1000;
+const LAUF_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function merkeLauf(id, reihe) {
+  try { sessionStorage.setItem(LAUF_SCHLUESSEL, JSON.stringify({ id, reihe, um: Date.now() })); } catch (e) { /* nur Komfort */ }
+}
+function ladeLauf() {
+  let x = null;
+  try { x = JSON.parse(sessionStorage.getItem(LAUF_SCHLUESSEL) || 'null'); } catch (e) { x = null; }
+  if (!x || typeof x.id !== 'string' || !LAUF_UUID.test(x.id) || !(Date.now() - Number(x.um) < LAUF_MAX_MS)) return null;
+  const reihe = Array.isArray(x.reihe) ? x.reihe.filter((r) => r === 'g' || r === 'r').slice(0, 60) : [];
+  return { id: x.id, reihe };
+}
+function vergissLauf(id) {
+  try { const x = JSON.parse(sessionStorage.getItem(LAUF_SCHLUESSEL) || 'null'); if (!id || !x || x.id === id) sessionStorage.removeItem(LAUF_SCHLUESSEL); } catch (e) { /* egal */ }
 }
 const ringSvg = (klasse) => `<svg class="${klasse}" viewBox="0 0 100 100" aria-hidden="true"><circle class="rd-ring-spur" cx="50" cy="50" r="44"/>`
   + `<circle class="rd-ring-rest" cx="50" cy="50" r="44" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="0"/></svg>`;
@@ -82,11 +110,26 @@ export function zeige(root, params, app) {
   const stoppeUhren = () => { for (const u of uhren) clearTimeout(u); uhren.clear(); };
   let suche = null;
   let brett = null;
+  // Brett-Einstellungen wirken sofort wie in der Bot-Partie (F-duell Figurensatz, F-duell2 Koordinaten und Auto-Dame,
+  // F-einst alle): kommt der Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen
+  // dann neu an) oder stellt der Spieler etwas um, folgt das stehende Brett ohne Neubau (js/ui/brett-einstellungen.js); das
+  // naechste Duell auf diesem Bildschirm baut sein Brett mit brettEinst. Ohne detail bleibt alles, wie es ist.
+  let brettEinst = einst;
+  const beiEinstellungen = (e) => {
+    if (!e.detail) return;
+    brettEinst = e.detail;
+    wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
+  };
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
+  const testHaken = app && app.test ? { brett: () => brett } : null;
+  if (testHaken) window.__duell = testHaken;
   // laufendes Duell; reihe: eigene Raetsel in Reihenfolge, 'g' geloest, 'r' Fehler (nur dieses Geraet, nur Anzeige)
   const d = { id: null, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe: [] };
 
   const phase = (p) => { s.dataset.phase = p; };
+  const endeIntro = () => { if (d.intro) { try { d.intro.ueberspringe(); } catch (e) { /* schon fertig */ } d.intro = null; } };
   function aufraeumen() {
+    endeIntro();
     stoppeUhren();
     if (suche) { suche.stopp(); suche = null; }
     if (brett) { try { brett.zerstoere(); } catch (e) { /* egal */ } brett = null; }
@@ -221,31 +264,43 @@ export function zeige(root, params, app) {
   }
 
   // ---------- Duell ----------
-  // Kopf an Kopf: Avatar, Zahl (gross, "gelöst" nur fuer Vorleser), Name und Fehler klein, duenner Balken
+  // Gerippe der Bot-Partie (R3, Gleichheits-Liste): Gegner-Leiste ueber dem Brett, eigene Leiste darunter (mit der
+  // eigenen Uhr, die Fehler-Strafe trifft nur sie), Klassen .spieler.gegner/.ich und .av wie in der Partie, damit das
+  // Duell-Intro (js/ui/duell.js) die Portraets hierher fliegen kann. Je Leiste: Avatar, Name und Fehler, die Zahl der
+  // geloesten Raetsel gross ("gelöst" nur fuer Vorleser), unten ein duenner Balken (Anteil am gemeinsamen Stand).
   function seiteHtml(wer) {
-    const bild = wer === 'ich' ? ichBild() : '<span class="rd-av rd-av-frage" aria-hidden="true">?</span>';
-    return `<div class="rd-seite" data-wer="${wer}">${bild}<span class="rd-zahlen"><b class="rd-geloest zahl"></b>
-      <span class="rd-name"></span><small class="rd-fehlerzahl"></small></span>
+    const ich = wer === 'ich';
+    const bild = ich ? floAvatar('w') : '<span class="rd-frage">?</span>';
+    return `<div class="spieler ${ich ? 'ich' : 'gegner'} rd-seite" data-wer="${wer}" role="group">
+      <span class="av rd-av" aria-hidden="true">${bild}</span>
+      <span class="rd-info"><span class="rd-name"></span><small class="rd-fehlerzahl"></small></span>
+      <b class="rd-geloest zahl"></b>${ich ? `<span class="rd-uhr zahl" role="timer" aria-live="off">${uhrText(DAUER_MS)}</span>` : ''}
       <span class="rd-balken" aria-hidden="true"><i></i></span></div>`;
   }
 
   function starteDuell(id) {
     aufraeumen();
-    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe: [], gesehen: false });
+    // dasselbe Duell nach dem Neuladen (oder Link): die Reihe dieses Tabs bleibt, ein neues Duell beginnt leer
+    const alt = ladeLauf();
+    const reihe = alt && alt.id === id ? alt.reihe : [];
+    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe, gesehen: false });
+    merkeLauf(id, reihe);
     phase('vorlauf');
     rumpf.innerHTML = `<div class="rd-spiel">
-        <div class="rd-leiste">${seiteHtml('ich')}<div class="rd-ring">${ringSvg('rd-ring-bild')}<span class="rd-uhr zahl" role="timer" aria-live="off">${uhrText(DAUER_MS)}</span></div>${seiteHtml('gegner')}</div>
+        ${seiteHtml('gegner')}
         <div class="rd-brettzone"><div class="brett-rahmen rd-rahmen"><div class="rd-brett" aria-label="${esc(D('brett'))}"></div></div></div>
+        ${seiteHtml('ich')}
         <p class="rd-zeile" role="status"><span class="rd-nr"></span><span class="rd-amzug"></span><span class="rd-meldung"></span></p>
         <div class="rd-reihe-ort">${reiheHtml()}</div>
       </div>`;
     brett = new Brett(rumpf.querySelector('.rd-brett'), {
-      ausrichtung: 'w', figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug, koordinaten: einst.koordinaten !== false, autoDame: einst.autoDame !== false,
+      ausrichtung: 'w', figurenPfad: new URL(figurenPfad(brettEinst), WURZEL).href, beiZug, ...brettOptionen(brettEinst),
     });
     hole();
     tick();
   }
-  const zeichneReihe = () => { const ort = rumpf.querySelector('.rd-reihe-ort'); if (ort) ort.innerHTML = reiheHtml(); };
+  // nach dem gezeigten Ende (eine spaete Zug-Antwort) nicht wieder merken, sonst kaeme das Ergebnis beim Neuladen erneut
+  const zeichneReihe = () => { if (d.id && s.dataset.phase !== 'beendet') merkeLauf(d.id, d.reihe); const ort = rumpf.querySelector('.rd-reihe-ort'); if (ort) ort.innerHTML = reiheHtml(); };
 
   // Abfrage alle 1 s: Gegner live, Ende; das eigene Raetsel nur, wenn gerade kein Zug unterwegs ist
   async function hole() {
@@ -260,12 +315,33 @@ export function zeige(root, params, app) {
       d.versatz = versatzAus(st.jetzt, Date.now());
       d.st = st;
       if (st.status === 'beendet' || st.status === 'abgebrochen') { zeigeEnde(st); return; }
-      // Start-Klang, sobald das Duell zum ersten Mal laeuft (Gegner gefunden, Einladung angenommen), wie vor einer Partie
-      if (!d.gesehen) { d.gesehen = true; try { klang.spiele('start'); } catch (e) { /* ohne Klang */ } }
+      // Sobald das Duell zum ersten Mal laeuft (Gegner gefunden, Einladung angenommen): Intro wie vor einer Partie
+      if (!d.gesehen) { d.gesehen = true; intro(st); }
       if (!d.wartet) setzeRaetsel(st.raetsel);
       zeichneLeiste();
     }
     spaeter(hole, testZahl('__duellAbfrageMs', 1000));
+  }
+
+  // Duell-Intro (js/ui/duell.js, wie vor einer Bot- oder Online-Partie): nur solange das Duell frisch ist (Vorlauf)
+  // und einmal je Duell; es spielt den Start-Klang selbst (bei Intro "aus" nur den Klang). Ein altes, schon laufendes
+  // Duell bekommt wie bisher nur den Klang. Gewertet zaehlt als Liga-Anlass (Vollfassung), Freundschaft nicht.
+  function intro(st) {
+    const startKlang = () => { try { klang.spiele('start'); } catch (e) { /* ohne Klang */ } };
+    let gesehen = [];
+    try { gesehen = JSON.parse(sessionStorage.getItem(INTRO_SCHLUESSEL) || '[]'); } catch (e) { gesehen = []; }
+    if (!Array.isArray(gesehen)) gesehen = [];
+    if (phaseAus(st, d.versatz, Date.now()) !== 'vorlauf' || gesehen.includes(d.id)) { startKlang(); return; }
+    try { sessionStorage.setItem(INTRO_SCHLUESSEL, JSON.stringify([...gesehen, d.id].slice(-20))); } catch (e) { /* nur Komfort */ }
+    const g = st.gegner || {};
+    const ki = st.art === 'ki' ? kiBot(g.elo) : null;
+    const bot = { id: 'raetsel-duell', name: ki ? D('ki') : st.art === 'freundschaft' ? D('freund') : D('gegner'),
+      elo: ki && Number.isInteger(g.elo) ? g.elo : null, avatar: ki ? avatarVon(ki) : '', farbe: ki ? ki.farbe : undefined };
+    try {
+      // ohne Vitrine (nie die lange Fassung), damit es in den Vorlauf passt; tick() beendet es spaetestens beim Start
+      d.intro = spieleDuell({ bot, farbe: 'w', anlass: st.art === 'freundschaft' ? null : 'liga', einstellung: einst.duellIntro || 'besondere',
+        bildschirm: 'raetsel-duell', mitFarbe: false, mitVitrine: false });
+    } catch (e) { startKlang(); }
   }
 
   function tick() {
@@ -276,10 +352,12 @@ export function zeige(root, params, app) {
     const rest = p === 'vorlauf' ? DAUER_MS - d.st.ich.fehler * KONST.STRAFE_S * 1000 : restMs(d.st.ich.ende_am, d.versatz, Date.now());
     uhr.textContent = uhrText(rest);
     uhr.setAttribute('aria-label', D('uhr.aria', { zeit: uhrText(rest) }));
-    const ring = rumpf.querySelector('.rd-ring .rd-ring-rest');
-    if (ring) ring.setAttribute('stroke-dashoffset', (RING * (1 - Math.min(1, rest / DAUER_MS))).toFixed(2));
+    // wie die Partie-Uhr: dunkel, solange sie laeuft, Warnfarbe in den letzten 30 Sekunden
+    uhr.classList.toggle('laeuft', p === 'laeuft');
+    uhr.classList.toggle('warn', p === 'laeuft' && rest <= 30000);
     if (s.dataset.phase !== p) {
       phase(p);
+      if (p !== 'vorlauf') endeIntro();
       if (p === 'laeuft' && !d.wartet) setzeRaetsel(d.st.raetsel, { neu: true });
       if (p === 'zeit_um') { brett.erlaubeZuege(null); zeigeMeldung('', D('zeit.um')); }
       if (p === 'vorlauf') zeigeMeldung('', D('vorlauf'));
@@ -307,7 +385,6 @@ export function zeige(root, params, app) {
     if (gs.dataset.ki !== ki) {
       gs.dataset.ki = ki;
       const av = gs.querySelector('.rd-av');
-      av.classList.remove('rd-av-frage');
       av.innerHTML = st.art === 'ki' ? kiBild(g.elo) : icon('person');
     }
   }
@@ -387,6 +464,8 @@ export function zeige(root, params, app) {
   // ---------- Ende ----------
   function zeigeEnde(st) {
     aufraeumen();
+    // das Ergebnis ist gezeigt: ein weiteres Neuladen fuehrt zum Start
+    vergissLauf(d.id);
     phase('beendet');
     const g = st.gegner || { geloest: 0 };
     const erg = st.ergebnis || 'remis';
@@ -417,12 +496,30 @@ export function zeige(root, params, app) {
     if (tempo() > 0) anim(rumpf.querySelector('.rd-ende'), [{ opacity: 0, transform: 'translateY(16px) scale(.97)' }, { opacity: 1, transform: 'none' }], { d: 420, k: 'weich' });
   }
 
-  zeigeStart();
-  if (params && params.code && server.angemeldet()) tritteBei(params.code);
-  else if (params && params.suchen && server.angemeldet()) starteSuche();
+  // Beim Oeffnen (auch nach dem Neuladen): ein Code-Link tritt bei (der Server gibt einem Teilnehmer sein Duell zurueck);
+  // sonst geht ein in diesem Tab laufendes Duell vor, auch vor params.suchen aus dem Verlaufseintrag, das sonst eine neue
+  // Suche startete. Kennt der Server das Duell nicht (mehr) oder ist es noch offen, gilt der Start wie bisher; ohne
+  // Antwort (offline) bleibt es beim Duell, die Abfrage versucht es weiter.
+  const lauf = server.angemeldet() && !(params && params.code) ? ladeLauf() : null;
+  const oeffne = () => {
+    zeigeStart();
+    if (params && params.code && server.angemeldet()) tritteBei(params.code);
+    else if (params && params.suchen && server.angemeldet()) starteSuche();
+  };
+  if (lauf) {
+    (async () => {
+      let st;
+      try { st = await server.stand(lauf.id); } catch (e) { st = undefined; }
+      if (weg) return;
+      if (st === undefined || (st && st.status !== 'offen')) starteDuell(lauf.id);
+      else { vergissLauf(lauf.id); oeffne(); }
+    })();
+  } else oeffne();
   return {
     verlasse() {
       weg = true;
+      window.removeEventListener('schach:einstellungen', beiEinstellungen);
+      if (testHaken && window.__duell === testHaken) delete window.__duell;
       aufraeumen();
       kopf.verlasse();
     },

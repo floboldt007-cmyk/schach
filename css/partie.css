@@ -287,22 +287,26 @@
    HOCH (iPad hoch): eine Spalte, Brett zuerst nach dem Gegner, Balken waagrecht ueber dem Brett
    Flo 06.11.2026 ("das Schachbrett ist viel zu klein"): das Brett nimmt die ganze Breite (820 x 1180 von 666 auf 788 px).
    Dafuer liegt der Balken wie auf dem Handy waagrecht ueber dem Brett, der Sockel ist 4 px, der Coach zeigt eine Zeile
-   (Antippen zeigt den Rest), und der Zugstreifen steht nach den Knoepfen (die Spalte scrollt, wie auf dem Handy).
-   --reserve: zwei Karten 58, Coach 66, Knoepfe 60, vier Luecken 8 px, Balken und Sockel.
+   (Antippen zeigt den Rest), und der Zugstreifen steht nach den Knoepfen.
+   R7 (Befund B8, 12.11.2026): der Zugstreifen lag unter dem Rand (820 x 1180: +46 px, die Spalte scrollte). Jetzt zaehlt er
+   zur Reserve, und den Platz geben Kopf (60 statt 76 px wie quer ab 1000 px, Knoepfe darin 44 px), Luecken (6 statt 8 px),
+   Karten (50 statt 58 px) und Coach (62 statt 66 px) ab. Das Brett bleibt so gross wie vorher (820 x 1180: 788 px, breiten-
+   begrenzt; 768 x 1024: 638 px, hoehenbegrenzt).
+   --reserve: zwei Karten 50, Coach 62, Knoepfe 60, Zugstreifen 44, fuenf Luecken 6 px, Balken und Sockel.
    ============================================================ */
 @media (orientation: portrait) and (min-width: 601px) {
-  .partie { --rahmen: 4px; --balken: 6px; --spalt: 4px; }
-  .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 12px 12px; container: partie / size;
+  .partie { --rahmen: 4px; --balken: 6px; --spalt: 4px; --kopf-hoehe-partie: 60px; }
+  .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 12px 8px; container: partie / size;
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
   .partie .seite { display: contents; }
   .partie .inhalt > *, .partie .seite > * {
-    --reserve: calc(58px + 58px + 66px + 60px + 4 * 8px + var(--balken) + var(--spalt) + 2 * var(--rahmen));
+    --reserve: calc(50px + 50px + 62px + 60px + 44px + 5 * 6px + var(--balken) + var(--spalt) + 2 * var(--rahmen));
     --brett: min(calc(100cqw - 2 * var(--rahmen)), calc(100cqh - var(--reserve)));
     width: calc(var(--brett) + 2 * var(--rahmen)); max-width: 100%; flex: none; }
   .partie .inhalt > .brettzone { flex-direction: column; }
   .partie .zugbox { display: none; }
   .partie .spieler.gegner { order: 0; } .partie .brettzone { order: 1; } .partie .spieler.ich { order: 2; }
-  .partie .coach { order: 3; height: 66px; padding-top: 10px; padding-bottom: 10px; align-content: start; overflow: hidden; }
+  .partie .coach { order: 3; height: 62px; padding-top: 8px; padding-bottom: 8px; align-content: start; overflow: hidden; }
   .partie .coach > .c-text { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   .partie .coach > .coach-knoepfe { display: none; }
   .partie .coach.offen { height: auto; }
@@ -311,7 +315,7 @@
   .partie .spielknoepfe { order: 4; }
   .partie .zugleiste { order: 5; height: var(--tap); flex: none; }
   .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 2; }
-  .partie .spieler { min-height: 58px; padding: 6px 8px 6px 10px; }
+  .partie .spieler { min-height: 50px; padding: 3px 8px 3px 10px; }
   .partie .spieler { --av: 44px; }
 }
 
@@ -371,7 +375,10 @@
   .partie .zugbox { display: none; }
   .partie .spieler.gegner { order: 0; } .partie .brettzone { order: 1; } .partie .spieler.ich { order: 2; }
   .partie .coach { order: 3; } .partie .zugleiste { order: 4; } .partie .spielknoepfe { order: 5; }
-  .partie.streifen-unten .zugleiste { order: 6; }
+  /* R7 (Befund B8, 12.11.2026): unter 760 px Hoehe lag der Zugstreifen nach den Knoepfen unter dem Rand, die Spalte musste
+     scrollen (iPhone SE +49 px). Dort entfaellt er: Zug zurueck und vor stehen als Pfeile in der Knopfreihe, den letzten
+     Zug nennt der Coach. Das Brett bleibt so gross wie vorher. */
+  .partie.streifen-unten .zugleiste { display: none; }
   .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 2; }
   /* Spielerkarten: Avatar 36, Name 15 px fett (zweizeilig erlaubt, nie gekuerzt), kompakte Uhr */
   .partie .spieler { --av: 36px; min-height: 48px; padding: 4px 6px 4px 8px; border-radius: 16px; }
@@ -444,7 +451,8 @@
 }
 
 /* Pfeile in der Knopfreihe einschalten (Abschnitt "Aktionen" oben): iPad hoch immer, Handy nur mit Streifen unten. Der
-   Zugstreifen behaelt seine Zuege (Antippen, die Spalte scrollt), seine eigenen Pfeile entfallen dort. */
+   Zugstreifen behaelt auf dem iPad seine Zuege (Antippen), seine eigenen Pfeile entfallen dort; auf dem Handy unter 760 px
+   Hoehe entfaellt der Streifen ganz (R7, B8). */
 @media (orientation: portrait) and (min-width: 601px) {
   .partie .spielknoepfe > .knopf.sk-pfeil { display: flex; }
   .partie .spielknoepfe { grid-template-columns: var(--tap) repeat(3, minmax(0, 1fr)) var(--tap); }

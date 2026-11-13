@@ -24,6 +24,7 @@
 // .ls-brett; .ls-seite > .ls-status, .ls-meldung[data-art], .ls-aktionen). Optik: css/pakete/lernen.css.
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
+import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
@@ -121,8 +122,16 @@ export function zeige(root, params, app) {
 
   const brett = new Brett($('.ls-brett'), {
     ausrichtung: flo, figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug,
-    koordinaten: einst.koordinaten !== false, autoDame: einst.autoDame !== false,
+    ...brettOptionen(einst),
   });
+  // Brett-Einstellungen wirken sofort wie in der Bot-Partie (R4 Figurensatz, F-einst alle): kommt der Erfinder-Status erst
+  // nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder stellt der Spieler etwas um,
+  // folgt das stehende Brett ohne Neubau (js/ui/brett-einstellungen.js)
+  const beiEinstellungen = (e) => wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
+  // Test-Haken (F-einst): Auto-Dame, Steuerung und Pfeile stehen nur am Brett-Objekt, nicht im DOM
+  const brettHaken = () => brett;
+  if (window.__lektion) window.__lektion.brett = brettHaken;
   const schach = () => (st.chess.inCheck() ? true : null);
   const zeichne = (m, animieren = false) => brett.setzeStellung(st.chess.fen(), { animieren, letzterZug: m ? [m.from, m.to] : null, schach: schach() });
   const erlaube = () => brett.erlaubeZuege(st.phase === 'flo' ? zielKarte(st.chess) : null);
@@ -427,6 +436,8 @@ export function zeige(root, params, app) {
       aktiv = null;
       for (const id of timer) clearTimeout(id);
       timer.clear();
+      window.removeEventListener('schach:einstellungen', beiEinstellungen);
+      if (window.__lektion && window.__lektion.brett === brettHaken) delete window.__lektion.brett;
       try { kopf.verlasse(); } catch (e) { /* egal */ }
       try { brett.zerstoere(); } catch (e) { /* egal */ }
     },

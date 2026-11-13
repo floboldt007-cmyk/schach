@@ -23,6 +23,9 @@ export const KARTE_MOTIVE = Object.freeze(['Q', 'R', 'B', 'N', 'P', 'karo', 'stu
 export const KARTE_RAHMEN = Object.freeze(['ohne', 'holz', 'liga-1', 'liga-2', 'liga-3', 'liga-4', 'liga-5', 'liga-6',
   'welt-1', 'welt-2', 'welt-3', 'welt-4', 'welt-5', 'serie-7', 'serie-30', 'serie-100']);
 const MELDBAR = FAMILIEN.filter((f) => !f.server).map((f) => f.id);
+// wie karte_konstanten() -> titel: nur Level-, Erfolgs- und Koennen-Titel (tests/karte-vertrag.test.mjs). Erfinder und
+// Pionier zeigt nur die eigene Karte; an den Server gingen sie als sichere Absage KARTE_TITEL (live 11.11.2026 20:09)
+const SERVER_TITEL = /^(level|erfolg|koennen)-[a-z0-9-]+$/;
 
 export const angemeldet = () => !!sitzung()?.access_token;
 
@@ -48,6 +51,7 @@ export function wahlFuerServer(wahl = profilWahl(), stand = null, titel = wahl.t
     if (!KARTE_RAHMEN.includes(rahmen)) rahmen = 'ohne';
     titel = null;
   }
+  if (!SERVER_TITEL.test(titel || '')) titel = null;
   return { banner, titel, vitrine, motiv: KARTE_MOTIVE.includes(wahl.figur) ? wahl.figur : 'P', grund: wahl.grund || 'standard', rahmen };
 }
 
