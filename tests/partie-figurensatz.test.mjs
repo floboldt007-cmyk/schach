@@ -3,7 +3,7 @@
 // oder der Spieler waehlt einen anderen Satz. Vorher blieb bis zum Neuladen der alte Satz stehen (R3, 12.11.2026;
 // dieselbe Luecke war in js/ui/online.js am 11.11. behoben, tests/online-ui.test.mjs "Figurensatz ... spaet").
 // Netzwerk ausschliesslich simuliert: kein Test schreibt ins echte Supabase-Projekt.
-//   PORT=9631 node tests/partie-figurensatz.test.mjs   eigener Port (Standard 8935)
+//   PORT=9631 node tests/partie-figurensatz.test.mjs   eigener Port (Standard: frei)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8935);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'u1' })).toString('base64url') + '.x', refresh_token: 'test-r', expires_at: 9999999999, user: { id: 'u1', email: 'spieler@example.invalid' } };
 let browser, ok = 0, gesamt = 0, sonderVerzug = 0, sonderAntworten = 0;

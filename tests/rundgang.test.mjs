@@ -12,7 +12,7 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8895);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const START = `http://127.0.0.1:${PORT}/index.html?test&reiter=training,verlauf`;
 const SHOTS = path.join(WURZEL, 'tests', 'rundgang-shots');
 const GROESSEN = [
@@ -60,7 +60,8 @@ async function screen(page, browserName, groesse, name, selector = '#app > .scre
   await page.screenshot({ path: path.join(SHOTS, datei), fullPage: false });
   const messung = await page.evaluate(() => {
     const sichtbar = (el) => { const s = getComputedStyle(el); const b = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && b.width > 0 && b.height > 0; };
-    const klein = [...document.querySelectorAll('button, [role="button"], input, select')].filter(sichtbar).map((el) => {
+    // ohne [inert]: hinter einem offenen Blatt ist der Hintergrund stillgelegt (js/ui/bauteile.js) und nicht antippbar
+    const klein = [...document.querySelectorAll('button, [role="button"], input, select')].filter((el) => sichtbar(el) && !el.closest('[inert]')).map((el) => {
       const b = el.getBoundingClientRect();
       return { text: (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 45), w: Math.round(b.width), h: Math.round(b.height) };
     }).filter((x) => x.w < 44 || x.h < 44);

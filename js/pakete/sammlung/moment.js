@@ -38,11 +38,29 @@ export function zielText(x) {
   return Number.isInteger(x.gold) && x.gold > 0 ? K('moment.ziel', { n: x.gold, was: K('was.' + x.familie) }) : '';
 }
 
-// waehrend einer Partie nicht ueber das Brett legen (das Ergebnis hat Vorrang)
-const buehneFrei = () => typeof document !== 'undefined' && !document.querySelector('.screen.partie');
+// waehrend einer Partie nicht ueber das Brett legen (das Ergebnis hat Vorrang), und nie ueber ein offenes Blatt oder einen
+// Dialog (Feinschliff R8, LG4 A: vorher lag "Ligaaufstieg" z. B. ueber dem offenen Shop-Blatt, zwei Ebenen uebereinander).
+// Es zaehlt nur ein sichtbares Blatt: nicht beim Schliessen (.weg, es gleitet noch hinaus) und nicht versteckt im Dokument
+// (z. B. die Tafel der Meisterschule mit hidden).
+const blattOffen = () => [...document.querySelectorAll('[aria-modal="true"]:not(.st-moment)')]
+  .some((e) => !e.closest('.weg, [hidden]') && e.getClientRects().length > 0);
+const buehneFrei = () => typeof document !== 'undefined' && !document.querySelector('.screen.partie') && !blattOffen();
+
+// wartet ein Erfolg auf ein offenes Blatt, kommt er, sobald es zu ist (sonst erst beim naechsten Bildschirmwechsel)
+let wache = null;
+function warteAufBlatt() {
+  if (wache || typeof MutationObserver === 'undefined' || !blattOffen()) return;
+  wache = new MutationObserver(() => {
+    if (blattOffen()) return;
+    wache.disconnect(); wache = null;
+    setTimeout(naechste, 300);
+  });
+  wache.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-modal'] });
+}
 
 function naechste() {
-  if (offen || !schlange.length || !buehneFrei()) return;
+  if (offen || !schlange.length) return;
+  if (!buehneFrei()) { warteAufBlatt(); return; }
   const x = schlange.shift();
   const f = FAMILIEN.find((y) => y.id === x.familie);
   const bild = (f && f.alt.length && erfolgKunst(f.alt[f.alt.length - 1])) || '';

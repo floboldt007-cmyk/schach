@@ -4,7 +4,7 @@
 // deshalb die BERECHNETE Sichtbarkeit (getComputedStyle, Box), nie nur das Attribut. Gegenprobe im selben Lauf: mit
 // eingeschaltetem Apple-Weg erscheint der Knopf (die Regel versteckt nur, was hidden traegt).
 // Netzwerk: alles ausser 127.0.0.1 wird abgebrochen.
-//   PORT=9620 node tests/apple-knopf.test.mjs   eigener Port (Standard 8929)
+//   PORT=9620 node tests/apple-knopf.test.mjs   eigener Port (Standard: frei)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -26,7 +26,7 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8929);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const BASIS = `http://127.0.0.1:${PORT}/?test&kern`;
 

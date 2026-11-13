@@ -14,7 +14,7 @@
 //
 //   node tests/bericht.test.mjs              beides
 //   node tests/bericht.test.mjs --nur-node   nur Teil 1
-//   PORT=9790 node tests/bericht.test.mjs    Port des Testservers (sonst 8897)
+//   PORT=9790 node tests/bericht.test.mjs    Port des Testservers (sonst: frei)
 //   BROWSER=webkit node tests/bericht.test.mjs
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
@@ -29,7 +29,7 @@ import { leseSw } from './sw.test.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8897);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/`;
 const NUR_NODE = process.argv.includes('--nur-node');
 
@@ -622,7 +622,12 @@ async function testeBlatt(browser) {
   const { BOTS } = await import('../js/bots.js');
   (await import('../js/sprache.js')).setzeSprache('de');
   const bName = BOTS.find((b) => b.id === g.bots.b).name;
-  const { kontext, seite, fremd } = await neueSeite(browser, { daten, zwischenablage: true });
+  // writeText wird abgefangen und haelt genau fest, was die App kopiert. Die echte System-Zwischenablage machte unter
+  // Windows aus \n ein \r\n (gemessen 20 von 20), der Vergleich mit dem Blatt schlug dort darum immer fehl.
+  const init = () => {
+    Clipboard.prototype.writeText = function (t) { window.__ablage = t; return Promise.resolve(); };
+  };
+  const { kontext, seite, fremd } = await neueSeite(browser, { daten, init, zwischenablage: true });
   try {
     await zuEinstellungen(seite);
     const eintrag = await seite.evaluate(() => {
@@ -668,7 +673,7 @@ async function testeBlatt(browser) {
     await seite.waitForFunction(() => /Kopiert/.test(document.querySelector('.bericht-status').textContent), null, { timeout: 5000 }).catch(() => {});
     const status = await seite.locator('.bericht-status').textContent();
     if (CHROMIUM) {
-      const ablage = await seite.evaluate(() => navigator.clipboard.readText());
+      const ablage = await seite.evaluate(() => window.__ablage);
       pruefe('Kopieren: Zwischenablage enthaelt genau den Bericht aus dem Blatt', ablage === text && /^Kopiert\./.test(status), { status, gleich: ablage === text });
     } else pruefe('Kopieren meldet "Kopiert."', /^Kopiert\./.test(status), status);
     // Fehlerliste leeren
@@ -698,7 +703,7 @@ async function testeBlatt(browser) {
     if (CHROMIUM) {
       await seite.locator('.bericht-blatt [data-knopf="kopieren"]').click();
       await seite.waitForTimeout(200);
-      pruefe('nach dem Leeren kopiert Kopieren den neuen Text', (await seite.evaluate(() => navigator.clipboard.readText())) === nach.text);
+      pruefe('nach dem Leeren kopiert Kopieren den neuen Text', (await seite.evaluate(() => window.__ablage)) === nach.text);
     }
     await seite.locator('.bericht-blatt [data-knopf="schliessen"]').click();
     await seite.waitForFunction(() => !document.querySelector('.sheet-ort:not(.weg)'), null, { timeout: 5000 }).catch(() => {});

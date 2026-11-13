@@ -22,7 +22,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8881);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // --pakete: mit allen Paketen aus PAKETE (Englisch Teil 2), sonst nur der Kern (?kern)
 const PAKETE_MODUS = process.argv.includes('--pakete');
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test${PAKETE_MODUS ? '' : '&kern'}`;
@@ -488,14 +488,21 @@ async function browserTeil(browser) {
       && /Einstellungen/.test(await seite.locator('#app').innerText()));
     pruefe('Sprachwahl sichtbar (Geraet, Deutsch, English), Geraet gewaehlt', await seite.locator('[data-einstellung="sprache"] .es-seg').count() === 3
       && await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="auto"]').getAttribute('aria-checked') === 'true');
-    await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="en"]').click();
-    await seite.waitForFunction(() => document.documentElement.lang === 'en', null, { timeout: 10000 });
-    const gespeichert = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')));
-    pruefe('Wahl English: Seite laedt neu und ist englisch', gespeichert.sprache === 'en' && gespeichert.spracheGewaehlt === true);
-    await seite.waitForFunction(() => !!document.querySelector('[data-einstellung="sprache"] .es-seg[aria-checked="true"]'), null, { timeout: 10000 });
-    await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="auto"]').click();
-    await seite.waitForFunction(() => document.documentElement.lang === 'de', null, { timeout: 10000 });
-    pruefe('Wahl Geraet: zurueck auf die Sprache des Geraets (Test: deutsch)', await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).spracheGewaehlt) === false);
+    // Die Wahl setzt lang sofort und laedt 60 ms spaeter neu (js/ui/einstellungen.js). Auf lang zu warten traf darum die
+    // alte Seite (gemessen 10 von 10), das naechste evaluate starb im Neuladen (CI, PR #243). Abgewartet wird das load
+    // der neuen Seite; die Marke __vorDerWahl beweist, dass wirklich neu geladen wurde.
+    const waehleUndWarteNeuladen = async (wert) => {
+      await seite.evaluate(() => { window.__vorDerWahl = true; });
+      const geladen = seite.waitForEvent('load', { timeout: 15000 });
+      await seite.locator(`[data-einstellung="sprache"] .es-seg[data-wert="${wert}"]`).click();
+      await geladen;
+      await seite.waitForFunction(() => !!window.__app && !!document.querySelector('[data-einstellung="sprache"] .es-seg[aria-checked="true"]'), null, { timeout: 20000 });
+      return seite.evaluate(() => ({ neu: window.__vorDerWahl === undefined, lang: document.documentElement.lang, e: JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')) }));
+    };
+    const nachEn = await waehleUndWarteNeuladen('en');
+    pruefe('Wahl English: Seite laedt neu und ist englisch', nachEn.neu && nachEn.lang === 'en' && nachEn.e.sprache === 'en' && nachEn.e.spracheGewaehlt === true, nachEn);
+    const nachAuto = await waehleUndWarteNeuladen('auto');
+    pruefe('Wahl Geraet: zurueck auf die Sprache des Geraets (Test: deutsch)', nachAuto.neu && nachAuto.lang === 'de' && nachAuto.e.spracheGewaehlt === false, nachAuto);
     await kontext.close();
   }
   // Sprache des Geraets ohne eigene Wahl (?autosprache: auch im Testlauf wie auf einem echten Geraet)
@@ -554,7 +561,7 @@ let browser = null;
 try {
   await nodeTeil();
   if (!NUR_NODE) {
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await browserTyp(ladePlaywright()).launch();
     await browserTeil(browser);

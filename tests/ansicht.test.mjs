@@ -13,7 +13,8 @@
 //   node tests/ansicht.test.mjs                    alles
 //   node tests/ansicht.test.mjs --nur=arena,ich    nur diese Ziele
 //   BILDER=/pfad node tests/ansicht.test.mjs       dazu je Ziel und Groesse ein Foto (fuer Flo)
-//   PORT=8961 node tests/ansicht.test.mjs          eigener Port (Standard 8961)
+//   KONTRAST=1 node tests/ansicht.test.mjs         dazu je Ziel die Kontrast-Befunde als INFO (zaehlt nicht, Feinschliff R9)
+//   PORT=8961 node tests/ansicht.test.mjs          eigener Port (Standard: frei)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn } from 'node:child_process';
@@ -22,10 +23,11 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { befundeDerSeite, untenFrei, kontrastBefunde } from './ansicht-befunde.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8961);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test#arena`;
 const BILDER = process.env.BILDER ? path.join(process.env.BILDER, 'ansicht') : '';
 if (BILDER) mkdirSync(BILDER, { recursive: true });
@@ -64,101 +66,9 @@ function pruefe(name, ok, detail = '') {
   console.log(`${ok ? 'ok  ' : 'FEHLER'} ${name}${!ok && detail ? ' (' + detail + ')' : ''}`);
 }
 
-// Laeuft in der Seite: Befunde des sichtbaren Zustands
-function befundeDerSeite() {
-  const W = innerWidth;
-  const sichtbar = (el) => {
-    const st = getComputedStyle(el);
-    if (st.visibility === 'hidden' || st.display === 'none' || +st.opacity === 0) return false;
-    const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0;
-  };
-  const pfad = (el) => {
-    const t = []; let e = el;
-    for (let i = 0; e && e !== document.body && i < 3; i++, e = e.parentElement) {
-      t.unshift(e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : ''));
-    }
-    return t.join('>');
-  };
-  // .sr: nur fuer Vorleser (1 x 1 px, absichtlich abgeschnitten)
-  const versteckt = (el) => !!el.closest('[aria-hidden="true"], [hidden], .sr');
-  const aus = { ueberlauf: document.documentElement.scrollWidth - W, klein: [], knopf: [], rand: [], ueberlapp: [], abgeschnitten: [], gekappt: [] };
-  // Inhalt, der unten abgeschnitten ist und sich nicht scrollen laesst (Flo 30.10.: "kann den unteren Teil nicht sehen")
-  for (const el of document.querySelectorAll('.screen, .screen *')) {
-    if (!sichtbar(el) || versteckt(el) || el.closest('.welt, .karte, .brett, .duell, .evalbalken')) continue;
-    const st = getComputedStyle(el);
-    if (/(hidden|clip)/.test(st.overflowY) && el.clientHeight > 120 && el.scrollHeight > el.clientHeight + 24) aus.gekappt.push(`${pfad(el)} ${el.scrollHeight}/${el.clientHeight}`);
-  }
-  const alle = [...document.querySelectorAll('body *')].filter(sichtbar);
-  for (const el of alle) {
-    if (versteckt(el)) continue;
-    const hatText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 0);
-    const st = getComputedStyle(el);
-    const min = el.closest('.koord, .evalbalken, .an-eb-wert, .an-evalbalken') ? 10 : 12;
-    if (hatText && parseFloat(st.fontSize) < min) aus.klein.push(`${pfad(el)} ${st.fontSize} "${el.textContent.trim().slice(0, 24)}"`);
-    const r = el.getBoundingClientRect();
-    if (r.right > W + 1 || r.left < -1) {
-      let a = el.parentElement, gekappt = false;
-      while (a && a !== document.documentElement) { if (/(hidden|auto|scroll|clip)/.test(getComputedStyle(a).overflowX)) { gekappt = true; break; } a = a.parentElement; }
-      if (!gekappt) aus.rand.push(`${pfad(el)} ${Math.round(r.left)}..${Math.round(r.right)}`);
-    }
-    if (hatText && /(hidden|clip)/.test(st.overflowX) && el.scrollWidth > el.clientWidth + 2 && st.textOverflow !== 'ellipsis' && !/-webkit-box/.test(st.display)) {
-      aus.abgeschnitten.push(`${pfad(el)} "${el.textContent.trim().slice(0, 24)}"`);
-    }
-  }
-  // Brettfelder sind seit dem Brett per Tastatur role="button", Groesse und Lage gibt das Brett vor (WCAG 2.5.8, Ausnahme
-  // "wesentlich"); vorher zaehlten sie hier nicht, darum bleiben sie draussen
-  const knoepfe = alle.filter((el) => el.matches('button, a[href], [role="button"], input:not([type="hidden"]), select, summary, textarea') && !el.closest('.brett-felder') && !versteckt(el));
-  const flaeche = (el) => {
-    const r = el.getBoundingClientRect(); let w = r.width, h = r.height;
-    for (const ps of ['::before', '::after']) {
-      const q = getComputedStyle(el, ps);
-      if (q.content === 'none' || q.position !== 'absolute') continue;
-      const n = (v) => Math.max(0, -parseFloat(v) || 0);
-      w = Math.max(w, r.width + n(q.left) + n(q.right)); h = Math.max(h, r.height + n(q.top) + n(q.bottom));
-    }
-    return { w, h };
-  };
-  for (const el of knoepfe) {
-    if (el.matches('input[type="checkbox"], input[type="radio"]')) continue;
-    const f = flaeche(el);
-    if (f.w < 44 || f.h < 44) aus.knopf.push(`${pfad(el)} ${Math.round(f.w)}x${Math.round(f.h)} "${(el.getAttribute('aria-label') || el.textContent).trim().slice(0, 20)}"`);
-  }
-  for (let i = 0; i < knoepfe.length; i++) for (let j = i + 1; j < knoepfe.length; j++) {
-    const a = knoepfe[i], c = knoepfe[j];
-    if (a.contains(c) || c.contains(a)) continue;
-    if (a.closest('.welt') || c.closest('.welt')) continue;
-    if (a.closest('.reiter-leiste, .cta-platz') || c.closest('.reiter-leiste, .cta-platz')) continue;
-    const ra = [...a.getClientRects()], rc = [...c.getClientRects()];
-    if (ra.some((x) => rc.some((y) => Math.min(x.right, y.right) - Math.max(x.left, y.left) > 4 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 4))) {
-      aus.ueberlapp.push(`${pfad(a)} / ${pfad(c)}`);
-    }
-  }
-  return aus;
-}
+// Befunde und "unten frei": tests/ansicht-befunde.mjs (dort an festen Probe-Seiten geprueft)
 
-// Laeuft in der Seite: ganz nach unten scrollen, dann darf nichts unter Leiste oder Spielen-Flaeche liegen
-async function untenFrei() {
-  const deckel = [...document.querySelectorAll('.reiter-leiste, .cta-platz')].filter((d) => getComputedStyle(d).display !== 'none'
-    && d.getBoundingClientRect().height > 0 && d.getBoundingClientRect().top > innerHeight / 2);
-  if (!deckel.length) return [];
-  const roller = [document.scrollingElement, ...[...document.querySelectorAll('body *')].filter((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY))]
-    .filter((e) => e && e.scrollHeight > e.clientHeight + 4);
-  for (const e of roller) e.scrollTop = e.scrollHeight;
-  await new Promise((r) => setTimeout(r, 400));
-  const aus = [];
-  for (const el of document.querySelectorAll('button, a[href], input, select, textarea, [role="button"]')) {
-    if (el.closest('.reiter-leiste, .cta-platz, .welt, [aria-hidden="true"]')) continue;
-    const st = getComputedStyle(el);
-    if (st.visibility === 'hidden' || st.display === 'none' || st.position === 'fixed') continue;
-    const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
-    const deckt = deckel.some((d) => { const l = d.getBoundingClientRect(); return Math.min(r.right, l.right) - Math.max(r.left, l.left) > 4 && Math.min(r.bottom, l.bottom) - Math.max(r.top, l.top) > 4; });
-    if (deckt) aus.push(`${String(el.className || el.tagName).slice(0, 40)} "${(el.textContent || '').trim().slice(0, 20)}"`);
-  }
-  for (const e of roller) e.scrollTop = 0;
-  return aus;
-}
-
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
 try {
   await warteAufServer(BASIS.replace(/#.*$/, ''));
@@ -178,6 +88,11 @@ try {
       await warte(screen === 'partie' ? 3000 : 1200);
       const b = await s.evaluate(befundeDerSeite);
       b.unten = await s.evaluate(untenFrei);
+      if (process.env.KONTRAST) {
+        const kb = await kontrastBefunde(s);
+        console.log(`INFO Kontrast ${ziel} @ ${gname}: ${kb.befunde.length} Befunde, ${kb.pixel} per Pixel, ${kb.unklar.length} unklar, ${kb.gemessen} Texte`
+          + (kb.befunde.length ? ' ' + JSON.stringify(kb.befunde.slice(0, 4)) : ''));
+      }
       const name = `${ziel} @ ${gname} (${w}x${h})`;
       pruefe(`${name}: nichts laeuft seitlich raus`, b.ueberlauf <= 1 && !b.rand.length, b.rand.slice(0, 3).join('; ') || `+${b.ueberlauf}px`);
       pruefe(`${name}: Schrift ab 12 px`, !b.klein.length, b.klein.slice(0, 3).join('; '));

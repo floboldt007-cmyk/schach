@@ -9,7 +9,7 @@
 //   node tests/arena.test.mjs                 alles
 //   node tests/arena.test.mjs --nur-node      ohne Browser
 //   node tests/arena.test.mjs --ohne-bilder   ohne Bilder
-//   PORT=9100 node tests/arena.test.mjs       eigener Port (Standard 8838)
+//   PORT=9100 node tests/arena.test.mjs       eigener Port (Standard: frei)
 //   BILDER=<Ordner>                           Bilder dorthin (Standard design/app-shots, per .gitignore ausgeschlossen)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
@@ -25,7 +25,7 @@ import { duellArt, BESONDERE, DAUER_MAX, WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN,
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8838);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // &kern: ohne die fest eingetragenen PAKETE und REITER (die pruefen die Integration und e2e)
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const NUR_NODE = process.argv.includes('--nur-node');
@@ -1690,7 +1690,7 @@ if (!NUR_NODE) {
   let browser = null;
   try {
     const { chromium } = ladePlaywright();
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await chromium.launch();
     await browserTeil(browser);

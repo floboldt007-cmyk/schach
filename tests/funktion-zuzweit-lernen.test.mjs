@@ -24,6 +24,7 @@ import { Chess } from '../vendor/chess/chess.js';
 import { ARTEN, ALLE, artVon, bereichVon, bilanz, pruefeZiel, grenze } from '../js/pakete/lernen/mattbilder.js';
 import { istGratis } from '../js/pakete/lernen/zugang.js';
 import { browserTyp } from './browser.mjs';
+import { messeAnsicht, introWeg, ROLLEN } from './gleichheit-messung.mjs';
 
 const require = createRequire(import.meta.url);
 let pw;
@@ -42,7 +43,7 @@ const server = http.createServer((req, res) => {
   try { const inhalt = readFileSync(p); res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(inhalt); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8947);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const warte = ms => new Promise(r => setTimeout(r, ms));
 
@@ -54,10 +55,11 @@ function pruefe(name, gut, detail = '', { hart = false } = {}) {
   console.log(`${gut ? 'OK geht' : 'FEHLER geht nicht'}: ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`);
   return gut;
 }
-// Gleichheits-Liste: nur Feststellung, zaehlt nie
-function befund(name, gleich, detail) {
-  befunde.push({ name, gleich, detail });
-  console.log(`BEFUND ${gleich ? 'gleich' : 'ABWEICHUNG'}: ${name} ${JSON.stringify(detail)}`);
+// Gleichheits-Liste: nur Feststellung, zaehlt nie. gewollt = Abweichung mit Beleg (GEWOLLT), zaehlt nicht als Abweichung
+function befund(name, gleich, detail, gewollt = null) {
+  befunde.push({ name, gleich, detail, gewollt });
+  // INTENTIONAL-SLOP[T4]: die Konsole ist der Ausgabeweg dieser Probe (tests/alle.mjs liest sie)
+  console.log(`BEFUND ${!gleich ? 'ABWEICHUNG' : gewollt ? 'gewollt' : 'gleich'}: ${name} ${JSON.stringify(detail)}${gewollt ? ' | ' + gewollt : ''}`);
 }
 
 // ---- Node-Teil: Lektion je Art, Loesungsweg und ein falscher Zug gegen die Test-Verteidigung ----
@@ -197,17 +199,6 @@ async function feldZug(s, brettSel, uci) {
     await tippe(s, wahl);
   }
 }
-// Masse fuer die Gleichheits-Liste, in der Seite: Brett, Spielerleisten, Knoepfe
-const masse = (s, { brett, spieler, knoepfe }) => s.evaluate(({ brett, spieler, knoepfe }) => {
-  const sichtbar = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
-  const b = document.querySelector(brett);
-  return {
-    brett: b ? Math.round(b.getBoundingClientRect().width) : 0,
-    spieler: [...document.querySelectorAll(spieler)].filter(sichtbar).length,
-    knoepfe: [...document.querySelectorAll(knoepfe)].filter(sichtbar).map(k => (k.getAttribute('aria-label') || k.textContent).trim().replace(/\s+/g, ' ')),
-    knopfHoehe: Math.min(...[...document.querySelectorAll(knoepfe)].filter(sichtbar).map(k => Math.round(k.getBoundingClientRect().height)), 9999),
-  };
-}, { brett, spieler, knoepfe });
 // Ergebnisblatt: Klasse, ob es ueber dem Brett liegt (Schleier) und wie breit
 const blatt = (s, sel) => s.evaluate(sel => {
   const e = document.querySelector(sel); if (!e || !e.getClientRects().length) return null;
@@ -216,6 +207,7 @@ const blatt = (s, sel) => s.evaluate(sel => {
 }, sel);
 
 // ---- Bot-Partie als Massstab ----
+const LS_BLATT = '.ls-screen > .ergebnis-overlay.sieg:not([hidden]) .ergebnis-karte';
 const BOT_BRETT = '.screen.partie:not(.zz-screen) .brett-rahmen > .brett';
 async function botMassstab(s) {
   // Lauf 2 (12.11.): am iPhone stand das Bot-Brett einmal nach 30 s nicht; deshalb ein zweiter Versuch und ein Bild
@@ -227,8 +219,11 @@ async function botMassstab(s) {
     await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno' }));
     if (!(await brettDa())) throw new Error('Bot-Brett auch im zweiten Versuch nicht bereit');
   }
-  await warte(800);
-  const m = await masse(s, { brett: BOT_BRETT, spieler: '.screen.partie .spieler', knoepfe: '.spielknoepfe button' });
+  // R9: gemessen wie in tests/gleichheit-ansichten.test.mjs (Feldraster, nach dem Duell-Intro und 1,2 s Ruhe); vorher
+  // stand hier die Breite von .brett mit Rand, 0,8 s nach dem Aufbau, also oft noch waehrend des Intros
+  await introWeg(s); await warte(1200);
+  const m = await messeAnsicht(s, '.screen.partie:not(.zz-screen)');
+  if (m.fehlt) throw new Error(m.fehlt);
   await s.locator('.spielknoepfe > [data-aktion="aufgeben"]').click();
   const dialog = s.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true });
   if (await dialog.waitFor({ timeout: 4000 }).then(() => true, () => false)) await dialog.click();
@@ -238,11 +233,26 @@ async function botMassstab(s) {
   m.ergebnis = await blatt(s, '.ergebnis-karte');
   return m;
 }
+// R9 (13.11.2026): Abweichungen mit Beleg im Konzept oder in einer Flo-Entscheidung. Sie werden genannt, zaehlen aber nicht
+// als Abweichung. Ohne Beleg bleibt es eine ABWEICHUNG (Befund oder Geschmacksfrage fuer Flo), auch wenn sie sinnvoll wirkt.
+const GEWOLLT = {
+  'Lektion|knopf:aufgeben': 'gewollt: Lektionen laufen im Modus Uebung und zaehlen nie gegen dich (SPIELKONZEPT 3.5); statt Aufgeben gibt es Neu starten',
+  'Lektion|knopf:remis': 'gewollt: Modus Uebung ohne Wertung (SPIELKONZEPT 3.5), ein Remis-Angebot an die Uebung haette keine Bedeutung',
+  'Zu zweit|knopf:hinweis': 'gewollt: Flo 08.11.2026 "Zu zweit ist kein Lernen" (js/ui/zuzweit.js Kopfkommentar), also kein Trainer-Hinweis',
+};
+const TOLERANZ_PX = 2;   // wie tests/gleichheit-ansichten.test.mjs: gerundete Feldbreiten plus Subpixel-Lage
+const leistenText = (m) => m.leisten.map((l) => `${l.wer}:${l.lage}`).join(' ') || 'keine';
 function vergleiche(geraet, was, bot, m, erg) {
-  befund(`${geraet}: ${was} Brettgroesse wie Bot-Partie`, Math.abs(m.brett - bot.brett) <= 2, { [was]: m.brett, bot: bot.brett });
-  befund(`${geraet}: ${was} Spielerleisten wie Bot-Partie`, m.spieler === bot.spieler, { [was]: m.spieler, bot: bot.spieler });
-  befund(`${geraet}: ${was} Knoepfe wie Bot-Partie`, JSON.stringify(m.knoepfe) === JSON.stringify(bot.knoepfe) && m.knopfHoehe === bot.knopfHoehe,
-    { [was]: m.knoepfe, hoehe: m.knopfHoehe, bot: bot.knoepfe, botHoehe: bot.knopfHoehe });
+  if (m.fehlt) { befund(`${geraet}: ${was} nicht messbar`, false, m.fehlt); return; }
+  // wie gleichheit-ansichten: mindestens so gross wie in der Bot-Partie (ein groesseres Brett ist keine Abweichung)
+  befund(`${geraet}: ${was} Brett mindestens so gross wie Bot-Partie`, m.brett >= bot.brett - TOLERANZ_PX, { [was]: m.brett, bot: bot.brett });
+  befund(`${geraet}: ${was} Spielerleisten wie Bot-Partie`, leistenText(m) === leistenText(bot), { [was]: leistenText(m), bot: leistenText(bot) });
+  // Knoepfe wie in gleichheit-ansichten: die Rollen aufgeben, remis, hinweis (da oder nicht), nicht Beschriftung und Hoehe
+  const anders = ROLLEN.filter((k) => !!m.knoepfe[k]?.da !== !!bot.knoepfe[k]?.da);
+  const offen = anders.filter((k) => !GEWOLLT[`${was}|knopf:${k}`]);
+  const rolle = (x) => ROLLEN.map((k) => `${k} ${x.knoepfe[k]?.da ? 'ja' : 'nein'}`).join(', ');
+  befund(`${geraet}: ${was} Knoepfe wie Bot-Partie`, !offen.length, { [was]: rolle(m), bot: rolle(bot), offen },
+    anders.length && !offen.length ? anders.map((k) => GEWOLLT[`${was}|knopf:${k}`]).join('; ') : null);
   befund(`${geraet}: ${was} Ergebnisblatt wie Bot-Partie`, !!erg && !!bot.ergebnis && erg.ueberBrett === bot.ergebnis.ueberBrett && Math.abs(erg.breite - bot.ergebnis.breite) <= 2,
     { [was]: erg, bot: bot.ergebnis });
 }
@@ -301,6 +311,9 @@ async function zuZweit(s, bot) {
     const namen = await s.evaluate(() => [...document.querySelectorAll('.zz-name b')].map(b => b.textContent));
     return { gut: p.modus === 'zuzweit' && !p.zuege.length && u.every(x => !x.sichtbar) && namen.includes('Anna') && namen.includes('Ben'), detail: { p, u, namen } };
   });
+  // R9: gemessen wie in tests/gleichheit-ansichten.test.mjs: ohne Uhr, nicht gedreht, nach dem Intro und 1,2 s Ruhe
+  await introWeg(s); await warte(1200);
+  const zzMasse = await messeAnsicht(s, '.screen.zz-screen').catch(() => null);
   await handlung(s, 'Zu zweit: Weiss zieht e2-e4', async () => {
     const gut = await zzZug(s, 'e2e4'); const p = await zz(s);
     return { gut: gut && p.zuege.join() === 'e2e4' && p.am === 'b', detail: p };
@@ -333,7 +346,6 @@ async function zuZweit(s, bot) {
     const u = await uhren(s);
     return { gut: u.length === 2 && u.every(x => x.sichtbar && /^5:00/.test(x.t)) && (await zz(s)).unten === 'w', detail: u };
   });
-  const zzMasse = await masse(s, { brett: ZZ, spieler: '.zz-screen .zz-spieler', knoepfe: '.zz-spielbereich > .zz-aktionen button' }).catch(() => null);
   await handlung(s, 'Zu zweit: Weiss zieht f2-f3, Brett dreht zu Schwarz, Schwarz-Uhr laeuft', async () => {
     const gut = await zzZug(s, 'f2f3'); await warte(300);
     const p = await zz(s), u = await uhren(s);
@@ -396,9 +408,10 @@ async function meisterschule(s, bot) {
       await s.locator(`.ms-lektion[data-id="${l.id}"]`).click();
       const intro = await warteLz(s, `z.id === '${l.id}' && z.phase === 'intro'`);
       await s.waitForFunction(() => document.querySelector('.ls-brett')?.getBoundingClientRect().width > 100, null, { timeout: 8000 });
-      if (!gemessen) lsMasse = await masse(s, { brett: '.ls-brett', spieler: '.ls-screen .spieler, .ls-screen .zz-spieler', knoepfe: '.ls-aktionen button' });
       await s.locator('.ls-aktionen [data-a="los"]').click();
       const los = await warteLz(s, "z.phase === 'flo' && z.zuege === 0");
+      // R9: gemessen wie in tests/gleichheit-ansichten.test.mjs: nach "Los geht's" (Phase flo) und 0,6 s Ruhe
+      if (!gemessen) { await warte(600); lsMasse = await messeAnsicht(s, '.ls-screen'); }
       return { gut: intro && los, detail: await lz(s) };
     });
     if (!gestartet) continue;
@@ -412,8 +425,11 @@ async function meisterschule(s, bot) {
       await warteLz(s, "z.zuege === 1 && (z.phase === 'flo' || z.phase === 'ende')");
       const z = await lz(s);
       const geschafftMeldung = await s.locator('.ls-meldung[data-art="geschafft"]').count();
-      // zurueck auf Anfang: "Neu starten" (laeuft) oder "Nochmal" (gescheitert)
-      await s.locator(`.ls-aktionen [data-a="${z.phase === 'ende' ? 'nochmal' : 'neu'}"]`).click();
+      // zurueck auf Anfang: "Neu starten" (laeuft) oder "Nochmal" im Ergebnisblatt (gescheitert, R8)
+      if (z.phase === 'ende') {
+        await s.locator(LS_BLATT).waitFor({ timeout: 8000 }).catch(() => {});
+        await s.locator('.ls-screen > .ergebnis-overlay [data-a="nochmal"]').click();
+      } else await s.locator('.ls-aktionen [data-a="neu"]').click();
       const neu = await warteLz(s, "z.phase === 'flo' && z.zuege === 0");
       return { gut: z.zuege === 1 && !geschafftMeldung && (z.phase === 'flo' || !!z.grund) && neu, detail: { nachFalsch: z, neu } };
     });
@@ -425,12 +441,13 @@ async function meisterschule(s, bot) {
       }
       await warteLz(s, "z.phase === 'ende'");
       const z = await lz(s);
-      const da = await s.locator('.ls-meldung[data-art="geschafft"]').isVisible().catch(() => false);
-      erg = await blatt(s, '.ls-meldung');
+      // R8: das Ende ist das Ergebnisblatt der Bot-Partie (vorher nur die Meldung in der Spalte)
+      const da = await s.locator(LS_BLATT).waitFor({ timeout: 8000 }).then(() => true, () => false);
+      erg = await blatt(s, LS_BLATT);
       return { gut: z.phase === 'ende' && !z.grund && z.sterne >= 1 && da, detail: z };
     });
     await handlung(s, `Lektion ${art} (${l.id}): zurueck zur Liste, Fortschritt (geschafft, Sterne) sichtbar`, async () => {
-      await s.locator('.ls-aktionen [data-a="uebersicht"]').click();
+      await s.locator('.ls-screen > .ergebnis-overlay [data-a="uebersicht"]').click();
       const da = await s.locator(`.ms-lektion[data-id="${l.id}"][data-geschafft]`).waitFor({ timeout: 10000 }).then(() => true, () => false);
       const aktiv = await s.locator('.ms-bkarte[aria-pressed="true"]').getAttribute('data-bereich');
       const nachher = await sterneVon(s, bereich);
@@ -457,6 +474,8 @@ try {
 finally { await browser?.close(); await new Promise(r => server.close(r)); }
 console.log(`\nBilder: ${BILDER}`);
 const abweichungen = befunde.filter(b => !b.gleich);
-console.log(`Gleichheits-Liste: ${befunde.length - abweichungen.length} gleich, ${abweichungen.length} Abweichung(en)${abweichungen.length ? ': ' + abweichungen.map(b => b.name).join(' | ') : ''}`);
+const gewollte = befunde.filter(b => b.gleich && b.gewollt);
+// INTENTIONAL-SLOP[T4]: Zusammenfassung der Probe, Ausgabeweg wie alle Zeilen hier
+console.log(`Gleichheits-Liste: ${befunde.length - abweichungen.length} gleich (davon ${gewollte.length} gewollt mit Beleg), ${abweichungen.length} Abweichung(en)${abweichungen.length ? ': ' + abweichungen.map(b => b.name).join(' | ') : ''}`);
 if (rotErwartet) console.log(`${rotErwartet} harte Pruefung(en) ROT-ERWARTET (zaehlen erst mit PROBE_STRENG=1): ${rot.join(' | ')}`);
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;

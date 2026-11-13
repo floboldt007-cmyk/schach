@@ -164,6 +164,13 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 @media (orientation: portrait) and (max-width: 600px) {
   .online-partie.partie .zugleiste { margin-top: 0; }
   .online-partie.partie .spielknoepfe { margin-top: auto; }
+  /* R8 (L3): ab 760 px Hoehe (ohne .streifen-unten, js/ui/online.js layout) steht der Zugstreifen wie in der Bot-Partie
+     UEBER Remis/Aufgeben, mit eigenen Pfeilen; darunter entfaellt er (css/partie.css) und die Pfeile bleiben in der
+     Knopfreihe. Vorher lag er hoch immer unter den Knoepfen, auf dem iPhone SE 44 px unter dem Rand. */
+  .online-partie.partie:not(.streifen-unten) .zugleiste { order: 3; margin-top: auto; }
+  .online-partie.partie:not(.streifen-unten) .spielknoepfe { order: 5; margin-top: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .online-partie.partie:not(.streifen-unten) .spielknoepfe > .knopf.sk-pfeil { display: none; }
+  .online-partie.partie:not(.streifen-unten) .zugleiste .zl-pfeil { display: grid; }
 }
 /* R7 (Gleichheits-Liste R6, B2): Ergebnisblatt wie die Bot-Partie (.ergebnis-overlay aus css/ergebnis.css). Hier nur die
    Kronen-Zeile gewerteter Partien und ein einzelner Hauptknopf (ohne Analyse) ueber die ganze Breite. */
@@ -175,9 +182,16 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 /* R7 (B5): in der Leiste mit Banner faerbt css/visitenkarte.css jedes Kind-div weiss, auch die Uhr; die ruhende Uhr auf
    --flaeche-3 hatte so im hellen Modus 1,16:1. Die Uhr behaelt die Farben aus css/partie.css (ruhend, laeuft, warn). */
 .online-partie .spieler.mit-banner > .uhr { color: var(--text-2); text-shadow: none; }
-.online-partie .spieler.mit-banner > .uhr.laeuft { color: var(--auf-tinte); }
+.online-partie .spieler.mit-banner > .uhr.laeuft, .online-partie .spieler.mit-banner > .uhr.am-zug { color: var(--auf-tinte); }
 .online-partie .spieler.mit-banner > .uhr.warn { color: var(--warn); }
-.online-partie .spieler.mit-banner > .uhr.warn.laeuft { color: var(--grund); }
+.online-partie .spieler.mit-banner > .uhr.warn.laeuft, .online-partie .spieler.mit-banner > .uhr.warn.am-zug { color: var(--grund); }
+/* R8 (B4, Gleichheits-Liste): die Leiste mit Banner behaelt Ecke und Innenabstand der Bot-Partie (css/partie.css
+   .partie .spieler je Format). css/visitenkarte.css setzt fuer .on-spieler.mit-banner sonst 16 px Ecke und 10 px
+   links und rechts; die Werte hier folgen css/partie.css und muessen mit ihr wandern. */
+.online-partie .spieler.on-spieler.mit-banner { border-radius: 20px; padding-inline: 12px 10px; }
+@container seite (max-width: 299px) { .online-partie .spieler.on-spieler.mit-banner { padding-inline: 10px 8px; } }
+@media (orientation: portrait) and (min-width: 601px) { .online-partie .spieler.on-spieler.mit-banner { padding-inline: 10px 8px; } }
+@media (orientation: portrait) and (max-width: 600px) { .online-partie .spieler.on-spieler.mit-banner { padding-inline: 8px 6px; border-radius: 16px; } }
 /* R7 (B3): nach dem Ende steht in der Spalte nur noch eine flache Zeile (Ergebnis, Grund, Knopf "Ergebnis" zurueck zum
    Blatt), damit sie auf iPhone SE und iPad hoch unter der eigenen Leiste Platz hat; Revanche und Analyse sind im Blatt */
 .online-partie .on-ergebnis { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; padding: 8px 12px; }

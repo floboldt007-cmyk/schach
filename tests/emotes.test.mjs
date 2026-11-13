@@ -21,7 +21,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8913);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // &emotes: seit 31.10.2026 gibt es Emotes nur noch online; die Tests pruefen Rad und Chat weiter in der Bot-Partie
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/emotes/index&emotes`;
 const NUR_NODE = process.argv.includes('--nur-node');
@@ -611,7 +611,7 @@ let server = null;
 let browser = null;
 try {
   if (!NUR_NODE) {
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await browserTyp(ladePlaywright()).launch();
     await browserTeil(browser);

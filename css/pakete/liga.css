@@ -149,8 +149,9 @@
 .lg-gr-streifen { position: absolute; inset: 0 auto 0 0; z-index: -1; width: 132px; background: center / cover no-repeat;
   -webkit-mask-image: linear-gradient(90deg, black 0, black 38%, transparent 82%); mask-image: linear-gradient(90deg, black 0, black 38%, transparent 82%);
   opacity: .9; pointer-events: none; }
+/* R8 (L2, 13.11.2026): die Plakette deckt ganz, vorher schien das Banner-Motiv zu 14 % durch die Platzzahl */
 .lg-gr-zeile[data-banner] .lg-gr-platz { justify-self: center; min-width: 26px; padding: 1px 4px; border-radius: var(--r-s);
-  background: color-mix(in srgb, var(--flaeche) 86%, transparent); }
+  background: var(--flaeche); box-shadow: 0 0 0 1px var(--linie); }
 .lg-gr-wer { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 48px; margin: 0; padding: 0 6px 0 0; border: 0; border-radius: var(--r-m);
   background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
 .lg-gr-wer:focus-visible { outline: var(--fokus); outline-offset: 2px; }
