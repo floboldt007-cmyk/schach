@@ -641,6 +641,25 @@ try {
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `groesse-bot-${width}x${height}.png`) });
     pruefe(`${width}x${height}: Online-Brett mindestens so gross wie das Brett der Bot-Partie`, on >= bot - 1, { online: on, bot });
   }
+  // R8-quer (13.11.2026): Handy quer (Hoehe bis 500 px): Brett und beide Leisten ganz im Bild, keine Seite scrollt, jeder
+  // sichtbare Knopf erreichbar (im Bild, mindestens 44 px hoch), kein Text laeuft aus seinem Knopf
+  for (const [width, height] of [[844, 390], [667, 375]]) {
+    await seite.setViewportSize({ width, height });
+    await oeffne(neueste); await seite.waitForFunction(id => window.__online?.partie()?.id === id, neueste.id);
+    await seite.waitForTimeout(400);
+    const q = await seite.evaluate(() => {
+      const sicht = (e) => !e.hidden && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .weg');
+      const imBild = (r) => r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5;
+      const brett = [...document.querySelectorAll('.online-screen .brett-felder')].at(-1)?.getBoundingClientRect();
+      const leisten = [...document.querySelectorAll('.online-screen .on-spieler')].filter(sicht).map((e) => imBild(e.getBoundingClientRect()));
+      const knoepfe = [...document.querySelectorAll('.online-screen button')].filter(sicht).map((b) => ({ t: (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 16),
+        bild: imBild(b.getBoundingClientRect()), h: Math.round(b.getBoundingClientRect().height), passt: b.scrollWidth <= b.clientWidth + 1 && b.scrollHeight <= b.clientHeight + 1 }));
+      return { brett: !!brett && imBild(brett), leisten: leisten.length === 2 && leisten.every(Boolean), scroll: document.documentElement.scrollHeight <= innerHeight + 1 && document.documentElement.scrollWidth <= innerWidth + 1,
+        schlecht: knoepfe.filter((k) => !k.bild || k.h < 44 || !k.passt) };
+    });
+    if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `quer-online-${width}x${height}.png`) });
+    pruefe(`Handy quer ${width}x${height}: Online-Brett und Leisten im Bild, kein Scrollen, Knoepfe erreichbar`, q.brett && q.leisten && q.scroll && q.schlecht.length === 0, q);
+  }
   // Befund 4 (Skin): Erfinder-Konto mit Figurensatz Blaupause; die Erfinder-Antwort kommt erst nach dem Aufbau der Partie
   erfinder = true; sonderVerzug = 900;
   // wie auf einem frischen Geraet: der gemerkte Erfinder-Status fehlt, die App fragt erst nach dem Laden nach
