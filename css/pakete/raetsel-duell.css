@@ -43,6 +43,10 @@
 .rd-los:hover { filter: brightness(1.05); }
 .rd-los:active { transform: scale(.98); }
 .rd-los:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
+/* "Gegner suchen" ist dieselbe Handlung wie "Duell suchen" auf der Online-Seite: dieselbe Farbe wie dort (.knopf.primaer,
+   css/app.css), nicht Gold (R6 B17, 12.11.2026) */
+.rd-los.rd-suchen { background: var(--akzent); color: var(--auf-akzent); }
+.rd-los.rd-suchen:active { background: var(--akzent-tief); }
 
 /* Mit einem Freund: Einladen und Code eingeben nebeneinander */
 .rd-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-self: stretch; }
@@ -79,6 +83,11 @@
    (Gegner, Zeile, Reihe, unten die eigene Leiste) wie die Partie quer. Waehrend des Spiels keine Reiter-Leiste. */
 html[data-reiter="unten"]:has(.screen.raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"])) .reiter-leiste { display: none; }
 html[data-reiter="unten"] #app > .screen.raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) { height: 100vh; height: 100dvh; }
+/* auch die Seitenleiste (iPad quer, PC) tritt im Spiel ab, der Screen bekommt die volle Breite (R6 B23, 12.11.2026) */
+html[data-reiter="seite"]:has(.screen.raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"])) .reiter-leiste { display: none; }
+html[data-reiter="seite"] #app > .screen.raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) { margin-left: 0; width: 100%; }
+/* Seitentitel im Kopf auch neben der Seitenleiste (dort tritt die Marke sonst zurueck, css/navigation.css), wie am Handy */
+html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; }
 .raetsel-duell:is([data-phase="vorlauf"], [data-phase="laeuft"], [data-phase="zeit_um"]) .rd-rumpf {
   padding: 4px 0 calc(12px + env(safe-area-inset-bottom, 0px)); align-content: safe center; }
 /* --rd-reserve: zwei Leisten 66, Zeile 44, Reihe 8, vier Luecken 10, Sockel */

@@ -120,6 +120,8 @@ button.bl-ib-zeile { cursor: pointer; }
 button.bl-ib-zeile:focus-visible, .bl-ich-alle:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-ib-bild { width: 48px; height: 48px; border-radius: var(--r-m); object-fit: cover; display: grid; place-items: center; background: var(--flaeche-3); }
 .bl-ib-mitte { display: grid; gap: 2px; min-width: 0; }
+/* im Raster streckte sich die Marke "neu" ueber die ganze Spalte (Kritik R6, B19: 170 px iPhone 13, 560 px PC) */
+.bl-ib-mitte .bl-neu { justify-self: start; }
 .bl-ib-mitte b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bl-ib-punkte { display: grid; justify-items: end; }
 .bl-ib-punkte b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px; }
@@ -325,7 +327,16 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-fr-codes { display: grid; gap: 12px; }
 /* <details> legt seinen Inhalt nicht ins Raster (gap wirkt nicht in jedem Browser): Abstand ueber die Karten selbst */
 .bl-fr-codes > :not(summary) + :not(summary) { margin-top: 12px; }
-.bl-fr-codes > summary { min-height: var(--tipp); display: flex; align-items: center; font-size: 14px; font-weight: 700; color: var(--text-2); cursor: pointer; }
+/* Kritik R6 (B24, 12.11.2026): angemeldet stand hier eine lose graue Zeile. Jetzt ein Knopf wie "Alle Partien, Rekorde
+   und Zeitraeume" (.bl-ich-alle), mit Pfeil wie .lg-gr-regeln, damit man sieht, dass er aufklappt */
+.bl-fr-codes > summary { min-height: var(--tipp); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 20px;
+  border-radius: var(--r-xl); background: var(--flaeche); box-shadow: var(--s2), var(--kante); font-size: 15px; font-weight: var(--gw-stark);
+  color: var(--text); cursor: pointer; list-style: none; }
+.bl-fr-codes > summary::-webkit-details-marker { display: none; }
+.bl-fr-codes > summary::after { content: ""; flex: none; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px); }
+.bl-fr-codes[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
+.bl-fr-codes > summary:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-fr-blatt { display: grid; gap: 10px; text-align: left; }
 .bl-fr-oder { text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
 .bl-fr-status { margin: 0; min-height: 0; font-size: 13.5px; font-weight: 600; color: var(--text); }

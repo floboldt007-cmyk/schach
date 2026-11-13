@@ -59,6 +59,10 @@ export function unterText(e, name = t('p-punkte.tafel.allein')) {
   // Platz gewonnen: "Platz 3 auf Thorstens Tafel" (der Pfeil ^ 2 und die durchgestrichene alte Zahl stehen daneben)
   if (e.rekord && e.aufstieg > 0 && e.platz != null) return t('p-punkte.platzAuf', { platz: e.platz, name });
   if (e.rekord) return t('p-punkte.rekordPlus', { name, plus: zahlText(e.w - (e.vorher || 0)) });
+  // Ohne Sieg vor dem 10. eigenen Zug beendet (formel.MIN_ZUEGE, dieselbe Grenze wie "zu kurz" in der Genauigkeit
+  // darueber): die Zahl besteht nur aus Theorie und Zugpunkten, der Satz erklaert sie statt eines Platzes; nach Matt im
+  // 2. Zug stand sonst "Platz 4 auf Lukas' Tafel" (R7, B15). Ein kurzer Sieg traegt die Verwertung und bleibt beim Platz.
+  if (e.posten && e.posten.kurz && e.erg !== 'sieg') return t('p-punkte.kurz');
   // "So nah" vor dem Platz: eine Partie mit 90 % des Rekords steht fast immer unter deinen drei Besten, und der leise
   // Moment (hoechstens einmal je Tafel und Woche) waere sonst nie zu sehen
   if (e.fast) return t('p-punkte.fast', { prozent: e.fast.prozent, name });

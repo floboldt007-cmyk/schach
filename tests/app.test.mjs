@@ -798,7 +798,9 @@ async function testePruefrunde(browser) {
     await seite.waitForSelector('.dialog-ort .dialog');
     await seite.waitForSelector('.ergebnis-overlay', { timeout: 15000 });
     await warte(400);
-    pruefe('Bot setzt matt: Rückfrage "Aufgeben?" ist zu', await seite.locator('.dialog-ort').count() === 0);
+    // Die Rueckfrage klappt beim Matt 200 ms zu (.dialog-ort.weg) und steht so lange noch im DOM: auf den Endzustand
+    // warten statt nach fester Pause zu zaehlen. Bliebe sie offen, verschwaende sie nie, und die Pruefung schlaegt fehl.
+    pruefe('Bot setzt matt: Rückfrage "Aufgeben?" ist zu', await seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false));
     pruefe('Bot setzt matt: Ergebnis Niederlage durch Matt', /matt/i.test(await seite.locator('.erg-unter').innerText()));
     await seite.evaluate(() => { window.__test = {}; });
 
@@ -917,7 +919,9 @@ async function testePruefrunde(browser) {
     await seite.waitForFunction(() => window.__partie && window.__partie.z.zuege.length === 2, null, { timeout: 20000 }).catch(() => {});
     const dauer = Date.now() - t0;
     pruefe('Kaputte Engine-Datei: Bot zieht ohne langes Warten', dauer < 6000, dauer + ' ms');
-    pruefe('Kaputte Engine-Datei: nur eine Meldung', await seite.locator('.dialog-ort').count() === 0);
+    // Die weggetippte Meldung klappt 200 ms zu (.dialog-ort.weg): auf den Endzustand warten statt auf die Pausen davor
+    // zu bauen. Eine zweite Meldung bliebe offen, verschwaende nie, und die Pruefung schlaegt fehl.
+    pruefe('Kaputte Engine-Datei: nur eine Meldung', await seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false));
     await kontext.close();
   }
   {
@@ -3882,12 +3886,31 @@ async function testeU7(browser) {
       const inh = getComputedStyle(document.querySelector('.screen.partie > .inhalt')).transform;
       const k = [...document.querySelectorAll('.erg-aktionen [data-ziel], .erg-aktionen .erg-lobby')].map((b) => { const r = b.getBoundingClientRect();
         return { ziel: b.dataset.ziel || 'lobby', primaer: b.classList.contains('primaer'), knopf: b.classList.contains('knopf'), t: r.top, u: r.bottom, l: r.left, w: r.width, hh: r.height }; });
-      return { text: wort.textContent, ausruf: aus && getComputedStyle(aus).color, gold: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim(),
+      // Grund hinter dem Wort: erstes deckendes Element darueber (fuer den Kontrast des Ausrufezeichens)
+      let grundEl = wort, grund = '';
+      while (grundEl && !grund) { const c = getComputedStyle(grundEl).backgroundColor; if (c && !/^transparent$|,\s*0\)$/.test(c)) grund = c; grundEl = grundEl.parentElement; }
+      // --gold als berechnete Farbe (eine Variable allein liefert den rohen Text)
+      const probe = document.createElement('i'); probe.style.color = 'var(--gold)'; document.body.append(probe); const goldFarbe = getComputedStyle(probe).color; probe.remove();
+      return { text: wort.textContent, ausruf: aus && getComputedStyle(aus).color, gold: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim(), goldFarbe, grund,
         konfetti: document.querySelectorAll('.konfetti').length, schleier: getComputedStyle(o).backgroundColor, filter: getComputedStyle(o).backdropFilter || getComputedStyle(o).webkitBackdropFilter || 'none',
         zurueck: document.querySelector('.screen.partie').classList.contains('mit-ergebnis'), inh, sterne: document.querySelectorAll('.erg-stern .e-stern svg').length, knoepfe: k };
     });
-    const hex = (c) => { const m = String(c).match(/\d+/g); return m ? '#' + m.slice(0, 3).map((x) => Number(x).toString(16).padStart(2, '0')).join('').toUpperCase() : c; };
-    pruefe('Sieg: „Sieg!“ mit goldenem Ausrufezeichen, kein Konfetti, Sterne als Symbole', sieg.text === 'Sieg!' && hex(sieg.ausruf) === sieg.gold.toUpperCase() && sieg.konfetti === 0 && sieg.sterne === 3, JSON.stringify(sieg));
+    // Das "!" ist seit Kritik R6 (B25) bewusst kein reines --gold mehr: pur hatte es hell nur 2,24:1, grosse Schrift braucht
+    // 3:1 (WCAG 1.4.3). css/ergebnis.css mischt es per color-mix zur Textfarbe hin. Geprueft wird deshalb, was zaehlt:
+    // es bleibt in der Gold-Familie (Farbton hoechstens 20 Grad von --gold, sichtbar farbig) UND erfuellt den Kontrast 3:1.
+    const goldAusruf = (() => {
+      const rgb = (c) => { const t = String(c); const f = t.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+        if (f) return f.slice(1, 4).map((x) => Number(x) * 255); const m = t.match(/[\d.]+/g); return m ? m.slice(0, 3).map(Number) : null; };
+      const ton = ([r, g, b]) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (!d) return { h: 0, s: 0 };
+        const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: (h * 60 + 360) % 360, s: d / mx }; };
+      const lum = (c) => { const [r, g, b] = c.map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const a = rgb(sieg.ausruf), gd = rgb(sieg.goldFarbe), gr = rgb(sieg.grund);
+      if (!a || !gd || !gr) return { ok: false, grund: 'Farbe nicht lesbar' };
+      const ha = ton(a), hg = ton(gd), dh = Math.min(Math.abs(ha.h - hg.h), 360 - Math.abs(ha.h - hg.h));
+      const [l1, l2] = [lum(a), lum(gr)].sort((x, y) => y - x), kontrast = (l1 + 0.05) / (l2 + 0.05);
+      return { ok: dh <= 20 && ha.s >= 0.25 && kontrast >= 3, dh: Math.round(dh), saett: +ha.s.toFixed(2), kontrast: +kontrast.toFixed(2) };
+    })();
+    pruefe('Sieg: „Sieg!“ mit goldenem Ausrufezeichen (Gold-Familie, Kontrast mindestens 3:1), kein Konfetti, Sterne als Symbole', sieg.text === 'Sieg!' && goldAusruf.ok && sieg.konfetti === 0 && sieg.sterne === 3, JSON.stringify({ ...sieg, goldAusruf }));
     pruefe('Schleier ohne Weichzeichner, der Screen dahinter tritt zurück (scale .975)', /rgba?\(/.test(sieg.schleier) && (sieg.filter === 'none' || !sieg.filter) && sieg.zurueck && /matrix\(0\.975/.test(sieg.inh), JSON.stringify(sieg));
     const a = sieg.knoepfe.find((x) => x.ziel === 'analyse');
     const b = sieg.knoepfe.find((x) => x.ziel === 'weiter');

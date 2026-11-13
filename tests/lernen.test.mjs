@@ -667,6 +667,49 @@ async function neuesGeraetTeil(browser) {
   await p.k.close();
 }
 
+// R6-Befund B9 (12.11.2026): auf dem iPhone SE lag "Los geht's" halb unter dem Rand (+45 px). Die Haupthandlung der
+// Idee-Phase steht in JEDER Lektion ganz im Bild, auf SE (375x667) und iPhone 13 (390x844), hell und dunkel, ohne Scrollen.
+async function kleinTeil(browser) {
+  for (const [geraet, groesse] of [['SE', { width: 375, height: 667 }], ['i13', { width: 390, height: 844 }]]) {
+    const p = await seite(browser, { groesse, hash: '#lernen' });
+    const schlecht = [];
+    let schlimmste = null;
+    for (const [i, l] of ALLE.entries()) {
+      if (i % 2 === 0) await p.s.evaluate((modus) => window.__app.setzeEinstellungen({ modus }), i % 4 === 0 ? 'hell' : 'dunkel');
+      await p.s.evaluate((id) => window.__app.gehe('lektion', { id }), l.id);
+      await warteLz(p.s, `z.id === '${l.id}' && z.phase === 'intro'`);
+      await p.s.waitForSelector('.ls-screen .ls-aktionen .knopf', { timeout: 10000 }).catch(() => {});
+      // gemessen wird der Ruhezustand: der Screen gleitet beim Oeffnen kurz herein
+      await p.s.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'
+        || a.effect?.getComputedTiming().iterations === Infinity), null, { timeout: 3000 }).catch(() => {});
+      const m = await p.s.evaluate(() => {
+        const k = [...document.querySelectorAll('.ls-screen .ls-aktionen .knopf')];
+        const los = document.querySelector('.ls-screen .ls-aktionen [data-a="los"]');
+        const r = los ? los.getBoundingClientRect() : null;
+        return { n: k.length, los: r ? { top: Math.round(r.top), bottom: Math.round(r.bottom) } : null, ih: innerHeight,
+          alle: k.every((x) => { const b = x.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight && b.height >= 44; }),
+          quer: document.documentElement.scrollWidth <= innerWidth + 1 };
+      });
+      const ueber = m.los ? m.los.bottom - m.ih : 999;
+      if (!schlimmste || ueber > schlimmste.ueber) schlimmste = { id: l.id, ueber };
+      if (!m.los || m.los.bottom > m.ih || m.los.top < 0 || !m.alle || !m.quer) schlecht.push(`${l.id}:${ueber}`);
+    }
+    pruefe(`${geraet}: „Los geht's“ (und jeder Knopf der Idee-Phase) in allen ${ALLE.length} Lektionen ganz im Bild (B9)`, schlecht.length === 0,
+      { schlecht: schlecht.join(' '), schlimmste });
+    if (process.env.BILDER && schlimmste) {
+      for (const modus of ['hell', 'dunkel']) {
+        await p.s.evaluate((m) => window.__app.setzeEinstellungen({ modus: m }), modus);
+        await p.s.evaluate((id) => window.__app.gehe('lektion', { id }), schlimmste.id);
+        await warteLz(p.s, `z.id === '${schlimmste.id}' && z.phase === 'intro'`);
+        await warte(400);
+        await p.s.screenshot({ path: path.join(process.env.BILDER, `lektion-${geraet}-${modus}.png`) });
+      }
+    }
+    pruefe(`${geraet}: keine Seitenfehler (B9)`, p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+    await p.k.close();
+  }
+}
+
 const LEKTIONEN_IDS = LEKTIONEN.map((l) => l.id).join();
 
 async function browserTeil() {
@@ -679,6 +722,7 @@ async function browserTeil() {
     await gratisTeil(browser);
     await willkommenTeil(browser);
     await neuesGeraetTeil(browser);
+    await kleinTeil(browser);
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);
   } finally {
