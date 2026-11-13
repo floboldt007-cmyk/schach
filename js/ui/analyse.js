@@ -30,7 +30,7 @@ import { klang } from '../sounds.js';
 import {
   ladePartie, ladePartien, ladeReview, ergaenzeAnalyse, naechsterGegner,
   ladeLaufendePartie, loescheLaufendePartie, eigeneZuege, BESTWERT_MIN_ZUEGE,
-  pruefeZuzweit,
+  pruefeZuzweit, istOnline,
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle } from '../orte.js';
@@ -139,16 +139,24 @@ function evalText(ev, { vorzeichen = true, sicht = 'w' } = {}) {
   return (vorzeichen ? (cp > 0 ? '+' : '−') : '') + dezimal(w.toFixed(1));
 }
 
-function ergebnisInfo(partie, letzteNummer) {
+// W-online-analyse: eine Online-Partie (istOnline) zeigt das Ergebnis aus der eigenen Sicht wie eine Bot-Partie; endete
+// sie ohne gueltiges Ergebnis (grund abgebrochen, strittig, unklar; ergebnis leer), steht dort "Ohne Ergebnis" statt Remis
+export function ergebnisInfo(partie, letzteNummer) {
   const sf = partie.spielerFarbe === 'b' ? 'b' : 'w';
   const e = partie.ergebnis;
+  const online = istOnline(partie);
+  if (online && !['sieg', 'niederlage', 'remis'].includes(e)) {
+    const g = ['abgebrochen', 'strittig', 'unklar'].includes(partie.grund) ? partie.grund : 'unklar';
+    return { stand: '–', grund: t(`analyse.ergebnis.${g}`), wort: t('analyse.ergebnis.ohneErgebnis'), art: 'offen' };
+  }
+  const zweiMenschen = partie.modus === 'zuzweit' && !online;
   let stand = '½:½';
   if (e === 'sieg') stand = sf === 'w' ? '1:0' : '0:1';
   else if (e === 'niederlage') stand = sf === 'w' ? '0:1' : '1:0';
   const n = letzteNummer || 1;
   const schluessel = {
     matt: 'mattIm',
-    aufgabe: partie.modus === 'zuzweit' ? 'aufgabe' : e === 'sieg' ? 'gegnerGibtAuf' : 'aufgegebenIm',
+    aufgabe: zweiMenschen ? 'aufgabe' : e === 'sieg' ? 'gegnerGibtAuf' : 'aufgegebenIm',
     zeit: 'zeit', vereinbart: 'vereinbart',
     patt: 'patt',
     wiederholung: 'dreifach',
@@ -157,7 +165,7 @@ function ergebnisInfo(partie, letzteNummer) {
   }[partie.grund];
   const grund = schluessel ? t(`analyse.ergebnis.${schluessel}`, { n }) : '';
   const namen = pruefeZuzweit(partie.zuzweit);
-  const wort = partie.modus === 'zuzweit' && e !== 'remis'
+  const wort = zweiMenschen && e !== 'remis'
     ? t('analyse.ergebnis.gewinnt', { name: namen[stand === '1:0' ? 'weiss' : 'schwarz'] })
     : e === 'sieg' ? t('allgemein.sieg') : e === 'niederlage' ? t('allgemein.niederlage') : t('allgemein.remis');
   return { stand, grund, wort, art: e === 'sieg' ? 'sieg' : e === 'niederlage' ? 'niederlage' : 'remis' };
@@ -168,6 +176,7 @@ function ergebnisInfo(partie, letzteNummer) {
 // Stellungen nur offene Stellungen und meldete nach Matt im 2. Zug "Knapp!" (R7, Befund B14).
 export function startSatz({ art, zuzweit = false, kurz = false, knapp = false, momente = 0 }) {
   if (zuzweit) return { schluessel: 'analyse.an.start.zuzweit' };
+  if (art === 'offen') return { schluessel: 'analyse.an.start.offen' };
   if (kurz && art === 'niederlage') return { schluessel: 'analyse.an.start.schnellNiederlage' };
   if (kurz && art === 'sieg') return { schluessel: 'analyse.an.start.schnellSieg' };
   if (art === 'sieg') return { schluessel: 'analyse.an.start.sieg' };
@@ -208,11 +217,17 @@ export function zeige(root, params = {}, app) {
   };
   const einst = (() => { try { return app.einstellungen(); } catch (e) { return {}; } })();
   const orte = { oben: null, coach: null };   // Fuellungen der Anzeige-Orte (verlasse vor dem Neuzeichnen)
-  const zuzweit = () => st.partie?.modus === 'zuzweit';
+  // W-online-analyse: die Online-Partie liegt als Zu-zweit-Partie mit Kennzeichen online; die Analyse zeigt sie aus der
+  // eigenen Sicht wie eine Bot-Partie (Du gegen <Name>, eigene Farbe, Startsatz und Schluesselmoment), nie als "Zu zweit"
+  const online = () => istOnline(st.partie);
+  const zuzweit = () => st.partie?.modus === 'zuzweit' && !online();
   // zu kurz fuer eine verlaessliche Bewertung: dieselbe Grenze wie der Bestwert und "zu kurz" in der Genauigkeit
   const istKurz = () => eigeneZuege(st.partie) < BESTWERT_MIN_ZUEGE;
   const personenName = (f) => pruefeZuzweit(st.partie?.zuzweit)[f === 'w' ? 'weiss' : 'schwarz'];
   const personenBild = (f) => `<div class="an-avatar" aria-hidden="true"><img src="${pfad('assets/pieces/' + f + 'K.svg')}" alt=""></div>`;
+  // Gegner in Beschriftungen und Bild: der Bot, in der Online-Partie der Mensch auf der anderen Seite
+  const gegnerKurz = () => (online() ? personenName(st.bf) : kurzName(st.bot));
+  const gegnerBild = () => (online() ? personenBild(st.bf) : avatarHtml(st.bot));
 
   const nach = (ms, f) => { const t = setTimeout(() => { timer.delete(t); if (!beendet) f(); }, ms); timer.add(t); return t; };
   const lausche = (ziel, typ, f, opt) => { ziel.addEventListener(typ, f, opt); aufraeumen.push(() => ziel.removeEventListener(typ, f, opt)); };
@@ -257,6 +272,7 @@ export function zeige(root, params = {}, app) {
       case 'moment': springe(Number(el.dataset.ply)); brettInSicht(); break;
       case 'klasse': springeZuKlasse(el.dataset.klasse); break;
       case 'nochmal-rechnen': rechne(); break;
+      case 'online': app.gehe('online', {}); break;
       default: break;
     }
   }
@@ -326,6 +342,7 @@ export function zeige(root, params = {}, app) {
     const unter = sec.querySelector('.an-unter');
     const namensSpan = (klasse, text) => { const e = document.createElement('span'); e.className = klasse; e.textContent = text; return e; };
     if (zuzweit()) unter.textContent = t('analyse.an.kopf.gegen', { weiss: personenName('w'), schwarz: personenName('b') });
+    else if (online()) unter.textContent = t('analyse.an.kopf.online', { name: personenName(st.bf) });
     else {
       unter.textContent = t('analyse.an.kopf.gegenBot');
       unter.append(namensSpan('an-unter-voll', name), namensSpan('an-unter-kurz', st.bot ? kurzName(st.bot) : name));
@@ -339,7 +356,8 @@ export function zeige(root, params = {}, app) {
     const derselbe = !ng || ng.id === p.botId;
     const nochmalAria = esc(t('analyse.an.knopf.nochmalGegen', { name }));
     const nochmalText = esc(t('analyse.an.knopf.nochmal'));
-    const knoepfe = zuzweit() ? `<button class="knopf" type="button" data-aktion="zurueck">${esc(t('allgemein.zurueck'))}</button>
+    const knoepfe = online() ? `<button class="knopf" type="button" data-aktion="zurueck">${esc(t('allgemein.zurueck'))}</button>
+      <button class="knopf primaer" type="button" data-aktion="online">${esc(t('analyse.an.knopf.online'))}</button>` : zuzweit() ? `<button class="knopf" type="button" data-aktion="zurueck">${esc(t('allgemein.zurueck'))}</button>
       <button class="knopf primaer" type="button" data-aktion="nochmal">${esc(t('analyse.an.knopf.revanche'))}</button>` : derselbe ? `
       <button class="knopf" type="button" data-aktion="weiter" aria-label="${esc(t('analyse.an.knopf.zurArena'))}">${icon('zurueck')} ${esc(t('allgemein.arena'))}</button>
       <button class="knopf primaer" type="button" data-aktion="nochmal" aria-label="${nochmalAria}">${icon('nochmal')} ${nochmalText}</button>` : `
@@ -364,7 +382,7 @@ export function zeige(root, params = {}, app) {
         <div class="an-laden-duell">
           ${zuzweit() ? personenBild('w') : floBild()}
           <span class="an-laden-vs">${esc(t('analyse.an.laden.gegen'))}</span>
-          ${zuzweit() ? personenBild('b') : avatarHtml(st.bot)}
+          ${zuzweit() ? personenBild('b') : gegnerBild()}
         </div>
         <h3 class="an-laden-titel">${esc(t(zuzweit() ? 'analyse.an.laden.beide' : 'analyse.an.laden.deine'))}</h3>
         <div class="an-fortschritt" role="progressbar" aria-label="${esc(t('analyse.an.laden.fortschritt'))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
@@ -580,7 +598,7 @@ export function zeige(root, params = {}, app) {
     const staerke = r.spielstaerke ? r.spielstaerke[st.sf] : null;
     const nummer = st.zuege.length ? st.zuege[st.zuege.length - 1].nummer : 1;
     const info = ergebnisInfo(st.partie, nummer);
-    const kurz = kurzName(st.bot);
+    const kurz = gegnerKurz();
     // gezeigt wird die Genauigkeit der Partie (auf ihr beruht Stern 2; eine spaetere Neuberechnung ersetzt
     // sie nicht, storage.ergaenzeAnalyse), sonst die der Review
     const eigen = Number.isFinite(st.partie.genauigkeit) ? st.partie.genauigkeit : du;
@@ -612,7 +630,7 @@ export function zeige(root, params = {}, app) {
         </div>
         <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span>${sterneHtml()}</div>
         <div class="an-seite an-re">
-          ${avatarHtml(st.bot)}
+          ${gegnerBild()}
           <div class="an-seite-text">${wert(gegner, false)}<div class="an-g-label">${esc(kurz)}</div></div>
         </div>
         ${zuKurz ? `<p class="an-g-hinweis">${esc(t('analyse.an.genau.hinweis'))}</p>` : ''}
@@ -687,7 +705,7 @@ export function zeige(root, params = {}, app) {
     const r = st.review;
     const du = (r.anzahl && r.anzahl[st.sf]) || {};
     const gegner = (r.anzahl && r.anzahl[st.bf]) || {};
-    const kurz = zuzweit() ? personenName(st.bf) : kurzName(st.bot);
+    const kurz = zuzweit() ? personenName(st.bf) : gegnerKurz();
     // Flo 30.10. abends ("kann aufgeklappt sein, aber muss angepasst werden"): links du, rechts der Gegner, je ein Balken
     // in der Farbe der Klasse (Laenge relativ zur haeufigsten Klasse der Partie)
     const hoechstens = Math.max(1, ...KLASSEN.map((k) => Math.max(du[k] || 0, gegner[k] || 0)));
@@ -873,7 +891,7 @@ export function zeige(root, params = {}, app) {
       return;
     }
     const du = z.farbe === st.sf;
-    const kurz = kurzName(st.bot);
+    const kurz = gegnerKurz();
     el.dataset.klasse = z.klasse;
     el.style.setProperty('--kf', `var(--k-${z.klasse})`);
     if (z.klasse === 'brillant') el.classList.add('brillant');

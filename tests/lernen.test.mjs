@@ -20,7 +20,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8934);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -277,6 +277,8 @@ async function warteLz(s, bedingung, ms = 10000) {
     return new Function('z', 'return ' + b)(z);
   }, bedingung, { timeout: ms }).catch(() => {});
 }
+// R8: das Ergebnisblatt der Lektion steht (es kommt kurz nach dem letzten Zug, damit man ihn noch sieht)
+const blattDa = (s) => s.waitForSelector('.ls-screen > .ergebnis-overlay:not([hidden]) .ergebnis-karte', { timeout: 8000 }).catch(() => {});
 async function ziehe(s, uci) {
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
     const b = await s.locator(`.ls-screen .brett-felder .feld[data-feld="${f}"]`).boundingBox();
@@ -350,16 +352,44 @@ async function erfinderTeil(browser) {
   await warteLz(p.s, "z.phase === 'ende'");
   z = await lz(p.s);
   pruefe('Grundreihe: Ta8 matt, ein Zug, drei Sterne', z.phase === 'ende' && z.zuege === 1 && z.sterne === 3 && !z.grund, z);
-  pruefe('Ergebnis: „Matt!“ mit drei leuchtenden Sternen und „Nächste Lektion“', await p.s.evaluate(() => {
-    const m = document.querySelector('.ls-meldung[data-art="geschafft"]');
-    return !!m && m.querySelectorAll('.ms-sterne > i.an').length === 3 && !!document.querySelector('.ls-aktionen [data-a="weiter"]');
-  }), await p.s.evaluate(() => document.querySelector('.ls-meldung')?.outerHTML.slice(0, 400) + ' | ' + document.querySelector('.ls-aktionen')?.innerHTML.slice(0, 300)));
+  // R8 (Gleichheit): das Ende ist das Ergebnisblatt der Bot-Partie (css/ergebnis.css), nicht mehr nur eine Meldung
+  await blattDa(p.s);
+  const lsBlatt = await p.s.evaluate(() => {
+    const o = document.querySelector('.ls-screen > .ergebnis-overlay:not([hidden])');
+    if (!o) return { da: false };
+    const k = o.querySelector('.ergebnis-karte');
+    return { da: true, sieg: o.classList.contains('sieg'), dialog: o.getAttribute('role') === 'dialog' && o.getAttribute('aria-modal') === 'true',
+      wort: (o.querySelector('.erg-wort')?.textContent || '').trim(), sterne: o.querySelectorAll('.erg-sterne .erg-stern.an').length,
+      haupt: [...o.querySelectorAll('.erg-knoepfe .knopf.primaer')].map((b) => b.dataset.a).join(),
+      neben: [...o.querySelectorAll('.erg-knoepfe .knopf:not(.primaer)')].map((b) => b.dataset.a).join(),
+      lobby: o.querySelector('.erg-lobby')?.dataset.a || null, fokus: !!k && k.contains(document.activeElement),
+      inert: [...document.querySelector('.ls-screen').children].filter((e) => e !== o).every((e) => e.inert),
+      breite: k ? Math.round(k.getBoundingClientRect().width) : 0,
+      // R8 Texte: Weg "Zur Meisterschule" mit dem Haus der Bot-Partie (icons.js haus), Zeile aus Zuegen und Hinweisen
+      lobbyText: (o.querySelector('.erg-lobby')?.textContent || '').trim(),
+      haus: /M4 11\.5 12 5l8 6\.5/.test(o.querySelector('.erg-lobby svg')?.innerHTML || ''),
+      zeile: (() => { const z = o.querySelector('.ls-erg-zeile'); if (!z) return null;
+        return { text: z.textContent.trim(), eineZeile: z.scrollWidth <= z.clientWidth + 1 && z.getClientRects().length === 1 }; })() };
+  });
+  pruefe('Ergebnisblatt wie in der Bot-Partie: „Matt!“, drei Sterne, Hauptknopf „Nächste Lektion“, „Nochmal“, Weg zur Übersicht',
+    lsBlatt.da && lsBlatt.sieg && lsBlatt.dialog && lsBlatt.wort === 'Matt!' && lsBlatt.sterne === 3 && lsBlatt.haupt === 'weiter'
+    && lsBlatt.neben === 'nochmal' && lsBlatt.lobby === 'uebersicht' && lsBlatt.fokus && lsBlatt.inert, lsBlatt);
+  pruefe('Ergebnisblatt: Weg „Zur Meisterschule“ mit dem Haus der Bot-Partie, unter den Sternen „In 1 Zug · ohne Hinweis“ in einer Zeile',
+    lsBlatt.lobbyText === 'Zur Meisterschule' && lsBlatt.haus && !!lsBlatt.zeile && lsBlatt.zeile.text === 'In 1 Zug · ohne Hinweis' && lsBlatt.zeile.eineZeile, lsBlatt);
+  // Auge zeigt das Brett, "Ergebnis" holt das Blatt zurueck (wie in der Bot-Partie)
+  await p.s.locator('.ls-screen > .ergebnis-overlay .erg-zu').click();
+  const brettSicht = await p.s.evaluate(() => ({ zu: document.querySelector('.ls-screen > .ergebnis-overlay')?.hidden === true,
+    knopf: !!document.querySelector('.ls-aktionen [data-a="ergebnis"]'), meldung: document.querySelector('.ls-meldung[data-art="geschafft"]')?.hidden === false }));
+  await p.s.locator('.ls-aktionen [data-a="ergebnis"]').click();
+  await blattDa(p.s);
+  pruefe('Ergebnisblatt: Auge zeigt das Brett mit Meldung, „Ergebnis“ holt das Blatt zurück', brettSicht.zu && brettSicht.knopf && brettSicht.meldung
+    && await p.s.locator('.ls-screen > .ergebnis-overlay:not([hidden])').count() === 1, brettSicht);
   const gespeichert = await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:lernen') || 'null'));
   pruefe('Speicher: Modul lernen hält 3 Sterne und 1 Zug', gespeichert && gespeichert.lek && gespeichert.lek.grundreihe
     && gespeichert.lek.grundreihe.s === 3 && gespeichert.lek.grundreihe.z === 1, gespeichert);
 
   // weiter zur naechsten Lektion, dann ueber die Uebersicht zur Dame
-  await p.s.locator('.ls-aktionen [data-a="weiter"]').click();
+  await p.s.locator('.ergebnis-overlay [data-a="weiter"]').click();
   await warteLz(p.s, `z.id === '${LEKTIONEN[1].id}' && z.phase === 'intro'`);
   pruefe('„Nächste Lektion“ öffnet die zweite Lektion', (await lz(p.s)).id === LEKTIONEN[1].id);
   await p.s.evaluate(() => window.__app.gehe('lernen'));
@@ -392,7 +422,8 @@ async function erfinderTeil(browser) {
   z = await lz(p.s);
   pruefe('Quadratregel: Bauer geschlagen, „Gehalten!“ mit drei Sternen', z.phase === 'ende' && !z.grund && z.sterne === 3
     && /Gehalten!/.test(await p.s.locator('.ls-meldung').innerText()), z);
-  await p.s.locator('.ls-aktionen [data-a="uebersicht"]').click();
+  await blattDa(p.s);
+  await p.s.locator('.ergebnis-overlay [data-a="uebersicht"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="quadrat"][data-geschafft]', { timeout: 10000 }).catch(() => {});
   pruefe('Zur Übersicht: zurück im Bereich Endspiele, Quadratregel „Gehalten“',
     await p.s.locator('.ms-bkarte[aria-pressed="true"]').getAttribute('data-bereich') === 'end'
@@ -516,9 +547,14 @@ async function erfinderTeil(browser) {
   }
   await warteLz(p.s, "z.phase === 'ende'");
   z = await lz(p.s);
+  await blattDa(p.s);
   pruefe('Zeig sie mir: geschafft mit einem Stern, „Züge gelernt!“, weiter mit „Ohne Hilfe spielen“', z.sterne === 1
-    && /Züge gelernt!/.test(await p.s.locator('.ls-meldung').innerText()) && /Ohne Hilfe spielen/.test(await p.s.locator('.ls-aktionen [data-a="los"].primaer').innerText()), z);
-  await p.s.locator('.ls-aktionen [data-a="los"]').click();
+    && /Züge gelernt!/.test(await p.s.locator('.ls-meldung').innerText()) && /Ohne Hilfe spielen/.test(await p.s.locator('.ergebnis-overlay [data-a="los"].primaer').innerText())
+    && await p.s.locator('.ergebnis-overlay .erg-stern.an').count() === 1, z);
+  // R8 Texte: bei Eroeffnungen zaehlen auch die Fehler (sterneFolge), deshalb stehen sie mit in der Zeile
+  const folgeZeile = (await p.s.locator('.ergebnis-overlay .ls-erg-zeile').textContent().catch(() => '')).trim();
+  pruefe('Zeig sie mir: Zeile unter dem Stern „In 4 Zügen · 1 Fehler · ohne Hinweis“', folgeZeile === 'In 4 Zügen · 1 Fehler · ohne Hinweis', { folgeZeile, z });
+  await p.s.locator('.ergebnis-overlay [data-a="los"]').click();
   await warteLz(p.s, "z.phase === 'flo' && z.modus === 'selbst'");
   pruefe('Ohne Hilfe: kein Pfeil, Hinweis-Knopf wieder da', await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() === 0
     && await p.s.locator('.ls-aktionen [data-a="hinweis"]').count() === 1);
@@ -603,10 +639,11 @@ async function gratisTeil(browser) {
     await ziehe(p.s, u);
   }
   await warteLz(p.s, "z.phase === 'ende'");
+  await blattDa(p.s);
   pruefe('Gratis: nach der letzten leichten Lektion „Weiter“ und „Nächste Lektion im Trainer“, kein Werbetext in der Meldung',
-    await p.s.locator('.ls-aktionen [data-a="weiter"]').count() === 1 && /Nächste Lektion im Trainer/.test(await p.s.locator('.ls-aktionen [data-a="trainer"]').innerText())
+    await p.s.locator('.ergebnis-overlay [data-a="weiter"]').count() === 1 && /Nächste Lektion im Trainer/.test(await p.s.locator('.ergebnis-overlay [data-a="trainer"]').innerText())
     && await p.s.locator('.ls-screen .premium-hinweis').count() === 0);
-  await p.s.locator('.ls-aktionen [data-a="weiter"]').click();
+  await p.s.locator('.ergebnis-overlay [data-a="weiter"]').click();
   await warteLz(p.s, "z.id === 'legal-falle'");
   pruefe('Gratis: „Weiter“ springt zur Gratis-Probe Legal-Falle', (await lz(p.s)).id === 'legal-falle');
   pruefe('Gratis: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
@@ -688,13 +725,29 @@ async function kleinTeil(browser) {
         const r = los ? los.getBoundingClientRect() : null;
         return { n: k.length, los: r ? { top: Math.round(r.top), bottom: Math.round(r.bottom) } : null, ih: innerHeight,
           alle: k.every((x) => { const b = x.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight && b.height >= 44; }),
-          quer: document.documentElement.scrollWidth <= innerWidth + 1 };
+          quer: document.documentElement.scrollWidth <= innerWidth + 1,
+          // R8 (13.11.2026): die stehende Leiste legt kein Band in Seitenfarbe ueber die Karte (sonst Kante und Farbsprung
+          // mitten in der weissen bzw. dunklen Karte, Bilder R8): weder eigener Grund noch Verlauf davor
+          band: (() => { const a = document.querySelector('.ls-screen .ls-aktionen'); if (!a) return 'fehlt';
+            const leer = (c) => c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c);
+            const vor = getComputedStyle(a, '::before');
+            return leer(getComputedStyle(a).backgroundColor) && getComputedStyle(a).backgroundImage === 'none'
+              && (vor.content === 'none' || vor.content === 'normal' || vor.backgroundImage === 'none') ? '' : 'band'; })(),
+          // R8 L4 (13.11.2026): die Leiste verdeckt nichts. Karte und Meldung enden ueber ihr, und die Flaeche rollt nicht
+          // (sonst laege Inhalt unter dem Rand oder hinter der Leiste)
+          verdeckt: (() => { const a = document.querySelector('.ls-screen .ls-aktionen'); const rumpf = document.querySelector('.ls-screen .ls-rumpf');
+            if (!a || !rumpf) return 'fehlt';
+            const oben = a.getBoundingClientRect().top;
+            const zu = [...document.querySelectorAll('.ls-screen .ls-seite > :not(.ls-aktionen)')].filter((e) => !e.hidden && e.getClientRects().length)
+              .filter((e) => e.getBoundingClientRect().bottom > oben + 1).map((e) => e.className.split(' ')[0]);
+            if (rumpf.scrollHeight > rumpf.clientHeight + 1) zu.push('rumpf-rollt:' + (rumpf.scrollHeight - rumpf.clientHeight));
+            return zu.join(','); })() };
       });
       const ueber = m.los ? m.los.bottom - m.ih : 999;
       if (!schlimmste || ueber > schlimmste.ueber) schlimmste = { id: l.id, ueber };
-      if (!m.los || m.los.bottom > m.ih || m.los.top < 0 || !m.alle || !m.quer) schlecht.push(`${l.id}:${ueber}`);
+      if (!m.los || m.los.bottom > m.ih || m.los.top < 0 || !m.alle || !m.quer || m.band || m.verdeckt) schlecht.push(`${l.id}:${ueber}${m.band ? ':' + m.band : ''}${m.verdeckt ? ':' + m.verdeckt : ''}`);
     }
-    pruefe(`${geraet}: „Los geht's“ (und jeder Knopf der Idee-Phase) in allen ${ALLE.length} Lektionen ganz im Bild (B9)`, schlecht.length === 0,
+    pruefe(`${geraet}: „Los geht's“ (und jeder Knopf der Idee-Phase) in allen ${ALLE.length} Lektionen ganz im Bild, ohne Band, ohne verdeckten Inhalt (B9, R8)`, schlecht.length === 0,
       { schlecht: schlecht.join(' '), schlimmste });
     if (process.env.BILDER && schlimmste) {
       for (const modus of ['hell', 'dunkel']) {
@@ -712,8 +765,62 @@ async function kleinTeil(browser) {
 
 const LEKTIONEN_IDS = LEKTIONEN.map((l) => l.id).join();
 
+// R9 (13.11.2026, Befund 1 der Gleichheits-Messung): das Lektions-Brett ist auf jeder Groesse mindestens so gross wie in
+// der Bot-Partie (gemessen wie tests/gleichheit-ansichten.test.mjs ueber tests/gleichheit-messung.mjs: Feldraster, Bot nach
+// dem Intro, Lektion nach "Los geht's"), und nichts laeuft ueber oder scrollt. Am PC 1280 x 800 waren es 686 gegen 718 px.
+const BRETT_GROESSEN = [['PC 1280x800', 1280, 800], ['PC 1440x900', 1440, 900], ['PC 1920x1080', 1920, 1080], ['iPad quer', 1180, 820],
+  ['PC 1280x720', 1280, 720], ['iPhone 13', 390, 664], ['iPhone SE', 375, 667]];
+async function brettGroesseTeil(browser) {
+  const { messeAnsicht, introWeg } = await import('./gleichheit-messung.mjs');
+  for (const [name, width, height] of BRETT_GROESSEN) {
+    const p = await seite(browser, { groesse: { width, height } });
+    await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno' }));
+    await p.s.waitForFunction(() => window.__partie?.bereit && document.querySelector('.brett-rahmen > .brett .feld'), null, { timeout: 30000 }).catch(() => {});
+    await introWeg(p.s); await warte(1200);
+    const bot = await messeAnsicht(p.s, '.screen.partie');
+    await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'grundreihe' }));
+    await warteLz(p.s, "z.id === 'grundreihe' && z.phase === 'intro'");
+    await p.s.locator('.ls-aktionen [data-a="los"]').click();
+    await warteLz(p.s, "z.phase === 'flo'");
+    await warte(600);
+    const ls = await messeAnsicht(p.s, '.ls-screen');
+    const platz = await p.s.evaluate(() => {
+      const r = document.querySelector('.ls-screen .ls-rumpf'), d = document.documentElement;
+      const unten = Math.max(...[...document.querySelectorAll('.ls-screen .ls-rahmen, .ls-screen .ls-seite')].map((e) => e.getBoundingClientRect().bottom));
+      return { rumpfRollt: r ? r.scrollHeight - r.clientHeight : null, seiteRollt: d.scrollHeight - innerHeight, quer: d.scrollWidth - innerWidth,
+        unten: Math.round(unten), hoehe: innerHeight };
+    });
+    pruefe(`Brettgröße ${name}: Lektion mindestens so groß wie die Bot-Partie (Feldraster), ohne Überlauf und ohne Scrollen`,
+      !bot.fehlt && !ls.fehlt && ls.brett >= bot.brett - 2 && platz.rumpfRollt <= 1 && platz.seiteRollt <= 1 && platz.quer <= 1 && platz.unten <= platz.hoehe + 1,
+      { lektion: ls.brett ?? ls.fehlt, bot: bot.brett ?? bot.fehlt, ...platz });
+    await p.k.close();
+  }
+}
+
+// R9-2 (Layout-Messung 13.11.2026): vor dem Start blieb unter "Los geht's" eine Leere bis zum Rand, iPhone 13 146 px,
+// iPad hoch 76 px. Wie in der Bot-Partie sitzen die Knoepfe unten fuer den Daumen; hoechstens 60 px bleiben frei.
+const LEERE_GROESSEN = [['iPhone 13', 390, 844], ['iPad hoch', 820, 1180], ['iPhone SE', 375, 667]];
+async function leereTeil(browser) {
+  for (const [name, width, height] of LEERE_GROESSEN) {
+    const p = await seite(browser, { groesse: { width, height } });
+    await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'grundreihe' }));
+    await warteLz(p.s, "z.id === 'grundreihe' && z.phase === 'intro'");
+    await warte(600);
+    const m = await p.s.evaluate(() => {
+      const los = document.querySelector('.ls-aktionen [data-a="los"]')?.getBoundingClientRect();
+      const brett = document.querySelector('.ls-screen .ls-rahmen')?.getBoundingClientRect();
+      const d = document.documentElement;
+      return { leere: los ? Math.round(innerHeight - los.bottom) : null, losOben: los ? Math.round(los.top) : null,
+        brett: brett ? Math.round(brett.width) : null, seiteRollt: d.scrollHeight - innerHeight, hoehe: innerHeight };
+    });
+    pruefe(`Leere ${name}: unter "Los geht's" höchstens 60 px bis zum Rand, Knopf ganz sichtbar, nichts scrollt`,
+      m.leere !== null && m.leere >= 0 && m.leere <= 60 && m.seiteRollt <= 1, m);
+    await p.k.close();
+  }
+}
+
 async function browserTeil() {
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser = null;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
@@ -723,6 +830,8 @@ async function browserTeil() {
     await willkommenTeil(browser);
     await neuesGeraetTeil(browser);
     await kleinTeil(browser);
+    await brettGroesseTeil(browser);
+    await leereTeil(browser);
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);
   } finally {

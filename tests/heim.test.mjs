@@ -6,7 +6,7 @@
 //
 //   node tests/heim.test.mjs              alles
 //   node tests/heim.test.mjs --nur-node   ohne Browser
-//   PORT=8972 node tests/heim.test.mjs    eigener Port (Standard 8972)
+//   PORT=8972 node tests/heim.test.mjs    eigener Port (Standard: frei)
 //   HEIM_BILDER=<ordner>                  legt dort Bildschirmfotos ab (iPhone, iPad hoch und quer, hell und dunkel, mit und ohne Partie)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
@@ -21,7 +21,7 @@ import { addiereTage } from '../js/tag.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8972);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const BILDER = process.env.HEIM_BILDER || '';
@@ -749,7 +749,7 @@ async function main() {
     let browser = null;
     try {
       const pw = ladePlaywright();
-      server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+      server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
       await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
       browser = await browserTyp(pw).launch();
       await browserTeil(browser);

@@ -28,7 +28,7 @@ import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { hoere } from '../ereignisse.js';
 import { spieleDuell } from './duell.js';
-import { speicherePartie } from '../storage.js';
+import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie } from '../storage.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -51,6 +51,7 @@ const BRETT_MIN = 280;
 // Brettwahl im Kopf (R7, wie BRETTER in js/ui/partie.js, dort nicht exportiert): id, helles und dunkles Feld des Musters
 const BRETTER = Object.freeze([['nacht', '#e4e8f6', '#7c87b6'], ['gruen', '#eeeed2', '#769656'], ['holz', '#f0d9b5', '#b58863']]);
 const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+const STREIFEN_AB = 760; // wie js/ui/partie.js
 const UHR_SYMBOL = '<svg class="ico uhr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
   + 'stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>';
 const REMIS_SYMBOL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><text x="12" y="18" text-anchor="middle" '
@@ -624,6 +625,9 @@ export function zeige(root, params, app) {
     const handy = !!(handyMq && handyMq.matches);
     s.classList.toggle('handy', handy);
     s.classList.remove('eng');
+    // R8 (L3): Zugstreifen wie in der Bot-Partie (js/ui/partie.js STREIFEN_AB): ab 760 px Hoehe ueber den Knoepfen, darunter
+    // entfaellt er und die Pfeile stehen in der Knopfreihe (css/partie.css .streifen-unten, css/online.css)
+    s.classList.toggle('streifen-unten', handy && s.clientHeight < STREIFEN_AB);
     if (!handy) { spiel.style.removeProperty('--brett'); spiel.style.removeProperty('--spalte'); return; }
     const rahmen = spiel.querySelector('.brett-rahmen');
     const rs = getComputedStyle(rahmen);
@@ -751,9 +755,13 @@ export function zeige(root, params, app) {
   // den Satz des Bots, online gibt es keinen).
   const ANALYSE_GRUND = { matt: 'matt', aufgabe: 'aufgabe', patt: 'patt', material: 'material', wiederholung: 'wiederholung',
     '50-zuege': '50-zuege', zeit: 'zeit', remis: 'vereinbart' };
-  // zaehlt: das Ende hat ein Ergebnis, das am Brett stimmt (wie endeTexte); nur dann Sieg/Niederlage/Remis und Analyse
+  // zaehlt: das Ende hat ein Ergebnis, das am Brett stimmt (wie endeTexte); nur dann Sieg/Niederlage/Remis
   const endeZaehlt = () => !!p && !!p.ergebnis && p.grund !== 'strittig' && !widerspruch && endePasst(p, chess);
-  const kannAnalyse = () => endeZaehlt() && chess.history().length > 0;
+  // W-online-analyse (Flo 13.11.: "beim 1 gegen 1 fehlt die Analyse"): Analyse bei JEDEM Ende mit mindestens einem Zug,
+  // auch abgebrochen, strittig oder nicht nachvollziehbar. chess ist immer der nachgespielte, legale Stand (bei einem
+  // Widerspruch der letzte stimmige), die Analyse rechnet also nur echte Zuege. Waehrend die Partie laeuft: nie. Nur fuer
+  // die beiden Spieler (abgemeldet oder fremde Partie: keine eigene Farbe, nichts ablegen).
+  const kannAnalyse = () => !!p && p.status === 'beendet' && chess.history().length > 0 && !!online.meineFarbe(p);
   const blattEl = () => s.querySelector(':scope > .ergebnis-overlay');
   function zeigeBlatt(an) {
     const o = blattEl(); if (!o) return;
@@ -771,6 +779,8 @@ export function zeige(root, params, app) {
     const art = !endeZaehlt() ? '' : p.ergebnis === '1/2-1/2' ? 'remis' : (p.ergebnis === '1-0' ? 'w' : 'b') === eigen ? 'sieg' : 'niederlage';
     const wort = esc(titel) + (art === 'sieg' ? '<span class="ausruf">!</span>' : '');
     const analyse = kannAnalyse();
+    // beim Ende sofort auf dem Geraet ablegen (W-online-analyse); scheitert der Speicher, bleibt "Zur Analyse" der zweite Versuch
+    if (analyse) { try { sichereFuerAnalyse(); } catch (e) { /* voller Speicher: Zur Analyse meldet es */ } }
     const o = document.createElement('div');
     o.className = `ergebnis-overlay on-erg ${art}`.trim();
     o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-labelledby', 'on-erg-wort');
@@ -797,23 +807,46 @@ export function zeige(root, params, app) {
     zeigeKronen();
     zeigeBlatt(true);
   }
-  // "Zur Analyse": die Spielanalyse (js/ui/analyse.js) liest nur Partien vom Geraet. Die Online-Partie wird dafuer einmal als
-  // Partie zweier Menschen abgelegt (modus 'zuzweit': wertet nie, kein Bot, beide Namen im Kopf), aus Sicht der eigenen Farbe.
-  // Feste ID je Online-Partie: ein zweites Oeffnen ersetzt den Eintrag statt ihn zu verdoppeln.
-  function zurAnalyse() {
-    if (!kannAnalyse()) return;
+  // Ablage fuer die Analyse: die Spielanalyse (js/ui/analyse.js) und "Meine Partien" (js/ui/verlauf.js) lesen nur Partien vom
+  // Geraet. W-online-analyse: jede beendete Online-Partie mit mindestens einem Zug wird beim Ende von selbst abgelegt (auch
+  // wer das Blatt nur schliesst, findet sie dort), als Partie zweier Menschen (modus 'zuzweit': wertet nie, kein Bot) mit dem
+  // Kennzeichen online, aus Sicht der eigenen Farbe. Feste ID je Online-Partie und genau einmal: steht sie schon auf dem
+  // Geraet (Neuladen, zweites Oeffnen, Klick auf "Zur Analyse"), bleibt der Eintrag samt Analyse stehen; nur die Namen
+  // werden nachgetragen, sobald die Visitenkarten da sind. Ein Ende ohne gueltiges Ergebnis hat kein ergebnis und einen
+  // ehrlichen Grund (abgebrochen, strittig, unklar).
+  const analyseId = () => 'on-' + p.id;
+  const namenDerPartie = () => ({ weiss: spielerDaten('w').name, schwarz: spielerDaten('b').name, drehen: false });
+  function sichereFuerAnalyse() {
+    if (!kannAnalyse()) return null;
+    const id = analyseId();
+    const da = ladeGespeichert(id);
+    if (da) {
+      const namen = namenDerPartie(), alt = da.zuzweit || {};
+      const teil = {};
+      if (kartenDaten && (alt.weiss !== namen.weiss || alt.schwarz !== namen.schwarz)) teil.zuzweit = namen;
+      // vor dem 13.11. per "Zur Analyse" abgelegt: damals ohne Kennzeichen, die Analyse zeigte sie als "Zu zweit"
+      if (!da.online) teil.online = { gewertet: p.gewertet === true };
+      if (Object.keys(teil).length) aktualisierePartie(id, teil);
+      return id;
+    }
     const zuege = chess.history({ verbose: true });
     const eigen = online.meineFarbe(p);
-    const ergebnis = p.ergebnis === '1/2-1/2' ? 'remis' : (p.ergebnis === '1-0' ? 'w' : 'b') === eigen ? 'sieg' : 'niederlage';
+    const zaehlt = endeZaehlt();
+    const ergebnis = !zaehlt ? null : p.ergebnis === '1/2-1/2' ? 'remis' : (p.ergebnis === '1-0' ? 'w' : 'b') === eigen ? 'sieg' : 'niederlage';
+    const grund = zaehlt ? ANALYSE_GRUND[p.grund] || null : p.grund === 'strittig' || p.grund === 'abgebrochen' ? p.grund : 'unklar';
     const tempo = p.bedenkzeit_s == null ? null : { grund: p.bedenkzeit_s, zuschlag: p.inkrement_s || 0 };
-    let gespeichert;
-    try {
-      gespeichert = speicherePartie({ id: 'on-' + p.id, modus: 'zuzweit', botId: null, spielerFarbe: eigen,
-        zuzweit: { weiss: spielerDaten('w').name, schwarz: spielerDaten('b').name, drehen: false },
-        zuege: zuege.map(m => m.lan), san: zuege.map(m => m.san), tempo, ergebnis, grund: ANALYSE_GRUND[p.grund] || null,
-        datum: p.aktualisiert_am || undefined, hinweise: 0, zuruecknahmen: 0, liveKlassen: [], genauigkeit: null, genauigkeitBot: null });
-    } catch (e) { melde(O('fehler')); return; }
-    app.gehe('analyse', { partieId: gespeichert.partie.id });
+    speicherePartie({ id, modus: 'zuzweit', botId: null, spielerFarbe: eigen, zuzweit: namenDerPartie(),
+      online: { gewertet: p.gewertet === true },
+      zuege: zuege.map(m => m.lan), san: zuege.map(m => m.san), tempo, ergebnis, grund,
+      datum: p.aktualisiert_am || undefined, hinweise: 0, zuruecknahmen: 0, liveKlassen: [], genauigkeit: null, genauigkeitBot: null });
+    return id;
+  }
+  function zurAnalyse() {
+    if (!kannAnalyse()) return;
+    let id;
+    try { id = sichereFuerAnalyse(); } catch (e) { id = null; }
+    if (!id) { melde(O('fehler')); return; }
+    app.gehe('analyse', { partieId: id });
   }
   // Etappe 4b: die Visitenkarten beider Spieler (js/karte.js, nur fuer die Teilnehmer dieser Partie) bringen Banner, Name
   // und Titel in die Spielerleisten; bis sie da sind (oder ohne Antwort) bleibt es bei "Ich" und "Freund"
@@ -823,7 +856,12 @@ export function zeige(root, params, app) {
       kartenPartie = p.id;
       kartenDaten = null;
       const id = p.id;
-      karteDerPartie(id, { frist: 8000 }).then((d) => { if (d && !weg && p && p.id === id) { kartenDaten = d; karten(); intro(); } });
+      karteDerPartie(id, { frist: 8000 }).then((d) => {
+        if (!d || weg || !p || p.id !== id) return;
+        kartenDaten = d; karten(); intro();
+        // die Namen kamen erst nach dem Ende: in der Ablage fuer die Analyse nachtragen
+        if (p.status === 'beendet') { try { sichereFuerAnalyse(); } catch (e) { /* bleibt bei den alten Namen */ } }
+      });
     }
     const eigen = online.meineFarbe(p);
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
@@ -876,6 +914,9 @@ export function zeige(root, params, app) {
       const f = el.dataset.farbe, r = rest(f), zeit = el.querySelector('.uhr-zeit');
       if (zeit) zeit.textContent = uhrText(r);
       el.classList.toggle('laeuft', p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2);
+      // R8 (B4): die Uhr dessen am Zug ist dunkel wie in der Bot-Partie (js/ui/partie.js zeichneKnoepfe), auch vor dem
+      // 2. Halbzug, wenn sie noch steht
+      el.classList.toggle('am-zug', p.status === 'laeuft' && p.am_zug === f);
       el.classList.toggle('warn', p.status === 'laeuft' && r < 20000);
     }
     // Uhr-Warnung einmal je Partie, sobald die eigene laufende Uhr unter 20 s faellt (wie in der Partie)

@@ -3,7 +3,7 @@
 // Home-Bildschirm (leerer Speicher) oder einen zweiten Tab; ein abgebrochener Dialog oder ein Tab ohne Abgleich durfte
 // den Cloud-Stand nicht ueberschreiben. Netzwerk nur simuliert: Anfragen an *.supabase.co beantwortet der Test,
 // alles ausser 127.0.0.1 wird abgebrochen.
-//   PORT=9620 node tests/konto-link.test.mjs   eigener Port (Standard 8907)
+//   PORT=9620 node tests/konto-link.test.mjs   eigener Port (Standard: frei)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8907);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const BASIS = `http://127.0.0.1:${PORT}/?test&kern`;
 const TOKEN = 'a.' + Buffer.from(JSON.stringify({ sub: 'u1', email: 'flo@example.invalid' })).toString('base64url') + '.x';

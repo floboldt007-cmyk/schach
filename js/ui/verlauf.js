@@ -21,22 +21,24 @@ import { eroeffnung, eroeffnungsAnzeige } from '../openings.js';
 import { t, sprache, locale } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/analyse.js';
-import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet, pruefeZuzweit } from '../storage.js';
+import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet, pruefeZuzweit, istOnline } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { botFarbe } from '../thema.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 
 // W0+a: Chip nicht wertender Partien je Art (w0plus-a-fix: dazu Gast), Einzahl und Mehrzahl fuer die Kopfzeile
 // (Texte: analyse.vl.chip.<art>, analyse.vl.art.<art>.eins/.mehr; ART_REIHE ist die Reihenfolge in der Kopfzeile)
-const CHIP_ARTEN = new Set(['boss', 'frei', 'spiel', 'gast', 'zuzweit']);
-const ART_REIHE = ['uebung', 'boss', 'frei', 'spiel', 'gast', 'zuzweit'];
+const CHIP_ARTEN = new Set(['boss', 'frei', 'spiel', 'gast', 'zuzweit', 'online']);
+const ART_REIHE = ['uebung', 'boss', 'frei', 'spiel', 'gast', 'zuzweit', 'online'];
 function chipText(art) {
   return t(`analyse.vl.chip.${CHIP_ARTEN.has(art) ? art : 'uebung'}`);
 }
 const LEITER = new Set(BOTS.map((b) => b.id));
 // Art einer nicht wertenden Partie: Modus boss, frei, spiel; Modus normal gegen einen angemeldeten Bot: gast; sonst
 // (Uebung, eigene Stellung) uebung
+// W-online-analyse: eine Online-Partie (Zu-zweit-Partie mit Kennzeichen online) heisst "Online"
 function artVon(p) {
+  if (istOnline(p)) return 'online';
   if (CHIP_ARTEN.has(p.modus)) return p.modus;
   if ((p.modus || 'normal') === 'normal' && p.botId != null && !LEITER.has(p.botId)) return 'gast';
   return 'uebung';
@@ -55,7 +57,7 @@ const ICON = {
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
 // Spielende: Grund (analyse.ergebnis.*) und Ergebnis (allgemein.sieg/niederlage/remis)
-const GRUND = new Set(['matt', 'aufgabe', 'patt', 'wiederholung', '50-zuege', 'material']);
+const GRUND = new Set(['matt', 'aufgabe', 'patt', 'wiederholung', '50-zuege', 'material', 'abgebrochen', 'strittig', 'unklar']);
 const ERGEBNIS = new Set(['sieg', 'niederlage', 'remis']);
 function grundText(grund) {
   return GRUND.has(grund) ? t(`analyse.ergebnis.${grund}`) : '';
@@ -203,10 +205,14 @@ export function zeige(root, params = {}, app) {
 
   function zeileHtml(p) {
     const bot = botNachId(p.botId);
-    const zuZweit = p.modus === 'zuzweit', namen = pruefeZuzweit(p.zuzweit);
-    const name = zuZweit ? t('analyse.vl.zeile.zuzweit', { weiss: namen.weiss, schwarz: namen.schwarz }) : bot ? bot.name : t('analyse.vl.zeile.unbekannt');
+    // Online: Name des Gegners (die andere Farbe), Ergebnis aus der eigenen Sicht wie bei einer Bot-Partie
+    const online = istOnline(p), zuZweit = p.modus === 'zuzweit' && !online, namen = pruefeZuzweit(p.zuzweit);
+    const gegner = namen[p.spielerFarbe === 'b' ? 'weiss' : 'schwarz'];
+    const name = zuZweit ? t('analyse.vl.zeile.zuzweit', { weiss: namen.weiss, schwarz: namen.schwarz }) : online ? gegner : bot ? bot.name : t('analyse.vl.zeile.unbekannt');
+    const ohneErgebnis = online && !ERGEBNIS.has(p.ergebnis);
     const art = ERGEBNIS.has(p.ergebnis) ? p.ergebnis : 'remis';
-    const erg = zuZweit && p.ergebnis !== 'remis' ? t('analyse.ergebnis.gewinnt', { name: p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz }) : t(`allgemein.${art}`);
+    const erg = ohneErgebnis ? t('analyse.ergebnis.ohneErgebnis')
+      : zuZweit && p.ergebnis !== 'remis' ? t('analyse.ergebnis.gewinnt', { name: p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz }) : t(`allgemein.${art}`);
     const grund = grundText(p.grund);
     const zuege = Math.ceil((p.zuege || []).length / 2);
     const sterne = Array.isArray(p.sterne) ? p.sterne : [false, false, false];
@@ -222,7 +228,7 @@ export function zeige(root, params = {}, app) {
           <button class="vl-oeffnen" type="button" data-aktion="oeffnen" aria-label="${esc(label)}">
             ${avatarHtml(bot)}
             <span class="vl-info">
-              <span class="vl-z1"><b class="vl-name">${esc(name)}</b><span class="vl-ergebnis ${art}">${esc(erg)}${grund ? ` · ${esc(grund)}` : ''}</span></span>
+              <span class="vl-z1"><b class="vl-name">${esc(name)}</b><span class="vl-ergebnis ${ohneErgebnis ? 'offen' : art}">${esc(erg)}${grund ? ` · ${esc(grund)}` : ''}</span></span>
               <span class="vl-z2">${ohneZuege ? esc(t('analyse.vl.zeile.ohneZug')) : `${esc(t('analyse.vl.zeile.zuege', { n: zuege }))} · ${esc(eroeffnungsName(p))}`}</span>
               <span class="vl-z3">${esc(datum)}${zuZweit ? '' : ' · ' + esc(t('analyse.vl.zeile.mitFarbe', { farbe: t(p.spielerFarbe === 'b' ? 'allgemein.schwarz' : 'allgemein.weiss') }))}</span>
             </span>
@@ -340,7 +346,8 @@ export function zeige(root, params = {}, app) {
     hg.innerHTML = `
       <div class="vl-dialog flaeche" role="alertdialog" aria-modal="true" aria-labelledby="vl-dialog-titel" aria-describedby="vl-dialog-text">
         <h3 id="vl-dialog-titel">${esc(t('analyse.vl.dialog.titel'))}</h3>
-        <p id="vl-dialog-text">${p.modus === 'zuzweit' ? esc(t('analyse.vl.dialog.zuzweit', { datum: datumKurz(p.datum) })) : esc(t('analyse.vl.dialog.text', { name: bot ? bot.name : t('analyse.vl.dialog.denBot'), datum: datumKurz(p.datum) }))}</p>
+        <p id="vl-dialog-text">${istOnline(p) ? esc(t('analyse.vl.dialog.online', { name: pruefeZuzweit(p.zuzweit)[p.spielerFarbe === 'b' ? 'weiss' : 'schwarz'], datum: datumKurz(p.datum) }))
+          : p.modus === 'zuzweit' ? esc(t('analyse.vl.dialog.zuzweit', { datum: datumKurz(p.datum) })) : esc(t('analyse.vl.dialog.text', { name: bot ? bot.name : t('analyse.vl.dialog.denBot'), datum: datumKurz(p.datum) }))}</p>
         <div class="vl-dialog-knoepfe">
           <button class="knopf" type="button" data-aktion="dialog-ab">${esc(t('allgemein.abbrechen'))}</button>
           <button class="knopf vl-rot" type="button" data-aktion="dialog-ok">${icon('muell')} ${esc(t('allgemein.loeschen'))}</button>

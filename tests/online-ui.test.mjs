@@ -1,5 +1,5 @@
 // Netzwerk ausschliesslich simuliert: kein Test schreibt ins echte Supabase-Projekt.
-//   PORT=9620 node tests/online-ui.test.mjs   eigener Port (Standard 8887)
+//   PORT=9620 node tests/online-ui.test.mjs   eigener Port (Standard: frei)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
@@ -22,7 +22,7 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-const PORT = Number(process.env.PORT || 8887);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'u1' })).toString('base64url') + '.x', refresh_token: 'test-r', expires_at: 9999999999, user: { id: 'u1', email: 'spieler@example.invalid' } };
 let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehnen = false, veraltet = false;
@@ -167,9 +167,12 @@ try {
   const knopf = a => seite.locator(`[data-online="${a}"]`);
   // Seit 11.11. misst sich das Brett wie in der Bot-Partie an der Hoehe des Screens: solange der alte Screen beim Wechsel
   // noch daneben steht, ist das neue Brett einen Moment 0 px gross. Erst tippen, wenn genau ein Brett Flaeche hat.
-  const bereit = () => seite.waitForFunction(() => window.__online?.brett() && !window.__online.busy()
-    && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100);
-  async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(); }
+  // R8 (13.11.2026): mit id erst, wenn genau diese Partie geladen ist. Beim Wechsel von Partie zu Partie stand sonst unter
+  // Last kurz noch der alte Screen bereit, und die Pruefung las die alte Partie (__online.partie() war null oder alt).
+  const bereit = (id = null) => seite.waitForFunction((id) => window.__online?.brett() && !window.__online.busy()
+    && (id == null || window.__online.partie()?.id === id)
+    && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100, id);
+  async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(p.id); }
   async function tippe(uci) {
     for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
       const r = await seite.locator(`.on-brett .feld[data-feld="${f}"]`).boundingBox();
@@ -394,6 +397,47 @@ try {
   await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
   await seite.locator('.on-ergebnis:not([hidden])').waitFor();
   pruefe('Aufgabe mit Rueckfrage und Niederlage', aufgabe.grund === 'aufgabe' && (await seite.locator('.on-ergebnis h3').innerText()) === 'Niederlage');
+  // R8 (13.11.2026, Bild online-pc-hell-ergebnis): nach dem Ende bleiben Endstellung und Zugliste stehen, am PC wie am iPad.
+  // Je Ende (Aufgabe, Matt, Remis, Zeit): jedes Feld des Bretts gegen die Zuege des Servers, dazu die Zahl der Eintraege
+  // in der Zugliste. Gegenprobe vor dem Ende, damit die Messung selbst stimmt.
+  const endstand = () => seite.evaluate(async () => {
+    const { Chess } = await import('/vendor/chess/chess.js');
+    const o = window.__online, p = o.partie(), b = o.brett(), c = new Chess();
+    for (const u of String(p.zuege || '').split(' ').filter(Boolean)) c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
+    const falsch = [];
+    for (const f of 'abcdefgh') for (let r = 1; r <= 8; r++) {
+      const x = c.get(f + r), soll = x ? x.color + x.type.toUpperCase() : null, ist = b.figurAuf(f + r);
+      if (soll !== ist) falsch.push(`${f + r}:${ist}/${soll}`);
+    }
+    return { status: p.status, zuege: c.history().length, liste: document.querySelectorAll('.zugliste .z[data-ply]').length, falsch: falsch.slice(0, 6) };
+  });
+  const stehtEnde = (s) => s.falsch.length === 0 && s.zuege > 0 && s.liste === s.zuege;
+  for (const [w, h] of [[1280, 720], [1180, 820]]) {
+    await seite.setViewportSize({ width: w, height: h });
+    const aufg = partie({ zuege: 'e2e4 e7e5 g1f3', zeit: 300 }); await oeffne(aufg);
+    const vorher = await endstand();
+    pruefe(`Endstand ${w}x${h}: Gegenprobe laufende Partie (Brett und Zugliste wie die Zuege des Servers)`, stehtEnde(vorher) && vorher.status === 'laeuft', vorher);
+    await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
+    await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
+    const nachAufgabe = await endstand();
+    pruefe(`Endstand ${w}x${h} nach Aufgabe: Endstellung und Zugliste bleiben`, stehtEnde(nachAufgabe) && nachAufgabe.status === 'beendet', nachAufgabe);
+    const matt = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4' }); await oeffne(matt);
+    await tippe('d8h4'); await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
+    const nachMatt = await endstand();
+    pruefe(`Endstand ${w}x${h} nach Matt: Endstellung und Zugliste bleiben`, stehtEnde(nachMatt) && nachMatt.zuege === 4, nachMatt);
+    const remis = partie({ zuege: 'd2d4 d7d5 c2c4 e7e6', zeit: 300 }); await oeffne(remis);
+    remis.remis_angebot = 'b'; aktualisieren(remis);
+    await knopf('annehmen').click(); await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
+    const nachRemis = await endstand();
+    pruefe(`Endstand ${w}x${h} nach Remis: Endstellung und Zugliste bleiben`, stehtEnde(nachRemis) && nachRemis.status === 'beendet', nachRemis);
+    const zeit = partie({ zuege: 'd2d4 d7d5 c2c4', zeit: 1 }); await oeffne(zeit);
+    await seite.evaluate(() => { window.__versatz += 10000; });
+    await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await seite.waitForTimeout(600);
+    const nachZeit = await endstand();
+    pruefe(`Endstand ${w}x${h} nach Zeit: Endstellung und Zugliste bleiben`, stehtEnde(nachZeit) && zeit.grund === 'zeit', nachZeit);
+    await seite.evaluate(() => { window.__versatz = 0; });
+  }
+  await seite.setViewportSize({ width: 1180, height: 820 });
   await knopf('liste-zurueck').click(); await seite.getByRole('button', { name: /Beendet/ }).first().waitFor();
   pruefe('Meine Partien zeigt auch beendete Serverpartien', await seite.getByRole('button', { name: /Beendet/ }).count() >= 3);
   // Angemeldeter Einladungslink ohne Umweg ueber Einstellungen.
@@ -641,6 +685,25 @@ try {
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `groesse-bot-${width}x${height}.png`) });
     pruefe(`${width}x${height}: Online-Brett mindestens so gross wie das Brett der Bot-Partie`, on >= bot - 1, { online: on, bot });
   }
+  // R8-quer (13.11.2026): Handy quer (Hoehe bis 500 px): Brett und beide Leisten ganz im Bild, keine Seite scrollt, jeder
+  // sichtbare Knopf erreichbar (im Bild, mindestens 44 px hoch), kein Text laeuft aus seinem Knopf
+  for (const [width, height] of [[844, 390], [667, 375]]) {
+    await seite.setViewportSize({ width, height });
+    await oeffne(neueste); await seite.waitForFunction(id => window.__online?.partie()?.id === id, neueste.id);
+    await seite.waitForTimeout(400);
+    const q = await seite.evaluate(() => {
+      const sicht = (e) => !e.hidden && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .weg');
+      const imBild = (r) => r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5;
+      const brett = [...document.querySelectorAll('.online-screen .brett-felder')].at(-1)?.getBoundingClientRect();
+      const leisten = [...document.querySelectorAll('.online-screen .on-spieler')].filter(sicht).map((e) => imBild(e.getBoundingClientRect()));
+      const knoepfe = [...document.querySelectorAll('.online-screen button')].filter(sicht).map((b) => ({ t: (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 16),
+        bild: imBild(b.getBoundingClientRect()), h: Math.round(b.getBoundingClientRect().height), passt: b.scrollWidth <= b.clientWidth + 1 && b.scrollHeight <= b.clientHeight + 1 }));
+      return { brett: !!brett && imBild(brett), leisten: leisten.length === 2 && leisten.every(Boolean), scroll: document.documentElement.scrollHeight <= innerHeight + 1 && document.documentElement.scrollWidth <= innerWidth + 1,
+        schlecht: knoepfe.filter((k) => !k.bild || k.h < 44 || !k.passt) };
+    });
+    if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `quer-online-${width}x${height}.png`) });
+    pruefe(`Handy quer ${width}x${height}: Online-Brett und Leisten im Bild, kein Scrollen, Knoepfe erreichbar`, q.brett && q.leisten && q.scroll && q.schlecht.length === 0, q);
+  }
   // Befund 4 (Skin): Erfinder-Konto mit Figurensatz Blaupause; die Erfinder-Antwort kommt erst nach dem Aufbau der Partie
   erfinder = true; sonderVerzug = 900;
   // wie auf einem frischen Geraet: der gemerkte Erfinder-Status fehlt, die App fragt erst nach dem Laden nach
@@ -765,8 +828,9 @@ try {
     const p = liste.find(x => x && x.id === 'on-' + id);
     return { unter: document.querySelector('.an-screen .an-unter')?.textContent || '', zuege: p?.zuege?.join(' '), ergebnis: p?.ergebnis, farbe: p?.spielerFarbe, n: liste.length };
   }, r7.id);
-  pruefe('R7 B2: "Zur Analyse" oeffnet .an-screen mit den Zuegen der Online-Partie und beiden Namen',
-    r7An && r7AnDaten.zuege === 'e2e4 e7e5 g1f3 b8c6' && r7AnDaten.ergebnis === 'sieg' && r7AnDaten.farbe === 'w' && /Spieler_1/.test(r7AnDaten.unter) && /Gegner_2/.test(r7AnDaten.unter), r7AnDaten);
+  // W-online-analyse: Kopf wie die Bot-Partie "Du gegen <Gegner>" (vorher "Spieler_1 gegen Gegner_2" wie Zu zweit)
+  pruefe('R7 B2: "Zur Analyse" oeffnet .an-screen mit den Zuegen der Online-Partie, Kopf "Du gegen Gegner_2"',
+    r7An && r7AnDaten.zuege === 'e2e4 e7e5 g1f3 b8c6' && r7AnDaten.ergebnis === 'sieg' && r7AnDaten.farbe === 'w' && /^Du gegen Gegner_2/.test(r7AnDaten.unter), r7AnDaten);
   // Zweimal "Zur Analyse": dieselbe Partie wird ersetzt, nicht doppelt gespeichert
   await oeffne(r7); await r7Warte();
   await seite.locator('.online-screen .ergebnis-overlay [data-online="analyse"]').click({ timeout: 3000 }).catch(() => {});
@@ -781,13 +845,83 @@ try {
   const r7FB = await r7Blatt();
   pruefe('R7 B2: Freundespartie bekommt dasselbe Blatt ohne Kronen-Zeile (Remis, Zur Analyse)',
     r7FDa && /\bremis\b/.test(r7FB?.art) && r7FB?.kronen === '' && r7FB.knoepfe.includes('analyse') && r7FB.knoepfe.includes('revanche'), r7FB);
-  // Strittig: Blatt ohne Zur Analyse (die Zuege passen nicht sicher zur Partie)
+  // Strittig: Blatt "Strittig" ohne Sieg oder Niederlage; seit W-online-analyse mit Zur Analyse (die Analyse rechnet den
+  // nachgespielten, legalen Stand und nennt das Ende ehrlich "Strittig beendet")
   const r7S = partie({ zuege: 'e2e4' }); await oeffne(r7S);
   Object.assign(r7S, { status: 'beendet', grund: 'strittig', ergebnis: null }); aktualisieren(r7S);
   await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
   await r7Warte(); await seite.waitForTimeout(300);
   const r7SB = await r7Blatt();
-  pruefe('R7 B2: strittiges Ende: Blatt "Strittig" ohne Zur Analyse', r7SB?.wort === 'Strittig' && !r7SB.knoepfe.includes('analyse'), r7SB);
+  pruefe('R7 B2: strittiges Ende: Blatt "Strittig", mit Zur Analyse (W-online-analyse)', r7SB?.wort === 'Strittig' && r7SB.knoepfe.includes('analyse'), r7SB);
+  // ---------- W-online-analyse (Flo 13.11.2026: "beim 1 gegen 1 fehlt die Analyse") ----------
+  // Funktionsprobe 1: gewertete Partie, Spieler_1 mit Schwarz verliert durch Schaefermatt. Das Blatt wird nur geschlossen
+  // (Auge, kein Klick auf "Zur Analyse"), danach Meine Partien: die Partie steht dort als "Online" mit dem Gegnernamen und
+  // oeffnet die Analyse mit "Du gegen Gegner_2", eigener Farbe Schwarz unten und am Schluesselmoment (kurze Niederlage).
+  const woaListe = () => seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]'));
+  const woa = partie({ farbe: 'b', gewertet: true, zuege: 'e2e4 e7e5 f1c4 b8c6 d1h5' });
+  await oeffne(woa);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'laeuft');
+  const woaLaufend = (await woaListe()).some(x => x.id === 'on-' + woa.id);
+  pruefe('W-online-analyse: waehrend die gewertete Partie laeuft, liegt nichts fuer die Analyse auf dem Geraet und kein Analyse-Knopf',
+    !woaLaufend && !(await seite.locator('.online-screen [data-online="analyse"]').count()), { woaLaufend });
+  zug(woa, 'g8f6'); zug(woa, 'h5f7');
+  Object.assign(woa, { status: 'beendet', grund: 'matt', ergebnis: '1-0' }); aktualisieren(woa);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
+  await r7Warte(); await seite.waitForTimeout(600);
+  await seite.locator('.online-screen .ergebnis-overlay .erg-zu').click().catch(() => {});
+  const woaGespeichert = (await woaListe()).find(x => x.id === 'on-' + woa.id);
+  pruefe('W-online-analyse: beim Ende ohne Klick abgelegt (Online, Schwarz, Niederlage durch Matt, Gegnername, alle 7 Zuege)',
+    woaGespeichert?.online?.gewertet === true && woaGespeichert.spielerFarbe === 'b' && woaGespeichert.ergebnis === 'niederlage'
+      && woaGespeichert.grund === 'matt' && woaGespeichert.zuzweit?.weiss === 'Gegner_2' && woaGespeichert.zuege?.length === 7, woaGespeichert);
+  await seite.evaluate(() => window.__app.gehe('verlauf'));
+  await seite.waitForFunction(() => document.querySelector('.vl-screen .vl-zeile'), null, { timeout: 8000 }).catch(() => {});
+  const woaZeile = await seite.evaluate(id => {
+    const z = document.querySelector(`.vl-screen .vl-zeile[data-id="on-${id}"]`);
+    return z ? { name: z.querySelector('.vl-name')?.textContent, chip: z.querySelector('.vl-uebung')?.textContent, erg: z.querySelector('.vl-ergebnis')?.textContent,
+      farbe: z.querySelector('.vl-z3')?.textContent } : null;
+  }, woa.id);
+  pruefe('W-online-analyse: Meine Partien zeigt sie mit Kennzeichen "Online", Gegnername, Niederlage und eigener Farbe',
+    woaZeile?.name === 'Gegner_2' && woaZeile.chip === 'Online' && /Niederlage/.test(woaZeile.erg) && /Schwarz/.test(woaZeile.farbe), woaZeile);
+  await seite.locator(`.vl-screen .vl-zeile[data-id="on-${woa.id}"] .vl-oeffnen`).click({ timeout: 3000 }).catch(() => {});
+  const woaAn = await seite.waitForFunction(() => document.querySelector('.an-screen .an-c-kopf'), null, { timeout: 90000 }).then(() => true, () => false);
+  await seite.waitForTimeout(500);
+  const woaAnalyse = await seite.evaluate(() => ({
+    unter: document.querySelector('.an-screen .an-unter')?.textContent || '',
+    unten: document.querySelector('.an-screen .an-evalbalken')?.dataset.unten,
+    zug: document.querySelector('.an-screen .an-c-zug')?.textContent || '',
+    start: !!document.querySelector('.an-screen .an-c-start'),
+    vs: document.querySelector('.an-screen .an-vs-wort')?.textContent || '',
+    zuZweit: /gewinnt/.test(document.querySelector('.an-screen .an-genau')?.textContent || ''),
+    knoepfe: [...document.querySelectorAll('.an-screen .an-kopf-knoepfe [data-aktion]')].map(b => b.dataset.aktion),
+  }));
+  pruefe('W-online-analyse: Analyse "Du gegen Gegner_2", Schwarz unten, "Niederlage" (nicht "<Name> gewinnt"), Start am Schluesselmoment 3... Sf6',
+    woaAn && /^Du gegen Gegner_2/.test(woaAnalyse.unter) && woaAnalyse.unten === 'b' && woaAnalyse.vs === 'Niederlage' && !woaAnalyse.zuZweit
+      && !woaAnalyse.start && /Sf6/.test(woaAnalyse.zug) && woaAnalyse.knoepfe.includes('online') && !woaAnalyse.knoepfe.includes('weiter'), woaAnalyse);
+  // Funktionsprobe 3: Neuladen nach dem Ende und erneutes Oeffnen legen keinen zweiten Eintrag an (die Analyse bleibt)
+  const woaVor = (await woaListe()).length;
+  await seite.reload(); await seite.waitForFunction(() => window.__app?.gehe, null, { timeout: 15000 });
+  await oeffne(woa); await r7Warte(); await seite.waitForTimeout(300);
+  const woaNach = await woaListe();
+  pruefe('W-online-analyse: Neuladen und erneutes Oeffnen nach dem Ende: kein Doppel-Eintrag, Analyse bleibt',
+    woaNach.length === woaVor && woaNach.filter(x => x.id === 'on-' + woa.id).length === 1 && woaNach.find(x => x.id === 'on-' + woa.id)?.analysiert === true,
+    { woaVor, nach: woaNach.length, eintrag: woaNach.find(x => x.id === 'on-' + woa.id) });
+  // Funktionsprobe 2: Abbruch nach einem Zug (Server: abgebrochen, ohne Ergebnis) hat den Analyse-Knopf; abgelegt ehrlich
+  // ohne Ergebnis mit Grund "abgebrochen", die Analyse nennt es so und nie Remis
+  const woaAb = partie({ gewertet: true, zuege: 'e2e4' }); await oeffne(woaAb);
+  Object.assign(woaAb, { status: 'beendet', grund: 'abgebrochen', ergebnis: null }); aktualisieren(woaAb);
+  await seite.waitForFunction(() => window.__online?.partie()?.status === 'beendet', null, { timeout: 8000 });
+  await r7Warte(); await seite.waitForTimeout(300);
+  const woaAbB = await r7Blatt();
+  const woaAbE = (await woaListe()).find(x => x.id === 'on-' + woaAb.id);
+  pruefe('W-online-analyse: Abbruch nach einem Zug: Blatt mit "Zur Analyse", abgelegt ohne Ergebnis mit Grund abgebrochen',
+    woaAbB?.knoepfe.includes('analyse') && woaAbE && woaAbE.ergebnis == null && woaAbE.grund === 'abgebrochen' && woaAbE.online?.gewertet === true, { woaAbB, woaAbE });
+  await seite.locator('.online-screen .ergebnis-overlay [data-online="analyse"]').click({ timeout: 3000 }).catch(() => {});
+  await seite.waitForFunction(() => document.querySelector('.an-screen .an-vs-wort'), null, { timeout: 90000 }).catch(() => {});
+  const woaAbA = await seite.evaluate(() => ({ vs: document.querySelector('.an-screen .an-vs-wort')?.textContent || '',
+    grund: document.querySelector('.an-screen .an-vs-grund')?.textContent || '' }));
+  pruefe('W-online-analyse: Analyse des Abbruchs sagt "Ohne Ergebnis" und "Partie abgebrochen", nicht Remis', woaAbA.vs === 'Ohne Ergebnis' && woaAbA.grund === 'Partie abgebrochen', woaAbA);
+  // zurueck zum strittigen Blatt fuer die Bild-Pruefungen B3 unten
+  await oeffne(r7S); await r7Warte(); await seite.waitForTimeout(300);
   // B3: alle Knoepfe des Blatts (und mit geschlossenem Blatt der Knopf "Ergebnis") im Bild, hell und dunkel
   for (const [width, height, name] of [[375, 667, 'iphone-se'], [768, 1024, 'ipad-hoch'], [1280, 800, 'pc']]) {
     for (const modus of ['hell', 'dunkel']) {

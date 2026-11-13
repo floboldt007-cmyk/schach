@@ -42,7 +42,9 @@ if (BILDER) await mkdir(BILDER, { recursive: true });
 
 // Brett vor der Reparatur (Gleichheits-Probe R6, Bot-Partie); iPad quer und PC 1920 hier mitgemessen
 const GERAETE = [
-  { name: 'iphone13', w: 390, h: 844, handy: true, brett: 384 },
+  // luecke: groesste freie Hoehe zwischen zwei Teilen der Spalte (Feinschliff R8, LG3 Variante 1: vorher 100 px zwischen
+  // Coach und Zugstreifen, jetzt Coach mit drei Zeilen und groessere Spielerkarten; der Streifen bleibt unten am Daumen)
+  { name: 'iphone13', w: 390, h: 844, handy: true, brett: 384, luecke: 60, av: 44, coachZeilen: 3 },
   { name: 'se', w: 375, h: 667, handy: true, brett: 368 },
   { name: 'ipad-hoch', w: 820, h: 1180, handy: false, brett: 788 },
   { name: 'ipad-hoch-klein', w: 768, h: 1024, handy: false, brett: 638 },
@@ -84,8 +86,11 @@ const messePartie = (s) => s.evaluate((SCREEN) => {
   const knoepfe = [...scr.querySelectorAll('.spielknoepfe > .knopf')].filter(sichtbar).map(e => Math.round(e.getBoundingClientRect().height));
   const ct = scr.querySelector('.coach > .c-text');
   const kopf = scr.querySelector(':scope > .kopf');
+  const av = scr.querySelector('.spieler.ich > .av');
+  const ctStil = ct ? getComputedStyle(ct) : null;
   return { innerH: innerHeight, docH: document.documentElement.scrollHeight, inhaltScroll: inhalt.scrollHeight, inhaltClient: inhalt.clientHeight,
-    brett, kinder, knoepfe, kopfH: kopf ? Math.round(kopf.getBoundingClientRect().height) : null,
+    brett, kinder, knoepfe, av: av ? Math.round(av.getBoundingClientRect().width) : null,
+    coachZeilen: ctStil ? Number(ctStil.webkitLineClamp) || null : null, kopfH: kopf ? Math.round(kopf.getBoundingClientRect().height) : null,
     klassen: scr.className, coachText: ct && sichtbar(ct) ? { scroll: ct.scrollHeight, client: ct.clientHeight } : null };
 }, SCREEN);
 
@@ -170,6 +175,13 @@ try {
       pruefe(`${g.name}: alles der Spalte (Karten, Coach, Knoepfe, Zugstreifen) endet im Fenster`, tief.length === 0, tief);
       if (g.brett) pruefe(`${g.name}: Brett nicht kleiner als vorher (${m.brett} >= ${g.brett})`, m.brett >= g.brett, m.brett);
       if (g.handy) pruefe(`${g.name}: Spielknoepfe mindestens 44 px hoch`, m.knoepfe.length > 0 && Math.min(...m.knoepfe) >= 44, m.knoepfe);
+      if (g.luecke) {
+        const reihe = [...m.kinder].filter(c => c.h > 1).sort((a, b) => a.oben - b.oben);
+        const luecke = Math.max(0, ...reihe.slice(1).map((c, i) => c.oben - reihe[i].unten));
+        pruefe(`${g.name}: keine grosse Leere in der Spalte (${luecke} <= ${g.luecke})`, luecke <= g.luecke, reihe);
+      }
+      if (g.av) pruefe(`${g.name}: Spielerbild ${m.av} px (>= ${g.av})`, m.av >= g.av, m.av);
+      if (g.coachZeilen) pruefe(`${g.name}: Coach zeigt ${m.coachZeilen} Zeilen (${g.coachZeilen})`, m.coachZeilen === g.coachZeilen, m.coachZeilen);
 
       for (const z of ZUEGE.slice(2)) await zug(s, z);
       const sieg = await klappt(s.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 }));
