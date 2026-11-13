@@ -173,6 +173,13 @@ const premium = async (uid) => (await db.query(`select public.ist_premium_von('$
     && (await premium(S)) === true, JSON.stringify(sz));
   const u = await wert(F, `public.verwaltung_premium('99999999-0000-4000-8000-000000000099', now() + interval '1 day')`);
   pruefe('unbekanntes Konto abgewiesen', /VERWALTUNG_KEIN_KONTO/.test(u?.fehler || ''), JSON.stringify(u));
+  // Kriterien-Review 13.11.: ohne Ziel ein eigener Code statt des rohen Datenbank-Fehlers, bei jeder Funktion mit Ziel
+  for (const aufruf of [`verwaltung_kaeufe(null)`, `verwaltung_premium(null, now() + interval '1 day')`,
+    `verwaltung_name(null, 'Niemand_1')`, `verwaltung_banner(null, 'saison-gold', true)`]) {
+    const n = await wert(F, `public.${aufruf}`);
+    pruefe(`${aufruf.split('(')[0]}(null): VERWALTUNG_KEIN_KONTO`, /VERWALTUNG_KEIN_KONTO/.test(n?.fehler || '') && !/violates|null value/.test(n?.fehler || ''),
+      JSON.stringify(n));
+  }
 }
 
 // ---------- AC-08 Kaeufe (nur lesend) ----------
@@ -271,6 +278,17 @@ ${fall.deleted ? `insert into public.stripe_ereignisse (id, typ, erstellt, kunde
     const nachher = (await db.query(`select status, gueltig_bis, quelle, abo_id from public.abos where user_id = '${uid}'`)).rows[0];
     if (fall.erlaubt) {
       pruefe(`${fall.name}: Freischaltung erlaubt`, !an?.fehler && (await premium(uid)) === true && nachher.quelle === 'manuell', JSON.stringify(an));
+      // Kriterien-Review 13.11.: abo_id bleibt als Verlauf stehen; Verlaengern und Ruecknahme muessen trotzdem gehen
+      const k2 = await wert(F, `public.verwaltung_kaeufe('${uid}')`);
+      pruefe(`${fall.name}: nach der Freischaltung nicht mehr an Stripe gebunden`, k2?.abo?.stripe_gebunden === false && nachher.abo_id === fall.abo,
+        JSON.stringify([k2?.abo, nachher]));
+      const mehr = await wert(F, `public.verwaltung_premium('${uid}', now() + interval '60 days')`);
+      pruefe(`${fall.name}: danach verlaengern erlaubt`, !mehr?.fehler && (await premium(uid)) === true, JSON.stringify(mehr));
+      const zurueck = await wert(F, `public.verwaltung_premium('${uid}', null)`);
+      pruefe(`${fall.name}: danach zuruecknehmen erlaubt, Premium aus`, !zurueck?.fehler && zurueck?.geaendert === true
+        && (await premium(uid)) === false, JSON.stringify(zurueck));
+      const wieder = await wert(F, `public.verwaltung_premium('${uid}', now() + interval '10 days')`);
+      pruefe(`${fall.name}: und wieder freischalten`, !wieder?.fehler && (await premium(uid)) === true, JSON.stringify(wieder));
     } else {
       pruefe(`${fall.name}: freischalten und zuruecknehmen abgewiesen, Zeile unberuehrt`,
         /VERWALTUNG_STRIPE_ABO/.test(an?.fehler || '') && /VERWALTUNG_STRIPE_ABO/.test(weg?.fehler || '')

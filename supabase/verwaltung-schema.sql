@@ -83,7 +83,9 @@ $$;
 -- Haengt das Konto an Stripe? Ja, solange es ein Stripe-Abo gibt, das nicht endgueltig beendet ist. Der Webhook legt
 -- past_due, unpaid, incomplete und paused als 'abgelaufen' ab (supabase/functions/_gemeinsam/stripe.js), genau wie ein
 -- beendetes Abo; der Status allein trennt beides also nicht. Endgueltig beendet ist ein Abo erst mit dem Ereignis
--- customer.subscription.deleted fuer genau diese abo_id. Ohne Abo-Kennung, aber mit Quelle stripe: angebunden.
+-- customer.subscription.deleted fuer genau diese abo_id, und das bleibt es, auch wenn die Verwaltung die Zeile danach
+-- auf aktiv/manuell setzt (abo_id bleibt als Verlauf stehen); ein neues Stripe-Abo kommt mit neuer abo_id.
+-- Ohne Abo-Kennung, aber mit Quelle stripe: angebunden.
 create or replace function public.verwaltung_stripe_gebunden(ziel uuid)
 returns boolean
 language sql
@@ -93,7 +95,7 @@ set search_path = ''
 as $$
   select coalesce((
     select (a.quelle = 'stripe' or a.abo_id is not null)
-      and not (a.abo_id is not null and a.status = 'abgelaufen' and exists (
+      and not (a.abo_id is not null and exists (
         select 1 from public.stripe_ereignisse e where e.abo_id = a.abo_id and e.typ = 'customer.subscription.deleted'))
     from public.abos a where a.user_id = ziel), false);
 $$;
@@ -160,6 +162,9 @@ set search_path = ''
 as $$
 begin
   perform public.verwaltung_pruefen(ziel);
+  if ziel is null then
+    raise exception 'VERWALTUNG_KEIN_KONTO';
+  end if;
   return jsonb_build_object(
     'premium', public.ist_premium_von(ziel),
     -- ohne Stripe-Kennungen, nur ob es einen Stripe-Kunden gibt
@@ -193,6 +198,9 @@ declare
   nachher jsonb;
 begin
   perform public.verwaltung_pruefen(ziel);
+  if ziel is null then
+    raise exception 'VERWALTUNG_KEIN_KONTO';
+  end if;
   if bis is not null and (bis <= now() or bis > now() + interval '5 years') then
     raise exception 'VERWALTUNG_DATUM';
   end if;
@@ -237,6 +245,9 @@ declare
   alt text;
 begin
   perform public.verwaltung_pruefen(ziel);
+  if ziel is null then
+    raise exception 'VERWALTUNG_KEIN_KONTO';
+  end if;
   if n !~ '^[A-Za-z0-9_]{3,20}$' then
     raise exception 'VERWALTUNG_NAME_FORMAT';
   end if;
@@ -271,6 +282,9 @@ declare
   n integer;
 begin
   perform public.verwaltung_pruefen(ziel);
+  if ziel is null then
+    raise exception 'VERWALTUNG_KEIN_KONTO';
+  end if;
   if an is null or not public.verwaltung_banner_gueltig(banner) then
     raise exception 'VERWALTUNG_BANNER_UNBEKANNT';
   end if;
