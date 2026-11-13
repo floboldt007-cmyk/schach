@@ -50,7 +50,7 @@ export function tafelName(tafelId, botNachId = () => null) {
   return t('p-punkte.tafel.allein');
 }
 
-const GRUENDE = ['hilfe', 'frei', 'spiel', 'gast', 'stellung'];
+const GRUENDE = ['hilfe', 'frei', 'spiel', 'gast', 'stellung', 'kurz'];
 
 export function unterText(e, name = t('p-punkte.tafel.allein')) {
   if (!e) return '';
@@ -173,6 +173,16 @@ export function abrechnungsZeile({ ergebnis: e, tafelName: name = t('p-punkte.ta
   const z = el('div', 'pk-abr');
   z.dataset.zeile = 'punkte';
   z.dataset.paket = 'punkte';
+  // R9-PunkteKurz: kurze Partie ohne Sieg zaehlt nicht, also keine Zahl und kein Hochzaehlen, nur der Satz (wie wartezeile)
+  if (e.grund === 'kurz') {
+    z.dataset.kurz = '1';
+    z.innerHTML = `<div class="pk-abr-knopf pk-statisch"><span class="pk-symbol" aria-hidden="true">${icon('podest')}</span>
+      <span class="pk-abr-mitte"><span class="pk-label">${esc(t('p-punkte.label'))}</span><span class="pk-text"><span class="pk-satz"></span></span></span></div>`;
+    z.querySelector('.pk-satz').textContent = unterText(e, name);
+    if (!schonGezeigt) merke();
+    z.dataset.fertig = '1';
+    return { el: z, beende() {}, verlasse() {} };
+  }
   if (e.rekord) z.dataset.rekord = '1';
   if (e.aufstieg > 0) z.dataset.aufstieg = String(e.aufstieg);
   const id = 'pk-d-' + String(e.id).replace(/[^a-z0-9]/gi, '').slice(0, 20);
