@@ -203,13 +203,37 @@ const messeLeistenStil = (s, screen) => s.evaluate((screen) => {
 }, screen);
 
 const klangStand = (s) => s.evaluate(async () => (await import('./js/sounds.js')).klang.protokoll().map((e) => ({ nr: e.nr, name: e.name, aktion: e.aktion || 'spielt', grund: e.grund || '' })));
-async function klangBeimZug(s, zug) {
+// Klang des EIGENEN Zugs: hoechstens 800 ms, und das Fenster endet, sobald eine Figur des Gegners auf einem neuen Feld
+// steht (R9: der Antwortzug des Bots fiel sonst je nach Zeitpunkt mal hinein, mal nicht). Die Seite schaut in jedem Bild
+// und alle 5 ms nach; gezaehlt wird, was beim letzten Blick VOR dem Gegnerzug im Protokoll stand.
+async function klangBeimZug(s, brettSel, uci) {
   const vorher = await klangStand(s);
   const letzte = vorher.length ? vorher[vorher.length - 1].nr : 0;
-  await zug();
+  await s.evaluate(async ([sel, von]) => {
+    const { klang } = await import('./js/sounds.js');
+    const brett = document.querySelector(`${sel} .feld[data-feld="${von}"]`)?.closest('.brett');
+    const ich = brett?.querySelector(`img.figur[data-feld="${von}"]:not(.geht)`)?.dataset.figur?.[0];
+    const gegner = () => new Set([...(brett?.querySelectorAll('img.figur:not(.geht)') || [])]
+      .filter((f) => ich && f.dataset.figur?.[0] !== ich).map((f) => f.dataset.feld + f.dataset.figur));
+    const start = gegner();
+    const stand = () => { const p = klang.protokoll(); return p.length ? p[p.length - 1].nr : 0; };
+    const w = { bis: stand(), gegnerZog: false, aus: false };
+    w.blick = () => {
+      if (w.aus) return;
+      if ([...gegner()].some((x) => !start.has(x))) { w.gegnerZog = true; w.aus = true; clearInterval(w.takt); return; }
+      w.bis = stand();
+    };
+    const bild = () => { w.blick(); if (!w.aus) requestAnimationFrame(bild); };
+    w.takt = setInterval(w.blick, 5);
+    window.__klangFenster = w;
+    requestAnimationFrame(bild);
+  }, [brettSel, uci.slice(0, 2)]);
+  await tippe(s, brettSel, uci);
   await warte(800);
-  // nur die ersten 800 ms nach dem eigenen Zug: der Antwortzug eines Bots kaeme spaeter und zaehlt nicht
-  return (await klangStand(s)).filter((e) => e.nr > letzte).map((e) => `${e.name}:${e.aktion}${e.grund ? '/' + e.grund : ''}`);
+  // Schluss im selben Schritt: ein letzter Blick, dann zaehlt der Stand JETZT (ein Bot-Zug zwischen Schluss und Auslesen
+  // zaehlt nicht mehr mit)
+  const bis = await s.evaluate(() => { const w = window.__klangFenster; w.blick(); w.aus = true; clearInterval(w.takt); return w.bis; });
+  return (await klangStand(s)).filter((e) => e.nr > letzte && e.nr <= bis).map((e) => `${e.name}:${e.aktion}${e.grund ? '/' + e.grund : ''}`);
 }
 async function tippe(s, brettSel, uci) {
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
@@ -240,7 +264,7 @@ const ABLAUF = {
     const m = await messeK(s, ctx, '.screen.partie');
     m.ueberArena = ueberArena;
     const weiss = await s.evaluate(() => window.__partie.chess().turn() === 'w' && window.__partie.chess().history().length === 0);
-    m.klang = weiss ? await klangBeimZug(s, () => tippe(s, '.brett-rahmen > .brett', 'e2e4')) : null;
+    m.klang = weiss ? await klangBeimZug(s, '.brett-rahmen > .brett', 'e2e4') : null;
     await bild(s, m);
     await s.locator('.spielknoepfe > [data-aktion="aufgeben"]').click();
     await bestaetige(s);
@@ -256,7 +280,7 @@ const ABLAUF = {
     await warte(2000); // Visitenkarten, dann (nach hoechstens 1,5 s) das Intro
     await introWeg(s); await warte(800);
     const m = await messeK(s, ctx, '.screen');
-    m.klang = await klangBeimZug(s, () => tippe(s, '.on-brett', 'e2e4'));
+    m.klang = await klangBeimZug(s, '.on-brett', 'e2e4');
     await bild(s, m);
     await s.locator('[data-online="aufgeben"]').filter({ visible: true }).first().click();
     await bestaetige(s);
@@ -271,7 +295,7 @@ const ABLAUF = {
     await s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"] .rd-brett .feld', { timeout: 15000 });
     await introWeg(s); await warte(800);
     const m = await messeK(s, ctx, '.screen.raetsel-duell');
-    m.klang = await klangBeimZug(s, () => tippe(s, '.rd-brett', 'a1a8'));
+    m.klang = await klangBeimZug(s, '.rd-brett', 'a1a8');
     await bild(s, m);
     m.zustand.duell.beendet = true;
     m.ergebnis = await s.waitForSelector('.screen.raetsel-duell[data-phase="beendet"]', { timeout: 10000 }).then(() => true).catch(() => false);
@@ -284,7 +308,7 @@ const ABLAUF = {
     await s.waitForSelector('.zz-brett .feld', { timeout: 20000 });
     await introWeg(s); await warte(1200);
     const m = await messeK(s, ctx, '.screen');
-    m.klang = await klangBeimZug(s, () => tippe(s, '.zz-brett', 'e2e4'));
+    m.klang = await klangBeimZug(s, '.zz-brett', 'e2e4');
     await bild(s, m);
     await s.locator('[data-zz="aufgeben"]').filter({ visible: true }).first().click();
     await bestaetige(s);
@@ -303,7 +327,7 @@ const ABLAUF = {
     await warte(600);
     const m = await messeK(s, ctx, '.ls-screen');
     m.ideePhase = ideePhase;
-    m.klang = await klangBeimZug(s, () => tippe(s, '.ls-screen .brett-felder', 'a1a8'));
+    m.klang = await klangBeimZug(s, '.ls-screen .brett-felder', 'a1a8');
     await bild(s, m);
     m.ergebnis = await sichtbarDa(s, '.ls-meldung[data-art="geschafft"]');
     return m;
