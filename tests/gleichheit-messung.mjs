@@ -1,6 +1,6 @@
-// Gemeinsame Messhilfe fuer Gleichheits-Proben (R9, 13.11.2026): misst eine Partie-Ansicht so wie
-// tests/gleichheit-ansichten.test.mjs (dort steht dieselbe Messung noch als eigene Funktion `messe`; sie soll beim
-// naechsten Anfassen dieser Datei hierher zeigen, damit es nur eine Messung gibt).
+// Gemeinsame Messhilfe fuer Gleichheits-Proben (R9, 13.11.2026): die EINE Messung einer Partie-Ansicht, genutzt von
+// tests/gleichheit-ansichten.test.mjs und tests/funktion-zuzweit-lernen.test.mjs (vorher hatte gleichheit-ansichten
+// eine eigene Kopie `messe`).
 //   messeAnsicht(seite, screenSelektor) -> { brett, brettRaster, leisten[], knoepfe{aufgeben,remis,hinweis}, zugStreifen, seiteScrollt }
 //     brett       Breite des Feldrasters (linke Kante a-Linie bis rechte Kante h-Linie), wie in gleichheit-ansichten
 //     brettRaster Gegenprobe: Breite von .brett-felder
@@ -35,6 +35,7 @@ export const messeAnsicht = (s, screen) => s.evaluate(({ screen, rollen }) => {
     const r = el?.getBoundingClientRect();
     knoepfe[k] = el ? { da: true, imBild: r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5 } : { da: false, imBild: false };
   }
+  // R8 (L3): Zugstreifen (hoch) oder Zugliste (quer): Lage zu den Knoepfen und ganz im Bild
   const zuege = [...wurzel.querySelectorAll('.zugleiste')].find(sichtbar) || [...wurzel.querySelectorAll('.zugbox')].find(sichtbar);
   const kn = [...wurzel.querySelectorAll('.spielknoepfe, .zz-aktionen')].find(sichtbar);
   let zugStreifen = 'keiner';
