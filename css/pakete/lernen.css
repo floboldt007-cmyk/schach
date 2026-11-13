@@ -122,8 +122,10 @@
 @media (orientation: portrait) and (max-width: 600px) { .ls-screen > .kopf.haupt-kopf { padding: 0 10px; gap: 8px; } }
 .ls-screen .ls-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; container: ls / size; }
-.ls-inhalt { --ls-seite: 380px; --ls-luft: 28px;
-  --ls-b: min(calc(100cqh - 8px), calc(100cqw - 2 * var(--rand) - var(--ls-seite) - var(--ls-luft)), 700px);
+.ls-inhalt { --ls-seite: clamp(300px, 28cqw, 380px); --ls-luft: clamp(16px, 2cqw, 28px);
+  /* R9 Befund 1: kein fester Deckel mehr (frueher 700px), die Bot-Partie hat auch keinen.
+     Leiste und Luft schrumpfen wie bei der Partie mit, sonst bleibt das Brett auf dem iPad quer kleiner. */
+  --ls-b: min(calc(100cqh - 8px), calc(100cqw - 2 * var(--rand) - var(--ls-seite) - var(--ls-luft)));
   display: grid; grid-template-columns: var(--ls-b) var(--ls-seite); column-gap: var(--ls-luft); row-gap: 14px;
   justify-content: center; align-content: center; min-height: 100%; padding: 4px var(--rand) 4px; }
 .ls-brettzone { min-width: 0; }
@@ -170,6 +172,9 @@
   .ls-seite { align-self: stretch; min-height: 0; gap: 12px; }
   .ls-status { flex: 0 1 auto; min-height: min(100%, 96px); overflow-y: auto; overscroll-behavior: contain; }
   .ls-meldung, .ls-aktionen { flex: none; }
+  /* R9-2: die Knoepfe sitzen unten fuer den Daumen wie in der Bot-Partie, statt unter sich eine Leere zu lassen
+     (vor dem Start auf dem iPhone 13 147 px, iPad hoch 76 px) */
+  .ls-aktionen { margin-top: auto; }
   .ls-screen:not([data-phase="intro"]) .ls-idee { display: none; }
   .ls-status { padding: 14px 16px; }
   .ls-status h2 { font-size: 22px; }
