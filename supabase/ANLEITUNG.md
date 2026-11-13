@@ -559,6 +559,13 @@ Besitzer im Supabase-Dashboard ein, **nie** in App-Dateien, Git, Screenshots ode
 anbietet, muss nach Apples Regeln zusätzlich „Sign in with Apple“ anbieten (oder eine gleichwertige datensparsame
 Anmeldung). Das betrifft nur eine native App im App Store, nicht die Web-App.
 
+**Löschseite für Google Play (Stand 13.11.2026):** `konto-loeschen.html` und `konto-loeschen-en.html` löschen das
+Konto auch ohne die App, mit E-Mail-Code oder Google und demselben Server-Aufruf `konto_loeschen` wie die App. Damit
+die Google-Anmeldung dorthin zurückkommt, unter **Authentication > URL Configuration > Redirect URLs** zusätzlich genau
+`https://crownmate.de/konto-loeschen.html#konto` und `https://crownmate.de/konto-loeschen-en.html#konto` eintragen
+(keine Wildcard). Fehlt der Eintrag, landet man nach Google auf der Startseite der App, angemeldet; gelöscht ist dann
+noch nichts. Die Adresse für die Play Console ist `https://crownmate.de/konto-loeschen.html`.
+
 ## Bot-Schutz für die Anmeldung (Cloudflare Turnstile, Stand 09.11.2026)
 
 Wozu: Supabase soll neue Konten wieder zulassen („Allow new users to sign up“), ohne dass Programme massenhaft Konten
