@@ -137,7 +137,8 @@
 .lg-gr-abschnitt + .lg-gr-abschnitt { border-top: 1px solid var(--linie); }
 .lg-gr-abschnitt h3 { display: flex; align-items: center; gap: 6px; margin: 0; padding: 12px 16px 6px; font-size: 13px; font-weight: var(--gw-stark);
   color: var(--text-2); }
-.lg-gr-abschnitt[data-zone="auf"] h3 { color: var(--gut); }
+/* --gut pur hatte hell nur 3,39:1 (Kritik R6, B25): zur Textfarbe hin gemischt, hell dunkler, dunkel heller */
+.lg-gr-abschnitt[data-zone="auf"] h3 { color: color-mix(in srgb, var(--gut) 75%, var(--text)); }
 .lg-gr-abschnitt[data-zone="ab"] h3 { color: var(--warn); }
 .lg-gr-abschnitt h3 .ico { width: 16px; height: 16px; }
 .lg-gr-abschnitt ol { margin: 0; padding: 0; list-style: none; }

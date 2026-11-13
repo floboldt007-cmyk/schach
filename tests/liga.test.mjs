@@ -510,7 +510,7 @@ async function browserTeil(browser, start) {
       await page.waitForSelector('.ergebnis-overlay.gefuellt .liga-abrechnung', { state: 'attached', timeout: 60000 });
       await page.waitForFunction(() => window.__ligaProbe.ereignisse.some((d) => d.wertung.n === 10), null, { timeout: 30000 });
       await browserPruefe(name + ': echte Partie: Abrechnung nur mit der Wertung, keine Liga-Punkte und keine Klassen-Feier', async () => {
-        assert.match(await page.locator('.liga-abrechnung').innerText(), /^Arena-Wertung \+\d+$/);
+        assert.match(await page.locator('.liga-abrechnung').innerText(), /^Liga-Wertung \+\d+$/);
         assert.equal(await page.locator('.liga-abrechnung .liga-erg-stand, .liga-abrechnung .liga-erg-wappen').count(), 0);
         assert.equal(await page.locator('.liga-abrechnung').isVisible(), false);
         assert.equal(await page.locator('.erg-liga-verweis').isVisible(), true);

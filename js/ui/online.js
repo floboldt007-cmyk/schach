@@ -48,6 +48,8 @@ const haengtNachMs = p => p.gewertet ? HAENGT_RANKED_MS : HAENGT_MS;
 // js/ui/partie.js (.partie > .inhalt > .brettzone + .seite, Spielerleisten, .spielknoepfe), damit css/partie.css Brett,
 // Leisten, Uhren und Knoepfe gleich setzt. Auf dem Handy rechnet layout() unten die Brettgroesse wie dort.
 const BRETT_MIN = 280;
+// Brettwahl im Kopf (R7, wie BRETTER in js/ui/partie.js, dort nicht exportiert): id, helles und dunkles Feld des Musters
+const BRETTER = Object.freeze([['nacht', '#e4e8f6', '#7c87b6'], ['gruen', '#eeeed2', '#769656'], ['holz', '#f0d9b5', '#b58863']]);
 const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
 const UHR_SYMBOL = '<svg class="ico uhr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
   + 'stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>';
@@ -118,6 +120,8 @@ export function zeige(root, params, app) {
     for (const el of inhalt.querySelectorAll('button, input, select')) el.disabled = busy || blockiert;
     const angebot = inhalt.querySelector('[data-online="angeboten"]');
     if (angebot) angebot.disabled = true;
+    // Blaettern aendert nichts an der Partie und bleibt auch waehrend einer Server-Antwort frei
+    zeigeZugNav();
     brett?.erlaubeZuege(!busy && !blockiert && !widerspruch && online.binAmZug(p) ? zielKarte(chess, { turmRochade: app.einstellungen().turmRochade === true }) : null);
   }
   async function aktion(fn, danach = uebernehme, beiFehler = fehler) {
@@ -395,6 +399,9 @@ export function zeige(root, params, app) {
         // Gerippe der Bot-Partie (js/ui/partie.js): Brett ohne Bewertungsbalken, rechts bzw. darunter die Spalte mit den
         // Spielerleisten (Name, Elo oder Liga, Uhr, geschlagene Figuren) und den Knoepfen. Das Symbol der Live-Bewertung
         // eigener Zuege setzt das Brett selbst (zeigeAbzeichen), .on-live nennt das Tageskontingent.
+        // R7 (B12): Zugliste und Zugstreifen mit Pfeilen wie dort (.zugbox quer, .zugleiste hoch, css/partie.css). Der
+        // Bewertungsbalken fehlt bewusst: gegen einen Menschen waere eine Engine-Bewertung waehrend der Partie Hilfe von
+        // aussen (Fairness, gewertet ein Muss); nach dem Ende bewertet "Zur Analyse" jeden Zug.
         s.classList.add('partie', 'online-partie', 'im-spiel', 'ohne-balken');
         s.classList.toggle('mit-uhr', p.bedenkzeit_s != null);
         inhalt.innerHTML = `<div class="inhalt on-spiel">
@@ -403,11 +410,14 @@ export function zeige(root, params, app) {
             <div class="spieler gegner on-spieler on-oben" role="group"></div>
             <div class="on-hinweise"><p class="on-angebot" role="alert" hidden></p><p class="on-neuer" hidden></p>
               <p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p><p class="on-live" hidden></p></div>
-            <p class="on-zuege" aria-label="${esc(O('zuege'))}"></p>
+            <div class="zugbox"><div class="zb-kopf">${pfeil('zug-zurueck', 'icon-knopf zl-zurueck dr')}<span class="zb-titel">${esc(O('zuege'))}</span>${pfeil('zug-vor', 'icon-knopf zl-vor dr')}</div>
+              <div class="zugliste" role="region" tabindex="0" aria-label="${esc(O('zuege'))}"></div></div>
+            <div class="zugleiste" role="region" tabindex="0" aria-label="${esc(O('zuege'))}"></div>
             <section class="on-ergebnis on-karte flaeche" hidden></section>
             <div class="spieler ich on-spieler on-unten" role="group"></div>
             <div class="spielknoepfe aktionen on-aktionen"></div>
           </div></div>`;
+        spielKopf();
         bauBrett();
         uhrTimer = setInterval(tick, 100);
         beobachteLayout();
@@ -433,6 +443,135 @@ export function zeige(root, params, app) {
       steuerung: e.steuerung, pfeile: e.pfeile !== false });
     brett.setzeAusrichtung(online.meineFarbe(p)); brett.setzeDauer(300);
   }
+  // R7 (B12): Kopf wie in der Bot-Partie: der Gegner als Titel, darunter die eigene Farbe, rechts die Brettwahl (quer;
+  // css/partie.css blendet sie auf dem Handy aus). Der Kopf bleibt derselbe Knoten (verbindeKopf haengt am Screen).
+  function spielKopf() {
+    const kopfEl = s.querySelector('.haupt-kopf');
+    if (!kopfEl || kopfEl.dataset.spiel) return;
+    kopfEl.dataset.spiel = '';
+    kopfEl.classList.remove('mit-seite', 'mit-marke');
+    kopfEl.querySelector('.kopf-seite')?.remove();
+    kopfEl.querySelector('.marke-zeichen')?.remove();
+    const unter = document.createElement('div');
+    unter.className = 'unter logo-unter';
+    unter.textContent = t('partie.kopf.duSpielst') + (online.meineFarbe(p) === 'w' ? O('weiss') : O('schwarz'));
+    kopfEl.querySelector('.marke-text').append(unter);
+    const gewaehlt = app.einstellungen().brett;
+    // hinter die (leeren) Chips: die schieben mit margin-left: auto alles Folgende an den rechten Rand
+    kopfEl.querySelector('.kopf-chips').insertAdjacentHTML('afterend', `<div class="brettwahl" role="radiogroup" aria-label="${esc(t('partie.kopf.brettfarbe'))}">`
+      + BRETTER.map(([id, h, d]) => `<button class="dr" type="button" role="radio" data-brett="${id}" aria-label="${esc(t('partie.kopf.brett', { name: t('partie.brett.' + id) }))}" `
+        + `aria-checked="${gewaehlt === id}"><i style="--h:${h};--d:${d}"><b></b><b></b><b></b><b></b></i></button>`).join('') + '</div>');
+    zeigeKopfTitel();
+  }
+  function zeigeKopfTitel() {
+    const el = s.querySelector('.haupt-kopf[data-spiel] .marke-titel');
+    const name = p && spielerDaten(andere(online.meineFarbe(p))).name;
+    if (el && name && el.textContent !== name) el.textContent = name;
+  }
+  // ---------- Zuege ansehen (wie zeigeAnsicht in js/ui/partie.js): ansehen.ply = Stellung nach diesem Halbzug (-1 =
+  // Ausgangsstellung), null = die Partie selbst. Ein eigenes kleineres Brett liegt ueber dem Spielbrett, das selbst
+  // unberuehrt bleibt; "Zur Partie", ein Tipp aufs Ansichts-Brett, Escape oder ein neuer Zug fuehren zur Partie zurueck.
+  const ansehen = { ply: null, el: null, brett: null, n: 0 };
+  const pfeil = (a, klasse) => `<button class="${klasse}" type="button" data-online="${a}" aria-label="${esc(t(a === 'zug-vor' ? 'partie.zuege.vor' : 'partie.zuege.zurueck'))}">${icon(a === 'zug-vor' ? 'vor' : 'zurueck')}</button>`;
+  const zugLabel = (i) => `${Math.floor(i / 2) + 1}${i % 2 === 0 ? '.' : '…'} ${sanAnzeige(chess.history()[i])}`;
+  function zeichneZugliste() {
+    const san = chess.history(), eigen = online.meineFarbe(p), letzter = san.length - 1;
+    const zelle = (i) => (i == null ? '<span class="z leer"></span>'
+      : `<span class="z${i === letzter ? ' aktuell' : ''}${(i % 2 === 0 ? 'w' : 'b') === eigen ? ' du' : ''}${i === ansehen.ply ? ' angesehen' : ''}" data-ply="${i}">${esc(sanAnzeige(san[i]))}</span>`);
+    let liste = '', leiste = '';
+    for (let i = 0; i < san.length; i += 2) liste += `<span class="nr">${i / 2 + 1}.</span>${zelle(i)}${zelle(i + 1 < san.length ? i + 1 : null)}`;
+    for (let i = 0; i < san.length; i++) leiste += `${i % 2 === 0 ? `<span class="nr">${i / 2 + 1}.</span>` : ''}${zelle(i)}`;
+    const leer = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
+    const listeEl = inhalt.querySelector('.zugliste'), leisteEl = inhalt.querySelector('.zugleiste');
+    const html = liste || leer;
+    if (listeEl._html !== html) { listeEl._html = html; listeEl.innerHTML = html; listeEl.scrollTop = listeEl.scrollHeight; }
+    const streifen = pfeil('zug-zurueck', 'zl-pfeil zl-zurueck dr') + `<span class="zl-zuege">${leiste || leer}</span>` + pfeil('zug-vor', 'zl-pfeil zl-vor dr');
+    if (leisteEl._html !== streifen) { leisteEl._html = streifen; leisteEl.innerHTML = streifen; leisteEl.scrollLeft = leisteEl.scrollWidth; }
+    zeigeZugNav();
+  }
+  function zeigeZugNav() {
+    if (!chess || !inhalt.querySelector('.zugbox')) return;
+    const n = chess.history().length;
+    for (const x of inhalt.querySelectorAll('.zugliste .z[data-ply], .zugleiste .z[data-ply]')) x.classList.toggle('angesehen', Number(x.dataset.ply) === ansehen.ply);
+    for (const b of inhalt.querySelectorAll('.zugbox .zl-zurueck, .zugleiste .zl-zurueck, .spielknoepfe .zl-zurueck')) b.disabled = !n || ansehen.ply === -1;
+    for (const b of inhalt.querySelectorAll('.zugbox .zl-vor, .zugleiste .zl-vor, .spielknoepfe .zl-vor')) b.disabled = ansehen.ply == null;
+    const an = inhalt.querySelector('.zugleiste .z.angesehen');
+    if (an) { const zl = an.closest('.zugleiste'); zl.scrollLeft = an.offsetLeft - zl.clientWidth / 2 + an.offsetWidth / 2; }
+    if (ansehen.el) ansehen.el.querySelector('[data-online="zug-zurueck"]').disabled = ansehen.ply === -1;
+  }
+  function zeigeAnsicht(ply) {
+    const verlauf = chess ? chess.history({ verbose: true }) : [];
+    const n = verlauf.length;
+    if (weg || !brett || !n || !Number.isFinite(ply)) return;
+    const z = Math.max(-1, Math.min(Math.trunc(ply), n - 1));
+    if (z === n - 1) {
+      // vor auf den letzten Zug: er laeuft noch einmal sichtbar, dann geht es zur Partie (wie in der Bot-Partie)
+      if (!ansehen.el || ansehen.ply !== n - 2) { schliesseAnsicht(); return; }
+      const el = ansehen.el, m = verlauf[z];
+      ansehen.ply = z;
+      ansehen.brett.setzeStellung(m.after, { animieren: true, letzterZug: [m.from, m.to], schach: /[+#]$/.test(m.san) ? true : null });
+      el.querySelector('.za-schild').textContent = zugLabel(z);
+      el.querySelector('[data-online="zug-vor"]').disabled = true;
+      setTimeout(() => { if (ansehen.el === el && ansehen.ply === z) schliesseAnsicht(); }, 1100);
+      return;
+    }
+    if (!ansehen.el) {
+      const e = app.einstellungen();
+      const el = document.createElement('div');
+      el.className = 'zug-ansicht';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-label', t('partie.zuege.blaettern'));
+      el.innerHTML = '<div class="za-brett"><div class="brett"></div></div><div class="za-steuer">'
+        + pfeil('zug-zurueck', 'icon-knopf dr') + '<span class="za-schild zahl" aria-live="polite"></span>' + pfeil('zug-vor', 'icon-knopf dr')
+        + `<button class="knopf primaer za-live dr" type="button" data-online="zug-live">${icon('play')} ${esc(t('partie.zuege.zurPartie'))}</button></div>`;
+      inhalt.querySelector('.brett-rahmen').append(el);
+      ansehen.el = el; ansehen.n = n;
+      ansehen.brett = new Brett(el.querySelector('.brett'), { ausrichtung: brett.ausrichtung, figurenPfad: skinPfad(e),
+        koordinaten: e.koordinaten !== false, koordLage: e.koordLage, pfeile: false });
+      ansehen.brett.setzeDauer(300);
+      // ein Tipp aufs Ansichts-Brett: zurueck zur Partie (nie ein Zug auf einer alten Stellung)
+      el.querySelector('.za-brett').addEventListener('pointerdown', (ev) => { ev.preventDefault(); schliesseAnsicht(); });
+    }
+    const vorher = ansehen.ply;
+    ansehen.ply = z;
+    const m = z >= 0 ? verlauf[z] : null;
+    const schritt = vorher != null ? Math.abs(vorher - z) === 1 : z === n - 2;
+    ansehen.brett.setzeStellung(m ? m.after : verlauf[0].before, { animieren: schritt, letzterZug: m ? [m.from, m.to] : null, schach: m && /[+#]$/.test(m.san) ? true : null });
+    const schild = ansehen.el.querySelector('.za-schild');
+    schild.textContent = m ? zugLabel(z) : t('partie.zuege.start');
+    schild.setAttribute('aria-label', m ? t('partie.zuege.ansicht', { zug: zugLabel(z) }) : t('partie.zuege.start'));
+    zeigeZugNav();
+  }
+  function schliesseAnsicht() {
+    if (!ansehen.el) return;
+    try { ansehen.brett.zerstoere(); } catch (e) { /* egal */ }
+    ansehen.el.remove();
+    ansehen.el = null; ansehen.brett = null; ansehen.ply = null;
+    zeigeZugNav();
+  }
+  // Tastatur (Rechner, iPad mit Tastatur): Pfeil links blaettert zurueck, rechts vor, Escape zur Partie
+  const zugTasten = (e) => {
+    if (weg || e.altKey || e.ctrlKey || e.metaKey || !s.isConnected || !brett || !chess) return;
+    if (e.target && e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]:not(.zug-ansicht)')) return;
+    if (document.querySelector('.ergebnis-overlay:not([hidden])')) return;
+    const n = chess.history().length;
+    if (e.key === 'ArrowLeft' && n) { e.preventDefault(); zeigeAnsicht((ansehen.ply ?? n - 1) - 1); }
+    else if (e.key === 'ArrowRight' && ansehen.ply != null) { e.preventDefault(); zeigeAnsicht(ansehen.ply + 1); }
+    else if (e.key === 'Escape' && ansehen.ply != null) { e.preventDefault(); schliesseAnsicht(); }
+  };
+  document.addEventListener('keydown', zugTasten);
+  // Ein Zug in der Liste oder im Streifen: diese Stellung ansehen; der letzte Zug zeigt die Stellung davor und laeuft
+  // dann noch einmal (wie in der Bot-Partie)
+  s.addEventListener('click', (e) => {
+    const zelle = e.target.closest && e.target.closest('.zugliste .z[data-ply], .zugleiste .z[data-ply]');
+    if (!zelle || !s.contains(zelle) || weg || !chess) return;
+    const ply = Number(zelle.dataset.ply), n = chess.history().length;
+    if (ply === n - 1) {
+      zeigeAnsicht(ply - 1);
+      const el = ansehen.el;
+      setTimeout(() => { if (el && ansehen.el === el && ansehen.ply === ply - 1) zeigeAnsicht(ply); }, 450);
+    } else zeigeAnsicht(ply);
+  });
   // Live-Bewertung eigener Zuege (js/pakete/online/live-eigene.js, Flo 11.11.2026): nach dem eigenen Zug das Symbol am
   // Zielfeld wie in der Bot-Partie, kein Balken, kein bester Zug, nichts zum Gegner. Gewertet fragt das Modul das
   // Tageskontingent beim Start und bucht erst beim ersten eigenen Zug; Freundespartien ohne Kontingent.
@@ -469,8 +608,10 @@ export function zeige(root, params, app) {
       .finally(() => { if (!weg) zeigeLiveHinweis(); });
   }
   function beiEinstellungen(ev) {
-    if (weg || !brett || blockiert) return;
+    if (weg) return;
     const e = ev?.detail || app.einstellungen();
+    for (const b of s.querySelectorAll('.brettwahl button[data-brett]')) b.setAttribute('aria-checked', String(b.dataset.brett === e.brett));
+    if (!brett || blockiert) return;
     if (skinPfad(e) === brett.figurenPfad) return;
     bauBrett(); zeichne();
   }
@@ -703,6 +844,7 @@ export function zeige(root, params, app) {
         : `${banner}<span class="av">${avatar}</span><div class="name"><b>${esc(name)}</b></div>${unter}${uhr}`;
     }
     zeichneGeschlagen();
+    zeigeKopfTitel();
     tick();
   }
   // geschlagene Figuren je Seite und Materialvorsprung "+n" (wie zeichneGeschlagen in js/ui/partie.js)
@@ -761,7 +903,9 @@ export function zeige(root, params, app) {
     const gegnerZug = p.gewertet ? O('gegnerAmZug') : O('gegner');
     inhalt.querySelector('.on-zug').textContent = p.status === 'beendet' ? O('fertig') : widerspruch ? O('stellung') : busy ? O('bestaetigt') : online.binAmZug(p) ? O('du') : gegnerZug;
     inhalt.querySelector('.on-uhr-hinweis').textContent = p.bedenkzeit_s != null && online.zuegeListe(p).length < 2 ? O('uhr') : '';
-    inhalt.querySelector('.on-zuege').textContent = chess.history().map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanAnzeige(san)}`).join(' ');
+    // ein neuer Zug fuehrt aus der Ansicht einer frueheren Stellung zur Partie zurueck
+    if (ansehen.el && chess.history().length !== ansehen.n) schliesseAnsicht();
+    zeichneZugliste();
     const angebot = p.status === 'laeuft' && !widerspruch && p.remis_angebot && p.remis_angebot !== online.meineFarbe(p);
     // Remis-Angebot des Gegners deutlich als eigener Streifen ueber den Knoepfen (Flo 11.11.: sonst uebersehen)
     const angebotEl = inhalt.querySelector('.on-angebot');
@@ -774,7 +918,9 @@ export function zeige(root, params, app) {
     const remis = angebot ? k('annehmen', icon('haken'), O('annehmen'), 'primaer')
       : p.remis_angebot ? k('angeboten', REMIS_SYMBOL, O('angeboten'), '', true) : k('remis', REMIS_SYMBOL, O('anbieten'));
     const knoepfe = inhalt.querySelector('.spielknoepfe');
-    const html = p.status !== 'laeuft' ? '' : widerspruch ? k('strittig', icon('hinweis'), O('strittigMelden'), 'primaer') + aufgeben : remis + aufgeben;
+    // R7 (B12): links und rechts die Pfeile zum Blaettern (nur hoch sichtbar, css/online.css), wie .sk-pfeil der Bot-Partie
+    const mitte = widerspruch ? k('strittig', icon('hinweis'), O('strittigMelden'), 'primaer') + aufgeben : remis + aufgeben;
+    const html = p.status !== 'laeuft' ? '' : pfeil('zug-zurueck', 'knopf aktion dr sk-pfeil zl-zurueck') + mitte + pfeil('zug-vor', 'knopf aktion dr sk-pfeil zl-vor');
     if (knoepfe._html !== html) { knoepfe._html = html; knoepfe.innerHTML = html; }
     const ergebnis = inhalt.querySelector('.on-ergebnis');
     ergebnis.hidden = p.status !== 'beendet';
@@ -839,6 +985,15 @@ export function zeige(root, params, app) {
     if (a === 'konto') { kontoFreigeschaltet('#konto'); app.gehe('einstellungen', { seite: 'konto' }); return; }
     if (a === 'liste') { ladeListe(); return; }
     if (a === 'brett') { zeigeBlatt(false); return; }
+    // R7 (B12): Blaettern in den Zuegen und Brettwahl im Kopf (aendern nichts an der Partie, darum vor der Sperre unten)
+    if (a === 'zug-zurueck' && chess) { zeigeAnsicht((ansehen.ply ?? chess.history().length - 1) - 1); return; }
+    if (a === 'zug-vor') { if (ansehen.ply != null) zeigeAnsicht(ansehen.ply + 1); return; }
+    if (a === 'zug-live') { schliesseAnsicht(); return; }
+    if (knopf.dataset.brett && knopf.closest('.brettwahl')) {
+      app.setzeEinstellungen({ brett: knopf.dataset.brett });
+      ton('klick');
+      return;
+    }
     if (a === 'ergebnis-zeigen') { zeigeBlatt(true); return; }
     if (a === 'analyse') { zurAnalyse(); return; }
     if (a === 'teilen' && p) {
@@ -868,5 +1023,5 @@ export function zeige(root, params, app) {
   if (app.test) window.__online = { partie: () => p, chess: () => chess, brett: () => brett, blockiert: () => blockiert, widerspruch: () => widerspruch, busy: () => busy, rest };
   start();
   return { verlasse() { weg = true; live?.stop(); clearInterval(restUhr); clearTimeout(introUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
-    window.removeEventListener('schach:einstellungen', beiEinstellungen); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
+    window.removeEventListener('schach:einstellungen', beiEinstellungen); document.removeEventListener('keydown', zugTasten); schliesseAnsicht(); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
 }
