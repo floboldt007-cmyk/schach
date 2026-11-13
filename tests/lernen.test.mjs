@@ -277,6 +277,8 @@ async function warteLz(s, bedingung, ms = 10000) {
     return new Function('z', 'return ' + b)(z);
   }, bedingung, { timeout: ms }).catch(() => {});
 }
+// R8: das Ergebnisblatt der Lektion steht (es kommt kurz nach dem letzten Zug, damit man ihn noch sieht)
+const blattDa = (s) => s.waitForSelector('.ls-screen > .ergebnis-overlay:not([hidden]) .ergebnis-karte', { timeout: 8000 }).catch(() => {});
 async function ziehe(s, uci) {
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
     const b = await s.locator(`.ls-screen .brett-felder .feld[data-feld="${f}"]`).boundingBox();
@@ -350,16 +352,37 @@ async function erfinderTeil(browser) {
   await warteLz(p.s, "z.phase === 'ende'");
   z = await lz(p.s);
   pruefe('Grundreihe: Ta8 matt, ein Zug, drei Sterne', z.phase === 'ende' && z.zuege === 1 && z.sterne === 3 && !z.grund, z);
-  pruefe('Ergebnis: „Matt!“ mit drei leuchtenden Sternen und „Nächste Lektion“', await p.s.evaluate(() => {
-    const m = document.querySelector('.ls-meldung[data-art="geschafft"]');
-    return !!m && m.querySelectorAll('.ms-sterne > i.an').length === 3 && !!document.querySelector('.ls-aktionen [data-a="weiter"]');
-  }), await p.s.evaluate(() => document.querySelector('.ls-meldung')?.outerHTML.slice(0, 400) + ' | ' + document.querySelector('.ls-aktionen')?.innerHTML.slice(0, 300)));
+  // R8 (Gleichheit): das Ende ist das Ergebnisblatt der Bot-Partie (css/ergebnis.css), nicht mehr nur eine Meldung
+  await blattDa(p.s);
+  const lsBlatt = await p.s.evaluate(() => {
+    const o = document.querySelector('.ls-screen > .ergebnis-overlay:not([hidden])');
+    if (!o) return { da: false };
+    const k = o.querySelector('.ergebnis-karte');
+    return { da: true, sieg: o.classList.contains('sieg'), dialog: o.getAttribute('role') === 'dialog' && o.getAttribute('aria-modal') === 'true',
+      wort: (o.querySelector('.erg-wort')?.textContent || '').trim(), sterne: o.querySelectorAll('.erg-sterne .erg-stern.an').length,
+      haupt: [...o.querySelectorAll('.erg-knoepfe .knopf.primaer')].map((b) => b.dataset.a).join(),
+      neben: [...o.querySelectorAll('.erg-knoepfe .knopf:not(.primaer)')].map((b) => b.dataset.a).join(),
+      lobby: o.querySelector('.erg-lobby')?.dataset.a || null, fokus: !!k && k.contains(document.activeElement),
+      inert: [...document.querySelector('.ls-screen').children].filter((e) => e !== o).every((e) => e.inert),
+      breite: k ? Math.round(k.getBoundingClientRect().width) : 0 };
+  });
+  pruefe('Ergebnisblatt wie in der Bot-Partie: „Matt!“, drei Sterne, Hauptknopf „Nächste Lektion“, „Nochmal“, Weg zur Übersicht',
+    lsBlatt.da && lsBlatt.sieg && lsBlatt.dialog && lsBlatt.wort === 'Matt!' && lsBlatt.sterne === 3 && lsBlatt.haupt === 'weiter'
+    && lsBlatt.neben === 'nochmal' && lsBlatt.lobby === 'uebersicht' && lsBlatt.fokus && lsBlatt.inert, lsBlatt);
+  // Auge zeigt das Brett, "Ergebnis" holt das Blatt zurueck (wie in der Bot-Partie)
+  await p.s.locator('.ls-screen > .ergebnis-overlay .erg-zu').click();
+  const brettSicht = await p.s.evaluate(() => ({ zu: document.querySelector('.ls-screen > .ergebnis-overlay')?.hidden === true,
+    knopf: !!document.querySelector('.ls-aktionen [data-a="ergebnis"]'), meldung: document.querySelector('.ls-meldung[data-art="geschafft"]')?.hidden === false }));
+  await p.s.locator('.ls-aktionen [data-a="ergebnis"]').click();
+  await blattDa(p.s);
+  pruefe('Ergebnisblatt: Auge zeigt das Brett mit Meldung, „Ergebnis“ holt das Blatt zurück', brettSicht.zu && brettSicht.knopf && brettSicht.meldung
+    && await p.s.locator('.ls-screen > .ergebnis-overlay:not([hidden])').count() === 1, brettSicht);
   const gespeichert = await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:lernen') || 'null'));
   pruefe('Speicher: Modul lernen hält 3 Sterne und 1 Zug', gespeichert && gespeichert.lek && gespeichert.lek.grundreihe
     && gespeichert.lek.grundreihe.s === 3 && gespeichert.lek.grundreihe.z === 1, gespeichert);
 
   // weiter zur naechsten Lektion, dann ueber die Uebersicht zur Dame
-  await p.s.locator('.ls-aktionen [data-a="weiter"]').click();
+  await p.s.locator('.ergebnis-overlay [data-a="weiter"]').click();
   await warteLz(p.s, `z.id === '${LEKTIONEN[1].id}' && z.phase === 'intro'`);
   pruefe('„Nächste Lektion“ öffnet die zweite Lektion', (await lz(p.s)).id === LEKTIONEN[1].id);
   await p.s.evaluate(() => window.__app.gehe('lernen'));
@@ -392,7 +415,8 @@ async function erfinderTeil(browser) {
   z = await lz(p.s);
   pruefe('Quadratregel: Bauer geschlagen, „Gehalten!“ mit drei Sternen', z.phase === 'ende' && !z.grund && z.sterne === 3
     && /Gehalten!/.test(await p.s.locator('.ls-meldung').innerText()), z);
-  await p.s.locator('.ls-aktionen [data-a="uebersicht"]').click();
+  await blattDa(p.s);
+  await p.s.locator('.ergebnis-overlay [data-a="uebersicht"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="quadrat"][data-geschafft]', { timeout: 10000 }).catch(() => {});
   pruefe('Zur Übersicht: zurück im Bereich Endspiele, Quadratregel „Gehalten“',
     await p.s.locator('.ms-bkarte[aria-pressed="true"]').getAttribute('data-bereich') === 'end'
@@ -516,9 +540,11 @@ async function erfinderTeil(browser) {
   }
   await warteLz(p.s, "z.phase === 'ende'");
   z = await lz(p.s);
+  await blattDa(p.s);
   pruefe('Zeig sie mir: geschafft mit einem Stern, „Züge gelernt!“, weiter mit „Ohne Hilfe spielen“', z.sterne === 1
-    && /Züge gelernt!/.test(await p.s.locator('.ls-meldung').innerText()) && /Ohne Hilfe spielen/.test(await p.s.locator('.ls-aktionen [data-a="los"].primaer').innerText()), z);
-  await p.s.locator('.ls-aktionen [data-a="los"]').click();
+    && /Züge gelernt!/.test(await p.s.locator('.ls-meldung').innerText()) && /Ohne Hilfe spielen/.test(await p.s.locator('.ergebnis-overlay [data-a="los"].primaer').innerText())
+    && await p.s.locator('.ergebnis-overlay .erg-stern.an').count() === 1, z);
+  await p.s.locator('.ergebnis-overlay [data-a="los"]').click();
   await warteLz(p.s, "z.phase === 'flo' && z.modus === 'selbst'");
   pruefe('Ohne Hilfe: kein Pfeil, Hinweis-Knopf wieder da', await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() === 0
     && await p.s.locator('.ls-aktionen [data-a="hinweis"]').count() === 1);
@@ -603,10 +629,11 @@ async function gratisTeil(browser) {
     await ziehe(p.s, u);
   }
   await warteLz(p.s, "z.phase === 'ende'");
+  await blattDa(p.s);
   pruefe('Gratis: nach der letzten leichten Lektion „Weiter“ und „Nächste Lektion im Trainer“, kein Werbetext in der Meldung',
-    await p.s.locator('.ls-aktionen [data-a="weiter"]').count() === 1 && /Nächste Lektion im Trainer/.test(await p.s.locator('.ls-aktionen [data-a="trainer"]').innerText())
+    await p.s.locator('.ergebnis-overlay [data-a="weiter"]').count() === 1 && /Nächste Lektion im Trainer/.test(await p.s.locator('.ergebnis-overlay [data-a="trainer"]').innerText())
     && await p.s.locator('.ls-screen .premium-hinweis').count() === 0);
-  await p.s.locator('.ls-aktionen [data-a="weiter"]').click();
+  await p.s.locator('.ergebnis-overlay [data-a="weiter"]').click();
   await warteLz(p.s, "z.id === 'legal-falle'");
   pruefe('Gratis: „Weiter“ springt zur Gratis-Probe Legal-Falle', (await lz(p.s)).id === 'legal-falle');
   pruefe('Gratis: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));

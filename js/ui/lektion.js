@@ -40,6 +40,8 @@ import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
 import { sterneHtml } from './lernen.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
+// Ergebnisblatt wie in der Bot-Partie: "Brett ansehen" und "Ergebnis" kommen aus dem Woerterbuch der Partie (wie js/ui/online.js)
+import '../sprachen/partie.js';
 
 const S = (k, w) => t('p-lernen.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -141,6 +143,74 @@ export function zeige(root, params, app) {
     aktionenEl.innerHTML = liste.map((k) => `<button class="knopf dr${k.primaer ? ' primaer' : ''}" type="button" data-a="${k.a}"${k.aus ? ' disabled' : ''}>`
       + `${k.icon ? icon(k.icon) : ''}${esc(k.text)}${k.vor ? icon('vor') : ''}</button>`).join('');
   }
+  // ---------- Ergebnisblatt (R8 Gleichheit, 13.11.2026) ----------
+  // Das Ende zeigt das Ergebnisblatt der Bot-Partie (css/ergebnis.css, Aufbau wie baueOverlay in js/ui/partie.js und das
+  // Blatt in js/ui/online.js): Kopfwort, Name und Ergebnis der Lektion, die Sterne, ein Hauptknopf, ein Nebenknopf und
+  // darunter der Weg zur Uebersicht. Das Auge zeigt das Brett mit der Meldung, "Ergebnis" in der Spalte holt das Blatt zurueck.
+  const blattEl = () => s.querySelector(':scope > .ergebnis-overlay');
+  function zeigeBlatt(an) {
+    const o = blattEl();
+    if (!o) return;
+    o.hidden = !an;
+    for (const e of s.children) if (e !== o) e.inert = an;
+    s.classList.toggle('mit-ergebnis', an);
+    if (an) o.querySelector('.ergebnis-karte').focus({ preventScroll: true });
+    else { const k = aktionenEl.querySelector('[data-a="ergebnis"]'); if (k) k.focus({ preventScroll: true }); }
+  }
+  function entferneBlatt() {
+    const o = blattEl();
+    if (!o) return;
+    o.remove();
+    for (const e of s.children) e.inert = false;
+    s.classList.remove('mit-ergebnis');
+  }
+  const blattKnopf = (k) => `<button class="knopf gross${k.primaer ? ' primaer' : ''}" type="button" data-a="${k.a}">`
+    + `${k.icon ? icon(k.icon) + ' ' : ''}${esc(k.text)}${k.vor ? ' ' + icon('vor') : ''}</button>`;
+  // art 'sieg' (geschafft, mit Sternen) oder 'niederlage' (gescheitert, ruhig); liste wie bei knoepfe(), "uebersicht" wird
+  // zum Weg unter den Knoepfen (wie "Zu den Bots")
+  function baueBlatt(art, kopfText, text, liste, sternZahl) {
+    entferneBlatt();
+    const haupt = liste.filter((k) => k.a !== 'uebersicht');
+    const wort = esc(kopfText).replace(/!$/, '<span class="ausruf">!</span>');
+    const sterneTeil = art !== 'sieg' ? '' : `<div class="erg-mitte"><div class="erg-sterne" role="img" aria-label="${esc(S('sterne', { n: sternZahl, max: 3 }))}">`
+      + [0, 1, 2].map((i) => `<div class="erg-stern ${i < sternZahl ? 'an' : 'aus'}" style="--i:${i}"><span class="e-stern" aria-hidden="true">${icon('stern')}</span></div>`).join('')
+      + '</div></div>';
+    const o = document.createElement('div');
+    o.className = `ergebnis-overlay ls-erg ${art}`;
+    o.setAttribute('role', 'dialog');
+    o.setAttribute('aria-modal', 'true');
+    o.setAttribute('aria-labelledby', 'ls-erg-wort');
+    o.hidden = true;
+    o.innerHTML = `<div class="ergebnis-karte" tabindex="-1">
+        <button class="icon-knopf erg-zu" type="button" aria-label="${esc(t('partie.erg.brettAnsehen'))}">${icon('auge')}</button>
+        <div class="erg-rumpf"><h2 class="erg-wort disp" id="ls-erg-wort">${wort}</h2>
+          <p class="erg-unter"><b class="ls-erg-titel">${esc(titel)}</b>${text ? ` · ${esc(text)}` : ''}</p>${sterneTeil}</div>
+        <div class="erg-aktionen"><div class="erg-knoepfe">${haupt.map(blattKnopf).join('')}</div>
+          <button class="erg-lobby" type="button" data-a="uebersicht">${icon('zurueck')}<span>${esc(S('uebersicht'))}</span></button></div>
+      </div>`;
+    // ungerade Zahl: der letzte Knopf nimmt die ganze Reihe (wie "Zur Analyse" allein in der Bot-Partie)
+    const kn = o.querySelector('.erg-knoepfe');
+    if (haupt.length % 2) kn.lastElementChild.style.gridColumn = '1 / -1';
+    o.querySelector('.erg-zu').addEventListener('click', () => zeigeBlatt(false));
+    o.addEventListener('click', klick);
+    // wie das Blatt der Bot-Partie: Tab kreist im Blatt, Escape zeigt das Brett
+    o.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); zeigeBlatt(false); return; }
+      if (e.key !== 'Tab') return;
+      const ziele = [...o.querySelectorAll('button')].filter((x) => !x.disabled && x.getClientRects().length);
+      if (!ziele.length) return;
+      const jetzt = document.activeElement;
+      if (e.shiftKey && (jetzt === ziele[0] || !ziele.includes(jetzt))) { e.preventDefault(); ziele[ziele.length - 1].focus(); }
+      else if (!e.shiftKey && (jetzt === ziele[ziele.length - 1] || !ziele.includes(jetzt))) { e.preventDefault(); ziele[0].focus(); }
+    });
+    s.append(o);
+    // in der Spalte bleibt die Meldung stehen, dazu nur der Weg zurueck zum Blatt (wie "Ergebnis" in der Bot-Partie)
+    knoepfe([{ a: 'ergebnis', text: t('partie.knopf.ergebnis'), icon: 'pokal', primaer: true }]);
+    // kurz warten, damit der letzte Zug auf dem Brett noch zu sehen ist
+    const lauf = st.lauf;
+    spaeter(() => { if (lauf === st.lauf && st.phase === 'ende') zeigeBlatt(true); }, tempo() > 0 ? 650 : 0);
+  }
+
   const spielKnoepfe = () => knoepfe([
     ...(st.modus === 'zeigen' ? [] : [{ a: 'hinweis', text: S('hinweis'), icon: 'hinweis', aus: st.phase !== 'flo' }]),
     { a: 'neu', text: S('neu'), icon: 'nochmal' },
@@ -179,6 +249,7 @@ export function zeige(root, params, app) {
 
   function starte({ intro = false, modus = 'selbst' } = {}) {
     st.lauf++;
+    entferneBlatt();
     st.modus = folge && modus === 'zeigen' ? 'zeigen' : 'selbst';
     st.chess = new Chess(l.fen);
     st.start = bilanz(st.chess);
@@ -384,7 +455,7 @@ export function zeige(root, params, app) {
         : st.zuege === 1 ? S('geschafftEins') : S('geschafftText', { n: st.zuege, ziel: l.ziel });
     meldung('geschafft', kopfText, text, sterneHtml(st.sterne));
     if (tempo() > 0) staffel(meldungEl.querySelectorAll('.ms-sterne > i.an'), { d: 460, v: 120, abstand: 110, von: 'scale(0) rotate(-30deg)', k: 'hupf' });
-    knoepfe(gezeigt ? [
+    baueBlatt('sieg', kopfText, text, gezeigt ? [
       { a: 'los', text: S('folge.ohneHilfe'), primaer: true, vor: true },
       { a: 'zeigen', text: S('folge.nochmalZeigen'), icon: 'nochmal' },
       { a: 'uebersicht', text: S('uebersicht') },
@@ -393,7 +464,7 @@ export function zeige(root, params, app) {
       { a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: !naechste },
       ...(folgtImTrainer ? [{ a: 'trainer', text: S('naechsteImTrainer'), icon: 'schloss' }] : []),
       { a: 'uebersicht', text: S('uebersicht') },
-    ]);
+    ], st.sterne);
   }
 
   function gescheitert(grund) {
@@ -403,21 +474,25 @@ export function zeige(root, params, app) {
     erlaube();
     spielKlang('raetsel-falsch');
     meldung('fehler', S('fehler.' + grund), S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }), `<span class="ls-symbol">${icon('kreuz')}</span>`);
-    knoepfe([{ a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: true }, { a: 'uebersicht', text: S('uebersicht') }]);
+    baueBlatt('niederlage', S('fehler.' + grund), S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }),
+      [{ a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: true }, { a: 'uebersicht', text: S('uebersicht') }], 0);
   }
 
-  aktionenEl.addEventListener('click', (ev) => {
+  // Knoepfe der Spalte und des Ergebnisblatts
+  function klick(ev) {
     const b = ev.target.closest('[data-a]');
     if (!b || b.disabled) return;
     const a = b.dataset.a;
-    if (a === 'los') starte();
+    if (a === 'ergebnis') zeigeBlatt(true);
+    else if (a === 'los') starte();
     else if (a === 'zeigen') starte({ modus: 'zeigen' });
     else if (a === 'hinweis') hinweis().catch((f) => console.error(f));
     else if (a === 'neu' || a === 'nochmal') starte({ modus: st.modus });
     else if (a === 'weiter' && naechste) app.gehe('lektion', { id: naechste.id }, { ersetzen: true });
     else if (a === 'uebersicht') app.gehe('lernen', { bereich: ber.id }, { ersetzen: true });
     else if (a === 'trainer') oeffneTrainer({ app });
-  });
+  }
+  aktionenEl.addEventListener('click', klick);
 
   starte({ intro: true });
   if (tempo() > 0) {

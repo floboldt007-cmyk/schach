@@ -216,6 +216,7 @@ const blatt = (s, sel) => s.evaluate(sel => {
 }, sel);
 
 // ---- Bot-Partie als Massstab ----
+const LS_BLATT = '.ls-screen > .ergebnis-overlay.sieg:not([hidden]) .ergebnis-karte';
 const BOT_BRETT = '.screen.partie:not(.zz-screen) .brett-rahmen > .brett';
 async function botMassstab(s) {
   // Lauf 2 (12.11.): am iPhone stand das Bot-Brett einmal nach 30 s nicht; deshalb ein zweiter Versuch und ein Bild
@@ -412,8 +413,11 @@ async function meisterschule(s, bot) {
       await warteLz(s, "z.zuege === 1 && (z.phase === 'flo' || z.phase === 'ende')");
       const z = await lz(s);
       const geschafftMeldung = await s.locator('.ls-meldung[data-art="geschafft"]').count();
-      // zurueck auf Anfang: "Neu starten" (laeuft) oder "Nochmal" (gescheitert)
-      await s.locator(`.ls-aktionen [data-a="${z.phase === 'ende' ? 'nochmal' : 'neu'}"]`).click();
+      // zurueck auf Anfang: "Neu starten" (laeuft) oder "Nochmal" im Ergebnisblatt (gescheitert, R8)
+      if (z.phase === 'ende') {
+        await s.locator(LS_BLATT).waitFor({ timeout: 8000 }).catch(() => {});
+        await s.locator('.ls-screen > .ergebnis-overlay [data-a="nochmal"]').click();
+      } else await s.locator('.ls-aktionen [data-a="neu"]').click();
       const neu = await warteLz(s, "z.phase === 'flo' && z.zuege === 0");
       return { gut: z.zuege === 1 && !geschafftMeldung && (z.phase === 'flo' || !!z.grund) && neu, detail: { nachFalsch: z, neu } };
     });
@@ -425,12 +429,13 @@ async function meisterschule(s, bot) {
       }
       await warteLz(s, "z.phase === 'ende'");
       const z = await lz(s);
-      const da = await s.locator('.ls-meldung[data-art="geschafft"]').isVisible().catch(() => false);
-      erg = await blatt(s, '.ls-meldung');
+      // R8: das Ende ist das Ergebnisblatt der Bot-Partie (vorher nur die Meldung in der Spalte)
+      const da = await s.locator(LS_BLATT).waitFor({ timeout: 8000 }).then(() => true, () => false);
+      erg = await blatt(s, LS_BLATT);
       return { gut: z.phase === 'ende' && !z.grund && z.sterne >= 1 && da, detail: z };
     });
     await handlung(s, `Lektion ${art} (${l.id}): zurueck zur Liste, Fortschritt (geschafft, Sterne) sichtbar`, async () => {
-      await s.locator('.ls-aktionen [data-a="uebersicht"]').click();
+      await s.locator('.ls-screen > .ergebnis-overlay [data-a="uebersicht"]').click();
       const da = await s.locator(`.ms-lektion[data-id="${l.id}"][data-geschafft]`).waitFor({ timeout: 10000 }).then(() => true, () => false);
       const aktiv = await s.locator('.ms-bkarte[aria-pressed="true"]').getAttribute('data-bereich');
       const nachher = await sterneVon(s, bereich);
