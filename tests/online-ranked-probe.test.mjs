@@ -5,6 +5,8 @@
 //   node tests/online-ranked-probe.test.mjs                  Probe (bekannte Luecken melden sich als ROT, ohne Abbruch)
 //   PROBE_STRENG=1 node tests/online-ranked-probe.test.mjs   auch die harten Pruefungen zaehlen (fuer die Reparatur)
 //   PORT=9631 node tests/online-ranked-probe.test.mjs        eigener Port (Standard: frei)
+//   BILDER=<ordner> node tests/online-ranked-probe.test.mjs  Bilder beider Sitzungen (iPhone 13 und PC, hell): Suche,
+//                                                            Partie, Remis-Angebot, Ergebnis, nach dem Neuladen
 //
 // Harte Pruefungen (hart: true) stehen fuer die Befunde vom 11.11. abends (Laufzettel Feinschliff 2026-11-11, Befund 1, 3,
 // 4, 5): zweite Partie, Zurueckkehren, Skin, Brettgroesse. Auf dem Stand live 297 sind sie rot. Ohne PROBE_STRENG
@@ -17,7 +19,7 @@
 // kronen-schema.sql, dann zwei-ligen-schema.sql, dann alle weiteren alphabetisch; die letzte Fassung gilt.
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
@@ -31,6 +33,8 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 if (!pw) throw new Error('Playwright fehlt');
 // Seit der Reparatur R1 (sammel-r1, 11.11.) streng als Vorgabe; PROBE_STRENG=0 zeigt die alte Probe-Ansicht
 const STRENG = process.env.PROBE_STRENG !== '0';
+const BILDER = process.env.BILDER || null;
+if (BILDER) mkdirSync(BILDER, { recursive: true });
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.json': 'application/json' };
 const server = http.createServer((req, res) => {
@@ -99,7 +103,9 @@ function paaren(uid) {
   partien.set(p.id, p); schlange.delete(uid); schlange.delete(g[0]);
   return p;
 }
-const warten = uid => { const q = schlange.get(uid); return q ? { wartet: true, seit: new Date(q.seit).toISOString(), warte_s: 30, ki_ab_s: 1, zeit: '5+3' } : null; };
+// Wartezeit bis zur KI wie im SQL 30 s; die Pruefung "Bot nach der Wartezeit" kuerzt sie hier am Server, nicht in der App
+let warteS = 30;
+const warten = uid => { const q = schlange.get(uid); return q ? { wartet: true, seit: new Date(q.seit).toISOString(), warte_s: warteS, ki_ab_s: Math.min(1, warteS), zeit: '5+3' } : null; };
 
 async function bediene(route) {
   const req = route.request(), url = new URL(req.url());
@@ -180,7 +186,7 @@ async function bediene(route) {
 let browser;
 const kontexte = [];
 async function neuerKontext(uid, viewport = { width: 1180, height: 820 }) {
-  const k = await browser.newContext({ viewport, hasTouch: true, serviceWorkers: 'block', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  const k = await browser.newContext({ viewport, hasTouch: true, serviceWorkers: 'block', locale: 'de-DE', timezoneId: 'Europe/Berlin', colorScheme: 'light' });
   kontexte.push(k);
   await k.route('**/*.supabase.co/**', bediene);
   await k.addInitScript(({ s, skin }) => {
@@ -211,10 +217,23 @@ async function tippe(s, uci) {
     await s.touchscreen.tap(r.x + r.width / 2, r.y + r.height / 2);
   }
 }
-// Beide suchen; liefert die Partie-ID, in der beide landen (oder null)
-async function beideSuchen(a, b) {
+// Bilder (nur mit BILDER=): dieselbe Sitzung kurz in iPhone-13- und PC-Groesse, danach zurueck auf ihre Groesse
+async function bilder(s, name) {
+  if (!BILDER) return;
+  const alt = s.viewportSize();
+  for (const [geraet, width, height] of [['iphone13', 390, 844], ['pc', 1280, 720]]) {
+    await s.setViewportSize({ width, height });
+    await s.waitForTimeout(500);
+    await s.screenshot({ path: path.join(BILDER, `${geraet}-${name}.png`) }).catch(e => console.log(`Bild ${geraet}-${name}: ${e.message}`));
+  }
+  await s.setViewportSize(alt);
+  await s.waitForTimeout(300);
+}
+// Beide suchen; liefert die Partie-ID, in der beide landen (oder null). mitBild: die wartende Suche von a festhalten
+async function beideSuchen(a, b, mitBild = false) {
   await a.locator('[data-online="suchen"]').click();
   await a.locator('.on-suche:not([hidden])').waitFor();
+  if (mitBild) await bilder(a, '1-suche');
   await b.locator('[data-online="suchen"]').click();
   const ids = await Promise.all([a, b].map(s => s.waitForFunction(() => window.__online?.brett() && window.__online.partie()?.status === 'laeuft'
     && window.__online.partie().id, null, { timeout: 12000 }).then(h => h.jsonValue()).catch(() => null)));
@@ -244,7 +263,7 @@ try {
   await Promise.all([a, b].map(async s => { await s.goto(START() + '#online'); await sucheBereit(s); }));
 
   // 1. Paarung in 5+3
-  const id1 = await beideSuchen(a, b);
+  const id1 = await beideSuchen(a, b, true);
   pruefe('Paarung: beide suchen Ranked und landen in derselben gewerteten Partie', !!id1, { a: await partieId(a), b: await partieId(b) });
   if (!id1) throw new Error('ohne Paarung kein weiterer Ablauf');
   const uhr = await a.evaluate(() => ({ p: window.__online.partie(), uhren: [...document.querySelectorAll('.on-spiel .uhr')].map(u => ({ t: u.textContent.trim(), sichtbar: !u.hidden })) }));
@@ -260,15 +279,18 @@ try {
   pruefe('Weiss zieht e2-e4, Schwarz sieht den Zug', await sieht(schwarz, 'e2e4'), await schwarz.evaluate(() => window.__online.partie().zuege));
   await bereit(schwarz); await tippe(schwarz, 'e7e5');
   pruefe('Schwarz zieht e7-e5, Weiss sieht den Zug', await sieht(weiss, 'e7e5'), await weiss.evaluate(() => window.__online.partie().zuege));
+  await bilder(weiss, '2-partie-weiss'); await bilder(schwarz, '2-partie-schwarz');
 
   // 3. Remis anbieten und annehmen
   await bereit(weiss); await fahne(weiss, 'remis');
   const angebot = await schwarz.locator('[data-online="annehmen"]').waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
   pruefe('Remis: Weiss bietet an (Fahne), Schwarz sieht "Annehmen"', angebot, partien.get(id1));
+  if (angebot) await bilder(schwarz, '3-remis-angebot');
   if (angebot) await schwarz.locator('[data-online="annehmen"]').click();
   const remisEnde = await Promise.all([weiss, schwarz].map(s => s.waitForFunction(() => window.__online?.partie()?.status === 'beendet'
     && !document.querySelector('.on-ergebnis').hidden, null, { timeout: 10000 }).then(() => true).catch(() => false)));
   pruefe('Remis angenommen: beide sehen das Ergebnis 1/2-1/2', remisEnde.every(Boolean) && partien.get(id1).ergebnis === '1/2-1/2', { remisEnde, p: partien.get(id1) });
+  await bilder(weiss, '4-ergebnis-weiss'); await bilder(schwarz, '4-ergebnis-schwarz');
 
   // 4. Neue Partie, Aufgeben
   await Promise.all([a, b].map(zurOnlineSeite));
@@ -300,6 +322,7 @@ try {
       text: eintrag?.textContent.trim().slice(0, 60) || null };
   }, id3);
   pruefe('Nach Neuladen zeigt die Online-Seite die laufende Partie (offen oder sichtbarer Eintrag, Befund 3)', anzeige.offen || anzeige.eintrag, anzeige, { hart: true });
+  await bilder(a, '5-nach-neuladen');
   let zurueck = anzeige.offen;
   if (!zurueck && anzeige.eintrag) {
     await a.locator(`[data-partie="${id3}"]`).filter({ visible: true }).first().click({ timeout: 5000 }).catch(() => {});
@@ -311,6 +334,7 @@ try {
   if (zurueck) await a.waitForFunction(() => window.__online.partie()?.zuege === 'd2d4', null, { timeout: 5000 }).catch(() => {});
   const zuegeZurueck = zurueck ? await a.evaluate(() => window.__online.partie().zuege) : null;
   pruefe('Zurueckkehren: ein Tipp fuehrt in dieselbe Partie mit allen Zuegen (Befund 3)', zurueck && zuegeZurueck === 'd2d4', { zurueck, zuegeZurueck }, { hart: true });
+  if (zurueck) await bilder(a, '6-zurueck-in-der-partie');
 
   // 6. Erneute Suche waehrend der laufenden Partie: nie eine zweite (Befund 1, DB 20:09:58 und 20:11:45)
   // Die Partie laeuft seit mehr als einer Minute (wie am Abend); das Fenster des SQL ist damit vorbei
@@ -357,6 +381,42 @@ try {
     }
     pruefe(`Brettgroesse @ ${name} (${w}x${h}): Online-Brett mindestens so gross wie in der Bot-Partie (Befund 5)`, online >= bot - 1, { online, bot }, { hart: true });
   }
+
+  // 8. Bot nach der Wartezeit (R9): u1 sucht allein und tippt nichts mehr. Nach der Wartezeit, die der Server nennt (hier
+  // auf 3 s gekuerzt, die App bekommt keinen Test-Schalter), steht von selbst die Bot-Partie: Brett, beide Leisten, eigener Zug
+  for (const q of laufendeVon('u1')) Object.assign(q, { status: 'beendet', grund: 'abgebrochen' });
+  warteS = 3;
+  const solo = await neuerKontext('u1');
+  await solo.goto(START() + '#online'); await sucheBereit(solo);
+  await solo.locator('[data-online="suchen"]').click();
+  const sucht = await solo.locator('.on-suche:not([hidden])').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  const t0 = jetzt();
+  const BOT = '.screen.partie:not(.online-screen)';
+  const kamBot = await solo.waitForFunction(sel => window.__partie?.bereit === true && document.querySelectorAll('.screen').length === 1
+    && document.querySelectorAll(sel + ' .brett img.figur').length === 32, BOT, { timeout: 20000 }).then(() => true).catch(() => false);
+  const nachMs = jetzt() - t0;
+  const lage = await solo.evaluate(sel => ({
+    ki: history.state?.params?.ki === true,
+    leisten: ['.spieler.gegner', '.spieler.ich'].map(q => { const r = document.querySelector(sel + ' ' + q)?.getBoundingClientRect(); return !!r && r.width > 0 && r.height > 0; }),
+  }), BOT);
+  pruefe(`Bot nach der Wartezeit: ohne Tippen wechselt die Suche nach ${warteS} s von selbst in die Bot-Partie (Brett, beide Leisten, KI-Partie)`,
+    sucht && kamBot && nachMs >= warteS * 1000 - 1000 && lage.ki && lage.leisten.every(Boolean), { sucht, kamBot, nachMs, ...lage });
+  let eigenerZug = false, zugUci = null;
+  if (kamBot) {
+    await bilder(solo, '7-bot-nach-wartezeit');
+    // Flo spielt Weiss oder Schwarz (Zufall der App); bei Schwarz zieht erst der Bot
+    await solo.waitForFunction(() => window.__partie.phase() === 'flo', null, { timeout: 30000 }).catch(() => {});
+    const vorher = await solo.evaluate(() => window.__partie.chess().history().length);
+    zugUci = await solo.evaluate(() => { const m = window.__partie.chess().moves({ verbose: true }).find(x => !x.promotion); return m ? m.from + m.to : null; });
+    if (zugUci) {
+      for (const f of [zugUci.slice(0, 2), zugUci.slice(2, 4)]) await solo.locator(`${BOT} .brett-felder .feld[data-feld="${f}"]`).click();
+      // Zug bestaetigen (Vorschau): zweiter Tipp aufs Ziel, wie tests/funktion-partie.test.mjs
+      if (await solo.locator(`${BOT} .brett .lage.vorschau`).count()) await solo.locator(`${BOT} .brett-felder .feld[data-feld="${zugUci.slice(2, 4)}"]`).click();
+      eigenerZug = await solo.waitForFunction(n => window.__partie.chess().history().length > n, vorher, { timeout: 10000 }).then(() => true).catch(() => false);
+    }
+  }
+  pruefe('Bot nach der Wartezeit: der eigene Zug per Tipp geht', eigenerZug, { zugUci });
+  warteS = 30;
 
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet: [...new Set(unerwartet)] });
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
