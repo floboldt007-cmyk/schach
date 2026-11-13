@@ -695,13 +695,22 @@ async function kleinTeil(browser) {
             const leer = (c) => c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c);
             const vor = getComputedStyle(a, '::before');
             return leer(getComputedStyle(a).backgroundColor) && getComputedStyle(a).backgroundImage === 'none'
-              && (vor.content === 'none' || vor.content === 'normal' || vor.backgroundImage === 'none') ? '' : 'band'; })() };
+              && (vor.content === 'none' || vor.content === 'normal' || vor.backgroundImage === 'none') ? '' : 'band'; })(),
+          // R8 L4 (13.11.2026): die Leiste verdeckt nichts. Karte und Meldung enden ueber ihr, und die Flaeche rollt nicht
+          // (sonst laege Inhalt unter dem Rand oder hinter der Leiste)
+          verdeckt: (() => { const a = document.querySelector('.ls-screen .ls-aktionen'); const rumpf = document.querySelector('.ls-screen .ls-rumpf');
+            if (!a || !rumpf) return 'fehlt';
+            const oben = a.getBoundingClientRect().top;
+            const zu = [...document.querySelectorAll('.ls-screen .ls-seite > :not(.ls-aktionen)')].filter((e) => !e.hidden && e.getClientRects().length)
+              .filter((e) => e.getBoundingClientRect().bottom > oben + 1).map((e) => e.className.split(' ')[0]);
+            if (rumpf.scrollHeight > rumpf.clientHeight + 1) zu.push('rumpf-rollt:' + (rumpf.scrollHeight - rumpf.clientHeight));
+            return zu.join(','); })() };
       });
       const ueber = m.los ? m.los.bottom - m.ih : 999;
       if (!schlimmste || ueber > schlimmste.ueber) schlimmste = { id: l.id, ueber };
-      if (!m.los || m.los.bottom > m.ih || m.los.top < 0 || !m.alle || !m.quer || m.band) schlecht.push(`${l.id}:${ueber}${m.band ? ':' + m.band : ''}`);
+      if (!m.los || m.los.bottom > m.ih || m.los.top < 0 || !m.alle || !m.quer || m.band || m.verdeckt) schlecht.push(`${l.id}:${ueber}${m.band ? ':' + m.band : ''}${m.verdeckt ? ':' + m.verdeckt : ''}`);
     }
-    pruefe(`${geraet}: „Los geht's“ (und jeder Knopf der Idee-Phase) in allen ${ALLE.length} Lektionen ganz im Bild, ohne Band ueber der Karte (B9, R8)`, schlecht.length === 0,
+    pruefe(`${geraet}: „Los geht's“ (und jeder Knopf der Idee-Phase) in allen ${ALLE.length} Lektionen ganz im Bild, ohne Band, ohne verdeckten Inhalt (B9, R8)`, schlecht.length === 0,
       { schlecht: schlecht.join(' '), schlimmste });
     if (process.env.BILDER && schlimmste) {
       for (const modus of ['hell', 'dunkel']) {
