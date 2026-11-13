@@ -6,6 +6,7 @@
 //   node tests/raetsel-duell-ui.test.mjs                    iPhone 13 390x844 hell, iPhone SE 375x667 dunkel, iPad 820x1180
 //                                                           dunkel, PC 1280x720 hell (Funktionsprobe: Start, Zuege, Ende)
 //   node tests/raetsel-duell-ui.test.mjs --bilder=<ordner>  dazu Bilder (alle vier Geraete, je hell und dunkel)
+//   node tests/raetsel-duell-ui.test.mjs --nur=gross|laden   nur grosser Schirm (Titel, Leiste, Knopffarbe) bzw. Neuladen
 // Die echten Regeln (Zeit, Abzug, Wertung, Kronen) prueft tests/server-raetsel-duell.test.mjs gegen das SQL; hier
 // geht es nur darum, dass der Screen zeigt, was der Server sagt.
 import { createRequire } from 'node:module';
@@ -156,6 +157,66 @@ const geloest = (s, wer) => s.locator(`.rd-seite[data-wer="${wer}"] .rd-geloest`
 async function warteBis(s, fn, arg, ms = 6000) { await s.waitForFunction(fn, arg, { timeout: ms }); }
 const bildName = (geraet, schema, teil) => `raetsel-duell-${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-${teil}`;
 async function bild(s, name) { if (BILDER) await s.screenshot({ path: path.join(BILDER, name + '.png') }); }
+// B17 (R6 12.11.2026): "Gegner suchen" hat dieselbe Fuellung und Schrift wie ein Hauptknopf (.knopf.primaer, so steht
+// "Duell suchen" auf der Online-Seite), nicht mehr Gold
+const suchFarbe = (s) => s.evaluate(() => {
+  const probe = document.createElement('button');
+  probe.className = 'knopf primaer';
+  document.body.append(probe);
+  const soll = getComputedStyle(probe);
+  const sollW = { grund: soll.backgroundColor, text: soll.color };
+  probe.remove();
+  const ist = getComputedStyle(document.querySelector('.rd-suchen'));
+  return { gleich: ist.backgroundColor === sollW.grund && ist.color === sollW.text, ist: { grund: ist.backgroundColor, text: ist.color }, soll: sollW };
+});
+// B23 (R6 12.11.2026): am grossen Schirm (Seitenleiste links) steht der Seitentitel im Kopf wie am Handy
+const titelSichtbar = (s, sel) => s.evaluate((sel) => {
+  const t = document.querySelector(sel + ' .haupt-kopf .marke-titel');
+  if (!t) return { da: false };
+  const r = t.getBoundingClientRect();
+  return { da: true, text: t.textContent, b: Math.round(r.width), h: Math.round(r.height), clip: getComputedStyle(t.closest('.marke')).clipPath,
+    ok: r.width > 40 && r.height > 12 && getComputedStyle(t.closest('.marke')).clipPath === 'none' && r.right <= innerWidth };
+}, sel);
+const leisteSichtbar = (s) => s.evaluate(() => {
+  const l = document.querySelector('.reiter-leiste');
+  const sc = document.querySelector('.screen.raetsel-duell');
+  return { leiste: !!(l && !l.hidden && l.getClientRects().length && getComputedStyle(l).display !== 'none'),
+    lage: document.documentElement.dataset.reiter || null, links: sc ? Math.round(sc.getBoundingClientRect().left) : null };
+});
+
+async function grosserSchirm(browser) {
+  gruppe = 'Grosser Schirm (PC 1280x720)';
+  const srv = neuerServer();
+  const p = await seite(browser, { breite: 1280, hoehe: 720, srv, rpc: (name, daten) => {
+    if (name === 'duell_suche_start' || name === 'duell_suche_stand') return {};
+    if (name === 'duell_suche_ende') { if (daten && daten.ki === true) { srv.anlegen(); return { duell: DUELL }; } return {}; }
+    return undefined;
+  } });
+  const { s } = p;
+  try {
+    await s.waitForSelector('.screen.raetsel-duell[data-phase="start"] .rd-suchen', { timeout: 30000 });
+    await warte(400);
+    const t0 = await titelSichtbar(s, '.screen.raetsel-duell');
+    const l0 = await leisteSichtbar(s);
+    pruefe('Start: Seitenleiste da, Seitentitel "Rätsel-Duell" sichtbar im Kopf', l0.lage === 'seite' && l0.leiste && t0.ok && /Rätsel-Duell/.test(t0.text), { ...t0, ...l0 });
+    const farbe = await suchFarbe(s);
+    pruefe('Start: Suchknopf in Hauptknopf-Farbe (wie Online)', farbe.gleich, farbe);
+    await s.locator('.rd-suchen').click();
+    await s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"]', { timeout: 8000 });
+    await warte(700);
+    const t1 = await titelSichtbar(s, '.screen.raetsel-duell');
+    const l1 = await leisteSichtbar(s);
+    pruefe('Laeuft: keine Seitenleiste, Screen beginnt am linken Rand, Seitentitel sichtbar', !l1.leiste && l1.links === 0 && t1.ok, { ...t1, ...l1 });
+    // Tagesraetsel (Screen raetsel mit Quelle oder Liste): derselbe Kopf, derselbe Titel am grossen Schirm
+    await s.evaluate(() => window.__app.gehe('raetsel', { liste: [{ id: 'w-duell-1', fen: '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', loesung: ['a1a8'] }],
+      titel: 'Tagesrätsel', unter: 'Mittwoch' }));
+    await s.waitForSelector('.screen.rs-screen .haupt-kopf', { timeout: 8000 });
+    await warte(400);
+    const t2 = await titelSichtbar(s, '.screen.rs-screen');
+    pruefe('Tagesraetsel: Seitentitel sichtbar im Kopf', t2.ok && t2.text === 'Tagesrätsel', t2);
+    pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  } finally { await p.k.close(); }
+}
 
 // Geometrie, die in jedem Zustand gelten muss: nichts breiter als das Fenster, Tippflaechen ab 44 px
 const geometrie = (s) => s.evaluate(() => ({
@@ -184,6 +245,8 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
     const g0 = await geometrie(s);
     pruefe('Start: Titel, drei Regeln, Hash #raetsel-duell, Reiter Heim, nichts breiter, Tippflaechen ab 44 px',
       /Rätsel-Duell/.test(start.titel) && start.regeln === 3 && start.hash === '#raetsel-duell' && g0.breit && g0.klein.length === 0, { ...start, ...g0 });
+    const farbe = await suchFarbe(s);
+    pruefe('Start: "Gegner suchen" in derselben Farbe wie "Duell suchen" auf Online (Hauptknopf, B17)', farbe.gleich, farbe);
     await bild(s, bildName(geraet, schema, '1-start'));
 
     await s.locator('.rd-suchen').click();
@@ -495,8 +558,17 @@ async function neuladen(browser) {
     await s.waitForSelector('.screen.raetsel-duell[data-phase="beendet"] .rd-ende', { timeout: 15000 });
     const ende = await s.evaluate(() => ({ erg: document.querySelector('.rd-ende').dataset.ergebnis, stand: document.querySelector('.rd-ende-stand').textContent }));
     pruefe('Neuladen nach dem Ende: Ergebnis statt Start (Gewonnen 3 zu 2)', ende.erg === 'sieg' && ende.stand === '3 zu 2 gelöst', ende);
-    // das gezeigte Ergebnis ist vergessen: ein weiteres Neuladen geht den gewohnten Weg (hier Online-Tuer: neue Suche)
     pruefe('Nach dem gezeigten Ergebnis ist das laufende Duell vergessen', await s.evaluate(() => sessionStorage.getItem('schach-arena:raetsel-duell:laufend') === null));
+    // die Online-Tuer hat ihre Suche schon gestartet: der Verlaufseintrag traegt kein suchen mehr, ein weiteres Neuladen
+    // zeigt den Start und sucht erst nach einem Klick (Rest aus R7)
+    const suchenNachEnde = p.aufrufe.filter((a) => a.name === 'duell_suche_start').length;
+    pruefe('Verlaufseintrag ohne suchen, sobald die Suche der Online-Tuer lief', await s.evaluate(() => !(history.state && history.state.params && history.state.params.suchen)));
+    await s.reload();
+    await s.waitForSelector('.screen.raetsel-duell[data-phase="start"] .rd-suchen', { timeout: 15000 });
+    await warte(800);
+    pruefe('Neuladen nach dem Ergebnis: Start, keine neue Gegnersuche ohne Klick',
+      await s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.phase) === 'start'
+      && p.aufrufe.filter((a) => a.name === 'duell_suche_start').length === suchenNachEnde, p.aufrufe.filter((a) => /^duell_suche/.test(a.name)).map((a) => a.name));
     pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   } catch (e) {
     console.log('  Screen: ' + await lage().then(JSON.stringify).catch(() => '?') + ' | Seitenfehler: ' + p.fehlerListe.join(' | '));
@@ -519,11 +591,12 @@ try {
   ];
   if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'light' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' });
-  if (NUR !== 'laden') {
+  if (!NUR) {
     for (const l of laeufe) await duellGegenKi(browser, l);
     await nebenwege(browser);
   }
-  await neuladen(browser);
+  if (!NUR || NUR === 'gross') await grosserSchirm(browser);
+  if (!NUR || NUR === 'laden') await neuladen(browser);
 } catch (e) {
   fehler++;
   console.log('FEHLER Ablauf ' + (gruppe ? '(' + gruppe + ') ' : '') + (e && e.stack || e));

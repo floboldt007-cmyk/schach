@@ -23,7 +23,7 @@ import { BOTS, WELTEN, botNachId } from '../../bots.js';
 import { avatarVon } from '../../thema.js';
 import {
   ladePartie, ladeFortschritt, istFreigeschaltet, naechsterGegner, ladeModulEinstellungen, speichereModulEinstellungen, ladeEinstellungen,
-  statistik,
+  statistik, BESTWERT_MIN_ZUEGE,
 } from '../../storage.js';
 import { analysierePartie } from '../../review.js';
 import { tagSchluessel } from '../../tag.js';
@@ -98,7 +98,10 @@ function infoText(e, { mitTafel = false } = {}) {
   if (e.f) teile.push(farbeText(e.f));
   if (e.e) teile.push(ergText(e.e));
   if (Number.isInteger(e.z) && e.z > 0) teile.push(t('p-punkte.zuege', { n: e.z }));
-  const g = genauText(e.g);
+  // Genauigkeit nur, wenn die Bilanz sie zaehlt (storage.statistik: ab BESTWERT_MIN_ZUEGE eigenen Zuegen); sonst stand
+  // neben "Ø Genauigkeit –" eine Zeile mit "4 Züge · 88,6 %" (R7, Befund B16). Ohne Zugzahl (alter Eintrag) wie bisher.
+  const zuKurz = Number.isInteger(e.z) && e.z < BESTWERT_MIN_ZUEGE;
+  const g = zuKurz ? null : genauText(e.g);
   if (g) teile.push(g);
   if (Number.isFinite(e.st)) teile.push(t('p-punkte.bossStaerke', { wert: e.st }));
   return teile.join(' · ');
@@ -714,4 +717,4 @@ export function reiterFreunde({ app, jetzt = new Date() } = {}) {
 }
 
 // fuer Tests
-export const _intern = { codeFuer, eigeneAus, tafelAuswahl };
+export const _intern = { codeFuer, eigeneAus, tafelAuswahl, infoText };

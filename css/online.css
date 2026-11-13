@@ -20,7 +20,9 @@
 .on-tuer-ueber { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--akzent-text, var(--akzent)); }
 .on-tuer h2 { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; text-wrap: balance; }
 .on-tuer-text p { margin: 0; font-size: 13.5px; line-height: 1.35; color: var(--text-2); }
-.on-tuer-knopf { min-height: 48px; justify-content: center; }
+/* Knopf am Kartenfuss (R6 B21): nebeneinander sind beide Karten gleich hoch (Grid), so stehen "Partie suchen" und
+   "Duell suchen" auf einer Hoehe, auch wenn die Partie-Karte die Zeile mit der Bedenkzeit mehr hat */
+.on-tuer-knopf { min-height: 48px; justify-content: center; margin-top: auto; }
 /* kleines Brett als Bild (nur Deko): 8 x 8 Felder in den Brettfarben, Figuren aus dem Standardsatz */
 .on-bild { position: relative; display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr); width: 76px; aspect-ratio: 1; border-radius: 10px;
   overflow: hidden; box-shadow: var(--kante);
@@ -100,6 +102,10 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
    auf dem Desktop 22 px */
 .screen.online-screen.im-spiel > .kopf.haupt-kopf { height: var(--kopf-hoehe-partie); min-height: 0; padding-top: 0; }
 @media (orientation: portrait) and (max-width: 600px) { .screen.online-screen.im-spiel > .kopf.haupt-kopf { padding: 0 10px; gap: 8px; } }
+/* R7 (B12): im Kopf der Gegner als Titel und darunter die eigene Farbe, wie .p-kopf .unter in css/partie.css */
+.online-partie .haupt-kopf .logo-unter { margin-top: 3px; font-size: 13.5px; font-weight: 650; color: var(--text-2); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+@media (orientation: portrait) and (max-width: 600px) { .online-partie .haupt-kopf .logo-unter { margin-top: 2px; font-size: 12.5px; } }
 /* Handy mit wenig Hoehe (layout() in js/ui/online.js, wie .coach-eng in der Bot-Partie): erst ruecken die Hinweise
    zusammen, dann wird das Brett kleiner */
 .online-partie.eng .on-hinweise { gap: 2px; }
@@ -119,10 +125,9 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-hinweise { display: flex; flex-direction: column; gap: 6px; }
 /* Tageskontingent der Live-Bewertung (gewertet, ohne Premium): ruhige Zeile wie der Uhr-Hinweis */
 .on-live[hidden] { display: none; }
-.on-zug, .on-uhr-hinweis, .on-zuege, .on-live { margin: 0; text-align: center; color: var(--text-2); font-size: var(--fs-klein); }
+.on-zug, .on-uhr-hinweis, .on-live { margin: 0; text-align: center; color: var(--text-2); font-size: var(--fs-klein); }
 .on-zug { font-weight: 700; color: var(--text); }
-.on-uhr-hinweis:empty, .on-zuege:empty { display: none; }
-.on-zuege { overflow: auto; font-variant-numeric: tabular-nums; }
+.on-uhr-hinweis:empty { display: none; }
 .on-ergebnis { text-align: center; margin-bottom: 0; }
 .on-ergebnis .on-aktionen { display: flex; flex-wrap: wrap; gap: var(--a3); justify-content: center; }
 .on-ergebnis[hidden], .on-angebot[hidden], .on-neuer[hidden] { display: none; }
@@ -135,18 +140,30 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .online-partie .spielknoepfe { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .online-partie .spielknoepfe:empty { display: none; }
 .online-partie .spielknoepfe > .knopf.primaer .ico { color: currentColor; }
-/* Reihenfolge der Spalte: quer Gegner, Hinweise, Zuege, Ergebnis, ich, Knoepfe; hoch Gegner, Brett, ich, Hinweise,
-   Ergebnis, Knoepfe, Zuege (die Ordnungszahlen der Partie-Teile stehen in css/partie.css) */
+/* Reihenfolge der Spalte: quer Gegner, Hinweise, Zugliste, Ergebnis, ich, Knoepfe; hoch Gegner, Brett, ich, Hinweise,
+   Ergebnis, Zugstreifen und Knoepfe (die Ordnungszahlen der Partie-Teile stehen in css/partie.css). R7 (B12): die Zuege
+   sind die Zugliste und der Zugstreifen der Bot-Partie (.zugbox quer fuellt die Spalte, .zugleiste hoch). */
 @media (orientation: landscape) {
   .online-partie .on-hinweise { order: 2; }
-  /* fuellt die Spalte wie die Zugliste der Bot-Partie, auch leer: die eigene Leiste und die Knoepfe stehen unten */
-  .online-partie .on-zuege, .online-partie .on-zuege:empty { display: block; order: 3; flex: 1 1 0; min-height: 0; text-align: left; }
   .online-partie .on-ergebnis { order: 3; }
 }
+/* Hoch steht der Zugstreifen nach den Knoepfen (wie .streifen-unten in der Bot-Partie): das Brett bleibt so gross wie
+   bisher (layout() misst bis zu den Knoepfen), die Pfeile zum Blaettern stehen links und rechts in der Knopfreihe
+   (.sk-pfeil). Ohne Knoepfe (nach dem Ende) bekommt der Streifen seine eigenen Pfeile zurueck. */
 @media (orientation: portrait) {
   .online-partie .on-hinweise, .online-partie .on-ergebnis { order: 3; }
   .online-partie .spielknoepfe { order: 4; }
-  .online-partie .on-zuege { order: 6; max-height: 4.2em; }
+  .online-partie .zugleiste { order: 6; }
+  .online-partie .spielknoepfe > .knopf.sk-pfeil { display: flex; }
+  .online-partie .spielknoepfe { grid-template-columns: var(--tap) repeat(2, minmax(0, 1fr)) var(--tap); }
+  .online-partie .zugleiste .zl-pfeil { display: none; }
+  .online-partie .seite:has(> .spielknoepfe:empty) .zugleiste .zl-pfeil { display: grid; }
+}
+/* Handy: Knoepfe und Streifen sitzen unten am Daumen, die freie Hoehe liegt darueber (wie .streifen-unten der Bot-Partie,
+   Flo 05.11.2026); ohne das stand der Streifen wegen margin-top: auto aus css/partie.css allein am unteren Rand */
+@media (orientation: portrait) and (max-width: 600px) {
+  .online-partie.partie .zugleiste { margin-top: 0; }
+  .online-partie.partie .spielknoepfe { margin-top: auto; }
 }
 /* R7 (Gleichheits-Liste R6, B2): Ergebnisblatt wie die Bot-Partie (.ergebnis-overlay aus css/ergebnis.css). Hier nur die
    Kronen-Zeile gewerteter Partien und ein einzelner Hauptknopf (ohne Analyse) ueber die ganze Breite. */
