@@ -1,6 +1,7 @@
 // Feinschliff R6 (12.11.2026), Start- und Bots-Befunde: B18 Serien-Chip in der Einzahl ("1 Tag"), B20 Bot-Spruch in der
 // kompakten Bots-Karte ohne angeschnittene Zeile, B22 Start quer ohne toten Bereich unter der Gegner-Karte ("Deine
 // Leiter" steht dort), B26 Start und Online-Seite nennen die Online-Partie gleich (Blitz 5 + 3 aus RANKED_ZEIT).
+// R8 (13.11.2026): kein Bot-Name bricht auf der Buehne mitten im Wort, auf keinem Geraet.
 //   node tests/start-befunde.test.mjs
 //   PORT=8952 node tests/start-befunde.test.mjs
 import http from 'node:http';
@@ -17,7 +18,8 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
   try { pw = require(p); break; } catch (e) { /* naechster */ }
 }
 if (!pw) throw new Error('Playwright fehlt (PLAYWRIGHT_PFAD setzen)');
-const root = fileURLToPath(new URL('../', import.meta.url));
+// WURZEL=<anderer Arbeitsbaum> prueft dessen Stand (Gegenprobe: rot vor dem Fix)
+const root = process.env.WURZEL ? path.resolve(process.env.WURZEL) + path.sep : fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.json': 'application/json' };
 const server = http.createServer((req, res) => {
   const p = path.resolve(root, '.' + new URL(req.url, 'http://test').pathname.replace(/\/$/, '/index.html'));
@@ -173,6 +175,49 @@ try {
     pruefe(`B22 ${w}x${h}: linke Spalte endet nicht weit vor der rechten (hoechstens 96 px)`, m.links >= m.rechts - 96, m);
     pruefe(`B22 ${w}x${h}: nichts scrollt`, m.ueber <= 0, m);
     pruefe(`B22 ${w}x${h}: keine Seitenfehler`, fehler.length === 0, fehler);
+    await k.close();
+  }
+
+  // ---------- R8: Name des Gegners auf der Buehne bricht nie mitten im Wort ("Vogelscheu|che Willi" auf 1024 x 768) ----------
+  // alle Bot-Namen nacheinander in die Buehne gesetzt; je Wort darf es nur eine Zeile geben, nichts laeuft ueber
+  for (const [w, h] of [[1024, 768], [1180, 820], [1280, 720], [1440, 900], [820, 1180], [768, 1024], [390, 844], [375, 667], [320, 568]]) {
+    const { k, s, fehler } = await seite(browser, { w, h, speicher: gesehen });
+    const m = await s.evaluate(async () => {
+      const { BOTS } = await import('/js/bots.js');
+      const g = document.querySelector('.heim-buehne .heim-gegner');
+      if (!g) return null;
+      const kaputt = [];
+      for (const b of BOTS) {
+        g.textContent = b.name;
+        let i = 0;
+        for (const wort of b.name.split(' ')) {
+          const rg = document.createRange(); rg.setStart(g.firstChild, i); rg.setEnd(g.firstChild, i + wort.length); i += wort.length + 1;
+          if (new Set([...rg.getClientRects()].map((r) => Math.round(r.top))).size > 1) kaputt.push(b.name + ': ' + wort);
+        }
+        if (g.scrollWidth > g.clientWidth + 1) kaputt.push(b.name + ' (laeuft ueber)');
+      }
+      return { n: BOTS.length, kaputt, schrift: getComputedStyle(g).fontSize, spalte: g.clientWidth };
+    });
+    pruefe(`R8 ${w}x${h}: kein Bot-Name bricht mitten im Wort`, m && m.n >= 30 && m.kaputt.length === 0, m);
+    // L8: dasselbe fuer die Namen in "Deine Leiter" (dort, wo sie zu sehen ist): nichts gekuerzt, kein Wort zerrissen
+    const l = await s.evaluate(async () => {
+      const { BOTS } = await import('/js/bots.js');
+      const namen = [...document.querySelectorAll('.heim-leiter-bot b')].filter((b) => b.getBoundingClientRect().width > 0);
+      if (!namen.length) return { sichtbar: false };
+      const kaputt = [];
+      for (const b of BOTS) for (const el of namen) {
+        el.textContent = b.name;
+        let i = 0;
+        for (const wort of b.name.split(' ')) {
+          const rg = document.createRange(); rg.setStart(el.firstChild, i); rg.setEnd(el.firstChild, i + wort.length); i += wort.length + 1;
+          if (new Set([...rg.getClientRects()].map((r) => Math.round(r.top))).size > 1) kaputt.push(b.name + ': ' + wort);
+        }
+        if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) kaputt.push(b.name + ' (gekuerzt, ' + Math.round(el.clientWidth) + ' px)');
+      }
+      return { sichtbar: true, kaputt: [...new Set(kaputt)] };
+    });
+    if (l.sichtbar) pruefe(`L8 ${w}x${h}: kein Name in "Deine Leiter" gekuerzt oder mitten im Wort getrennt`, l.kaputt.length === 0, l);
+    pruefe(`R8 ${w}x${h}: keine Seitenfehler`, fehler.length === 0, fehler);
     await k.close();
   }
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
