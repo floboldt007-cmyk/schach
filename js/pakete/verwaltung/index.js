@@ -34,7 +34,8 @@ export function kontoZeile(k) {
 
 export function kontoAnsicht(k, d) {
   const abo = d?.abo;
-  const stripe = abo && abo.quelle === 'stripe' && d.premium;
+  // dieselbe Regel wie der Server (verwaltung_stripe_gebunden): auch in der Mahnphase keine Premium-Knoepfe
+  const stripe = !!abo?.stripe_gebunden;
   const premium = d?.premium ? V('premiumBis', { d: tag(abo?.gueltig_bis) }) : V('k.premiumAus');
   const verdient = new Map((d?.banner || []).map((b) => [b.banner, b.quelle]));
   const ed = d?.editionen || [];

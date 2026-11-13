@@ -130,7 +130,11 @@ if (ansicht) {
   const zeile = ansicht.kontoZeile(boese);
   pruefe('Kontozeile maskiert Fremdtext', !zeile.includes('<img') && zeile.includes('&lt;img') && !zeile.includes('<b>x'), zeile);
   pruefe('Kontozeile: nie angemeldet', zeile.includes(DE.nie));
-  const stripe = ansicht.kontoAnsicht(boese, { premium: true, abo: { quelle: 'stripe', gueltig_bis: '2027-01-01T00:00:00Z' },
+  const mahn = ansicht.kontoAnsicht(boese, { premium: false, abo: { quelle: 'stripe', status: 'abgelaufen', stripe_gebunden: true },
+    editionen: [], sonderstuecke: [], banner: [] });
+  pruefe('Stripe in der Mahnphase (kein Premium): trotzdem keine Premium-Knoepfe', !mahn.includes('data-vw="premium"')
+    && mahn.includes(DE['k.stripe']), mahn);
+  const stripe = ansicht.kontoAnsicht(boese, { premium: true, abo: { quelle: 'stripe', gueltig_bis: '2027-01-01T00:00:00Z', stripe_gebunden: true },
     editionen: [{ name: '<i>Ed</i>', nummer: 3, status: 'aktiv', erworben_am: '2026-11-02T00:00:00Z' }], sonderstuecke: [], banner: [] });
   pruefe('Stripe-Abo: keine Premium-Knoepfe, Hinweis', !stripe.includes('data-vw="premium"') && !stripe.includes('premium-weg')
     && stripe.includes(DE['k.stripe']), stripe);

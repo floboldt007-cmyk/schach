@@ -528,8 +528,9 @@ schief, klappt die Anmeldung trotzdem (nur ohne Nummer).
 
 In der App unter Einstellungen erscheint dann die Gruppe „Verwaltung“, aber nur für dein Konto: Konten mit E-Mail und
 letzter Anmeldung ansehen, Premium freischalten oder zurücknehmen, Käufe ansehen, Benutzername ändern, Banner vergeben
-oder wegnehmen. Jede Änderung steht im Protokoll. Ein laufendes Stripe-Abo kann die Verwaltung nicht ändern, das geht
-nur in Stripe. Taler, Kronen, Liga und Sonderstücke bleiben unberührt.
+oder wegnehmen. Jede Änderung steht im Protokoll; wird ein Konto gelöscht, gehen seine Protokollzeilen mit. Ein
+Stripe-Abo, das nicht endgültig beendet ist (auch in der Mahnphase, wenn eine Zahlung offen ist), kann die Verwaltung
+nicht ändern, das geht nur in Stripe. Taler, Kronen, Liga und Sonderstücke bleiben unberührt.
 
 1. Vorher müssen `schema.sql`, `abo-schema.sql`, `werkstatt-schema.sql`, `pionier-schema.sql` und `karte-schema.sql`
    eingespielt sein.

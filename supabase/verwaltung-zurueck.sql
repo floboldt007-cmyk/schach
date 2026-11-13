@@ -14,6 +14,7 @@ drop function if exists public.verwaltung_premium(uuid, timestamptz);
 drop function if exists public.verwaltung_kaeufe(uuid);
 drop function if exists public.verwaltung_konten(text, integer);
 drop function if exists public.verwaltung_banner_gueltig(text);
+drop function if exists public.verwaltung_stripe_gebunden(uuid);
 drop function if exists public.verwaltung_pruefen(uuid);
 drop function if exists public.ist_verwalter();
 

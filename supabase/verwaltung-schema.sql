@@ -29,13 +29,19 @@ create table if not exists public.verwaltung_protokoll (
   id bigint generated always as identity primary key,
   wer uuid references auth.users (id) on delete set null,
   was text not null,
-  ziel_user uuid references auth.users (id) on delete set null,
+  -- geht mit dem Konto (Kaskade, auch ueber konto_loeschen): ein geloeschtes Konto hinterlaesst kein Protokoll
+  ziel_user uuid references auth.users (id) on delete cascade,
   vorher jsonb,
   nachher jsonb,
   am timestamptz not null default now(),
   constraint verwaltung_protokoll_was check (was in ('premium', 'name', 'banner'))
 );
 create index if not exists verwaltung_protokoll_am on public.verwaltung_protokoll (am desc);
+create index if not exists verwaltung_protokoll_ziel on public.verwaltung_protokoll (ziel_user);
+-- Wiederholbar: wer die Datei schon mit "on delete set null" eingespielt hat, bekommt hier die Kaskade
+alter table public.verwaltung_protokoll drop constraint if exists verwaltung_protokoll_ziel_user_fkey;
+alter table public.verwaltung_protokoll add constraint verwaltung_protokoll_ziel_user_fkey
+  foreign key (ziel_user) references auth.users (id) on delete cascade;
 alter table public.verwaltung_protokoll enable row level security;
 revoke all on table public.verwaltung_protokoll from public, anon, authenticated;
 
@@ -72,6 +78,24 @@ begin
     raise exception 'VERWALTUNG_KEIN_KONTO';
   end if;
 end;
+$$;
+
+-- Haengt das Konto an Stripe? Ja, solange es ein Stripe-Abo gibt, das nicht endgueltig beendet ist. Der Webhook legt
+-- past_due, unpaid, incomplete und paused als 'abgelaufen' ab (supabase/functions/_gemeinsam/stripe.js), genau wie ein
+-- beendetes Abo; der Status allein trennt beides also nicht. Endgueltig beendet ist ein Abo erst mit dem Ereignis
+-- customer.subscription.deleted fuer genau diese abo_id. Ohne Abo-Kennung, aber mit Quelle stripe: angebunden.
+create or replace function public.verwaltung_stripe_gebunden(ziel uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((
+    select (a.quelle = 'stripe' or a.abo_id is not null)
+      and not (a.abo_id is not null and a.status = 'abgelaufen' and exists (
+        select 1 from public.stripe_ereignisse e where e.abo_id = a.abo_id and e.typ = 'customer.subscription.deleted'))
+    from public.abos a where a.user_id = ziel), false);
 $$;
 
 -- Gueltige Banner: Start-Banner, Liga-Banner und die Banner der Erfolgs-Familien (alles aus karte_konstanten())
@@ -140,7 +164,7 @@ begin
     'premium', public.ist_premium_von(ziel),
     -- ohne Stripe-Kennungen, nur ob es einen Stripe-Kunden gibt
     'abo', (select jsonb_build_object('status', a.status, 'plan', a.plan, 'gueltig_bis', a.gueltig_bis, 'quelle', a.quelle,
-        'stripe_kunde', a.kunde_id is not null, 'erstellt_am', a.erstellt_am, 'aktualisiert_am', a.aktualisiert_am)
+        'stripe_kunde', a.kunde_id is not null, 'stripe_gebunden', public.verwaltung_stripe_gebunden(ziel), 'erstellt_am', a.erstellt_am, 'aktualisiert_am', a.aktualisiert_am)
       from public.abos a where a.user_id = ziel),
     'editionen', coalesce((select jsonb_agg(jsonb_build_object('produkt_id', b.produkt_id, 'name', e.name, 'nummer', b.nummer,
         'status', b.status, 'erworben_am', b.erworben_am) order by b.erworben_am, b.produkt_id)
@@ -173,8 +197,9 @@ begin
     raise exception 'VERWALTUNG_DATUM';
   end if;
   select * into a from public.abos x where x.user_id = ziel for update;
-  -- Ein laufendes Stripe-Abo gehoert Stripe: weder verlaengern noch wegnehmen (sonst stimmt die Abrechnung nicht)
-  if found and a.quelle = 'stripe' and a.status in ('aktiv', 'gekuendigt') and a.gueltig_bis > now() then
+  -- Ein Stripe-Abo gehoert Stripe, auch in der Mahnphase: weder verlaengern noch wegnehmen. Sonst ueberschriebe das
+  -- naechste Stripe-Ereignis die Freischaltung still, oder sie haengte danach an einem Stripe-Abo.
+  if found and public.verwaltung_stripe_gebunden(ziel) then
     raise exception 'VERWALTUNG_STRIPE_ABO';
   end if;
   vorher := case when found then jsonb_build_object('status', a.status, 'gueltig_bis', a.gueltig_bis, 'quelle', a.quelle) end;
@@ -296,6 +321,7 @@ $$;
 revoke all on function public.ist_verwalter() from public, anon, authenticated;
 revoke all on function public.verwaltung_pruefen(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.verwaltung_banner_gueltig(text) from public, anon, authenticated, service_role;
+revoke all on function public.verwaltung_stripe_gebunden(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.verwaltung_konten(text, integer) from public, anon, authenticated;
 revoke all on function public.verwaltung_kaeufe(uuid) from public, anon, authenticated;
 revoke all on function public.verwaltung_premium(uuid, timestamptz) from public, anon, authenticated;

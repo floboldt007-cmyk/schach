@@ -149,6 +149,14 @@ reset role;
   const r = await db.query(`select has_function_privilege('anon', 'public.meine_daten()', 'execute') as anon,
     has_function_privilege('authenticated', 'public.meine_daten()', 'execute') as auth`);
   pruefe('nach dem Rueckweg: Rechte wie vorher', r.rows[0].anon === false && r.rows[0].auth === true, JSON.stringify(r.rows[0]));
+  // Die Loeschung haengt an der Kaskade in verwaltung-schema.sql, nicht an meine_daten(): auch nach diesem Rueckweg
+  const vorB = (await db.query(`select count(*)::int as n from public.verwaltung_protokoll where ziel_user = '${B}'`)).rows[0].n;
+  await db.exec(ALS(B));
+  let fehler = null;
+  try { await db.query('select public.konto_loeschen()'); } catch (e) { fehler = e.message; } finally { await db.exec('reset role;'); }
+  const nachB = (await db.query(`select count(*)::int as n from public.verwaltung_protokoll where ziel_user = '${B}'
+    or nachher ->> 'banner' = 'saison-gold'`)).rows[0].n;
+  pruefe('nach dem Rueckweg: konto_loeschen nimmt das Protokoll ueber B mit', !fehler && vorB === 1 && nachB === 0, `${fehler} ${vorB} -> ${nachB}`);
   const y = await lauf(db, 'daten-schema.sql (erneut)', lies('supabase/daten-schema.sql'));
   pruefe('daten-schema.sql danach wieder einspielbar, Teil wieder da', !y && (await auskunft(db, A))?.verwaltung?.protokoll?.length === 2, y);
   const z = await lauf(db, 'daten-rls-test.sql', lies('supabase/daten-rls-test.sql'));

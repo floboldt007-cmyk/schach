@@ -240,6 +240,60 @@ insert into public.besitz (produkt_id, nummer, user_id, reservierung_id) select 
   pruefe('Protokoll: abgewiesene Versuche schreiben nichts', !arten.includes(undefined) && p.length === 8, p?.length);
 }
 
+// ---------- Stripe-Zustaende (Kaltreview 13.11.: Mahnphase) ----------
+// Der Webhook legt past_due, unpaid, incomplete und paused als 'abgelaufen' ab; beendet ist ein Abo erst mit
+// customer.subscription.deleted fuer seine abo_id. Nur dann darf die Verwaltung Premium setzen.
+{
+  const FAELLE = [
+    { name: 'aktiv, Datum vorbei (Mahnphase vor dem Webhook)', status: 'aktiv', bis: "now() - interval '2 days'", abo: 'sub_Mahn1', erlaubt: false },
+    { name: 'gekuendigt, noch gueltig', status: 'gekuendigt', bis: "now() + interval '5 days'", abo: 'sub_Kuend1', erlaubt: false },
+    { name: 'abgelaufen ohne deleted (past_due, unpaid, incomplete)', status: 'abgelaufen', bis: "now() - interval '1 day'", abo: 'sub_Offen1', erlaubt: false },
+    { name: 'abgelaufen, deleted nur fuer ein anderes Abo', status: 'abgelaufen', bis: "now() - interval '1 day'", abo: 'sub_Neu1', deleted: 'sub_Alt1', erlaubt: false },
+    { name: 'Quelle stripe ohne Abo-Kennung', status: 'abgelaufen', bis: "now() - interval '1 day'", abo: null, erlaubt: false },
+    { name: 'abgelaufen mit deleted (endgueltig beendet)', status: 'abgelaufen', bis: "now() - interval '1 day'", abo: 'sub_Ende1', deleted: 'sub_Ende1', erlaubt: true },
+  ];
+  let i = 0;
+  for (const fall of FAELLE) {
+    i++;
+    const uid = `d${i}000000-0000-4000-8000-00000000000${i}`;
+    const kunde = `cus_Fall${i}`;
+    await db.exec(`
+insert into auth.users (id, email) values ('${uid}', 'fall${i}@x.de');
+insert into public.abos (user_id, status, gueltig_bis, quelle, kunde_id, abo_id)
+  values ('${uid}', '${fall.status}', ${fall.bis}, 'stripe', '${kunde}', ${fall.abo ? `'${fall.abo}'` : 'null'});
+${fall.deleted ? `insert into public.stripe_ereignisse (id, typ, erstellt, kunde_id, abo_id, status, gueltig_bis)
+  values ('evt_Fall${i}', 'customer.subscription.deleted', now() - interval '1 day', '${kunde}', '${fall.deleted}', 'abgelaufen', now() - interval '1 day');` : ''}`);
+    const vorher = (await db.query(`select status, gueltig_bis, quelle, abo_id from public.abos where user_id = '${uid}'`)).rows[0];
+    const k = await wert(F, `public.verwaltung_kaeufe('${uid}')`);
+    pruefe(`${fall.name}: Kaeufe melden stripe_gebunden = ${!fall.erlaubt}`, k?.abo?.stripe_gebunden === !fall.erlaubt, JSON.stringify(k?.abo));
+    const an = await wert(F, `public.verwaltung_premium('${uid}', now() + interval '30 days')`);
+    const weg = fall.erlaubt ? null : await wert(F, `public.verwaltung_premium('${uid}', null)`);
+    const nachher = (await db.query(`select status, gueltig_bis, quelle, abo_id from public.abos where user_id = '${uid}'`)).rows[0];
+    if (fall.erlaubt) {
+      pruefe(`${fall.name}: Freischaltung erlaubt`, !an?.fehler && (await premium(uid)) === true && nachher.quelle === 'manuell', JSON.stringify(an));
+    } else {
+      pruefe(`${fall.name}: freischalten und zuruecknehmen abgewiesen, Zeile unberuehrt`,
+        /VERWALTUNG_STRIPE_ABO/.test(an?.fehler || '') && /VERWALTUNG_STRIPE_ABO/.test(weg?.fehler || '')
+        && JSON.stringify(vorher) === JSON.stringify(nachher), JSON.stringify([an, weg, nachher]));
+    }
+  }
+}
+
+// ---------- Protokoll geht mit dem Konto (Kaltreview 13.11.) ----------
+{
+  const fk = (await db.query(`select confdeltype from pg_constraint where conname = 'verwaltung_protokoll_ziel_user_fkey'`)).rows[0];
+  pruefe('Protokoll: Verweis auf das Konto mit Kaskade', fk?.confdeltype === 'c', JSON.stringify(fk));
+  const zahl = async (uid) => (await db.query(`select count(*)::int as n from public.verwaltung_protokoll where ziel_user = '${uid}'`)).rows[0].n;
+  const namen = async (n) => (await db.query(`select count(*)::int as n from public.verwaltung_protokoll
+    where vorher ->> 'benutzername' = '${n}' or nachher ->> 'benutzername' = '${n}'`)).rows[0].n;
+  const vorher = await zahl(A);
+  const r = await als(A, 'select public.konto_loeschen() as x');
+  pruefe('konto_loeschen laeuft fuer A', !r.fehler, JSON.stringify(r));
+  pruefe('konto_loeschen: alle Protokollzeilen ueber A weg, auch die Namen', vorher > 0 && (await zahl(A)) === 0
+    && (await namen('Anna_Neu')) === 0 && (await namen('Anna_1')) === 0, `${vorher} -> ${await zahl(A)}`);
+  pruefe('konto_loeschen: Zeilen ueber andere bleiben', (await zahl(B)) > 0);
+}
+
 // ---------- SQL-Editor-Test und Rueckweg ----------
 {
   const x = await lauf(db, 'verwaltung-rls-test.sql', lies('supabase/verwaltung-rls-test.sql'));
