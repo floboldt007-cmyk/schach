@@ -21,7 +21,7 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
   try { pw = require(p); break; } catch (e) { /* naechster */ }
 }
 if (!pw) throw new Error('Playwright fehlt');
-const PORT = Number(process.env.PORT || 8891);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.json': 'application/json', '.woff2': 'font/woff2' };

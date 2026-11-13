@@ -20,7 +20,7 @@ import { EROEFFNUNGEN, eroeffnung, tabellenFehler, stellungsSchluessel } from '.
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8822);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 
 // ---------------------------------------------------------------------------
 // Mini-Testrahmen

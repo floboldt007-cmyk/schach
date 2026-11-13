@@ -852,10 +852,10 @@ try {
         res.writeHead(200, { 'Content-Type': typen[path.extname(voll)] || 'application/octet-stream' }); res.end(daten);
       } catch (e) { res.writeHead(404).end(); }
     });
-    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(8847, '127.0.0.1', resolve); });
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(Number(process.env.PORT || 0), '127.0.0.1', resolve); });
     browser = await browserTyp(pw).launch();
-    await browserTeil(browser, 'http://127.0.0.1:8847/index.html');
-    await gruppeTeil(browser, 'http://127.0.0.1:8847/index.html');
+    await browserTeil(browser, `http://127.0.0.1:${server.address().port}/index.html`);
+    await gruppeTeil(browser, `http://127.0.0.1:${server.address().port}/index.html`);
   }
 } catch (e) {
   ergebnisse.push({ name: 'Testlauf', ok: false }); console.error('FEHLER Testlauf: ' + e.stack);

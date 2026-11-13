@@ -13,7 +13,7 @@
 //   node tests/ansicht.test.mjs                    alles
 //   node tests/ansicht.test.mjs --nur=arena,ich    nur diese Ziele
 //   BILDER=/pfad node tests/ansicht.test.mjs       dazu je Ziel und Groesse ein Foto (fuer Flo)
-//   PORT=8961 node tests/ansicht.test.mjs          eigener Port (Standard 8961)
+//   PORT=8961 node tests/ansicht.test.mjs          eigener Port (Standard: frei)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn } from 'node:child_process';
@@ -25,7 +25,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8961);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test#arena`;
 const BILDER = process.env.BILDER ? path.join(process.env.BILDER, 'ansicht') : '';
 if (BILDER) mkdirSync(BILDER, { recursive: true });
@@ -106,8 +106,9 @@ function befundeDerSeite() {
     }
   }
   // Brettfelder sind seit dem Brett per Tastatur role="button", Groesse und Lage gibt das Brett vor (WCAG 2.5.8, Ausnahme
-  // "wesentlich"); vorher zaehlten sie hier nicht, darum bleiben sie draussen
-  const knoepfe = alle.filter((el) => el.matches('button, a[href], [role="button"], input:not([type="hidden"]), select, summary, textarea') && !el.closest('.brett-felder') && !versteckt(el));
+  // "wesentlich"); vorher zaehlten sie hier nicht, darum bleiben sie draussen. Knoepfe in [inert] auch: hinter einem
+  // offenen Blatt legt die App den Hintergrund still (js/ui/bauteile.js), dort ist nichts antippbar (R6: 43 px hinter dem Ergebnis)
+  const knoepfe = alle.filter((el) => el.matches('button, a[href], [role="button"], input:not([type="hidden"]), select, summary, textarea') && !el.closest('.brett-felder, [inert]') && !versteckt(el));
   const flaeche = (el) => {
     const r = el.getBoundingClientRect(); let w = r.width, h = r.height;
     for (const ps of ['::before', '::after']) {

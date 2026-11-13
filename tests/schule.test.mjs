@@ -9,7 +9,7 @@
 // Das Paket wird ueber ?test&erw=pakete/schule/index geladen, bis die Integration es in PAKETE eintraegt.
 //   node tests/schule.test.mjs              alles
 //   node tests/schule.test.mjs --nur-node   ohne Browser
-//   PORT=9800 BILDER=<ordner> node tests/schule.test.mjs   eigener Port (Standard 8876), Bildschirmfotos in <ordner>
+//   PORT=9800 BILDER=<ordner> node tests/schule.test.mjs   eigener Port (Standard: frei), Bildschirmfotos in <ordner>
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +30,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8876);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // Das Paket steht noch nicht in PAKETE (das macht die Integration, js/erweiterungen.js): im Test ueber ?erw laden.
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/schule/index`;
 const NUR_NODE = process.argv.includes('--nur-node');
