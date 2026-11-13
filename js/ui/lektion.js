@@ -166,8 +166,6 @@ export function zeige(root, params, app) {
   }
   const blattKnopf = (k) => `<button class="knopf gross${k.primaer ? ' primaer' : ''}" type="button" data-a="${k.a}">`
     + `${k.icon ? icon(k.icon) + ' ' : ''}${esc(k.text)}${k.vor ? ' ' + icon('vor') : ''}</button>`;
-  // art 'sieg' (geschafft, mit Sternen) oder 'niederlage' (gescheitert, ruhig); liste wie bei knoepfe(), "uebersicht" wird
-  // zum Weg unter den Knoepfen (wie "Zu den Bots")
   // Zeile unter den Sternen wie die Zeilen unter den Sternen der Bot-Partie: woraus die Sterne entstehen (Zuege, bei
   // Eroeffnungen auch Fehler, und Hinweise; js/pakete/lernen/mattbilder.js sterne, sterneFolge)
   function zeileText() {
@@ -176,7 +174,9 @@ export function zeige(root, params, app) {
       ...(folge ? [zahl(st.fehler, 'erg.fehlerEins', 'erg.fehler', 'erg.ohneFehler')] : []),
       zahl(st.hinweise, 'erg.hinweisEins', 'erg.hinweise', 'erg.ohneHinweis')].join(' · ');
   }
-  function baueBlatt(art, kopfText, text, liste, sternZahl, zeile = '') {
+  // art 'sieg' (geschafft, mit Sternen) oder 'niederlage' (gescheitert, ruhig); liste wie bei knoepfe(), "uebersicht" wird
+  // zum Weg unter den Knoepfen (wie "Zu den Bots"); zeile steht unter den Sternen
+  function baueBlatt(art, { kopfText, text, liste, sternZahl = 0, zeile = '' }) {
     entferneBlatt();
     const haupt = liste.filter((k) => k.a !== 'uebersicht');
     const wort = esc(kopfText).replace(/!$/, '<span class="ausruf">!</span>');
@@ -463,7 +463,7 @@ export function zeige(root, params, app) {
         : st.zuege === 1 ? S('geschafftEins') : S('geschafftText', { n: st.zuege, ziel: l.ziel });
     meldung('geschafft', kopfText, text, sterneHtml(st.sterne));
     if (tempo() > 0) staffel(meldungEl.querySelectorAll('.ms-sterne > i.an'), { d: 460, v: 120, abstand: 110, von: 'scale(0) rotate(-30deg)', k: 'hupf' });
-    baueBlatt('sieg', kopfText, text, gezeigt ? [
+    baueBlatt('sieg', { kopfText, text, sternZahl: st.sterne, zeile: zeileText(), liste: gezeigt ? [
       { a: 'los', text: S('folge.ohneHilfe'), primaer: true, vor: true },
       { a: 'zeigen', text: S('folge.nochmalZeigen'), icon: 'nochmal' },
       { a: 'uebersicht', text: S('uebersicht') },
@@ -472,7 +472,7 @@ export function zeige(root, params, app) {
       { a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: !naechste },
       ...(folgtImTrainer ? [{ a: 'trainer', text: S('naechsteImTrainer'), icon: 'schloss' }] : []),
       { a: 'uebersicht', text: S('uebersicht') },
-    ], st.sterne, zeileText());
+    ] });
   }
 
   function gescheitert(grund) {
@@ -482,8 +482,8 @@ export function zeige(root, params, app) {
     erlaube();
     spielKlang('raetsel-falsch');
     meldung('fehler', S('fehler.' + grund), S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }), `<span class="ls-symbol">${icon('kreuz')}</span>`);
-    baueBlatt('niederlage', S('fehler.' + grund), S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }),
-      [{ a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: true }, { a: 'uebersicht', text: S('uebersicht') }], 0);
+    baueBlatt('niederlage', { kopfText: S('fehler.' + grund), text: S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }),
+      liste: [{ a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: true }, { a: 'uebersicht', text: S('uebersicht') }] });
   }
 
   // Knoepfe der Spalte und des Ergebnisblatts
