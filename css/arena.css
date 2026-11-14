@@ -542,9 +542,9 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-weg .detail { position: absolute; z-index: 20; left: calc(var(--rand) + 6px); right: calc(var(--rand) + 6px); bottom: 18px;
   max-height: calc(100% - 96px); overflow-y: auto; overflow-x: hidden; gap: 10px; padding: 0 16px; border-radius: 24px;
   background: var(--flaeche); box-shadow: var(--s3), var(--kante); overscroll-behavior: contain; }
-.arena.karte-weg .karte-griff { display: flex; justify-content: center; align-items: center; flex: none; width: calc(100% + 32px); min-height: 26px;
-  margin: 0 -16px -6px; padding: 0; border: 0; background: none; cursor: pointer; }
-.arena.karte-weg .karte-griff span { width: 40px; height: 5px; border-radius: 3px; background: var(--text-3, #9A948A); opacity: .7; }
+.arena.karte-weg .karte-griff { display: flex; justify-content: center; align-items: center; flex: none; order: -1; width: calc(100% + 32px); min-height: 44px;
+  margin: 0 -16px -18px; padding: 0; border: 0; background: none; cursor: pointer; }
+.arena.karte-weg .karte-griff span { width: 40px; height: 5px; border-radius: 3px; background: var(--text-3); opacity: .7; }
 .arena.karte-weg .karte-griff:focus-visible { outline: var(--fokus); outline-offset: -4px; border-radius: 24px 24px 0 0; }
 .arena.karte-weg .detail-kopf { gap: 12px; }
 .arena.karte-weg .detail-kopf .av { width: 52px; height: 52px; border-radius: 16px; }
@@ -560,13 +560,18 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
    Welt darueber zeigt alles auf einen Blick. Der Name des Knopfs bleibt fuer Vorleser da (Text nur optisch verborgen). */
 .arena.karte-leiste .detail { bottom: 14px; }
 .arena.karte-leiste .detail:not(.offen) { flex-flow: row wrap; align-items: center; gap: 0 10px; padding-bottom: 10px; }
-.arena.karte-leiste .detail:not(.offen) .karte-griff { flex-basis: calc(100% + 32px); min-height: 18px; margin-bottom: 0; }
+/* zu: der Griff liegt oben mittig ueber der Leiste (44 px Tippflaeche), die Zeile darunter bleibt bedienbar */
+.arena.karte-leiste .detail:not(.offen) { padding-top: 14px; }
+.arena.karte-leiste .detail:not(.offen) .karte-griff { position: absolute; z-index: 1; top: 0; left: 50%; width: 96px; min-height: 44px; margin: 0 0 0 -48px;
+  align-items: flex-start; padding-top: 6px; }
 .arena.karte-leiste .detail:not(.offen) .detail-kopf { flex: 1 1 0; min-width: 0; gap: 10px; }
 .arena.karte-leiste .detail:not(.offen) .detail-kopf .av { width: 48px; height: 48px; border-radius: 14px; }
-.arena.karte-leiste .detail:not(.offen) .detail-ueber { margin-bottom: 1px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.arena.karte-leiste .detail:not(.offen) h2 { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena.karte-leiste .detail:not(.offen) .detail-ueber { margin-bottom: 1px; font-size: 11px; line-height: 1.25; }
+.arena.karte-leiste .detail:not(.offen) h2 { font-size: 17px; line-height: 1.15; }
 .arena.karte-leiste .detail:not(.offen) .elo { margin-top: 1px; font-size: 12px; }
 .arena.karte-leiste .detail:not(.offen) .mini-sterne { display: none; }
+/* die Leiste nennt den naechsten Gegner schon; die Fahne ueber der Station verdeckte in der engen Welt Nachbar-Schilder */
+.arena.karte-leiste .knoten .fahne { display: none; }
 .arena.karte-leiste .detail:not(.offen) .fortsetzen { flex-basis: 100%; margin-bottom: 8px; }
 .arena.karte-leiste .detail:not(.offen) .cta-platz { flex: none; margin: 0; padding: 0; background: none; }
 .arena.karte-leiste .detail:not(.offen) .spielen { width: 56px; min-height: 56px; padding: 0; justify-content: center; border-radius: 18px; }

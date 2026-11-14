@@ -551,6 +551,9 @@ export function zeige(root, params, app) {
     s.classList.toggle('karte-hoch', !quer);
     s.classList.toggle('karte-kompakt', kompakt);
     s.classList.toggle('karte-weg', wegModus);
+    // die Klassen aendern die Groesse der Karte (Weg: volle Hoehe statt Platz fuer das Panel); danach neu messen, sonst rechnet
+    // die Welt mit der alten Hoehe und der ResizeObserver sieht keine Aenderung mehr
+    const khNeu = karte.clientHeight || kh;
     const lage = LAGEN[lageModus];
     const w = kw;
     weltEl.dataset.welt = welt.id;
@@ -559,7 +562,7 @@ export function zeige(root, params, app) {
     // schmale Karten (Handy quer: Karte neben dem Panel) mindestens WELT_MIN_H hoch, sonst rueckten die Stationen so eng
     // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen. Der Weg (R19 A) ist hoeher, damit
     // jede Station ihren eigenen Platz hat
-    const h = quer || kompakt || wegModus ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
+    const h = quer || kompakt || wegModus ? khNeu : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
     // kompakt: kleinere Stationen, damit die ganze Welt in die Karte passt; mit der Leiste (R19 B) nach der freien Hoehe
     const sk = kompakt ? Math.max(0.56, Math.min(0.78, Math.min(w, h * 1.25) / 560))
       : wegModus ? Math.max(0.66, Math.min(0.9, Math.min(w, (h - WEG_KARTE_ZU) * 1.1) / 430))
@@ -630,7 +633,7 @@ export function zeige(root, params, app) {
     const k = karte.getBoundingClientRect();
     // Weg (R19 A): was unter der zugeklappten Gegner-Karte liegt, ist nicht im Bild
     const unten = k.bottom - (s.classList.contains('karte-weg') ? WEG_KARTE_ZU + 18 : 0);
-    const teile = [el, el.querySelector('.k-schild'), el.querySelector('.fahne')].filter(Boolean).map((t) => t.getBoundingClientRect());
+    const teile = [el, el.querySelector('.k-schild'), el.querySelector('.fahne')].filter(Boolean).map((t) => t.getBoundingClientRect()).filter((r) => r.width || r.height);
     return teile.every((n) => n.top >= k.top - 1 && n.bottom <= unten + 1);
   }
 
@@ -695,8 +698,8 @@ export function zeige(root, params, app) {
       // Spruch, Stern-Ziele, Farbe, Spielen). Liga-Karte (Ort arena:panel-oben), Heute-Karte (arena:heute, jetzt auf der
       // Startseite), Bot-Zeilen (arena:panel-bot), Merkmale und Bilanz entfallen; oben bleibt nur die Nachlese.
       detail.innerHTML = `
-      <button class="karte-griff" type="button" aria-expanded="false" aria-label="${esc(t('arena.karte.auf'))}"><span aria-hidden="true"></span></button>
       <div class="ort-panel-oben" hidden></div>
+      <button class="karte-griff" type="button" aria-expanded="false" aria-label="${esc(t('arena.karte.auf'))}"><span aria-hidden="true"></span></button>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${botFarbe(laufBot)}">
         <span class="avatar"><img src="${esc(avatarVon(laufBot))}" alt=""></span>
