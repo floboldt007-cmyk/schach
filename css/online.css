@@ -17,7 +17,7 @@
 .on-tuer-kopf { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: center; }
 .on-tuer-kopf[hidden] { display: none; }
 .on-tuer-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.on-tuer-ueber { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--akzent-text, var(--akzent)); }
+.on-tuer-ueber { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--akzent-text, var(--akzent)); }
 .on-tuer h2 { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; text-wrap: balance; }
 .on-tuer-text p { margin: 0; font-size: 13.5px; line-height: 1.35; color: var(--text-2); }
 /* Knopf am Kartenfuss (R6 B21): nebeneinander sind beide Karten gleich hoch (Grid), so stehen "Partie suchen" und
@@ -216,6 +216,9 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .on-inhalt > .on-liga { grid-row: 3; }
   .on-inhalt > .on-tueren { grid-row: 4; }
   .on-inhalt > .on-freunde { grid-row: 6; margin-bottom: 0; }
+  /* abgemeldet steht der Konto-Hinweis an der Stelle der Freunde-Zeile (die gibt es dann nicht); ohne Zeile rutschte er in die
+     freie 1fr-Zeile 2 ueber die Tueren und wurde gestreckt (R18-Kritik E1, tests/r19-online.test.mjs) */
+  .on-inhalt > .on-konto { grid-row: 6; margin-bottom: 0; }
 }
 @media (orientation: portrait) and (min-height: 740px) and (max-width: 759px) {
   .on-inhalt > .on-tueren { grid-template-rows: auto minmax(0, 36px) auto; }   /* + zweimal 12 px Rasterluecke = 60 px */

@@ -3,9 +3,10 @@
 // konto_loeschen. Netzwerk nur simuliert: Anfragen an *.supabase.co beantwortet der Test, alles ausser 127.0.0.1 wird
 // abgebrochen. Nie gegen die echte Supabase.
 //   PORT=9621 node tests/konto-loeschen.test.mjs   eigener Port (Standard: frei)
+//   BILDER=<ordner> node tests/konto-loeschen.test.mjs   dazu an jeder Haupthandlung ein Bild (wie die Funktionsprobe)
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
@@ -33,6 +34,14 @@ const TOKEN = 'a.' + Buffer.from(JSON.stringify({ sub: 'u1', email: 'flo@example
 const SITZUNG = { access_token: TOKEN, refresh_token: 'r1', expires_in: 3600, expires_at: 9999999999, user: { id: 'u1', email: 'flo@example.invalid' } };
 
 let ok = 0, gesamt = 0;
+const BILDER = process.env.BILDER || null;
+if (BILDER) mkdirSync(BILDER, { recursive: true });
+const bilderListe = [];
+async function bild(s, name) {
+  if (!BILDER) return;
+  const datei = path.join(BILDER, `konto-loeschen-${name}.png`);
+  await s.screenshot({ path: datei, fullPage: true }); bilderListe.push(datei);
+}
 // INTENTIONAL-SLOP[T4]: die Konsole ist der Ausgabeweg dieser Probe (tests/alle.mjs liest sie)
 function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`${gut ? 'OK' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`); }
 const browser = await browserTyp(pw).launch({ headless: true });
@@ -91,18 +100,22 @@ try {
     const { k, z } = await umgebung();
     const s = await seite(k, z, DE);
     pruefe('de: Seite laedt, Titel „Konto löschen“, lang de', /Konto löschen/.test(await s.locator('h1').textContent()) && (await s.evaluate(() => document.documentElement.lang)) === 'de');
-    pruefe('de: Mail-Weg an kontakt@anfrageprofi.de mit Betreff', /^mailto:kontakt@anfrageprofi\.de\?subject=/.test(await s.locator('a.kl-mail').getAttribute('href') || ''));
+    pruefe('de: Mail-Weg an kontakt@crownmate.de mit Betreff', /^mailto:kontakt@crownmate\.de\?subject=/.test(await s.locator('a.kl-mail').getAttribute('href') || ''));
     pruefe('ohne Anmeldung: kein Loeschknopf sichtbar', !(await sichtbar(s, '[data-kl="weiter"]')) && !(await sichtbar(s, '[data-kl="loeschen"]')));
+    await bild(s, '1-start');
     await codeAnmelden(s);
     pruefe('Code-Anmeldung: „angemeldet als“ mit der E-Mail', (await sichtbar(s, '.kl-angemeldet')) && /flo@example\.invalid/.test(await s.locator('.kl-wer').textContent()));
+    await bild(s, '1-angemeldet');
     await s.locator('[data-kl="weiter"]').click(); await s.waitForTimeout(200);
     pruefe('Schritt 2: Loeschknopf gesperrt, bis das Wort getippt ist', await s.locator('[data-kl="loeschen"]').isDisabled());
     await s.locator('.kl-bestaetigen').fill('loeschen');
     pruefe('Falsches Wort (ohne ö): Knopf bleibt gesperrt', await s.locator('[data-kl="loeschen"]').isDisabled());
+    await bild(s, '1-schritt2');
     await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
     await s.locator('[data-kl="loeschen"]').click(); await s.waitForTimeout(600);
     pruefe('Loeschen: konto_loeschen genau einmal', z.aufrufe.loeschen === 1, z.aufrufe);
     pruefe('Loeschen: danach abgemeldet und Bestaetigung sichtbar', !(await sitzungDa(s)) && (await sichtbar(s, '.kl-fertig')) && !(await sichtbar(s, '.kl-angemeldet')));
+    await bild(s, '1-geloescht');
     pruefe('de: keine Seitenfehler', z.fehler.length === 0, z.fehler);
     await k.close();
   }
@@ -113,6 +126,7 @@ try {
     await s.locator('[data-kl="weiter"]').click(); await s.waitForTimeout(200);
     await s.locator('[data-kl="abbrechen"]').click(); await s.waitForTimeout(200);
     pruefe('Abbrechen: nichts geloescht, Sitzung bleibt, Schritt 2 zu', z.aufrufe.loeschen === 0 && (await sitzungDa(s)) && !(await sichtbar(s, '[data-kl="loeschen"]')));
+    await bild(s, '2-abgebrochen');
     await k.close();
   }
   { // 3. Fehler: Server lehnt das Loeschen ab -> klarer Text, Sitzung bleibt
@@ -123,6 +137,7 @@ try {
     const st = await status(s);
     pruefe('rpc 500: Fehler als Text, keine Bestaetigung, Sitzung bleibt, kein Server-Text',
       st.fehler === 'ja' && st.text.length > 5 && !/boom/.test(st.text) && !(await sichtbar(s, '.kl-fertig')) && (await sitzungDa(s)), st);
+    await bild(s, '3-serverfehler');
     await k.close();
   }
   { // 4. Fehler bei der Code-Anforderung: nichts angemeldet, nichts geloescht
@@ -141,6 +156,7 @@ try {
     await codeAnmelden(s);
     const st = await status(s);
     pruefe('Falscher Code: Fehler als Text, nicht angemeldet', st.fehler === 'ja' && !(await sitzungDa(s)) && !(await sichtbar(s, '.kl-angemeldet')), st);
+    await bild(s, '4-falscher-code');
     await k.close();
   }
   { // 5. Google: Knopf schickt mit Rueckkehr auf diese Seite; Rueckkehr meldet an und raeumt die Adresse auf
@@ -152,12 +168,14 @@ try {
     const s2 = await seite(k, z, `${DE}#konto#access_token=${TOKEN}&expires_at=9999999999&expires_in=3600&refresh_token=r1&token_type=bearer`);
     pruefe('Google-Rueckkehr: angemeldet, Adresse ohne Token', (await sichtbar(s2, '.kl-angemeldet'))
       && !(await s2.evaluate(() => location.href)).includes('access_token') && z.aufrufe.loeschen === 0);
+    await bild(s2, '5-google-rueckkehr');
     await k.close();
     const neu = await umgebung();   // ohne die Sitzung von eben
     const s3 = await seite(neu.k, neu.z, `${DE}#error=access_denied&error_code=signup_disabled&error_description=x`);
     const st = await status(s3);
     pruefe('Google-Rueckkehr mit Fehler: Fehler als Text, Adresse ohne #error, Anmeldung sichtbar', st.fehler === 'ja'
       && !(await s3.evaluate(() => location.href)).includes('error') && (await sichtbar(s3, '.kl-anmelden')), st);
+    await bild(s3, '5-google-fehler');
     await neu.k.close();
   }
   { // 6. Englisch, Breiten, Abo-Hinweis
@@ -167,6 +185,7 @@ try {
     await s.locator('.kl-email').fill('kein-mail'); await s.locator('[data-kl="code"]').click(); await s.waitForTimeout(200);
     const st = await status(s);
     pruefe('en: Fehlertext englisch', st.fehler === 'ja' && /email/i.test(st.text) && !/E-Mail-Adresse/.test(st.text), st);
+    await bild(s, '6-en-fehler');
     await s.locator('[data-kl="google"]').waitFor();
     pruefe('en: keine Seitenfehler', z.fehler.length === 0, z.fehler);
     await k.close();
@@ -177,6 +196,7 @@ try {
         await p.locator('[data-kl="weiter"]').click();
         const breit = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         pruefe(`${breite}px ${adresse.includes('-en') ? 'en' : 'de'}: kein seitlicher Ueberlauf`, breit <= 0, breit);
+        await bild(p, `6-schritt2-${breite}-${adresse.includes('-en') ? 'en' : 'de'}`);
         await u.k.close();
       }
     }
@@ -193,6 +213,7 @@ try {
     await s.waitForTimeout(1800);
     pruefe('Tippen waehrend der Loeschung + zweiter Klick: konto_loeschen genau einmal', z.aufrufe.loeschen === 1, z.aufrufe);
     pruefe('Tippen waehrend der Loeschung: danach Bestaetigung sichtbar', await sichtbar(s, '.kl-fertig'));
+    await bild(s, '7-tippen-waehrend-loeschung');
     await k.close();
   }
   { // 8. Abgelaufene Sitzung, Refresh tot: schon beim Laden Meldung und Anmeldung, nichts geloescht
@@ -204,7 +225,20 @@ try {
     pruefe('Sitzung abgelaufen, Refresh tot: beim Laden Fehlertext, Anmeldung sichtbar, „angemeldet als“ und Loeschknopf weg',
       st.fehler === 'ja' && st.text.length > 5 && (await sichtbar(s, '.kl-anmelden')) && !(await sichtbar(s, '.kl-angemeldet'))
       && !(await sichtbar(s, '[data-kl="weiter"]')) && !(await sitzungDa(s)) && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
+    await bild(s, '8-sitzung-abgelaufen');
     await k.close();
+  }
+  { // 8c. R17: wie 8, Refresh tot im alten Format (error invalid_grant): beim Laden Text "abgelaufen" (de) / "expired" (en)
+    for (const [name, adresse, wort] of [['de', DE, /abgelaufen/i], ['en', EN, /expired/i]]) {
+      const { k, z } = await umgebung({ token: { status: 400, body: { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' } },
+        lokal: { 'schach-arena:konto:sitzung': JSON.stringify({ ...SITZUNG, expires_at: 1 }) } });
+      const s = await seite(k, z, adresse);
+      const st = await status(s);
+      pruefe(`${name}: Sitzung abgelaufen, Refresh tot (invalid_grant): beim Laden Text abgelaufen, Anmeldung sichtbar, nichts geloescht`,
+        st.fehler === 'ja' && wort.test(st.text) && (await sichtbar(s, '.kl-anmelden')) && !(await sichtbar(s, '.kl-angemeldet'))
+        && !(await sitzungDa(s)) && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
+      await k.close();
+    }
   }
   { // 8b. Gegenprobe: abgelaufene Sitzung, Refresh klappt -> beim Laden erneuert, angemeldet, keine Meldung
     const { k, z } = await umgebung({ lokal: { 'schach-arena:konto:sitzung': JSON.stringify({ ...SITZUNG, expires_at: 1 }) } });
@@ -212,6 +246,7 @@ try {
     const st = await status(s);
     pruefe('Sitzung abgelaufen, Refresh klappt: beim Laden erneuert, angemeldet, keine Meldung',
       (await sichtbar(s, '.kl-angemeldet')) && !(await sichtbar(s, '.kl-anmelden')) && st.text === '' && z.aufrufe.token === 1, { st, aufrufe: z.aufrufe });
+    await bild(s, '8b-refresh-klappt');
     await k.close();
   }
   { // 9. Abo-Hinweis: bekanntes laufendes Stripe-Abo steht vor Schritt 2, ohne Abo kein Hinweis
@@ -223,6 +258,7 @@ try {
       const t = (await s.locator('.kl-abo').textContent()) || '';
       pruefe(`${name}: laufendes Stripe-Abo, Hinweis vor Schritt 2 sichtbar`, (await sichtbar(s, '.kl-abo')) && muster.test(t)
         && (name === 'de' ? /kündig/i.test(t) : /cancel/i.test(t)), t);
+      await bild(s, `9-abo-hinweis-${name}`);
       await k.close();
     }
     const { k, z } = await umgebung({ lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
@@ -241,6 +277,8 @@ try {
     const ten = await en.locator('main').textContent();
     pruefe('en: „What stays“ nennt Stripe customer number und 90 days', /Stripe customer number/.test(ten) && /90 days/.test(ten));
     pruefe('en: Mitloeschungen aus §5 genannt', ['player card', 'crowns', 'puzzle duel', 'online games', 'school mode', 'age statement'].every((w) => ten.toLowerCase().includes(w)));
+    await bild(de, '10-texte-de');
+    await bild(en, '10-texte-en');
     await k.close();
   }
   { // 11. Waehrend der Loeschung sind Abbrechen, Weiter und Abmelden gesperrt; nach Serverfehler folgt der Knopf dem Feld
@@ -256,6 +294,7 @@ try {
     await s.evaluate(() => { document.querySelector('.kl-bestaetigen').value = ''; });
     await s.waitForTimeout(1800);
     pruefe('Waehrend der Loeschung: Abbrechen, Weiter und Abmelden gesperrt', gesperrt.every(Boolean), gesperrt);
+    await bild(s, '11-nach-serverfehler');
     pruefe('Nach Serverfehler mit leerem Feld: Loeschknopf gesperrt, Schritt 2 offen, Abbrechen wieder frei',
       (await s.locator('[data-kl="loeschen"]').isDisabled()) && (await sichtbar(s, '.kl-schritt2')) && !(await s.locator('[data-kl="abbrechen"]').isDisabled()));
     await s.locator('[data-kl="loeschen"]').click({ timeout: 500 }).catch(() => {});
@@ -269,7 +308,7 @@ try {
     const abgelehnt = { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } };
     // nochmal: zweiter Klick nach dem Fehler (Dauerfeuer-Probe); bleibt die Seite angemeldet, ist er ein neuer Versuch
     // sitz: die Sitzung im Geraet vor dem Laden (Standard: lokal noch gueltig)
-    const lauf = async (opt, adresse = DE, nochmal = true, sitz = SITZUNG) => {
+    const lauf = async (opt, adresse = DE, nochmal = true, sitz = SITZUNG, name = null) => {
       const { k, z } = await umgebung({ ...opt, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(sitz) } });
       const s = await seite(k, z, adresse);
       const T = await s.evaluate(() => JSON.parse(document.getElementById('kl-texte').textContent));
@@ -281,20 +320,29 @@ try {
       const r = { z, st: await status(s), fertig: await sichtbar(s, '.kl-fertig'), anmelden: await sichtbar(s, '.kl-anmelden'),
         angemeldet: await sichtbar(s, '.kl-angemeldet'), sitzung: await sitzungDa(s), T,
         frei: await sichtbar(s, '[data-kl="loeschen"]') && !(await s.locator('[data-kl="loeschen"]').isDisabled()) };
+      if (name) await bild(s, `12-${name}`);
       await k.close();
       return r;
     };
-    const a = await lauf({ rpc: [abgelehnt, null] });
+    const a = await lauf({ rpc: [abgelehnt, null] }, DE, true, SITZUNG, 'refresh-klappt');
     pruefe('401, Refresh klappt: erneuert, zweiter Versuch loescht, Bestaetigung sichtbar',
       a.fertig && !a.sitzung && a.z.aufrufe.token === 1 && a.z.aufrufe.loeschen === 2, { aufrufe: a.z.aufrufe, st: a.st });
-    const b = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } });
+    const b = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } }, DE, true, SITZUNG, 'refresh-tot');
     pruefe('401, Refresh tot: lokal abgemeldet, Anmeldung sichtbar, Fehlertext, kein weiterer rpc',
       b.anmelden && !b.angemeldet && !b.sitzung && b.st.fehler === 'ja' && b.z.aufrufe.token === 1 && b.z.aufrufe.loeschen === 1, { aufrufe: b.z.aufrufe, st: b.st });
     // Kaltreview loeschseite-2, Hinweis 2: der Text sagt, dass die Anmeldung abgelaufen ist (de und en)
     pruefe('401, Refresh tot: Text "abgelaufen"', /abgelaufen/i.test(b.st.text), b.st);
     const bEn = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } }, EN);
     pruefe('en: 401, Refresh tot: lokal abgemeldet, Text "expired"', !bEn.sitzung && bEn.anmelden && /expired/i.test(bEn.st.text), bEn.st);
-    const c = await lauf({ rpc: [abgelehnt, abgelehnt] });
+    // R17: totes Refresh-Token im alten Format (error invalid_grant, kein error_code) wie oben, de und en
+    const TOT_ALT = { status: 400, body: { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' } };
+    for (const [name, adresse, wort] of [['de', DE, /abgelaufen/i], ['en', EN, /expired/i]]) {
+      const b2 = await lauf({ rpc: abgelehnt, token: TOT_ALT }, adresse);
+      pruefe(`${name}: 401, Refresh tot (invalid_grant): lokal abgemeldet, Anmeldung sichtbar, Text abgelaufen, kein Server-Text, kein weiterer rpc`,
+        b2.anmelden && !b2.angemeldet && !b2.sitzung && b2.st.fehler === 'ja' && wort.test(b2.st.text) && !/invalid|Refresh Token|Serverfehler|Server error/i.test(b2.st.text)
+        && b2.z.aufrufe.token === 1 && b2.z.aufrufe.loeschen === 1, { aufrufe: b2.z.aufrufe, st: b2.st });
+    }
+    const c = await lauf({ rpc: [abgelehnt, abgelehnt] }, DE, true, SITZUNG, 'zweimal-abgelehnt');
     pruefe('401, Refresh klappt, wieder 401: lokal abgemeldet, Anmeldung sichtbar, genau zwei rpc',
       c.anmelden && !c.angemeldet && !c.sitzung && c.st.fehler === 'ja' && c.z.aufrufe.token === 1 && c.z.aufrufe.loeschen === 2, { aufrufe: c.z.aufrufe, st: c.st });
     pruefe('401, Refresh klappt, wieder 401: eigener Text (neu anmelden, Mail-Weg), nicht "abgelaufen"',
@@ -338,5 +386,6 @@ try {
   await browser.close(); server.close();
 }
 // INTENTIONAL-SLOP[T4]: Zusammenfassung der Probe, Ausgabeweg wie alle Zeilen hier
+if (BILDER) pruefe(`Bilder abgelegt: ${bilderListe.length}`, bilderListe.length > 0 && bilderListe.every((d) => existsSync(d)), bilderListe.filter((d) => !existsSync(d)));
 console.log(`${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);
