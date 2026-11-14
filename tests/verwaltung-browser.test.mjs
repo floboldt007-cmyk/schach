@@ -252,8 +252,11 @@ async function browserTeil(browser) {
   pruefe('ohne Recht am Handy: kein Konsolenfehler', keinHandy.fehler.length === 0, keinHandy.fehler);
 }
 
-// Der Servertest der Verwaltung laeuft auch lokal mit tests/alle.mjs, nicht nur in der CI
-pruefe('tests/alle.mjs fuehrt die Suite server-verwaltung', /name: 'server-verwaltung', datei: 'server-verwaltung\.test\.mjs'/
+// Der Servertest der Verwaltung braucht PGlite und laeuft darum im CI-Job sql, nicht ueber tests/alle.mjs (dort fehlt
+// PGlite im Browser-Job, R17-sammelfix2)
+pruefe('CI-Job sql fuehrt die Suite server-verwaltung', /run: node tests\/server-verwaltung\.test\.mjs/
+  .test(readFileSync(path.join(WURZEL, '.github/workflows/tests.yml'), 'utf8')));
+pruefe('tests/alle.mjs fuehrt server-verwaltung nicht (PGlite nur im CI-Job sql)', !/name: 'server-verwaltung'/
   .test(readFileSync(path.join(WURZEL, 'tests/alle.mjs'), 'utf8')));
 
 let server = null;

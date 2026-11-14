@@ -49,7 +49,8 @@ const SUITEN = [
   { name: 'konto-loeschen', datei: 'konto-loeschen.test.mjs', args: [], was: 'Löschseite ohne App (Google Play): Anmeldung, zweistufig löschen, Mail-Weg (Browser)' },
   { name: 'server-abo', datei: 'server-abo.test.mjs', args: [], was: 'Abo: Stripe-Webhook und Schema-Vertrag (Server)' },
   { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Trainer“: Stand, Kauf, Blatt' },
-  { name: 'server-verwaltung', datei: 'server-verwaltung.test.mjs', args: [], was: 'Verwaltung: Schema-Vertrag, Rechte, Premium, Kaeufe, Name, Banner, Rueckweg (Server)' },
+  // server-verwaltung steht wie alle PGlite-Suiten (server-karte*, server-daten*) nicht hier: PGlite gibt es nur im CI-Job
+  // sql (.github/workflows/tests.yml), im Browser-Job brach die Suite ab (R17-sammelfix2, Run 43587846003)
   { name: 'verwaltung', datei: 'verwaltung.test.mjs', args: [], was: 'Verwaltung fuer Flo: Recht still pruefen, Aufrufe, Fehlertexte, Ansichten (ohne Browser)' },
   { name: 'verwaltung-browser', datei: 'verwaltung-browser.test.mjs', args: [], was: 'Verwaltung im Browser: still unsichtbar ohne Recht, Menue-Eintrag nach spaeter Antwort (PC und Handy)' },
   { name: 'server-coach', datei: 'server-coach.test.mjs', args: [], was: 'Frag den Coach: Edge Function, Prompt, Tageslimit (Server)' },
@@ -136,6 +137,7 @@ const SUITEN = [
   { name: 'systeme-texte', datei: 'systeme-texte.test.mjs', args: [], was: 'Spielsysteme: Funken, Duell, Liga nennen in DE und EN dieselben Zahlen wie der Code' },
   { name: 'start-befunde', datei: 'start-befunde.test.mjs', args: [], was: 'Feinschliff R6: Serie "1 Tag", Bot-Spruch ohne angeschnittene Zeile, Leiter auf Start quer, ein Begriff fuer Online (Browser)' },
   { name: 'r17-heim-hover', datei: 'r17-heim-hover.test.mjs', args: [], was: 'Feinschliff R17: Knoepfe der Startseite in Ruhe, Zeiger, Fokus, gedrueckt mind. 4,5:1, Zeiger sichtbar (Browser)' },
+  { name: 'r17-hover-handy', datei: 'r17-hover-handy.test.mjs', args: [], was: 'Feinschliff R17: Zeiger-Zustand bleibt am Handy nach dem Tippen nicht haengen, am PC unveraendert (Browser)' },
   { name: 'geschmack-r8', datei: 'geschmack-r8.test.mjs', args: [], was: 'Feinschliff R8: Serien-Chip neben dem Gruss auf kurzen Handys, Erfolgs-Fenster nie ueber einem offenen Blatt (Browser)' },
   { name: 'r17-kopf', datei: 'r17-kopf.test.mjs', args: [], was: 'Feinschliff R17: Kopf-Knoepfe (Premium, rund) in Ruhe, Zeiger, Fokus, gedrueckt lesbar, Zeiger nur bei hover:hover, Handy ohne haengenden Zustand (Browser)' },
 ];
