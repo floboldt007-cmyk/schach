@@ -245,7 +245,8 @@
 
 /* Weltrangliste nach Online-Elo (welt.js, G-006 AC-11, 14.11.2026): Kopf, Teilnahme mit Knopf, dann die Liste wie die
    Gruppe (Banner-Streifen links, Name auf der Flaeche, rechts die Elo) */
-.lg-welt { gap: 12px; }
+/* Hoechstbreite wie der Reiter "Ich" (punkte.css): am PC lagen Name und Elo sonst ueber 1.500 px auseinander (R19) */
+.lg-welt { gap: 12px; max-width: 760px; }
 .lg-welt-kopf h2 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); color: var(--text); }
 .lg-welt-kopf p { margin: 2px 0 0; font-size: 14px; font-weight: 600; color: var(--text-2); }
 .lg-welt-teilnahme { display: grid; justify-items: start; gap: 10px; padding: 16px; border-radius: var(--r-xl); background: var(--flaeche);
