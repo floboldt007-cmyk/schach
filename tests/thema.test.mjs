@@ -76,9 +76,17 @@ export function leseCss(text) {
       const kopf = t.slice(i, auf).trim();
       i = auf + 1;
       if (/^@(media|supports)/.test(kopf)) { block(kopf); continue; }
-      const zu = t.indexOf('}', i);
+      // die schliessende Klammer zaehlend suchen: @keyframes traegt eigene Bloecke (from {…} to {…}), die erste "}" waere
+      // deren Ende und alles danach (etwa :root in tokens.css) ginge verloren
+      let zu = i;
+      for (let tiefe = 0; zu < t.length; zu++) {
+        if (t[zu] === '{') tiefe++;
+        else if (t[zu] === '}' && tiefe-- === 0) break;
+      }
+      if (zu >= t.length) { regeln.push({ media, selektor: kopf, decls: [], kaputt: true }); i = t.length; return; }
       const inhalt = t.slice(i, zu);
       i = zu + 1;
+      if (inhalt.includes('{')) { regeln.push({ media, selektor: kopf, decls: [], verschachtelt: true }); continue; }
       const decls = inhalt.split(';').map((d) => d.trim()).filter(Boolean).map((d) => {
         const k = d.indexOf(':');
         return [d.slice(0, k).trim(), d.slice(k + 1).trim()];
@@ -265,6 +273,8 @@ function nodeTeil() {
     && /@fontsource-variable\/bricolage-grotesque@5\.3\.0/.test(modernCss));
 
   gruppe = 'tokens.css';
+  const probe = leseCss('@keyframes k { from { opacity: 0; } to { opacity: 1; } } :root { --nach: 1; }');
+  pruefe('Selbstprobe Leser: Regel nach @keyframes wird gelesen', probe.some((r) => r.selektor === ':root' && r.decls.some(([k]) => k === '--nach')));
   const tok = lies('css/tokens.css');
   const tr = leseCss(tok);
   const tn = new Set(tr.flatMap((r) => r.decls.map(([k]) => k)));
