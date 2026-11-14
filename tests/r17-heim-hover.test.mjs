@@ -24,6 +24,7 @@ const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 let ok = 0, gesamt = 0;
 function pruefe(name, gut, detail = '') {
   gesamt++; if (gut) ok++;
+  // INTENTIONAL-SLOP[T4]: die Pruefzeile ist die Ausgabe des Tests (wie in tests/heim.test.mjs)
   console.log(`${gut ? 'ok  ' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`);
 }
 
@@ -92,17 +93,16 @@ async function lauf(browser, { w, h, schema, mitPartie }) {
   s.on('pageerror', (e) => fehler.push(e.message));
   // Tag des Willkommens wie im Paket start (Grenze 4:00), Sprache gewaehlt, keine Hinweise
   await s.addInitScript(({ P, laufend }) => {
-    try {
-      if (sessionStorage.getItem('hh-probe')) return;
-      sessionStorage.setItem('hh-probe', '1');
-      localStorage.clear();
-      const d = new Date(); if (d.getHours() < 4) d.setDate(d.getDate() - 1);
-      const z = (n) => String(n).padStart(2, '0');
-      localStorage.setItem(P + 'modul:start', JSON.stringify({ gesehen: `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` }));
-      localStorage.setItem(P + 'einstellungen', JSON.stringify({ sprache: 'de', spracheGewaehlt: true }));
-      localStorage.setItem(P + 'hinweis-installieren', '1');
-      if (laufend) localStorage.setItem(P + 'laufend', JSON.stringify(laufend));
-    } catch (e) { /* egal */ }
+    if (!location.protocol.startsWith('http')) return; // about:blank hat keinen Speicher
+    if (sessionStorage.getItem('hh-probe')) return;
+    sessionStorage.setItem('hh-probe', '1');
+    localStorage.clear();
+    const d = new Date(); if (d.getHours() < 4) d.setDate(d.getDate() - 1);
+    const z = (n) => String(n).padStart(2, '0');
+    localStorage.setItem(P + 'modul:start', JSON.stringify({ gesehen: `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` }));
+    localStorage.setItem(P + 'einstellungen', JSON.stringify({ sprache: 'de', spracheGewaehlt: true }));
+    localStorage.setItem(P + 'hinweis-installieren', '1');
+    if (laufend) localStorage.setItem(P + 'laufend', JSON.stringify(laufend));
   }, { P, laufend: mitPartie ? laufend : null });
   await s.goto(BASIS + '#heim');
   await s.waitForSelector('.heim-los', { state: 'visible', timeout: 20000 });
@@ -142,7 +142,12 @@ try { pw = require(process.env.PLAYWRIGHT_PFAD || 'playwright'); } catch (e) { p
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser = null;
 try {
-  for (let i = 0; i < 60; i++) { try { const r = await fetch(BASIS); await r.arrayBuffer(); if (r.ok) break; } catch (e) { /* noch nicht */ } await warte(150); }
+  let bereit = false, letzter = null;
+  for (let i = 0; i < 60 && !bereit; i++) {
+    try { const r = await fetch(BASIS); await r.arrayBuffer(); bereit = r.ok; } catch (e) { letzter = e; }
+    if (!bereit) await warte(150);
+  }
+  if (!bereit) throw new Error(`Testserver nicht erreichbar: ${letzter?.message || 'keine 200-Antwort'}`);
   browser = await browserTyp(pw).launch({ headless: true });
   for (const [w, h] of [[820, 1180], [1440, 900]]) {
     for (const schema of ['light', 'dark']) {
@@ -155,5 +160,6 @@ try {
   if (browser) await browser.close().catch(() => {});
   server.kill();
 }
+// INTENTIONAL-SLOP[T4]: Summenzeile, die tests/alle.mjs auswertet
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);
