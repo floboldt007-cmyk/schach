@@ -36,7 +36,7 @@
   .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
   .kasten > :last-child { margin-bottom: 0; }
   .kasten[hidden], [hidden] { display: none !important; }
-  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+  .zurueck, .sprung { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
     border: 1px solid var(--text-2); text-decoration: none; font-weight: var(--gw-stark); }
   .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
   .fuss a { margin-right: var(--a3); }
@@ -66,6 +66,7 @@
   <h1>Delete account</h1>
   <p>Here you can delete your Crownmate account, even without the app. In the app it is under Settings → Data →
   “Delete account”.</p>
+  <p><a class="sprung" href="#selbst-loeschen">Straight to “Delete it yourself”</a></p>
 
   <h2>What is deleted</h2>
   <div class="kasten">
@@ -86,7 +87,7 @@
     <p><b>Subscription:</b> A running subscription does not end with the account. Cancel it first.</p>
   </div>
 
-  <h2>Delete it yourself</h2>
+  <h2 id="selbst-loeschen">Delete it yourself</h2>
   <p class="kl-status" aria-live="polite" data-fehler="nein"></p>
 
   <section class="kl-anmelden kasten" aria-labelledby="kl-anmelden-titel">
@@ -131,7 +132,7 @@
 
   <h2>Delete by email</h2>
   <p>Can’t sign in any more? Then write from your account’s address to
-  <a class="kl-mail" href="mailto:kontakt@anfrageprofi.de?subject=Crownmate%3A%20Delete%20account&amp;body=Please%20delete%20my%20Crownmate%20account.%0A%0AEmail%20address%20of%20the%20account%3A%20%0AUsername%20(if%20known)%3A%20">kontakt@anfrageprofi.de</a>
+  <a class="kl-mail" href="mailto:kontakt@crownmate.de?subject=Crownmate%3A%20Delete%20account&amp;body=Please%20delete%20my%20Crownmate%20account.%0A%0AEmail%20address%20of%20the%20account%3A%20%0AUsername%20(if%20known)%3A%20">kontakt@crownmate.de</a>
   with the subject “Crownmate: Delete account”. Give the account’s email address and, if you know it, your username.
   We delete the account within one month and confirm it to you by email.</p>
 
@@ -141,7 +142,7 @@
 {"wort": "DELETE", "codeGesendet": "The code is on its way. Check your inbox (and the spam folder) and enter the 6 digits.",
  "zuGoogle": "On to Google …", "loescht": "Deleting the account …", "fehler": "That did not work. Please try again.",
  "offline": "No connection. You are still signed in. Please try again in a moment.",
- "abgelehnt": "The server did not accept your sign-in. Please sign in again. If it still fails, write to kontakt@anfrageprofi.de.",
+ "abgelehnt": "The server did not accept your sign-in. Please sign in again. If it still fails, write to kontakt@crownmate.de.",
  "googleFehler": "Signing in with Google was not completed. Please try again."}
 </script>
 <script type="module">

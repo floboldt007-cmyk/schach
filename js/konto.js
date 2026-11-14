@@ -133,6 +133,10 @@ function neueAnmeldung() { try { lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } c
 // Kontos gespeichert ist: Eine spaete Antwort darf eine Abmeldung nie rueckgaengig machen. Hat ein anderer Tab schon
 // erneuert (anderer Schluessel, gleiches Konto), gilt dessen Sitzung.
 let laufendeErneuerung = null;   // { token, versprechen }
+// Beim Erneuern melden ausser der toten Sitzung auch ein gesperrtes Konto (user_banned) und eine Sitzung, die der Server
+// nicht mehr annimmt (validation_failed), lokal ab: sonst bliebe die Gruppe "angemeldet" und jede Sicherung scheiterte
+// still (R18). Die Texte bleiben die der Kennung; andere Auth-Aufrufe melden bei diesen Kennungen nicht ab.
+const ERNEUERN_ABMELDEN = new Set([...SITZUNG_TOT, 'user_banned', 'validation_failed']);
 export function erneuereSitzung() {
   const s = sitzung(); if (!s?.refresh_token) return Promise.reject(new Error(K('nichtAngemeldet')));
   if (laufendeErneuerung && laufendeErneuerung.token === s.refresh_token) return laufendeErneuerung.versprechen;
@@ -152,7 +156,7 @@ async function erneuere(s) {
     const j = vonAnderemTab(); if (j) return j;
     // Tote Sitzung (auf dem Server abgemeldet oder abgelaufen): lokal entfernen, damit die Gruppe "abgemeldet" zeigt,
     // statt still nie mehr zu sichern. Nur wenn noch diese Sitzung gespeichert ist.
-    if (SITZUNG_TOT.has(e.kennung) && epoche === e0 && sitzung()?.refresh_token === s.refresh_token) {
+    if (ERNEUERN_ABMELDEN.has(e.kennung) && epoche === e0 && sitzung()?.refresh_token === s.refresh_token) {
       epoche++; sitzungTot = true; try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (f) { /* egal */ }
     }
     throw e;

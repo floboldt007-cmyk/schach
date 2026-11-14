@@ -7,11 +7,13 @@
 // genau einmal neu gebaut, nach dem Verlassen nie mehr; der Deep Link #einstellungen/verwaltung oeffnet am Handy.
 //   node tests/verwaltung-browser.test.mjs
 //   PORT=9800 node tests/verwaltung-browser.test.mjs   eigener Port (Standard: frei)
+//   BILDER=<ordner> node tests/verwaltung-browser.test.mjs   dazu je Fall ein Bild der Einstellungen (wie die Funktionsprobe)
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { mkdirSync, existsSync } from 'node:fs';
 import { browserTyp } from './browser.mjs';
 import { DE } from '../js/pakete/verwaltung/texte.js';
 
@@ -21,6 +23,16 @@ const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs'
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+const BILDER = process.env.BILDER || null;
+if (BILDER) mkdirSync(BILDER, { recursive: true });
+const bilderListe = [];
+// Bild der Einstellungen, die Gruppe Verwaltung (falls da) im Blick; misst nichts und aendert nichts am Ablauf
+async function bild(seite, name) {
+  if (!BILDER || !name) return;
+  await seite.evaluate(() => document.querySelector('.vw-gruppe:not([hidden])')?.scrollIntoView({ block: 'center' }));
+  const datei = path.join(BILDER, `verwaltung-${name}.png`);
+  await seite.screenshot({ path: datei }); bilderListe.push(datei);
+}
 
 let ok = 0;
 let gesamt = 0;
@@ -32,6 +44,8 @@ function pruefe(name, bedingung, info) {
 const UID = 'f1000000-0000-4000-8000-0000000000f1';
 const token = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 9999999999, user: { id: UID, email: 'f@x' }, email: 'f@x' };
+const UID_B = 'b2000000-0000-4000-8000-0000000000b2';
+const SITZUNG_B = { access_token: token(UID_B), refresh_token: 'r2', expires_at: 9999999999, user: { id: UID_B, email: 'b@x' }, email: 'b@x' };
 
 function ladePlaywright() {
   for (const k of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
@@ -55,25 +69,32 @@ async function warteAufServer(url, ms = 10000) {
 // Test den Menue-Eintrag an und misst, ob die Seite des Bereichs aufgeht. hash: Ziel beim Laden (Deep Link). verlassen:
 // gleich nach dem Laden nach #heim, noch vor der Antwort. probe: wird zum Schluss mit der Seite gerufen, ihr Ergebnis
 // steht in probe. neubau zaehlt, wie oft das Menue (.es-nav) neu gefuellt wurde, nachdem die Seite stand.
+// folge: je Anfrage an ist_verwalter eigene Antwort und Verzoegerung ([{ recht, spaet }, ...], die n-te Anfrage nimmt
+// den n-ten Eintrag); reihenfolge haelt fest, in welcher Reihenfolge die Antworten fertig wurden (Anfrage-Nummern ab 1).
 async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, konto = true, handy = false, hash = '#einstellungen',
-  verlassen = false, probe = null } = {}) {
+  verlassen = false, probe = null, folge = null, bildName = null } = {}) {
   const [w, h] = handy ? [390, 844] : [1180, 820];
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
   const seite = await kontext.newPage();
   const fehler = [];
   const frage = [];
+  const [rechtStandard, spaetStandard] = [recht, spaet];
   seite.on('pageerror', (e) => fehler.push('pageerror: ' + e.message));
   // wie tests/abo.test.mjs: Netzmeldungen des Browsers (404, abgebrochen) sind kein Fehler der App
   seite.on('console', (m) => {
     if (m.type() === 'error' && !/404|ERR_FAILED|net::/.test(m.text())) fehler.push('console: ' + m.text());
   });
   let beantwortet = 0;
+  const reihenfolge = [];
   await seite.route(SUPA + '/**', async (r) => {
     const u = r.request().url();
     if (u.endsWith('/rest/v1/rpc/ist_verwalter')) {
       frage.push(u);
+      const nr = frage.length;
+      const { recht, spaet } = folge?.[nr - 1] || { recht: rechtStandard, spaet: spaetStandard };
       if (spaet) await warte(spaet);
       beantwortet++;
+      reihenfolge.push(nr);
       if (recht === 'offline') return r.abort('internetdisconnected');
       if (recht === 'fehlt') {
         return r.fulfill({ status: 404, contentType: 'application/json',
@@ -120,6 +141,7 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, k
     };
   }, DE.titel);
   const stand = await messe();
+  await bild(seite, bildName);
   let seiteAuf = null;
   if (handy && stand.inNav && hash === '#einstellungen') {
     await seite.locator('.es-nav-punkt', { hasText: DE.titel }).first().click();
@@ -127,26 +149,34 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, k
     await warte(600);
     seiteAuf = { hash: await seite.evaluate(() => location.hash), ...(await messe()),
       offen: await seite.evaluate(() => !!document.querySelector('.vw-gruppe.es-offen')) };
+    await bild(seite, bildName && bildName + '-seite');
   }
-  const probeErg = probe ? await probe(seite) : null;
+  const probeErg = probe ? await probe(seite, { fragen: () => frage.length, beantwortet: () => beantwortet }) : null;
   await kontext.close();
-  return { ...stand, navVorher, seiteAuf, fehler, fragen: frage.length, probe: probeErg };
+  return { ...stand, navVorher, seiteAuf, fehler, fragen: frage.length, reihenfolge, probe: probeErg };
 }
 
 async function browserTeil(browser) {
-  const ohne = await zustand(browser, { sitzung: null });
+  const ohne = await zustand(browser, { sitzung: null, bildName: 'ohne-anmeldung' });
   pruefe('ohne Anmeldung: Gruppe still unsichtbar, keine Anfrage an ist_verwalter', !ohne.sichtbar && !ohne.text && ohne.fragen === 0, ohne);
   pruefe('ohne Anmeldung: kein Konsolenfehler', ohne.fehler.length === 0, ohne.fehler);
 
-  const kein = await zustand(browser, { recht: false });
+  const kein = await zustand(browser, { recht: false, bildName: 'ohne-recht' });
   pruefe('ohne Recht: Gruppe still unsichtbar, nicht im Menue', kein.fragen === 1 && !kein.sichtbar && !kein.text && !kein.inNav, kein);
   pruefe('ohne Recht: kein Konsolenfehler', kein.fehler.length === 0, kein.fehler);
 
-  const offline = await zustand(browser, { recht: 'offline' });
+  const offline = await zustand(browser, { recht: 'offline', bildName: 'offline' });
   pruefe('offline: Gruppe still unsichtbar', offline.fragen >= 1 && !offline.sichtbar && !offline.text, offline);
   pruefe('offline: kein Konsolenfehler', offline.fehler.length === 0, offline.fehler);
 
-  const fehlt = await zustand(browser, { recht: 'fehlt' });
+  // Kaltreview R18 (Befund 1): eine spaete Antwort, die nichts aendert, setzt hidden nicht erneut; sonst meldet Chromium eine
+  // Mutation und das Menue wird bei jedem normalen Nutzer neu gebaut
+  for (const [art, recht] of [['ohne Recht', false], ['offline', 'offline']]) {
+    const still = await zustand(browser, { recht, spaet: 1500 });
+    pruefe(`${art}, spaete Antwort: das Menue wird nicht neu gebaut`, still.fragen >= 1 && !still.sichtbar && still.neubau === 0, still.neubau);
+  }
+
+  const fehlt = await zustand(browser, { recht: 'fehlt', bildName: 'sql-fehlt' });
   pruefe('SQL fehlt (404): Gruppe still unsichtbar', fehlt.fragen >= 1 && !fehlt.sichtbar && !fehlt.text, fehlt);
   pruefe('SQL fehlt (404): kein Konsolenfehler', fehlt.fehler.length === 0, fehlt.fehler);
 
@@ -156,13 +186,13 @@ async function browserTeil(browser) {
   pruefe('angemeldet ohne #konto-Merker: Verwalter sieht Gruppe und Menue-Eintrag', ohneMerker.fragen === 1 && ohneMerker.sichtbar
     && ohneMerker.inNav, ohneMerker);
   pruefe('angemeldet ohne #konto-Merker: kein Konsolenfehler', ohneMerker.fehler.length === 0, ohneMerker.fehler);
-  const nichts = await zustand(browser, { sitzung: null, konto: false });
+  const nichts = await zustand(browser, { sitzung: null, konto: false, bildName: 'ohne-konto' });
   pruefe('ohne Sitzung und ohne Merker: keine Anfrage an ist_verwalter, Gruppe unsichtbar', nichts.fragen === 0 && !nichts.sichtbar
     && !nichts.text, nichts);
 
   // Gegenprobe: das Paket steht in PAKETE und zeigt die Gruppe dem Verwalter, ohne ?erw. ist_verwalter antwortet spaet,
   // das Menue ist dann schon gebaut und muss den Eintrag nachreichen
-  const flo = await zustand(browser, { recht: true, spaet: 1500, probe: (s) => s.evaluate(async () => {
+  const flo = await zustand(browser, { recht: true, spaet: 1500, bildName: 'verwalter-pc', probe: (s) => s.evaluate(async () => {
     // Verstecken und wieder Zeigen der Gruppe: je genau ein Neubau des Menues, keine Schleife
     const g = document.querySelector('.vw-gruppe');
     const pause = () => new Promise((r) => setTimeout(r, 300));
@@ -241,21 +271,84 @@ async function browserTeil(browser) {
   pruefe('Ab- und Wiederanmeldung desselben Kontos bei offenen Einstellungen: neu gefragt (2 Anfragen), Gruppe wieder da',
     !wieder.probe.zwischen.sichtbar && wieder.probe.nachher.sichtbar && wieder.fragen === 2, { probe: wieder.probe, fragen: wieder.fragen });
 
-  const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true });
+  // R18: zwei sich kreuzende Antworten. Die Anfrage der ersten Anmeldung antwortet erst, nachdem das Konto ab- und wieder
+  // angemeldet ist und die zweite Anfrage schon beantwortet wurde. Gezaehlt wird nur die juengste Anfrage: die spaete
+  // Antwort einer frueheren Anmeldung ueberschreibt sie nie, und wer nicht Verwalter ist, sieht die Verwaltung nie, auch
+  // nicht kurz (Abtastung alle 10 ms und bei jeder Aenderung des hidden-Attributs)
+  const kreuz = (folge) => zustand(browser, { sitzung: null, hash: '#einstellungen/konto', folge, probe: async (s, z) => {
+    await s.evaluate(() => {
+      window.__gesehen = 0;
+      const sieh = () => { const g = document.querySelector('.vw-gruppe'); if (g && !g.hidden && g.getClientRects().length) window.__gesehen++; };
+      setInterval(sieh, 10);
+      new MutationObserver(sieh).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    });
+    const bis = async (f, ms = 8000) => { const ende = Date.now() + ms; while (!f() && Date.now() < ende) await warte(25); };
+    const an = () => s.evaluate((x) => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(x)), SITZUNG);
+    await an();
+    await bis(() => z.fragen() >= 1);
+    await s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+    await warte(1500);
+    await an();
+    await bis(() => z.fragen() >= 2);
+    await bis(() => z.beantwortet() >= 2, 10000);
+    await warte(600);
+    return { ...(await imBlick(s)), gesehen: await s.evaluate(() => window.__gesehen) };
+  } });
+  const spaetJa = await kreuz([{ recht: true, spaet: 5000 }, { recht: false, spaet: 0 }]);
+  pruefe('R18 sich kreuzende Antworten: die spaete Antwort kam zuletzt (Anfrage 2 vor Anfrage 1)',
+    spaetJa.fragen === 2 && spaetJa.reihenfolge.join() === '2,1', { fragen: spaetJa.fragen, reihenfolge: spaetJa.reihenfolge });
+  pruefe('R18 spaete Antwort "Verwalter" der frueheren Anmeldung: wer nicht Verwalter ist, sieht die Verwaltung nie, auch nicht kurz',
+    !spaetJa.probe.sichtbar && !spaetJa.probe.inNav && spaetJa.probe.gesehen === 0, spaetJa.probe);
+  pruefe('R18 spaete Antwort "Verwalter": kein Konsolenfehler', spaetJa.fehler.length === 0, spaetJa.fehler);
+  const spaetNein = await kreuz([{ recht: false, spaet: 5000 }, { recht: true, spaet: 0 }]);
+  pruefe('R18 Gegenrichtung: die spaete Antwort kam zuletzt', spaetNein.fragen === 2 && spaetNein.reihenfolge.join() === '2,1',
+    { fragen: spaetNein.fragen, reihenfolge: spaetNein.reihenfolge });
+  pruefe('R18 spaete Antwort "kein Recht" der frueheren Anmeldung: die neuere Antwort bleibt, Verwaltung sichtbar',
+    spaetNein.probe.sichtbar && spaetNein.probe.inNav, spaetNein.probe);
+  pruefe('R18 spaete Antwort "kein Recht": kein Konsolenfehler', spaetNein.fehler.length === 0, spaetNein.fehler);
+  // R18: direkter Wechsel vom Verwalter-Konto zu einem anderen Konto ohne Abmelden dazwischen (z. B. aus einem anderen
+  // Tab). Solange die Antwort fuer das neue Konto aussteht, ist die Verwaltung schon weg; bleibt sie offline aus, auch
+  for (const [art, zweite] of [['kein Recht', { recht: false, spaet: 3000 }], ['offline', { recht: 'offline', spaet: 3000 }]]) {
+    const wechsel = await zustand(browser, { hash: '#einstellungen/konto', folge: [{ recht: true, spaet: 0 }, zweite], probe: async (s, z) => {
+      const bis = async (f, ms = 8000) => { const ende = Date.now() + ms; while (!f() && Date.now() < ende) await warte(25); };
+      const vorher = await imBlick(s);
+      // wie ein anderer Tab: Speicher schreiben und das storage-Ereignis melden (im selben Tab feuert es nicht von selbst)
+      await s.evaluate((x) => {
+        const neu = JSON.stringify(x);
+        localStorage.setItem('schach-arena:konto:sitzung', neu);
+        window.dispatchEvent(new StorageEvent('storage', { key: 'schach-arena:konto:sitzung', newValue: neu }));
+      }, SITZUNG_B);
+      await bis(() => z.fragen() >= 2);
+      await warte(300);
+      const offen = { ...(await imBlick(s)), beantwortet: z.beantwortet() };
+      await bis(() => z.beantwortet() >= 2, 10000);
+      await warte(600);
+      return { vorher, offen, nachher: await imBlick(s) };
+    } });
+    pruefe(`R18 direkter Kontowechsel (${art}): vorher sichtbar, waehrend die Antwort aussteht schon weg, danach weg`,
+      wechsel.fragen === 2 && wechsel.probe.vorher.sichtbar && wechsel.probe.offen.beantwortet === 1 && !wechsel.probe.offen.sichtbar
+      && !wechsel.probe.offen.inNav && !wechsel.probe.nachher.sichtbar && !wechsel.probe.nachher.inNav, { fragen: wechsel.fragen, probe: wechsel.probe });
+    pruefe(`R18 direkter Kontowechsel (${art}): kein Konsolenfehler`, wechsel.fehler.length === 0, wechsel.fehler);
+  }
+
+  const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true, bildName: 'verwalter-handy' });
   pruefe('Verwalter am Handy: Eintrag in der Liste nach spaeter Antwort', floHandy.navVorher > 0 && floHandy.inNav, floHandy);
   pruefe('Verwalter am Handy: Tipp oeffnet die Seite der Verwaltung', !!floHandy.seiteAuf?.offen && floHandy.seiteAuf.sichtbar
     && floHandy.seiteAuf.hash === '#einstellungen/verwaltung', floHandy.seiteAuf);
   pruefe('Verwalter am Handy: kein Konsolenfehler', floHandy.fehler.length === 0, floHandy.fehler);
 
-  const keinHandy = await zustand(browser, { recht: false, spaet: 1500, handy: true });
+  const keinHandy = await zustand(browser, { recht: false, spaet: 1500, handy: true, bildName: 'ohne-recht-handy' });
   pruefe('ohne Recht am Handy: kein Eintrag in der Liste, Gruppe unsichtbar', keinHandy.fragen === 1 && !keinHandy.inNav && !keinHandy.sichtbar, keinHandy);
   pruefe('ohne Recht am Handy: kein Konsolenfehler', keinHandy.fehler.length === 0, keinHandy.fehler);
 }
 
 // Der Servertest der Verwaltung braucht PGlite und laeuft darum im CI-Job sql, nicht ueber tests/alle.mjs (dort fehlt
-// PGlite im Browser-Job, R17-sammelfix2)
-pruefe('CI-Job sql fuehrt die Suite server-verwaltung', /run: node tests\/server-verwaltung\.test\.mjs/
-  .test(readFileSync(path.join(WURZEL, '.github/workflows/tests.yml'), 'utf8')));
+// PGlite im Browser-Job, R17-sammelfix2). Gesucht wird nur im Job sql (bis zum naechsten Job auf derselben Einrueckung)
+// und nur als eigene, nicht auskommentierte Zeile (Kaltreview sammelfix2, Befund m3: ein auskommentierter Schritt liess
+// die alte Suche ueber die ganze Datei gruen)
+const sqlJob = readFileSync(path.join(WURZEL, '.github/workflows/tests.yml'), 'utf8')
+  .match(/^ {2}sql:\r?\n([\s\S]*?)(?=^ {2}[\w-]+:|(?![\s\S]))/m)?.[1] || '';
+pruefe('CI-Job sql fuehrt die Suite server-verwaltung', /^\s+run: node tests\/server-verwaltung\.test\.mjs\s*$/m.test(sqlJob), sqlJob.length);
 pruefe('tests/alle.mjs fuehrt server-verwaltung nicht (PGlite nur im CI-Job sql)', !/name: 'server-verwaltung'/
   .test(readFileSync(path.join(WURZEL, 'tests/alle.mjs'), 'utf8')));
 
@@ -273,5 +366,6 @@ try {
   if (browser) await browser.close().catch(() => {});
   if (server) server.kill();
 }
+if (BILDER) pruefe(`Bilder abgelegt: ${bilderListe.length}`, bilderListe.length > 0 && bilderListe.every((d) => existsSync(d)), bilderListe.filter((d) => !existsSync(d)));
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);
