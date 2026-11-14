@@ -33,6 +33,15 @@ for (const sp of ['de', 'en']) {
   pruefe(`${sp}: Visitenkarte nennt dieselben Namen`, JSON.stringify(karte) === JSON.stringify(ERWARTET), karte);
   pruefe(`${sp}: Titel-Weg "Ligakrone" nennt Crownmate III (Stufe 15)`, /Crownmate III/.test(t('p-sammlung.titel.weg.ligakrone'))
     && ERWARTET[15] === 'Crownmate III', t('p-sammlung.titel.weg.ligakrone'));
+  // Kaltreview 26 (14.11.): Titel-Weg "Kroenung", Liga-Banner und die Zeile der Liga-Familie nach Satz A
+  const kroenung = t('p-sammlung.titel.weg.kroenung');
+  pruefe(`${sp}: Titel-Weg "Kroenung" nennt Crownmate`, /Crownmate/.test(kroenung) && !/König|King/.test(kroenung), kroenung);
+  const banner = ['holz', 'bronze', 'silber', 'gold', 'diamant', 'krone'].map((b) => t('p-karte.b.saison-' + b));
+  const bannerSoll = NAMEN.map((n) => (sp === 'de' ? `${n}-Banner` : `${n} banner`));
+  pruefe(`${sp}: Liga-Banner heissen Squire- bis Crownmate-Banner`, JSON.stringify(banner) === JSON.stringify(bannerSoll), banner);
+  const zeile = t('p-karte.zeile.liga');
+  pruefe(`${sp}: Zeile der Liga-Familie nennt Warden, Baron, Crownmate`, /Warden.*Baron.*Crownmate/.test(zeile)
+    && !/Läufer|Turm|König|Bishop|Rook|King/.test(zeile), zeile);
 }
 pruefe('IDs der Ligen bleiben (LIGA_NAMEN)', Object.values(LIGA_NAMEN).join() === 'bauer,springer,laeufer,turm,dame,koenig', LIGA_NAMEN);
 
