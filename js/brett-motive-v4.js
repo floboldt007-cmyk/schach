@@ -62,7 +62,7 @@ const umlauf = (B, n, versatz = 0.5) => {
 const ecken = (B) => [[B / 2, B / 2], [1000 - B / 2, B / 2], [1000 - B / 2, 1000 - B / 2], [B / 2, 1000 - B / 2]];
 const band = (B, fill) => `<path d="M0 0H1000V1000H0ZM${B} ${B}V${1000 - B}H${1000 - B}V${B}Z" fill="${fill}" fill-rule="evenodd"/>`;
 const kante = (a, farbe, w) => `<rect x="${a}" y="${a}" width="${1000 - 2 * a}" height="${1000 - 2 * a}" fill="none" stroke="${farbe}" stroke-width="${w}"/>`;
-const verlauf = (id, stopps, winkel = 135) => `<defs><linearGradient id="${id}" gradientTransform="rotate(${winkel - 90} .5 .5)">${stopps.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient></defs>`;
+const verlauf = (id, stopps) => `<defs><linearGradient id="${id}" gradientTransform="rotate(45 .5 .5)">${stopps.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient></defs>`;
 
 // ---------- die 20 Motive
 // textur(R, art) zeichnet EINE Feldzelle (0..100) mit den Rollen §g§ (Grund) §l§ §ll§ (heller) §t§ §tt§ (dunkler) §a§ §b§ (Akzentton heller/dunkler)

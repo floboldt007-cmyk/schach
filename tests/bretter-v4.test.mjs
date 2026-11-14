@@ -133,8 +133,8 @@ else {
       }, { b64, N: 400 * dsf });
     };
     // je Feld (ohne den aeussersten Pixel): kleinster, groesster, mittlerer Wert
-    const felder = (L, N = 400) => {
-      const F = N / 8, aus = [];
+    const felder = (L) => {
+      const N = 400, F = 50, aus = [];
       for (let fy = 0; fy < 8; fy++) for (let fx = 0; fx < 8; fx++) {
         let lo = 1, hi = 0, s = 0, n = 0;
         for (let py = fy * F + 1; py < (fy + 1) * F - 1; py++) for (let px = fx * F + 1; px < (fx + 1) * F - 1; px++) {
