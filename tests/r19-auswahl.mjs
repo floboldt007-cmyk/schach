@@ -80,6 +80,49 @@ const PRUEFUNGEN = {
     return { gut: ruhe.arten === 'blitz*,schnell-,klassisch-' && !ruhe.kasten && ruhe.wappen && ruhe.aendern
       && offen.arten === 'blitz,schnell*,klassisch' && offen.chips === '10+0,15+10' && /15\s*\+\s*10/.test(klein), info: { ruhe, offen, klein } };
   },
+  'lobby-b': async (s) => {
+    const ruhe = await s.evaluate(() => {
+      const img = document.querySelector('.lb-rang img');
+      return { gewertet: document.querySelector('.lb-gewertet.lb-suchen b')?.textContent.replace(/\s/g, ''),
+        frei: [...document.querySelectorAll('.lb-frei')].map((b) => b.dataset.zeit).join(),
+        weg: !!document.querySelector('.lb-wertungen, .lb-zeile, .segment, .lb-zeiten'), wappen: !!(img && img.complete && img.naturalWidth > 0),
+        klein: [...document.querySelectorAll('.lb-kachel')].filter((e) => e.getBoundingClientRect().height < 44).length };
+    });
+    await s.locator('.lb-frei[data-zeit="10+0"]').click();
+    await s.waitForSelector('.lb-suche[data-phase="suche"]', { timeout: 3000 });
+    const zeile = await s.locator('.lb-suche-zeile').innerText();
+    return { gut: ruhe.gewertet === '5+3' && ruhe.frei === '3+0,3+2,5+0,10+0,15+10,30+0' && !ruhe.weg && ruhe.wappen && ruhe.klein === 0
+      && /Schnellschach/.test(zeile) && /Freundschaft/.test(zeile), info: { ruhe, zeile } };
+  },
+  'shopleiste-a': async (s) => {
+    const ruhe = await s.evaluate(() => {
+      const leiste = document.querySelector('.heim-shop');
+      const karten = [...leiste.querySelectorAll('.heim-shop-karte')];
+      return { titel: leiste.querySelector('h3').textContent, karten: karten.map((k) => k.dataset.produkt).join(),
+        bild: karten.every((k) => k.querySelector('svg.heim-shop-bild')?.getBoundingClientRect().width >= 40),
+        // keine Preise, kein Kaufknopf, kein Abo: kein Waehrungszeichen und kein Kauf-Element in der Leiste
+        geld: /[€$]|EUR|\d+[,.]\d\d/.test(leiste.textContent) || !!leiste.querySelector('.sh-kaufen, [data-preis]'),
+        klein: [...leiste.querySelectorAll('button')].filter((b) => b.getClientRects().length && b.getBoundingClientRect().height < 44).length };
+    });
+    await s.locator('.heim-shop [data-aktion="heim-shop"] >> visible=true').first().click();
+    const shop = await s.waitForSelector('[data-bereich="shop"]', { timeout: 5000 }).then(() => true, () => false);
+    return { gut: ruhe.titel === 'Neu im Shop' && ruhe.karten === 'brett-mitternacht' && ruhe.bild && !ruhe.geld && ruhe.klein === 0 && shop,
+      info: { ruhe, shop } };
+  },
+  'shopleiste-b': async (s) => {
+    const ruhe = await s.evaluate(() => {
+      const k = document.querySelector('.kopf-shop');
+      const r = k.getBoundingClientRect(); const kopf = k.closest('.haupt-kopf').getBoundingClientRect();
+      return { produkt: k.dataset.produkt, bild: k.querySelector('svg.kopf-shop-brett')?.getBoundingClientRect().width >= 20,
+        neu: getComputedStyle(k.querySelector('.kopf-shop-neu')).display !== 'none',
+        geld: /[€$]|EUR|\d+[,.]\d\d/.test(k.textContent + k.getAttribute('aria-label')),
+        gross: r.height >= 44 && r.width >= 44, imKopf: r.top >= kopf.top - 8 && r.bottom <= kopf.bottom + 8 && r.right <= innerWidth };
+    });
+    await s.locator('.kopf-shop').click();
+    const shop = await s.waitForSelector('[data-bereich="shop"]', { timeout: 5000 }).then(() => true, () => false);
+    return { gut: ruhe.produkt === 'brett-mitternacht' && ruhe.bild && ruhe.neu && !ruhe.geld && ruhe.gross && ruhe.imKopf && shop,
+      info: { ruhe, shop } };
+  },
 };
 
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
