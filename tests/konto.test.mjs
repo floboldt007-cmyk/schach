@@ -149,6 +149,25 @@ mitAntwort(400, { error: 'invalid_grant', error_description: 'Invalid Refresh To
 serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
 pruefe('Tote Sitzung im alten Format (invalid_grant): Text "Anmeldung abgelaufen", lokal abgemeldet, Riegel zu, kein Server-Text',
   /Anmeldung ist abgelaufen/.test(serverFehler) && !/invalid|Refresh Token/i.test(serverFehler) && sitzung() === null && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null, serverFehler);
+// R18: Gesperrtes Konto (user_banned) und ungueltige Sitzung (validation_failed) beim Erneuern melden ebenfalls ab.
+// Der Fehlertext bleibt der eigene der Kennung (Entscheid loeschseite-3), nur die Sitzung faellt weg.
+for (const [kennung, status, muster] of [['user_banned', 403, /gesperrt/], ['validation_failed', 400, /^Serverfehler \(400, validation_failed\)$/]]) {
+  localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
+  mitAntwort(status, { code: status, error_code: kennung, msg: 'Server-Text mit a@b.de' });
+  serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
+  pruefe(`Erneuern mit ${kennung}: lokal abgemeldet, Riegel zu, eigener Text, kein Server-Text`,
+    muster.test(serverFehler) && !serverFehler.includes('a@b.de') && sitzung() === null && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null, serverFehler);
+}
+// Andere Auth-Aufrufe bleiben: user_banned beim Code pruefen behaelt seinen Text und laesst die gespeicherte Sitzung stehen
+localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(session));
+mitAntwort(403, { code: 403, error_code: 'user_banned', msg: 'User is banned' });
+serverFehler = ''; try { await pruefeCode('a@b.de', '123456'); } catch (e) { serverFehler = e.message; }
+pruefe('Code pruefen mit user_banned: Text "gesperrt", Sitzung bleibt', /gesperrt/.test(serverFehler) && sitzung()?.refresh_token === 'r', serverFehler);
+// Eine Antwort ohne Kennung beim Erneuern (500) meldet weiter NICHT ab
+localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 }));
+mitAntwort(500, { msg: 'kaputt' });
+serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
+pruefe('Erneuern mit 500 ohne Kennung: Sitzung bleibt', /Serverfehler/.test(serverFehler) && sitzung()?.refresh_token === 'r', serverFehler);
 { // Anmelde-Link (Rueckfall ohne SMTP): Sitzung uebernehmen, Token aus der Adresse entfernen
   const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u9', email: 'link@b.de' })).toString('base64url') + '.x';
   let neu = null; const ort = { hash: `#access_token=${tok}&expires_in=3600&refresh_token=rl&token_type=bearer&type=magiclink`, pathname: '/schach/', search: '' };
