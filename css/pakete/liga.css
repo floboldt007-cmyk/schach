@@ -222,3 +222,33 @@
   transform: rotate(45deg) translateY(-2px); }
 .lg-gr-regeln[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
 .lg-gr-regeln p { margin: 0 0 8px; line-height: 1.45; }
+
+/* Weltrangliste nach Online-Elo (welt.js, G-006 AC-11, 14.11.2026): Kopf, Teilnahme mit Knopf, dann die Liste wie die
+   Gruppe (Banner-Streifen links, Name auf der Flaeche, rechts die Elo) */
+.lg-welt { gap: 12px; }
+.lg-welt-kopf h2 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); color: var(--text); }
+.lg-welt-kopf p { margin: 2px 0 0; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.lg-welt-teilnahme { display: grid; justify-items: start; gap: 10px; padding: 16px; border-radius: var(--r-xl); background: var(--flaeche);
+  box-shadow: var(--kante); }
+.lg-welt-teilnahme p { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.45; color: var(--text-2); }
+.lg-welt-teilnahme .lg-welt-stand { color: var(--text); }
+.lg-welt-meldung { margin: 0; font-size: 14px; font-weight: 600; color: var(--warn); }
+.lg-welt-leer { margin: 0; padding: 16px; font-size: 15px; font-weight: 600; color: var(--text-2); }
+.lg-welt-liste { display: grid; min-width: 0; margin: 0; padding: 0; list-style: none; border-radius: var(--r-xl); background: var(--flaeche);
+  box-shadow: var(--kante); overflow: hidden; }
+.lg-welt-zeile { position: relative; isolation: isolate; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center;
+  gap: 10px; min-height: 56px; padding: 6px 14px 6px 12px; }
+.lg-welt-zeile + .lg-welt-zeile { border-top: 1px solid var(--linie); }
+.lg-welt-zeile.ich { background: var(--gold-weich); box-shadow: inset 4px 0 0 var(--gold); }
+.lg-welt-streifen { position: absolute; inset: 0 auto 0 0; z-index: -1; width: 112px; background: center / cover no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, black 0, black 30%, transparent 80%); mask-image: linear-gradient(90deg, black 0, black 30%, transparent 80%);
+  opacity: .9; pointer-events: none; }
+.lg-welt-rang { justify-self: center; min-width: 30px; padding: 1px 4px; border-radius: var(--r-s); background: var(--flaeche);
+  box-shadow: 0 0 0 1px var(--linie); font-family: var(--display); font-weight: var(--gw-titel); font-size: 16px; color: var(--text);
+  text-align: center; font-variant-numeric: tabular-nums; }
+.lg-welt-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lg-welt-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: var(--text); }
+.lg-welt-du { flex: none; padding: 1px 6px; border-radius: var(--r-s); background: var(--gold); color: var(--auf-akzent); font-size: 12px; font-weight: 800; }
+.lg-welt-elo { display: inline-flex; align-items: baseline; gap: 4px; font-family: var(--display); font-weight: var(--gw-titel); font-size: 16px;
+  color: var(--text); font-variant-numeric: tabular-nums; }
+.lg-welt-elo small { font-family: inherit; font-size: 12px; font-weight: 700; color: var(--text-2); }

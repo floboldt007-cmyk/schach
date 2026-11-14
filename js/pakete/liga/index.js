@@ -11,6 +11,7 @@ import {
 } from './wertung.js';
 import { verlaufKarte, botBilanz, abrechnungsZeile } from './ansicht.js';
 import { reiterGruppe, huelleGruppe } from './gruppe.js';
+import { reiterWelt, huelleWelt } from './welt.js';
 import { protokolliere } from '../../protokoll.js';
 
 const MODUL = 'liga';
@@ -138,4 +139,7 @@ if (typeof document !== 'undefined') {
   // Wochen-Gruppe der Kronen-Liga (07.11.2026): erster Reiter der Bestenliste, Freunde (Paket punkte, 8) gleich dahinter
   anbieten('bestenliste:reiter', sicher((k) => (k && k.reiter === 'gruppe' ? reiterGruppe(k) : { el: huelleGruppe(), verlasse() {} })),
     { reihenfolge: 5, paket: MODUL });
+  // Weltrangliste nach Online-Elo (G-006 AC-11, 14.11.2026): letzter Reiter, nach Bots (20); nur mit eigener Zustimmung
+  anbieten('bestenliste:reiter', sicher((k) => (k && k.reiter === 'welt' ? reiterWelt() : { el: huelleWelt(), verlasse() {} })),
+    { reihenfolge: 30, paket: MODUL });
 }

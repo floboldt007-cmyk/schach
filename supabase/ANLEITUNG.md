@@ -505,6 +505,24 @@ kann kein Server verhindern; die Regeln oben begrenzen nur, wie viele Kronen so 
 dann alle Duelle, Duell-Rätsel und Duell-Funktionen. Cron selbst bleibt eingeschaltet, das stört nicht. Schon
 gebuchte Kronen aus Duellen bleiben stehen. Die Function danach im Dashboard unter **Edge Functions** löschen.
 
+## Weltrangliste nach Online-Elo (Stand 14.11.2026, vorbereitet, noch nicht eingespielt)
+
+Der Reiter „Welt“ in der Bestenliste zeigt Rang, Benutzername, Banner und Online-Elo. Gezeigt wird nur, wer selbst
+„Mitmachen“ tippt (Vorgabe aus), mindestens 15 gewertete Online-Partien hat und einen Benutzernamen trägt. Ein Banner,
+das dem Konto nicht gehört, erscheint als Start-Banner. **Vorher:** den neuen Absatz der Datenschutzerklärung prüfen
+und live stellen, denn die Online-Elo wird damit für alle angemeldeten Spieler sichtbar.
+
+| Nr. | Was | Datei | Prüfen (Erwartung) |
+| --- | --- | --- | --- |
+| 1 | Weltrangliste | `weltrang-schema.sql` | `weltrang-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK` |
+| 2 | Datenauskunft auf den neuen Stand | `daten-schema.sql` (noch einmal) | `daten-rls-test.sql`: unten `Daten-RLS-Test erfolgreich` |
+| 3 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
+
+Bis Schritt 1 eingespielt ist, zeigt der Reiter „Die Weltrangliste ist gerade nicht erreichbar“.
+
+**Rückweg:** `supabase/weltrang-zurueck.sql` entfernt beide Funktionen und die Tabelle der Zustimmungen (die
+Zustimmungen gehen dabei verloren, Elo und Liga bleiben). Danach `notify pgrst, 'reload schema';`.
+
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 
 Flo: „Die ersten 100 Spieler bekommen einen Titel freigeschaltet.“ Die Datei `supabase/pionier-schema.sql` gibt den
