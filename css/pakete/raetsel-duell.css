@@ -240,28 +240,10 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
   .raetsel-duell[data-phase="start"] .rd-buehne { grid-row: 2; }
   .raetsel-duell[data-phase="start"] .rd-freund { grid-row: 4; }
 }
-/* R17 ende-pc, Variante C (Auswahlseite R17, Flo waehlt): am PC sass die Ende-Karte oben, darunter bis zu 560 px Leere
-   (1920x1080). Hier steht sie senkrecht mittig und breiter (bis 960 px); rechts daneben der Verlauf: die Reihe der
-   Raetsel als nummerierte Liste (Nummer, Balken gruen/rot/leer), die Knoepfe ueber die ganze Breite darunter. Nur
-   Querformat ab 1021 px MIT Maus (hover und pointer fine): iPad quer (1180x820, Touch) hat dieselbe Breite und bleibt
-   unveraendert; gemessen in tests/r17-ende-pc.test.mjs. Unten derselbe Polster wie oben (wie die Lobby R9) */
+/* R17 ende-pc, Variante A (Auswahlseite R17, Flo waehlt): am PC sass die Ende-Karte oben, darunter bis zu 560 px Leere
+   (1920x1080). Hier steht sie senkrecht mittig im Rumpf. Nur Querformat ab 1021 px MIT Maus (hover und pointer fine):
+   iPad quer (1180x820, Touch) hat dieselbe Breite und bleibt unveraendert; gemessen in tests/r17-ende-pc.test.mjs.
+   Unten derselbe Polster wie oben (wie die Lobby R9): sonst stuende die Karte um 24 px + Leistenhoehe zu hoch */
 @media (orientation: landscape) and (min-width: 1021px) and (hover: hover) and (pointer: fine) {
-  .raetsel-duell[data-phase="beendet"] .rd-rumpf { align-content: center; padding-bottom: 6px;
-    padding-inline: max(var(--rand), calc((100% - 960px) / 2 + var(--rand))); }
-  .raetsel-duell[data-phase="beendet"] .rd-ende { display: grid; grid-template-columns: minmax(0, 1fr) 240px; column-gap: 40px; row-gap: 14px;
-    justify-items: center; align-items: center; padding: 32px 36px; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende > .rd-ende-paar { grid-area: 1 / 1; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende > h2 { grid-area: 2 / 1; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende > .rd-gross { grid-area: 3 / 1; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende > .rd-kronen { grid-area: 4 / 1; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende > .rd-knoepfe { grid-area: 5 / 1 / 6 / 3; justify-self: stretch; margin-top: 10px; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende > .rd-reihe { grid-area: 1 / 2 / 5 / 3; align-self: center; display: flex; flex-direction: column;
-    gap: 8px; width: 100%; counter-reset: rd-nr; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende .rd-reihe li { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; height: auto;
-    background: none; counter-increment: rd-nr; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende .rd-reihe li::before { content: counter(rd-nr); font-size: 14px; font-weight: 800;
-    font-variant-numeric: tabular-nums; color: var(--auf-buehne-2); text-align: left; }
-  .raetsel-duell[data-phase="beendet"] .rd-ende .rd-reihe li::after { content: ""; height: 14px; border-radius: var(--r-pille); background: rgba(255, 255, 255, .14); }
-  .raetsel-duell[data-phase="beendet"] .rd-ende .rd-reihe li[data-art="g"]::after { background: var(--gut); }
-  .raetsel-duell[data-phase="beendet"] .rd-ende .rd-reihe li[data-art="r"]::after { background: var(--warn); }
+  .raetsel-duell[data-phase="beendet"] .rd-rumpf { align-content: safe center; padding-bottom: 6px; }
 }
