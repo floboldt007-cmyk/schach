@@ -578,7 +578,7 @@ const GR_UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
 const GR_SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: GR_UID })).toString('base64url') + '.x', refresh_token: 'r1',
   expires_at: 9999999999, user: { id: GR_UID, email: 'probe@example.invalid' } };
 
-async function gruppeSeite(browser, start, { antwort, ligen = null, konto = true, w = 390, h = 844, modus = 'hell', sprache = 'de' }) {
+async function gruppeSeite(browser, start, { antwort, ligen = null, welt = null, konto = true, w = 390, h = 844, modus = 'hell', sprache = 'de' }) {
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: w < 700, reducedMotion: 'reduce', serviceWorkers: 'block' });
   const page = await kontext.newPage();
   const fehler = [];
@@ -598,6 +598,15 @@ async function gruppeSeite(browser, start, { antwort, ligen = null, konto = true
       if (ligen === 'fehlt') return r.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"PGRST202","message":"Could not find the function"}' });
       if (ligen[liga] === 'fehler') return r.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"kaputt"}' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ligen[liga] ?? null) });
+    }
+    // Weltrangliste (G-006 AC-11): welt = { liste, mitmachen(an) } je Antwort oder 'fehler' (500) / 'fehlt' (404)
+    if ((name === 'weltrang_liste' || name === 'weltrang_mitmachen') && welt) {
+      const daten = r.request().postDataJSON();
+      welt.aufrufe.push({ name, daten });
+      const a = name === 'weltrang_liste' ? welt.liste : welt.mitmachen(daten?.an);
+      if (a === 'fehlt') return r.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"PGRST202","message":"Could not find the function"}' });
+      if (a === 'fehler') return r.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"kaputt"}' });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(a) });
     }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
@@ -823,6 +832,123 @@ async function gruppeTeil(browser, start) {
   }
 }
 
+// Weltrangliste (G-006 AC-11): Reiter "Welt" mit abgefangenem Server (weltrang_liste, weltrang_mitmachen). Liste mit
+// gleichem Rang bei gleicher Elo, einer unbrauchbaren Zeile (faellt weg) und einem unbekannten Banner (wird Start-Banner).
+function probeWelt({ teilnahme = true, ich = { status: 'dabei', rang: 2, elo: 1640, name: 'flo', banner: 'start' } } = {}) {
+  return { ab: 15, teilnahme, ich, liste: [
+    { rang: 1, name: 'bert', banner: 'saison-gold', elo: 1912, ich: false },
+    { rang: 2, name: 'flo', banner: 'erfunden', elo: 1640, ich: teilnahme && ich.status === 'dabei' },
+    { rang: 2, name: 'zoe', banner: 'start', elo: 1640, ich: false },
+    { rang: 4, name: '', banner: 'start', elo: 1500, ich: false },
+  ] };
+}
+async function weltSeite(browser, start, { liste, mitmachen = () => 'fehler', sprache = 'de', konto = true }) {
+  const welt = { liste, mitmachen, aufrufe: [] };
+  const s = await gruppeSeite(browser, start, { antwort: probeGruppe(), welt, sprache, konto });
+  await s.page.locator('.bl-steuer-reiter :is([role="radio"], button)', { hasText: sprache === 'en' ? 'World' : 'Welt' }).click();
+  await s.page.waitForSelector('.lg-welt[data-zustand]:not([data-zustand="laedt"])', { timeout: 15000 });
+  return { ...s, welt };
+}
+
+async function weltTeil(browser, start) {
+  {
+    const { kontext, page, fehler, welt } = await weltSeite(browser, start, { liste: probeWelt(),
+      mitmachen: (an) => (an ? probeWelt() : probeWelt({ teilnahme: false, ich: { status: 'nicht_dabei' } })) });
+    try {
+      await browserPruefe('Welt: letzter Reiter, ohne Zeitfenster, fragt die besten 100 ab', async () => {
+        const reiter = await page.locator('.bl-steuer-reiter [role="radio"], .bl-steuer-reiter button').allInnerTexts();
+        assert.equal(reiter.at(-1).trim(), 'Welt', JSON.stringify(reiter));
+        assert.equal(await page.locator('.bl-screen').getAttribute('data-reiter'), 'welt');
+        assert.ok(await page.locator('.bl-steuer-fenster').isHidden());
+        assert.deepEqual(welt.aufrufe[0], { name: 'weltrang_liste', daten: { grenze: 100 } });
+      });
+      await browserPruefe('Welt: Liste nach Rang, gleiche Elo gleicher Rang, unbrauchbare Zeile faellt weg', async () => {
+        assert.equal(await page.locator('.lg-welt-kopf h2').innerText(), 'Weltrangliste');
+        assert.equal(await page.locator('.lg-welt-kopf p').innerText(), 'Nach Online-Elo, ab 15 gewerteten Online-Partien');
+        assert.deepEqual(await page.locator('.lg-welt-zeile .lg-welt-rang').allInnerTexts(), ['1', '2', '2']);
+        assert.deepEqual(await page.locator('.lg-welt-zeile .lg-welt-name b').allInnerTexts(), ['bert', 'flo', 'zoe']);
+        assert.match(await page.locator('.lg-welt-zeile').first().locator('.lg-welt-elo').innerText(), /1\.912$/);
+        assert.equal(await page.locator('.lg-welt-zeile').first().getAttribute('data-banner'), 'saison-gold');
+      });
+      await browserPruefe('Welt: eigene Zeile markiert, fremdes Banner wird Start-Banner, eigener Stand mit Platz und Elo', async () => {
+        assert.equal(await page.locator('.lg-welt-zeile.ich').count(), 1);
+        assert.equal(await page.locator('.lg-welt-zeile.ich').getAttribute('data-banner'), 'start');
+        assert.equal(await page.locator('.lg-welt-zeile.ich .lg-welt-du').innerText(), 'Du');
+        assert.equal(await page.locator('.lg-welt-stand').innerText(), 'Du bist auf Platz 2 · Elo 1.640');
+        assert.equal(await page.locator('.lg-welt-mitmachen').count(), 0);
+      });
+      await browserPruefe('Welt: "Nicht mehr zeigen" nimmt die Zustimmung zurueck, danach Erklaerung und "Mitmachen"', async () => {
+        await page.locator('.lg-welt-austreten').click();
+        await page.waitForSelector('.lg-welt[data-zustand="aus"]');
+        assert.deepEqual(welt.aufrufe.at(-1), { name: 'weltrang_mitmachen', daten: { an: false } });
+        assert.match(await page.locator('.lg-welt-erklaerung').innerText(), /Benutzernamen, dein Banner und deine Online-Elo/);
+        assert.equal(await page.locator('.lg-welt-mitmachen').innerText(), 'Mitmachen');
+        assert.equal(await page.locator('.lg-welt-zeile.ich').count(), 0);
+        assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('lg-welt-mitmachen')), true);
+      });
+      await browserPruefe('Welt: ohne Seitenfehler', async () => assert.deepEqual(fehler, []));
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page, welt } = await weltSeite(browser, start, { liste: probeWelt({ teilnahme: false, ich: { status: 'nicht_dabei' } }),
+      mitmachen: (an) => (an ? probeWelt({ ich: { status: 'zaehlt_noch', fehlen: 3 } }) : 'fehler') });
+    try {
+      await browserPruefe('Welt ohne Zustimmung: Erklaerung, "Mitmachen", keine eigene Zeile', async () => {
+        assert.equal(await page.locator('.lg-welt').getAttribute('data-zustand'), 'aus');
+        assert.match(await page.locator('.lg-welt-erklaerung').innerText(), /nur Spieler, die mitmachen.*ab 15 gewerteten Online-Partien/);
+        assert.equal(await page.locator('.lg-welt-zeile.ich').count(), 0);
+      });
+      await browserPruefe('Welt: "Mitmachen" mit 12 Partien zeigt "Noch 3 gewertete Online-Partien"', async () => {
+        await page.locator('.lg-welt-mitmachen').click();
+        await page.waitForSelector('.lg-welt[data-zustand="dabei"]');
+        assert.deepEqual(welt.aufrufe.at(-1), { name: 'weltrang_mitmachen', daten: { an: true } });
+        assert.equal(await page.locator('.lg-welt-stand').innerText(), 'Noch 3 gewertete Online-Partien, dann zählst du mit.');
+        assert.equal(await page.locator('.lg-welt-austreten').innerText(), 'Nicht mehr zeigen');
+      });
+      await browserPruefe('Welt: Fehler beim Austreten zeigt eine Meldung, die Liste bleibt', async () => {
+        await page.locator('.lg-welt-austreten').click();
+        await page.waitForSelector('.lg-welt-meldung');
+        assert.equal(await page.locator('.lg-welt-meldung').innerText(), 'Das hat gerade nicht geklappt. Bitte noch einmal versuchen.');
+        assert.equal(await page.locator('.lg-welt-zeile').count(), 3);
+        assert.equal(await page.locator('.lg-welt-austreten').isEnabled(), true);
+      });
+    } finally { await kontext.close(); }
+  }
+  for (const art of ['fehler', 'fehlt']) {
+    const { kontext, page } = await weltSeite(browser, start, { liste: art });
+    try {
+      await browserPruefe(`Welt: Server ${art === 'fehler' ? 'Fehler (500)' : 'ohne SQL (404)'} -> "gerade nicht erreichbar", keine Zahlen`, async () => {
+        assert.equal(await page.locator('.lg-welt').getAttribute('data-zustand'), 'fehler');
+        assert.equal(await page.locator('.lg-welt .lg-gr-karte p').innerText(),
+          'Die Weltrangliste ist gerade nicht erreichbar. Später noch einmal versuchen.');
+        assert.equal(await page.locator('.lg-welt-zeile, .lg-welt-mitmachen, .lg-welt-austreten').count(), 0);
+        assert.ok(!/\d/.test(await page.locator('.lg-welt').innerText()));
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page, welt } = await weltSeite(browser, start, { liste: probeWelt(), konto: false });
+    try {
+      await browserPruefe('Welt ohne Konto: ruhige Karte mit Link zum Konto, keine Abfrage', async () => {
+        assert.equal(await page.locator('.lg-welt').getAttribute('data-zustand'), 'ohne-konto');
+        assert.equal(await page.locator('.lg-welt .lg-gr-konto').getAttribute('href'), '#einstellungen/konto');
+        assert.equal(welt.aufrufe.length, 0);
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page } = await weltSeite(browser, start, { liste: probeWelt(), sprache: 'en' });
+    try {
+      await browserPruefe('Welt auf Englisch: Reiter, Kopf, Stand und Knopf', async () => {
+        assert.equal(await page.locator('.lg-welt-kopf h2').innerText(), 'World ranking');
+        assert.equal(await page.locator('.lg-welt-stand').innerText(), 'You are in place 2 · Elo 1,640');
+        assert.equal(await page.locator('.lg-welt-austreten').innerText(), 'Stop showing me');
+        assert.equal(await page.locator('.lg-welt-zeile.ich .lg-welt-du').innerText(), 'You');
+      });
+    } finally { await kontext.close(); }
+  }
+}
+
 let server, browser;
 try {
   nodeTeil();
@@ -856,6 +982,7 @@ try {
     browser = await browserTyp(pw).launch();
     await browserTeil(browser, `http://127.0.0.1:${server.address().port}/index.html`);
     await gruppeTeil(browser, `http://127.0.0.1:${server.address().port}/index.html`);
+    await weltTeil(browser, `http://127.0.0.1:${server.address().port}/index.html`);
   }
 } catch (e) {
   ergebnisse.push({ name: 'Testlauf', ok: false }); console.error('FEHLER Testlauf: ' + e.stack);

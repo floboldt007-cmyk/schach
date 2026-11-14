@@ -456,6 +456,13 @@ begin
       into raetsel using uid;
     kronen := kronen || jsonb_build_object('live_bewertung', raetsel);
   end if;
+  -- Weltrangliste (weltrang-schema.sql, 14.11.2026): ob und seit wann du in der Weltrangliste gezeigt werden willst
+  if to_regclass('public.weltrang_teilnahme') is not null then
+    execute 'select jsonb_build_object(''teilnahme'', t.user_id is not null, ''seit'', t.seit)
+             from (select 1) x left join public.weltrang_teilnahme t on t.user_id = $1'
+      into raetsel using uid;
+    kronen := kronen || jsonb_build_object('weltrang', raetsel);
+  end if;
   -- Visitenkarte und Erfolge (karte-schema.sql, Etappe 4b): erreichte Stufen, alle Taler-Buchungen, eigene Banner und die
   -- gewaehlte Karte (Banner, Titel, Vitrine, Profilbild)
   if to_regclass('public.karte_stufen') is not null then
