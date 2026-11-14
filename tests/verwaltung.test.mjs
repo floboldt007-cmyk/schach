@@ -9,7 +9,7 @@ import { setzeSpeicher } from '../js/storage.js';
 import { SITZUNG_SCHLUESSEL } from '../js/konto.js';
 import { setzeSprache } from '../js/sprache.js';
 import {
-  istVerwalter, konten, kaeufe, setzePremium, setzeName, setzeBanner, protokoll, setzeVerwaltungFetch, fehlerAus, KENNUNGEN,
+  istVerwalter, vergissVerwalter, konten, kaeufe, setzePremium, setzeName, setzeBanner, protokoll, setzeVerwaltungFetch, fehlerAus, KENNUNGEN,
 } from '../js/verwaltung.js';
 import { DE, EN } from '../js/pakete/verwaltung/texte.js';
 
@@ -61,6 +61,18 @@ aufrufe.length = 0;
 await istVerwalter();
 pruefe('anderes Konto fragt neu', aufrufe.length === 1);
 localStorage.setItem(SITZUNG_SCHLUESSEL, JSON.stringify(SITZUNG));
+// Abmelden verwirft die gemerkte Antwort: wer sich danach (auch mit demselben Konto) anmeldet, wird neu gefragt
+await istVerwalter();
+localStorage.removeItem(SITZUNG_SCHLUESSEL);
+aufrufe.length = 0;
+pruefe('abgemeldet: false, keine Anfrage', (await istVerwalter()) === false && aufrufe.length === 0);
+localStorage.setItem(SITZUNG_SCHLUESSEL, JSON.stringify(SITZUNG));
+await istVerwalter();
+pruefe('nach Ab- und neuer Anmeldung desselben Kontos: neu gefragt (Merker beim Abmelden verworfen)', aufrufe.length === 1, aufrufe.length);
+aufrufe.length = 0;
+vergissVerwalter();
+await istVerwalter();
+pruefe('vergissVerwalter (Weg der Gruppe beim Abmelden): naechster Aufruf fragt neu', aufrufe.length === 1, aufrufe.length);
 
 // ---------- Aufrufe ----------
 aufrufe.length = 0;

@@ -6,7 +6,7 @@
 //   starte(doc = document) -> { zeige() }   verdrahtet die Seite; Sprache aus <html lang>
 // Ein laufendes Stripe-Abo endet mit dem Konto nicht: Ist es im Geraet bekannt (js/abo.js), steht der Hinweis vor dem
 // zweiten Schritt. Die Seite zeigt den Hinweis ausserdem immer als festen Satz, weil ein fremder Browser den Stand nicht kennt.
-import { setzeSprache } from './sprache.js';
+import { setzeSprache, t } from './sprache.js';
 import { fordereCodeAn, pruefeCode, meldeMitGoogleAn, uebernimmLinkSitzung, sitzung, userId, abmelden, aktiveSitzung, erneuereSitzung } from './konto.js';
 import { loescheKonto } from './daten.js';
 import { botschutz } from './botschutz.js';
@@ -103,13 +103,25 @@ export function starte(doc = document) {
   // abmelden() entfernt die Sitzung sofort und wartet danach auf den Server: nicht darauf warten
   knopf('abmelden', () => { abmelden().catch(() => {}); melde(''); zeige(); });
   // Lehnt der Server ein lokal noch gueltiges Token ab (401, PGRST301/303), einmal erneuern und einmal wiederholen.
-  // Scheitert das, lokal abmelden: Die Seite zeigt dann die Anmeldung, statt weiter abgelehnte Aufrufe zu schicken.
+  // Ist der Refresh tot, hat js/konto.js die Sitzung schon entfernt: lokal abmelden, die Seite zeigt die Anmeldung.
+  // Steht dieselbe Sitzung noch da, scheiterte die Erneuerung am Netz oder am Server: angemeldet bleiben, wie beim Laden
+  // (Kaltreview 14.11.2026). Lehnt der Server auch das frische Token ab, eigener Text mit dem Mail-Weg.
   const abgelehnt = (f) => f?.status === 401 || f?.code === 'PGRST301' || f?.code === 'PGRST303';
+  // Ohne Netz der eigene Satz der Seite, nicht der aus den Einstellungen ("funktioniert weiter offline") oder der Datenseite
+  const OFFLINE = [t('einstellungen.konto.offline'), t('einstellungen.daten.verbindung')];
+  const eigen = (f) => (OFFLINE.includes(f?.message) ? new Error(text('offline')) : f);
   async function loescheMitErneuerung() {
     let erster;
-    try { return await loescheKonto(); } catch (f) { if (!abgelehnt(f)) throw f; erster = f; }
-    try { await erneuereSitzung(); } catch (f) { abmelden().catch(() => {}); throw erster; }
-    try { return await loescheKonto(); } catch (f) { if (abgelehnt(f)) abmelden().catch(() => {}); throw f; }
+    try { return await loescheKonto(); } catch (f) { if (!abgelehnt(f)) throw eigen(f); erster = f; }
+    const vorher = sitzung()?.refresh_token;
+    try { await erneuereSitzung(); } catch (f) {
+      if (vorher && sitzung()?.refresh_token === vorher) throw eigen(f);
+      abmelden().catch(() => {}); throw erster;
+    }
+    try { return await loescheKonto(); } catch (f) {
+      if (!abgelehnt(f)) throw eigen(f);
+      abmelden().catch(() => {}); throw new Error(text('abgelehnt'));
+    }
   }
   knopf('loeschen', async () => {
     melde(text('loescht'));
