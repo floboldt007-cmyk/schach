@@ -239,35 +239,35 @@
 .welt-svg .w-blase { fill: none; stroke: var(--welt-blase); stroke-width: 1.4; }
 .welt-svg .w-fisch { fill: var(--welt-fisch); } .welt-svg .w-tiefe { fill: var(--welt-tiefe); }
 
-/* ---------- Panorama (R19): hinten Skyline bzw. ferne Huegel, vorn Mauer bzw. Gras, Voegel; nur Turmstadt und Karofelder
+/* ---------- Panorama (R19, ruhige Variante B): hinten Skyline bzw. ferne Huegel, vorn Mauer bzw. Gras, ohne Bewegung; nur Turmstadt und Karofelder
    (js/ui/arena.js PANORAMA). Farben je Welt, hell und dunkel. ---------- */
 .arena .welt[data-welt="karofelder"] {
   --welt-fern: #A9C9A0; --welt-fern-2: #97BE8E; --welt-fern-baum: #86B27E; --welt-fern-mast: #8AA07A; --welt-fern-licht: transparent;
-  --welt-dunst: #FFFFFF; --welt-vogel: #4A5A78; --welt-rauch: rgba(255, 255, 255, .8);
+  --welt-dunst: #FFFFFF;
   --welt-vorn: #7CC465; --welt-vorn-2: #6AB656; --welt-vorn-mast: #4E8E44; --welt-vorn-fuge: transparent;
 }
 .arena .welt[data-welt="turmstadt"] {
   --welt-fern: #B4BFD6; --welt-fern-2: #A6B2CC; --welt-fern-baum: #A6B2CC; --welt-fern-mast: #7D88A3; --welt-fern-licht: rgba(255, 255, 255, .45);
-  --welt-dunst: #FFF4E2; --welt-vogel: #4A5470; --welt-rauch: rgba(255, 255, 255, .85);
+  --welt-dunst: #FFF4E2;
   --welt-vorn: #B9B2A2; --welt-vorn-2: #B9B2A2; --welt-vorn-mast: #6B6457; --welt-vorn-fuge: #A39B89;
 }
 :root[data-modus="dunkel"] .arena .welt[data-welt="karofelder"] {
   --welt-fern: #48604E; --welt-fern-2: #52694F; --welt-fern-baum: #3E5A44; --welt-fern-mast: #3A4C3C;
-  --welt-dunst: #6A5A7A; --welt-vogel: #C9CEDF; --welt-vorn: #3E6A36; --welt-vorn-2: #477540; --welt-vorn-mast: #2F5229;
+  --welt-dunst: #6A5A7A; --welt-vorn: #3E6A36; --welt-vorn-2: #477540; --welt-vorn-mast: #2F5229;
 }
 :root[data-modus="dunkel"] .arena .welt[data-welt="turmstadt"] {
   --welt-fern: #3A4362; --welt-fern-2: #333B58; --welt-fern-baum: #333B58; --welt-fern-mast: #59627E; --welt-fern-licht: #F2C96A;
-  --welt-dunst: #8A6A7E; --welt-vogel: #D6D9E6; --welt-rauch: rgba(220, 225, 240, .45);
+  --welt-dunst: #8A6A7E;
   --welt-vorn: #5B5F56; --welt-vorn-2: #5B5F56; --welt-vorn-mast: #3B3E37; --welt-vorn-fuge: #4A4E46;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-modus="system"] .arena .welt[data-welt="karofelder"] {
     --welt-fern: #48604E; --welt-fern-2: #52694F; --welt-fern-baum: #3E5A44; --welt-fern-mast: #3A4C3C;
-    --welt-dunst: #6A5A7A; --welt-vogel: #C9CEDF; --welt-vorn: #3E6A36; --welt-vorn-2: #477540; --welt-vorn-mast: #2F5229;
+    --welt-dunst: #6A5A7A; --welt-vorn: #3E6A36; --welt-vorn-2: #477540; --welt-vorn-mast: #2F5229;
   }
   :root[data-modus="system"] .arena .welt[data-welt="turmstadt"] {
     --welt-fern: #3A4362; --welt-fern-2: #333B58; --welt-fern-baum: #333B58; --welt-fern-mast: #59627E; --welt-fern-licht: #F2C96A;
-    --welt-dunst: #8A6A7E; --welt-vogel: #D6D9E6; --welt-rauch: rgba(220, 225, 240, .45);
+    --welt-dunst: #8A6A7E;
     --welt-vorn: #5B5F56; --welt-vorn-2: #5B5F56; --welt-vorn-mast: #3B3E37; --welt-vorn-fuge: #4A4E46;
   }
 }
@@ -275,30 +275,9 @@
 .welt-svg .w-fern { fill: var(--welt-fern); } .welt-svg .w-fern-2 { fill: var(--welt-fern-2); }
 .welt-svg .w-fern-baum { fill: var(--welt-fern-baum); } .welt-svg .w-fern-mast { fill: var(--welt-fern-mast); stroke: var(--welt-fern-mast); stroke-width: 1; }
 .welt-svg .w-fern-licht { fill: var(--welt-fern-licht); }
-.welt-svg .w-vogel { fill: none; stroke: var(--welt-vogel); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.welt-svg .w-rauch { fill: var(--welt-rauch); opacity: 0; }
-.welt-svg .w-wehen { fill: var(--welt-fahne); }
 .welt-svg .w-vorn { fill: var(--welt-vorn); } .welt-svg .w-vorn-2 { fill: var(--welt-vorn-2); }
 .welt-svg .w-vorn-mast { fill: none; stroke: var(--welt-vorn-mast); stroke-width: 2; stroke-linecap: round; }
 .welt-svg .w-vorn-fuge { fill: none; stroke: var(--welt-vorn-fuge); stroke-width: 1.4; stroke-linecap: round; }
-/* Leichtes Leben: Voegel ziehen, Rauch steigt, Fahnen wehen, Muehlenfluegel drehen sich */
-@keyframes w-zug { from { transform: translateX(var(--von)); } to { transform: translateX(var(--bis)); } }
-@keyframes w-rauch { 0% { transform: translate(0, 0) scale(.5); opacity: 0; } 20% { opacity: .9; } 100% { transform: translate(7px, -22px) scale(1.5); opacity: 0; } }
-@keyframes w-wehen { 0%, 100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(9deg) scaleX(.86); } }
-@keyframes w-dreh { to { transform: rotate(360deg); } }
-.welt-svg .w-zug { animation: w-zug 50s linear infinite; }
-.welt-svg .w-rauch { transform-box: fill-box; transform-origin: center; animation: w-rauch 5.1s ease-out infinite; }
-.welt-svg .w-wehen { transform-box: fill-box; transform-origin: left center; animation: w-wehen 2.6s ease-in-out infinite; }
-.welt-svg .w-fluegel { transform-box: fill-box; transform-origin: center; animation: w-dreh 12s linear infinite; }
-/* Ruhe: Voegel stehen am Himmel, Rauch als stille Fahne ueber dem Schornstein, Fluegel stehen */
-@media (prefers-reduced-motion: reduce) {
-  .welt-svg .w-zug, .welt-svg .w-wehen, .welt-svg .w-fluegel, .welt-svg .w-rauch { animation: none; }
-  .welt-svg .w-rauch { opacity: .55; }
-}
-:root[data-bewegung="aus"] .welt-svg :is(.w-zug, .w-wehen, .w-fluegel, .w-rauch) { animation: none; }
-:root[data-bewegung="aus"] .welt-svg .w-rauch { opacity: .55; }
-/* gesperrte Welt: kein Leben */
-.arena .welt.gesperrt .welt-svg :is(.w-zug, .w-wehen, .w-fluegel, .w-rauch) { animation: none; }
 
 /* ---------- Stationen (button.stufe.knoten[data-bot]) ---------- */
 .arena .knoten { --kn: var(--kn-basis); --bf: var(--linie-2); position: absolute; width: var(--kn); height: var(--kn);
