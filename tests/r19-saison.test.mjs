@@ -82,9 +82,9 @@ setzeSprache('de');
 
 for (const [datei, kopf, muss] of [
   ['datenschutz.html', '<h3>Seasons</h3>', ['8 Wochen', '4. Januar 2027', 'Crownmaster', 'Top 10', 'Top 100', 'mindestens 20 Online-Partien mit Kronen',
-    'mindestens 4 Halbzügen, höchstens 3 je Gegner und Tag', 'um 3 Stufen', 'Eine Rangliste mit Namen', 'automatisch mitgelöscht', 'Meine Daten herunterladen']],
+    'mindestens 4 Halbzügen, höchstens 3 je Gegner und Tag', 'um 3 Stufen', 'nur der Vergabe der Titel', 'automatisch mitgelöscht', 'Meine Daten herunterladen']],
   ['datenschutz-en.html', '<h3>Seasons</h3>', ['8 weeks', '4 January 2027', 'Crownmaster', 'Top 10', 'Top 100', 'at least 20 online games with crowns',
-    'at least 4 half-moves, at most 3 per opponent and day', 'by 3 tiers', 'We do not publish a ranking', 'deleted automatically', 'Download my data']],
+    'at least 4 half-moves, at most 3 per opponent and day', 'by 3 tiers', 'only used to award the titles', 'deleted automatically', 'Download my data']],
 ]) {
   const html = readFileSync(path.join(WURZEL, datei), 'utf8');
   const i = html.indexOf(kopf);
