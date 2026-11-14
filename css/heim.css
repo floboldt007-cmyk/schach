@@ -120,12 +120,9 @@
 }
 .heim-symbol { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--auf-akzent); }
 .heim-symbol svg { width: 20px; height: 20px; }
-/* R19 Lobby-Farbe: gefuellte Spiel-Symbole (js/ui/icons.js) auf einem Hauch ihrer Farbe statt Strich auf Vollfarbe */
-.heim-modus[data-weg="online"] { --sp: var(--sp-blitz); }
-.heim-modus[data-weg="raetsel"] { --sp: var(--sp-raetsel); }
-.heim-modus[data-weg="zuzweit"] { --sp: var(--sp-freunde); }
-.heim-modus[data-weg] .heim-symbol { background: color-mix(in srgb, var(--sp) 18%, transparent); }
-.heim-symbol .sy { width: 90%; height: 90%; }
+.heim-modus[data-weg="online"] .heim-symbol { background: var(--akzent); }
+.heim-modus[data-weg="raetsel"] .heim-symbol { background: var(--gut); color: var(--kg-stark); }
+.heim-modus[data-weg="zuzweit"] .heim-symbol { background: var(--gold); color: var(--kg-stark); }
 .heim-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .heim-text b { font-size: 15px; font-weight: var(--gw-stark); color: var(--text); }
 .heim-text span { font-size: 12.5px; font-weight: 600; color: var(--text-2); }

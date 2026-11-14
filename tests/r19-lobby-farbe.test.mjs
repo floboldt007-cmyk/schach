@@ -1,8 +1,9 @@
 // R19 Lobby-Farbe (Flo 14.11.2026: "ist nur orange und schwarz, die Symbole da unten sind so herzlos, Raetsel oder Blitz"):
-// gefuellte, mehrfarbige Spiel-Symbole (js/ui/icons.js spielSymbol) in der Lobby (Spielarten, Mehr Spielarten), auf der
-// Startseite (Wege) und in der unteren Leiste, eine Akzentfarbe je Spielart. Geprueft wird an echten Pixeln: jedes
-// sichtbare Symbol hebt sich mit mindestens 3:1 vom Grund ab (WCAG 1.4.11), hell und dunkel, Handy und PC; die
-// Startseite scrollt nicht. Satz A (Spiel-Symbole) oder B (Schach-Figuren) steht in SYMBOL_SATZ.
+// gefuellte, mehrfarbige Spiel-Symbole (js/ui/icons.js spielSymbol) in der Lobby (Spielarten, Mehr Spielarten) und in
+// der unteren Leiste, eine Akzentfarbe je Spielart. Geprueft wird an echten Pixeln: jedes sichtbare Symbol hebt sich mit
+// mindestens 3:1 vom Grund ab (WCAG 1.4.11), hell und dunkel, Handy und PC. Die Startseite bleibt wie vorher (Flos Wahl
+// 14.11. abends: Strich-Icons auf Vollfarbe, keine Spiel-Symbole) und scrollt nicht. Satz A (Spiel-Symbole) oder B
+// (Schach-Figuren) steht in SYMBOL_SATZ.
 //   node tests/r19-lobby-farbe.test.mjs
 //   AUS=<ordner> node tests/r19-lobby-farbe.test.mjs   dazu Bilder nach <ordner>/<satz>/<seite>-<breite>x<hoehe>-<modus>.png
 import { createRequire } from 'node:module';
@@ -205,17 +206,14 @@ try {
       const p = await seite(browser, { breite, hoehe, modus, hash: 'heim' });
       await p.s.waitForSelector('.heim-screen', { timeout: 15000 });
       await warte(500);
-      const lage = await p.s.evaluate(() => ({ wege: document.querySelectorAll('.heim-modus .heim-symbol .sy').length,
+      // Flo 14.11. abends: "Die Startseite gefaellt mir nicht, die hat mir vorher mehr gefallen" -> Wege wie vorher:
+      // Strich-Icon auf Vollfarbe, keine Spiel-Symbole, keine --sp-*-Kacheln
+      const lage = await p.s.evaluate(() => ({ sy: document.querySelectorAll('.heim-modus .sy').length,
+        ico: document.querySelectorAll('.heim-modus .heim-symbol .ico').length,
+        sp: [...document.querySelectorAll('.heim-modus')].filter((m) => getComputedStyle(m).getPropertyValue('--sp').trim() !== '').length,
         scrollt: document.scrollingElement.scrollHeight > innerHeight + 1 || document.scrollingElement.scrollWidth > innerWidth + 1 }));
-      pruefe(`${wer} Startseite: drei Wege mit Spiel-Symbol, nichts scrollt`, lage.wege === 3 && !lage.scrollt, lage);
-      const schwach = [];
-      for (const el of await p.s.locator('.heim-modus .heim-symbol .sy').all()) {
-        if (!(await el.isVisible())) continue;
-        const r = await pixelKontrast(p.s, el);
-        if (!(r.anteil >= 0.1)) schwach.push({ cls: await el.getAttribute('class'), ...r });
-      }
-      pruefe(`${wer} Startseite: Symbole mind. 3:1`, schwach.length === 0, schwach);
-      if (AUS) await p.s.screenshot({ path: path.join(AUS, SATZ, `heim-${breite}x${hoehe}-${modus}.png`) });
+      pruefe(`${wer} Startseite wie vorher: drei Wege mit Strich-Icon, kein Spiel-Symbol, keine --sp-Kachel, nichts scrollt`,
+        lage.sy === 0 && lage.ico === 3 && lage.sp === 0 && !lage.scrollt, lage);
       pruefe(`${wer} Startseite: keine Seitenfehler`, p.fehlerListe.length === 0, p.fehlerListe);
       await p.k.close();
     }
