@@ -107,16 +107,19 @@ export function starte(doc = document) {
   // Steht dieselbe Sitzung noch da, scheiterte die Erneuerung am Netz oder am Server: angemeldet bleiben, wie beim Laden
   // (Kaltreview 14.11.2026). Lehnt der Server auch das frische Token ab, eigener Text mit dem Mail-Weg.
   const abgelehnt = (f) => f?.status === 401 || f?.code === 'PGRST301' || f?.code === 'PGRST303';
+  // Ohne Netz der eigene Satz der Seite, nicht der aus den Einstellungen ("funktioniert weiter offline") oder der Datenseite
+  const OFFLINE = [t('einstellungen.konto.offline'), t('einstellungen.daten.verbindung')];
+  const eigen = (f) => (OFFLINE.includes(f?.message) ? new Error(text('offline')) : f);
   async function loescheMitErneuerung() {
     let erster;
-    try { return await loescheKonto(); } catch (f) { if (!abgelehnt(f)) throw f; erster = f; }
+    try { return await loescheKonto(); } catch (f) { if (!abgelehnt(f)) throw eigen(f); erster = f; }
     const vorher = sitzung()?.refresh_token;
     try { await erneuereSitzung(); } catch (f) {
-      if (vorher && sitzung()?.refresh_token === vorher) throw f?.message === t('einstellungen.konto.offline') ? new Error(text('offline')) : f;
+      if (vorher && sitzung()?.refresh_token === vorher) throw eigen(f);
       abmelden().catch(() => {}); throw erster;
     }
     try { return await loescheKonto(); } catch (f) {
-      if (!abgelehnt(f)) throw f;
+      if (!abgelehnt(f)) throw eigen(f);
       abmelden().catch(() => {}); throw new Error(text('abgelehnt'));
     }
   }

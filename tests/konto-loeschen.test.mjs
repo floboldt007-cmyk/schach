@@ -38,7 +38,7 @@ function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`
 const browser = await browserTyp(pw).launch({ headless: true });
 
 // otp/verify/rpc/token: { status, body } statt der Erfolgsantwort (rpc auch als Liste je Aufruf, null = Erfolg);
-// token.abbruch: die Verbindung zum Token-Endpunkt bricht ab;
+// token.abbruch: die Verbindung zum Token-Endpunkt bricht ab; rpc.abbruch: dasselbe fuer konto_loeschen;
 // rpcMs: Antwort von konto_loeschen verzoegert;
 // lokal: Eintraege im localStorage vor dem Laden
 async function umgebung({ otp = null, verify = null, rpc = null, token = null, rpcMs = 0, lokal = {}, breite = 390 } = {}) {
@@ -61,6 +61,7 @@ async function umgebung({ otp = null, verify = null, rpc = null, token = null, r
       z.aufrufe.loeschen++;
       if (rpcMs) await new Promise((w) => setTimeout(w, rpcMs));
       const a = Array.isArray(z.rpc) ? z.rpc[z.aufrufe.loeschen - 1] : z.rpc;
+      if (a?.abbruch) return r.abort('internetdisconnected');
       return a ? antwort(a.body, a.status) : r.fulfill({ status: 204, body: '' });
     }
     if (u.pathname === '/auth/v1/logout') { z.aufrufe.logout++; return r.fulfill({ status: 204, body: '' }); }
@@ -267,8 +268,9 @@ try {
   { // 12. Server lehnt ein lokal gueltiges Token ab (401 PGRST301): einmal erneuern, einmal wiederholen
     const abgelehnt = { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } };
     // nochmal: zweiter Klick nach dem Fehler (Dauerfeuer-Probe); bleibt die Seite angemeldet, ist er ein neuer Versuch
-    const lauf = async (opt, adresse = DE, nochmal = true) => {
-      const { k, z } = await umgebung({ ...opt, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
+    // sitz: die Sitzung im Geraet vor dem Laden (Standard: lokal noch gueltig)
+    const lauf = async (opt, adresse = DE, nochmal = true, sitz = SITZUNG) => {
+      const { k, z } = await umgebung({ ...opt, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(sitz) } });
       const s = await seite(k, z, adresse);
       const T = await s.evaluate(() => JSON.parse(document.getElementById('kl-texte').textContent));
       await s.locator('[data-kl="weiter"]').click();
@@ -288,6 +290,10 @@ try {
     const b = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } });
     pruefe('401, Refresh tot: lokal abgemeldet, Anmeldung sichtbar, Fehlertext, kein weiterer rpc',
       b.anmelden && !b.angemeldet && !b.sitzung && b.st.fehler === 'ja' && b.z.aufrufe.token === 1 && b.z.aufrufe.loeschen === 1, { aufrufe: b.z.aufrufe, st: b.st });
+    // Kaltreview loeschseite-2, Hinweis 2: der Text sagt, dass die Anmeldung abgelaufen ist (de und en)
+    pruefe('401, Refresh tot: Text "abgelaufen"', /abgelaufen/i.test(b.st.text), b.st);
+    const bEn = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } }, EN);
+    pruefe('en: 401, Refresh tot: lokal abgemeldet, Text "expired"', !bEn.sitzung && bEn.anmelden && /expired/i.test(bEn.st.text), bEn.st);
     const c = await lauf({ rpc: [abgelehnt, abgelehnt] });
     pruefe('401, Refresh klappt, wieder 401: lokal abgemeldet, Anmeldung sichtbar, genau zwei rpc',
       c.anmelden && !c.angemeldet && !c.sitzung && c.st.fehler === 'ja' && c.z.aufrufe.token === 1 && c.z.aufrufe.loeschen === 2, { aufrufe: c.z.aufrufe, st: c.st });
@@ -305,6 +311,19 @@ try {
     const f = await lauf({ rpc: [abgelehnt, abgelehnt] }, EN);
     pruefe('en: 401, Refresh klappt, wieder 401: englischer eigener Text',
       /sign in again/i.test(f.T.abgelehnt || '') && f.st.text === f.T.abgelehnt && !f.sitzung, { st: f.st });
+    // Kaltreview loeschseite-2, Hinweis 3: ohne Netz zeigt die Seite ihren eigenen Verbindungstext, nicht den der
+    // Einstellungen ("Die App funktioniert weiter offline") oder der Datenseite. Lokal schon abgelaufene Sitzung: die
+    // Erneuerung scheitert vor dem Loeschaufruf; frische Sitzung: der Loeschaufruf selbst scheitert am Netz
+    for (const [name, adresse] of [['de', DE], ['en', EN]]) {
+      const g = await lauf({ token: { abbruch: true } }, adresse, false, { ...SITZUNG, expires_at: 1 });
+      pruefe(`${name}: lokal abgelaufen und offline: eigener Verbindungstext der Seite, angemeldet, kein Loeschaufruf`,
+        g.st.text === g.T.offline && g.st.fehler === 'ja' && g.angemeldet && g.sitzung && g.z.aufrufe.loeschen === 0 && g.frei,
+        { st: g.st, soll: g.T.offline, aufrufe: g.z.aufrufe });
+      const h = await lauf({ rpc: { abbruch: true } }, adresse, false);
+      pruefe(`${name}: Loeschaufruf offline: eigener Verbindungstext der Seite, angemeldet, genau ein Aufruf`,
+        h.st.text === h.T.offline && h.st.fehler === 'ja' && h.angemeldet && h.sitzung && h.z.aufrufe.loeschen === 1 && h.frei,
+        { st: h.st, soll: h.T.offline, aufrufe: h.z.aufrufe });
+    }
   }
 } finally {
   await browser.close(); server.close();
