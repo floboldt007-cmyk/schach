@@ -191,8 +191,8 @@
   <p>Processing is necessary to provide the account (Art. 6 Abs. 1 lit. b DSGVO, GDPR). The data is retained until you
   delete your account. You can do so at any time in the app under Settings → Data → Delete account.
   We then immediately delete everything associated with your account in our database: the account and authentication
-  data (including the Google or Apple link), username, friendships, requests, invite code and weekly score, cloud progress, shared games and usage data, and the
-  authentication log.
+  data (including the Google or Apple link), username, friendships, requests, invite code and weekly score, cloud progress, shared games and usage data, the
+  authentication log and the administration log.
   Exception for the subscription: technical payment events from Stripe (section 7) remain without your account ID but
   with the Stripe customer number until they are deleted at the next incoming payment event after 90 days. A running
   subscription does not end with the account; cancel it first (with an active subscription the app points this out when
@@ -206,12 +206,15 @@
   <!-- DRAFT stage 4b (player card): legal review by Flo before going live on main -->
   <h3>Player card, achievements and thalers</h3>
   <p>With an account, we store which achievement tiers (bronze, silver, gold) you have reached, the thalers those tiers
-  credited to you, which banners you own and what your player card looks like (banner, a title from a fixed list, profile
-  picture, background, frame and up to three achievements on show). Without an account, all of this stays on your device.
+  credited to you, which banners you own and what your player card looks like (banner, a title from a fixed list or a special
+  title such as "Creator" or "Pioneer" that you own, profile picture, background, frame and up to three achievements on show). Without an account, all of this stays on your device.
   This data is necessary for the app's features (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in
   Frankfurt, just like your account.</p>
   <p>Your player card is visible only to the person playing the same online game with you (invited or via matchmaking):
-  your username, title, banner, profile picture, league tier and the achievements on show. Your weekly league group and
+  your username, title, banner, profile picture, league tier, the achievements on show and, in rated games, your online
+  Elo. Games with friends remain without Elo. Special titles such as "Creator" or "Pioneer" (with a number) are seen only
+  by your opponent in a shared online game, and only if the server confirms that you own them; otherwise the app shows
+  them only on your own card. Your weekly league group and
   your opponents in the puzzle duel cannot see it, nor can other users or visitors without an account.
   Download my data includes this data. If your account is deleted, it is deleted automatically too.</p>
 
@@ -325,6 +328,19 @@
   <p>The first 100 accounts receive the title "Pioneer" with a number. For this we store which number was assigned to your
   account and when (Art. 6 Abs. 1 lit. b DSGVO, GDPR). If you delete your account, the number remains without your account
   ID so that it is never issued a second time.</p>
+
+  <!-- Sources administration, retrieved 13.11.2026: see the German page (BfDI text edition, EDPB Guidelines 01/2022). -->
+  <h3>Administration by the operator</h3>
+  <p>The operator (section 1) can view individual accounts through an internal admin tool: email address, time of creation
+  and last sign-in, sign-in method, username, premium and subscription status, purchases, special items and banners with
+  their origin. In individual cases, for example at your
+  request or after an error, the operator can grant or revoke premium, change your username, grant banners and remove
+  banners it granted there. A subscription through Stripe that has not been finally ended is never changed by the admin tool. We store each
+  of these changes with the state before and after and the time in a log. Other users have no access to it.</p>
+  <p>The legal basis for the changes is your user agreement (Art. 6 Abs. 1 lit. b DSGVO, GDPR). We keep the log based on
+  our legitimate interest in being able to trace changes to accounts and to clear up errors or misuse (Art. 6 Abs. 1
+  lit. f DSGVO, GDPR). The log about your account is part of your data export (section 13) and is deleted when you delete
+  your account.</p>
 
   <h2>6. Sharing games and usage data (optional, with consent)</h2>
   <p>With an account, you can turn on Share games and usage under Settings → Data. It is off by default.
