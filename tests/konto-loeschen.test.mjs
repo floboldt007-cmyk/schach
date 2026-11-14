@@ -91,7 +91,7 @@ try {
     const { k, z } = await umgebung();
     const s = await seite(k, z, DE);
     pruefe('de: Seite laedt, Titel „Konto löschen“, lang de', /Konto löschen/.test(await s.locator('h1').textContent()) && (await s.evaluate(() => document.documentElement.lang)) === 'de');
-    pruefe('de: Mail-Weg an kontakt@anfrageprofi.de mit Betreff', /^mailto:kontakt@anfrageprofi\.de\?subject=/.test(await s.locator('a.kl-mail').getAttribute('href') || ''));
+    pruefe('de: Mail-Weg an kontakt@crownmate.de mit Betreff', /^mailto:kontakt@crownmate\.de\?subject=/.test(await s.locator('a.kl-mail').getAttribute('href') || ''));
     pruefe('ohne Anmeldung: kein Loeschknopf sichtbar', !(await sichtbar(s, '[data-kl="weiter"]')) && !(await sichtbar(s, '[data-kl="loeschen"]')));
     await codeAnmelden(s);
     pruefe('Code-Anmeldung: „angemeldet als“ mit der E-Mail', (await sichtbar(s, '.kl-angemeldet')) && /flo@example\.invalid/.test(await s.locator('.kl-wer').textContent()));

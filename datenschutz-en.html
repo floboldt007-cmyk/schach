@@ -31,13 +31,8 @@
   ul { padding-left: 1.2em; }
   a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
   .stand { color: var(--text-2); font-size: var(--fs-klein); }
-  .entwurf { margin: 0 0 var(--a5); padding: var(--a4); border: 2px solid var(--warn); border-radius: var(--r-l); background: var(--warn-weich); }
-  .entwurf p { margin: 0; }
-  .entwurf b { display: block; margin-bottom: var(--a1); }
   .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
   .kasten p:last-child, .kasten ul:last-child { margin-bottom: 0; }
-  .platz { padding: 0 .3em; border-radius: var(--r-s); background: var(--flaeche-2); border: 1px dashed var(--linie-2); color: var(--text-2);
-    -webkit-box-decoration-break: clone; box-decoration-break: clone; overflow-wrap: anywhere; }
   .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
     border: 1px solid var(--linie); text-decoration: none; font-weight: var(--gw-stark); }
   .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
@@ -49,20 +44,15 @@
   <p><a class="zurueck" href="./#einstellungen">Back to Crownmate</a></p>
   <p class="stand">This is a courtesy translation. <a href="datenschutz.html" lang="de" hreflang="de">The German version is legally binding.</a></p>
   <h1>Privacy Policy</h1>
-  <p class="stand">Draft, last updated November 2026</p>
+  <p class="stand">Last updated November 2026</p>
 
-  <div class="entwurf" role="note">
-    <p><b>Draft. Have a qualified person review this before publication.</b>
-    Only the provider details in square brackets are still open. This text does not apply until it has been reviewed.</p>
-  </div>
 
   <h2>1. Who is responsible?</h2>
   <div class="kasten">
     <p>Florian Boldt<br>
     Gartenstrasse 49<br>
     51379 Leverkusen, Germany<br>
-    Email: <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a>
-    <span class="platz">[Provider details as in the legal notice; set a dedicated email address for Crownmate]</span></p>
+    Email: <a href="mailto:kontakt@crownmate.de">kontakt@crownmate.de</a></p>
   </div>
   <p>Crownmate is a chess app that runs in your browser (a web app). This policy explains what data the app processes,
   why, on what legal basis, and what rights you have.</p>
@@ -170,7 +160,7 @@
        https://www.gesetze-im-internet.de/ttdsg/__25.html; DSK OH Digitale Dienste 1.2 (Nov. 2024) Rn. 24, 74, 83;
        EDSA Guidelines 2/2023 v2.0 Rn. 33; localStorage cf.turnstile.u gemessen am 09.11.2026 (Beleg in
        .code-guardian-rechtsbelege.md). Ob § 25 Abs. 2 Nr. 2 auch Cloudflares eigenen Zweck traegt, ist offen. Pruefung durch eine fachkundige Person
-       steht aus (Entwurf, siehe Kasten oben). -->
+       steht aus. -->
   <p id="botschutz"><b>Bot protection at sign-in (Cloudflare Turnstile, once switched on):</b> To stop programs from creating
   accounts or triggering sign-in emails in bulk, a service from Cloudflare, Inc., 101 Townsend St., San Francisco,
   CA 94107, USA, checks whether a human is using the sign-in. The app loads the check only when you open the sign-in in
@@ -192,7 +182,8 @@
   delete your account. You can do so at any time in the app under Settings → Data → Delete account.
   We then immediately delete everything associated with your account in our database: the account and authentication
   data (including the Google or Apple link), username, friendships, requests, invite code and weekly score, cloud progress, shared games and usage data, the
-  authentication log and the administration log.
+  authentication log and the administration log, plus everything named in the sections below (player card, league,
+  puzzle duels, online games, school mode), your subscription status (section 7) and the coach counters (section 8).
   Exception for the subscription: technical payment events from Stripe (section 7) remain without your account ID but
   with the Stripe customer number until they are deleted at the next incoming payment event after 90 days. A running
   subscription does not end with the account; cancel it first (with an active subscription the app points this out when
@@ -306,7 +297,8 @@
   like your account. If you leave a class, your row is deleted; if the leader deletes a class, the whole class is deleted.
   Closed classes are deleted 90 days after closing at the next clean-up. To prevent codes from being guessed, we count
   wrong codes per account and day and delete these counters after two days (Art. 6 Abs. 1 lit. f DSGVO, GDPR). Everything
-  is deleted automatically with your account.</p>
+  is deleted automatically with your account. If the leader deletes their account, their classes are deleted too, with
+  all member rows, figures and tasks; the members' accounts remain.</p>
 
   <h3>Shop: editions</h3>
   <p>The shop offers limited, numbered editions. They are visible only to people who are signed in and have stated that
@@ -417,7 +409,7 @@
   that, only with your parents' approval (Art. 8(1) DSGVO, GDPR). The switch is therefore off by default, and the app
   explains this right beside it. Editions in the shop are available only from 18 (section "Shop: editions"). Parents can
   request information about an account or its deletion at
-  <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a>.</p>
+  <a href="mailto:kontakt@crownmate.de">kontakt@crownmate.de</a>.</p>
 
   <h2>13. Your rights</h2>
   <ul>
