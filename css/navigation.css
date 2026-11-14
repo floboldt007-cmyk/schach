@@ -61,7 +61,8 @@
   .screen .haupt-kopf .kopf-chips > .chip { margin-block: -3px; }
   .screen .haupt-kopf .kopf-chips > .chip:not(:first-child)::after { top: 14px; bottom: 14px; }
 }
-.screen .haupt-kopf .kopf-chips > .chip:hover { background: var(--flaeche-2); }
+/* Zeiger-Zustand nur auf Geraeten mit Zeiger: auf dem Handy bliebe :hover nach dem Tippen stehen (R18 hover-rest) */
+@media (hover: hover) { .screen .haupt-kopf .kopf-chips > .chip:hover { background: var(--flaeche-2); } }
 .screen .haupt-kopf .kopf-knopf { flex: none; width: 46px; height: 46px; border-radius: var(--r-m); border: 0; box-shadow: var(--s1), var(--kante); }
 .haupt-kopf .kopf-knopf .ico { width: 22px; height: 22px; }
 .haupt-kopf .kopf-zurueck { margin-right: 2px; }
