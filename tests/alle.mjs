@@ -117,6 +117,7 @@ const SUITEN = [
   { name: 'emotes', datei: 'emotes.test.mjs', args: [], was: 'Paket Emotes: Rad, Schnell-Chat, Bot-Antwort und Barrierefreiheit' },
   { name: 'sammlung', datei: 'sammlung.test.mjs', args: [], was: 'Paket Sammlung: Reiter Ich, Bereiche mit Schloss, Erfolge' },
   { name: 'bretter-65', datei: 'bretter-65.test.mjs', args: [], was: '65 Bretter: Katalog, Gleichlauf mit tokens.css, Kontrast und Figuren-Lesbarkeit, Glanz nur ohne weniger Bewegung' },
+  { name: 'bretter-oberflaechen', datei: 'bretter-oberflaechen.test.mjs', args: [], was: 'Brett-Oberflaechen: Seltenheit gewoehnlich, Oberflaeche je seltenem Brett, Farbabstand, Kontrast mit Oberflaeche, Feldausschnitt im Browser' },
   { name: 'lernen', datei: 'lernen.test.mjs', args: [], was: 'Paket lernen: Meisterschule, leicht gratis, Rest im Trainer, Lektionen mit Engine-Verteidigung' },
   { name: 'lobby', datei: 'lobby.test.mjs', args: [], was: 'Paket lobby: Online-Lobby als Vorschau im Labor (Umschalter, Bedenkzeiten, Suche, Partie mit Uhr)' },
   { name: 'finisher', datei: 'finisher.test.mjs', args: [], was: 'Paket Finisher: Freischaltung und sichere Standardwahl' },

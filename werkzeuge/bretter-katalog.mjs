@@ -1,11 +1,13 @@
 // Die 65 Bretter als eine Liste fuer Vorschau und Auswahl-Liste (Flo 14.11.2026). Nur fuer Werkzeuge, nicht in der App:
 // Browser (werkzeuge/bretter-vorschau.html) und Node (werkzeuge/bretter-vorschau.mjs) lesen dieselben Texte und Zahlen.
-//   alleBretter() -> [{ id, hell, dunkel, rand, familie, seltenheit, weg, welt?, muster?, bewegung?, glanz?, alt }]
+//   alleBretter() -> [{ id, hell, dunkel, rand, familie, seltenheit, weg, welt?, muster?, flaeche?, bewegung?, glanz?, alt }]
 //                    alt: eines der 13 Bretter von vor dem 14.11.2026
 //   wegText(weg, weltName) -> string     der geplante Weg in Worten (Schwellen wie js/pakete/sammlung/stufen.js)
 //   brettMass(b) -> { feld, weissAufDunkel, schwarzAufDunkel, schwarzAufHell }   WCAG-Kontraste, schlechteste Stelle mit
-//                    jeder Farbe der Feldzeichnung und dem Glanz darueber (gleiche Regel wie tests/bretter-65.test.mjs)
+//                    allen aufhellenden bzw. abdunkelnden Toenen der Zeichnung oder Oberflaeche und dem Glanz uebereinander
+//                    (gleiche Regel wie tests/bretter-oberflaechen.test.mjs)
 import { LABOR_BRETTER, FREIE_BRETTER_PLAN } from '../js/labor.js';
+import { brettMuster } from '../js/brett-flaechen.js';
 
 const FREI = Object.freeze({ nacht: ['#e4e8f6', '#7c87b6', '#2A3150'], gruen: ['#eeeed2', '#769656', '#3E5A2A'], holz: ['#f0d9b5', '#b58863', '#6E4420'] });
 const ALT = new Set(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron', 'acker', 'moos', 'pflaster', 'brandung', 'tiefsee']);
@@ -46,14 +48,17 @@ const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.04045 
   .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
 const kontrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 const ueber = (u, o) => u.map((v, i) => (i < 3 ? v * (1 - o[3]) + o[i] * o[3] : 1));
+// schlechteste Stellen: alle aufhellenden bzw. alle abdunkelnden Toene uebereinander (Oberflaechen kreuzen sich)
 const stellen = (grund, zeichnung, glanz) => {
   const g = farbe(grund);
-  const oben = [...String(zeichnung || '').matchAll(/rgba\([^)]*\)/g)].map((m) => farbe(m[0])).filter(Boolean);
+  const oben = [...new Set(String(zeichnung || '').match(/rgba\([^)]*\)/g) || [])].map(farbe).filter(Boolean);
   if (glanz) oben.push(farbe(glanz));
-  return [g, ...oben.map((o) => ueber(g, o))];
+  const hell = oben.filter((o) => lum(ueber(g, o)) > lum(g)), dunkel = oben.filter((o) => lum(ueber(g, o)) <= lum(g));
+  return [g, hell.reduce(ueber, g), dunkel.reduce(ueber, g)];
 };
 export function brettMass(b) {
-  const H = stellen(b.hell, b.muster && b.muster.h, b.glanz), D = stellen(b.dunkel, b.muster && b.muster.d, b.glanz);
+  const m = brettMuster(b) || b.muster;
+  const H = stellen(b.hell, m && m.h, b.glanz), D = stellen(b.dunkel, m && m.d, b.glanz);
   const min = (l) => Math.min(...l);
   return {
     feld: min(H.flatMap((h) => D.map((d) => kontrast(h, d)))),

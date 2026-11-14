@@ -91,7 +91,10 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
   }).map((b) => b.id);
   pruefe('Welten-Bretter: je Welt drei (Welt 1 bis 5), jede Zeichnung im Spiel und im Sammelbild gleich',
     welten.map((b) => b.welt).sort().join() === '1,1,1,2,2,2,3,3,3,4,4,4,5,5,5' && abweichend.length === 0, abweichend);
-  pruefe('Welten-Bretter: das Sammelbild trägt die Zeichnung je Feld, die Themen-Bretter ohne', (brettKunst('#fff', '#000', '#111', '', welten[0].muster).match(/class="sk-muster"/g) || []).length === 9
+  // seit den Oberflaechen (14.11.2026) zeichnen nur noch die gewoehnlichen je Feld (Heuboden ist ein Welten-Brett); die
+  // seltenen tragen eine Oberflaeche aus js/brett-flaechen.js, Spiel und Sammelbild nehmen sie aus brettMuster
+  const jeFeld = welten.find((b) => b.muster);
+  pruefe('Welten-Bretter: das Sammelbild trägt die Zeichnung je Feld, die Themen-Bretter ohne', !!jeFeld && (brettKunst('#fff', '#000', '#111', '', jeFeld.muster).match(/class="sk-muster"/g) || []).length === 9
     && !/sk-muster/.test(brettKunst('#fff', '#000', '#111', '')));
 }
 

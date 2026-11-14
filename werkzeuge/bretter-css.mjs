@@ -1,6 +1,7 @@
-// Brett-Bloecke fuer css/tokens.css aus dem Katalog in js/labor.js (65 Bretter, Flo 14.11.2026). Die 13 aelteren Bretter
-// stehen von Hand in tokens.css; die neuen schreibt dieses Werkzeug zwischen die Marken BRETTER-65 ANFANG und ENDE, damit
-// Farbe und Zeichnung im Spiel und im Sammelbild aus einer Quelle kommen (tests/bretter-65.test.mjs prueft den Gleichlauf).
+// Brett-Bloecke fuer css/tokens.css aus dem Katalog in js/labor.js (65 Bretter, Flo 14.11.2026). Nacht, Gruen und Holz
+// stehen von Hand in tokens.css; die 62 Labor-Bretter schreibt dieses Werkzeug zwischen die Marken BRETTER-65 ANFANG und
+// ENDE, damit Farbe und Zeichnung im Spiel und im Sammelbild aus einer Quelle kommen (tests/bretter-65.test.mjs prueft den
+// Gleichlauf). Die Oberflaechen der seltenen Bretter stehen nicht hier: js/labor.js brettFlaeche setzt sie zur Laufzeit.
 //   node werkzeuge/bretter-css.mjs            schreibt den Block in css/tokens.css
 //   node werkzeuge/bretter-css.mjs --pruefen  Ausgang 1, wenn der Block in tokens.css abweicht
 //   bretterCss() -> string                    der Block ohne die Marken
@@ -14,7 +15,6 @@ import { LABOR_BRETTER } from '../js/labor.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOKENS = path.join(WURZEL, 'css/tokens.css');
-const VON_HAND = new Set(['kuerbis', 'frost', 'marmor', 'nussbaum', 'thron', 'acker', 'moos', 'pflaster', 'brandung', 'tiefsee']);
 const ANFANG = '/* BRETTER-65 ANFANG (werkzeuge/bretter-css.mjs schreibt diesen Block, nicht von Hand aendern) */\n';
 const ENDE = '/* BRETTER-65 ENDE */';
 
@@ -24,7 +24,7 @@ const kodiert = (s) => s.replace(/[<>(),#%"]/g, (c) => '%' + c.charCodeAt(0).toS
 const svgUrl = (innen) => `url("data:image/svg+xml,${kodiert(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'>${innen}</svg>`)}")`;
 
 export function bretterCss() {
-  const neu = LABOR_BRETTER.filter((b) => !VON_HAND.has(b.id));
+  const neu = LABOR_BRETTER;
   const bloecke = neu.map((b) => {
     const z = [`html[data-brett="${b.id}"] {`, `  --feld-hell: ${b.hell}; --feld-dunkel: ${b.dunkel};`,
       `  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(${rgb(b.rand)}, .28); --punkt: rgba(${rgb(b.rand)}, .24);`,
@@ -37,10 +37,11 @@ export function bretterCss() {
   const sel = `:is(${leg.join(', ')})`;
   const streif = 'linear-gradient(105deg, transparent 40%, var(--feld-glanz) 50%, transparent 60%)';
   const glanz = leg.length ? [
-    '/* Legendaer: ein leiser Lichtstreif zieht ueber jedes Feld (9 s, ein Drittel davon sichtbar) */',
-    '@keyframes brett-glanz { from { background-position: 0 0, 0 0; } to { background-position: 0 0, 100% 0; } }',
+    '/* Legendaer: ein leiser Lichtstreif zieht ueber jedes Feld (9 s, ein Drittel davon sichtbar); die Oberflaeche behaelt',
+    '   ihren Ausschnitt (--feld-lage, css/board.css) */',
+    '@keyframes brett-glanz { from { background-position: var(--feld-lage), 0 0; } to { background-position: var(--feld-lage), 100% 0; } }',
     '@media (prefers-reduced-motion: no-preference) {',
-    `  ${sel} .brett .feld { background-size: 100% 100%, 400% 100%; animation: brett-glanz 9s linear infinite; }`,
+    `  ${sel} .brett .feld { background-size: var(--feld-muster-groesse, 100% 100%), 400% 100%; animation: brett-glanz 9s linear infinite; }`,
     `  ${sel} .brett .feld.h { background-image: var(--feld-muster-hell, none), ${streif}; }`,
     `  ${sel} .brett .feld.d { background-image: var(--feld-muster-dunkel, none), ${streif}; }`,
     '}',
@@ -63,5 +64,5 @@ if (istHaupt) {
     : css.replace(/\n:root \{\n  --hinweis:/, `\n${ANFANG}${soll}${ENDE}\n:root {\n  --hinweis:`);
   if (neu === css && a < 0) throw new Error('Einfuegestelle in css/tokens.css nicht gefunden');
   writeFileSync(TOKENS, neu);
-  console.log(`bretter-css: ${LABOR_BRETTER.filter((b) => !VON_HAND.has(b.id)).length} Bretter geschrieben`);
+  console.log(`bretter-css: ${LABOR_BRETTER.length} Bretter geschrieben`);
 }

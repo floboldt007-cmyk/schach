@@ -67,9 +67,19 @@
 .brett .feld { position: absolute; width: 12.5%; height: 12.5%; }
 .brett .feld.h { background: var(--b-hell); }
 .brett .feld.d { background: var(--b-dunkel); }
-/* Bretter mit Struktur (Welten-Bretter, css/tokens.css): je Feld eine leichte Zeichnung ueber der Farbe */
-.brett .feld.h { background-image: var(--feld-muster-hell, none); background-size: 100% 100%; }
-.brett .feld.d { background-image: var(--feld-muster-dunkel, none); background-size: 100% 100%; }
+/* Bretter mit Struktur: je Feld eine leichte Zeichnung ueber der Farbe (css/tokens.css), oder eine Oberflaeche ueber das
+   ganze Brett (seltene Labor-Bretter, js/brett-flaechen.js, --feld-muster-groesse 800 %): dann zeigt jedes Feld seinen
+   Ausschnitt, Lage nach Spalte und Reihe am Bildschirm (die 64 Felder stehen in Reihenfolge vorn in .brett-felder).
+   Die Lage steht hier und nicht an .feld: das background-Kuerzel darueber setzt sie sonst zurueck. */
+.brett .feld { --feld-lage: calc(var(--sp, 0) * 100% / 7) calc(var(--zl, 0) * 100% / 7); }
+.brett .feld.h { background-image: var(--feld-muster-hell, none); background-size: var(--feld-muster-groesse, 100% 100%); background-position: var(--feld-lage); }
+.brett .feld.d { background-image: var(--feld-muster-dunkel, none); background-size: var(--feld-muster-groesse, 100% 100%); background-position: var(--feld-lage); }
+.brett .feld:nth-child(8n+2) { --sp: 1; } .brett .feld:nth-child(8n+3) { --sp: 2; } .brett .feld:nth-child(8n+4) { --sp: 3; }
+.brett .feld:nth-child(8n+5) { --sp: 4; } .brett .feld:nth-child(8n+6) { --sp: 5; } .brett .feld:nth-child(8n+7) { --sp: 6; }
+.brett .feld:nth-child(8n+8) { --sp: 7; }
+.brett .feld:nth-child(n+9) { --zl: 1; } .brett .feld:nth-child(n+17) { --zl: 2; } .brett .feld:nth-child(n+25) { --zl: 3; }
+.brett .feld:nth-child(n+33) { --zl: 4; } .brett .feld:nth-child(n+41) { --zl: 5; } .brett .feld:nth-child(n+49) { --zl: 6; }
+.brett .feld:nth-child(n+57) { --zl: 7; }
 
 /* Koordinaten, Lage "ecke": klein in der Feldecke, Zahlen oben links, Buchstaben unten rechts (PLAN 2.5 Regel 4) */
 .brett .koord {

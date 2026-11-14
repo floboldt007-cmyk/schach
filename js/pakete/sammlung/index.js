@@ -13,6 +13,9 @@ import { PAKETE_KLANG } from '../../sounds.js';
 import { klangKunst, brettKunst, erfolgKunst, erfolgSeltenheit } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
 import { LABOR_BRETTER, LABOR_FIGUREN, LABOR_KLAENGE, laborFrei, brettWahl, klangWahl } from '../../labor.js';
+// Oberflaechen der seltenen Labor-Bretter (14.11.2026): nur das Erfinder-Konto laedt sie; fehlt die Datei (offline, nicht im
+// Cache), zeigt das Sammelbild die Farben ohne Oberflaeche
+const FLAECHEN = laborFrei() ? await import('../../brett-flaechen.js').catch(() => null) : null;
 import { figurenSatz, figurenPfad } from '../../figurensatz.js';
 import { hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { shopBereich } from './shop.js';
@@ -47,7 +50,7 @@ const wahlVon = (app, teil) => (app && typeof app.setzeEinstellungen === 'functi
 export function teileBretter(e = ladeEinstellungen(), app = null) {
   const an = brettWahl(e.brett);
   // Labor (Flo 31.10.2026): Kuerbis, Frost, Marmor, Nussbaum, Thron nur im Erfinder-Konto (js/labor.js)
-  const liste = [...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, b.muster]) : [])];
+  const liste = [...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, (b.flaeche && FLAECHEN && FLAECHEN.brettMuster(b)) || b.muster]) : [])];
   // echte Figuren des ausgeruesteten Satzes (Flo 31.10.: "der Koenig sieht ganz anders aus")
   const figuren = new URL('../../../' + figurenPfad(e), import.meta.url).href;
   return liste.map(([id, h, d, r, labor, muster]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: an === id, zeile: an === id ? S('an') : S('frei'),

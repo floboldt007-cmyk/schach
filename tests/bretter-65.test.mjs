@@ -40,7 +40,7 @@ pruefe('Nur nacht, gruen und holz sind frei, alles andere ist Labor', ids.filter
 const FAM = ['klassik', 'natur', 'edelstein', 'welten', 'nacht-neon', 'legendaer'];
 pruefe('Sechs Familien in fester Reihenfolge', Array.isArray(BRETT_FAMILIEN) && BRETT_FAMILIEN.join() === FAM.join(), BRETT_FAMILIEN);
 pruefe('Jede Familie hat neue Bretter', FAM.every((f) => neu.some((b) => b.familie === f)), FAM.map((f) => [f, neu.filter((b) => b.familie === f).length]));
-const SELTEN = ['frei', 'selten', 'episch', 'legende'];
+const SELTEN = ['gewoehnlich', 'selten', 'episch', 'legende'];
 pruefe('Jedes Brett: Familie und Seltenheit gesetzt', alle.every((b) => FAM.includes(b.familie) && SELTEN.includes(b.seltenheit)),
   alle.filter((b) => !FAM.includes(b.familie) || !SELTEN.includes(b.seltenheit)).map((b) => b.id));
 pruefe('Welten: je Bot-Welt drei Bretter', [1, 2, 3, 4, 5].every((w) => alle.filter((b) => b.familie === 'welten' && b.welt === w).length === 3)

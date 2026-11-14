@@ -171,6 +171,7 @@ const require = createRequire(import.meta.url);
 let chromium = null;
 for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright'].filter(Boolean)) { try { ({ chromium } = require(p)); break; } catch (e) { /* weiter */ } }
 if (!chromium) pruefe('Playwright fuer den Browser-Teil (PLAYWRIGHT_PFAD)', false);
+else if (!mitFlaeche || !besonders.some((b) => b.flaeche && !b.bewegung)) pruefe('Browser-Teil braucht Bretter mit Oberflaeche, mit und ohne Glanz', false);
 else {
   const PORT = await (await import('./freier-port.mjs')).freierPort();
   const server = spawn(process.execPath, [path.join(WURZEL, 'tests/testserver.mjs'), String(PORT)], { cwd: WURZEL, stdio: 'ignore' });

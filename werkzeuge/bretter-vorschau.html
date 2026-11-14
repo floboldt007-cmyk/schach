@@ -24,7 +24,7 @@
   .nr { color: var(--leise); font-weight: 500; font-size: 12px; }
   .zeile { color: var(--leise); font-size: 12px; }
   .sel { display: inline-block; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 700; }
-  .sel.frei { background: #2c3340; } .sel.selten { background: #1d4a7a; } .sel.episch { background: #5a2a8a; } .sel.legende { background: #8a5a10; }
+  .sel.gewoehnlich { background: #2c3340; } .sel.selten { background: #1d4a7a; } .sel.episch { background: #5a2a8a; } .sel.legende { background: #8a5a10; }
   .neu { color: #ffd27a; font-size: 11px; font-weight: 700; }
   body.einzeln main { max-width: none; padding: 0; }
   body.einzeln .einzel { width: 560px; height: 560px; position: relative; }
@@ -34,7 +34,7 @@
 <main id="haupt"></main>
 <script type="module">
   import { Brett } from '../js/board.js';
-  import { BRETT_FAMILIEN } from '../js/labor.js';
+  import { BRETT_FAMILIEN, brettFlaeche } from '../js/labor.js';
   import { WELTEN } from '../js/bots.js';
   import { t } from '../js/sprache.js';
   import '../js/pakete/sammlung/texte.js';
@@ -42,8 +42,8 @@
 
   const FEN = 'r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 7';
   const FAMILIE = { klassik: 'Klassik', natur: 'Natur', edelstein: 'Edelstein', welten: 'Welten', 'nacht-neon': 'Nacht und Neon', legendaer: 'Legendär' };
-  const SELTEN = { frei: 'Frei', selten: 'Selten', episch: 'Episch', legende: 'Legende' };
-  const VARS = ['--feld-hell', '--feld-dunkel', '--zuletzt', '--auswahl', '--punkt', '--auswahl-kante', '--feld-muster-hell', '--feld-muster-dunkel'];
+  const SELTEN = { gewoehnlich: 'Gewöhnlich', selten: 'Selten', episch: 'Episch', legende: 'Legende' };
+  const VARS = ['--feld-hell', '--feld-dunkel', '--zuletzt', '--auswahl', '--punkt', '--auswahl-kante', '--feld-muster-hell', '--feld-muster-dunkel', '--feld-muster-groesse'];
   const weltName = (n) => (WELTEN.find((w) => w.nr === n) || {}).name || 'Welt ' + n;
   const name = (id) => t('p-sammlung.brett.' + id);
   const haupt = document.getElementById('haupt');
@@ -56,25 +56,28 @@
   if (einzeln) {
     document.body.classList.add('einzeln');
     html.dataset.brett = einzeln;
+    // die Vorschau zeigt die Oberflaechen wie das Erfinder-Konto
+    await brettFlaeche(html, einzeln, true);
     const el = document.createElement('div');
     el.className = 'einzel';
     haupt.append(el);
     brett(el);
   } else {
-    haupt.insertAdjacentHTML('beforeend', `<h1>65 Bretter zur Auswahl</h1><div class="zeile">13 vorhandene und 52 neue in sechs Familien. Streichen in Bretter-Auswahl.md (Vault). Der Glanz der Legendären steht in den Einzelbildern.</div>`);
+    haupt.insertAdjacentHTML('beforeend', `<h1>65 Bretter zur Auswahl</h1><div class="zeile">13 vorhandene und 52 neue in sechs Familien, Selten bis Legende mit eigener Oberfläche. Streichen in Bretter-Auswahl.md (Vault). Der Glanz der Legendären steht in den Einzelbildern.</div>`);
     for (const f of BRETT_FAMILIEN) {
       const liste = bretter.filter((b) => b.familie === f);
       haupt.insertAdjacentHTML('beforeend', `<h2>${FAMILIE[f]} · ${liste.length}</h2><div class="raster" data-familie="${f}"></div>`);
       const raster = haupt.lastElementChild;
       for (const b of liste) {
         html.dataset.brett = b.id;
+        await brettFlaeche(html, b.id, true);
         const cs = getComputedStyle(html);
         const werte = VARS.map((v) => [v, cs.getPropertyValue(v).trim()]);
         const m = brettMass(b);
         const karte = document.createElement('div');
         karte.className = 'karte';
         karte.dataset.brett = b.id;
-        for (const [v, w] of werte) karte.style.setProperty(v, w || 'none');
+        for (const [v, w] of werte) karte.style.setProperty(v, w || (v === '--feld-muster-groesse' ? '100% 100%' : 'none'));
         karte.innerHTML = `<div class="brett-platz"></div><div class="name"><span class="nr">${nummer.get(b.id)}</span>${name(b.id)}${b.alt ? '' : ' <span class="neu">neu</span>'}</div>`
           + `<div class="zeile"><span class="sel ${b.seltenheit}">${SELTEN[b.seltenheit]}</span> ${wegText(b.weg, weltName)}</div>`
           + `<div class="zeile">Kontrast ${m.feld.toFixed(1)} · weiß ${m.weissAufDunkel.toFixed(1)} · schwarz ${m.schwarzAufDunkel.toFixed(1)}</div>`;
@@ -83,6 +86,7 @@
       }
     }
     html.dataset.brett = 'nacht';
+    await brettFlaeche(html, 'nacht', true);
   }
   window.vorschauFertig = true;
 </script>

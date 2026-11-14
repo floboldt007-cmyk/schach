@@ -27,7 +27,7 @@ const PORT = await (await import('../tests/freier-port.mjs')).freierPort();
 const server = spawn(process.execPath, [path.join(WURZEL, 'tests/testserver.mjs'), String(PORT)], { cwd: WURZEL, stdio: 'ignore' });
 const basis = `http://127.0.0.1:${PORT}/werkzeuge/bretter-vorschau.html`;
 const FAMILIE = { klassik: 'Klassik', natur: 'Natur', edelstein: 'Edelstein', welten: 'Welten', 'nacht-neon': 'Nacht und Neon', legendaer: 'Legendär' };
-const SELTEN = { frei: 'Frei', selten: 'Selten', episch: 'Episch', legende: 'Legende' };
+const SELTEN = { gewoehnlich: 'Gewöhnlich', selten: 'Selten', episch: 'Episch', legende: 'Legende' };
 const weltName = (n) => (WELTEN.find((w) => w.nr === n) || {}).name || 'Welt ' + n;
 let fehler = 0;
 try {
@@ -54,24 +54,25 @@ try {
   await browser.close();
 
   const zeilen = ['---', 'tags: [schach-app, crownmate, feinschliff, auswahl]', 'date: 2026-11-14', 'status: aktiv', '---', '',
-    '# Bretter-Auswahl (65)', '',
+    '# Bretter-Auswahl (65), Fassung 2', '',
     'Flo, 14.11.2026: "65 Bretter-Skins, schöne, überdenken". Hier sind 13 vorhandene und 52 neue Bretter. Die neuen liegen bisher nur im Labor, also nur im Erfinder-Konto. Freigeschaltet wird erst nach deiner Wahl.',
+    'Neu in Fassung 2 (Flo: "nur Farben, zu ähnlich"): Selten, Episch und Legende haben jetzt eine echte Oberfläche (Maserung, Marmor-Adern, Edelstein-Schliff, Sternenstaub, Schuppen und mehr), die über das ganze Brett läuft. Gewöhnlich (früher "Frei") bleibt schlicht. Die Farben sind neu verteilt: Je zwei Bretter liegen jetzt mindestens 10 Farbabstand auseinander (CIEDE2000, vorher 3,5 bis 7,1 bei Thron, Topas, Bernstein, Kürbis und Sonnenkrone).',
     '', '**So streichst du:** Mach ein `x` in die Klammer bei jedem Brett, das raus soll. Was stehen bleibt, kommt in die nächste Runde.',
     'Alle 65 auf einen Blick: ![[uebersicht.png]]', '',
     '"Weg" heißt, wie das Brett später frei wird. Jeder Weg nutzt eine Mechanik, die es schon gibt: Level, Welt, Endgegner oder eine Stufe der Erfolge. Kein Brett kostet etwas.',
-    'Die Kontraste sind gemessen (WCAG), jeweils an der schlechtesten Stelle mit Feldzeichnung und Glanz. Die Mindestwerte stammen von Nacht, Grün und Holz: Feld 2,2, weiße Figur auf dunklem Feld 3,0, schwarze Figur auf dunklem Feld 3,0, schwarze Figur auf hellem Feld 7,0.', ''];
+    'Die Kontraste sind gemessen (WCAG), jeweils an der schlechtesten Stelle: alle aufhellenden bzw. alle abdunkelnden Töne der Oberfläche und der Glanz übereinander. Die Mindestwerte stammen von Nacht, Grün und Holz: Feld 2,2, weiße Figur auf dunklem Feld 3,0, schwarze Figur auf dunklem Feld 3,0, schwarze Figur auf hellem Feld 7,0.', ''];
   for (const f of BRETT_FAMILIEN) {
     const liste = bretter.map((b, n) => [b, n + 1]).filter(([b]) => b.familie === f);
     zeilen.push(`## ${FAMILIE[f]} (${liste.length})`, '', `![[familie-${f}.png]]`, '');
     for (const [b, n] of liste) {
       const m = brettMass(b);
       const bild = `einzeln/${String(n).padStart(2, '0')}-${b.id}.png`;
-      zeilen.push(`- [ ] **${n} ${t('p-sammlung.brett.' + b.id)}**${b.alt ? ' (vorhanden)' : ' (neu)'} · ${SELTEN[b.seltenheit]} · Weg: ${wegText(b.weg, weltName)}`
+      zeilen.push(`- [ ] **${n} ${t('p-sammlung.brett.' + b.id)}**${b.alt ? ' (vorhanden)' : ' (neu)'} · ${SELTEN[b.seltenheit]}${b.flaeche ? ` · Oberfläche ${b.flaeche.art}` : ''} · Weg: ${wegText(b.weg, weltName)}`
         + `${b.bewegung ? ' · bewegt sich (leiser Glanz, aus bei "weniger Bewegung")' : ''} · Kontrast ${m.feld.toFixed(1)} / ${m.weissAufDunkel.toFixed(1)} / ${m.schwarzAufDunkel.toFixed(1)} · [[${bild}|Bild]]`);
     }
     zeilen.push('');
   }
-  zeilen.push('Gebaut auf dem Zweig `so/R19-sammlung-65` (Repo schach), Vorschau: `werkzeuge/bretter-vorschau.html`. Bilder: `node werkzeuge/bretter-vorschau.mjs --ziel <dieser Ordner>`.', '');
+  zeilen.push('Gebaut auf dem Zweig `so/R19-bretter-oberflaechen` (Repo schach), Vorschau: `werkzeuge/bretter-vorschau.html`. Bilder: `node werkzeuge/bretter-vorschau.mjs --ziel <dieser Ordner>`.', '');
   writeFileSync(path.join(ZIEL, 'Bretter-Auswahl.md'), zeilen.join('\n'));
   console.log(`bretter-vorschau: ${karten} Karten im Raster, ${bretter.length} Einzelbilder, ${BRETT_FAMILIEN.length} Familien, Seitenfehler ${fehler}`);
   process.exitCode = karten === 65 && bretter.length === 65 && !fehler ? 0 : 1;
