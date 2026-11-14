@@ -322,9 +322,12 @@ async function browserTeil(browser) {
 }
 
 // Der Servertest der Verwaltung braucht PGlite und laeuft darum im CI-Job sql, nicht ueber tests/alle.mjs (dort fehlt
-// PGlite im Browser-Job, R17-sammelfix2)
-pruefe('CI-Job sql fuehrt die Suite server-verwaltung', /run: node tests\/server-verwaltung\.test\.mjs/
-  .test(readFileSync(path.join(WURZEL, '.github/workflows/tests.yml'), 'utf8')));
+// PGlite im Browser-Job, R17-sammelfix2). Gesucht wird nur im Job sql (bis zum naechsten Job auf derselben Einrueckung)
+// und nur als eigene, nicht auskommentierte Zeile (Kaltreview sammelfix2, Befund m3: ein auskommentierter Schritt liess
+// die alte Suche ueber die ganze Datei gruen)
+const sqlJob = readFileSync(path.join(WURZEL, '.github/workflows/tests.yml'), 'utf8')
+  .match(/^ {2}sql:\r?\n([\s\S]*?)(?=^ {2}[\w-]+:|(?![\s\S]))/m)?.[1] || '';
+pruefe('CI-Job sql fuehrt die Suite server-verwaltung', /^\s+run: node tests\/server-verwaltung\.test\.mjs\s*$/m.test(sqlJob), sqlJob.length);
 pruefe('tests/alle.mjs fuehrt server-verwaltung nicht (PGlite nur im CI-Job sql)', !/name: 'server-verwaltung'/
   .test(readFileSync(path.join(WURZEL, 'tests/alle.mjs'), 'utf8')));
 
