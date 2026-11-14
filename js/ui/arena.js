@@ -547,6 +547,9 @@ export function zeige(root, params, app) {
     s.classList.toggle('karte-hoch', !quer);
     s.classList.toggle('karte-kompakt', kompakt);
     s.classList.toggle('karte-weg', wegModus);
+    // die Klassen aendern die Groesse der Karte (Weg: volle Hoehe statt Platz fuer das Panel); danach neu messen, sonst rechnet
+    // die Welt mit der alten Hoehe und der ResizeObserver sieht keine Aenderung mehr
+    const khNeu = karte.clientHeight || kh;
     const lage = LAGEN[lageModus];
     const w = kw;
     weltEl.dataset.welt = welt.id;
@@ -555,7 +558,7 @@ export function zeige(root, params, app) {
     // schmale Karten (Handy quer: Karte neben dem Panel) mindestens WELT_MIN_H hoch, sonst rueckten die Stationen so eng
     // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen. Der Weg (R19 A) ist hoeher, damit
     // jede Station ihren eigenen Platz hat
-    const h = quer || kompakt ? kh : wegModus ? Math.max(kh + 200, Math.round(kw * 2.5), 980)
+    const h = quer || kompakt ? kh : wegModus ? Math.max(khNeu + 200, Math.round(kw * 2.5), 980)
       : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
     // kompakt: kleinere Stationen, damit die ganze Welt in die Karte passt; auf dem Weg grosse Stationen (Daumen)
     const sk = kompakt ? Math.max(0.56, Math.min(0.78, Math.min(w, h * 1.25) / 560))
@@ -691,8 +694,8 @@ export function zeige(root, params, app) {
       // Spruch, Stern-Ziele, Farbe, Spielen). Liga-Karte (Ort arena:panel-oben), Heute-Karte (arena:heute, jetzt auf der
       // Startseite), Bot-Zeilen (arena:panel-bot), Merkmale und Bilanz entfallen; oben bleibt nur die Nachlese.
       detail.innerHTML = `
-      <button class="karte-griff" type="button" aria-expanded="false" aria-label="${esc(t('arena.karte.auf'))}"><span aria-hidden="true"></span></button>
       <div class="ort-panel-oben" hidden></div>
+      <button class="karte-griff" type="button" aria-expanded="false" aria-label="${esc(t('arena.karte.auf'))}"><span aria-hidden="true"></span></button>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${botFarbe(laufBot)}">
         <span class="avatar"><img src="${esc(avatarVon(laufBot))}" alt=""></span>
