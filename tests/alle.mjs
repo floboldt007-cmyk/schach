@@ -84,6 +84,7 @@ const SUITEN = [
   { name: 'partie-figurensatz', datei: 'partie-figurensatz.test.mjs', args: [], was: 'Bot-Partie: Figurensatz wechselt ohne Neuladen (spaeter Erfinder-Status, Wahl in den Einstellungen)' },
   { name: 'zuzweit-lektion-figurensatz', datei: 'zuzweit-lektion-figurensatz.test.mjs', args: [], was: 'Zu zweit und Meisterschule-Lektion: Figurensatz wechselt ohne Neuladen (spaeter Erfinder-Status, Wahl in den Einstellungen)' },
   { name: 'funktion-partie', datei: 'funktion-partie.test.mjs', args: [], was: 'Funktionsprobe Bot-Partie: Start, Zug, Hinweis, Sieg, Aufgeben, Ergebnisblatt (iPhone 13 + PC)' },
+  { name: 'r19-lektionen-probe', datei: 'r19-lektionen-probe.mjs', args: [], was: 'Funktionsprobe Meisterschule: jede der 65 Lektionen Start, Zug per Klick, Ergebnisblatt (iPhone 13 + PC, hell + dunkel)' },
   { name: 'ergebnis-einmal', datei: 'ergebnis-einmal.test.mjs', args: [], was: 'Ergebnisblatt der Bot-Partie: Spruch einmal, ein Nochmal-Knopf (Revanche), Knoepfe ab 44 px (iPhone 13 + PC)' },
   { name: 'r17-ende-feinschliff', datei: 'r17-ende-feinschliff.test.mjs', args: [], was: 'R17: Fokus nach Niederlage auf Zur Analyse, Namen auf der Duell-Ende-Karte, kein Streifen unter dem Profilbanner (Browser)' },
   { name: 'liga-kontrast', datei: 'liga-kontrast.test.mjs', args: [], was: 'Kritik R6: Marke "neu" als Chip, Code-Teilen als Knopf, Kontraste Bronze/Gold/Aufstieg/"!", Knoepfe hinter dem Ergebnis-Blatt gesperrt (Browser)' },
