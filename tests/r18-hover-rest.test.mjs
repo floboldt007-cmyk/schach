@@ -90,16 +90,28 @@ const aussehen = (el) => el.evaluate((x) => [x, ...x.querySelectorAll('*')].map(
 const zeigerAusserhalb = (el) => el.evaluate((x) => {
   const knoten = [x, ...x.querySelectorAll('*')];
   const funde = [];
+  // nur an Kommas der obersten Ebene trennen: .x:is(.a, .b):hover ist EIN Selektor (Muster tests/r18-rd-hover.test.mjs, R19)
+  const teile = (sel) => {
+    const aus = []; let tiefe = 0, an = 0;
+    for (let i = 0; i < sel.length; i++) {
+      if (sel[i] === '(' || sel[i] === '[') tiefe++;
+      else if (sel[i] === ')' || sel[i] === ']') tiefe--;
+      else if (sel[i] === ',' && tiefe === 0) { aus.push(sel.slice(an, i)); an = i + 1; }
+    }
+    return aus.concat(sel.slice(an));
+  };
+  // :hover gilt als erfuellt (:is(*); so bleibt :not(:hover) gueltig und trifft nie). Ein Pseudo-Element hinter :hover
+  // (::before, ::after) zeichnet am Element selbst und zaehlt fuer es. Wirft matches() trotzdem, ist das ein Fund.
+  const element = (teil) => teil.replace(/:hover/g, ':is(*)').replace(/::[a-z-]+(\([^)]*\))?|:(before|after|first-line|first-letter)\b/g, '').trim() || '*';
   const geh = (regeln, unterHover) => {
     for (const r of regeln) {
       if (r.cssRules && r.media) { geh(r.cssRules, unterHover || /\(\s*hover\s*:\s*hover\s*\)/.test(r.media.mediaText)); continue; }
       if (r.cssRules && !r.selectorText) { geh(r.cssRules, unterHover); continue; }
       if (!r.selectorText || !r.selectorText.includes(':hover') || unterHover) continue;
-      for (const teil of r.selectorText.split(',')) {
+      for (const teil of teile(r.selectorText)) {
         if (!teil.includes(':hover')) continue;
-        const ohne = teil.replace(/:hover/g, '').trim() || '*';
-        // INTENTIONAL-SLOP[F1]: matches() wirft bei Pseudo-Elementen und bei :not() ohne Inhalt; die treffen keinen Knopf selbst
-        try { if (knoten.some((k) => k.matches(ohne))) funde.push(teil.trim()); } catch (e) { /* kein Element-Selektor */ }
+        try { if (knoten.some((k) => k.matches(element(teil)))) funde.push(teil.trim()); }
+        catch (e) { funde.push(`Selektor nicht pruefbar: ${teil.trim()} (${e.message})`); }
       }
     }
   };
@@ -128,6 +140,16 @@ async function beruehrung(browser, { geraet, w, h, schema, css }) {
     pruefe(`${name} ${z.name} (${els.length} Elemente): Zeiger an der Tippstelle sieht aus wie Ruhe`, anders.length === 0, anders);
     pruefe(`${name} ${z.name} (${els.length} Elemente): keine :hover-Regel ausserhalb von @media (hover: hover)`, funde.size === 0, [...funde]);
   }
+  // Selbsttest des Scanners (R19) an einem sichtbaren Ziel: eine :is()-Liste mit Komma und ein Pseudo-Element hinter :hover
+  // sind Funde; beide fielen mit split(',') still durch, weil matches() warf. Die Regeln kommen erst nach der echten Pruefung.
+  const probeEl = (await finde(s, ZIELE[0]))[0];
+  if (probeEl) {
+    await probeEl.evaluate((x) => x.setAttribute('data-scanner-probe', ''));
+    await s.addStyleTag({ content: '[data-scanner-probe]:is(.gibt-es-nicht, [data-scanner-probe]):hover { outline: 2px solid red } [data-scanner-probe]:hover::after { content: "" }' });
+  }
+  const probe = probeEl ? await zeigerAusserhalb(probeEl) : [];
+  pruefe(`${name}: Scanner findet :is()-Liste und ::after hinter :hover (Selbsttest)`,
+    probe.some((f) => f.startsWith('[data-scanner-probe]:is(.gibt-es-nicht')) && probe.some((f) => f.startsWith('[data-scanner-probe]:hover::after')), probe);
   pruefe(`${name}: keine Seitenfehler`, fehler.length === 0, fehler);
   await kontext.close();
 }
