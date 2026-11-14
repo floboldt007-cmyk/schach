@@ -37,19 +37,25 @@ let ok = 0, gesamt = 0;
 function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`${gut ? 'OK' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`); }
 const browser = await browserTyp(pw).launch({ headless: true });
 
-// otp/verify/rpc: { status, body } statt der Erfolgsantwort; lokal: Eintraege im localStorage vor dem Laden
-async function umgebung({ otp = null, verify = null, rpc = null, lokal = {}, breite = 390 } = {}) {
+// otp/verify/rpc/token: { status, body } statt der Erfolgsantwort; rpcMs: Antwort von konto_loeschen verzoegert;
+// lokal: Eintraege im localStorage vor dem Laden
+async function umgebung({ otp = null, verify = null, rpc = null, token = null, rpcMs = 0, lokal = {}, breite = 390 } = {}) {
   const k = await browser.newContext({ viewport: { width: breite, height: 800 }, serviceWorkers: 'block' });
-  const z = { otp, verify, rpc, aufrufe: { otp: 0, verify: 0, loeschen: 0, logout: 0 }, google: [], fehler: [] };
+  const z = { otp, verify, rpc, token, aufrufe: { otp: 0, verify: 0, loeschen: 0, logout: 0, token: 0 }, google: [], fehler: [] };
   await k.addInitScript((l) => { for (const [a, b] of Object.entries(l)) localStorage.setItem(a, b); }, lokal);
-  await k.route('**/*', (r) => {
+  await k.route('**/*', async (r) => {
     const u = new URL(r.request().url());
     if (u.hostname === '127.0.0.1') return r.continue();
     if (!u.hostname.endsWith('supabase.co')) return r.abort();
     const antwort = (body, status = 200) => r.fulfill({ status, contentType: 'application/json', body: body == null ? '' : JSON.stringify(body) });
     if (u.pathname === '/auth/v1/otp') { z.aufrufe.otp++; return z.otp ? antwort(z.otp.body, z.otp.status) : antwort({}); }
     if (u.pathname === '/auth/v1/verify') { z.aufrufe.verify++; return z.verify ? antwort(z.verify.body, z.verify.status) : antwort(SITZUNG); }
-    if (u.pathname === '/rest/v1/rpc/konto_loeschen') { z.aufrufe.loeschen++; return z.rpc ? antwort(z.rpc.body, z.rpc.status) : r.fulfill({ status: 204, body: '' }); }
+    if (u.pathname === '/auth/v1/token') { z.aufrufe.token++; return z.token ? antwort(z.token.body, z.token.status) : antwort(SITZUNG); }
+    if (u.pathname === '/rest/v1/rpc/konto_loeschen') {
+      z.aufrufe.loeschen++;
+      if (rpcMs) await new Promise((w) => setTimeout(w, rpcMs));
+      return z.rpc ? antwort(z.rpc.body, z.rpc.status) : r.fulfill({ status: 204, body: '' });
+    }
     if (u.pathname === '/auth/v1/logout') { z.aufrufe.logout++; return r.fulfill({ status: 204, body: '' }); }
     if (u.pathname === '/auth/v1/authorize') { z.google.push(u.href); return r.fulfill({ status: 200, contentType: 'text/html', body: '<p>google</p>' }); }
     return antwort({});
@@ -166,6 +172,63 @@ try {
         await u.k.close();
       }
     }
+  }
+  { // 7. Tippen waehrend der laufenden Loeschung gibt den Knopf nicht wieder frei: genau ein konto_loeschen
+    const { k, z } = await umgebung({ rpcMs: 1200, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
+    const s = await seite(k, z, DE);
+    await s.locator('[data-kl="weiter"]').click();
+    await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
+    await s.locator('[data-kl="loeschen"]').click(); await s.waitForTimeout(100);
+    await s.locator('.kl-bestaetigen').press('End').catch(() => {});
+    await s.locator('.kl-bestaetigen').pressSequentially(' ', { timeout: 500 }).catch(() => {});
+    await s.locator('[data-kl="loeschen"]').click({ timeout: 500 }).catch(() => {});
+    await s.waitForTimeout(1800);
+    pruefe('Tippen waehrend der Loeschung + zweiter Klick: konto_loeschen genau einmal', z.aufrufe.loeschen === 1, z.aufrufe);
+    pruefe('Tippen waehrend der Loeschung: danach Bestaetigung sichtbar', await sichtbar(s, '.kl-fertig'));
+    await k.close();
+  }
+  { // 8. Abgelaufene Sitzung, Refresh tot: Meldung bleibt, die Seite zeigt wieder die Anmeldung, nichts geloescht
+    const alt = { ...SITZUNG, expires_at: 1 };
+    const { k, z } = await umgebung({ token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } },
+      lokal: { 'schach-arena:konto:sitzung': JSON.stringify(alt) } });
+    const s = await seite(k, z, DE);
+    await s.locator('[data-kl="weiter"]').click();
+    await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
+    await s.locator('[data-kl="loeschen"]').click(); await s.waitForTimeout(600);
+    const st = await status(s);
+    pruefe('Sitzung abgelaufen: Fehlertext, Anmeldung sichtbar, „angemeldet als“ weg, nichts geloescht',
+      st.fehler === 'ja' && st.text.length > 5 && (await sichtbar(s, '.kl-anmelden')) && !(await sichtbar(s, '.kl-angemeldet'))
+      && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
+    await k.close();
+  }
+  { // 9. Abo-Hinweis: bekanntes laufendes Stripe-Abo steht vor Schritt 2, ohne Abo kein Hinweis
+    const abo = JSON.stringify({ uid: 'u1', premium: true, status: 'aktiv', plan: 'monat', gueltigBis: 9999999999999, quelle: 'stripe', geprueftAm: Date.now() });
+    for (const [name, adresse, muster] of [['de', DE, /Stripe/], ['en', EN, /Stripe/]]) {
+      const { k, z } = await umgebung({ lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG), 'schach-arena:abo:stand': abo } });
+      const s = await seite(k, z, adresse);
+      await s.locator('[data-kl="weiter"]').click(); await s.waitForTimeout(300);
+      const t = (await s.locator('.kl-abo').textContent()) || '';
+      pruefe(`${name}: laufendes Stripe-Abo, Hinweis vor Schritt 2 sichtbar`, (await sichtbar(s, '.kl-abo')) && muster.test(t)
+        && (name === 'de' ? /kündig/i.test(t) : /cancel/i.test(t)), t);
+      await k.close();
+    }
+    const { k, z } = await umgebung({ lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
+    const s = await seite(k, z, DE);
+    await s.locator('[data-kl="weiter"]').click(); await s.waitForTimeout(300);
+    pruefe('ohne bekanntes Abo: kein Abo-Hinweis in Schritt 2', !(await sichtbar(s, '.kl-abo')));
+    await k.close();
+  }
+  { // 10. Texte wie Datenschutz §5: was bleibt (Stripe-Kundennummer, 90 Tage) und die Mitloeschungen, de und en
+    const { k, z } = await umgebung();
+    const de = await seite(k, z, DE);
+    const tde = await de.locator('main').textContent();
+    pruefe('de: „Was bleibt“ nennt Stripe-Kundennummer und 90 Tage', /Stripe-Kundennummer/.test(tde) && /90 Tag/.test(tde));
+    pruefe('de: Mitloeschungen aus §5 genannt', ['Visitenkarte', 'Kronen', 'Rätsel-Duell', 'Online-Partien', 'Schulmodus', 'Altersangabe'].every((w) => tde.includes(w)));
+    const en = await seite(k, z, EN);
+    const ten = await en.locator('main').textContent();
+    pruefe('en: „What stays“ nennt Stripe customer number und 90 days', /Stripe customer number/.test(ten) && /90 days/.test(ten));
+    pruefe('en: Mitloeschungen aus §5 genannt', ['player card', 'crowns', 'puzzle duel', 'online games', 'school mode', 'age statement'].every((w) => ten.toLowerCase().includes(w)));
+    await k.close();
   }
 } finally {
   await browser.close(); server.close();

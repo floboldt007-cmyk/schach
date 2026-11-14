@@ -87,7 +87,10 @@ export function starte(doc = document) {
     $('[data-kl="loeschen"]').disabled = true;
     $('.kl-bestaetigen').focus();
   });
+  // Waehrend der Loeschung gibt das Feld den Knopf nicht wieder frei, sonst loest ein zweiter Klick einen zweiten rpc aus
+  let loeschtGerade = false;
   $('.kl-bestaetigen').addEventListener('input', (e) => {
+    if (loeschtGerade) return;
     $('[data-kl="loeschen"]').disabled = e.target.value.trim().toLocaleUpperCase(sprache) !== wort;
   });
   knopf('abbrechen', () => { melde(''); zeige(); });
@@ -95,8 +98,17 @@ export function starte(doc = document) {
   knopf('abmelden', () => { abmelden().catch(() => {}); melde(''); zeige(); });
   knopf('loeschen', async () => {
     melde(text('loescht'));
+    loeschtGerade = true;
+    $('.kl-bestaetigen').disabled = true;
     const ok = await versuche(() => loescheKonto());
-    if (!ok) { $('[data-kl="loeschen"]').disabled = false; return; }
+    loeschtGerade = false;
+    $('.kl-bestaetigen').disabled = false;
+    if (!ok) {
+      // Sitzung abgelaufen (Refresh tot): js/konto.js hat sie entfernt, also zurueck zur Anmeldung; die Meldung bleibt stehen
+      if (!sitzung()) { zeige(); return; }
+      $('[data-kl="loeschen"]').disabled = false;
+      return;
+    }
     $('.kl-anmelden').hidden = true;
     $('.kl-angemeldet').hidden = true;
     $('.kl-fertig').hidden = false;
