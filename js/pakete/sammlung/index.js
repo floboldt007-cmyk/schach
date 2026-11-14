@@ -142,12 +142,14 @@ export function titelDaten(f = ladeFortschritt(), schule = schulStand()) {
     kartei: zahl(kartei && kartei.zaehler && kartei.zaehler.richtig),
     schulKapitel: schule ? schule.bereiche.filter((b) => b.alle > 0 && b.geschafft >= b.alle).length : 0,
     erzfeind: Object.keys(erzfeind).length,
-    // R19 (./taten.js): Bretter in der Sammlung
+    // R19 (./taten.js): frei geschaltete Bretter
     bretterFrei: bretterFrei(),
   };
 }
-// so viele Bretter zeigt die Sammlung (teileBretter): die freien und fuer den Erfinder das Labor
-export const bretterFrei = () => BRETTER.length + (laborFrei() ? LABOR_BRETTER.length : 0);
+// frei geschaltete Bretter: heute die drei Grundbretter. Die Labor-Bretter zeigt die Sammlung dem Erfinder nur als Vorschau
+// (ihr weg ist ein Vorschlag, nirgends erfuellt), sie zaehlen nicht, sonst gaebe es Brettsammler Gold beim ersten Oeffnen
+// (Kaltreview 14.11.). Schaltet spaeter ein Weg Bretter frei, gehoeren sie hierher.
+export const bretterFrei = () => BRETTER.length;
 export const LIGA_STUFEN = 6;                     // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
 export const SERIE_ZIELE = Object.freeze([7, 30, 100]);
 export const LEVEL_ZIELE = Object.freeze([10, 20, 30]);

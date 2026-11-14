@@ -147,5 +147,27 @@ if (A.TAT_TITEL && t) {
   setzeSprache('de');
 }
 
+// Kaltreview 14.11.: bretterFrei zaehlt frei geschaltete Bretter, nicht den Katalog. Heute schaltet niemand ein Brett frei
+// (kein Besitz-Eintrag fuer Bretter), frei sind die drei Grundbretter. Die Labor-Bretter sieht nur das Erfinder-Konto als
+// Vorschau, ihr weg ist ein Vorschlag und nirgends erfuellt: sie zaehlen nicht, sonst gaebe es Gold beim ersten Oeffnen.
+if (I.bretterFrei && I.teileBretter && A.lokaleStufen) {
+  const tok = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
+  const normal = I.bretterFrei();
+  // js/sonderstuecke.js liest den Merker direkt aus globalThis.localStorage
+  const vorher = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (k) => (lager.has(k) ? lager.get(k) : null) } });
+  lager.set('schach-arena:konto:sitzung', JSON.stringify({ access_token: tok('u-flo'), refresh_token: 'r', expires_at: 9999999999 }));
+  lager.set('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: 'u-flo', ids: ['erfinder-titel'] }));
+  const erfinder = I.bretterFrei();
+  const sammlung = I.teileBretter().length;
+  lager.delete('schach-arena:konto:sitzung'); lager.delete('schach-arena:konto:sonderstuecke');
+  if (vorher) Object.defineProperty(globalThis, 'localStorage', vorher); else delete globalThis.localStorage;
+  pruefe('Bretter: normales Konto zaehlt seine 3 freien Bretter', normal === 3, { normal });
+  pruefe('Bretter: Erfinder-Konto zaehlt die Labor-Vorschau nicht (3, nicht der Katalog)', erfinder === 3 && sammlung > 3, { erfinder, sammlung });
+  const stufe = A.lokaleStufen(A.lokalStand([], { bretterFrei: erfinder }), []).find((x) => x.familie === 'brettsammler');
+  pruefe('Bretter: Erfinder bekommt beim ersten Oeffnen weder Brettsammler noch Brettfaecher',
+    !!stufe && stufe.stufe === 0 && !A.tatenFrei([], { bretterFrei: erfinder }).includes('tat-kartenfaecher'), { stufe });
+} else pruefe('Bretter: bretterFrei, teileBretter und lokaleStufen exportiert', false);
+
 console.log(`\n${ok}/${ok + fehler} bestanden`);
 process.exit(fehler ? 1 : 0);
