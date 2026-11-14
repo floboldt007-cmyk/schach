@@ -168,6 +168,26 @@ localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, 
 mitAntwort(500, { msg: 'kaputt' });
 serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
 pruefe('Erneuern mit 500 ohne Kennung: Sitzung bleibt', /Serverfehler/.test(serverFehler) && sitzung()?.refresh_token === 'r', serverFehler);
+// Kaltreview R18 (37, Befund 1): eine spaete user_banned-Antwort einer alten Erneuerung meldet eine neuere Sitzung nie ab
+// (Schutz ueber epoche und refresh_token in erneuere; Muster kaltreview-belege/probe.mjs Block 4)
+{
+  const tokVon = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
+  for (const [fall, waehrend, soll] of [
+    ['Ab- und Neuanmeldung', async () => { await abmelden({ frist: 5 }); localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, refresh_token: 'r2' })); }, 'r2'],
+    ['anderer Tab, anderes Konto', async () => { localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: tokVon('u7'), refresh_token: 'r-u7', expires_at: 9999999999, user: { id: 'u7', email: 'c@d.de' } })); }, 'r-u7'],
+  ]) {
+    localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, refresh_token: 'r1', expires_at: 1 }));
+    let gib; const spaet = new Promise((r) => { gib = r; });
+    setzeKontoFetch(async (url) => {
+      if (url.includes('grant_type=refresh_token')) { await spaet; return { ok: false, status: 403, async json() { return { code: 403, error_code: 'user_banned', msg: 'x' }; } }; }
+      return { ok: true, status: 204, async json() { return null; } };
+    });
+    const lauf = aktiveSitzung().then(() => 'ok', (e) => e.message);
+    await new Promise((r) => setTimeout(r, 10)); await waehrend(); gib();
+    const text = await lauf;
+    pruefe(`Veraltete user_banned-Antwort (${fall}): neuere Sitzung bleibt`, sitzung()?.refresh_token === soll, { text, gespeichert: sitzung()?.refresh_token });
+  }
+}
 { // Anmelde-Link (Rueckfall ohne SMTP): Sitzung uebernehmen, Token aus der Adresse entfernen
   const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u9', email: 'link@b.de' })).toString('base64url') + '.x';
   let neu = null; const ort = { hash: `#access_token=${tok}&expires_in=3600&refresh_token=rl&token_type=bearer&type=magiclink`, pathname: '/schach/', search: '' };
