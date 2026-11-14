@@ -96,11 +96,13 @@ const zeigerAusserhalb = (s) => s.evaluate(() => {
       for (const teil of r.selectorText.split(',')) {
         if (!teil.includes(':hover')) continue;
         const ohne = teil.replace(/:hover/g, '').trim() || '*';
-        try { if (knoepfe.some((k) => k.matches(ohne))) funde.push(teil.trim()); } catch (e) { /* unbekannter Selektor */ }
+        // INTENTIONAL-SLOP[F1]: matches() wirft bei Pseudo-Elementen (::before); die treffen keinen Knopf selbst
+        try { if (knoepfe.some((k) => k.matches(ohne))) funde.push(teil.trim()); } catch (e) { /* kein Element-Selektor */ }
       }
     }
   };
-  for (const blatt of document.styleSheets) { try { geh(blatt.cssRules, false); } catch (e) { /* fremdes Blatt */ } }
+  // ein unlesbares Blatt koennte eine Zeiger-Regel verstecken: es zaehlt als Fund statt still uebersprungen
+  for (const blatt of document.styleSheets) { try { geh(blatt.cssRules, false); } catch (e) { funde.push(`Blatt nicht lesbar: ${blatt.href}`); } }
   return [...new Set(funde)];
 });
 
@@ -186,6 +188,7 @@ async function handy(browser, schema) {
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
 try {
+  // INTENTIONAL-SLOP[F1]: Warten auf den Testserver, ein abgelehnter Abruf heisst nur "startet noch"
   for (let i = 0; i < 50; i++) { try { if ((await fetch(BASIS)).ok) break; } catch (e) { /* Server startet noch */ } await warte(200); }
   browser = await browserTyp(require(process.env.PLAYWRIGHT_PFAD || 'playwright')).launch({ headless: true });
   for (const schema of ['light', 'dark']) {
@@ -199,5 +202,6 @@ try {
   await browser?.close();
   server.kill();
 }
+// INTENTIONAL-SLOP[T4]: Summenzeile, die tests/alle.mjs auswertet
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);
