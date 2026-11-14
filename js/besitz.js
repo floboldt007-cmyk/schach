@@ -79,15 +79,17 @@ export function zaehleRaetsel(d = {}) {
   if (id) b.raetsel.ids = [...b.raetsel.ids, id].slice(-RAETSEL_IDS);
   const heute = ortsTag(d.jetzt);
   if (b.raetsel.tag !== heute) {
-    b.raetsel.folge = b.raetsel.tag === ortsTag((d.jetzt ?? Date.now()) - 864e5) ? (b.raetsel.folge || 0) + 1 : 1;
+    b.raetsel.folge = b.raetsel.tag === ortsTag(d.jetzt, -1) ? (b.raetsel.folge || 0) + 1 : 1;
     b.raetsel.beste = Math.max(b.raetsel.beste || 0, b.raetsel.folge);
     b.raetsel.tag = heute;
   }
   return speichere(b);
 }
-// Kalendertag in Ortszeit (die Serie zaehlt Tage, wie der Spieler sie erlebt); jetzt: Millisekunden, fuer Tests
-function ortsTag(jetzt = Date.now()) {
+// Kalendertag in Ortszeit (die Serie zaehlt Tage, wie der Spieler sie erlebt); jetzt: Millisekunden, fuer Tests.
+// versatz in Kalendertagen, nicht in 24 h: Tage der Zeitumstellung haben 23 oder 25 Stunden
+function ortsTag(jetzt = Date.now(), versatz = 0) {
   const d = new Date(jetzt ?? Date.now());
+  d.setDate(d.getDate() + versatz);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 

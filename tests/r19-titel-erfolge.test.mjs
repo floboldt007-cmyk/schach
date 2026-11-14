@@ -124,6 +124,14 @@ if (B.zaehleRaetsel) {
   const r9 = B.ladeBesitz().raetsel;
   pruefe('Raetselserie: drei Tage in Folge = 3, zweites Raetsel am selben Tag zaehlt nicht doppelt, Luecke beginnt bei 1, bester bleibt 3',
     r3.folge === 3 && r3.beste === 3 && r9.folge === 1 && r9.beste === 3 && r9.n === 5, { r3, r9 });
+  // Zeitumstellung: der 25.10.2026 hat 25 Stunden, der 28.03.2027 nur 23; "gestern" ist der Kalendertag davor, nicht jetzt minus 24 h
+  const tz = process.env.TZ;
+  process.env.TZ = 'Europe/Berlin';
+  const folgeNach = (a, b, id) => { B.zaehleRaetsel({ id: id + 'a', richtig: true, jetzt: new Date(a).getTime() }); B.zaehleRaetsel({ id: id + 'b', richtig: true, jetzt: new Date(b).getTime() }); return B.ladeBesitz().raetsel.folge; };
+  const herbst = folgeNach('2026-10-24T12:00:00', '2026-10-25T23:30:00', 'h');
+  const fruehling = folgeNach('2027-03-28T12:00:00', '2027-03-29T00:30:00', 'f');
+  if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
+  pruefe('Raetselserie: ueber die Zeitumstellung (Herbst 23:30, Fruehling 00:30) laeuft die Folge weiter', herbst === 2 && fruehling === 2, { herbst, fruehling });
 }
 
 // Namen: Dinge statt Personen, nie Meister, Profi, Experte, Elo; je Sprache ein eigener Text
