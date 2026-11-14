@@ -6,6 +6,7 @@
 //   node tests/raetsel-duell-ui.test.mjs                    iPhone 13 390x844 hell, iPhone SE 375x667 dunkel, iPad 820x1180
 //                                                           dunkel, PC 1280x720 hell (Funktionsprobe: Start, Zuege, Ende)
 //   node tests/raetsel-duell-ui.test.mjs --bilder=<ordner>  dazu Bilder (alle vier Geraete, je hell und dunkel)
+//   BILDER=<ordner> node tests/raetsel-duell-ui.test.mjs    dasselbe ueber die Umgebung (wie die Funktionsprobe)
 //   node tests/raetsel-duell-ui.test.mjs --nur=gross|laden   nur grosser Schirm (Titel, Leiste, Knopffarbe) bzw. Neuladen
 // Die echten Regeln (Zeit, Abzug, Wertung, Kronen) prueft tests/server-raetsel-duell.test.mjs gegen das SQL; hier
 // geht es nur darum, dass der Screen zeigt, was der Server sagt.
@@ -21,7 +22,7 @@ const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = bilderArg ? bilderArg.slice(9) : null;
+const BILDER = bilderArg ? bilderArg.slice(9) : (process.env.BILDER || null);
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let ok = 0; let fehler = 0; let gruppe = '';
@@ -156,7 +157,14 @@ async function zieh(s, uci) { await tippe(s, uci.slice(0, 2)); await tippe(s, uc
 const geloest = (s, wer) => s.locator(`.rd-seite[data-wer="${wer}"] .rd-geloest`).textContent();
 async function warteBis(s, fn, arg, ms = 6000) { await s.waitForFunction(fn, arg, { timeout: ms }); }
 const bildName = (geraet, schema, teil) => `raetsel-duell-${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-${teil}`;
-async function bild(s, name) { if (BILDER) await s.screenshot({ path: path.join(BILDER, name + '.png') }); }
+const bilderListe = [];
+async function bild(s, name) {
+  if (!BILDER) return;
+  const datei = path.join(BILDER, name + '.png');
+  await s.screenshot({ path: datei }); bilderListe.push(datei);
+}
+// Bild am Ende eines Nebenwegs, benannt nach der Gruppe ("Falscher Code" -> raetsel-duell-weg-falscher-code)
+const bildGruppe = (s) => bild(s, 'raetsel-duell-weg-' + gruppe.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
 // B17 (R6 12.11.2026): "Gegner suchen" hat dieselbe Fuellung und Schrift wie ein Hauptknopf (.knopf.primaer, so steht
 // "Duell suchen" auf der Online-Seite), nicht mehr Gold
 const suchFarbe = (s) => s.evaluate(() => {
@@ -229,12 +237,14 @@ async function grosserSchirm(browser) {
     pruefe('Start: Seitenleiste da, Seitentitel "Rätsel-Duell" sichtbar im Kopf', l0.lage === 'seite' && l0.leiste && t0.ok && /Rätsel-Duell/.test(t0.text), { ...t0, ...l0 });
     const farbe = await suchFarbe(s);
     pruefe('Start: Suchknopf in Hauptknopf-Farbe (wie Online)', farbe.gleich, farbe);
+    await bild(s, 'raetsel-duell-gross-1-start');
     await s.locator('.rd-suchen').click();
     await s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"]', { timeout: 8000 });
     await warte(700);
     const t1 = await titelSichtbar(s, '.screen.raetsel-duell');
     const l1 = await leisteSichtbar(s);
     pruefe('Laeuft: keine Seitenleiste, Screen beginnt am linken Rand, Seitentitel sichtbar', !l1.leiste && l1.links === 0 && t1.ok, { ...t1, ...l1 });
+    await bild(s, 'raetsel-duell-gross-2-laeuft');
     // Tagesraetsel (Screen raetsel mit Quelle oder Liste): derselbe Kopf, derselbe Titel am grossen Schirm
     await s.evaluate(() => window.__app.gehe('raetsel', { liste: [{ id: 'w-duell-1', fen: '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', loesung: ['a1a8'] }],
       titel: 'Tagesrätsel', unter: 'Mittwoch' }));
@@ -242,6 +252,7 @@ async function grosserSchirm(browser) {
     await warte(400);
     const t2 = await titelSichtbar(s, '.screen.rs-screen');
     pruefe('Tagesraetsel: Seitentitel sichtbar im Kopf', t2.ok && t2.text === 'Tagesrätsel', t2);
+    await bild(s, 'raetsel-duell-gross-3-tagesraetsel');
     pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   } finally { await p.k.close(); }
 }
@@ -451,6 +462,14 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
     const g2 = await geometrie(s);
     pruefe('Ende: nichts breiter, Tippflaechen ab 44 px', g2.breit && g2.klein.length === 0, g2);
     await bild(s, bildName(geraet, schema, '4-ende'));
+    // R18: Ende mit "Nochmal" unter dem Zeiger (Zeiger-Zustand, Kritik R17); nur mit Bildern, der Lauf ohne bleibt gleich
+    if (BILDER) {
+      const nochmal = s.locator('.rd-ende .rd-nochmal');
+      await nochmal.hover(); await warte(400);
+      pruefe('Bild: Nochmal liegt unter dem Zeiger', await nochmal.evaluate((e) => e.matches(':hover')));
+      await bild(s, bildName(geraet, schema, '5-ende-nochmal-zeiger'));
+      await s.mouse.move(1, 1);
+    }
     // R17 B3: Nochmal und Fertig in Ruhe, unter dem Zeiger, mit Fokus und gedrueckt lesbar (Text mindestens 4,5:1)
     const kNochmal = await knopfKontrast(s, '.rd-ende', '.rd-ende .rd-nochmal');
     const kFertig = await knopfKontrast(s, '.rd-ende', '.rd-ende .rd-fertig');
@@ -494,6 +513,7 @@ async function nebenwege(browser) {
       await p.s.locator('.rd-nochmal').click();
       await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"]', { timeout: 3000 });
       pruefe('Nochmal nach Freundschaft fuehrt zum Start, nicht in die gewertete Suche', !p.aufrufe.some((a) => a.name === 'duell_suche_start'));
+      await bildGruppe(p.s);
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }
@@ -510,6 +530,7 @@ async function nebenwege(browser) {
       await p.s.locator('.rd-beitreten').click();
       await p.s.waitForSelector('.rd-fehler:not([hidden])', { timeout: 3000 });
       pruefe('Meldung: Code passt zu keinem offenen Duell', /passt zu keinem offenen Duell/.test(await p.s.locator('.rd-fehler').innerText()));
+      await bildGruppe(p.s);
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }
@@ -523,6 +544,7 @@ async function nebenwege(browser) {
       await warte(500);
       pruefe('Ohne Konto: Hinweis und Knopf zum Konto, keine duell-Aufrufe', await p.s.locator('.rd-konto').isVisible()
         && p.aufrufe.every((a) => !/^duell_/.test(a.name)));
+      await bildGruppe(p.s);
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }
@@ -548,6 +570,7 @@ async function nebenwege(browser) {
         && p.aufrufe.some((a) => a.name === 'duell_suche_start'), rest);
       await p.s.locator('.rd-abbrechen').click();
       await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"]', { timeout: 3000 });
+      await bildGruppe(p.s);
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }
@@ -577,6 +600,7 @@ async function nebenwege(browser) {
       await p.s.waitForFunction(() => document.querySelector('.screen.raetsel-duell')?.dataset.phase !== 'suche', null, { timeout: 5000 });
       pruefe('Neues SQL: Knopf beendet die Suche mit ki true und startet das KI-Duell',
         p.aufrufe.some((a) => a.name === 'duell_suche_ende' && a.daten?.ki === true) && !p.aufrufe.some((a) => a.name === 'duell_suche_ende' && a.daten?.ki === false));
+      await bildGruppe(p.s);
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }
@@ -590,6 +614,7 @@ async function nebenwege(browser) {
       await p.s.locator('.lb-modus-karte[data-ziel="duell"]').click();
       await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"]', { timeout: 5000 });
       pruefe('Karte Raetsel-Duell ist aktiv und oeffnet den Duell-Screen', await p.s.evaluate(() => location.hash === '#raetsel-duell'));
+      await bildGruppe(p.s);
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }
@@ -637,6 +662,7 @@ async function neuladen(browser) {
     const nachher = { ...(await lage()), sek: await sek() };
     pruefe('Neuladen: zurueck im laufenden Duell, Raetsel 3 halb geloest (Kg8 steht), 2 geloest, Reihe gruen-gruen',
       nachher.phase === 'laeuft' && /3/.test(nachher.nr) && nachher.g8 && nachher.geloest === '2' && nachher.reihe === 'gg--', { vorher, nachher });
+    await bild(s, 'raetsel-duell-neuladen-1-laeuft');
     pruefe('Neuladen: Restzeit nicht groesser als vorher (Uhr vom Server, kein Zuruecksetzen auf 3:00)',
       nachher.sek <= vorher.sek && nachher.sek < 180, { vorher: vorher.sek, nachher: nachher.sek });
     pruefe('Neuladen: keine neue Gegnersuche', p.aufrufe.filter((a) => a.name === 'duell_suche_start').length === suchenVorher,
@@ -654,6 +680,7 @@ async function neuladen(browser) {
     await s.waitForSelector('.screen.raetsel-duell[data-phase="beendet"] .rd-ende', { timeout: 15000 });
     const ende = await s.evaluate(() => ({ erg: document.querySelector('.rd-ende').dataset.ergebnis, stand: document.querySelector('.rd-ende-stand').textContent }));
     pruefe('Neuladen nach dem Ende: Ergebnis statt Start (Gewonnen 3 zu 2)', ende.erg === 'sieg' && ende.stand === '3 zu 2 gelöst', ende);
+    await bild(s, 'raetsel-duell-neuladen-2-ende');
     pruefe('Nach dem gezeigten Ergebnis ist das laufende Duell vergessen', await s.evaluate(() => sessionStorage.getItem('schach-arena:raetsel-duell:laufend') === null));
     // die Online-Tuer hat ihre Suche schon gestartet: der Verlaufseintrag traegt kein suchen mehr, ein weiteres Neuladen
     // zeigt den Start und sucht erst nach einem Klick (Rest aus R7)
@@ -662,6 +689,7 @@ async function neuladen(browser) {
     await s.reload();
     await s.waitForSelector('.screen.raetsel-duell[data-phase="start"] .rd-suchen', { timeout: 15000 });
     await warte(800);
+    await bild(s, 'raetsel-duell-neuladen-3-start');
     pruefe('Neuladen nach dem Ergebnis: Start, keine neue Gegnersuche ohne Klick',
       await s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.phase) === 'start'
       && p.aufrufe.filter((a) => a.name === 'duell_suche_start').length === suchenNachEnde, p.aufrufe.filter((a) => /^duell_suche/.test(a.name)).map((a) => a.name));
@@ -706,5 +734,6 @@ try {
   if (browser) await browser.close();
   server.kill();
 }
+if (BILDER) pruefe(`Bilder abgelegt: ${bilderListe.length}`, bilderListe.length > 0 && bilderListe.every((d) => fs.existsSync(d)), bilderListe.filter((d) => !fs.existsSync(d)));
 console.log(`\n${ok} ok, ${fehler} Fehler${BILDER ? '; Bilder in ' + BILDER : ''}`);
 process.exit(fehler ? 1 : 0);

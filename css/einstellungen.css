@@ -128,7 +128,9 @@
   border: 1px solid var(--linie); color: var(--text-2); }
 .es-nav-zeichen svg { width: 17px; height: 17px; }
 .es-nav-text { min-width: 0; line-height: 1.2; overflow-wrap: normal; hyphens: manual; }
-.es-nav-punkt:hover, .es-nav-punkt:focus-visible { color: var(--text); background: var(--flaeche-2); }
+/* Zeiger-Zustand nur auf Geraeten mit Zeiger: auf dem Handy bliebe :hover nach dem Tippen stehen (R18 hover-rest) */
+@media (hover: hover) { .es-nav-punkt:hover { color: var(--text); background: var(--flaeche-2); } }
+.es-nav-punkt:focus-visible { color: var(--text); background: var(--flaeche-2); }
 .es-nav-punkt:focus-visible { outline: var(--fokus); outline-offset: 1px; }
 .es-nav-punkt[aria-current="true"] { color: var(--text); background: var(--flaeche-2); }
 .es-nav-punkt[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--akzent); }

@@ -416,6 +416,10 @@
 .arena.karte-hoch .detail { flex: none; overflow: visible; }
 .arena.karte-hoch .inhalt { padding-bottom: 0; }
 .arena.karte-hoch .cta-platz { bottom: 0; }
+/* Fokus und Rollen ins Bild halten Abstand zum klebenden Spielen-Knopf (bis 92 px hoch): sonst bleibt ein Ziel direkt
+   darueber, etwa "Weiss" der Farbwahl am iPhone SE, darunter verdeckt (WCAG 2.4.11, Kritik R18 E2, tests/r19-bots-se.test.mjs).
+   Aendert nur, wohin gerollt wird, nicht das Bild in Ruhe */
+.arena.karte-hoch .inhalt { scroll-padding-bottom: 96px; }
 @media (min-width: 700px) {
   /* iPad hoch: Panel zweispaltig, damit die Karte viel Platz behaelt; unten etwas Luft unter dem Panel */
   .arena.karte-hoch .inhalt { padding-bottom: 20px; }
