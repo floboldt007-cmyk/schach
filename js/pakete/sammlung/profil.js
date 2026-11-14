@@ -26,8 +26,9 @@ import { t, locale } from '../../sprache.js';
 import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
 import { visitenkarte, botKarte, karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN } from '../../ui/visitenkarte.js';
 import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
-import { teileErfolge, teileErfolgsStufen, familienOrden, karteAbgleichen, spielstand, titelDaten, schulStand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
+import { teileErfolge, teileErfolgsStufen, teileLokaleStufen, familienOrden, karteAbgleichen, spielstand, titelDaten, schulStand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
+import { tatenFrei } from './taten.js';
 import { familieVonAlt, FAMILIEN } from './stufen.js';
 import './texte.js';
 import './karte-texte.js';
@@ -71,7 +72,7 @@ function rahmenBild(id) {
 // Errungenschaften der Vitrine, die (noch) frei sind; ein Platz mit einem nicht mehr freien Erfolg bleibt leer.
 // Etappe 4b: ausgestellt werden Erfolgs-Familien mit ihrer Stufe ('stufe-<familie>'); ein frueher gespeicherter
 // Einzel-Erfolg zeigt seine Familie, einer ohne Familie (z. B. Sieg mit Schwarz) bleibt wie bisher stehen.
-function vitrineTeile(erfolge = teileErfolge(), stufen = teileErfolgsStufen()) {
+function vitrineTeile(erfolge = teileErfolge(), stufen = [...teileErfolgsStufen(), ...teileLokaleStufen()]) {
   const frei = new Map(erfolge.filter((e) => e.frei).map((e) => [e.id, e]));
   const fam = new Map(stufen.filter((s) => s.frei).map((s) => [s.id, s]));
   const schon = new Set();
@@ -153,11 +154,18 @@ function titelStand(erfolge = teileErfolge()) {
   let schule = null;
   try { schule = schulStand(); } catch (e) { schule = null; }
   try {
-    const neu = koennenFrei(ladePartien().filter(wertet), (id) => (botNachId(id) || {}).elo || 0, titelDaten(undefined, schule))
+    const partien = ladePartien().filter(wertet);
+    const daten = titelDaten(undefined, schule);
+    // R19 Taten-Titel (./taten.js) teilen sich die gemerkte Liste mit den Koennen-Titeln (Ids 'tat-...')
+    const neu = [...koennenFrei(partien, (id) => (botNachId(id) || {}).elo || 0, daten), ...tatenFrei(partien, daten)]
       .filter((x) => !koennen.includes(x));
     if (neu.length) { merkeErspielteTitel(neu); koennen = [...koennen, ...neu]; }
   } catch (e) { /* ohne Archiv nur die gemerkten */ }
-  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, labor: !!schule };
+  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, taten: koennen, labor: !!schule };
+}
+// R19 Familie Titeltraeger: wie viele Titel frei sind
+export function titelFreiZahl(erfolge = teileErfolge()) {
+  return titelListe(titelStand(erfolge)).filter((x) => x.frei).length;
 }
 export function titelJetzt(erfolge = teileErfolge()) {
   return aktuellerTitel({ ...titelStand(erfolge), wahl: profilWahl().titel });
@@ -166,7 +174,7 @@ export function titelTeile(erfolge = teileErfolge()) {
   const stand = titelStand(erfolge);
   const jetzt = aktuellerTitel({ ...stand, wahl: profilWahl().titel });
   const gruppe = { erfinder: S('gruppe.titelErfinder'), pionier: S('gruppe.titelErfinder'), level: S('gruppe.titelLevel'), erfolg: S('gruppe.titelErfolg'),
-    koennen: S('gruppe.titelKoennen') };
+    koennen: S('gruppe.titelKoennen'), tat: S('gruppe.titelTat') };
   return titelListe(stand).map((x) => {
     const an = !!jetzt && jetzt.id === x.id;
     return { id: 'titel-' + x.id, name: x.name, frei: x.frei, an, gruppe: gruppe[x.art],
@@ -285,7 +293,7 @@ function waehleAussehen(app) {
 
 // Etappe 4b: zur Wahl stehen die erreichten Erfolgs-Familien (mit Stufe), nie etwas Gekauftes
 function waehleOrden(app, platz) {
-  const erfolge = teileErfolgsStufen().filter((e) => e.frei);
+  const erfolge = [...teileErfolgsStufen(), ...teileLokaleStufen()].filter((e) => e.frei);
   const wahl = profilWahl();
   const jetzt = vitrineTeile()[platz];
   const inhalt = document.createElement('div');
