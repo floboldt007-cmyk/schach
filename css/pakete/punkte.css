@@ -83,7 +83,8 @@
 .bl-fenster-wahl select { -webkit-appearance: none; appearance: none; min-height: var(--tipp); margin: 0; padding: 0 40px 0 16px;
   border: 0; border-radius: var(--r-pille); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text); font: inherit;
   font-size: 14px; font-weight: 700; cursor: pointer; }
-.bl-fenster-wahl select:hover { background: var(--flaeche-3); }
+/* Zeiger-Zustand nur mit Zeiger: am Handy bliebe er nach dem Tippen haengen (R17, tests/r17-hover-handy.test.mjs) */
+@media (hover: hover) { .bl-fenster-wahl select:hover { background: var(--flaeche-3); } }
 .bl-fenster-wahl select:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-fenster-pfeil { position: absolute; right: 14px; top: 50%; display: grid; width: 16px; height: 16px; margin-top: -8px; color: var(--text-2);
   pointer-events: none; transform: rotate(90deg); }
