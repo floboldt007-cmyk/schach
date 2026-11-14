@@ -5,11 +5,15 @@
 //
 //   node tests/bilder-online.mjs --bilder=<ordner>     16 Bilder: online-<geraet>-<hell|dunkel>-<lobby|suche|partie|ergebnis>.png
 //   PORT=8991 node tests/bilder-online.mjs ...         eigener Port (Standard 8991)
+//   --stil=a|b|c       Entwurf "online ruhig" (R19, ?onlineStil=, js/ui/online.js); Dateien online-<stil>-<geraet>-...;
+//                      die Attrappe nennt dann die Elo (Feld elo in kronen_mein_stand, das der Server heute noch nicht schickt)
+//   --nur-hell         nur das helle Schema (8 Bilder)
+//   --zahlen=<datei>   schreibt je Ansicht alle sichtbaren Zahlen als Markdown-Liste (Brett-Koordinaten zusammengefasst)
 // Exit 0, wenn alle 16 Bilder entstanden sind und jede Ansicht im erwarteten Modus stand; sonst 1.
 import http from 'node:http';
 import os from 'node:os';
 import { createRequire } from 'node:module';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
@@ -24,6 +28,9 @@ if (!pw) throw new Error('Playwright fehlt (PLAYWRIGHT_PFAD setzen)');
 const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : null; };
 const BILDER = arg('bilder') || path.join(os.tmpdir(), 'bilder-online');
 mkdirSync(BILDER, { recursive: true });
+const STIL = ['a', 'b', 'c'].includes(arg('stil')) ? arg('stil') : null;
+const ZAHLEN = arg('zahlen');
+const zahlenListe = [];
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
@@ -36,7 +43,7 @@ const server = http.createServer((req, res) => {
 });
 const PORT = Number(process.env.PORT || 8991);
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test${STIL ? '&onlineStil=' + STIL : ''}`;
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let ok = 0, gesamt = 0;
@@ -50,7 +57,8 @@ function pruefe(name, gut, detail = '') {
 const UID = 'u1';
 const token = (uid) => 'a.' + Buffer.from(JSON.stringify({ sub: uid })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'test-r', expires_at: 9999999999, user: { id: UID, email: 'u1@example.invalid' } };
-const NAMEN = { u1: 'Spieler_1', u2: 'Spieler_2' };
+// Namen ohne Ziffern, damit die Zahlenliste (--zahlen) nur echte Zahlen zaehlt
+const NAMEN = { u1: 'Mira', u2: 'Jonas' };
 const PARTIE = 'such-1';
 const iso = (ms) => new Date(ms).toISOString();
 
@@ -104,7 +112,7 @@ function bediener(z) {
         const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du: u === UID });
         return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
       }
-      if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09' });
+      if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...(STIL ? { elo: 1240 } : {}) });
       z.unerwartet.push(rpc);
       return antwort([]);
     }
@@ -138,8 +146,27 @@ async function bestaetige(s) {
 const sichtbar = (s, sel, ms = 15000) => s.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((e) => !e.hidden && e.getClientRects().length > 0), sel, { timeout: ms })
   .then(() => true).catch(() => false);
 
+// Alle Zahlen, die man in der Ansicht sieht: Textknoten mit Ziffern oder ½, sichtbar (checkVisibility) und im Bild
+// (Viewport), mit der Klasse des Elternelements als Ort. Brett-Koordinaten (1-8, a-h) stehen als eine Zeile.
+const sichtbareZahlen = (s) => s.evaluate(() => {
+  const raus = [];
+  let koord = 0;
+  const gang = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = gang.nextNode())) {
+    const el = n.parentElement;
+    const zahlen = n.textContent.match(/\d+(?:[:.,]\d+)*|½/g);
+    if (!el || !zahlen || !el.checkVisibility({ visibilityProperty: true, opacityProperty: true })) continue;
+    const r = el.getBoundingClientRect();
+    if (r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) continue;
+    if (el.closest('.koord, .koords, [class*="koord"]')) { koord++; continue; }
+    const ort = el.closest('[class]')?.getAttribute('class').split(/\s+/).slice(0, 2).join('.') || el.tagName.toLowerCase();
+    raus.push({ text: n.textContent.trim().replace(/\s+/g, ' ').slice(0, 80), zahlen, ort });
+  }
+  return { raus, koord };
+});
 const GERAETE = [['iphone-13', 390, 844], ['pc', 1280, 720]];
-const SCHEMATA = [['hell', 'light', 'hell'], ['dunkel', 'dark', 'dunkel']];
+const SCHEMATA = [['hell', 'light', 'hell'], ['dunkel', 'dark', 'dunkel']].slice(0, process.argv.includes('--nur-hell') ? 1 : 2);
 const seitenfehler = [];
 
 async function lauf(browser, [geraet, w, h], [wort, schema, modus]) {
@@ -152,7 +179,8 @@ async function lauf(browser, [geraet, w, h], [wort, schema, modus]) {
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
   const bild = async (teil) => {
-    const datei = path.join(BILDER, `online-${geraet}-${wort}-${teil}.png`);
+    if (ZAHLEN) zahlenListe.push({ ansicht: `${geraet} ${wort} ${teil}`, zahlen: await sichtbareZahlen(s) });
+    const datei = path.join(BILDER, `online-${STIL ? STIL + '-' : ''}${geraet}-${wort}-${teil}.png`);
     const da = await s.screenshot({ path: datei }).then(() => true).catch(() => false);
     pruefe(`${gruppe}: Bild ${teil}`, da, datei);
   };
@@ -203,6 +231,18 @@ try {
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();
+}
+if (ZAHLEN) {
+  const zeilen = [`# Sichtbare Zahlen je Ansicht${STIL ? ' (Entwurf ' + STIL + ')' : ' (heute)'}`, '',
+    'Gemessen mit tests/bilder-online.mjs --zahlen: jeder sichtbare Text mit Ziffern (oder ½) im Bild; Namen wie Spieler_2 zaehlen mit.', ''];
+  for (const { ansicht, zahlen } of zahlenListe) {
+    const anzahl = zahlen.raus.reduce((a, x) => a + x.zahlen.length, 0);
+    zeilen.push(`## ${ansicht}: ${anzahl} Zahlen${zahlen.koord ? ` (dazu ${zahlen.koord} Brett-Koordinaten)` : ''}`, '');
+    for (const x of zahlen.raus) zeilen.push(`- ${x.zahlen.join(', ')}: "${x.text}" (${x.ort})`);
+    zeilen.push('');
+  }
+  writeFileSync(ZAHLEN, zeilen.join('\n'));
+  console.log(`Zahlenliste in ${ZAHLEN}`);
 }
 pruefe('keine Seitenfehler', seitenfehler.length === 0, seitenfehler);
 console.log(`\nBilder in ${BILDER}\n${ok}/${gesamt} Pruefungen bestanden`);

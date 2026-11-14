@@ -28,7 +28,9 @@ import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { hoere } from '../ereignisse.js';
 import { spieleDuell } from './duell.js';
-import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie } from '../storage.js';
+import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie, ladeModul } from '../storage.js';
+import { normalisiereStand } from '../pakete/liga/wertung.js';
+import { profilWahl } from '../profil.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -59,6 +61,22 @@ const REMIS_SYMBOL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fo
 // Duell-Intro vor gewerteten Partien (js/ui/duell.js) nur einmal je Partie und nur in der ersten Minute
 const INTRO_SCHLUESSEL = 'schach-arena:online:intro';
 const INTRO_FRIST_MS = 60 * 1000;
+// R19 online ruhig (Flo 14.11.2026: "zu viele Zahlen, zu unuebersichtlich"): drei ENTWUERFE fuer Flos Wahl, sichtbar nur
+// mit der Kennung ?onlineStil=a|b|c (a nur das Wichtige, b Karten, c Spielerleiste; tests/r19-online-ruhig.test.mjs).
+// Ohne Kennung und mit jeder anderen bleibt die Seite wie bisher.
+const RUHIG_STILE = ['a', 'b', 'c'];
+function ruhigStil() {
+  try { const w = new URLSearchParams(globalThis.location?.search || '').get('onlineStil'); return RUHIG_STILE.includes(w) ? w : null; }
+  catch (e) { return null; }
+}
+// Elo fuer Variante a: die des Servers, sobald kronen_mein_stand sie mitschickt (Feld elo, heute noch nicht), sonst die
+// Liga-Wertung dieses Geraets (ihr Wert ist der Online-Startwert, js/kronen.js startEinmal); ohne gewertete Partie keine
+// Zahl, statt einen Startwert als Elo auszugeben
+function eigeneElo(st) {
+  if (Number.isInteger(st.elo) && st.elo >= 100 && st.elo <= 4000) return st.elo;
+  try { const liga = normalisiereStand(ladeModul('liga'), new Date()); if (liga && liga.wertung.n > 0) return liga.wertung.wert; } catch (e) { /* ohne Wertung */ }
+  return null;
+}
 // neueste laufende Partie zuerst (Befund 2 vom 11.11.: zwei gewertete Partien zugleich, jedes Geraet sass in einer anderen)
 const zeitVon = (row) => Date.parse(row?.erstellt_am || row?.aktualisiert_am || '') || 0;
 const neuesteLaufende = (liste) => (Array.isArray(liste) ? liste : []).filter((row) => row && row.status === 'laeuft')
@@ -92,6 +110,13 @@ export function zeige(root, params, app) {
   // die Leiste unten stehen (js/app.js reiterVon)
   s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', chips: '', seite: O('titel') })}`
     + `<div class="on-rumpf"><p class="on-meldung" role="status" hidden></p><div class="on-inhalt"></div></div>`;
+  const stil = ruhigStil();
+  if (stil) s.dataset.onlineStil = stil;
+  // gemeinsame Bausteine der Entwuerfe: Karte (Symbol, Ueberzeile, EIN Wert, Unterzeile), Chip, Liga-Abzeichen
+  const ruhigKarte = (sym, ueber, wert, unter, zahl = false) => `<span class="on-rk"><span class="on-rk-symbol" aria-hidden="true">${icon(sym)}</span>`
+    + `<span class="on-rk-ueber">${esc(ueber)}</span><b class="on-rk-wert${zahl ? ' zahl' : ''}">${esc(wert)}</b><small>${esc(unter)}</small></span>`;
+  const chip = (sym, text) => `<span class="on-chip">${icon(sym)}<span>${esc(text)}</span></span>`;
+  const abzeichen = (text) => `<span class="on-abzeichen">${icon('liga')}<span>${esc(text)}</span></span>`;
   root.append(s);
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
   let suche = null;
@@ -167,7 +192,7 @@ export function zeige(root, params, app) {
     + `${art === 'duell' ? '<b class="on-bild-uhr zahl">3:00</b>' : ''}</span>`;
   const tuer = (art, rumpf) => `<section class="on-art on-tuer" data-art="${art}" aria-labelledby="on-${art}-t">
       <div class="on-tuer-kopf">${bild(art)}<div class="on-tuer-text"><span class="on-tuer-ueber">${esc(O(`tuer.${art}.ueber`))}</span>
-        <h2 id="on-${art}-t">${esc(O(`tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
+        <h2 id="on-${art}-t">${esc(O(stil === 'a' && art === 'duell' ? 'ruhig.duellTitel' : `tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
   const RING = 2 * Math.PI * 44;
   function start() {
     const kopfHtml = seitenKopf({ titel: O('titel'), text: O('kurz') });
@@ -202,7 +227,8 @@ export function zeige(root, params, app) {
         <span class="on-liga-text"><b></b><span></span></span></button>
       <div class="on-tueren" data-zustand="konto">
       ${tuer('partie', `<p class="on-suche-text" hidden>${esc(O('suche.pruefen'))}</p>
-        <p class="on-zeit-fest">${esc(O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) }))}</p>
+        ${stil === 'b' ? `<p class="on-zeit-fest">${chip('blitz', `${RANKED_ZEIT.id.replace('+', ' + ')} · ${O('zeit.' + RANKED_ZEIT.art)}`)}</p>`
+    : `<p class="on-zeit-fest">${esc(O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) }))}</p>`}
         <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="suchen" disabled>${esc(O('tuer.partie.knopf'))}</button>
         <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="fortsetzen" hidden>${esc(O('laufend.knopf'))}</button>
         <div class="on-suche" hidden>
@@ -279,6 +305,44 @@ export function zeige(root, params, app) {
       + `<span class="on-liga-kronen zahl" aria-hidden="true">${icon('krone')}${esc(String(zahlKronen))}</span>`;
     el.setAttribute('aria-label', O('liga.label', { stufe, zeile, kronen: O('liga.kronen', { n: zahlKronen }) }));
     el.hidden = false;
+    if (stil) zeigeLigaRuhig(el, st, stufe, zeile, zahlKronen);
+  }
+  // Entwuerfe: a eine grosse Zahl (Elo) und der Rest hinter "Mehr"; b drei Karten Stand, Liga, Saison; c du als
+  // Spielerleiste mit Banner und Liga-Abzeichen. Alles fuehrt wie der Streifen zur Liga (data-online="liga").
+  function zeigeLigaRuhig(el, st, stufe, zeile, kronen) {
+    const zeitFest = O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) });
+    if (stil === 'a') {
+      const elo = eigeneElo(st);
+      el.innerHTML = `<span class="on-liga-schild" aria-hidden="true">${icon(elo != null ? 'podest' : 'liga')}</span>`
+        + `<span class="on-gross"><span class="on-gross-wert${elo != null ? ' zahl' : ''}">${esc(elo != null ? String(elo) : stufe)}</span>`
+        + `<span class="on-gross-text">${esc(O(elo != null ? 'ruhig.elo' : 'ruhig.deineLiga'))}</span></span>`;
+      // vorgelesen wird, was zu sehen ist; Liga, Platz und Kronen liest "Mehr" vor
+      el.setAttribute('aria-label', `${O(elo != null ? 'ruhig.elo' : 'ruhig.deineLiga')}: ${elo != null ? elo : stufe}`);
+      const wrap = document.createElement('div');
+      wrap.className = 'on-ruhig';
+      el.replaceWith(wrap);
+      wrap.append(el);
+      wrap.insertAdjacentHTML('beforeend', `<details class="on-mehr"><summary class="dr">${esc(O('ruhig.mehr'))}</summary><ul>`
+        + [stufe, zeile, O('liga.kronen', { n: kronen }), zeitFest, O('tuer.partie.text')].map(x => `<li>${esc(x)}</li>`).join('') + '</ul></details>');
+      return;
+    }
+    el.hidden = true;
+    if (stil === 'b') {
+      const platz = Number.isInteger(st.platz) && st.platz > 0;
+      el.insertAdjacentHTML('afterend', `<button class="on-ruhig on-rk-reihe dr" type="button" data-online="liga" aria-label="${esc(el.getAttribute('aria-label'))}">`
+        + ruhigKarte('podest', O('ruhig.stand'), platz ? O('ruhig.platz', { platz: st.platz }) : '–', platz ? O('ruhig.inGruppe') : O('liga.ohneGruppe'))
+        + ruhigKarte('liga', O('ruhig.liga'), stufe, O('ruhig.ligaUnter'))
+        + ruhigKarte('krone', O('ruhig.saison'), String(kronen), O('ruhig.kronenWoche'), true) + '</button>');
+      return;
+    }
+    el.insertAdjacentHTML('afterend', `<button class="on-ruhig on-ich-leiste dr" type="button" data-online="liga" aria-label="${esc(el.getAttribute('aria-label'))}">`
+      + `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(profilWahl().banner)}')"></span>`
+      + `<span class="av">${floAvatar('w')}</span><span class="on-il-text"><b class="on-il-name">${esc(profil?.benutzername || O('ich'))}</b>${abzeichen(stufe)}</span>`
+      + `<span class="on-il-pfeil" aria-hidden="true">${icon('vor')}</span></button>`);
+    ladeProfil().then(d => {
+      const n = inhalt.querySelector('.on-il-name');
+      if (!weg && n && d?.benutzername) { profil = d; n.textContent = d.benutzername; }
+    }).catch(() => { /* bleibt "Ich" */ });
   }
   // Laeuft fuer das Konto eine Partie (online_meine), wird die Partie-Tuer zur Karte "Laufende Partie fortsetzen" und
   // oeffnet die NEUESTE laufende (Befund 3 vom 11.11.: kein Weg zurueck; Befund 2: zwei laufende zugleich). Solange eine
@@ -753,8 +817,15 @@ export function zeige(root, params, app) {
     el.hidden = !ok;
     if (!ok) { el.textContent = ''; return; }
     const d = kronenNach.kronen - kronenVor.kronen;
-    el.innerHTML = `${icon('krone')}<b class="zahl">${d > 0 ? '+' + d : d < 0 ? '−' + Math.abs(d) : '±0'}</b>`
-      + `<span>${esc(O('liga.kronen', { n: kronenNach.kronen }))}</span>`;
+    const aenderung = d > 0 ? '+' + d : d < 0 ? '−' + Math.abs(d) : '±0';
+    // Entwuerfe: a und c nur die Aenderung, b zwei Karten (diese Partie, diese Woche)
+    if (stil === 'b') {
+      el.innerHTML = ruhigKarte('krone', O('ruhig.kronen'), aenderung, O('ruhig.diesePartie'), true)
+        + ruhigKarte('podest', O('ruhig.woche'), String(kronenNach.kronen), O('ruhig.kronen'), true);
+      return;
+    }
+    el.innerHTML = `${icon('krone')}<b class="zahl">${aenderung}</b>`
+      + `<span>${esc(stil ? O('ruhig.kronen') : O('liga.kronen', { n: kronenNach.kronen }))}</span>`;
   }
   // R7 (Gleichheits-Liste R6, B2): das Ende zeigt das Ergebnisblatt der Bot-Partie (css/ergebnis.css, Aufbau wie baueOverlay
   // in js/ui/partie.js): Kopfwort, Grund, bei gewerteten Partien die Kronen-Aenderung, "Zur Analyse", Revanche und Meine
@@ -794,6 +865,7 @@ export function zeige(root, params, app) {
     o.innerHTML = `<div class="ergebnis-karte" tabindex="-1">
         <button class="icon-knopf erg-zu" type="button" data-online="brett" aria-label="${esc(t('partie.erg.brettAnsehen'))}">${icon('auge')}</button>
         <div class="erg-rumpf"><h2 class="erg-wort disp" id="on-erg-wort">${wort}</h2><p class="erg-unter">${esc(grund)}</p>
+          ${stil === 'c' ? `<div class="on-erg-leisten">${[eigen, andere(eigen)].map(f => ergSpieler(f, art)).join('')}</div>` : ''}
           ${p.gewertet ? '<p class="on-erg-kronen" hidden></p>' : ''}</div>
         <div class="erg-aktionen"><div class="erg-knoepfe">
           ${analyse ? `<button class="knopf primaer gross" type="button" data-online="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>` : ''}
@@ -813,6 +885,16 @@ export function zeige(root, params, app) {
     s.append(o);
     zeigeKronen();
     zeigeBlatt(true);
+  }
+  // Entwurf c: Spielerleiste im Ergebnis (Banner, Name, Liga-Abzeichen), der Gewinner mit Pokal
+  function ergSpieler(f, art) {
+    const { k, name, liga } = spielerDaten(f);
+    const eigen = online.meineFarbe(p);
+    const sieger = (art === 'sieg' && f === eigen) || (art === 'niederlage' && f !== eigen);
+    const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
+    return `<div class="on-erg-spieler${f === eigen ? ' ich' : ''}${sieger ? ' sieger' : ''}${banner ? ' mit-banner' : ''}">${banner}`
+      + `<span class="av">${k?.avatar || floAvatar(f)}</span><span class="on-il-text"><b>${esc(name)}</b>${abzeichen(liga || (f === 'w' ? O('weiss') : O('schwarz')))}</span>`
+      + `${sieger ? `<span class="on-erg-sieg">${icon('pokal')}</span>` : ''}</div>`;
   }
   // Ablage fuer die Analyse: die Spielanalyse (js/ui/analyse.js) und "Meine Partien" (js/ui/verlauf.js) lesen nur Partien vom
   // Geraet. W-online-analyse: jede beendete Online-Partie mit mindestens einem Zug wird beim Ende von selbst abgelegt (auch
@@ -878,7 +960,11 @@ export function zeige(root, params, app) {
       // Unterzeile wie in der Bot-Partie: Elo (wenn bekannt) und Liga, sonst die Farbe; dahinter die geschlagenen Figuren
       const meta = [elo != null ? `Elo ${elo}` : '', liga].filter(Boolean).join(' · ') || (f === 'w' ? O('weiss') : O('schwarz'));
       const avatar = k?.avatar || floAvatar(f);
-      const unter = `<div class="unter bot-meta">${titel}<span class="p-meta">${esc(meta)}</span><span class="geschlagen-ort" data-wer="${f}"></span></div>`;
+      // Entwuerfe: a nur der Name, b Titel und Liga als Chips, c das Liga-Abzeichen; keine Elo
+      const farbe = f === 'w' ? O('weiss') : O('schwarz');
+      const zeile = !stil ? `${titel}<span class="p-meta">${esc(meta)}</span>` : stil === 'a' ? ''
+        : stil === 'b' ? (k && k.titel ? chip('stern', k.titel.name) : '') + chip('liga', liga || farbe) : abzeichen(liga || farbe);
+      const unter = `<div class="unter bot-meta">${zeile}<span class="geschlagen-ort" data-wer="${f}"></span></div>`;
       const uhr = `<div class="uhr zahl" data-farbe="${f}"${p.bedenkzeit_s == null ? ' hidden' : ''}>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
       const el = inhalt.querySelector('.on-' + ort);
       el.classList.toggle('mit-banner', !!banner);

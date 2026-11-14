@@ -225,3 +225,77 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .on-tueren > .on-tuer:first-child { grid-row: 1; }
   .on-tueren > .on-tuer + .on-tuer { grid-row: 3; }
 }
+
+/* ---------- R19 online ruhig (14.11.2026): drei ENTWUERFE fuer Flos Wahl, nur mit ?onlineStil=a|b|c
+   (js/ui/online.js ruhigStil, tests/r19-online-ruhig.test.mjs). Ohne Kennung greift hier nichts. ---------- */
+@media (orientation: portrait) and (min-height: 740px) { .on-inhalt > .on-ruhig { grid-row: 3; } }
+.on-inhalt > .on-ruhig { margin-bottom: var(--a3); }
+.on-ruhig > .on-liga { margin-bottom: 0; }
+/* a "Nur das Wichtige": eine grosse Zahl, Erklaerungen und Bedenkzeit hinter "Mehr" */
+.online-screen[data-online-stil="a"] .on-liga { min-height: 76px; }
+.on-gross { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.on-gross-wert { font-family: var(--display); font-weight: var(--gw-titel); font-size: 34px; line-height: 1.05; color: var(--text); }
+.on-gross-text { font-size: 13px; color: var(--text-2); }
+.on-mehr { margin-top: 6px; }
+.on-mehr > summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; font-size: 14px; font-weight: 650; color: var(--text-2);
+  cursor: pointer; list-style: none; }
+.on-mehr > summary::-webkit-details-marker { display: none; }
+.on-mehr > summary::after { content: ''; width: 7px; height: 7px; margin-left: 8px; border: solid currentColor; border-width: 0 2px 2px 0;
+  transform: translateY(-2px) rotate(45deg); }
+.on-mehr[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
+.on-mehr > ul { margin: 0 0 4px; padding: 10px 14px 10px 30px; border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--kante);
+  font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+.online-screen[data-online-stil="a"] .on-tuer-text p, .online-screen[data-online-stil="a"] .on-zeit-fest,
+.online-screen[data-online-stil="a"] .on-bild-uhr { display: none; }
+.online-screen[data-online-stil="a"] .on-tuer-kopf { align-items: center; }
+/* b "Karten": drei ruhige Karten mit Symbol, je ein Wert */
+.on-rk-reihe { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; padding: 0; border: 0; background: none;
+  font: inherit; text-align: left; color: var(--text); cursor: pointer; }
+.on-rk-reihe:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; border-radius: var(--r-l); }
+.on-rk { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: var(--r-l); background: var(--flaeche);
+  box-shadow: var(--s1), var(--kante); }
+.on-rk-symbol { display: grid; place-items: center; width: 30px; height: 30px; margin-bottom: 4px; border-radius: 10px; background: var(--flaeche-2); }
+.on-rk-symbol .ico { width: 18px; height: 18px; }
+.on-rk-ueber { font-size: 12px; font-weight: 650; letter-spacing: .02em; color: var(--text-2); }
+.on-rk-wert { font-family: var(--display); font-weight: var(--gw-titel); font-size: 19px; line-height: 1.15; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.on-rk small { font-size: 12px; line-height: 1.3; color: var(--text-2); }
+.on-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 9px 3px 7px; border-radius: var(--r-pille);
+  background: var(--flaeche-2); color: var(--text); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.on-chip .ico { flex: none; width: 14px; height: 14px; }
+.online-screen[data-online-stil="b"] .on-zeit-fest { margin-top: 2px; }
+.online-partie .spieler.mit-banner .on-chip { background: rgba(255, 255, 255, .16); color: var(--vk-schrift); text-shadow: none; }
+.online-partie .spieler .bot-meta:has(.on-chip, .on-abzeichen) { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.on-erg-kronen:has(.on-rk) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; text-align: left; }
+.on-erg-kronen .on-rk .ico { width: 18px; height: 18px; }
+.on-erg-kronen .on-rk-wert { font-size: 22px; }
+/* c "Spielerleiste": du als Leiste wie im Spiel, Liga-Abzeichen statt Zahlen */
+.on-abzeichen { display: inline-flex; align-items: center; gap: 5px; width: max-content; max-width: 100%; padding: 3px 10px 3px 6px;
+  border-radius: var(--r-pille); background: color-mix(in srgb, var(--gold, var(--akzent)) 22%, transparent); color: inherit;
+  font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.on-abzeichen .ico { flex: none; width: 15px; height: 15px; color: var(--gold, var(--akzent)); }
+.on-ich-leiste, .on-erg-spieler { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 8px 14px 8px 10px;
+  border: 0; border-radius: var(--r-l); overflow: hidden; background: var(--flaeche); box-shadow: var(--s1), var(--kante); color: var(--text);
+  font: inherit; text-align: left; }
+.on-ich-leiste { cursor: pointer; }
+.on-ich-leiste:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+.on-ich-leiste > .on-banner, .on-erg-spieler > .on-banner { position: absolute; inset: 0; background-color: #14161C; background-repeat: no-repeat;
+  pointer-events: none; --banner-h: 64px; --banner-motiv: 33px;
+  /* wie css/visitenkarte.css: das Motiv (x 0,267 der Breite) hinter der Mitte des Profilbilds, rechts die dunkle Grundfarbe */
+  background-size: auto 100%; background-position: calc(var(--banner-motiv) - var(--banner-h) * 1.067) 50%; }
+.on-erg-spieler > .on-banner { --banner-h: 56px; }
+.on-ich-leiste > .on-banner::after, .on-erg-spieler > .on-banner::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(10, 12, 16, .2), rgba(10, 12, 16, .72) 55%, rgba(10, 12, 16, .85)); }
+.on-ich-leiste, .on-erg-spieler.mit-banner { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
+.on-ich-leiste > :not(.on-banner), .on-erg-spieler > :not(.on-banner) { position: relative; }
+.on-ich-leiste .av, .on-erg-spieler .av { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 14px; overflow: hidden;
+  background: var(--flo-grund, var(--flaeche-2)); }
+.on-ich-leiste .av svg, .on-erg-spieler .av svg { display: block; width: 100%; height: 100%; }
+.on-il-text { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.on-il-text b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.on-ich-leiste .on-abzeichen, .on-erg-spieler.mit-banner .on-abzeichen { background: rgba(255, 255, 255, .16); text-shadow: none; }
+.on-il-pfeil .ico { width: 18px; height: 18px; opacity: .8; }
+.on-erg-leisten { display: grid; gap: 8px; width: 100%; margin-top: 10px; }
+.on-erg-spieler { min-height: 56px; }
+.on-erg-spieler.sieger { box-shadow: 0 0 0 2px var(--gold, var(--akzent)), var(--s1); }
+.on-erg-sieg .ico { width: 22px; height: 22px; color: var(--gold, var(--akzent)); }
