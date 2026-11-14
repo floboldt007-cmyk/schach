@@ -7,7 +7,7 @@
 // Ein laufendes Stripe-Abo endet mit dem Konto nicht: Ist es im Geraet bekannt (js/abo.js), steht der Hinweis vor dem
 // zweiten Schritt. Die Seite zeigt den Hinweis ausserdem immer als festen Satz, weil ein fremder Browser den Stand nicht kennt.
 import { setzeSprache } from './sprache.js';
-import { fordereCodeAn, pruefeCode, meldeMitGoogleAn, uebernimmLinkSitzung, sitzung, userId, abmelden } from './konto.js';
+import { fordereCodeAn, pruefeCode, meldeMitGoogleAn, uebernimmLinkSitzung, sitzung, userId, abmelden, aktiveSitzung, erneuereSitzung } from './konto.js';
 import { loescheKonto } from './daten.js';
 import { botschutz } from './botschutz.js';
 
@@ -87,26 +87,39 @@ export function starte(doc = document) {
     $('[data-kl="loeschen"]').disabled = true;
     $('.kl-bestaetigen').focus();
   });
-  // Waehrend der Loeschung gibt das Feld den Knopf nicht wieder frei, sonst loest ein zweiter Klick einen zweiten rpc aus
+  // Waehrend der Loeschung sind Feld, Abbrechen, Weiter und Abmelden gesperrt, sonst loest ein zweiter Klick einen zweiten
+  // rpc aus. Der Loeschknopf folgt immer dem Feld, auch nach einem Serverfehler.
   let loeschtGerade = false;
-  $('.kl-bestaetigen').addEventListener('input', (e) => {
+  const wortPasst = () => $('.kl-bestaetigen').value.trim().toLocaleUpperCase(sprache) === wort;
+  const sperre = (an) => {
+    for (const k of ['abbrechen', 'weiter', 'abmelden']) $(`[data-kl="${k}"]`).disabled = an;
+    $('.kl-bestaetigen').disabled = an;
+  };
+  $('.kl-bestaetigen').addEventListener('input', () => {
     if (loeschtGerade) return;
-    $('[data-kl="loeschen"]').disabled = e.target.value.trim().toLocaleUpperCase(sprache) !== wort;
+    $('[data-kl="loeschen"]').disabled = !wortPasst();
   });
   knopf('abbrechen', () => { melde(''); zeige(); });
   // abmelden() entfernt die Sitzung sofort und wartet danach auf den Server: nicht darauf warten
   knopf('abmelden', () => { abmelden().catch(() => {}); melde(''); zeige(); });
+  // Lehnt der Server ein lokal noch gueltiges Token ab (401, PGRST301/303), einmal erneuern und einmal wiederholen.
+  // Scheitert das, lokal abmelden: Die Seite zeigt dann die Anmeldung, statt weiter abgelehnte Aufrufe zu schicken.
+  const abgelehnt = (f) => f?.status === 401 || f?.code === 'PGRST301' || f?.code === 'PGRST303';
+  async function loescheMitErneuerung() {
+    let erster;
+    try { return await loescheKonto(); } catch (f) { if (!abgelehnt(f)) throw f; erster = f; }
+    try { await erneuereSitzung(); } catch (f) { abmelden().catch(() => {}); throw erster; }
+    try { return await loescheKonto(); } catch (f) { if (abgelehnt(f)) abmelden().catch(() => {}); throw f; }
+  }
   knopf('loeschen', async () => {
     melde(text('loescht'));
-    loeschtGerade = true;
-    $('.kl-bestaetigen').disabled = true;
-    const ok = await versuche(() => loescheKonto());
-    loeschtGerade = false;
-    $('.kl-bestaetigen').disabled = false;
+    loeschtGerade = true; sperre(true);
+    const ok = await versuche(loescheMitErneuerung);
+    loeschtGerade = false; sperre(false);
     if (!ok) {
-      // Sitzung abgelaufen (Refresh tot): js/konto.js hat sie entfernt, also zurueck zur Anmeldung; die Meldung bleibt stehen
+      // Sitzung tot (Refresh gescheitert oder vom Server abgelehnt): zurueck zur Anmeldung; die Meldung bleibt stehen
       if (!sitzung()) { zeige(); return; }
-      $('[data-kl="loeschen"]').disabled = false;
+      $('[data-kl="loeschen"]').disabled = !wortPasst();
       return;
     }
     $('.kl-anmelden').hidden = true;
@@ -117,5 +130,10 @@ export function starte(doc = document) {
   });
 
   zeige();
+  // Beim Laden eine lokal abgelaufene Sitzung gleich erneuern (aktiveSitzung). Ist der Refresh tot, hat js/konto.js sie
+  // entfernt: Die Seite zeigt dann sofort die Anmeldung, nicht erst nach dem Loeschversuch.
+  if (sitzung()) {
+    aktiveSitzung().catch((f) => { if (!sitzung() && !loeschtGerade) { melde(f?.message || text('fehler'), true); zeige(); } });
+  }
   return { zeige };
 }

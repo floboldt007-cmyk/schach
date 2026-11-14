@@ -37,7 +37,8 @@ let ok = 0, gesamt = 0;
 function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`${gut ? 'OK' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`); }
 const browser = await browserTyp(pw).launch({ headless: true });
 
-// otp/verify/rpc/token: { status, body } statt der Erfolgsantwort; rpcMs: Antwort von konto_loeschen verzoegert;
+// otp/verify/rpc/token: { status, body } statt der Erfolgsantwort (rpc auch als Liste je Aufruf, null = Erfolg);
+// rpcMs: Antwort von konto_loeschen verzoegert;
 // lokal: Eintraege im localStorage vor dem Laden
 async function umgebung({ otp = null, verify = null, rpc = null, token = null, rpcMs = 0, lokal = {}, breite = 390 } = {}) {
   const k = await browser.newContext({ viewport: { width: breite, height: 800 }, serviceWorkers: 'block' });
@@ -54,7 +55,8 @@ async function umgebung({ otp = null, verify = null, rpc = null, token = null, r
     if (u.pathname === '/rest/v1/rpc/konto_loeschen') {
       z.aufrufe.loeschen++;
       if (rpcMs) await new Promise((w) => setTimeout(w, rpcMs));
-      return z.rpc ? antwort(z.rpc.body, z.rpc.status) : r.fulfill({ status: 204, body: '' });
+      const a = Array.isArray(z.rpc) ? z.rpc[z.aufrufe.loeschen - 1] : z.rpc;
+      return a ? antwort(a.body, a.status) : r.fulfill({ status: 204, body: '' });
     }
     if (u.pathname === '/auth/v1/logout') { z.aufrufe.logout++; return r.fulfill({ status: 204, body: '' }); }
     if (u.pathname === '/auth/v1/authorize') { z.google.push(u.href); return r.fulfill({ status: 200, contentType: 'text/html', body: '<p>google</p>' }); }
@@ -187,18 +189,23 @@ try {
     pruefe('Tippen waehrend der Loeschung: danach Bestaetigung sichtbar', await sichtbar(s, '.kl-fertig'));
     await k.close();
   }
-  { // 8. Abgelaufene Sitzung, Refresh tot: Meldung bleibt, die Seite zeigt wieder die Anmeldung, nichts geloescht
+  { // 8. Abgelaufene Sitzung, Refresh tot: schon beim Laden Meldung und Anmeldung, nichts geloescht
     const alt = { ...SITZUNG, expires_at: 1 };
     const { k, z } = await umgebung({ token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } },
       lokal: { 'schach-arena:konto:sitzung': JSON.stringify(alt) } });
     const s = await seite(k, z, DE);
-    await s.locator('[data-kl="weiter"]').click();
-    await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
-    await s.locator('[data-kl="loeschen"]').click(); await s.waitForTimeout(600);
     const st = await status(s);
-    pruefe('Sitzung abgelaufen: Fehlertext, Anmeldung sichtbar, „angemeldet als“ weg, nichts geloescht',
+    pruefe('Sitzung abgelaufen, Refresh tot: beim Laden Fehlertext, Anmeldung sichtbar, „angemeldet als“ und Loeschknopf weg',
       st.fehler === 'ja' && st.text.length > 5 && (await sichtbar(s, '.kl-anmelden')) && !(await sichtbar(s, '.kl-angemeldet'))
-      && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
+      && !(await sichtbar(s, '[data-kl="weiter"]')) && !(await sitzungDa(s)) && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
+    await k.close();
+  }
+  { // 8b. Gegenprobe: abgelaufene Sitzung, Refresh klappt -> beim Laden erneuert, angemeldet, keine Meldung
+    const { k, z } = await umgebung({ lokal: { 'schach-arena:konto:sitzung': JSON.stringify({ ...SITZUNG, expires_at: 1 }) } });
+    const s = await seite(k, z, DE);
+    const st = await status(s);
+    pruefe('Sitzung abgelaufen, Refresh klappt: beim Laden erneuert, angemeldet, keine Meldung',
+      (await sichtbar(s, '.kl-angemeldet')) && !(await sichtbar(s, '.kl-anmelden')) && st.text === '' && z.aufrufe.token === 1, { st, aufrufe: z.aufrufe });
     await k.close();
   }
   { // 9. Abo-Hinweis: bekanntes laufendes Stripe-Abo steht vor Schritt 2, ohne Abo kein Hinweis
@@ -229,6 +236,53 @@ try {
     pruefe('en: „What stays“ nennt Stripe customer number und 90 days', /Stripe customer number/.test(ten) && /90 days/.test(ten));
     pruefe('en: Mitloeschungen aus §5 genannt', ['player card', 'crowns', 'puzzle duel', 'online games', 'school mode', 'age statement'].every((w) => ten.toLowerCase().includes(w)));
     await k.close();
+  }
+  { // 11. Waehrend der Loeschung sind Abbrechen, Weiter und Abmelden gesperrt; nach Serverfehler folgt der Knopf dem Feld
+    const { k, z } = await umgebung({ rpcMs: 1200, rpc: { status: 500, body: { message: 'boom' } }, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
+    const s = await seite(k, z, DE);
+    await s.locator('[data-kl="weiter"]').click();
+    await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
+    await s.locator('[data-kl="loeschen"]').click(); await s.waitForTimeout(100);
+    const gesperrt = await s.evaluate(() => ['abbrechen', 'weiter', 'abmelden'].map((k) => document.querySelector(`[data-kl="${k}"]`).disabled));
+    await s.locator('[data-kl="abbrechen"]').click({ timeout: 500 }).catch(() => {});
+    await s.locator('[data-kl="weiter"]').click({ timeout: 500, force: true }).catch(() => {});
+    // das Feld ist gesperrt, also leert der Test es von aussen: nach dem Fehler muss der Knopf dem leeren Feld folgen
+    await s.evaluate(() => { document.querySelector('.kl-bestaetigen').value = ''; });
+    await s.waitForTimeout(1800);
+    pruefe('Waehrend der Loeschung: Abbrechen, Weiter und Abmelden gesperrt', gesperrt.every(Boolean), gesperrt);
+    pruefe('Nach Serverfehler mit leerem Feld: Loeschknopf gesperrt, Schritt 2 offen, Abbrechen wieder frei',
+      (await s.locator('[data-kl="loeschen"]').isDisabled()) && (await sichtbar(s, '.kl-schritt2')) && !(await s.locator('[data-kl="abbrechen"]').isDisabled()));
+    await s.locator('[data-kl="loeschen"]').click({ timeout: 500 }).catch(() => {});
+    await s.waitForTimeout(300);
+    pruefe('Nach Serverfehler ohne Wort: kein zweites konto_loeschen', z.aufrufe.loeschen === 1, z.aufrufe);
+    await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
+    pruefe('Nach Serverfehler: Wort wieder getippt gibt den Knopf frei', !(await s.locator('[data-kl="loeschen"]').isDisabled()));
+    await k.close();
+  }
+  { // 12. Server lehnt ein lokal gueltiges Token ab (401 PGRST301): einmal erneuern, einmal wiederholen
+    const abgelehnt = { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } };
+    const lauf = async (opt) => {
+      const { k, z } = await umgebung({ ...opt, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
+      const s = await seite(k, z, DE);
+      await s.locator('[data-kl="weiter"]').click();
+      await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
+      await s.locator('[data-kl="loeschen"]').click(); await s.waitForTimeout(800);
+      await s.locator('[data-kl="loeschen"]').click({ timeout: 500 }).catch(() => {});
+      await s.waitForTimeout(300);
+      const r = { z, st: await status(s), fertig: await sichtbar(s, '.kl-fertig'), anmelden: await sichtbar(s, '.kl-anmelden'),
+        angemeldet: await sichtbar(s, '.kl-angemeldet'), sitzung: await sitzungDa(s) };
+      await k.close();
+      return r;
+    };
+    const a = await lauf({ rpc: [abgelehnt, null] });
+    pruefe('401, Refresh klappt: erneuert, zweiter Versuch loescht, Bestaetigung sichtbar',
+      a.fertig && !a.sitzung && a.z.aufrufe.token === 1 && a.z.aufrufe.loeschen === 2, { aufrufe: a.z.aufrufe, st: a.st });
+    const b = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } });
+    pruefe('401, Refresh tot: lokal abgemeldet, Anmeldung sichtbar, Fehlertext, kein weiterer rpc',
+      b.anmelden && !b.angemeldet && !b.sitzung && b.st.fehler === 'ja' && b.z.aufrufe.token === 1 && b.z.aufrufe.loeschen === 1, { aufrufe: b.z.aufrufe, st: b.st });
+    const c = await lauf({ rpc: [abgelehnt, abgelehnt] });
+    pruefe('401, Refresh klappt, wieder 401: lokal abgemeldet, Anmeldung sichtbar, genau zwei rpc',
+      c.anmelden && !c.angemeldet && !c.sitzung && c.st.fehler === 'ja' && c.z.aufrufe.token === 1 && c.z.aufrufe.loeschen === 2, { aufrufe: c.z.aufrufe, st: c.st });
   }
 } finally {
   await browser.close(); server.close();
