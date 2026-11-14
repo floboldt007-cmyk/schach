@@ -150,7 +150,9 @@ export function verwaltungGruppe() {
   // jeder DOM-Aenderung die Nutzer-ID vergleichen, dazu "storage" fuer andere Tabs. Abgemeldet: sofort weg, ohne Anfrage,
   // und die gemerkte Antwort ist verworfen (die naechste Anmeldung fragt neu).
   // Es zaehlt nur die Antwort der juengsten Anfrage (runde): eine spaete Antwort fuer ein abgemeldetes Konto oder aus einer
-  // frueheren Anmeldung desselben Kontos aendert nichts (R18, tests/verwaltung-browser.test.mjs).
+  // frueheren Anmeldung desselben Kontos aendert nichts (R18, tests/verwaltung-browser.test.mjs). Bei jedem Kontowechsel
+  // ist die Gruppe weg, bis die Antwort fuer das neue Konto da ist (nur gesetzt, wenn sie sichtbar war: das Menue der
+  // Einstellungen beobachtet hidden und baut bei jeder Meldung neu).
   const pruefeAnmeldung = () => {
     if (weg) return;
     const s = sitzung();
@@ -158,7 +160,8 @@ export function verwaltungGruppe() {
     if (jetzt === uid) return;
     uid = jetzt;
     const nr = ++runde;
-    if (!jetzt) { el.hidden = true; vergissVerwalter(); return; }
+    if (!el.hidden) el.hidden = true;
+    if (!jetzt) { vergissVerwalter(); return; }
     istVerwalter().then((ja) => { if (!weg && nr === runde) el.hidden = !ja; }).catch(() => {});
   };
   let beobachter = null;

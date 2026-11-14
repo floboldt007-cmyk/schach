@@ -32,6 +32,8 @@ function pruefe(name, bedingung, info) {
 const UID = 'f1000000-0000-4000-8000-0000000000f1';
 const token = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 9999999999, user: { id: UID, email: 'f@x' }, email: 'f@x' };
+const UID_B = 'b2000000-0000-4000-8000-0000000000b2';
+const SITZUNG_B = { access_token: token(UID_B), refresh_token: 'r2', expires_at: 9999999999, user: { id: UID_B, email: 'b@x' }, email: 'b@x' };
 
 function ladePlaywright() {
   for (const k of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
@@ -283,6 +285,30 @@ async function browserTeil(browser) {
   pruefe('R18 spaete Antwort "kein Recht" der frueheren Anmeldung: die neuere Antwort bleibt, Verwaltung sichtbar',
     spaetNein.probe.sichtbar && spaetNein.probe.inNav, spaetNein.probe);
   pruefe('R18 spaete Antwort "kein Recht": kein Konsolenfehler', spaetNein.fehler.length === 0, spaetNein.fehler);
+  // R18: direkter Wechsel vom Verwalter-Konto zu einem anderen Konto ohne Abmelden dazwischen (z. B. aus einem anderen
+  // Tab). Solange die Antwort fuer das neue Konto aussteht, ist die Verwaltung schon weg; bleibt sie offline aus, auch
+  for (const [art, zweite] of [['kein Recht', { recht: false, spaet: 3000 }], ['offline', { recht: 'offline', spaet: 3000 }]]) {
+    const wechsel = await zustand(browser, { hash: '#einstellungen/konto', folge: [{ recht: true, spaet: 0 }, zweite], probe: async (s, z) => {
+      const bis = async (f, ms = 8000) => { const ende = Date.now() + ms; while (!f() && Date.now() < ende) await warte(25); };
+      const vorher = await imBlick(s);
+      // wie ein anderer Tab: Speicher schreiben und das storage-Ereignis melden (im selben Tab feuert es nicht von selbst)
+      await s.evaluate((x) => {
+        const neu = JSON.stringify(x);
+        localStorage.setItem('schach-arena:konto:sitzung', neu);
+        window.dispatchEvent(new StorageEvent('storage', { key: 'schach-arena:konto:sitzung', newValue: neu }));
+      }, SITZUNG_B);
+      await bis(() => z.fragen() >= 2);
+      await warte(300);
+      const offen = { ...(await imBlick(s)), beantwortet: z.beantwortet() };
+      await bis(() => z.beantwortet() >= 2, 10000);
+      await warte(600);
+      return { vorher, offen, nachher: await imBlick(s) };
+    } });
+    pruefe(`R18 direkter Kontowechsel (${art}): vorher sichtbar, waehrend die Antwort aussteht schon weg, danach weg`,
+      wechsel.fragen === 2 && wechsel.probe.vorher.sichtbar && wechsel.probe.offen.beantwortet === 1 && !wechsel.probe.offen.sichtbar
+      && !wechsel.probe.offen.inNav && !wechsel.probe.nachher.sichtbar && !wechsel.probe.nachher.inNav, { fragen: wechsel.fragen, probe: wechsel.probe });
+    pruefe(`R18 direkter Kontowechsel (${art}): kein Konsolenfehler`, wechsel.fehler.length === 0, wechsel.fehler);
+  }
 
   const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true });
   pruefe('Verwalter am Handy: Eintrag in der Liste nach spaeter Antwort', floHandy.navVorher > 0 && floHandy.inNav, floHandy);
