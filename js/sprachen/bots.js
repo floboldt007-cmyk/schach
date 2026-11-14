@@ -105,8 +105,8 @@ const DE = {
       ],
       gewinnt: [
         'Was, ich hab gewonnen? Das muss ich der Kuh Elsa erzählen!',
-        'Juhu! Heute gibt’s Pfannkuchen zur Feier!',
-        'Ich glaub’s nicht! Willst du gleich noch mal?',
+        'Juhu, ich hab gewonnen! Heute gibt’s Pfannkuchen zur Feier!',
+        'Ich glaub’s nicht, ich hab gewonnen! Willst du gleich noch mal?',
         'Ich hab gewonnen! Das lag bestimmt an meinem Glücksstrohhalm.',
       ],
       remis: [
@@ -1654,8 +1654,8 @@ const EN = {
       ],
       gewinnt: [
         'What, I won? I have to tell Elsa the cow!',
-        'Yippee! Pancakes tonight to celebrate!',
-        'I can’t believe it! Want to go again?',
+        'Yippee, I won! Pancakes tonight to celebrate!',
+        'I can’t believe I won! Want to go again?',
         'I won! Must be my lucky piece of straw.',
       ],
       remis: [
