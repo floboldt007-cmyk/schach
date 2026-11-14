@@ -101,6 +101,11 @@ html[data-reiter-wurzel="ja"] .haupt-kopf .kopf-zurueck { display: none; }
   font: inherit; font-weight: var(--gw-stark); font-size: 12px; line-height: 1.1; color: var(--text-2); white-space: nowrap; cursor: pointer;
   transition: color var(--d-s) var(--sanft), transform var(--d-m) var(--feder); }
 .reiter-leiste .reiter .ico { width: 22px; height: 22px; stroke-width: 1.7; }
+/* R19 Lobby-Farbe: gefuellte Spiel-Symbole (js/ui/icons.js), nur der aktive Reiter in Farbe, die anderen grau
+   (die graue Mitte traegt auf dunklem Grund 3:1, der Rand auf hellem) */
+.reiter-leiste .reiter .sy { width: 26px; height: 26px; transition: transform var(--d-m) var(--feder); }
+.reiter-leiste .reiter:not(.an) .sy { --sy-hell: var(--sp-grau-hell); --sy-mitte: var(--sp-grau); --sy-rand: var(--sp-grau-rand); --sy-glut: var(--sp-grau); }
+.reiter-leiste .reiter.an .sy { transform: scale(1.08); }
 .reiter-leiste .reiter.an { color: var(--kt-stark); }
 .reiter-leiste .reiter:focus-visible { outline: var(--fokus); outline-offset: -2px; }
 .reiter-pille { position: absolute; z-index: 0; top: 6px; bottom: 6px; left: 0; width: 0; border-radius: 26px; pointer-events: none;

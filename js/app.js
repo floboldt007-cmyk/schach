@@ -68,7 +68,7 @@ import { SYMBOLE } from './symbole.js';
 import {
   ladeEinstellungen, speichereEinstellungen, ladeLaufendePartie, ladePartien, dauerhaftAnfragen, duenneAnalysenAus,
 } from './storage.js';
-import { icon } from './ui/icons.js';
+import { icon, spielSymbol } from './ui/icons.js';
 import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
@@ -386,7 +386,7 @@ function schliesseDialog() {
 // REITER (erweiterungen.js) sie nennt. Training und Verlauf sind keine Reiter mehr: Training erreicht man ueber die
 // Startseite, der Verlauf gehoert zu Ich. Der Name je Reiter ist die deutsche Quelle; gezeigt wird
 // t('rahmen.reiter.<reiter>') beim Bauen der Leiste.
-const REITER_ALLE = [['heim', 'Start', 'haus'], ['arena', 'Bots', 'pokal'], ['bestenliste', 'Liga', 'liga'], ['ich', 'Ich', 'person']];
+const REITER_ALLE = [['heim', 'Start', 'heim'], ['arena', 'Bots', 'bots'], ['bestenliste', 'Liga', 'liga'], ['ich', 'Ich', 'ich']];
 const REITER_FEST = new Set(['heim', 'arena']);
 // fruehere Reiter: im Testmodus (?reiter=training oder verlauf) schalten sie nur die Leiste ein, ohne eigenen Reiter
 const REITER_FRUEHER = new Set(['training', 'verlauf']);
@@ -439,7 +439,7 @@ function baueReiter(liste) {
   // die Marke zeigt nur die Seitenleiste (css/navigation.css), wie im Entwurf ipad-pc-v2
   nav.innerHTML = '<span class="reiter-marke" aria-hidden="true">Crownmate</span><span class="reiter-pille" aria-hidden="true"></span>'
     + REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, , ic]) =>
-    `<button type="button" class="reiter dr" data-reiter="${n}">${icon(ic)}<span>${t('rahmen.reiter.' + n)}</span></button>`).join('');
+    `<button type="button" class="reiter dr" data-reiter="${n}">${spielSymbol(ic)}<span>${t('rahmen.reiter.' + n)}</span></button>`).join('');
   nav.addEventListener('click', (e) => {
     const k = e.target.closest('[data-reiter]');
     if (!k) return;

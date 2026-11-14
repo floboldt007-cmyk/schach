@@ -65,11 +65,24 @@
   border: 0; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text); font: inherit; cursor: pointer;
   transition: transform var(--d-s, .2s) var(--sanft, ease), background-color var(--d-s, .2s) var(--sanft, ease); }
 .lb-art .ico { width: 24px; height: 24px; color: var(--akzent); }
+.lb-art > .sy { width: 44px; height: 44px; }
 .lb-art b { font-size: 16px; font-weight: 800; }
 .lb-art small { font-size: 14px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .lb-art:active { transform: scale(.97); }
-.lb-art[aria-checked="true"] { background: var(--akzent); color: var(--auf-akzent); box-shadow: var(--s1); }
-.lb-art[aria-checked="true"] .ico, .lb-art[aria-checked="true"] small { color: var(--auf-akzent); }
+/* R19 Lobby-Farbe: jede Spielart traegt ihre Farbe (css/bauteile.css --sp-*) als Verlauf und Rand; gewaehlt ein doppelter
+   Ring (innen der dunkle Rand fuer hellen Grund, aussen die Mitte fuer dunklen), so traegt die Wahl in beiden Modi 3:1 */
+.lb-art[data-art="blitz"] { --sp: var(--sp-blitz); --sp-rand: var(--sp-blitz-rand); }
+.lb-art[data-art="schnell"] { --sp: var(--sp-schnell); --sp-rand: var(--sp-schnell-rand); }
+.lb-art[data-art="klassisch"] { --sp: var(--sp-klassisch); --sp-rand: var(--sp-klassisch-rand); }
+.lb-modus-karte[data-ziel="online"] { --sp: var(--sp-freunde); --sp-rand: var(--sp-freunde-rand); }
+.lb-modus-karte[data-ziel="turniere"] { --sp: var(--sp-turniere); --sp-rand: var(--sp-turniere-rand); }
+.lb-modus-karte[data-ziel="duell"] { --sp: var(--sp-raetsel); --sp-rand: var(--sp-raetsel-rand); }
+.lb-art[data-art], .lb-modus-karte[data-ziel] {
+  background: linear-gradient(155deg, color-mix(in srgb, var(--sp) 20%, var(--flaeche-2)), var(--flaeche-2) 72%);
+  box-shadow: var(--kante), inset 0 0 0 1.5px color-mix(in srgb, var(--sp) 38%, transparent); }
+.lb-art[aria-checked="true"] { background: linear-gradient(155deg, color-mix(in srgb, var(--sp) 34%, var(--flaeche)), color-mix(in srgb, var(--sp) 12%, var(--flaeche)));
+  color: var(--text); box-shadow: var(--s1), inset 0 0 0 2px var(--sp-rand), 0 0 0 2px var(--sp); }
+.lb-art[aria-checked="true"] small { color: var(--text); }
 .lb-art:disabled { cursor: default; }
 .lb-art:disabled b, .lb-art:disabled .ico { color: var(--text-3); }
 .lb-aendern[hidden], .lb-gruppe[hidden] { display: none; }
@@ -94,10 +107,11 @@
 /* Mehr Spielarten */
 .lb-mehr { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .lb-mehr-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 10px; }
-.lb-modus-karte { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 76px; padding: 12px 16px;
+.lb-modus-karte { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 76px; padding: 12px 16px;
   font: inherit; text-align: left; cursor: pointer; flex-direction: row; }
 .lb-modus-karte > .ico { width: 26px; height: 26px; color: var(--akzent); }
 .lb-modus-karte > .ico:last-child { width: 18px; height: 18px; color: var(--text-3); }
+.lb-modus-karte > .sy { width: 46px; height: 46px; }
 .lb-modus-karte > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .lb-modus-karte b { font-weight: 800; font-size: 16px; }
 .lb-modus-karte small { color: var(--text-2); font-size: 13px; line-height: 1.35; }

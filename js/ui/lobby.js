@@ -14,7 +14,7 @@
 // des Servers (window.__lobbyBotMs verkuerzt sie im Test) startet die Partie gegen den passenden Bot als KI-Gegner (params ki, kiRef).
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { segment } from './bauteile.js';
-import { icon } from './icons.js';
+import { icon, spielSymbol } from './icons.js';
 import { staffel, tempo, anim } from '../bewegung.js';
 import { laborFrei } from '../labor.js';
 import { ladeFortschritt, ladeModul } from '../storage.js';
@@ -35,7 +35,7 @@ import '../sprachen/online.js';
 const L = (k, w) => t('p-lobby.' + k, w);
 const O = (k, w) => t('online.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const ART_ICON = { blitz: 'blitz', schnell: 'play', klassisch: 'verlauf' };
+const ART_ICON = { blitz: 'blitz', schnell: 'schnell', klassisch: 'klassisch' };
 // so lange sucht die Vorschau, bevor der Gegner "gefunden" ist (ms); window.__lobbySuche verkuerzt es im Test
 const SUCHDAUER = 2600;
 // Etappe 4b: so lange stehen die Visitenkarten nach einem Treffer oder dem KI-Ersatz (ms); window.__lobbyGefundenMs im Test
@@ -88,7 +88,7 @@ export function zeige(root, params, app) {
         </div>
         <div class="lb-wertung-ort"></div>
         <div class="lb-arten" role="radiogroup" aria-label="${esc(L('a.arten'))}">
-          ${ARTEN.map((art) => `<button type="button" class="lb-art dr" role="radio" data-art="${art}">${icon(ART_ICON[art])}<b>${esc(L('a.art.' + art))}</b><small class="zahl"></small></button>`).join('')}
+          ${ARTEN.map((art) => `<button type="button" class="lb-art dr" role="radio" data-art="${art}">${spielSymbol(ART_ICON[art])}<b>${esc(L('a.art.' + art))}</b><small class="zahl"></small></button>`).join('')}
         </div>
         <details class="lb-aendern">
           <summary class="dr">${esc(L('a.zeitAendern'))}</summary>
@@ -101,9 +101,9 @@ export function zeige(root, params, app) {
       <section class="lb-mehr" aria-labelledby="lb-mehr-titel">
         <h2 id="lb-mehr-titel">${esc(L('mehr.titel'))}</h2>
         <div class="lb-mehr-liste">
-          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="online">${icon('person')}<span><b>${esc(L('freunde.titel'))}</b><small>${esc(L('freunde.text'))}</small></span>${icon('vor')}</button>
-          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="turniere" disabled>${icon('pokal')}<span><b>${esc(L('turniere.titel'))}</b><small>${esc(L('turniere.text'))}</small></span><span class="lb-bald">${esc(L('bald'))}</span></button>
-          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="duell">${icon('ziel')}<span><b>${esc(L('duell.titel'))}</b><small>${esc(L('duell.text'))}</small></span>${icon('vor')}</button>
+          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="online">${spielSymbol('freunde')}<span><b>${esc(L('freunde.titel'))}</b><small>${esc(L('freunde.text'))}</small></span>${icon('vor')}</button>
+          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="turniere" disabled>${spielSymbol('turniere')}<span><b>${esc(L('turniere.titel'))}</b><small>${esc(L('turniere.text'))}</small></span><span class="lb-bald">${esc(L('bald'))}</span></button>
+          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="duell">${spielSymbol('raetsel')}<span><b>${esc(L('duell.titel'))}</b><small>${esc(L('duell.text'))}</small></span>${icon('vor')}</button>
         </div>
       </section>
     </div>`;

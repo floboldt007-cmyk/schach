@@ -225,3 +225,13 @@
   .segment { padding: 3px; }
   .seg { font-size: 13.5px; }
 }
+
+/* Spiel-Symbole (js/ui/icons.js spielSymbol, R19): Farben aus css/tokens.css (--sp-*) */
+.sy { display: block; flex: none; overflow: visible; }
+.sy-blitz { --sy-hell: var(--sp-blitz-hell); --sy-mitte: var(--sp-blitz); --sy-rand: var(--sp-blitz-rand); --sy-glut: var(--sp-blitz); }
+.sy-schnell { --sy-hell: var(--sp-schnell-hell); --sy-mitte: var(--sp-schnell); --sy-rand: var(--sp-schnell-rand); }
+.sy-klassisch, .sy-bots { --sy-hell: var(--sp-klassisch-hell); --sy-mitte: var(--sp-klassisch); --sy-rand: var(--sp-klassisch-rand); --sy-glut: var(--sp-blitz); }
+.sy-freunde { --sy-hell: var(--sp-freunde-hell); --sy-mitte: var(--sp-freunde); --sy-rand: var(--sp-freunde-rand); }
+.sy-turniere, .sy-liga { --sy-hell: var(--sp-turniere-hell); --sy-mitte: var(--sp-turniere); --sy-rand: var(--sp-turniere-rand); }
+.sy-raetsel, .sy-ich { --sy-hell: var(--sp-raetsel-hell); --sy-mitte: var(--sp-raetsel); --sy-rand: var(--sp-raetsel-rand); }
+.sy-heim { --sy-hell: var(--sp-heim-hell); --sy-mitte: var(--akzent); --sy-rand: var(--sp-heim-rand); }

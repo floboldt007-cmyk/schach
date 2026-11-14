@@ -64,6 +64,7 @@ const SUITEN = [
   { name: 'kronen-vertrag', datei: 'kronen-vertrag.test.mjs', args: [], was: 'Liga mit Kronen: Schema-Vertrag mit js/pakete/liga/kronen.js, Rechte, Rueckweg (Server)' },
   { name: 'besitz', datei: 'besitz.test.mjs', args: [], was: 'Etappe 4b: Erfolge in Stufen, lokales Taler- und Banner-Buch (ohne Konto)' },
   { name: 'r19-liga-namen', datei: 'r19-liga-namen.test.mjs', args: [], was: 'Liga-Namen Satz A (Squire bis Crownmate, auch deutsch), Figuren und IDs unverändert, alte Spielklassen nie angezeigt' },
+  { name: 'r19-lobby-farbe', datei: 'r19-lobby-farbe.test.mjs', args: [], was: 'Spiel-Symbole: gefuellt und farbig in Lobby, Startseite und Leiste, je Symbol mind. 3:1 an Pixeln hell und dunkel, Startseite scrollt nicht (Browser)' },
   { name: 'karte', datei: 'karte.test.mjs', args: [], was: 'Etappe 4b: js/karte.js gegen einen nachgebildeten Server (Stufen melden, Karte waehlen, Karte der Partie)' },
   { name: 'karte-vertrag', datei: 'karte-vertrag.test.mjs', args: [], was: 'Etappe 4b: Schema-Vertrag Visitenkarte (Zahlen, feste Listen, Rechte, Rueckweg, nie kaeuflich)' },
   { name: 'raetsel-duell', datei: 'raetsel-duell.test.mjs', args: [], was: 'Raetsel-Duell: reine Rechnung (Uhr, Phase, Stand) und Vertrag mit duell_konstanten' },
