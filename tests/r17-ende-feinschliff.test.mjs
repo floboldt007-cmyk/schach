@@ -35,8 +35,8 @@ function ladePlaywright() {
   }
   throw new Error('Playwright fehlt');
 }
-async function warteAufServer(url, ms = 10000) {
-  const bis = Date.now() + ms;
+async function warteAufServer(url) {
+  const bis = Date.now() + 10000;
   while (Date.now() < bis) {
     // INTENTIONAL-SLOP[F1]: der Server startet gerade, ein Fehlschlag heisst nur: gleich noch einmal
     try { if ((await fetch(url)).ok) return; } catch (e) { /* noch nicht da */ }
@@ -210,7 +210,7 @@ try {
     await p.s.evaluate(() => window.__app.gehe('ich'));
     await p.s.waitForSelector('.pr-karte .pr-vitrine', { timeout: 15000 });
     await ruhe(p.s);
-    // INTENTIONAL-SLOP[F1]: ein Moment-Overlay (neuer Erfolg) darf fehlen; ist es da, wird es geschlossen
+    // ein Moment-Overlay (neuer Erfolg) darf fehlen; ist es da, wird es geschlossen
     for (let i = 0; i < 6 && await p.s.locator('.st-moment .st-weiter').count(); i++) { await p.s.locator('.st-moment .st-weiter').first().click().catch(() => {}); await warte(400); }
     const st = await streifen(p.s);
     pruefe(`I3 ${g.name}: kein Streifen in der Grundfarbe unter dem Bannerbild (0 px)`, st.grund === 0, st);
@@ -232,6 +232,7 @@ try {
   }
 } catch (e) {
   fehler++;
+  // INTENTIONAL-SLOP[T4]: Ablauffehler gehen wie alle Zeilen auf die Konsole (tests/alle.mjs liest sie)
   console.log('FEHLER Ablauf ' + (e && e.stack || e));
 } finally {
   if (browser) await browser.close();
