@@ -100,9 +100,12 @@ const zeigerAusserhalb = (el) => el.evaluate((x) => {
     }
     return aus.concat(sel.slice(an));
   };
-  // :hover gilt als erfuellt (:is(*); so bleibt :not(:hover) gueltig und trifft nie). Ein Pseudo-Element hinter :hover
-  // (::before, ::after) zeichnet am Element selbst und zaehlt fuer es. Wirft matches() trotzdem, ist das ein Fund.
-  const element = (teil) => teil.replace(/:hover/g, ':is(*)').replace(/::[a-z-]+(\([^)]*\))?|:(before|after|first-line|first-letter)\b/g, '').trim() || '*';
+  // Fund ist jede Regel, deren Treffer am Zeiger haengt: einmal gilt :hover als erfuellt (:is(*)), einmal als nicht
+  // erfuellt (:not(*)); weichen beide ab, aendert der Zeiger das Element. So zaehlen .k:hover und .k:not(:hover) gleich.
+  // Ein Pseudo-Element hinter :hover (::before, ::after) zeichnet am Element selbst und zaehlt fuer es. Wirft matches()
+  // trotzdem, ist das ein Fund.
+  const haengtAmZeiger = (x, teil) => x.matches(element(teil, ':is(*)')) !== x.matches(element(teil, ':not(*)'));
+  const element = (teil, hover) => teil.replace(/:hover/g, hover).replace(/::[a-z-]+(\([^)]*\))?|:(before|after|first-line|first-letter)\b/g, '').trim() || '*';
   const geh = (regeln, unterHover) => {
     for (const r of regeln) {
       if (r.cssRules && r.media) { geh(r.cssRules, unterHover || /\(\s*hover\s*:\s*hover\s*\)/.test(r.media.mediaText)); continue; }
@@ -110,7 +113,7 @@ const zeigerAusserhalb = (el) => el.evaluate((x) => {
       if (!r.selectorText || !r.selectorText.includes(':hover') || unterHover) continue;
       for (const teil of teile(r.selectorText)) {
         if (!teil.includes(':hover')) continue;
-        try { if (knoten.some((k) => k.matches(element(teil)))) funde.push(teil.trim()); }
+        try { if (knoten.some((k) => haengtAmZeiger(k, teil))) funde.push(teil.trim()); }
         catch (e) { funde.push(`Selektor nicht pruefbar: ${teil.trim()} (${e.message})`); }
       }
     }
@@ -145,11 +148,12 @@ async function beruehrung(browser, { geraet, w, h, schema, css }) {
   const probeEl = (await finde(s, ZIELE[0]))[0];
   if (probeEl) {
     await probeEl.evaluate((x) => x.setAttribute('data-scanner-probe', ''));
-    await s.addStyleTag({ content: '[data-scanner-probe]:is(.gibt-es-nicht, [data-scanner-probe]):hover { outline: 2px solid red } [data-scanner-probe]:hover::after { content: "" }' });
+    await s.addStyleTag({ content: '[data-scanner-probe]:is(.gibt-es-nicht, [data-scanner-probe]):hover { outline: 2px solid red } [data-scanner-probe]:hover::after { content: "" } [data-scanner-probe]:not(:hover) { outline-offset: 1px }' });
   }
   const probe = probeEl ? await zeigerAusserhalb(probeEl) : [];
-  pruefe(`${name}: Scanner findet :is()-Liste und ::after hinter :hover (Selbsttest)`,
-    probe.some((f) => f.startsWith('[data-scanner-probe]:is(.gibt-es-nicht')) && probe.some((f) => f.startsWith('[data-scanner-probe]:hover::after')), probe);
+  pruefe(`${name}: Scanner findet :is()-Liste, ::after hinter :hover und :not(:hover) (Selbsttest)`,
+    probe.some((f) => f.startsWith('[data-scanner-probe]:is(.gibt-es-nicht')) && probe.some((f) => f.startsWith('[data-scanner-probe]:hover::after'))
+    && probe.some((f) => f.startsWith('[data-scanner-probe]:not(:hover)')), probe);
   pruefe(`${name}: keine Seitenfehler`, fehler.length === 0, fehler);
   await kontext.close();
 }
