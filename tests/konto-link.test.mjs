@@ -487,14 +487,16 @@ try {
       p.on('close', (code) => {
         clearTimeout(frist);
         const zeilen = aus.trim().split(/\r?\n/);
+        const fehler = zeilen.filter((z) => z.startsWith('FEHLER'));
+        // Absturz ohne FEHLER-Zeile (Ausnahme im Kind): die letzten Zeilen nennen die Ursache
         fertig({ g, code: abgelaufen ? 'frist' : code, ende: abgelaufen ? `nach ${FRIST_KIND} s abgebrochen` : zeilen.at(-1),
-          fehler: zeilen.filter((z) => z.startsWith('FEHLER')) });
+          fehler: fehler.length || code === 0 ? fehler : zeilen.slice(-12) });
       });
     });
     const offen = [...GERAETE], erg = [];
     await Promise.all([0, 1].map(async () => { while (offen.length) erg.push(await lauf(offen.shift())); }));
     for (const e of erg.sort((a, b) => GERAETE.indexOf(a.g) - GERAETE.indexOf(b.g))) {
-      pruefe(`Bilder ${e.g}: Lauf gruen, 19 Bilder (${e.ende})`, e.code === 0, e.fehler.slice(0, 4));
+      pruefe(`Bilder ${e.g}: Lauf gruen, 19 Bilder (${e.ende})`, e.code === 0, e.fehler.slice(0, 12));
     }
   }
 } finally {
