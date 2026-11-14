@@ -36,7 +36,7 @@
   .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
   .kasten > :last-child { margin-bottom: 0; }
   .kasten[hidden], [hidden] { display: none !important; }
-  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+  .zurueck, .sprung { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
     border: 1px solid var(--text-2); text-decoration: none; font-weight: var(--gw-stark); }
   .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
   .fuss a { margin-right: var(--a3); }
@@ -66,6 +66,7 @@
   <h1>Konto löschen</h1>
   <p>Hier löschst du dein Crownmate-Konto, auch ohne die App. In der App geht es unter Einstellungen → Daten →
   „Konto löschen“.</p>
+  <p><a class="sprung" href="#selbst-loeschen">Direkt zu „Selbst löschen“</a></p>
 
   <h2>Was gelöscht wird</h2>
   <div class="kasten">
@@ -87,7 +88,7 @@
     <p><b>Abo:</b> Ein laufendes Abo endet mit dem Konto nicht. Kündige es vorher.</p>
   </div>
 
-  <h2>Selbst löschen</h2>
+  <h2 id="selbst-loeschen">Selbst löschen</h2>
   <p class="kl-status" aria-live="polite" data-fehler="nein"></p>
 
   <section class="kl-anmelden kasten" aria-labelledby="kl-anmelden-titel">
