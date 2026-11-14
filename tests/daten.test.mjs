@@ -527,11 +527,12 @@ async function browserAblauf(browser) {
   }));
 
   // Datenschutzerklaerung und Impressum: erreichbar, Anbieter-Angaben (Name, Anschrift, E-Mail), keine Telefonnummer,
-  // keine fremde E-Mail-Adresse. Das Impressum ist fertig (keine Platzhalter), die Datenschutzerklaerung bleibt Entwurf.
-  const ANBIETER = ['Florian Boldt', '51379 Leverkusen', 'kontakt@anfrageprofi.de'];
-  const nurAnbieterKontakt = (t) => (t.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[a-z]{2,}/g) || []).every((m) => m === 'kontakt@anfrageprofi.de')
+  // keine fremde E-Mail-Adresse. Beide sind fertig, ohne Entwurf und ohne Platzhalter: seit R19 (14.11.2026) steht die eigene
+  // Adresse kontakt@crownmate.de drin und der Entwurfs-Kasten der Datenschutzerklaerung ist weg (Flos Entscheidung).
+  const ANBIETER = ['Florian Boldt', '51379 Leverkusen', 'kontakt@crownmate.de'];
+  const nurAnbieterKontakt = (t) => (t.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[a-z]{2,}/g) || []).every((m) => m === 'kontakt@crownmate.de')
     && !/\+49|\b0\d{2,5}[\s/-]*\d{4,}/.test(t);
-  for (const [datei, muss, entwurf] of [['datenschutz.html', ['Entwurf', 'fachkundigen Person', 'Frankfurt', 'GitHub', 'Google', 'Art. 6 Abs. 1 lit. a', 'Art. 6 Abs. 1 lit. b', 'Eltern', 'Werbung', 'Beschwerde', 'LDI NRW', ...ANBIETER], true],
+  for (const [datei, muss, entwurf] of [['datenschutz.html', ['Frankfurt', 'GitHub', 'Google', 'Art. 6 Abs. 1 lit. a', 'Art. 6 Abs. 1 lit. b', 'Eltern', 'Werbung', 'Beschwerde', 'LDI NRW', ...ANBIETER], false],
     ['impressum.html', ['§ 5 DDG', '§ 18 Abs. 2 MStV', 'Verbraucherschlichtungsstelle', ...ANBIETER], false]]) {
     const s2 = await kontext.newPage();
     const r = await s2.goto(BASIS + datei);
@@ -541,10 +542,10 @@ async function browserAblauf(browser) {
     pruefe(`Browser: ${datei} nur die Anbieter-E-Mail, keine Telefonnummer`, nurAnbieterKontakt(t));
     pruefe(`Browser: ${datei} ${entwurf ? 'bleibt Entwurf mit offenen Platzhaltern' : 'fertig, ohne Entwurf und ohne Platzhalter'}`,
       entwurf ? /\[[^\]]+\]/.test(t) : !/\[[^\]]+\]/.test(t) && !/Entwurf/.test(t));
-    // G-002 AC-05 (U, 09.11.2026): in der Datenschutzerklaerung sind nur noch die Anbieter-Angaben offen
+    // G-002 AC-05: die letzten offenen Anbieter-Angaben sind seit R19 aufgeloest, kein Platzhalter-Element mehr
     if (datei === 'datenschutz.html') {
       const platz = await s2.evaluate(() => [...document.querySelectorAll('.platz')].map((s) => s.textContent));
-      pruefe('Browser: datenschutz.html offen sind nur noch Anbieter-Angaben', platz.length > 0 && platz.every((p) => /^\[Anbieter/.test(p)), platz);
+      pruefe('Browser: datenschutz.html ohne offene Anbieter-Angaben', platz.length === 0, platz);
     }
     pruefe(`Browser: ${datei} nutzt die Farben der App (Tokens)`, css.grund !== 'rgba(0, 0, 0, 0)' && css.grund !== css.text, css);
     await s2.close();
