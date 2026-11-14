@@ -344,3 +344,66 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   .pr-vitrine-ort .pr-orden.leer { background: rgba(10, 12, 16, .62); border-color: rgba(255, 255, 255, .55); color: #FFFFFF; }
   .pr-vitrine-ort .pr-vitrine[data-leer] .pr-orden { min-height: 44px; }
 }
+
+/* R19-Entwurf "Shop wie Fortnite" (shop-entwurf.js, nur mit ?shopStil=a|b|c): grosse bunte Karten mit Bild und Preis,
+   Farbe je Seltenheit; "Neu" ist nur eine Sortierung (kein Ablauf, keine Restzahl) */
+.shf { display: grid; gap: 22px; min-width: 0; }
+.sh-inhalt:has(> .shf) { max-width: none; }
+.shf-karte[data-seltenheit="haeufig"] { --shf-farbe: #4f9a64; }
+.shf-karte[data-seltenheit="selten"] { --shf-farbe: #3a78d4; }
+.shf-karte[data-seltenheit="episch"] { --shf-farbe: #8b4fd8; }
+.shf-karte[data-seltenheit="exklusiv"] { --shf-farbe: #c38f22; }
+.shf-karte { position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: 10px; border: 0; border-radius: 16px;
+  text-align: left; font: inherit; color: var(--text); cursor: pointer; min-width: 0; background: var(--flaeche);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--shf-farbe) 60%, transparent), var(--s1); }
+.shf-karte:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+.shf-bild { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+  background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--shf-farbe) 34%, #fff), color-mix(in srgb, var(--shf-farbe) 80%, #000)); }
+.shf-brettbild { width: 72%; height: auto; border-radius: 6px; box-shadow: 0 6px 14px rgba(0, 0, 0, .3); }
+.shf-figuren { display: flex; align-items: flex-end; justify-content: center; width: 100%; }
+.shf-fig { width: 44%; height: auto; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .35)); }
+.shf-figuren.auf { position: absolute; inset: auto 0 5% 0; }
+.shf-figuren.auf .shf-fig { width: 34%; }
+.shf-effekt { width: 80%; height: auto; }
+.shf-text { display: grid; gap: 2px; min-width: 0; align-content: start; }
+.shf-selten { font-size: 12px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; color: color-mix(in srgb, var(--shf-farbe) 78%, var(--text)); }
+.shf-name { font-family: var(--display); font-weight: var(--gw-titel); font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
+.shf-unter { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.shf-preis { justify-self: start; padding: 4px 10px; border-radius: 99px; font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums;
+  background: var(--flaeche-2); }
+.shf-neu { position: absolute; top: 16px; left: 16px; z-index: 1; padding: 3px 9px; border-radius: 99px; font-size: 12px; font-weight: 800;
+  background: #ffd84d; color: #2a2100; }
+.shf-reihe { display: grid; gap: 10px; min-width: 0; }
+.shf-reihe-titel { margin: 0; font-family: var(--display); font-size: 19px; font-weight: var(--gw-titel); }
+.shf-gitter { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+/* a Schaufenster: das Neue als grosses Highlight in Mitternacht & Gold */
+.shf-held { display: grid; gap: 10px; }
+.shf-held .shf-karte { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; align-items: center; gap: 14px 18px;
+  padding: 16px; color: #fff; background: linear-gradient(135deg, #1c2346, #3b4a7a 58%, #b8862b); }
+.shf-held .shf-bild { grid-row: 1 / span 2; }
+@media (min-width: 521px) { .shf-held .shf-karte { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); } }
+.shf-held .shf-name { font-size: clamp(22px, 4vw, 32px); }
+.shf-held .shf-selten, .shf-held .shf-unter { color: #f3e3b6; }
+.shf-held .shf-preis { align-self: start; background: #ffd84d; color: #2a2100; font-size: 16px; }
+/* b Raster: alle Karten gleich gross und ganz in der Farbe ihrer Seltenheit */
+.shf-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+.shf[data-shop-stil="b"] .shf-karte { color: #fff; box-shadow: var(--s1);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--shf-farbe) 84%, #fff), color-mix(in srgb, var(--shf-farbe) 88%, #000)); }
+.shf[data-shop-stil="b"] .shf-bild { background: rgba(255, 255, 255, .16); }
+.shf[data-shop-stil="b"] .shf-selten, .shf[data-shop-stil="b"] .shf-unter { color: rgba(255, 255, 255, .9); }
+.shf[data-shop-stil="b"] .shf-preis { background: rgba(0, 0, 0, .3); color: #fff; }
+/* c Regal: je Kategorie eine waagerecht wischbare Reihe, die erste ("Neu diese Woche") mit breiter Karte */
+.shf-band { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 42%); gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 2px 2px 10px; overscroll-behavior-x: contain; }
+.shf-band > .shf-karte { scroll-snap-align: start; }
+.shf-reihe:first-child .shf-band { grid-auto-columns: minmax(240px, 78%); }
+@media (min-width: 700px) { .shf-band { grid-auto-columns: 180px; } .shf-reihe:first-child .shf-band { grid-auto-columns: 360px; } }
+@media (max-width: 520px) {
+  .shf-gitter, .shf-raster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .shf-held .shf-karte { grid-template-columns: minmax(0, 1fr); }
+  .shf-held .shf-bild { grid-row: auto; }
+}
+/* Vorschau auf dem echten Brett (js/board.js); die Farben setzt shop-entwurf.js als --feld-hell und --feld-dunkel */
+.shf-vorschau { position: relative; width: min(340px, 78vw); margin: 4px auto 12px; }
+.shf-vorschau-brett { width: 100%; aspect-ratio: 1; }
+.shf-vorschau-effekt { position: absolute; left: 50%; top: 50%; width: 30%; transform: translate(-50%, -50%); pointer-events: none; }

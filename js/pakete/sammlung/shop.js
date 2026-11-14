@@ -16,6 +16,7 @@ import { sitzung, aktiveSitzung, kontoFreigeschaltet } from '../../konto.js';
 import { sheet } from '../../ui/bauteile.js';
 import { t, zahl, datum, sprache } from '../../sprache.js';
 import './texte.js';
+import { shopStil, shopEntwurf } from './shop-entwurf.js';
 
 const S = (k, w) => t('p-sammlung.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -164,6 +165,12 @@ export function shopBereich({ app } = {}) {
     } catch (e) {
       satz(S('shop.vorbereitung'));
       return;
+    }
+    // R19-Entwurf "Shop wie Fortnite" (nur mit ?shopStil=a|b|c, js/pakete/sammlung/shop-entwurf.js)
+    const stil = shopStil();
+    if (stil) {
+      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen: liste, katalog: KATALOG, produktName, bereich: s, app })); return; }
+      catch (e) { console.error(e); }
     }
     const karten = liste.map(karte).filter(Boolean);
     if (!karten.length) { satz(S('shop.vorbereitung')); return; }

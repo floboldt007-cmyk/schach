@@ -94,6 +94,7 @@ const SUITEN = [
   { name: 'partie-hoehe', datei: 'partie-hoehe.test.mjs', args: [], was: 'Bot-Partie ohne Seitenueberlauf und Sieg-Blatt ohne Innen-Scrollen, Brett nicht kleiner (7 Geraete, R7 B8/B10)' },
   { name: 'layout-r8', datei: 'layout-r8.test.mjs', args: [], was: 'Kritik R8: Liga-Platzzahl deckend ueber dem Banner, Sieg-Blatt SE/PC ohne Innen-Scrollen, Fertig im Bereichs-Blatt volle Breite (Browser)' },
   { name: 'funktion-shop-skin', datei: 'funktion-shop-skin.test.mjs', args: [], was: 'Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht' },
+  { name: 'r19-shop-fortnite', datei: 'r19-shop-fortnite.test.mjs', args: [], was: 'R19-Entwurf Shop wie Fortnite: ?shopStil=a|b|c, Server-Preis oder Preis folgt, kein Druck, Vorschau auf echtem Brett, Kaufen ohne Kasse' },
   { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
   { name: 'r15-ergebnis-teilen', datei: 'r15-ergebnis-teilen.test.mjs', args: [], was: 'Feinschliff R15: Duell-Nochmal in Suchfarbe, Niederlage mit Liga-Verweis, ein Knopf "Teilen ..." nach dem Sieg (Browser)' },
