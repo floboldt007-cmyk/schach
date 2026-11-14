@@ -162,12 +162,14 @@ try {
     const s2 = await seite(k, z, `${DE}#konto#access_token=${TOKEN}&expires_at=9999999999&expires_in=3600&refresh_token=r1&token_type=bearer`);
     pruefe('Google-Rueckkehr: angemeldet, Adresse ohne Token', (await sichtbar(s2, '.kl-angemeldet'))
       && !(await s2.evaluate(() => location.href)).includes('access_token') && z.aufrufe.loeschen === 0);
+    await bild(s2, '5-google-rueckkehr');
     await k.close();
     const neu = await umgebung();   // ohne die Sitzung von eben
     const s3 = await seite(neu.k, neu.z, `${DE}#error=access_denied&error_code=signup_disabled&error_description=x`);
     const st = await status(s3);
     pruefe('Google-Rueckkehr mit Fehler: Fehler als Text, Adresse ohne #error, Anmeldung sichtbar', st.fehler === 'ja'
       && !(await s3.evaluate(() => location.href)).includes('error') && (await sichtbar(s3, '.kl-anmelden')), st);
+    await bild(s3, '5-google-fehler');
     await neu.k.close();
   }
   { // 6. Englisch, Breiten, Abo-Hinweis
@@ -205,6 +207,7 @@ try {
     await s.waitForTimeout(1800);
     pruefe('Tippen waehrend der Loeschung + zweiter Klick: konto_loeschen genau einmal', z.aufrufe.loeschen === 1, z.aufrufe);
     pruefe('Tippen waehrend der Loeschung: danach Bestaetigung sichtbar', await sichtbar(s, '.kl-fertig'));
+    await bild(s, '7-tippen-waehrend-loeschung');
     await k.close();
   }
   { // 8. Abgelaufene Sitzung, Refresh tot: schon beim Laden Meldung und Anmeldung, nichts geloescht
@@ -225,6 +228,7 @@ try {
     const st = await status(s);
     pruefe('Sitzung abgelaufen, Refresh klappt: beim Laden erneuert, angemeldet, keine Meldung',
       (await sichtbar(s, '.kl-angemeldet')) && !(await sichtbar(s, '.kl-anmelden')) && st.text === '' && z.aufrufe.token === 1, { st, aufrufe: z.aufrufe });
+    await bild(s, '8b-refresh-klappt');
     await k.close();
   }
   { // 9. Abo-Hinweis: bekanntes laufendes Stripe-Abo steht vor Schritt 2, ohne Abo kein Hinweis
@@ -255,6 +259,8 @@ try {
     const ten = await en.locator('main').textContent();
     pruefe('en: „What stays“ nennt Stripe customer number und 90 days', /Stripe customer number/.test(ten) && /90 days/.test(ten));
     pruefe('en: Mitloeschungen aus §5 genannt', ['player card', 'crowns', 'puzzle duel', 'online games', 'school mode', 'age statement'].every((w) => ten.toLowerCase().includes(w)));
+    await bild(de, '10-texte-de');
+    await bild(en, '10-texte-en');
     await k.close();
   }
   { // 11. Waehrend der Loeschung sind Abbrechen, Weiter und Abmelden gesperrt; nach Serverfehler folgt der Knopf dem Feld
@@ -282,7 +288,7 @@ try {
   }
   { // 12. Server lehnt ein lokal gueltiges Token ab (401 PGRST301): einmal erneuern, einmal wiederholen
     const abgelehnt = { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } };
-    const lauf = async (opt) => {
+    const lauf = async (opt, name) => {
       const { k, z } = await umgebung({ ...opt, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
       const s = await seite(k, z, DE);
       await s.locator('[data-kl="weiter"]').click();
@@ -292,16 +298,17 @@ try {
       await s.waitForTimeout(300);
       const r = { z, st: await status(s), fertig: await sichtbar(s, '.kl-fertig'), anmelden: await sichtbar(s, '.kl-anmelden'),
         angemeldet: await sichtbar(s, '.kl-angemeldet'), sitzung: await sitzungDa(s) };
+      await bild(s, `12-${name}`);
       await k.close();
       return r;
     };
-    const a = await lauf({ rpc: [abgelehnt, null] });
+    const a = await lauf({ rpc: [abgelehnt, null] }, 'refresh-klappt');
     pruefe('401, Refresh klappt: erneuert, zweiter Versuch loescht, Bestaetigung sichtbar',
       a.fertig && !a.sitzung && a.z.aufrufe.token === 1 && a.z.aufrufe.loeschen === 2, { aufrufe: a.z.aufrufe, st: a.st });
-    const b = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } });
+    const b = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } }, 'refresh-tot');
     pruefe('401, Refresh tot: lokal abgemeldet, Anmeldung sichtbar, Fehlertext, kein weiterer rpc',
       b.anmelden && !b.angemeldet && !b.sitzung && b.st.fehler === 'ja' && b.z.aufrufe.token === 1 && b.z.aufrufe.loeschen === 1, { aufrufe: b.z.aufrufe, st: b.st });
-    const c = await lauf({ rpc: [abgelehnt, abgelehnt] });
+    const c = await lauf({ rpc: [abgelehnt, abgelehnt] }, 'zweimal-abgelehnt');
     pruefe('401, Refresh klappt, wieder 401: lokal abgemeldet, Anmeldung sichtbar, genau zwei rpc',
       c.anmelden && !c.angemeldet && !c.sitzung && c.st.fehler === 'ja' && c.z.aufrufe.token === 1 && c.z.aufrufe.loeschen === 2, { aufrufe: c.z.aufrufe, st: c.st });
   }
