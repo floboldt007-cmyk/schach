@@ -87,6 +87,9 @@
 .pr-karte .pr-kopf { position: relative; overflow: hidden; min-height: 112px; padding: 12px 14px; margin: -14px -14px 0; border-radius: var(--r-l, 18px) var(--r-l, 18px) 0 0; }
 .pr-karte .pr-kopf > :not(.pr-banner) { position: relative; z-index: 1; }
 .pr-banner { position: absolute; inset: 0; z-index: 0; }
+/* R16-Kritik I3 (Auswahl a): im Profilkopf das Bild senkrecht mittig. Die Verschiebung um h/15 nach oben (oben) liess hier
+   unten einen Streifen in der Grundfarbe stehen (PC 7 px, iPhone 3 px), weil das Bild nur so hoch ist wie der Kopf. */
+.pr-karte .pr-banner { background-position-y: center; }
 .pr-karte .pr-kopf .pr-av { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 8px rgba(0, 0, 0, .45); }
 .pr-karte .pr-kopf .pr-name b, .pr-karte .pr-kopf .pr-seit { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
 .pr-chip.pr-chip-krone { color: #FFFFFF; background: rgba(255, 255, 255, .16); }

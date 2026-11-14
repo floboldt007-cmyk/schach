@@ -2375,7 +2375,10 @@ export function zeige(root, params, app) {
           }
           // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.
           // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
-          const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]') || revanche;
+          // Nach Niederlage und Remis ist das "Zur Analyse" (R12-W1); sonst traegt die Revanche einen orangen Fokusring
+          // neben dem orangen Analyse-Knopf (R16-Kritik E3, Auswahl a)
+          const folge = (ergebnis !== 'sieg' && knoepfe.querySelector('[data-ziel="analyse"]'))
+            || knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]') || revanche;
           if (folge) folge.focus({ preventScroll: true });
         }
         o.classList.add(rechnet ? 'vorlaeufig' : 'gefuellt');
