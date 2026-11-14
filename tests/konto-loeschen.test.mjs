@@ -47,6 +47,7 @@ function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`
 const browser = await browserTyp(pw).launch({ headless: true });
 
 // otp/verify/rpc/token: { status, body } statt der Erfolgsantwort (rpc auch als Liste je Aufruf, null = Erfolg);
+// token.abbruch: die Verbindung zum Token-Endpunkt bricht ab; rpc.abbruch: dasselbe fuer konto_loeschen;
 // rpcMs: Antwort von konto_loeschen verzoegert;
 // lokal: Eintraege im localStorage vor dem Laden
 async function umgebung({ otp = null, verify = null, rpc = null, token = null, rpcMs = 0, lokal = {}, breite = 390 } = {}) {
@@ -60,11 +61,16 @@ async function umgebung({ otp = null, verify = null, rpc = null, token = null, r
     const antwort = (body, status = 200) => r.fulfill({ status, contentType: 'application/json', body: body == null ? '' : JSON.stringify(body) });
     if (u.pathname === '/auth/v1/otp') { z.aufrufe.otp++; return z.otp ? antwort(z.otp.body, z.otp.status) : antwort({}); }
     if (u.pathname === '/auth/v1/verify') { z.aufrufe.verify++; return z.verify ? antwort(z.verify.body, z.verify.status) : antwort(SITZUNG); }
-    if (u.pathname === '/auth/v1/token') { z.aufrufe.token++; return z.token ? antwort(z.token.body, z.token.status) : antwort(SITZUNG); }
+    if (u.pathname === '/auth/v1/token') {
+      z.aufrufe.token++;
+      if (z.token?.abbruch) return r.abort('internetdisconnected');
+      return z.token ? antwort(z.token.body, z.token.status) : antwort(SITZUNG);
+    }
     if (u.pathname === '/rest/v1/rpc/konto_loeschen') {
       z.aufrufe.loeschen++;
       if (rpcMs) await new Promise((w) => setTimeout(w, rpcMs));
       const a = Array.isArray(z.rpc) ? z.rpc[z.aufrufe.loeschen - 1] : z.rpc;
+      if (a?.abbruch) return r.abort('internetdisconnected');
       return a ? antwort(a.body, a.status) : r.fulfill({ status: 204, body: '' });
     }
     if (u.pathname === '/auth/v1/logout') { z.aufrufe.logout++; return r.fulfill({ status: 204, body: '' }); }
@@ -222,6 +228,18 @@ try {
     await bild(s, '8-sitzung-abgelaufen');
     await k.close();
   }
+  { // 8c. R17: wie 8, Refresh tot im alten Format (error invalid_grant): beim Laden Text "abgelaufen" (de) / "expired" (en)
+    for (const [name, adresse, wort] of [['de', DE, /abgelaufen/i], ['en', EN, /expired/i]]) {
+      const { k, z } = await umgebung({ token: { status: 400, body: { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' } },
+        lokal: { 'schach-arena:konto:sitzung': JSON.stringify({ ...SITZUNG, expires_at: 1 }) } });
+      const s = await seite(k, z, adresse);
+      const st = await status(s);
+      pruefe(`${name}: Sitzung abgelaufen, Refresh tot (invalid_grant): beim Laden Text abgelaufen, Anmeldung sichtbar, nichts geloescht`,
+        st.fehler === 'ja' && wort.test(st.text) && (await sichtbar(s, '.kl-anmelden')) && !(await sichtbar(s, '.kl-angemeldet'))
+        && !(await sitzungDa(s)) && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
+      await k.close();
+    }
+  }
   { // 8b. Gegenprobe: abgelaufene Sitzung, Refresh klappt -> beim Laden erneuert, angemeldet, keine Meldung
     const { k, z } = await umgebung({ lokal: { 'schach-arena:konto:sitzung': JSON.stringify({ ...SITZUNG, expires_at: 1 }) } });
     const s = await seite(k, z, DE);
@@ -288,29 +306,81 @@ try {
   }
   { // 12. Server lehnt ein lokal gueltiges Token ab (401 PGRST301): einmal erneuern, einmal wiederholen
     const abgelehnt = { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } };
-    const lauf = async (opt, name) => {
-      const { k, z } = await umgebung({ ...opt, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
-      const s = await seite(k, z, DE);
+    // nochmal: zweiter Klick nach dem Fehler (Dauerfeuer-Probe); bleibt die Seite angemeldet, ist er ein neuer Versuch
+    // sitz: die Sitzung im Geraet vor dem Laden (Standard: lokal noch gueltig)
+    const lauf = async (opt, adresse = DE, nochmal = true, sitz = SITZUNG, name = null) => {
+      const { k, z } = await umgebung({ ...opt, lokal: { 'schach-arena:konto:sitzung': JSON.stringify(sitz) } });
+      const s = await seite(k, z, adresse);
+      const T = await s.evaluate(() => JSON.parse(document.getElementById('kl-texte').textContent));
       await s.locator('[data-kl="weiter"]').click();
-      await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
+      await s.locator('.kl-bestaetigen').fill(T.wort);
       await s.locator('[data-kl="loeschen"]').click(); await s.waitForTimeout(800);
-      await s.locator('[data-kl="loeschen"]').click({ timeout: 500 }).catch(() => {});
+      if (nochmal) await s.locator('[data-kl="loeschen"]').click({ timeout: 500 }).catch(() => {});
       await s.waitForTimeout(300);
       const r = { z, st: await status(s), fertig: await sichtbar(s, '.kl-fertig'), anmelden: await sichtbar(s, '.kl-anmelden'),
-        angemeldet: await sichtbar(s, '.kl-angemeldet'), sitzung: await sitzungDa(s) };
-      await bild(s, `12-${name}`);
+        angemeldet: await sichtbar(s, '.kl-angemeldet'), sitzung: await sitzungDa(s), T,
+        frei: await sichtbar(s, '[data-kl="loeschen"]') && !(await s.locator('[data-kl="loeschen"]').isDisabled()) };
+      if (name) await bild(s, `12-${name}`);
       await k.close();
       return r;
     };
-    const a = await lauf({ rpc: [abgelehnt, null] }, 'refresh-klappt');
+    const a = await lauf({ rpc: [abgelehnt, null] }, DE, true, SITZUNG, 'refresh-klappt');
     pruefe('401, Refresh klappt: erneuert, zweiter Versuch loescht, Bestaetigung sichtbar',
       a.fertig && !a.sitzung && a.z.aufrufe.token === 1 && a.z.aufrufe.loeschen === 2, { aufrufe: a.z.aufrufe, st: a.st });
-    const b = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } }, 'refresh-tot');
+    const b = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } }, DE, true, SITZUNG, 'refresh-tot');
     pruefe('401, Refresh tot: lokal abgemeldet, Anmeldung sichtbar, Fehlertext, kein weiterer rpc',
       b.anmelden && !b.angemeldet && !b.sitzung && b.st.fehler === 'ja' && b.z.aufrufe.token === 1 && b.z.aufrufe.loeschen === 1, { aufrufe: b.z.aufrufe, st: b.st });
-    const c = await lauf({ rpc: [abgelehnt, abgelehnt] }, 'zweimal-abgelehnt');
+    // Kaltreview loeschseite-2, Hinweis 2: der Text sagt, dass die Anmeldung abgelaufen ist (de und en)
+    pruefe('401, Refresh tot: Text "abgelaufen"', /abgelaufen/i.test(b.st.text), b.st);
+    const bEn = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } }, EN);
+    pruefe('en: 401, Refresh tot: lokal abgemeldet, Text "expired"', !bEn.sitzung && bEn.anmelden && /expired/i.test(bEn.st.text), bEn.st);
+    // R17: totes Refresh-Token im alten Format (error invalid_grant, kein error_code) wie oben, de und en
+    const TOT_ALT = { status: 400, body: { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' } };
+    for (const [name, adresse, wort] of [['de', DE, /abgelaufen/i], ['en', EN, /expired/i]]) {
+      const b2 = await lauf({ rpc: abgelehnt, token: TOT_ALT }, adresse);
+      pruefe(`${name}: 401, Refresh tot (invalid_grant): lokal abgemeldet, Anmeldung sichtbar, Text abgelaufen, kein Server-Text, kein weiterer rpc`,
+        b2.anmelden && !b2.angemeldet && !b2.sitzung && b2.st.fehler === 'ja' && wort.test(b2.st.text) && !/invalid|Refresh Token|Serverfehler|Server error/i.test(b2.st.text)
+        && b2.z.aufrufe.token === 1 && b2.z.aufrufe.loeschen === 1, { aufrufe: b2.z.aufrufe, st: b2.st });
+    }
+    const c = await lauf({ rpc: [abgelehnt, abgelehnt] }, DE, true, SITZUNG, 'zweimal-abgelehnt');
     pruefe('401, Refresh klappt, wieder 401: lokal abgemeldet, Anmeldung sichtbar, genau zwei rpc',
       c.anmelden && !c.angemeldet && !c.sitzung && c.st.fehler === 'ja' && c.z.aufrufe.token === 1 && c.z.aufrufe.loeschen === 2, { aufrufe: c.z.aufrufe, st: c.st });
+    pruefe('401, Refresh klappt, wieder 401: eigener Text (neu anmelden, Mail-Weg), nicht "abgelaufen"',
+      !!c.T.abgelehnt && c.st.text === c.T.abgelehnt, { st: c.st, soll: c.T.abgelehnt });
+    // Kaltreview Runde 3, Befund 1: scheitert die Erneuerung nur am Netz, ist das Refresh-Token noch gut
+    const d = await lauf({ rpc: abgelehnt, token: { abbruch: true } }, DE, false);
+    pruefe('401, Refresh offline: bleibt angemeldet, Verbindungstext, kein Abmelden, kein zweiter rpc',
+      d.angemeldet && !d.anmelden && d.sitzung && !!d.T.offline && d.st.text === d.T.offline && d.st.fehler === 'ja'
+        && d.z.aufrufe.token === 1 && d.z.aufrufe.loeschen === 1 && d.z.aufrufe.logout === 0, { aufrufe: d.z.aufrufe, st: d.st });
+    pruefe('401, Refresh offline: Loeschknopf mit Wort wieder frei', d.frei);
+    const e = await lauf({ rpc: abgelehnt, token: { abbruch: true } }, EN, false);
+    pruefe('en: 401, Refresh offline: englischer Verbindungstext, angemeldet',
+      e.angemeldet && e.sitzung && /connection/i.test(e.T.offline || '') && e.st.text === e.T.offline, { st: e.st });
+    // Kurz-Review loeschseite-3 (13:15): Erneuerung klappt, erst der zweite Loeschaufruf scheitert am Netz. Das frische
+    // Token ist gut, also kein Abmelden und nicht der Text fuer "abgelehnt", sondern der eigene Verbindungstext
+    for (const [name, adresse] of [['de', DE], ['en', EN]]) {
+      const n = await lauf({ rpc: [abgelehnt, { abbruch: true }] }, adresse, false);
+      pruefe(`${name}: 401, Refresh klappt, zweiter Aufruf offline: angemeldet, eigener Verbindungstext, kein Abmelden`,
+        n.angemeldet && !n.anmelden && n.sitzung && n.st.text === n.T.offline && n.st.fehler === 'ja' && n.frei
+          && n.z.aufrufe.token === 1 && n.z.aufrufe.loeschen === 2 && n.z.aufrufe.logout === 0,
+        { aufrufe: n.z.aufrufe, st: n.st, soll: n.T.offline });
+    }
+    const f = await lauf({ rpc: [abgelehnt, abgelehnt] }, EN);
+    pruefe('en: 401, Refresh klappt, wieder 401: englischer eigener Text',
+      /sign in again/i.test(f.T.abgelehnt || '') && f.st.text === f.T.abgelehnt && !f.sitzung, { st: f.st });
+    // Kaltreview loeschseite-2, Hinweis 3: ohne Netz zeigt die Seite ihren eigenen Verbindungstext, nicht den der
+    // Einstellungen ("Die App funktioniert weiter offline") oder der Datenseite. Lokal schon abgelaufene Sitzung: die
+    // Erneuerung scheitert vor dem Loeschaufruf; frische Sitzung: der Loeschaufruf selbst scheitert am Netz
+    for (const [name, adresse] of [['de', DE], ['en', EN]]) {
+      const g = await lauf({ token: { abbruch: true } }, adresse, false, { ...SITZUNG, expires_at: 1 });
+      pruefe(`${name}: lokal abgelaufen und offline: eigener Verbindungstext der Seite, angemeldet, kein Loeschaufruf`,
+        g.st.text === g.T.offline && g.st.fehler === 'ja' && g.angemeldet && g.sitzung && g.z.aufrufe.loeschen === 0 && g.frei,
+        { st: g.st, soll: g.T.offline, aufrufe: g.z.aufrufe });
+      const h = await lauf({ rpc: { abbruch: true } }, adresse, false);
+      pruefe(`${name}: Loeschaufruf offline: eigener Verbindungstext der Seite, angemeldet, genau ein Aufruf`,
+        h.st.text === h.T.offline && h.st.fehler === 'ja' && h.angemeldet && h.sitzung && h.z.aufrufe.loeschen === 1 && h.frei,
+        { st: h.st, soll: h.T.offline, aufrufe: h.z.aufrufe });
+    }
   }
 } finally {
   await browser.close(); server.close();

@@ -48,6 +48,10 @@
    dieselbe Farbe (R7 A, 13.11.2026) */
 .rd-los:is(.rd-suchen, .rd-nochmal) { background: var(--akzent); color: var(--auf-akzent); }
 .rd-los:is(.rd-suchen, .rd-nochmal):active { background: var(--akzent-tief); }
+/* "Gegner suchen" und "Nochmal" unter dem Zeiger ohne Aufhellung wie .knopf.primaer: brightness(1.05) senkte die weisse
+   Schrift auf 4,28:1 (hell) bzw. 4,49:1 (dunkel), unter 4,5:1 (R17 B3 Nochmal, R17 suchen Gegner suchen). Die Aufhellung
+   bleibt nur am goldenen Grundknopf .rd-los, den heute keine Ansicht ohne eine der beiden Klassen benutzt */
+.rd-los:is(.rd-suchen, .rd-nochmal):hover { filter: none; }
 
 /* Mit einem Freund: Einladen und Code eingeben nebeneinander */
 .rd-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-self: stretch; }

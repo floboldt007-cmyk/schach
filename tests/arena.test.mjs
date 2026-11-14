@@ -826,12 +826,16 @@ async function testeHandyQuer(browser) {
 // in allen Ziel-Lagen: echte Panels (alle besiegt, Welt fuer Welt jede Station antippen: "Revanche gegen …") und der
 // Spielen-Text jedes Bots im echten Knopf (spielenText aus js/ui/arena.js, dieselbe Funktion wie im Panel)
 async function testeKnopftext(browser) {
-  for (const vp of [{ w: 375, h: 667, handy: true }, { w: 390, h: 844, handy: true }, { w: 820, h: 1180 }, { w: 1024, h: 768 }, { w: 1180, h: 820 }, { w: 844, h: 390, handy: true }]) {
-    gruppe = `Knopftext ${vp.w} × ${vp.h}`;
+  // last: CPU 8x gedrosselt (R17, 14.11.2026): Die Vorprobe a2d6aba war unter Last rot ("Revanche gegen Johann" ragt aus dem
+  // 56-px-Knopf), einzeln gruen. Gemessen wurde mitten im Hereingleiten des Panels (staffel in js/ui/arena.js zeigeDetail):
+  // Die cta-platz-Zeile stand um 9,15 px verschoben, und das Rechteck des 56 px hohen Knopfs kam knapp unter 56 heraus.
+  for (const vp of [{ w: 375, h: 667, handy: true }, { w: 375, h: 667, handy: true, last: 8 }, { w: 390, h: 844, handy: true }, { w: 820, h: 1180 }, { w: 1024, h: 768 }, { w: 1180, h: 820 }, { w: 844, h: 390, handy: true }]) {
+    gruppe = `Knopftext ${vp.w} × ${vp.h}${vp.last ? ` unter CPU-Last (${vp.last}x)` : ''}`;
     const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, handy: !!vp.handy, saat: SAAT_ALLE });
     await seite.goto(BASIS + (vp.handy ? '&reiter=verlauf' : '') + '#arena');
     await seite.waitForSelector('.screen.arena .knoten');
     await warte(900);
+    if (vp.last) await (await kontext.newCDPSession(seite)).send('Emulation.setCPUThrottlingRate', { rate: vp.last });
     const echt = [];
     const texte = [];
     const ab = new Set();
@@ -841,6 +845,10 @@ async function testeKnopftext(browser) {
       for (const id of ids) {
         await seite.evaluate((i) => document.querySelector(`.knoten[data-bot="${i}"]`).click(), id);
         texte.push(await seite.evaluate(() => document.querySelector('.detail [data-aktion="spielen"]').textContent.trim()));
+        // erst messen, wenn das Panel steht: die Staffel ans Ende springen lassen statt sie abzuwarten (bis 682 ms je Panel);
+        // finish() wirft bei einer unendlichen Animation, darum nur die endlichen
+        await seite.evaluate(() => document.querySelector('.detail').getAnimations({ subtree: true })
+          .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity).forEach((a) => a.finish()));
         const r = await spielenPasst(seite);
         if (r) echt.push(r);
         for (const x of await abgeschnitten(seite)) ab.add(id + ' ' + x);

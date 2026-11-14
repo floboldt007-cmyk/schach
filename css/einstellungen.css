@@ -60,16 +60,25 @@
 
 .es-info p { margin: 0 0 10px; font-size: 14px; color: var(--text-2); }
 .es-info a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere;
-  /* Tippflaeche >= 44 px: Polster nur fuer den Finger, die Zeilenhoehe bleibt (Polster an inline-Elementen zaehlt nicht zur Zeile) */
-  padding-block: 13px; }
+  /* Tippflaeche >= 44 px: Polster nur fuer den Finger, die Zeilenhoehe bleibt (Polster an inline-Elementen zaehlt nicht zur Zeile);
+     positioniert liegt das Polster ueber den Textzeilen davor und danach, sonst fing am Handy die Nachbarzeile den Tipp (R18) */
+  padding-block: 13px; position: relative; }
+/* Absaetze mit Link untereinander (GPL-3.0 und GitHub, GitHub und Datenschutz): 26 px Abstand = beide Polster, sonst
+   ueberlappen die Tippflaechen und ein Tipp oeffnet den falschen Link (R17-Sammelfix, tests/info-lizenzen.test.mjs) */
+.es-info > p:has(a) ~ p:has(a) { margin-top: 26px; }
 /* Link im Bot-Schutz-Hinweis der Anmeldung (js/konto.js): dieselbe Tippflaeche wie .es-info a; der Abstand am Absatz
-   haelt das Polster aus den Anmelde-Knoepfen darueber (sonst trifft ein Tipp auf deren Unterkante den Link) */
-.konto-botschutz-hinweis { margin-block-start: 14px; }
+   haelt das Polster aus den Anmelde-Knoepfen darueber (sonst trifft ein Tipp auf deren Unterkante den Link). Seit dem
+   Kaltreview R16-p1 A2 steht der Hinweis vor "Code senden": der Abstand unten haelt das Polster auch aus diesem Knopf */
+.konto-botschutz-hinweis { margin-block: 14px; }
 .konto-botschutz-hinweis a { padding-block: 13px; }
 .es-lizenzen { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .es-lizenzen li { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 12px; background: var(--flaeche-2); border: 1px solid var(--linie); }
 .es-lizenzen b { font-size: 14px; }
 .es-lizenzen span { font-size: 13px; color: var(--text-2); }
+.es-lizenztext { font-size: 12px; color: var(--text-2); }
+/* Tippflaeche >= 44 px wie die Links der Info-Gruppe */
+.es-lizenztext summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--akzent-text); }
+.es-lizenztext p { margin: 0 0 6px; font-size: 12px; overflow-wrap: anywhere; }
 
 /* ---------- Tester-Bericht (Luecken-Check 10): Eintrag in "Info und Lizenzen" und das Blatt (js/bericht.js) ---------- */
 .es-bericht { margin: var(--a2) 0 var(--a4); padding: var(--a3); border-radius: var(--r-m); background: var(--flaeche-2); border: 1px solid var(--linie); }
@@ -182,5 +191,6 @@
 .konto-gruppe .konto-ziffern { display: flex; gap: .4rem; }
 .konto-gruppe .konto-ziffern input { width: 2.6rem; padding-inline: .2rem; text-align: center; font-size: 1.25rem; }
 .konto-gruppe .konto-status { font-size: .9rem; }
-.konto-gruppe .konto-status[data-fehler="ja"] { color: var(--gefahr, #a32626); }
+/* R16 A1: --gefahr gab es in keinem Thema, das feste Dunkelrot stand dunkel bei 2,2:1; Warnfarbe wie css/daten.css */
+.konto-gruppe .konto-status[data-fehler="ja"] { color: var(--warn); }
 
