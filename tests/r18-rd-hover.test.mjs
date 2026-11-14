@@ -110,10 +110,12 @@ const deckt = async (a, els) => els.length > 0 && (await Promise.all(els.map((e)
 const kennung = (el) => el.evaluate((x) => `${x.tagName.toLowerCase()}.${[...x.classList].join('.')}`);
 
 // Aussehen: Farbe, Flaeche, Rand, Schatten, Filter, Verschiebung, Umriss des Knopfs und seiner Nachfahren
-const aussehen = (el) => el.evaluate((x) => [x, ...x.querySelectorAll('*')].map((k) => {
-  const st = getComputedStyle(k);
-  return [st.color, st.backgroundColor, st.borderTopColor, st.boxShadow, st.filter, st.transform, st.outlineStyle, st.outlineColor].join(' | ');
-}).join(' || '));
+// je Element auch ::before und ::after: eine Zeiger-Regel auf einem Pseudo-Element (Overlay) bliebe sonst ungesehen
+// (Kaltreview R18 rd-los-hover, Befund 1)
+const aussehen = (el) => el.evaluate((x) => [x, ...x.querySelectorAll('*')].flatMap((k) => [null, '::before', '::after'].map((p) => {
+  const st = getComputedStyle(k, p);
+  return [st.content, st.color, st.backgroundColor, st.borderTopColor, st.boxShadow, st.filter, st.transform, st.opacity, st.outlineStyle, st.outlineColor].join(' | ');
+})).join(' || '));
 
 // :hover-Regeln ausserhalb von @media (hover: hover), die den Knopf oder ein Kind treffen (Muster aus tests/r18-hover-rest.test.mjs)
 const zeigerAusserhalb = (el) => el.evaluate((x) => {
@@ -136,9 +138,14 @@ const zeigerAusserhalb = (el) => el.evaluate((x) => {
       if (!r.selectorText || !r.selectorText.includes(':hover') || unterHover) continue;
       for (const teil of teile(r.selectorText)) {
         if (!teil.includes(':hover')) continue;
-        const ohne = teil.replace(/:hover/g, '').trim() || '*';
-        // INTENTIONAL-SLOP[F1]: matches() wirft bei Pseudo-Elementen und bei :not() ohne Inhalt; die treffen keinen Knopf selbst
-        try { if (knoten.some((k) => k.matches(ohne))) funde.push(teil.trim()); } catch (e) { /* kein Element-Selektor */ }
+        // Pseudo-Elemente (::after, auch mit Zustand dahinter) gehoeren zu ihrem Element: abschneiden, dann dem Element
+        // zuordnen (Kaltreview R18 rd-los-hover, Befund 1). Was matches() danach nicht versteht, zaehlt als Fund statt
+        // still durchzurutschen. :not(:hover) haengt ebenso am Zeiger und faellt mit weg (sonst bliebe ein leeres :not())
+        const ohne = teil.replace(/::[\w-]+(\([^)]*\))?(:[\w-]+(\([^)]*\))?)*/g, '').replace(/:not\(\s*:hover\s*\)/g, '')
+          .replace(/:hover/g, '').trim() || '*';
+        let trifft;
+        try { trifft = knoten.some((k) => k.matches(ohne)); } catch (e) { funde.push(`nicht pruefbar: ${teil.trim()}`); continue; }
+        if (trifft) funde.push(teil.trim());
       }
     }
   };
