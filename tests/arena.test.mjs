@@ -845,9 +845,10 @@ async function testeKnopftext(browser) {
       for (const id of ids) {
         await seite.evaluate((i) => document.querySelector(`.knoten[data-bot="${i}"]`).click(), id);
         texte.push(await seite.evaluate(() => document.querySelector('.detail [data-aktion="spielen"]').textContent.trim()));
-        // erst messen, wenn das Panel steht (Muster aus tests/board.test.mjs:70); die Frist faengt Endlos-Animationen ab
-        await seite.evaluate(() => Promise.race([Promise.all(document.querySelector('.detail').getAnimations({ subtree: true })
-          .map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 3000))]));
+        // erst messen, wenn das Panel steht: die Staffel ans Ende springen lassen statt sie abzuwarten (bis 682 ms je Panel);
+        // finish() wirft bei einer unendlichen Animation, die try-Klammer haelt das ab
+        await seite.evaluate(() => document.querySelector('.detail').getAnimations({ subtree: true })
+          .forEach((a) => { try { a.finish(); } catch (e) { /* unendlich */ } }));
         const r = await spielenPasst(seite);
         if (r) echt.push(r);
         for (const x of await abgeschnitten(seite)) ab.add(id + ' ' + x);
