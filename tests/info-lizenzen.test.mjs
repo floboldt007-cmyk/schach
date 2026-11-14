@@ -50,6 +50,16 @@ async function oeffneInfo(s) {
   await s.evaluate(() => document.querySelector('.es-lizenztext summary').scrollIntoView({ block: 'center' }));
   await warte(300);
 }
+// Kurz-Review rechte (37), Befund 1: die Nennungen stehen nicht nur im DOM, sie sind sichtbar (je Sprache und je Breite,
+// Fix-Review 37: ein li, das nur am Handy per @media ausgeblendet ist, fiel bei 1180 nicht auf)
+const sichtbarkeit = (s) => s.evaluate(() => {
+  const el = document.querySelector('.es-info');
+  const zu = (e) => !!e && e.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && e.getBoundingClientRect().height > 0;
+  const quelle = el.querySelector('a[href="https://github.com/floboldt007-cmyk/schach"]');
+  const unsichtbar = [...el.querySelectorAll('.es-lizenzen li')].filter((li) => !zu(li)).map((li) => li.textContent.trim().slice(0, 30));
+  const su = el.querySelector('.es-lizenztext summary');
+  return { quelle: zu(quelle), unsichtbar, posten: el.querySelectorAll('.es-lizenzen li').length, summary: zu(su) };
+});
 // Kurz-Review rechte (37), Befund 2: die Tippflaeche "Lizenztext" ist mindestens 44 px hoch und an neun Punkten (Ecken
 // 2 px eingerueckt, Kantenmitten, Mitte) trifft ein Tippen wirklich sie, nicht etwas darueber (Muster screens, Treffer)
 const tippflaeche = (s) => s.evaluate(() => {
@@ -107,14 +117,7 @@ try {
     // Kurz-Review rechte (37), Befund 1: die Nennungen stehen nicht nur im DOM, sie sind sichtbar, und der Lizenztext ist
     // nach dem Antippen aufgeklappt lesbar
     await oeffneInfo(s);
-    const sicht = await s.evaluate(() => {
-      const el = document.querySelector('.es-info');
-      const zu = (e) => !!e && e.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && e.getBoundingClientRect().height > 0;
-      const quelle = el.querySelector('a[href="https://github.com/floboldt007-cmyk/schach"]');
-      const unsichtbar = [...el.querySelectorAll('.es-lizenzen li')].filter((li) => !zu(li)).map((li) => li.textContent.trim().slice(0, 30));
-      const su = el.querySelector('.es-lizenztext summary');
-      return { quelle: zu(quelle), unsichtbar, posten: el.querySelectorAll('.es-lizenzen li').length, summary: zu(su) };
-    });
+    const sicht = await sichtbarkeit(s);
     pruefe(`${sp}: Quellcode-Link, alle Lizenz-Eintraege und der Knopf Lizenztext sichtbar`,
       sicht.quelle && sicht.posten >= 6 && sicht.unsichtbar.length === 0 && sicht.summary, sicht);
     // per DOM statt s.click: ein verdeckter Knopf soll als Befund im Bericht stehen (Treffer prueft tippflaeche), nicht den Lauf abbrechen
@@ -140,6 +143,9 @@ try {
     await oeffneInfo(s);
     const t = await tippflaeche(s);
     pruefe(`${sp} ${w}x${h}: Tippflaeche Lizenztext mindestens 44 px, 9 von 9 Punkten treffen sie`, t.h >= 44 && t.treffer === 9, t);
+    const sb = await sichtbarkeit(s);
+    pruefe(`${sp} ${w}x${h}: Quellcode-Link, alle Lizenz-Eintraege und der Knopf Lizenztext sichtbar`,
+      sb.quelle && sb.posten >= 6 && sb.unsichtbar.length === 0 && sb.summary, sb);
     await k.close();
   }
 } finally {
