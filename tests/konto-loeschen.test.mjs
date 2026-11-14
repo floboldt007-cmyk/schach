@@ -308,6 +308,15 @@ try {
     const e = await lauf({ rpc: abgelehnt, token: { abbruch: true } }, EN, false);
     pruefe('en: 401, Refresh offline: englischer Verbindungstext, angemeldet',
       e.angemeldet && e.sitzung && /connection/i.test(e.T.offline || '') && e.st.text === e.T.offline, { st: e.st });
+    // Kurz-Review loeschseite-3 (13:15): Erneuerung klappt, erst der zweite Loeschaufruf scheitert am Netz. Das frische
+    // Token ist gut, also kein Abmelden und nicht der Text fuer "abgelehnt", sondern der eigene Verbindungstext
+    for (const [name, adresse] of [['de', DE], ['en', EN]]) {
+      const n = await lauf({ rpc: [abgelehnt, { abbruch: true }] }, adresse, false);
+      pruefe(`${name}: 401, Refresh klappt, zweiter Aufruf offline: angemeldet, eigener Verbindungstext, kein Abmelden`,
+        n.angemeldet && !n.anmelden && n.sitzung && n.st.text === n.T.offline && n.st.fehler === 'ja' && n.frei
+          && n.z.aufrufe.token === 1 && n.z.aufrufe.loeschen === 2 && n.z.aufrufe.logout === 0,
+        { aufrufe: n.z.aufrufe, st: n.st, soll: n.T.offline });
+    }
     const f = await lauf({ rpc: [abgelehnt, abgelehnt] }, EN);
     pruefe('en: 401, Refresh klappt, wieder 401: englischer eigener Text',
       /sign in again/i.test(f.T.abgelehnt || '') && f.st.text === f.T.abgelehnt && !f.sitzung, { st: f.st });
