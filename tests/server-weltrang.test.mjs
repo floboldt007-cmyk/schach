@@ -76,6 +76,23 @@ if (f || g) { console.log(`\n${ok}/${gesamt} bestanden`); process.exit(1); }
 f = await lauf(db, 'daten-schema.sql (nach weltrang)', lies('supabase/daten-schema.sql'));
 pruefe('daten-schema.sql laeuft danach noch einmal (Reihenfolge egal)', !f, f);
 
+// ---------- meine_daten: Kopie in weltrang-schema.sql (Lehre aus dem Kaltreview R19-saison, 14.11.2026) ----------
+// Flo spielt nur weltrang-schema.sql ein, live laeuft meine_daten() ohne den Weltrang-Block. Darum bringt weltrang-schema.sql
+// meine_daten() zeichengleich mit daten-schema.sql mit (wie saison-schema.sql), sonst fehlte die Zustimmung in der Auskunft.
+const fnMeine = (s) => {
+  const a = s.indexOf('create or replace function public.meine_daten()');
+  return a < 0 ? null : s.slice(a, s.indexOf('$$;', s.indexOf('$$', a) + 2) + 3);
+};
+const ohneWeltrang = (s) => s.replace(/\n {2}-- Weltrangliste \(weltrang-schema\.sql[\s\S]*?kronen := kronen \|\| jsonb_build_object\('weltrang', raetsel\);\n {2}end if;/, '');
+{
+  const daten = fnMeine(lies('supabase/daten-schema.sql'));
+  pruefe('meine_daten in weltrang-schema.sql == daten-schema.sql, zeichengleich', !!daten && fnMeine(lies('supabase/weltrang-schema.sql')) === daten);
+  pruefe('weltrang-schema.sql: meine_daten nur fuer authenticated',
+    /revoke execute on function public\.meine_daten\(\) from public, anon;\s+grant execute on function public\.meine_daten\(\) to authenticated;/
+      .test(lies('supabase/weltrang-schema.sql')));
+  pruefe('Hilfe ohneWeltrang entfernt genau den Weltrang-Block', !!daten && ohneWeltrang(daten) !== daten && !/weltrang/i.test(ohneWeltrang(daten)));
+}
+
 await db.exec(`
 insert into auth.users (id, email) values ${Object.entries(U).map(([n, id]) => `('${id}', '${n}@x.invalid')`).join(', ')};
 insert into public.profile (user_id, benutzername) values ('${U.anna}', 'anna'), ('${U.bert}', 'bert'), ('${U.carl}', 'carl'),
@@ -226,6 +243,34 @@ for (const n of ['anna', 'bert', 'carl', 'emil', 'fritz']) {
   pruefe('danach nur noch bert', namen(l) === 'bert', JSON.stringify(l));
 }
 
+// ---------- R19 (Flo 14.11.2026): selbst angegebene Start-Elo zaehlt erst ab 30 Online-Partien ----------
+// Laufzettel 14.11.: Start 2800 und 15 Niederlagen stehen noch bei 2200 und waeren Platz 1. Wer kronen_start genutzt hat
+// (kronen_stand.start_gesetzt), erscheint erst ab 30 Partien; alle anderen bleiben bei 15.
+{
+  const G = { gero: 'f7000000-0000-4000-8000-000000000071', hans: 'f8000000-0000-4000-8000-000000000081' };
+  await db.exec(`insert into auth.users (id, email) values ('${G.gero}', 'gero@x.invalid'), ('${G.hans}', 'hans@x.invalid');
+    insert into public.profile (user_id, benutzername) values ('${G.gero}', 'gero'), ('${G.hans}', 'hans');
+    insert into public.kronen_stand (user_id, elo, elo_n, start_gesetzt) values ('${G.gero}', 2200, 15, true), ('${G.hans}', 2100, 30, true)
+      on conflict (user_id) do update set elo = excluded.elo, elo_n = excluded.elo_n, start_gesetzt = excluded.start_gesetzt;`);
+  for (const id of Object.values(G)) await mitmachen(id, true);
+  let l = await liste(G.gero);
+  pruefe('Antwort nennt beide Grenzen (ab 15, ab_start 30)', l?.ab === 15 && l?.ab_start === 30, JSON.stringify(l && { ab: l.ab, ab_start: l.ab_start }));
+  pruefe('Start-Elo selbst gesetzt, 15 Partien (gero, Elo 2200): nicht in der Liste', !!l?.liste && !namen(l).includes('gero'), namen(l));
+  pruefe('gero zaehlt noch, es fehlen 15 Partien', l?.ich?.status === 'zaehlt_noch' && l.ich.fehlen === 15, JSON.stringify(l?.ich));
+  pruefe('Start-Elo selbst gesetzt, 30 Partien (hans): in der Liste, Platz 1', l?.liste?.[0]?.name === 'hans' && l.liste[0].rang === 1, JSON.stringify(l?.liste));
+  await db.exec(`update public.kronen_stand set elo_n = 29 where user_id = '${G.gero}'`);
+  l = await liste(G.gero);
+  pruefe('gero mit 29 Partien: noch draussen, 1 fehlt', !!l?.liste && !namen(l).includes('gero') && l?.ich?.fehlen === 1, JSON.stringify(l?.ich));
+  await db.exec(`update public.kronen_stand set elo_n = 30 where user_id = '${G.gero}'`);
+  l = await liste(G.gero);
+  pruefe('gero mit 30 Partien: dabei, Platz 1 vor hans', l?.ich?.status === 'dabei' && l.ich.rang === 1 && namen(l) === 'gero,hans,bert', JSON.stringify(l));
+  pruefe('ohne selbst gesetzte Start-Elo bleibt die Grenze 15 (bert mit 15 weiter dabei)', namen(l).includes('bert'), namen(l));
+  const c = await liste(U.carl);
+  pruefe('carl (14 Partien, ohne Start-Elo): es fehlt weiter 1 Partie', c?.ich?.status === 'zaehlt_noch' && c.ich.fehlen === 1, JSON.stringify(c?.ich));
+  for (const id of Object.values(G)) await mitmachen(id, false);
+  await db.exec(`delete from auth.users where id in ('${G.gero}', '${G.hans}')`);
+}
+
 // ---------- Probe fuer den SQL-Editor, Rueckweg, wiederholbar ----------
 {
   const x = await lauf(db, 'weltrang-rls-test.sql', lies('supabase/weltrang-rls-test.sql'));
@@ -251,6 +296,29 @@ for (const n of ['anna', 'bert', 'carl', 'emil', 'fritz']) {
   const z = await lauf(db, 'weltrang-schema.sql (nach Rueckweg)', lies('supabase/weltrang-schema.sql'));
   const l = await liste(U.bert);
   pruefe('Vorschlag laeuft danach erneut, Liste leer (Zustimmungen waren mit weg)', !z && l?.liste?.length === 0, z || JSON.stringify(l));
+}
+
+// ---------- Live-Stand: meine_daten() ohne Weltrang-Block, dann NUR weltrang-schema.sql ----------
+{
+  const live = new PGlite();
+  const datenDatei = lies('supabase/daten-schema.sql');
+  const fnDaten = fnMeine(datenDatei);
+  let x = await lauf(live, 'Attrappe', ATTRAPPE);
+  for (const d of BISHER) x = x || await lauf(live, d, d === 'supabase/daten-schema.sql' ? datenDatei.replace(fnDaten, () => ohneWeltrang(fnDaten)) : lies(d));
+  const vorher = !x && (await live.query(`select prosrc from pg_proc where proname = 'meine_daten'`)).rows[0]?.prosrc;
+  pruefe('Live-Stand: meine_daten() ohne Weltrang-Block', !!vorher && !vorher.includes('weltrang'), x);
+  x = x || await lauf(live, 'weltrang-schema.sql (live)', lies('supabase/weltrang-schema.sql'));
+  pruefe('Live-Stand: weltrang-schema.sql laeuft', !x, x);
+  if (!x) {
+    await live.exec(`insert into auth.users (id, email) values ('${U.anna}', 'anna@x.invalid');`);
+    const mit = async (sql) => {
+      await live.exec(ALS(U.anna) + 'set role authenticated;');
+      try { return (await live.query(sql)).rows[0]; } catch (e) { return { fehler: e.message }; } finally { await live.exec('reset role;'); }
+    };
+    await mit('select public.weltrang_mitmachen(true) as m');
+    const d = await mit('select public.meine_daten() as d');
+    pruefe('Live-Stand nach weltrang-schema.sql: Datenauskunft nennt die Zustimmung', d?.d?.kronen?.weltrang?.teilnahme === true, JSON.stringify(d?.d?.kronen?.weltrang || d));
+  }
 }
 
 console.log(`\n${ok}/${gesamt} bestanden`);

@@ -49,7 +49,8 @@ export function weltLage(d) {
     : ich.status === 'zaehlt_noch' ? (ganz(ich.fehlen) ? { status: 'zaehlt_noch', fehlen: ich.fehlen } : null)
       : { status: ich.status };
   if (!stand) return null;
-  return { ab: d.ab, teilnahme: d.teilnahme, liste, ich: stand };
+  // ab_start erst seit R19 (Start-Elo selbst gesetzt: 30); altes SQL ohne das Feld nennt keine Zahl statt einer erfundenen
+  return { ab: d.ab, abStart: ganz(d.ab_start) ? d.ab_start : null, teilnahme: d.teilnahme, liste, ich: stand };
 }
 
 function zeile(z) {
@@ -91,9 +92,10 @@ export function reiterWelt() {
       : `<button class="knopf primaer lg-welt-mitmachen" type="button">${esc(T('mitmachen'))}</button>`;
     const oben = lage.teilnahme
       ? `${stand ? `<p class="lg-welt-stand" data-status="${lage.ich.status}">${esc(stand)}</p>` : ''}`
-      : `<p class="lg-welt-erklaerung">${esc(T('erklaerung', { ab: zahl(lage.ab) }))}</p>`;
+      : `<p class="lg-welt-erklaerung">${esc(T('erklaerung', { ab: zahl(lage.ab) }))}${lage.abStart
+        ? ` ${esc(T('erklaerungStart', { abStart: zahl(lage.abStart) }))}` : ''}</p>`;
     const liste = lage.liste.length
-      ? `<ol class="lg-welt-liste">${lage.liste.map(zeile).join('')}</ol>`
+      ? `<ol class="lg-welt-liste">${lage.liste.map(zeile).join('')}</ol><p class="lg-welt-fussnote">${esc(T('fussnote'))}</p>`
       : `<p class="lg-welt-leer">${esc(T('leer'))}</p>`;
     s.innerHTML = `${kopf}<div class="lg-welt-teilnahme">${oben}${knopf}</div>
       ${meldung ? `<p class="lg-welt-meldung" role="alert">${esc(meldung)}</p>` : ''}${liste}`;

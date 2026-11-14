@@ -66,6 +66,8 @@ const SUITEN = [
   { name: 'r19-liga-namen', datei: 'r19-liga-namen.test.mjs', args: [], was: 'Liga-Namen Satz A (Squire bis Crownmate, auch deutsch), Figuren und IDs unverändert, alte Spielklassen nie angezeigt' },
   { name: 'server-saison', datei: 'server-saison.test.mjs', args: [], was: 'R19 Season: Abrechnung, Abzeichen, Titel, Reset, Karte der Partie, Rechte, Rueckweg (Server, PGlite)' },
   { name: 'r19-saison', datei: 'r19-saison.test.mjs', args: [], was: 'R19 Season: Leiste im Profil, Titelwahl, Blatt am Season-Ende einmal, Karte, Datenschutz' },
+  { name: 'server-weltrang', datei: 'server-weltrang.test.mjs', args: [], was: 'Weltrangliste: Zustimmung, ab 15 bzw. 30 Partien (Start-Elo selbst gesetzt), Rechte, Auskunft, Rueckweg (Server, PGlite)' },
+  { name: 'r19-weltrang', datei: 'r19-weltrang.test.mjs', args: [], was: 'R19 Weltrangliste: Texte DE/EN, Satz unter der Liste, ab_start nie erfunden, Datenschutz DE/EN' },
   { name: 'karte', datei: 'karte.test.mjs', args: [], was: 'Etappe 4b: js/karte.js gegen einen nachgebildeten Server (Stufen melden, Karte waehlen, Karte der Partie)' },
   { name: 'karte-vertrag', datei: 'karte-vertrag.test.mjs', args: [], was: 'Etappe 4b: Schema-Vertrag Visitenkarte (Zahlen, feste Listen, Rechte, Rueckweg, nie kaeuflich)' },
   { name: 'raetsel-duell', datei: 'raetsel-duell.test.mjs', args: [], was: 'Raetsel-Duell: reine Rechnung (Uhr, Phase, Stand) und Vertrag mit duell_konstanten' },

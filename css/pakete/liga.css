@@ -254,6 +254,7 @@
 .lg-welt-teilnahme .lg-welt-stand { color: var(--text); }
 .lg-welt-meldung { margin: 0; font-size: 14px; font-weight: 600; color: var(--warn); }
 .lg-welt-leer { margin: 0; padding: 16px; font-size: 15px; font-weight: 600; color: var(--text-2); }
+.lg-welt-fussnote { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
 .lg-welt-liste { display: grid; min-width: 0; margin: 0; padding: 0; list-style: none; border-radius: var(--r-xl); background: var(--flaeche);
   box-shadow: var(--kante); overflow: hidden; }
 .lg-welt-zeile { position: relative; isolation: isolate; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center;

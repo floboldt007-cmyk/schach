@@ -129,6 +129,9 @@ export const DE = {
   'welt.du': 'Du',
   'welt.elo': 'Elo',
   'welt.eloLang': 'Online-Elo {elo}',
+  // R19 (Flo 14.11.2026): wer die Start-Elo selbst angegeben hat, zaehlt erst ab {abStart} Partien (weltrang-schema.sql ab_start)
+  'welt.erklaerungStart': 'Hast du deine Start-Elo selbst angegeben, zählst du erst ab {abStart} Partien mit.',
+  'welt.fussnote': 'Elo aus Online-Partien, Startwert selbst angegeben.',
   ...stufenDe,
 };
 
@@ -249,6 +252,8 @@ export const EN = {
   'welt.du': 'You',
   'welt.elo': 'Elo',
   'welt.eloLang': 'Online Elo {elo}',
+  'welt.erklaerungStart': 'If you set your starting Elo yourself, you count from {abStart} games.',
+  'welt.fussnote': 'Elo from online games, starting value self-reported.',
 };
 
 registriereTexte('p-liga', { de: DE, en: EN });

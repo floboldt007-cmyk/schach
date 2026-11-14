@@ -835,7 +835,7 @@ async function gruppeTeil(browser, start) {
 // Weltrangliste (G-006 AC-11): Reiter "Welt" mit abgefangenem Server (weltrang_liste, weltrang_mitmachen). Liste mit
 // gleichem Rang bei gleicher Elo, einer unbrauchbaren Zeile (faellt weg) und einem unbekannten Banner (wird Start-Banner).
 function probeWelt({ teilnahme = true, ich = { status: 'dabei', rang: 2, elo: 1640, name: 'flo', banner: 'start' } } = {}) {
-  return { ab: 15, teilnahme, ich, liste: [
+  return { ab: 15, ab_start: 30, teilnahme, ich, liste: [
     { rang: 1, name: 'bert', banner: 'saison-gold', elo: 1912, ich: false },
     { rang: 2, name: 'flo', banner: 'erfunden', elo: 1640, ich: teilnahme && ich.status === 'dabei' },
     { rang: 2, name: 'zoe', banner: 'start', elo: 1640, ich: false },
@@ -866,6 +866,8 @@ async function weltTeil(browser, start) {
         assert.equal(await page.locator('.lg-welt-kopf h2').innerText(), 'Weltrangliste');
         assert.equal(await page.locator('.lg-welt-kopf p').innerText(), 'Nach Online-Elo, ab 15 gewerteten Online-Partien');
         assert.deepEqual(await page.locator('.lg-welt-zeile .lg-welt-rang').allInnerTexts(), ['1', '2', '2']);
+        // R19: Satz direkt unter der Liste
+        assert.equal(await page.locator('.lg-welt-liste + .lg-welt-fussnote').innerText(), 'Elo aus Online-Partien, Startwert selbst angegeben.');
         assert.deepEqual(await page.locator('.lg-welt-zeile .lg-welt-name b').allInnerTexts(), ['bert', 'flo', 'zoe']);
         assert.match(await page.locator('.lg-welt-zeile').first().locator('.lg-welt-elo').innerText(), /1\.912$/);
         assert.equal(await page.locator('.lg-welt-zeile').first().getAttribute('data-banner'), 'saison-gold');
@@ -896,6 +898,7 @@ async function weltTeil(browser, start) {
       await browserPruefe('Welt ohne Zustimmung: Erklaerung, "Mitmachen", keine eigene Zeile', async () => {
         assert.equal(await page.locator('.lg-welt').getAttribute('data-zustand'), 'aus');
         assert.match(await page.locator('.lg-welt-erklaerung').innerText(), /nur Spieler, die mitmachen.*ab 15 gewerteten Online-Partien/);
+        assert.match(await page.locator('.lg-welt-erklaerung').innerText(), /Start-Elo selbst angegeben, zählst du erst ab 30 Partien mit\.$/);
         assert.equal(await page.locator('.lg-welt-zeile.ich').count(), 0);
       });
       await browserPruefe('Welt: "Mitmachen" mit 12 Partien zeigt "Noch 3 gewertete Online-Partien"', async () => {

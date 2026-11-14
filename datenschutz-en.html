@@ -254,12 +254,26 @@
     half-moves, at most 3 per opponent and day),</li>
     <li>which of your season titles you want to show; without a choice none is shown.</li>
   </ul>
-  <p>When the new season begins, your league tier drops by 3 tiers (at most down to Squire III). We do not publish a ranking
-  with names: the places by Elo are only used to award the titles. Your best badge and your chosen title are seen only by
+  <p>When the new season begins, your league tier drops by 3 tiers (at most down to Squire III). Here the places by Elo are
+  only used to award the titles; a list with names exists only in the world ranking, and only if you join it yourself (see
+  "World ranking"). Your best badge and your chosen title are seen only by
   the person playing the same online game with you (see "Player card"); only you see your own badges and titles in your
   profile. This data is necessary for the league (Art. 6 Abs. 1 lit. b DSGVO, GDPR), is stored with Supabase in Frankfurt
   just like your account and remains stored until you delete your account; it is then deleted automatically. Download my
   data includes it.</p>
+
+  <!-- R19 (world ranking, supabase/weltrang-schema.sql), as of 14.11.2026: review by a qualified person is still pending -->
+  <h3>World ranking</h3>
+  <p>The "World" tab of the league shows a world ranking by online Elo. You appear in it only if you join it yourself
+  ("Join" button); without your consent it contains nothing about you. If you join, every signed-in player sees your
+  username, your banner, your online Elo and your place. Other details such as your email, your ID, your league tier or
+  your titles are not in the list. You are only shown once your Elo rests on enough rated online games: from 15 games, and
+  from 30 games if you set your starting Elo yourself. Without a username you do not appear.</p>
+  <p>For this we only store that you join and since when; the Elo comes from the league (see "League with crowns and weekly groups"). The
+  legal basis is your consent (Art. 6 Abs. 1 lit. a DSGVO, GDPR). You can withdraw it at any time with "Stop showing me";
+  the entry is then deleted immediately and you disappear from the list. This does not affect the lawfulness of the
+  display up to the withdrawal. The entry is stored with Supabase in Frankfurt just like your account, is deleted with
+  your account and is included in Download my data.</p>
 
   <!-- stage B (puzzle duel), as of 14.11.2026: review by a qualified person is still pending -->
   <h3>Puzzle duel</h3>
