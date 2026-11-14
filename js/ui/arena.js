@@ -241,7 +241,7 @@ const SZENE = {
   fisch: (x, y, s = 1) => g(x, y, s, '<path d="M0 0q10-8 20 0q-10 8-20 0z" class="w-fisch"/><path d="M19 0l8-6v12z" class="w-fisch"/><circle cx="5" cy="-1" r="1.3" class="w-tuer"/>'),
   wrack: (x, y, s = 1) => g(x - 30, y - 16, s, '<path d="M0 10 60 4l-8 18H8z" class="w-stamm-2"/><path d="M26 6V-18M40 5V-8" class="w-mast"/><path d="M27-16l12 6-12 4z" class="w-fahne"/><circle cx="16" cy="14" r="2.4" class="w-tiefe"/><circle cx="30" cy="13" r="2.4" class="w-tiefe"/>'),
   grund: (x, y, s = 1) => g(x - 30, y - 26, s, '<path d="M-4 30q0-44 34-44t34 44z" class="w-stein-2"/><path d="M12 30q0-26 18-26t18 26z" class="w-tiefe"/><circle cx="30" cy="16" r="3.4" class="w-lampe"/><path d="M-8 30h76" class="w-welle"/>'),
-  muehle: (x, y, s = 1) => g(x, y, s, '<ellipse cx="0" cy="22" rx="14" ry="4" class="w-schatten"/><path d="M-10 22 -6-10h12l4 32z" class="w-wand"/><path d="M-7-10 0-20 7-10z" class="w-dach-2"/><path d="M0-14 18-26M0-14-18-2M0-14 12 4M0-14-12-32" class="w-mast"/><circle cy="-14" r="2.2" class="w-tuer"/><rect x="-3" y="10" width="6" height="12" rx="3" class="w-tuer"/>'),
+  muehle: (x, y, s = 1) => g(x, y, s, '<ellipse cx="0" cy="22" rx="14" ry="4" class="w-schatten"/><path d="M-10 22 -6-10h12l4 32z" class="w-wand"/><path d="M-7-10 0-20 7-10z" class="w-dach-2"/><g class="w-fluegel"><path d="M0-14 18-26M0-14-18-2M0-14 12 4M0-14-12-32" class="w-mast"/></g><circle cy="-14" r="2.2" class="w-tuer"/><rect x="-3" y="10" width="6" height="12" rx="3" class="w-tuer"/>'),
 };
 
 // Wellenband: Huegelkante quer ueber die ganze Breite
@@ -256,16 +256,114 @@ function berg(x, y, s, w) {
     + `<path d="M${r1(x)} ${r1(y - hh)} l${r1(-b * 0.27)} ${r1(hh * 0.3)} l${r1(b * 0.14)} ${r1(-hh * 0.05)} l${r1(b * 0.1)} ${r1(hh * 0.08)} l${r1(b * 0.11)} ${r1(-hh * 0.09)} l${r1(b * 0.12)} ${r1(hh * 0.05)}z" class="w-schnee"/>`;
 }
 
+// Panorama (R19, Flo 14.11.: "Hintergrund schoener"): je Welt eine hintere Ebene am Horizont (Turmstadt: Skyline mit
+// Fahnen und Rauch, Karofelder: ferne Huegel mit Baeumchen), eine vordere am unteren Rand und Voegel am Himmel.
+// Bewegung nur per CSS (.w-zug, .w-rauch, .w-wehen, .w-fluegel), aus bei prefers-reduced-motion und data-bewegung="aus".
+// zz: feste Pseudo-Zufallszahl 0..1, damit dieselbe Welt bei jedem Layout gleich aussieht
+const zz = (i) => { const v = Math.sin(i * 12.9898 + 4.1) * 43758.5453; return v - Math.floor(v); };
+function voegel(w, himmel, s) {
+  const v = (x, y, b) => `<path d="M${r1(x - b)} ${r1(y - b * 0.5)}q${r1(b * 0.5)} ${r1(-b * 0.2)} ${r1(b)} ${r1(b * 0.5)}q${r1(b * 0.5)} ${r1(-b * 0.7)} ${r1(b)} ${r1(-b * 0.5)}" class="w-vogel"/>`;
+  const b = 5 * s;
+  const y = Math.max(18 * s, himmel * 0.45);
+  const zug = (x0, yy, dauer, verz) => `<g class="w-zug" style="--von:${r1(-x0 - 40)}px;--bis:${r1(w - x0 + 40)}px;animation-duration:${dauer}s;animation-delay:${verz}s"><g transform="translate(${r1(x0)} ${r1(yy)})">${v(0, 0, b)}${v(b * 2.6, b * 1.2, b * 0.8)}${v(-b * 2.2, b * 1.6, b * 0.7)}</g></g>`;
+  return zug(w * 0.28, y, 46, -12) + zug(w * 0.7, y * 0.7 + 8 * s, 62, -40);
+}
+function skyline(w, basis, s) {
+  const teile = [];
+  const fahnen = [];
+  let x = -4;
+  let i = 0;
+  while (x < w + 4) {
+    const breit = (14 + zz(i) * 18) * s;
+    const hoch = (16 + zz(i + 50) * 34) * s;
+    const top = basis - hoch;
+    const art = Math.floor(zz(i + 99) * 6);
+    teile.push(`<rect x="${r1(x)}" y="${r1(top)}" width="${r1(breit + 1)}" height="${r1(hoch + 30 * s)}" class="${i % 2 ? 'w-fern' : 'w-fern-2'}"/>`);
+    if (art === 0) {
+      // Turmspitze mit Fahne
+      const mx = x + breit / 2;
+      teile.push(`<path d="M${r1(x + 2 * s)} ${r1(top)}L${r1(mx)} ${r1(top - 16 * s)}L${r1(x + breit - 2 * s)} ${r1(top)}z" class="w-fern"/>`);
+      fahnen.push(`<path d="M${r1(mx)} ${r1(top - 15 * s)}v${r1(-9 * s)}" class="w-fern-mast"/><path d="M${r1(mx)} ${r1(top - 24 * s)}l${r1(8 * s)} ${r1(2.5 * s)}l${r1(-8 * s)} ${r1(2.5 * s)}z" class="w-wehen"/>`);
+    } else if (art === 1) {
+      // Kuppel
+      teile.push(`<path d="M${r1(x + 1 * s)} ${r1(top)}a${r1(breit / 2 - 1 * s)} ${r1(breit / 2 - 1 * s)} 0 0 1 ${r1(breit - 2 * s)} 0z" class="w-fern"/>`);
+    } else if (art === 2) {
+      // Schornstein mit Rauch
+      const sx = x + breit * 0.7;
+      teile.push(`<rect x="${r1(sx)}" y="${r1(top - 7 * s)}" width="${r1(3.4 * s)}" height="${r1(8 * s)}" class="w-fern-2"/>`);
+      for (let k = 0; k < 3; k++) fahnen.push(`<circle cx="${r1(sx + 1.7 * s)}" cy="${r1(top - 9 * s)}" r="${r1(3.2 * s)}" class="w-rauch" style="animation-delay:${-k * 1.7}s"/>`);
+    }
+    // Fensterreihen: hell nur als feine Struktur, abends erleuchtet
+    for (let fy = top + 6 * s; fy < basis - 4 * s; fy += 8 * s) {
+      for (let fx = x + 3 * s; fx < x + breit - 4 * s; fx += 6 * s) {
+        if (zz(i * 31 + fx + fy) > 0.55) teile.push(`<rect x="${r1(fx)}" y="${r1(fy)}" width="${r1(2.2 * s)}" height="${r1(3 * s)}" class="w-fern-licht"/>`);
+      }
+    }
+    x += breit + (zz(i + 7) > 0.7 ? 3 * s : 0);
+    i++;
+  }
+  return teile.join('') + fahnen.join('');
+}
+function fernhuegel(w, basis, s) {
+  const teile = [];
+  const huegel = (y, hoch, klasse, versatz) => {
+    const q = w / 3;
+    let d = `M0 ${r1(y)}`;
+    for (let k = 0; k < 4; k++) d += ` q${r1(q / 2)} ${r1(-hoch * (0.6 + zz(k + versatz) * 0.8))} ${r1(q)} 0`;
+    return `<path d="${d} V${r1(y + 60 * s)} H0z" class="${klasse}"/>`;
+  };
+  teile.push(huegel(basis - 6 * s, 64 * s, 'w-fern', 3));
+  teile.push(huegel(basis + 2 * s, 40 * s, 'w-fern-2', 11));
+  for (let k = 0; k < Math.round(w / (34 * s)); k++) {
+    const x = (k + zz(k) * 0.8) * 34 * s;
+    const y = basis - (8 + zz(k + 40) * 12) * s;
+    const r = (3 + zz(k + 80) * 2.4) * s;
+    teile.push(`<rect x="${r1(x - 0.7 * s)}" y="${r1(y - r)}" width="${r1(1.4 * s)}" height="${r1(r + 2 * s)}" class="w-fern-mast"/><circle cx="${r1(x)}" cy="${r1(y - r * 1.4)}" r="${r1(r)}" class="w-fern-baum"/>`);
+  }
+  return teile.join('');
+}
+function vordergrund(welt, w, h, s) {
+  const teile = [];
+  if (welt === 'turmstadt') {
+    // Stadtmauer mit Zinnen und Laternen am unteren Rand
+    const hm = 22 * s;
+    let d = `M0 ${r1(h - hm)}`;
+    for (let x = 0; x < w + 12 * s; x += 12 * s) d += ` h${r1(6 * s)} v${r1(-7 * s)} h${r1(6 * s)} v${r1(7 * s)}`;
+    teile.push(`<path d="${d} V${r1(h)} H0z" class="w-vorn"/>`);
+    for (let x = 6 * s; x < w; x += 24 * s) teile.push(`<path d="M${r1(x)} ${r1(h - hm + 3 * s)}h${r1(10 * s)}M${r1(x + 12 * s)} ${r1(h - hm + 11 * s)}h${r1(10 * s)}" class="w-vorn-fuge"/>`);
+    for (let x = w * 0.12; x < w; x += Math.max(110, w * 0.3)) teile.push(`<path d="M${r1(x)} ${r1(h - hm)}v${r1(-26 * s)}" class="w-vorn-mast"/><circle cx="${r1(x)}" cy="${r1(h - hm - 29 * s)}" r="${r1(5 * s)}" class="w-lampe"/>`);
+  } else if (welt === 'karofelder') {
+    // Grasbueschel und Sonnenblumen am unteren Rand
+    for (let x = -4; x < w + 8; x += 16 * s) {
+      const hh = (16 + zz(x) * 16) * s;
+      teile.push(`<path d="M${r1(x)} ${r1(h)}q${r1(2 * s)} ${r1(-hh)} ${r1(5 * s)} ${r1(-hh * 1.1)}q${r1(-1 * s)} ${r1(hh * 0.6)} ${r1(1.6 * s)} ${r1(hh * 1.1)}q${r1(2 * s)} ${r1(-hh * 0.9)} ${r1(6 * s)} ${r1(-hh * 0.8)}q${r1(-2.5 * s)} ${r1(hh * 0.5)} ${r1(-1.5 * s)} ${r1(hh * 0.8)}z" class="${zz(x + 3) > 0.5 ? 'w-vorn' : 'w-vorn-2'}"/>`);
+    }
+    for (let x = w * 0.08; x < w; x += Math.max(96, w * 0.22)) {
+      const y = h - 40 * s;
+      teile.push(`<path d="M${r1(x)} ${r1(h)}V${r1(y)}" class="w-vorn-mast"/><path d="M${r1(x)} ${r1(y + 12 * s)}q${r1(6 * s)} ${r1(-6 * s)} ${r1(9 * s)} ${r1(-2 * s)}" class="w-vorn-mast"/>`
+        + `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r1(10 * s)}" class="w-blume-1"/><circle cx="${r1(x)}" cy="${r1(y)}" r="${r1(4.6 * s)}" class="w-stamm"/>`);
+    }
+  }
+  return teile.join('');
+}
+const PANORAMA = new Set(['turmstadt', 'karofelder']);
+
 // Die ganze Zeichnung. punkte: Stationen in Pixel; bis: Index des naechsten Gegners (Fortschritt bis dorthin);
 // neuIdx: Station, die gerade frei wird (ihr Stueck Weg zeichnet sich spaeter, Klasse .w-fortschritt-neu).
 // y0/hy: senkrechte Abbildung der Anteile auf Pixel, Y(f) = y0 + f * hy (Hochformat: Rand oben fuer Krone und Fahne
 // des Endgegners, unten fuer das Schild der ersten Station; die Flaeche darunter bleibt Wiese, darueber Himmel)
-export function weltSvg({ w, h, s, lage, punkte, start, bis, neuIdx = -1, y0 = 0, hy = h, szene: szeneListe = null }) {
+export function weltSvg({ w, h, s, lage, punkte, start, bis, neuIdx = -1, y0 = 0, hy = h, szene: szeneListe = null, welt = '' }) {
   const Y = (f) => y0 + f * hy;
   const himmel = Y(lage.himmel);
   const amp = Math.max(8, Math.min(16, 14 * s));
+  const pano = PANORAMA.has(welt);
   const teile = [`<rect width="${r1(w)}" height="${r1(h)}" class="w-gras"/>`, `<rect width="${r1(w)}" height="${r1(himmel + amp)}" class="w-himmel"/>`];
+  // Dunst zum Horizont hin: Verlauf ueber dem Himmel (Farbe per CSS, .w-dunst-stop)
+  if (pano) teile.push(`<defs><linearGradient id="w-dunst-${welt}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="w-dunst-stop" stop-opacity="0"/><stop offset="1" class="w-dunst-stop" stop-opacity=".75"/></linearGradient></defs><rect width="${r1(w)}" height="${r1(himmel + amp)}" fill="url(#w-dunst-${welt})"/>`);
+  if (pano) teile.push(voegel(w, himmel, s));
   for (const [fx, bs] of lage.berge) teile.push(berg(fx * w, himmel + amp * 0.6, bs * s, w));
+  if (welt === 'turmstadt') teile.push(skyline(w, himmel + amp * 0.9, s));
+  if (welt === 'karofelder') teile.push(fernhuegel(w, himmel + amp * 0.6, s));
   teile.push(band(himmel, w, h, 'w-strand', amp));
   teile.push(band(himmel + Math.max(14, 18 * s), w, h, 'w-gras-4', amp));
   const klassen = ['w-gras-3', 'w-gras-2', 'w-gras'];
@@ -276,6 +374,7 @@ export function weltSvg({ w, h, s, lage, punkte, start, bis, neuIdx = -1, y0 = 0
     const fn = SZENE[art];
     if (fn) teile.push(fn(fx * w, Y(fy), gr * s, v));
   }
+  if (pano) teile.push(vordergrund(welt, w, h, s));
   // Pfad: drei Lagen (Rand, Weg, gestrichelte Mitte), dann der Fortschritt in Akzentfarbe
   const alle = [start, ...punkte];
   const d = pfadD(alle);
@@ -566,7 +665,7 @@ export function zeige(root, params, app) {
     const punkte = lage.stationen.map(([fx, fy]) => [fx * w, yVon(fy)]);
     const start = [lage.start[0] * w, yVon(lage.start[1])];
     const neuIdx = neuId ? idx(neuId) : -1;
-    bild.innerHTML = weltSvg({ w, h, s: sk, lage, punkte, start, bis: aktuellIdx, neuIdx, y0, hy, szene: szeneVon(welt, lageModus) });
+    bild.innerHTML = weltSvg({ w, h, s: sk, lage, punkte, start, bis: aktuellIdx, neuIdx, y0, hy, szene: szeneVon(welt, lageModus), welt: welt.id });
     const neuWeg = bild.querySelector('.w-fortschritt-neu');
     if (neuWeg && !wegGezeichnet) neuWeg.style.opacity = '0';
     // Stationen und Orte in Prozent der Welt (folgen damit jeder Groesse; hoch haengt y an der Abbildung)
