@@ -66,10 +66,19 @@ async function bild(seite, name) {
 // Neue Seite mit Fehler-Sammler
 // speicher: storageState mit den Testdaten (jeder Kontext hat sein eigenes localStorage)
 let SPEICHER;
+// Bot-Schutz (js/botschutz.js): screens.html laeuft ohne ?test, also mit dem echten Site-Key; das Skript von
+// challenges.cloudflare.com kommt aus einem Nachbau wie in tests/konto-link.test.mjs, damit kein Lauf das echte
+// Turnstile anfragt (auf 127.0.0.1 antwortet Cloudflare mit 400). Jede abgefangene Anfrage landet in CLOUDFLARE.
+const CLOUDFLARE = [];
+const TURNSTILE_NACHBAU = 'window.turnstile = { render() { return "w1"; }, reset() {}, remove() {} };';
 async function neueSeite(browser, { breite = 1180, hoehe = 820, touch = false, bewegung = 'no-preference', speicher = SPEICHER } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: breite, height: hoehe }, hasTouch: touch, isMobile: false, reducedMotion: bewegung, deviceScaleFactor: 1,
     ...(speicher ? { storageState: speicher } : {}),
+  });
+  await kontext.route('https://challenges.cloudflare.com/**', (route) => {
+    CLOUDFLARE.push(new URL(route.request().url()).pathname);
+    return route.fulfill({ status: 200, contentType: 'text/javascript', body: TURNSTILE_NACHBAU });
   });
   const seite = await kontext.newPage();
   const fehler = [];
@@ -685,6 +694,10 @@ async function testeEinstellungen(browser) {
   await oeffne(seite);
   await seite.evaluate(async () => { testseite.leere(); await testseite.opernpartie({ mitReview: false }); });
   await oeffne(seite, 'screen=einstellungen');
+  // Bot-Schutz mit echtem Site-Key: Hinweis samt Link steht, das Skript kam aus dem Nachbau (kein echtes Cloudflare)
+  const botschutz = await seite.waitForSelector('.konto-botschutz-hinweis a', { timeout: 8000 }).then(() => true, () => false);
+  pruefe('Bot-Schutz: Hinweis mit Link steht, Turnstile kommt aus dem Nachbau statt von Cloudflare',
+    botschutz && CLOUDFLARE.includes('/turnstile/v0/api.js'), { botschutz, CLOUDFLARE });
   const lies = () => seite.evaluate(() => testseite.speicher.ladeEinstellungen());
   const an = (key) => seite.locator(`.es-schalter[data-key="${key}"]`).getAttribute('aria-checked');
 
