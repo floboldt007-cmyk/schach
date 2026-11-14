@@ -39,6 +39,7 @@ import { fuelle } from '../orte.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { t, zahl, registriereTexte } from '../sprache.js';
 import { stufenName } from '../pakete/liga/texte.js';
+import { KATALOG, brettSvg, produktName } from '../pakete/sammlung/shop.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 // Art der Online-Partie ("Blitz", online.zeit.*): der Weg Online nennt sie wie die Online-Seite (Feinschliff R6, B26)
@@ -83,6 +84,8 @@ registriereTexte('heim', {
     spielen: 'Spielen',
     elo: 'Elo {elo}',
     naechstes: 'Als Nächstes',
+    'shop.neu': 'Neu',
+    'shop.label': 'Shop, neu: {name}',
     'liga.platz': 'Platz {platz} von {n}',
     'liga.ohneGruppe': 'Spiel eine Partie für deine Gruppe',
     'liga.label': '{stufe}, {zeile}, {kronen} Kronen diese Woche',
@@ -138,6 +141,8 @@ registriereTexte('heim', {
     spielen: 'Play',
     elo: 'Elo {elo}',
     naechstes: 'Up next',
+    'shop.neu': 'New',
+    'shop.label': 'Shop, new: {name}',
     'liga.platz': 'Place {platz} of {n}',
     'liga.ohneGruppe': 'Play a game to join your group',
     'liga.label': '{stufe}, {zeile}, {kronen} crowns this week',
@@ -403,6 +408,17 @@ function zeichneLiga(s, lg) {
   zeigeNaechstes(s);
 }
 
+// R19 Shopleiste B (Flo 14.11.: "Shop auf die Startseite"): eine Shop-Pille im Kopf neben Premium, mit dem Brett des
+// neuesten Katalog-Stuecks als Bild und einem Punkt "Neu". Braucht keine Hoehe, steht also auf jedem Geraet; den Klick
+// fuehrt verbindeKopf (js/ui/seite.js, Aktion "shop") in den Shop. Kein Preis, kein Stand, kein Kaufknopf.
+function shopKnopf() {
+  const [id, a] = Object.entries(KATALOG).at(-1);
+  const name = produktName(id);
+  return `<button class="kopf-shop dr" type="button" data-aktion="shop" data-variante="shopleiste-b" data-produkt="${esc(id)}"
+    aria-label="${esc(t('heim.shop.label', { name }))}">${brettSvg(a, 'kopf-shop-brett')}<span>${esc(t('rahmen.kopf.shop'))}</span>
+    <i class="kopf-shop-neu">${esc(t('heim.shop.neu'))}</i></button>`;
+}
+
 export function zeigeHeim(app, { jetzt = new Date() } = {}) {
   const laufend = ladeLaufendePartie();
   const st = laufend ? stellung(laufend) : null;
@@ -437,6 +453,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
         </section>
       </div>
     </div>`;
+  s.querySelector('.kopf-premium').insertAdjacentHTML('afterend', shopKnopf());
   s._orte = fuelle('heim:naechstes', s.querySelector('.heim-liste'), { app, tag: tagSchluessel(jetzt), zeile: paketZeile });
   zeichneLiga(s, ersteLage());
   // Rueckkehr nach einer Pause: als erste Zeile (die Reihenfolge ist die Prioritaet, css/heim.css blendet von unten aus)

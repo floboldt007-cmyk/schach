@@ -266,3 +266,22 @@
 .heim-zurueck .heim-zeile-bild { background: var(--gold-weich); color: var(--kt-stark); }
 .heim-zurueck-knopf { flex: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: var(--r-pille);
   background: var(--text); color: var(--flaeche); font-size: 13.5px; font-weight: var(--gw-stark); white-space: nowrap; }
+
+/* ---------- R19 Shopleiste B: Shop-Pille im Kopf neben Premium (Brett des neuesten Stuecks, Punkt "Neu") ---------- */
+.heim-screen .kopf-shop { position: relative; flex: none; display: inline-flex; align-items: center; gap: 8px; height: var(--tipp, 44px);
+  min-width: 44px; margin: 0 0 0 8px; padding: 0 14px 0 8px; border: 0; border-radius: var(--r-pille); font: inherit;
+  font-family: var(--display); font-weight: var(--gw-titel); font-size: 14.5px; white-space: nowrap; color: var(--text);
+  background: var(--flaeche); box-shadow: inset 0 0 0 1.5px var(--linie-2), var(--s1, none); cursor: pointer;
+  transition: transform var(--d-s) var(--feder), box-shadow var(--d-s) var(--sanft); }
+.heim-screen .kopf-shop-brett { flex: none; width: 28px; height: 28px; border-radius: 6px; box-shadow: var(--kante); }
+.heim-screen .kopf-shop-neu { position: absolute; top: -6px; right: -6px; padding: 2px 6px; border-radius: var(--r-pille); font-style: normal;
+  font-family: var(--text-schrift, inherit); font-size: 11px; font-weight: 800; line-height: 1.3; letter-spacing: .02em;
+  background: var(--gold); color: var(--kg-stark); box-shadow: 0 0 0 2px var(--grund, var(--flaeche)); }
+.heim-screen .kopf-shop:active { transform: scale(.96); }
+.heim-screen .kopf-shop:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+@media (hover: hover) { .heim-screen .kopf-shop:hover { box-shadow: inset 0 0 0 2px var(--gold), var(--s2, none); } }
+/* iPad hoch und kleine Fenster: wie die Krone nur das Bild */
+@media (min-width: 521px) and (max-width: 1020px) {
+  .heim-screen .kopf-shop { padding: 0 8px; }
+  .heim-screen .kopf-shop > span { display: none; }
+}
