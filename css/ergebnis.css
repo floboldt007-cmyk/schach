@@ -55,7 +55,10 @@
 /* R14-G2: "Teilen …" (Paket teilen, Ort ergebnis:karte) klappt an seiner Stelle zwei gleich breite Knoepfe auf,
    Siegesbild und Freund herausfordern; das Blatt wird dabei nicht hoeher. Aussehen wie der Teilen-Knopf. */
 .tl-knopf-zeile .tl-teilen[hidden], .tl-wahl[hidden] { display: none; }
-.tl-wahl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.tl-wahl { display: grid; grid-template-columns: 1fr 1fr 44px; gap: 8px; width: 100%; }
+/* R16 E1: "×" klappt die Auswahl zu, quadratisch wie die Icon-Knoepfe */
+.tl-wahl .tl-wahl-zu { padding: 0; }
+.tl-wahl-zu svg { width: 18px; height: 18px; }
 .tl-wahl .knopf { min-width: 0; padding: 0 10px; background-color: var(--flaeche-2); color: var(--text); box-shadow: var(--kante);
   white-space: normal; text-align: center; line-height: 1.2; }
 .erg-lobby svg, .erg-link svg { width: 18px; height: 18px; }

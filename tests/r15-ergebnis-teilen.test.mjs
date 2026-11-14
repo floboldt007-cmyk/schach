@@ -43,6 +43,7 @@ await mkdir(BILDER, { recursive: true });
 const { defaultBrowserType, ...IPHONE } = pw.devices['iPhone 13'];
 const GERAETE = [
   { name: 'iphone13', optionen: IPHONE },
+  { name: 'iphonese', optionen: { viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
   { name: 'pc1280', optionen: { viewport: { width: 1280, height: 800 } } },
 ];
 const PARTIEN = [
@@ -153,11 +154,19 @@ try {
         const l2 = await lage(s);
         const offen = await knopf.getAttribute('aria-expanded');
         await s.screenshot({ path: path.join(BILDER, `${g.name}-sieg-auswahl.png`) }).catch(() => {});
-        pruefe(`${g.name} Sieg: "Teilen …" klappt die Auswahl Siegesbild / Freund herausfordern auf`,
-          offen === 'true' && l2.wahl.length === 2 && l2.wahl[0] === 'Siegesbild' && l2.wahl[1] === 'Freund herausfordern', { offen, ...l2 });
-        const hoehen = await s.evaluate(() => [...document.querySelectorAll('.ergebnis-overlay .tl-wahl button')].map(b => b.offsetHeight));
-        pruefe(`${g.name} Sieg: Eintraege der Auswahl mindestens 44 px hoch`, hoehen.length === 2 && hoehen.every(h => h >= 44), hoehen);
-        await s.locator('.ergebnis-overlay .tl-wahl button', { hasText: 'Freund herausfordern' }).click();
+        // R16 E1: kurz "Herausfordern" (Name fuer Screenreader weiter "Freund herausfordern") und ein sichtbares Schliessen
+        const namen = await s.evaluate(() => [...document.querySelectorAll('.ergebnis-overlay .tl-wahl button')].map(b => b.getAttribute('aria-label') || b.textContent.trim()));
+        pruefe(`${g.name} Sieg: "Teilen …" klappt die Auswahl Siegesbild / Herausfordern / Schliessen auf`,
+          offen === 'true' && l2.wahl.length === 3 && l2.wahl[0] === 'Siegesbild' && l2.wahl[1] === 'Herausfordern' && l2.wahl[2] === ''
+          && namen[1] === 'Freund herausfordern' && namen[2] === 'Schließen', { offen, ...l2, namen });
+        const masse = await s.evaluate(() => [...document.querySelectorAll('.ergebnis-overlay .tl-wahl button')].map(b => {
+          const r = document.createRange(); r.selectNodeContents(b);
+          const zeilen = new Set([...r.getClientRects()].filter(q => q.width > 1).map(q => Math.round(q.top))).size;
+          return { h: b.offsetHeight, w: b.offsetWidth, zeilen };
+        }));
+        pruefe(`${g.name} Sieg: Eintraege der Auswahl mindestens 44 x 44 px, Beschriftung einzeilig`,
+          masse.length === 3 && masse.every(m => m.h >= 44 && m.w >= 44 && m.zeilen <= 1), masse);
+        await s.locator('.ergebnis-overlay .tl-wahl button', { hasText: 'Herausfordern' }).click();
         await warte(300);
         const geteilt = await s.evaluate(() => window.__geteilt);
         const l3 = await lage(s);
@@ -171,6 +180,14 @@ try {
         const esc = await s.evaluate(() => ({ blatt: !document.querySelector('.ergebnis-overlay').hidden, wahl: !!document.querySelector('.ergebnis-overlay .tl-wahl:not([hidden])'),
           fokus: !!document.activeElement?.classList.contains('tl-teilen') }));
         pruefe(`${g.name} Sieg: Escape klappt nur die Auswahl zu (Blatt bleibt, Fokus zurueck auf "Teilen …")`, esc.blatt && !esc.wahl && esc.fokus, esc);
+        await knopf.click();
+        await warte(200);
+        await s.locator('.ergebnis-overlay .tl-wahl [data-tl-wahl="zu"]').click();
+        await warte(200);
+        const zu = await s.evaluate(() => ({ blatt: !document.querySelector('.ergebnis-overlay').hidden, wahl: !!document.querySelector('.ergebnis-overlay .tl-wahl:not([hidden])'),
+          fokus: !!document.activeElement?.classList.contains('tl-teilen'), geteilt: window.__geteilt.length, blattTeilen: !!document.querySelector('.tl-blatt') }));
+        pruefe(`${g.name} Sieg: "×" klappt die Auswahl zu, nichts geteilt, Fokus zurueck auf "Teilen …"`,
+          zu.blatt && !zu.wahl && zu.fokus && zu.geteilt === 1 && !zu.blattTeilen, zu);
         await knopf.click();
         await warte(200);
         await s.locator('.ergebnis-overlay .tl-wahl button', { hasText: 'Siegesbild' }).click();

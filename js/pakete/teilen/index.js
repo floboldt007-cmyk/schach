@@ -401,7 +401,8 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
 // ---------- Knoepfe an den Orten ----------
 // R14-G2: bietet das Ergebnis zusaetzlich "Freund herausfordern" an (Kontext herausfordern { text, teile }, nur nach
 // einem Sieg), wird daraus EIN Knopf "Teilen …" mit einer kleinen Auswahl (Siegesbild, Freund herausfordern) an Stelle
-// der Zeile; data-mit-freund sagt dem Ergebnis, dass sein eigener Knopf entfaellt. Escape klappt nur die Auswahl zu.
+// der Zeile; data-mit-freund sagt dem Ergebnis, dass sein eigener Knopf entfaellt. Escape und "×" (R16 E1, am Handy der einzige
+// sichtbare Weg zurueck) klappen nur die Auswahl zu.
 function knopf({ app, partie, bot, ort, herausfordern = null }) {
   const el = document.createElement('div');
   el.className = 'tl-knopf-zeile';
@@ -425,7 +426,8 @@ function knopf({ app, partie, bot, ort, herausfordern = null }) {
   wahl.setAttribute('role', 'group');
   wahl.setAttribute('aria-label', t('allgemein.teilen'));
   wahl.innerHTML = `<button class="knopf dr" type="button" data-tl-wahl="bild">${esc(t(sieg ? 'p-teilen.wahl.sieg' : 'p-teilen.wahl.bild'))}</button>
-    <button class="knopf dr" type="button" data-tl-wahl="freund">${esc(freund.text || '')}</button>`;
+    <button class="knopf dr" type="button" data-tl-wahl="freund" aria-label="${esc(freund.text || '')}">${esc(t('p-teilen.wahl.freund'))}</button>
+    <button class="knopf dr tl-wahl-zu" type="button" data-tl-wahl="zu" aria-label="${esc(t('allgemein.schliessen'))}">${icon('kreuz')}</button>`;
   el.append(wahl);
   haupt.setAttribute('aria-expanded', 'false');
   haupt.setAttribute('aria-controls', wahlId);
@@ -441,6 +443,7 @@ function knopf({ app, partie, bot, ort, herausfordern = null }) {
     if (!b) return;
     ev.stopPropagation();
     klappe(false);
+    if (b.dataset.tlWahl === 'zu') return;
     if (b.dataset.tlWahl === 'bild') bild();
     else {
       try { freund.teile(); } catch (e) { console.error('teilen: herausfordern', e); }

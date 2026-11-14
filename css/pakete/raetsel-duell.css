@@ -212,6 +212,9 @@ html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: s
 .rd-ende h2 { margin: 0; font-size: 28px; font-weight: 850; color: var(--auf-buehne); }
 .rd-ende-stand { margin: -6px 0 0; font-size: 14px; color: var(--auf-buehne-2); }
 .rd-ende .rd-kronen { padding: 6px 16px; border-radius: var(--r-pille); background: var(--gold); color: var(--kg-stark); font-size: 15px; font-weight: 800; }
+/* R16 D1: auf der Ende-Karte stehen die Striche mittig wie der Rest (auto-fill legte leere Spalten an, rechts blieb eine
+   Luecke); im Spiel bleibt die Reihe ueber die ganze Breite */
+.rd-ende .rd-reihe { grid-template-columns: repeat(auto-fit, minmax(24px, 32px)); justify-content: center; }
 .rd-ende .rd-reihe li { background: rgba(255, 255, 255, .14); }
 .rd-ende .rd-reihe li[data-art="g"] { background: var(--gut); }
 .rd-ende .rd-reihe li[data-art="r"] { background: var(--warn); }

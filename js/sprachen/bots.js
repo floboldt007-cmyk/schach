@@ -52,7 +52,7 @@ const DE = {
       ],
       gewinnt: [
         'Oh, ich hab gewonnen? Das war bestimmt nur der Rückenwind.',
-        'Gewonnen, aber du warst nah dran! Probier’s gleich noch mal.',
+        'Diesmal hab ich gewonnen, aber du warst nah dran! Probier’s gleich noch mal.',
         'Der Wind war heute auf meiner Seite. Beim nächsten Mal weht er für dich.',
       ],
       remis: [

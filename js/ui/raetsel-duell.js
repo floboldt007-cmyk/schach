@@ -485,8 +485,8 @@ export function zeige(root, params, app) {
         </div>
         <h2>${esc(D('ende.' + erg))}</h2>
         <b class="rd-gross zahl" aria-hidden="true">${esc(String(st.ich.geloest))} : ${esc(String(g.geloest))}</b>
+        <p class="rd-ende-stand sr">${esc(D('ende.stand', { ich: st.ich.geloest, gegner: g.geloest }))}</p>
         <p class="rd-text rd-kronen">${esc(kronen)}</p>
-        <p class="rd-ende-stand">${esc(D('ende.stand', { ich: st.ich.geloest, gegner: g.geloest }))}</p>
         ${reiheHtml()}
         <div class="rd-knoepfe"><button type="button" class="rd-los dr rd-nochmal">${esc(D('nochmal'))}</button>
           <button type="button" class="knopf dr rd-fertig">${esc(D('fertig'))}</button></div></section>`;

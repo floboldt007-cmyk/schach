@@ -121,6 +121,11 @@ try {
         await s.screenshot({ path: path.join(BILDER, `${g.name}-${p.art}.png`) }).catch(() => {});
         const l = await lage(s);
         pruefe(`${g.name} ${p.art}: Spruch des Bots steht genau einmal sichtbar, im Blatt`, l.spruch.length > 0 && l.orte.length === 1 && l.orte[0] === 'blatt', l);
+        // R16 E2: nach einer Niederlage spricht der Bot als Sieger (Anlass gewinnt), nach einem Sieg als Verlierer
+        const liste = await s.evaluate(async (anlass) => (await import('/js/bots.js')).BOTS.find((b) => b.id === 'fridolin').saetze[anlass],
+          p.art === 'niederlage' ? 'gewinnt' : 'verliert');
+        pruefe(`${g.name} ${p.art}: Spruch passt zum Ergebnis (Bot-Satz ${p.art === 'niederlage' ? 'gewinnt' : 'verliert'}), kein Lob als Sieger nach Niederlage`,
+          liste.includes(l.spruch) && !(p.art === 'niederlage' && /du hast gewonnen|^gewonnen, aber du/i.test(l.spruch)), { spruch: l.spruch, liste });
         if (p.art === 'niederlage') {
           pruefe(`${g.name} ${p.art}: genau ein Knopf zum Nochmal-Spielen, und er heisst "Revanche" wie in der Online-Partie`,
             l.nochmal.length === 1 && /^Revanche/.test(l.nochmal[0]), l.nochmal);
