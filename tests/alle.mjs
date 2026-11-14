@@ -137,6 +137,7 @@ const SUITEN = [
   { name: 'r17-heim-hover', datei: 'r17-heim-hover.test.mjs', args: [], was: 'Feinschliff R17: Knoepfe der Startseite in Ruhe, Zeiger, Fokus, gedrueckt mind. 4,5:1, Zeiger sichtbar (Browser)' },
   { name: 'geschmack-r8', datei: 'geschmack-r8.test.mjs', args: [], was: 'Feinschliff R8: Serien-Chip neben dem Gruss auf kurzen Handys, Erfolgs-Fenster nie ueber einem offenen Blatt (Browser)' },
   { name: 'r17-kopf', datei: 'r17-kopf.test.mjs', args: [], was: 'Feinschliff R17: Kopf-Knoepfe (Premium, rund) in Ruhe, Zeiger, Fokus, gedrueckt lesbar, Zeiger nur bei hover:hover, Handy ohne haengenden Zustand (Browser)' },
+  { name: 'r18-hover-rest', datei: 'r18-hover-rest.test.mjs', args: [], was: 'Feinschliff R18: Einstellungen-Navigation und Kopf-Chips am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover (Browser)' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
