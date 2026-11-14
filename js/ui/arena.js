@@ -1014,6 +1014,9 @@ export function zeige(root, params, app) {
   function wechsleWelt(nr) {
     if (!WELTEN.some((w) => w.nr === nr) || nr === weltNr) return;
     weltNr = nr;
+    // Gegner-Karte unten (R19): in der neuen Welt zugeklappt, sie zeigt einen anderen Gegner
+    karteOffen = false;
+    detail.classList.remove('offen');
     welt = WELTEN.find((w) => w.nr === nr);
     LBOTS = botsDerWelt(nr);
     weltFrei = istWeltFrei(nr, fortschritt);
