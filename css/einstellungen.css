@@ -62,6 +62,10 @@
 .es-info a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere;
   /* Tippflaeche >= 44 px: Polster nur fuer den Finger, die Zeilenhoehe bleibt (Polster an inline-Elementen zaehlt nicht zur Zeile) */
   padding-block: 13px; }
+/* Link im Bot-Schutz-Hinweis der Anmeldung (js/konto.js): dieselbe Tippflaeche wie .es-info a; der Abstand am Absatz
+   haelt das Polster aus den Anmelde-Knoepfen darueber (sonst trifft ein Tipp auf deren Unterkante den Link) */
+.konto-botschutz-hinweis { margin-block-start: 14px; }
+.konto-botschutz-hinweis a { padding-block: 13px; }
 .es-lizenzen { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .es-lizenzen li { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 12px; background: var(--flaeche-2); border: 1px solid var(--linie); }
 .es-lizenzen b { font-size: 14px; }
