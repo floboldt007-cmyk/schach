@@ -70,6 +70,35 @@ const tippflaeche = (s) => s.evaluate(() => {
   for (const x of xs) for (const y of ys) { const e = document.elementFromPoint(x, y); if (!e || e.closest('summary') !== su) daneben.push(`${Math.round(x)},${Math.round(y)}:${e ? e.tagName + '.' + e.className : 'nichts'}`); }
   return { h: Math.round(r.height * 10) / 10, b: Math.round(r.width), treffer: 9 - daneben.length, daneben };
 });
+// R17-Sammelfix: jeder Link der Info-Gruppe hat >= 44 px Tippflaeche, keine zwei Flaechen ueberlappen sich (auch nicht
+// ueber zwei Absaetze hinweg: GPL-3.0 und GitHub lagen mit je 13 px Polster 29 px auseinander), und an neun Punkten je
+// Zeilenstueck landet kein Tippen auf einem ANDEREN Tippziel (Fehltreffer wie R15-sammelfix); die Mitte trifft den Link
+// selbst. Fliesstext der naechsten Zeile ueber dem Polster ist kein Fehltreffer, er oeffnet nichts
+const infoLinks = (s) => s.evaluate(() => {
+  const links = [...document.querySelectorAll('.es-info a')].filter((a) => a.getClientRects().length);
+  const zu = (a) => a.textContent.trim().slice(0, 16);
+  const klein = [], ueberlapp = [], daneben = [];
+  for (const a of links) for (const r of a.getClientRects()) if (r.height < 44) klein.push(`${zu(a)} ${Math.round(r.height)}`);
+  for (let i = 0; i < links.length; i++) for (let j = i + 1; j < links.length; j++) {
+    const ra = [...links[i].getClientRects()], rb = [...links[j].getClientRects()];
+    if (ra.some((x) => rb.some((y) => Math.min(x.right, y.right) - Math.max(x.left, y.left) > 0.5 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 0.5))) {
+      ueberlapp.push(`${zu(links[i])} / ${zu(links[j])}`);
+    }
+  }
+  for (const a of links) {
+    a.scrollIntoView({ block: 'center' });
+    for (const r of a.getClientRects()) {
+      const xs = [r.left + 2, r.left + r.width / 2, r.right - 2], ys = [r.top + 2, r.top + r.height / 2, r.bottom - 2];
+      for (const x of xs) for (const y of ys) {
+        const e = document.elementFromPoint(x, y);
+        const ziel = e && e.closest('a, button, summary, input, select, label, [role="button"]');
+        const mitte = x === xs[1] && y === ys[1];
+        if (mitte ? ziel !== a : (ziel && ziel !== a)) daneben.push(`${zu(a)} ${Math.round(x)},${Math.round(y)}:${e ? (e.closest('a') ? 'a ' + zu(e.closest('a')) : e.tagName) : 'nichts'}`);
+      }
+    }
+  }
+  return { links: links.length, klein, ueberlapp, daneben: daneben.slice(0, 6), fehltreffer: daneben.length };
+});
 const BSD = flach(lies('vendor/chess/LICENSE'));
 let pw;
 try { pw = require(process.env.PLAYWRIGHT_PFAD || 'playwright'); } catch (e) { pw = require('/opt/node-tools/node_modules/playwright'); }
@@ -132,7 +161,8 @@ try {
     pruefe(`${sp}: keine Fehler und keine fehlenden Texte`, fehler.length === 0, fehler);
     await k.close();
   }
-  for (const [sp, w, h] of [['de', 375, 667], ['en', 390, 844], ['de', 820, 1180], ['de', 1180, 820], ['de', 1440, 900]]) {
+  // die sieben Groessen aus tests/ansicht.test.mjs (GROESSEN), eine davon englisch
+  for (const [sp, w, h] of [['de', 375, 667], ['en', 390, 844], ['de', 667, 375], ['de', 820, 1180], ['de', 1180, 820], ['de', 1000, 590], ['de', 1440, 900]]) {
     const k = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: w < 1000 });
     const s = await k.newPage();
     await s.addInitScript((sprache) => {
@@ -143,6 +173,10 @@ try {
     await oeffneInfo(s);
     const t = await tippflaeche(s);
     pruefe(`${sp} ${w}x${h}: Tippflaeche Lizenztext mindestens 44 px, 9 von 9 Punkten treffen sie`, t.h >= 44 && t.treffer === 9, t);
+    const li = await infoLinks(s);
+    pruefe(`${sp} ${w}x${h}: jeder Info-Link mindestens 44 px hoch`, li.links >= 4 && li.klein.length === 0, li);
+    pruefe(`${sp} ${w}x${h}: keine zwei Info-Links ueberlappen sich`, li.ueberlapp.length === 0, li.ueberlapp);
+    pruefe(`${sp} ${w}x${h}: jeder Info-Link an 9 von 9 Punkten kein Fehltreffer, die Mitte trifft ihn`, li.fehltreffer === 0, li.daneben);
     const sb = await sichtbarkeit(s);
     pruefe(`${sp} ${w}x${h}: Quellcode-Link, alle Lizenz-Eintraege und der Knopf Lizenztext sichtbar`,
       sb.quelle && sb.posten >= 6 && sb.unsichtbar.length === 0 && sb.summary, sb);
