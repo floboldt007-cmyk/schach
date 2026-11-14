@@ -62,6 +62,9 @@
 .es-info a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere;
   /* Tippflaeche >= 44 px: Polster nur fuer den Finger, die Zeilenhoehe bleibt (Polster an inline-Elementen zaehlt nicht zur Zeile) */
   padding-block: 13px; }
+/* Absaetze mit Link untereinander (GPL-3.0 und GitHub, GitHub und Datenschutz): 26 px Abstand = beide Polster, sonst
+   ueberlappen die Tippflaechen und ein Tipp oeffnet den falschen Link (R17-Sammelfix, tests/info-lizenzen.test.mjs) */
+.es-info > p:has(a) ~ p:has(a) { margin-top: 26px; }
 /* Link im Bot-Schutz-Hinweis der Anmeldung (js/konto.js): dieselbe Tippflaeche wie .es-info a; der Abstand am Absatz
    haelt das Polster aus den Anmelde-Knoepfen darueber (sonst trifft ein Tipp auf deren Unterkante den Link) */
 .konto-botschutz-hinweis { margin-block-start: 14px; }
