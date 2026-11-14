@@ -380,6 +380,32 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
       fokus: document.activeElement?.classList.contains('rd-nochmal') }));
     pruefe('Ende: Gewonnen 3 zu 2, +20 Kronen, Fokus auf Nochmal', ende.erg === 'sieg' && ende.titel === 'Gewonnen' && ende.stand === '3 zu 2 gelöst'
       && ende.kronen === '+20 Kronen' && ende.fokus, ende);
+    // R16 D1: die Striche der Raetsel stehen auf der Ende-Karte mittig wie der Rest (vorher linksbuendig, rechts eine Luecke)
+    // R16 D2: das Ergebnis steht sichtbar nur einmal (gross "3 : 2"); "3 zu 2 gelöst" bleibt fuer Screenreader
+    const mitte = await s.evaluate(() => {
+      const karte = document.querySelector('.rd-ende').getBoundingClientRect();
+      const li = [...document.querySelectorAll('.rd-ende .rd-reihe li')].map((e) => e.getBoundingClientRect());
+      const links = Math.min(...li.map((r) => r.left)), rechts = Math.max(...li.map((r) => r.right));
+      const stand = document.querySelector('.rd-ende-stand').getBoundingClientRect();
+      return { striche: li.length, versatz: Math.round(((links + rechts) / 2 - (karte.left + karte.right) / 2) * 10) / 10,
+        breiteMin: Math.round(Math.min(...li.map((r) => r.width))), standSichtbar: stand.width > 1 && stand.height > 1,
+        gross: document.querySelector('.rd-ende .rd-gross').textContent.trim() };
+    });
+    pruefe('Ende: Raetsel-Striche mittig auf der Karte (Versatz hoechstens 2 px), jeder Strich mindestens 24 px breit',
+      mitte.striche > 0 && Math.abs(mitte.versatz) <= 2 && mitte.breiteMin >= 24, mitte);
+    pruefe('Ende: Ergebnis sichtbar nur einmal (gross 3 : 2), "3 zu 2 gelöst" nur fuer Screenreader', mitte.gross === '3 : 2' && !mitte.standSichtbar, mitte);
+    // R7 Duellknopf A (13.11.): "Nochmal" startet dieselbe Suche wie "Gegner suchen" und traegt dessen Farbe (Akzent)
+    const nochmalFarbe = await s.evaluate(() => {
+      const n = document.querySelector('.rd-ende .rd-nochmal');
+      const probe = document.createElement('button');
+      probe.className = 'rd-los dr rd-suchen';
+      n.parentElement.append(probe);
+      const f = (e) => { const st = getComputedStyle(e); return st.backgroundColor + ' / ' + st.color; };
+      const erg = { nochmal: f(n), suchen: f(probe) };
+      probe.remove();
+      return erg;
+    });
+    pruefe('Ende: Nochmal in der Farbe des Suchknopfs', nochmalFarbe.nochmal === nochmalFarbe.suchen, nochmalFarbe);
     const g2 = await geometrie(s);
     pruefe('Ende: nichts breiter, Tippflaechen ab 44 px', g2.breit && g2.klein.length === 0, g2);
     await bild(s, bildName(geraet, schema, '4-ende'));

@@ -60,7 +60,7 @@ alter default privileges in schema public grant all on functions to anon, authen
 // Reihenfolge wie in supabase/ANLEITUNG.md: die Datenauskunft zuletzt, weil sie alle Teile mit ausgibt
 const SCHEMATA = ['schema', 'online-schema', 'freunde-schema', 'abo-schema', 'werkstatt-schema', 'pionier-schema',
   'coach-schema', 'schule-schema', 'kronen-schema', 'zaehler-schema', 'karte-schema', 'raetsel-duell-schema',
-  'liga-bild-schema', 'zwei-ligen-schema', 'daten-schema'];
+  'liga-bild-schema', 'zwei-ligen-schema', 'karte-sondertitel-schema', 'daten-schema'];
 
 async function lauf(db, name, sql) {
   try {

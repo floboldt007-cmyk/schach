@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" data-thema="modern" data-modus="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F4F1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171B" media="(prefers-color-scheme: dark)">
+<title>Delete account · Crownmate</title>
+<script>
+  // Hell oder Dunkel wie in der App (gespeicherte Einstellung "modus"), sonst nach dem System.
+  try {
+    var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+    if (e && (e.modus === 'hell' || e.modus === 'dunkel')) document.documentElement.setAttribute('data-modus', e.modus);
+  } catch (f) { /* privater Modus: System */ }
+  // Rueckkehr von Google: den Hash merken, bevor js/konto.js ihn beim Import umschreibt (js/konto-loeschen.js)
+  window.__klHash = location.hash;
+</script>
+<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/themes/modern.css">
+<style>
+  /* Plain text page like impressum-en.html, app tokens (light and dark), no fixed colours. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background-color: var(--grund); color: var(--text); font-family: var(--schrift); font-size: var(--fs-text); line-height: 1.55;
+    -webkit-text-size-adjust: 100%; }
+  main { max-width: 760px; margin: 0 auto; padding: var(--a6) var(--rand) var(--a7); padding-bottom: calc(var(--a7) + env(safe-area-inset-bottom)); }
+  h1 { margin: var(--a4) 0 var(--a2); font-family: var(--display); font-size: var(--fs-h1); font-weight: var(--gw-titel); letter-spacing: var(--lw-titel); line-height: 1.1; }
+  h2 { margin: var(--a6) 0 var(--a2); font-size: var(--fs-h2); font-weight: var(--gw-stark); line-height: 1.2; }
+  h3 { margin: 0 0 var(--a2); font-size: var(--fs-text); font-weight: var(--gw-stark); overflow-wrap: anywhere; }
+  p, li { margin: 0 0 var(--a3); color: var(--text); }
+  ul { padding-left: 1.2em; }
+  a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .stand { color: var(--text-2); font-size: var(--fs-klein); }
+  .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
+  .kasten > :last-child { margin-bottom: 0; }
+  .kasten[hidden], [hidden] { display: none !important; }
+  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+    border: 1px solid var(--text-2); text-decoration: none; font-weight: var(--gw-stark); }
+  .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
+  .fuss a { margin-right: var(--a3); }
+  .kl-feld { display: grid; gap: var(--a1); margin: 0 0 var(--a3); font-weight: var(--gw-stark); }
+  .kl-feld input { width: 100%; min-height: var(--tipp); padding: 0 12px; border-radius: var(--r-m, 10px); border: 1px solid var(--text-2);
+    background: var(--grund); color: var(--text); font: inherit; font-weight: normal; }
+  .kl-knoepfe { display: flex; flex-wrap: wrap; gap: var(--a2); margin: 0 0 var(--a3); }
+  .kl-knopf { min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); border: 1px solid var(--text-2); background: var(--flaeche-2);
+    color: var(--text); font: inherit; font-weight: var(--gw-stark); cursor: pointer; }
+  .kl-knopf.primaer { background: var(--akzent); border-color: var(--akzent); color: var(--auf-akzent); }
+  .kl-knopf.gefahr { background: var(--flaeche); border: 2px solid var(--warn); color: var(--text); }
+  .kl-knopf:disabled { opacity: .55; cursor: not-allowed; }
+  /* :focus statt :focus-visible: der Rahmen soll auch nach Tippen und bei per Skript gesetztem Fokus sichtbar sein */
+  .kl-knopf:focus, .kl-feld input:focus, a:focus, .kl-fertig:focus { outline: var(--fokus); outline-offset: 2px; }
+  .kl-oder { color: var(--text-2); font-size: var(--fs-klein); }
+  .kl-status:empty { display: none; }
+  .kl-status { padding: var(--a3) var(--a4); border-radius: var(--r-l); background: var(--flaeche-2); }
+  .kl-status[data-fehler="ja"] { background: var(--warn-weich); border: 1px solid var(--warn); }
+  .kl-hinweis { padding: var(--a3); border-radius: var(--r-l); background: var(--warn-weich); }
+  .konto-botschutz { margin: 0 0 var(--a3); }
+</style>
+</head>
+<body>
+<main>
+  <p><a class="zurueck" href="./#einstellungen">Back to Crownmate</a></p>
+  <p class="stand"><a href="konto-loeschen.html" lang="de" hreflang="de">Deutsche Fassung</a></p>
+  <h1>Delete account</h1>
+  <p>Here you can delete your Crownmate account, even without the app. In the app it is under Settings → Data →
+  “Delete account”.</p>
+
+  <h2>What is deleted</h2>
+  <div class="kasten">
+    <p>Immediately and for good on the server:</p>
+    <ul>
+      <li>your account with its email address and sign-in data (including the link to Google or Apple)</li>
+      <li>your username, friendships, requests, invite code and weekly ranking</li>
+      <li>your cloud progress</li>
+      <li>shared games and usage data</li>
+      <li>the sign-in log</li>
+      <li>your player card with achievements and thalers, your league with crowns and weekly groups, your puzzle duels
+      (for both players), your online games, your data in school mode and the age statement for the shop</li>
+    </ul>
+    <p>What stays: the progress on your devices. Supabase server logs and backups are deleted automatically after at
+    most 7 days. Technical payment events from Stripe remain without your account ID but with the Stripe customer number
+    until they are deleted at the next incoming payment event after 90 days. For shop editions and the pioneer title, a
+    few details stay without your account ID, as described in the <a href="datenschutz-en.html">privacy policy</a>.</p>
+    <p><b>Subscription:</b> A running subscription does not end with the account. Cancel it first.</p>
+  </div>
+
+  <h2>Delete it yourself</h2>
+  <p class="kl-status" aria-live="polite" data-fehler="nein"></p>
+
+  <section class="kl-anmelden kasten" aria-labelledby="kl-anmelden-titel">
+    <h3 id="kl-anmelden-titel">Sign in first</h3>
+    <p>So that nobody deletes someone else’s account, you sign in first, just like in the app.</p>
+    <label class="kl-feld">Email address
+      <input class="kl-email" type="email" autocomplete="email" inputmode="email" maxlength="254"></label>
+    <div class="konto-botschutz" hidden></div>
+    <div class="kl-knoepfe"><button class="kl-knopf primaer" type="button" data-kl="code">Email me a code</button></div>
+    <div class="kl-codeteil" hidden>
+      <label class="kl-feld">6-digit code from the email
+        <input class="kl-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
+      <div class="kl-knoepfe"><button class="kl-knopf primaer" type="button" data-kl="pruefen">Sign in</button></div>
+    </div>
+    <p class="kl-oder">or</p>
+    <div class="kl-knoepfe"><button class="kl-knopf" type="button" data-kl="google">Sign in with Google</button></div>
+  </section>
+
+  <section class="kl-angemeldet kasten" hidden aria-labelledby="kl-angemeldet-titel">
+    <h3 id="kl-angemeldet-titel">Signed in as <span class="kl-wer"></span></h3>
+    <div class="kl-knoepfe">
+      <button class="kl-knopf gefahr" type="button" data-kl="weiter">Delete account …</button>
+      <button class="kl-knopf" type="button" data-kl="abmelden">Sign out</button>
+    </div>
+    <div class="kl-schritt2" hidden>
+      <p><b>Really delete for good?</b> This cannot be undone. You can sign up again later with the same email address,
+      but with empty cloud progress.</p>
+      <p class="kl-abo kl-hinweis" hidden></p>
+      <label class="kl-feld">Type <b>DELETE</b> to confirm
+        <input class="kl-bestaetigen" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20"></label>
+      <div class="kl-knoepfe">
+        <button class="kl-knopf gefahr" type="button" data-kl="loeschen" disabled>Delete for good</button>
+        <button class="kl-knopf" type="button" data-kl="abbrechen">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="kl-fertig kasten" hidden tabindex="-1" aria-labelledby="kl-fertig-titel">
+    <h3 id="kl-fertig-titel">Your account has been deleted.</h3>
+    <p>You are signed out. The progress on your devices stays until you delete it there.</p>
+  </section>
+
+  <h2>Delete by email</h2>
+  <p>Can’t sign in any more? Then write from your account’s address to
+  <a class="kl-mail" href="mailto:kontakt@anfrageprofi.de?subject=Crownmate%3A%20Delete%20account&amp;body=Please%20delete%20my%20Crownmate%20account.%0A%0AEmail%20address%20of%20the%20account%3A%20%0AUsername%20(if%20known)%3A%20">kontakt@anfrageprofi.de</a>
+  with the subject “Crownmate: Delete account”. Give the account’s email address and, if you know it, your username.
+  We delete the account within one month and confirm it to you by email.</p>
+
+  <p class="fuss"><a href="datenschutz-en.html">Privacy policy</a> <a href="impressum-en.html">Imprint</a> <a href="./#einstellungen">Back to Crownmate</a></p>
+</main>
+<script type="application/json" id="kl-texte">
+{"wort": "DELETE", "codeGesendet": "The code is on its way. Check your inbox (and the spam folder) and enter the 6 digits.",
+ "zuGoogle": "On to Google …", "loescht": "Deleting the account …", "fehler": "That did not work. Please try again.",
+ "googleFehler": "Signing in with Google was not completed. Please try again."}
+</script>
+<script type="module">
+  import { starte } from './js/konto-loeschen.js';
+  starte();
+</script>
+</body>
+</html>

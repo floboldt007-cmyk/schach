@@ -936,11 +936,15 @@ function registriereSW() {
   let wechsel = false;
   // nur im Test: Ablauf des Versionswechsels fuer die Fehlermeldung von tests/e2e.test.mjs (Update)
   const swLog = (s) => { if (TEST) console.info('SW-Ablauf ' + s); };
-  sw.addEventListener('controllerchange', () => {
-    swLog('controllerchange wechsel=' + wechsel);
+  const neuLaden = (grund) => {
     if (!wechsel) return;
     wechsel = false;
+    swLog('neu laden: ' + grund);
     location.reload();
+  };
+  sw.addEventListener('controllerchange', () => {
+    swLog('controllerchange wechsel=' + wechsel);
+    neuLaden('controllerchange');
   });
   const aktiviere = (w) => {
     swLog('aktiviere von ' + String((new Error().stack || '').split('\n')[2] || '').trim().replace(/^.*\/js\//, ''));
@@ -948,8 +952,15 @@ function registriereSW() {
     try { sessionStorage.setItem(SW_MERKER, String(Date.now())); } catch (e) { /* egal */ }
     // laufende Partie sichern (verlasse speichert den Stand), dann uebernimmt die neue Version
     if (aktuell && aktuell.handle) { try { aktuell.handle.verlasse(); } catch (e) { /* egal */ } aktuell.handle = null; }
+    // Neu laden erst, wenn die neue Version wirklich uebernommen hat. Ein fester 4-s-Reload kam auf langsamen Geraeten zu
+    // frueh (b6, CI 13.11.2026): der alte Worker beantwortete die Seite noch aus dem alten Cache, die neue Version
+    // uebernahm danach ohne Neuladen, und die alte Seite lief mit dem neuen Service Worker.
+    w.addEventListener('statechange', () => {
+      if (w.state === 'activated' || w.state === 'redundant') neuLaden('statechange ' + w.state);
+    });
     w.postMessage('aktivieren');
-    setTimeout(() => location.reload(), 4000);   // falls controllerchange ausbleibt
+    if (w.state === 'activated' || w.state === 'redundant') neuLaden('schon ' + w.state);
+    setTimeout(() => neuLaden('Notbremse'), 30000);   // falls die neue Version haengt: die Seite ist schon verlassen
   };
   const kuerzlich = () => {
     try { return Date.now() - Number(sessionStorage.getItem(SW_MERKER) || 0) < 15000; } catch (e) { return true; }

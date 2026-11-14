@@ -7,6 +7,7 @@ import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudSta
   SYNC_SCHLUESSEL, VERDRAENGT_SCHLUESSEL, synchronisiere, standHash, verdraengterStand, holeVerdraengtZurueck, gemerkterStand, cloudStand,
  } from '../js/konto.js';
 import { SUPABASE_URL } from '../js/konto-config.js';
+import { setzeSprache } from '../js/sprache.js';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') { gesamt++; if (wert) ok++; else console.error('FEHLER ' + name, extra); }
@@ -105,6 +106,38 @@ pruefe('Ohne Kennung nur der Status', serverFehler === 'Serverfehler (500)', ser
 mitAntwort(400, { code: 400, error_code: 'captcha_failed', msg: 'captcha protection: request disallowed (no captcha_token found)' });
 serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
 pruefe('Bot-Schutz abgelehnt (captcha_failed): eigener Text statt Serverfehler', /Bot-Schutz/.test(serverFehler) && !/captcha/i.test(serverFehler), serverFehler);
+// Neue Konten gesperrt (Supabase "Allow new users to sign up" aus): /otp legt das Konto ueber Signup an und meldet
+// signup_disabled, mit create_user:false kaeme otp_disabled (supabase/auth internal/api/signup.go, otp.go)
+for (const [kennung, msg] of [['signup_disabled', 'Signups not allowed for this instance'], ['otp_disabled', 'Signups not allowed for otp']]) {
+  mitAntwort(422, { code: 422, error_code: kennung, msg });
+  serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+  pruefe(`Neue Konten gesperrt (${kennung}): eigener Text statt Serverfehler, nie der Server-Text`,
+    /noch nicht freigeschaltet/.test(serverFehler) && !/Signups|Serverfehler/.test(serverFehler), serverFehler);
+}
+mitAntwort(429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('Mail-Grenze (429 over_email_send_rate_limit): gleich nochmal oder mit Google', /gleich noch einmal/.test(serverFehler) && /Google/.test(serverFehler) && !/rate limit/.test(serverFehler), serverFehler);
+// Kaltreview 13.11.: geerbte Eigenschaften des Objekts sind keine Kennungen
+for (const kennung of ['toString', '__proto__', 'constructor']) {
+  mitAntwort(400, { code: 400, error_code: kennung, msg: 'x' });
+  serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+  pruefe(`Kennung ${kennung}: Sammeltext, kein Objekt-Text`, /^Serverfehler \(400/.test(serverFehler) && !/function|\[object|einstellungen\./.test(serverFehler), serverFehler);
+}
+mitAntwort(429, { msg: 'Too many requests' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('429 ohne Kennung: Text "Zu viele Versuche" statt Serverfehler', /Zu viele Versuche/.test(serverFehler), serverFehler);
+// Kaltreview 13.11. (K2): dieselben Faelle auf Englisch, nie der Server-Text
+setzeSprache('en');
+for (const [name, status, body, fn, muster] of [
+  ['falscher Code', 403, { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' }, () => pruefeCode('a@b.de', '123456'), /wrong or has expired/],
+  ['signup_disabled', 422, { code: 422, error_code: 'signup_disabled', msg: 'Signups not allowed for this instance' }, () => fordereCodeAn('a@b.de'), /not open yet/],
+  ['429 Mail-Grenze', 429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' }, () => fordereCodeAn('a@b.de'), /again in a moment.*Google/],
+]) {
+  mitAntwort(status, body);
+  serverFehler = ''; try { await fn(); } catch (e) { serverFehler = e.message; }
+  pruefe(`[en] ${name}: englischer Text, kein Server-Text`, muster.test(serverFehler) && !serverFehler.includes(body.msg), serverFehler);
+}
+setzeSprache('de');
 localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
 mitAntwort(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' });
 serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }

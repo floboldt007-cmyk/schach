@@ -63,6 +63,8 @@ jobs:
         run: node tests/server-karte.test.mjs
       - name: Karte-Elo-Vorschlag pruefen (nicht eingespielt)
         run: node tests/server-karte-elo.test.mjs
+      - name: Karte-Sondertitel-Vorschlag pruefen (nicht eingespielt)
+        run: node tests/server-karte-sondertitel.test.mjs
       - name: Liga-Bild-SQL ausfuehren (vorbereitet, nicht eingespielt)
         run: node tests/server-liga-bild.test.mjs
       - name: Raetsel-Duell-SQL ausfuehren
@@ -71,6 +73,10 @@ jobs:
         run: node tests/server-daten.test.mjs
       - name: Zwei-Ligen-SQL ausfuehren (vorbereitet, nicht eingespielt; Umstieg, Paarung, Rueckweg)
         run: node tests/server-zwei-ligen.test.mjs
+      - name: Verwaltungs-SQL pruefen (vorbereitet, nicht eingespielt; Rechte, Premium, Kaeufe, Name, Banner, Rueckweg)
+        run: node tests/server-verwaltung.test.mjs
+      - name: Datenauskunft mit Verwaltung pruefen (vorbereitet; Vollstaendigkeit, eigene Zeilen, Rueckweg)
+        run: node tests/server-daten-verwaltung.test.mjs
 
   webkit:
     # Fest auf 24.04: Mit dem Wechsel von ubuntu-latest auf 26.04 (29.10.2026) kam die Figur im Brett-Test

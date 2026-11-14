@@ -41,6 +41,12 @@ registriereTexte('p-teilen', {
     // Knopf und Blatt (index.js)
     'knopf.sieg': 'Siegesbild teilen',
     'knopf.bild': 'Als Bild teilen',
+    // EIN Knopf mit Auswahl, wenn das Ergebnis auch "Freund herausfordern" anbietet (R14-G2)
+    'knopf.mehr': 'Teilen …',
+    'wahl.sieg': 'Siegesbild',
+    'wahl.bild': 'Als Bild',
+    // R16 E1: kurz, damit es am Handy einzeilig bleibt; der Name fuer Screenreader bleibt "Freund herausfordern"
+    'wahl.freund': 'Herausfordern',
     'blatt.sieg': 'Siegesbild teilen',
     'blatt.remis': 'Partie als Bild teilen',
     entsteht: 'Bild entsteht …',
@@ -90,6 +96,10 @@ registriereTexte('p-teilen', {
     'figur.K': 'K', 'figur.Q': 'Q', 'figur.R': 'R', 'figur.B': 'B', 'figur.N': 'N', 'figur.P': 'P',
     'knopf.sieg': 'Share victory image',
     'knopf.bild': 'Share as image',
+    'knopf.mehr': 'Share …',
+    'wahl.sieg': 'Victory image',
+    'wahl.bild': 'As image',
+    'wahl.freund': 'Challenge',
     'blatt.sieg': 'Share victory image',
     'blatt.remis': 'Share game as image',
     entsteht: 'Creating image…',

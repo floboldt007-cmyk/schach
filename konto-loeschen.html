@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="de" data-thema="modern" data-modus="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F4F1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171B" media="(prefers-color-scheme: dark)">
+<title>Konto löschen · Crownmate</title>
+<script>
+  // Hell oder Dunkel wie in der App (gespeicherte Einstellung "modus"), sonst nach dem System.
+  try {
+    var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+    if (e && (e.modus === 'hell' || e.modus === 'dunkel')) document.documentElement.setAttribute('data-modus', e.modus);
+  } catch (f) { /* privater Modus: System */ }
+  // Rueckkehr von Google: den Hash merken, bevor js/konto.js ihn beim Import umschreibt (js/konto-loeschen.js)
+  window.__klHash = location.hash;
+</script>
+<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/themes/modern.css">
+<style>
+  /* Schlichte Textseite wie impressum.html, mit den Tokens der App (hell und dunkel), keine festen Farben. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background-color: var(--grund); color: var(--text); font-family: var(--schrift); font-size: var(--fs-text); line-height: 1.55;
+    -webkit-text-size-adjust: 100%; }
+  main { max-width: 760px; margin: 0 auto; padding: var(--a6) var(--rand) var(--a7); padding-bottom: calc(var(--a7) + env(safe-area-inset-bottom)); }
+  h1 { margin: var(--a4) 0 var(--a2); font-family: var(--display); font-size: var(--fs-h1); font-weight: var(--gw-titel); letter-spacing: var(--lw-titel); line-height: 1.1; }
+  h2 { margin: var(--a6) 0 var(--a2); font-size: var(--fs-h2); font-weight: var(--gw-stark); line-height: 1.2; }
+  h3 { margin: 0 0 var(--a2); font-size: var(--fs-text); font-weight: var(--gw-stark); overflow-wrap: anywhere; }
+  p, li { margin: 0 0 var(--a3); color: var(--text); }
+  ul { padding-left: 1.2em; }
+  a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .stand { color: var(--text-2); font-size: var(--fs-klein); }
+  .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
+  .kasten > :last-child { margin-bottom: 0; }
+  .kasten[hidden], [hidden] { display: none !important; }
+  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+    border: 1px solid var(--text-2); text-decoration: none; font-weight: var(--gw-stark); }
+  .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
+  .fuss a { margin-right: var(--a3); }
+  .kl-feld { display: grid; gap: var(--a1); margin: 0 0 var(--a3); font-weight: var(--gw-stark); }
+  .kl-feld input { width: 100%; min-height: var(--tipp); padding: 0 12px; border-radius: var(--r-m, 10px); border: 1px solid var(--text-2);
+    background: var(--grund); color: var(--text); font: inherit; font-weight: normal; }
+  .kl-knoepfe { display: flex; flex-wrap: wrap; gap: var(--a2); margin: 0 0 var(--a3); }
+  .kl-knopf { min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); border: 1px solid var(--text-2); background: var(--flaeche-2);
+    color: var(--text); font: inherit; font-weight: var(--gw-stark); cursor: pointer; }
+  .kl-knopf.primaer { background: var(--akzent); border-color: var(--akzent); color: var(--auf-akzent); }
+  .kl-knopf.gefahr { background: var(--flaeche); border: 2px solid var(--warn); color: var(--text); }
+  .kl-knopf:disabled { opacity: .55; cursor: not-allowed; }
+  /* :focus statt :focus-visible: der Rahmen soll auch nach Tippen und bei per Skript gesetztem Fokus sichtbar sein */
+  .kl-knopf:focus, .kl-feld input:focus, a:focus, .kl-fertig:focus { outline: var(--fokus); outline-offset: 2px; }
+  .kl-oder { color: var(--text-2); font-size: var(--fs-klein); }
+  .kl-status:empty { display: none; }
+  .kl-status { padding: var(--a3) var(--a4); border-radius: var(--r-l); background: var(--flaeche-2); }
+  .kl-status[data-fehler="ja"] { background: var(--warn-weich); border: 1px solid var(--warn); }
+  .kl-hinweis { padding: var(--a3); border-radius: var(--r-l); background: var(--warn-weich); }
+  .konto-botschutz { margin: 0 0 var(--a3); }
+</style>
+</head>
+<body>
+<main>
+  <p><a class="zurueck" href="./#einstellungen">Zurück zu Crownmate</a></p>
+  <p class="stand"><a href="konto-loeschen-en.html" lang="en" hreflang="en">English version</a></p>
+  <h1>Konto löschen</h1>
+  <p>Hier löschst du dein Crownmate-Konto, auch ohne die App. In der App geht es unter Einstellungen → Daten →
+  „Konto löschen“.</p>
+
+  <h2>Was gelöscht wird</h2>
+  <div class="kasten">
+    <p>Sofort und endgültig auf dem Server:</p>
+    <ul>
+      <li>dein Konto mit der E-Mail-Adresse und den Anmeldedaten (auch die Verknüpfung mit Google oder Apple)</li>
+      <li>dein Benutzername, Freundschaften, Anfragen, Einladungscode und Wochenwertung</li>
+      <li>dein Cloud-Spielstand</li>
+      <li>geteilte Partien und Nutzungsdaten</li>
+      <li>das Anmeldeprotokoll</li>
+      <li>deine Visitenkarte mit Erfolgen und Talern, deine Liga mit Kronen und Wochen-Gruppen, deine Rätsel-Duelle (für
+      beide Spieler), deine Online-Partien, deine Daten im Schulmodus und die Altersangabe für den Shop</li>
+    </ul>
+    <p>Was bleibt: der Spielstand auf deinen Geräten. Server-Protokolle und Datensicherungen von Supabase löschen sich
+    nach höchstens 7 Tagen von selbst. Technische Zahlungsereignisse von Stripe bleiben ohne deine Konto-Kennung, aber mit
+    der Stripe-Kundennummer stehen, bis sie nach Ablauf von 90 Tagen beim nächsten eingehenden Zahlungsereignis gelöscht
+    werden. Bei Shop-Editionen und Pionier-Titel bleiben einzelne Angaben ohne deine Konto-Kennung stehen, wie in der
+    <a href="datenschutz.html">Datenschutzerklärung</a> beschrieben.</p>
+    <p><b>Abo:</b> Ein laufendes Abo endet mit dem Konto nicht. Kündige es vorher.</p>
+  </div>
+
+  <h2>Selbst löschen</h2>
+  <p class="kl-status" aria-live="polite" data-fehler="nein"></p>
+
+  <section class="kl-anmelden kasten" aria-labelledby="kl-anmelden-titel">
+    <h3 id="kl-anmelden-titel">Erst anmelden</h3>
+    <p>Damit niemand fremde Konten löscht, meldest du dich zuerst an, genau wie in der App.</p>
+    <label class="kl-feld">E-Mail-Adresse
+      <input class="kl-email" type="email" autocomplete="email" inputmode="email" maxlength="254"></label>
+    <div class="konto-botschutz" hidden></div>
+    <div class="kl-knoepfe"><button class="kl-knopf primaer" type="button" data-kl="code">Code per E-Mail schicken</button></div>
+    <div class="kl-codeteil" hidden>
+      <label class="kl-feld">6-stelliger Code aus der E-Mail
+        <input class="kl-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
+      <div class="kl-knoepfe"><button class="kl-knopf primaer" type="button" data-kl="pruefen">Anmelden</button></div>
+    </div>
+    <p class="kl-oder">oder</p>
+    <div class="kl-knoepfe"><button class="kl-knopf" type="button" data-kl="google">Mit Google anmelden</button></div>
+  </section>
+
+  <section class="kl-angemeldet kasten" hidden aria-labelledby="kl-angemeldet-titel">
+    <h3 id="kl-angemeldet-titel">Angemeldet als <span class="kl-wer"></span></h3>
+    <div class="kl-knoepfe">
+      <button class="kl-knopf gefahr" type="button" data-kl="weiter">Konto löschen …</button>
+      <button class="kl-knopf" type="button" data-kl="abmelden">Abmelden</button>
+    </div>
+    <div class="kl-schritt2" hidden>
+      <p><b>Wirklich endgültig löschen?</b> Das lässt sich nicht rückgängig machen. Du kannst dich später mit derselben
+      E-Mail-Adresse neu anmelden, dann aber mit leerem Cloud-Spielstand.</p>
+      <p class="kl-abo kl-hinweis" hidden></p>
+      <label class="kl-feld">Zum Bestätigen <b>LÖSCHEN</b> eintippen
+        <input class="kl-bestaetigen" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20"></label>
+      <div class="kl-knoepfe">
+        <button class="kl-knopf gefahr" type="button" data-kl="loeschen" disabled>Endgültig löschen</button>
+        <button class="kl-knopf" type="button" data-kl="abbrechen">Abbrechen</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="kl-fertig kasten" hidden tabindex="-1" aria-labelledby="kl-fertig-titel">
+    <h3 id="kl-fertig-titel">Dein Konto ist gelöscht.</h3>
+    <p>Du bist abgemeldet. Der Spielstand auf deinen Geräten bleibt, bis du ihn dort löschst.</p>
+  </section>
+
+  <h2>Löschen per E-Mail</h2>
+  <p>Kannst du dich nicht mehr anmelden? Dann schreib von der Adresse deines Kontos an
+  <a class="kl-mail" href="mailto:kontakt@anfrageprofi.de?subject=Crownmate%3A%20Konto%20l%C3%B6schen&amp;body=Bitte%20l%C3%B6scht%20mein%20Crownmate-Konto.%0A%0AE-Mail-Adresse%20des%20Kontos%3A%20%0ABenutzername%20(falls%20bekannt)%3A%20">kontakt@anfrageprofi.de</a>
+  mit dem Betreff „Crownmate: Konto löschen“. Nenne die E-Mail-Adresse des Kontos und, falls du ihn weißt, deinen
+  Benutzernamen. Wir löschen das Konto innerhalb eines Monats und bestätigen es dir per E-Mail.</p>
+
+  <p class="fuss"><a href="datenschutz.html">Datenschutzerklärung</a> <a href="impressum.html">Impressum</a> <a href="./#einstellungen">Zurück zu Crownmate</a></p>
+</main>
+<script type="application/json" id="kl-texte">
+{"wort": "LÖSCHEN", "codeGesendet": "Der Code ist unterwegs. Schau in dein Postfach (auch im Spam-Ordner) und gib die 6 Ziffern ein.",
+ "zuGoogle": "Weiter zu Google …", "loescht": "Konto wird gelöscht …", "fehler": "Das hat nicht geklappt. Bitte versuche es noch einmal.",
+ "googleFehler": "Die Anmeldung mit Google wurde nicht abgeschlossen. Bitte versuche es noch einmal."}
+</script>
+<script type="module">
+  import { starte } from './js/konto-loeschen.js';
+  starte();
+</script>
+</body>
+</html>

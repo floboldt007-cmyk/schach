@@ -69,6 +69,13 @@ const server = http.createServer((req, res) => {
   };
   if (!pfad.startsWith(PRAEFIX)) return nicht();
   let rel = pfad.slice(PRAEFIX.length);
+  // b6 (13.11.2026): eine absichtlich langsame Antwort haelt den alten Service Worker beschaeftigt (siehe Update Teil b)
+  if (rel === '__langsam') {
+    merke('server __langsam');
+    serverLog.push({ pfad, status: 204 });
+    setTimeout(() => { res.writeHead(204, { 'Cache-Control': 'no-store' }); res.end(); }, Number(url.searchParams.get('ms')) || 0);
+    return;
+  }
   if (rel === '' || rel.endsWith('/')) rel += 'index.html';
   const datei = path.resolve(WURZEL, rel);
   if (!datei.startsWith(WURZEL + path.sep)) return nicht(403);
@@ -158,6 +165,15 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
       if (d === 'aktivieren' || (d && d.typ === 'aktivieren')) return;
       return senden.call(this, d, ...rest);
     };
+  });
+  // Update Teil b: gleich beim Start eine Anfrage, die der alte Service Worker 7 s lang offen hat (nur einmal, per Merker)
+  await kontext.addInitScript(() => {
+    try {
+      const ms = sessionStorage.getItem('test:langsam');
+      if (!ms) return;
+      sessionStorage.removeItem('test:langsam');
+      fetch('__langsam?ms=' + ms).catch(() => {});
+    } catch (e) { /* egal */ }
   });
   const seite = await kontext.newPage();
   return { kontext, seite, fehler, fehlgeschlagen };
@@ -710,6 +726,9 @@ async function testeUpdate(seite, h, fehler) {
   await S('b2 update()', () => seite.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()).then(() => true)));
   await S('b3 neue Version wartet', () => seite.waitForFunction(() => navigator.serviceWorker.getRegistration().then((r) => !!r.waiting), null, { timeout: 30000, polling: 200 }));
   await S('b4 Hinweis weg', () => seite.evaluate(() => { document.querySelector('.update-hinweis')?.remove(); }));
+  // b6 war in CI rot (13.11.2026, 3 von 4 Laeufen): auf langsamen Rechnern wird die neue Version erst nach mehr als 4 s
+  // aktiv, weil der alte Worker noch Anfragen der frischen Seite beantwortet. Der Test stellt das mit einer 7-s-Anfrage nach.
+  await S('b4b langsame Anfrage beim Start', () => seite.evaluate(() => sessionStorage.setItem('test:langsam', '7000')));
   await S('b5 Neuladen', () => seite.reload());
   await S('b6 neue Dateien da', () => seite.waitForFunction((v) => document.querySelector('meta[name="schach-test-version"]')?.content === String(v), neueVersion, { timeout: 20000 }));
   await S('b7 Arena', () => h.screen('arena'));

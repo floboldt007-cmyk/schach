@@ -27,8 +27,10 @@ import { visitenkarte, eigeneKarte, fremdeKarte, botKarte, karteVomServer } from
 import { hoere } from '../ereignisse.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
+import '../sprachen/online.js';
 
 const L = (k, w) => t('p-lobby.' + k, w);
+const O = (k, w) => t('online.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ART_ICON = { blitz: 'blitz', schnell: 'play', klassisch: 'verlauf' };
 // so lange sucht die Vorschau, bevor der Gegner "gefunden" ist (ms); window.__lobbySuche verkuerzt es im Test
@@ -36,6 +38,16 @@ const SUCHDAUER = 2600;
 // Etappe 4b: so lange stehen die Visitenkarten nach einem Treffer oder dem KI-Ersatz (ms); window.__lobbyGefundenMs im Test
 const GEFUNDEN_MS = 1800;
 const KT = (k, w) => t('p-karte.' + k, w);
+
+// Sondertitel (supabase/karte-sondertitel-schema.sql): die Sammlung kennt sie nur fuer das eigene Konto, deshalb hier
+// benannt; dieselbe Regel steht in js/ui/online.js spielerDaten (Duell-Intro), beide gleich halten
+function mitSondertitel(k, roh) {
+  if (!k || k.titel || !roh || typeof roh.titel !== 'string') return k;
+  const pionier = /^pionier-(\d{3})$/.exec(roh.titel);
+  if (roh.titel === 'erfinder') k.titel = { name: O('titel.erfinder') };
+  else if (pionier && Number(pionier[1]) >= 1 && Number(pionier[1]) <= 100) k.titel = { name: O('titel.pionier', { n: Number(pionier[1]) }) };
+  return k;
+}
 
 export function zeige(root, params, app) {
   const s = document.createElement('section');
@@ -240,7 +252,7 @@ export function zeige(root, params, app) {
               const fremd = d.w && d.w.du ? d.s : d.w;
               const alt = el.querySelector('.lb-karte-gegner');
               if (!fremd || !alt) return;
-              const neu = visitenkarte(fremdeKarte(fremd), { groesse: 'mittel' });
+              const neu = visitenkarte(mitSondertitel(fremdeKarte(fremd), fremd), { groesse: 'mittel' });
               neu.classList.add('lb-karte-gegner');
               alt.replaceWith(neu);
             });

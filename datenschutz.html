@@ -195,7 +195,7 @@
   gespeichert, bis du dein Konto löschst. Das geht jederzeit in der App unter Einstellungen → Daten → „Konto löschen“.
   Dabei löschen wir sofort alles, was in unserer Datenbank zu deinem Konto gehört: Konto und Anmeldedaten (auch die
   Verknüpfung mit Google oder Apple), Benutzername, Freundschaften, Anfragen, Einladungscode und Wochenwertung, Cloud-Spielstand,
-  geteilte Partien und Nutzungsdaten sowie das Anmeldeprotokoll.
+  geteilte Partien und Nutzungsdaten sowie das Anmeldeprotokoll und das Protokoll der Verwaltung.
   Ausnahme beim Abo: Technische Zahlungsereignisse von Stripe (Abschnitt 7) bleiben ohne deine Konto-Kennung, aber mit der
   Stripe-Kundennummer stehen, bis sie nach Ablauf von 90 Tagen beim nächsten eingehenden Zahlungsereignis gelöscht werden. Ein laufendes Abo endet mit dem Konto nicht; kündige
   es vorher (bei einem aktiven Abo weist die App beim Löschen darauf hin).
@@ -210,11 +210,14 @@
   <h3>Visitenkarte, Erfolge und Taler</h3>
   <p>Mit Konto speichern wir, welche Erfolgs-Stufen (Bronze, Silber, Gold) du erreicht hast, die Taler, die diese Stufen
   dir gutgeschrieben haben, welche Banner du besitzt und wie deine Visitenkarte aussieht (Banner, Titel aus einer festen
-  Liste, Profilbild, Hintergrund, Rahmen und bis zu drei ausgestellte Erfolge). Ohne Konto bleibt das alles nur auf deinem
+  Liste oder ein besonderer Titel wie „Erfinder“ oder „Pionier“, den du besitzt, Profilbild, Hintergrund, Rahmen und bis zu drei ausgestellte Erfolge). Ohne Konto bleibt das alles nur auf deinem
   Gerät. Diese Daten sind für die Funktionen der App erforderlich (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto
   bei Supabase in Frankfurt.</p>
   <p>Deine Visitenkarte sieht nur, wer mit dir in derselben Online-Partie sitzt (eingeladen oder über die Gegnersuche):
-  dein Benutzername, Titel, Banner, Profilbild, deine Liga-Stufe und die ausgestellten Erfolge. Deine Wochen-Gruppe in der
+  dein Benutzername, Titel, Banner, Profilbild, deine Liga-Stufe, die ausgestellten Erfolge und in gewerteten Partien deine
+  Online-Elo. Freundespartien bleiben ohne Elo. Besondere Titel wie „Erfinder“ oder „Pionier“ (mit Nummer) sieht nur dein
+  Gegner in einer gemeinsamen Online-Partie, und nur, wenn der Server bestätigt, dass du sie besitzt; sonst zeigt die App
+  sie nur auf deiner eigenen Karte. Deine Wochen-Gruppe in der
   Liga und deine Gegner im Rätsel-Duell sehen sie nicht, ebenso wenig andere Nutzer und Besucher ohne Konto.
   Unter „Meine Daten herunterladen“ erhältst du diese Daten mit. Wird dein Konto gelöscht, werden sie automatisch
   mitgelöscht.</p>
@@ -333,6 +336,24 @@
   <p>Die ersten 100 Konten erhalten den Titel „Pionier“ mit einer Nummer. Dafür speichern wir, welche Nummer deinem Konto
   zugeteilt ist und wann (Art. 6 Abs. 1 lit. b DSGVO). Löschst du dein Konto, bleibt die Nummer ohne deine Konto-Kennung
   stehen, damit sie nie ein zweites Mal vergeben wird.</p>
+
+  <!-- Quellen Verwaltung, abgerufen am 13.11.2026: DSGVO Art. 6 Abs. 1 lit. b und f, Art. 13 Abs. 1 lit. c und d, Abs. 2
+       lit. a, Art. 15 Abs. 1, Art. 17 Abs. 1 lit. a, Wortlaut aus BfDI "DSGVO - BDSG" (INFO 1, Stand Maerz 2026,
+       bfdi.bund.de; EUR-Lex lieferte am Abruftag 404); Gegenprobe EDSA Leitlinien 01/2022 zum Auskunftsrecht, Version 2.0
+       vom 28.03.2023 (Aktivitaetsprotokolle gehoeren zur Auskunft). Technik: supabase/verwaltung-schema.sql auf
+       so/R15-verwaltung (ziel_user on delete cascade, verwaltung_stripe_gebunden). Pruefung durch eine fachkundige Person
+       steht aus (Entwurf, siehe Kasten oben). -->
+  <h3>Verwaltung durch den Betreiber</h3>
+  <p>Der Betreiber (Abschnitt 1) kann einzelne Konten über eine interne Verwaltung einsehen: E-Mail-Adresse, Zeitpunkt
+  von Anlage und letzter Anmeldung, Anmeldeart, Benutzername, Premium- und Abo-Stand, Käufe, Sonderstücke und Banner samt Herkunft. In Einzelfällen, etwa auf deine
+  Bitte oder bei einem Fehler, kann er dort Premium freischalten oder zurücknehmen, deinen Benutzernamen ändern,
+  Banner vergeben und die dort vergebenen Banner wieder entfernen. Ein Abo über Stripe, das nicht endgültig beendet ist, ändert die Verwaltung nicht.
+  Jede dieser Änderungen speichern wir mit dem Stand vorher und nachher und dem Zeitpunkt in einem Protokoll. Andere
+  Nutzer haben darauf keinen Zugriff.</p>
+  <p>Rechtsgrundlage für die Änderungen ist dein Nutzungsvertrag (Art. 6 Abs. 1 lit. b DSGVO). Das Protokoll führen wir
+  aus unserem berechtigten Interesse, Änderungen an Konten nachvollziehen und Fehler oder Missbrauch aufklären zu können
+  (Art. 6 Abs. 1 lit. f DSGVO). Das Protokoll über dein Konto ist Teil deiner Datenauskunft (Abschnitt 13) und wird
+  gelöscht, wenn du dein Konto löschst.</p>
 
   <h2>6. Teilen von Partien und Nutzungsdaten (freiwillig, Einwilligung)</h2>
   <p>Mit einem Konto kannst du in den Einstellungen unter „Daten“ den Schalter „Partien und Nutzung teilen“ einschalten.

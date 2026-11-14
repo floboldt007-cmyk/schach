@@ -504,7 +504,7 @@ export function setzeFehlerMelder(fn)            // fn(ort, paket, fehler) bekom
 | `arena:karte-boss` | DOM | `arena.js` (U5), `.ort-karte-boss` am Zelt des Wochen-Boss auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | S1-6 Boss |
 | `arena:karte-event` | DOM | `arena.js` (U5), `.ort-karte-event` an der Fahne (Burgturm) auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | Events |
 | `partie:begruessung?` | Wahl | `partie.js` Start, vor der Begruessungs-Blase | `{ bot, farbe, modus, partienGegenBot }` -> `{ anlass, werte }` | 2B 10 |
-| `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel }` | 2A 5 · 1B 10 · 2B 20 |
+| `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel, boss, herausfordern }` (`herausfordern { text, teile() }` nur nach einem Sieg: teilt den Link zur Bot-Herausforderung; ein Paket, das es in seinen Knopf aufnimmt, markiert ihn mit `data-mit-freund`, dann entfaellt der eigene Knopf `.erg-freund`, R14-G2) | 2A 5 · 1B 10 · 2B 20 |
 | `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 · B2 Frag den Coach 30 |
 | `analyse:oben` | DOM | `analyse.js` `baue()`, oben in `.an-rechts` nach dem Banner | `{ app, partie, review }` | frei |
 | `verlauf:seite` | DOM | `verlauf.js` `baue()`, in `.vl-seite` zwischen Statistik und Schatzkiste | `{ app }` | 2A 10 · 2A 15 · 1C 30 · 2D 40 |
