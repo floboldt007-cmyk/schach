@@ -5,10 +5,12 @@
 // waere "unsichtbar" auch dann gruen, wenn das Paket gar nicht geladen wird).
 //   node tests/verwaltung-browser.test.mjs
 //   PORT=9800 node tests/verwaltung-browser.test.mjs   eigener Port (Standard: frei)
+//   BILDER=<ordner> node tests/verwaltung-browser.test.mjs   dazu je Fall ein Bild der Einstellungen (wie die Funktionsprobe)
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { mkdirSync, existsSync } from 'node:fs';
 import { browserTyp } from './browser.mjs';
 import { DE } from '../js/pakete/verwaltung/texte.js';
 
@@ -18,6 +20,16 @@ const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs'
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+const BILDER = process.env.BILDER || null;
+if (BILDER) mkdirSync(BILDER, { recursive: true });
+const bilderListe = [];
+// Bild der Einstellungen, die Gruppe Verwaltung (falls da) im Blick; misst nichts und aendert nichts am Ablauf
+async function bild(seite, name) {
+  if (!BILDER || !name) return;
+  await seite.evaluate(() => document.querySelector('.vw-gruppe:not([hidden])')?.scrollIntoView({ block: 'center' }));
+  const datei = path.join(BILDER, `verwaltung-${name}.png`);
+  await seite.screenshot({ path: datei }); bilderListe.push(datei);
+}
 
 let ok = 0;
 let gesamt = 0;
@@ -50,7 +62,7 @@ async function warteAufServer(url, ms = 10000) {
 // ist (bzw. ohne Anmeldung nach derselben Wartezeit). spaet: ist_verwalter antwortet erst nach so vielen ms (das Menue
 // ist dann laengst gebaut). konto: Konto freigeschaltet (schach-arena:konto:sichtbar). handy: Handybreite, dort tippt der
 // Test den Menue-Eintrag an und misst, ob die Seite des Bereichs aufgeht.
-async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, konto = true, handy = false } = {}) {
+async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, konto = true, handy = false, bildName = null } = {}) {
   const [w, h] = handy ? [390, 844] : [1180, 820];
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
   const seite = await kontext.newPage();
@@ -101,6 +113,7 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, k
     };
   }, DE.titel);
   const stand = await messe();
+  await bild(seite, bildName);
   let seiteAuf = null;
   if (handy && stand.inNav) {
     await seite.locator('.es-nav-punkt', { hasText: DE.titel }).first().click();
@@ -108,48 +121,49 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, k
     await warte(600);
     seiteAuf = { hash: await seite.evaluate(() => location.hash), ...(await messe()),
       offen: await seite.evaluate(() => !!document.querySelector('.vw-gruppe.es-offen')) };
+    await bild(seite, bildName && bildName + '-seite');
   }
   await kontext.close();
   return { ...stand, navVorher, seiteAuf, fehler, fragen: frage.length };
 }
 
 async function browserTeil(browser) {
-  const ohne = await zustand(browser, { sitzung: null });
+  const ohne = await zustand(browser, { sitzung: null, bildName: 'ohne-anmeldung' });
   pruefe('ohne Anmeldung: Gruppe still unsichtbar, keine Anfrage an ist_verwalter', !ohne.sichtbar && !ohne.text && ohne.fragen === 0, ohne);
   pruefe('ohne Anmeldung: kein Konsolenfehler', ohne.fehler.length === 0, ohne.fehler);
 
-  const kein = await zustand(browser, { recht: false });
+  const kein = await zustand(browser, { recht: false, bildName: 'ohne-recht' });
   pruefe('ohne Recht: Gruppe still unsichtbar, nicht im Menue', kein.fragen === 1 && !kein.sichtbar && !kein.text && !kein.inNav, kein);
   pruefe('ohne Recht: kein Konsolenfehler', kein.fehler.length === 0, kein.fehler);
 
-  const offline = await zustand(browser, { recht: 'offline' });
+  const offline = await zustand(browser, { recht: 'offline', bildName: 'offline' });
   pruefe('offline: Gruppe still unsichtbar', offline.fragen >= 1 && !offline.sichtbar && !offline.text, offline);
   pruefe('offline: kein Konsolenfehler', offline.fehler.length === 0, offline.fehler);
 
-  const fehlt = await zustand(browser, { recht: 'fehlt' });
+  const fehlt = await zustand(browser, { recht: 'fehlt', bildName: 'sql-fehlt' });
   pruefe('SQL fehlt (404): Gruppe still unsichtbar', fehlt.fragen >= 1 && !fehlt.sichtbar && !fehlt.text, fehlt);
   pruefe('SQL fehlt (404): kein Konsolenfehler', fehlt.fehler.length === 0, fehlt.fehler);
 
   // wie abo und schule: ohne Konto-Freischaltung fragt die Verwaltung gar nicht erst, auch mit Sitzung und Recht
-  const gesperrt = await zustand(browser, { recht: true, konto: false });
+  const gesperrt = await zustand(browser, { recht: true, konto: false, bildName: 'ohne-konto' });
   pruefe('ohne Konto-Freischaltung: keine Anfrage an ist_verwalter, Gruppe unsichtbar', gesperrt.fragen === 0 && !gesperrt.sichtbar && !gesperrt.text,
     gesperrt);
   pruefe('ohne Konto-Freischaltung: kein Konsolenfehler', gesperrt.fehler.length === 0, gesperrt.fehler);
 
   // Gegenprobe: das Paket steht in PAKETE und zeigt die Gruppe dem Verwalter, ohne ?erw. ist_verwalter antwortet spaet,
   // das Menue ist dann schon gebaut und muss den Eintrag nachreichen
-  const flo = await zustand(browser, { recht: true, spaet: 1500 });
+  const flo = await zustand(browser, { recht: true, spaet: 1500, bildName: 'verwalter-pc' });
   pruefe('Gegenprobe Verwalter: Gruppe da und sichtbar (Paket aus PAKETE geladen, ohne ?erw)', flo.da && flo.sichtbar && flo.text, flo);
   pruefe('Verwalter am PC: Eintrag im Menue, obwohl ist_verwalter erst nach dem Menue antwortet', flo.navVorher > 0 && flo.inNav, flo);
   pruefe('Verwalter am PC: kein Konsolenfehler', flo.fehler.length === 0, flo.fehler);
 
-  const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true });
+  const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true, bildName: 'verwalter-handy' });
   pruefe('Verwalter am Handy: Eintrag in der Liste nach spaeter Antwort', floHandy.navVorher > 0 && floHandy.inNav, floHandy);
   pruefe('Verwalter am Handy: Tipp oeffnet die Seite der Verwaltung', !!floHandy.seiteAuf?.offen && floHandy.seiteAuf.sichtbar
     && floHandy.seiteAuf.hash === '#einstellungen/verwaltung', floHandy.seiteAuf);
   pruefe('Verwalter am Handy: kein Konsolenfehler', floHandy.fehler.length === 0, floHandy.fehler);
 
-  const keinHandy = await zustand(browser, { recht: false, spaet: 1500, handy: true });
+  const keinHandy = await zustand(browser, { recht: false, spaet: 1500, handy: true, bildName: 'ohne-recht-handy' });
   pruefe('ohne Recht am Handy: kein Eintrag in der Liste, Gruppe unsichtbar', keinHandy.fragen === 1 && !keinHandy.inNav && !keinHandy.sichtbar, keinHandy);
   pruefe('ohne Recht am Handy: kein Konsolenfehler', keinHandy.fehler.length === 0, keinHandy.fehler);
 }
@@ -168,5 +182,6 @@ try {
   if (browser) await browser.close().catch(() => {});
   if (server) server.kill();
 }
+if (BILDER) pruefe(`Bilder abgelegt: ${bilderListe.length}`, bilderListe.length > 0 && bilderListe.every((d) => existsSync(d)), bilderListe.filter((d) => !existsSync(d)));
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);

@@ -9,6 +9,7 @@
 //   PROBE_STRENG=1 node tests/funktion-shop-skin.test.mjs       auch die harten Pruefungen zaehlen (fuer eine Reparatur)
 //   PROBE_SKIN=neon node tests/funktion-shop-skin.test.mjs      ein Labor-Satz (nur Erfinder, js/labor.js) statt Blaupause
 //   node tests/funktion-shop-skin.test.mjs --bilder=<ordner>    je Ansicht ein Bild (<ansicht>.png)
+//   BILDER=<ordner> node tests/funktion-shop-skin.test.mjs      dasselbe ueber die Umgebung (wie die Funktionsprobe)
 //   PORT=9631 node tests/funktion-shop-skin.test.mjs            eigener Port (Standard: frei)
 //
 // Je Ansicht zwei Pruefungen: der gewaehlte Satz steht im Brett, und ein Wechsel bei offener Ansicht wirkt sofort (spaeter
@@ -18,7 +19,7 @@
 // (tests/alle.mjs zaehlt nur "FEHLER" und den Exitcode).
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
@@ -33,7 +34,7 @@ if (!pw) throw new Error('Playwright fehlt');
 const STRENG = process.env.PROBE_STRENG === '1';
 const SKIN = process.env.PROBE_SKIN || 'blaupause';
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = bilderArg ? bilderArg.slice(9) : null;
+const BILDER = bilderArg ? bilderArg.slice(9) : (process.env.BILDER || null);
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.json': 'application/json' };
@@ -113,7 +114,12 @@ const satzAuf = (s, sel) => s.evaluate(({ sel, skin }) => {
     geladen: bilder.filter(i => i.complete && i.naturalWidth > 0).length, beispiel: [...new Set(pfade.map(p => p.replace(/[^/]+\.svg$/, '')))].slice(0, 3) };
 }, { sel, skin: SKIN });
 const imSatz = r => r.da && r.n > 0 && r.imSatz === r.n && r.geladen === r.n;
-async function bild(s, name) { if (BILDER) await s.screenshot({ path: path.join(BILDER, name + '.png') }).catch(e => console.log('Bild ' + name + ': ' + e.message)); }
+const bilderListe = [];
+async function bild(s, name) {
+  if (!BILDER) return;
+  const datei = path.join(BILDER, name + '.png');
+  await s.screenshot({ path: datei }).then(() => bilderListe.push(datei), e => console.log('Bild ' + name + ': ' + e.message));
+}
 async function ansicht(s, name, sel) {
   // Figuren erscheinen, sobald das Brett steht; der Satz kann noch nachkommen (Einstellungen spaet), darum bis 4 s warten
   await s.waitForFunction(({ sel, skin }) => {
@@ -248,6 +254,7 @@ try {
   const gewaehlt = await s.evaluate((sel) => ({ zustand: document.querySelector(sel)?.dataset.zustand,
     figuren: JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').figuren }), teil);
   pruefe(`Auswahl: "${SKIN}" ist ausgeruestet und gespeichert`, gewaehlt.zustand === 'an' && gewaehlt.figuren === SKIN, gewaehlt);
+  await bild(s, '3-ausgeruestet');
   await blattZu(s);
 
   // 3) Bot-Partie
@@ -297,4 +304,5 @@ if (liveListe.length) {
   for (const z of liveListe) console.log('  ' + z.ansicht.padEnd(15) + spalten.map(k => (z[k] ? 'ja' : 'nein').padEnd(13)).join(''));
 }
 if (rotErwartet) console.log(`\n${rotErwartet} harte Pruefung(en) ROT-ERWARTET (zaehlen erst mit PROBE_STRENG=1): ${rot.join(' | ')}`);
+if (BILDER) pruefe(`Bilder abgelegt: ${bilderListe.length}`, bilderListe.length > 0 && bilderListe.every(d => existsSync(d)), bilderListe.filter(d => !existsSync(d)));
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;

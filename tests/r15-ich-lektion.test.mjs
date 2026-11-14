@@ -10,9 +10,11 @@
 //
 //   node tests/r15-ich-lektion.test.mjs
 //   node tests/r15-ich-lektion.test.mjs --bilder=<ordner> --name=vorher|nachher    dazu Bilder je Punkt und Geraet
+//   BILDER=<ordner> node tests/r15-ich-lektion.test.mjs                             dasselbe ueber die Umgebung (wie die Funktionsprobe)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
@@ -26,7 +28,7 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 }
 if (!pw) throw new Error('Playwright fehlt (PLAYWRIGHT_PFAD setzen)');
 const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : null; };
-const BILDER = arg('bilder');
+const BILDER = arg('bilder') || process.env.BILDER || null;
 const NAME = arg('name') || 'bild';
 if (BILDER) await mkdir(BILDER, { recursive: true });
 
@@ -80,7 +82,13 @@ async function seite(browser, viewport, { vitrine = null } = {}) {
 }
 const ruhe = (s) => s.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'
   || a.effect?.getComputedTiming().iterations === Infinity), null, { timeout: 4000 }).catch(() => {});
-async function bild(s, datei) { if (BILDER) await s.screenshot({ path: path.join(BILDER, `${datei}-${NAME}.png`) }); }
+const bilderListe = [];
+const kurz = (geraet) => geraet.replace(/\s+/g, '').toLowerCase();
+async function bild(s, datei) {
+  if (!BILDER) return;
+  const pfad = path.join(BILDER, `${datei}-${NAME}.png`);
+  await s.screenshot({ path: pfad }); bilderListe.push(pfad);
+}
 
 let browser;
 try {
@@ -128,7 +136,7 @@ try {
         // nur die Seite: die Karte selbst meldet am Handy schon vorher 2 px Inhaltsbreite ueber (Banner mit negativem Rand), unsichtbar
         pruefe(`Ich ${geraet} (${fall}): nichts laeuft quer ueber`, m.seiteQuer <= 1, m);
       }
-      if (geraet === 'PC' || geraet === 'iPhone 13') await bild(s, `R4-banner-${geraet.replace(/\s+/g, '').toLowerCase()}-${fall}`);
+      await bild(s, `R4-banner-${kurz(geraet)}-${fall}`);
       pruefe(`Ich ${geraet} (${fall}): keine Seitenfehler`, !fehler.length, fehler);
       await k.close();
     }
@@ -148,6 +156,7 @@ try {
     await s.waitForFunction(() => window.__lektion?.zustand().phase === 'intro', null, { timeout: 15000 }).catch(() => {});
     await ruhe(s);
     const vorStart = await messeAnsicht(s, '.ls-screen');
+    await bild(s, `R6-lektion-vor-start-${kurz(geraet)}`);
     await s.locator('.ls-aktionen [data-a="los"]').click();
     await s.waitForFunction(() => window.__lektion?.zustand().phase === 'flo', null, { timeout: 10000 }).catch(() => {});
     await warte(600); await ruhe(s);
@@ -174,7 +183,7 @@ try {
     pruefe(`Lektion ${geraet}: Leisten und Knoepfe ganz im Bild, nichts rollt oder liegt unter den Knoepfen`, (m.leisten || []).every((l) => l.imBild)
       && m.knoepfe?.hinweis?.imBild && platz.knoepfeImBild && platz.rumpfRollt <= 1 && platz.quer <= 1 && !m.seiteScrollt && !platz.unterKnoepfen.length,
       { platz, knoepfe: m.knoepfe, seiteScrollt: m.seiteScrollt });
-    if (geraet === 'PC' || geraet === 'iPhone 13') await bild(s, `R6-leisten-${geraet.replace(/\s+/g, '').toLowerCase()}`);
+    await bild(s, `R6-leisten-${kurz(geraet)}`);
     pruefe(`Lektion ${geraet}: keine Seitenfehler`, !fehler.length, fehler);
     await k.close();
   }
@@ -193,10 +202,11 @@ try {
     console.log(`  Messung ${geraet}: Zu zweit ${zz.brett ?? zz.fehlt} px, Bot-Partie ${bot.brett ?? bot.fehlt} px`);
     pruefe(`Zu zweit ${geraet}: Brett mindestens so gross wie in der Bot-Partie (${zz.brett} gegen ${bot.brett} px, R6-Brett B)`,
       !zz.fehlt && !bot.fehlt && zz.brett >= bot.brett - 2, { zz: zz.brett ?? zz.fehlt, bot: bot.brett ?? bot.fehlt });
-    if (geraet === 'PC 1280x800') await bild(s, 'R6-brett-zuzweit-pc');
+    await bild(s, geraet === 'PC 1280x800' ? 'R6-brett-zuzweit-pc' : `R6-brett-zuzweit-${kurz(geraet)}`);
     pruefe(`Zu zweit ${geraet}: keine Seitenfehler`, !fehler.length, fehler);
     await k.close();
   }
 } catch (e) { pruefe('Probe laeuft ohne Abbruch', false, e.stack); }
 finally { await browser?.close(); await new Promise((r) => server.close(r)); }
+if (BILDER) pruefe(`Bilder abgelegt: ${bilderListe.length}`, bilderListe.length > 0 && bilderListe.every((d) => existsSync(d)), bilderListe.filter((d) => !existsSync(d)));
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;

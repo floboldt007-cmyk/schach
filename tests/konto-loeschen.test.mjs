@@ -3,9 +3,10 @@
 // konto_loeschen. Netzwerk nur simuliert: Anfragen an *.supabase.co beantwortet der Test, alles ausser 127.0.0.1 wird
 // abgebrochen. Nie gegen die echte Supabase.
 //   PORT=9621 node tests/konto-loeschen.test.mjs   eigener Port (Standard: frei)
+//   BILDER=<ordner> node tests/konto-loeschen.test.mjs   dazu an jeder Haupthandlung ein Bild (wie die Funktionsprobe)
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
@@ -33,6 +34,14 @@ const TOKEN = 'a.' + Buffer.from(JSON.stringify({ sub: 'u1', email: 'flo@example
 const SITZUNG = { access_token: TOKEN, refresh_token: 'r1', expires_in: 3600, expires_at: 9999999999, user: { id: 'u1', email: 'flo@example.invalid' } };
 
 let ok = 0, gesamt = 0;
+const BILDER = process.env.BILDER || null;
+if (BILDER) mkdirSync(BILDER, { recursive: true });
+const bilderListe = [];
+async function bild(s, name) {
+  if (!BILDER) return;
+  const datei = path.join(BILDER, `konto-loeschen-${name}.png`);
+  await s.screenshot({ path: datei, fullPage: true }); bilderListe.push(datei);
+}
 // INTENTIONAL-SLOP[T4]: die Konsole ist der Ausgabeweg dieser Probe (tests/alle.mjs liest sie)
 function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`${gut ? 'OK' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`); }
 const browser = await browserTyp(pw).launch({ headless: true });
@@ -87,16 +96,20 @@ try {
     pruefe('de: Seite laedt, Titel „Konto löschen“, lang de', /Konto löschen/.test(await s.locator('h1').textContent()) && (await s.evaluate(() => document.documentElement.lang)) === 'de');
     pruefe('de: Mail-Weg an kontakt@anfrageprofi.de mit Betreff', /^mailto:kontakt@anfrageprofi\.de\?subject=/.test(await s.locator('a.kl-mail').getAttribute('href') || ''));
     pruefe('ohne Anmeldung: kein Loeschknopf sichtbar', !(await sichtbar(s, '[data-kl="weiter"]')) && !(await sichtbar(s, '[data-kl="loeschen"]')));
+    await bild(s, '1-start');
     await codeAnmelden(s);
     pruefe('Code-Anmeldung: „angemeldet als“ mit der E-Mail', (await sichtbar(s, '.kl-angemeldet')) && /flo@example\.invalid/.test(await s.locator('.kl-wer').textContent()));
+    await bild(s, '1-angemeldet');
     await s.locator('[data-kl="weiter"]').click(); await s.waitForTimeout(200);
     pruefe('Schritt 2: Loeschknopf gesperrt, bis das Wort getippt ist', await s.locator('[data-kl="loeschen"]').isDisabled());
     await s.locator('.kl-bestaetigen').fill('loeschen');
     pruefe('Falsches Wort (ohne ö): Knopf bleibt gesperrt', await s.locator('[data-kl="loeschen"]').isDisabled());
+    await bild(s, '1-schritt2');
     await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
     await s.locator('[data-kl="loeschen"]').click(); await s.waitForTimeout(600);
     pruefe('Loeschen: konto_loeschen genau einmal', z.aufrufe.loeschen === 1, z.aufrufe);
     pruefe('Loeschen: danach abgemeldet und Bestaetigung sichtbar', !(await sitzungDa(s)) && (await sichtbar(s, '.kl-fertig')) && !(await sichtbar(s, '.kl-angemeldet')));
+    await bild(s, '1-geloescht');
     pruefe('de: keine Seitenfehler', z.fehler.length === 0, z.fehler);
     await k.close();
   }
@@ -107,6 +120,7 @@ try {
     await s.locator('[data-kl="weiter"]').click(); await s.waitForTimeout(200);
     await s.locator('[data-kl="abbrechen"]').click(); await s.waitForTimeout(200);
     pruefe('Abbrechen: nichts geloescht, Sitzung bleibt, Schritt 2 zu', z.aufrufe.loeschen === 0 && (await sitzungDa(s)) && !(await sichtbar(s, '[data-kl="loeschen"]')));
+    await bild(s, '2-abgebrochen');
     await k.close();
   }
   { // 3. Fehler: Server lehnt das Loeschen ab -> klarer Text, Sitzung bleibt
@@ -117,6 +131,7 @@ try {
     const st = await status(s);
     pruefe('rpc 500: Fehler als Text, keine Bestaetigung, Sitzung bleibt, kein Server-Text',
       st.fehler === 'ja' && st.text.length > 5 && !/boom/.test(st.text) && !(await sichtbar(s, '.kl-fertig')) && (await sitzungDa(s)), st);
+    await bild(s, '3-serverfehler');
     await k.close();
   }
   { // 4. Fehler bei der Code-Anforderung: nichts angemeldet, nichts geloescht
@@ -135,6 +150,7 @@ try {
     await codeAnmelden(s);
     const st = await status(s);
     pruefe('Falscher Code: Fehler als Text, nicht angemeldet', st.fehler === 'ja' && !(await sitzungDa(s)) && !(await sichtbar(s, '.kl-angemeldet')), st);
+    await bild(s, '4-falscher-code');
     await k.close();
   }
   { // 5. Google: Knopf schickt mit Rueckkehr auf diese Seite; Rueckkehr meldet an und raeumt die Adresse auf
@@ -161,6 +177,7 @@ try {
     await s.locator('.kl-email').fill('kein-mail'); await s.locator('[data-kl="code"]').click(); await s.waitForTimeout(200);
     const st = await status(s);
     pruefe('en: Fehlertext englisch', st.fehler === 'ja' && /email/i.test(st.text) && !/E-Mail-Adresse/.test(st.text), st);
+    await bild(s, '6-en-fehler');
     await s.locator('[data-kl="google"]').waitFor();
     pruefe('en: keine Seitenfehler', z.fehler.length === 0, z.fehler);
     await k.close();
@@ -171,6 +188,7 @@ try {
         await p.locator('[data-kl="weiter"]').click();
         const breit = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         pruefe(`${breite}px ${adresse.includes('-en') ? 'en' : 'de'}: kein seitlicher Ueberlauf`, breit <= 0, breit);
+        await bild(p, `6-schritt2-${breite}-${adresse.includes('-en') ? 'en' : 'de'}`);
         await u.k.close();
       }
     }
@@ -198,6 +216,7 @@ try {
     pruefe('Sitzung abgelaufen, Refresh tot: beim Laden Fehlertext, Anmeldung sichtbar, „angemeldet als“ und Loeschknopf weg',
       st.fehler === 'ja' && st.text.length > 5 && (await sichtbar(s, '.kl-anmelden')) && !(await sichtbar(s, '.kl-angemeldet'))
       && !(await sichtbar(s, '[data-kl="weiter"]')) && !(await sitzungDa(s)) && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
+    await bild(s, '8-sitzung-abgelaufen');
     await k.close();
   }
   { // 8b. Gegenprobe: abgelaufene Sitzung, Refresh klappt -> beim Laden erneuert, angemeldet, keine Meldung
@@ -217,6 +236,7 @@ try {
       const t = (await s.locator('.kl-abo').textContent()) || '';
       pruefe(`${name}: laufendes Stripe-Abo, Hinweis vor Schritt 2 sichtbar`, (await sichtbar(s, '.kl-abo')) && muster.test(t)
         && (name === 'de' ? /kündig/i.test(t) : /cancel/i.test(t)), t);
+      await bild(s, `9-abo-hinweis-${name}`);
       await k.close();
     }
     const { k, z } = await umgebung({ lokal: { 'schach-arena:konto:sitzung': JSON.stringify(SITZUNG) } });
@@ -250,6 +270,7 @@ try {
     await s.evaluate(() => { document.querySelector('.kl-bestaetigen').value = ''; });
     await s.waitForTimeout(1800);
     pruefe('Waehrend der Loeschung: Abbrechen, Weiter und Abmelden gesperrt', gesperrt.every(Boolean), gesperrt);
+    await bild(s, '11-nach-serverfehler');
     pruefe('Nach Serverfehler mit leerem Feld: Loeschknopf gesperrt, Schritt 2 offen, Abbrechen wieder frei',
       (await s.locator('[data-kl="loeschen"]').isDisabled()) && (await sichtbar(s, '.kl-schritt2')) && !(await s.locator('[data-kl="abbrechen"]').isDisabled()));
     await s.locator('[data-kl="loeschen"]').click({ timeout: 500 }).catch(() => {});
@@ -288,5 +309,6 @@ try {
   await browser.close(); server.close();
 }
 // INTENTIONAL-SLOP[T4]: Zusammenfassung der Probe, Ausgabeweg wie alle Zeilen hier
+if (BILDER) pruefe(`Bilder abgelegt: ${bilderListe.length}`, bilderListe.length > 0 && bilderListe.every((d) => existsSync(d)), bilderListe.filter((d) => !existsSync(d)));
 console.log(`${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);
