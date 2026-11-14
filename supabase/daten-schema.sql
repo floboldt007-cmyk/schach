@@ -331,6 +331,7 @@ declare
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
   duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
   raetsel jsonb;
+  verwaltung jsonb := jsonb_build_object('verwalter', null, 'protokoll', '[]'::jsonb); -- [verwaltung]
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -478,6 +479,11 @@ begin
                ''suche'', (select to_jsonb(q) - ''user_id'' from public.duell_warteschlange q where q.user_id = $1))'
       into duelle using uid;
   end if;
+  -- [verwaltung] Verwaltung (verwaltung-schema.sql): Aenderungen der Verwaltung an diesem Konto (was, vorher, nachher,
+  -- [verwaltung] wann), ohne die Kennung des Verwalters; dazu, seit wann das Konto selbst verwalten darf
+  if to_regclass('public.verwaltung_protokoll') is not null then -- [verwaltung]
+    execute 'select jsonb_build_object(''verwalter'', (select jsonb_build_object(''seit'', v.seit) from public.verwalter v where v.user_id = $1), ''protokoll'', coalesce((select jsonb_agg(jsonb_build_object(''was'', x.was, ''vorher'', x.vorher, ''nachher'', x.nachher, ''am'', x.am) order by x.am, x.id) from public.verwaltung_protokoll x where x.ziel_user = $1), ''[]''::jsonb))' into verwaltung using uid; -- [verwaltung]
+  end if; -- [verwaltung]
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
                ''ip'', e.ip_address) order by e.created_at), ''[]''::jsonb)
@@ -533,6 +539,8 @@ begin
     'coach', coach,
     -- Schulmodus: geleitete Klassen mit Aufgaben, eigene Mitgliedschaften mit Fortschritt, Beitrittsversuche
     'schule', schule,
+    -- [verwaltung] Aenderungen der Verwaltung an diesem Konto (leer ohne verwaltung-schema.sql)
+    'verwaltung', verwaltung, -- [verwaltung]
     -- Anmeldeprotokoll von Supabase (Zeitpunkt, Art, IP); null, wenn die Funktion es nicht lesen darf
     'anmeldeprotokoll', protokoll
   ) || werkstatt;

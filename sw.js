@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 337;
-const STAND = '71e776307556';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 342;
+const STAND = '9b02766b75b2';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -80,6 +80,7 @@ const DATEIEN = [
   'js/pakete/finisher/texte.js',
   'js/sprachen/bericht.js',
   'js/pakete/abo/texte.js',
+  'js/pakete/verwaltung/texte.js',
   'js/pakete/coach-ki/texte.js',
   'js/pakete/online/texte.js',
   'js/pakete/schule/texte.js',
@@ -89,6 +90,7 @@ const DATEIEN = [
   'js/sprachen/schule.js',
   'datenschutz-en.html',
   'impressum-en.html',
+  'konto-loeschen-en.html',
   'js/pakete/funken/texte.js',
   'js/pakete/gedaechtnis/texte.js',
   'js/pakete/kartei/texte.js',
@@ -175,6 +177,8 @@ const DATEIEN = [
   'index.html',
   'datenschutz.html',
   'impressum.html',
+  'konto-loeschen.html',
+  'js/konto-loeschen.js',
   'manifest.webmanifest',
   'LICENSE',
   'css/tokens.css',
@@ -218,8 +222,10 @@ const DATEIEN = [
   'js/sonderstuecke.js', 'js/labor.js',
   'js/figurensatz.js',
   'js/abo.js',
+  'js/verwaltung.js',
   'js/pakete/abo/index.js',
   'js/pakete/abo/trainer.js',
+  'js/pakete/verwaltung/index.js',
   'js/coach-ki.js',
   'js/pakete/coach-ki/index.js',
   'js/schule.js',

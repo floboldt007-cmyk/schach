@@ -365,6 +365,12 @@ export function zeige(root, params, app) {
     spaeter(tick, 250);
   }
 
+  // Name des Gegners wie in der Leiste, auch auf der Ende-Karte
+  const gegnerName = (st) => {
+    const g = st.gegner || {};
+    return st.art === 'ki' ? (Number.isInteger(g.elo) ? D('ki.elo', { elo: g.elo }) : D('ki')) : st.art === 'freundschaft' ? D('freund') : D('gegner');
+  };
+
   function zeichneLeiste() {
     const st = d.st;
     const g = st.gegner || { geloest: 0, fehler: 0 };
@@ -378,8 +384,7 @@ export function zeige(root, params, app) {
       el.querySelector('.rd-balken > i').style.transform = `scaleX(${anteil(x.geloest, wer === 'ich' ? g.geloest : st.ich.geloest)})`;
     };
     seite('ich', st.ich, D('du'));
-    const gName = st.art === 'ki' ? (Number.isInteger(g.elo) ? D('ki.elo', { elo: g.elo }) : D('ki')) : st.art === 'freundschaft' ? D('freund') : D('gegner');
-    seite('gegner', g, gName);
+    seite('gegner', g, gegnerName(st));
     const gs = rumpf.querySelector('.rd-seite[data-wer="gegner"]');
     const ki = st.art === 'ki' ? 'ja' : 'nein';
     if (gs.dataset.ki !== ki) {
@@ -479,14 +484,14 @@ export function zeige(root, params, app) {
     const krone = `<span class="rd-krone" aria-hidden="true">${icon('krone')}</span>`;
     rumpf.innerHTML = `<section class="rd-ende" data-ergebnis="${esc(erg)}" aria-live="polite">
         <div class="rd-paar rd-ende-paar">
-          <span class="rd-ende-wer" data-sieger="${erg === 'sieg'}">${erg === 'sieg' ? krone : ''}${ichBild()}</span>
+          <span class="rd-ende-wer" data-sieger="${erg === 'sieg'}">${erg === 'sieg' ? krone : ''}${ichBild()}<small class="rd-ende-name">${esc(D('du'))}</small></span>
           <b class="rd-vs" aria-hidden="true">VS</b>
-          <span class="rd-ende-wer" data-sieger="${erg === 'niederlage'}">${erg === 'niederlage' ? krone : ''}<span class="rd-av" aria-hidden="true">${gegnerBild}</span></span>
+          <span class="rd-ende-wer" data-sieger="${erg === 'niederlage'}">${erg === 'niederlage' ? krone : ''}<span class="rd-av" aria-hidden="true">${gegnerBild}</span><small class="rd-ende-name">${esc(gegnerName(st))}</small></span>
         </div>
         <h2>${esc(D('ende.' + erg))}</h2>
         <b class="rd-gross zahl" aria-hidden="true">${esc(String(st.ich.geloest))} : ${esc(String(g.geloest))}</b>
+        <p class="rd-ende-stand sr">${esc(D('ende.stand', { ich: st.ich.geloest, gegner: g.geloest }))}</p>
         <p class="rd-text rd-kronen">${esc(kronen)}</p>
-        <p class="rd-ende-stand">${esc(D('ende.stand', { ich: st.ich.geloest, gegner: g.geloest }))}</p>
         ${reiheHtml()}
         <div class="rd-knoepfe"><button type="button" class="rd-los dr rd-nochmal">${esc(D('nochmal'))}</button>
           <button type="button" class="knopf dr rd-fertig">${esc(D('fertig'))}</button></div></section>`;

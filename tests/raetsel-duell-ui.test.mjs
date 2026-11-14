@@ -169,6 +169,34 @@ const suchFarbe = (s) => s.evaluate(() => {
   const ist = getComputedStyle(document.querySelector('.rd-suchen'));
   return { gleich: ist.backgroundColor === sollW.grund && ist.color === sollW.text, ist: { grund: ist.backgroundColor, text: ist.color }, soll: sollW };
 });
+// R17 B3 / R17 suchen: Text eines Knopfs auf der Buehne gegen seine eigene Flaeche in Ruhe, unter dem Zeiger, mit Fokus und
+// gedrueckt (17 px ist keine grosse Schrift: Grenze 4,5:1). Eine Aufhellung per filter zaehlt mit, durchscheinende Flaechen gegen
+// beide Endfarben des Kartenverlaufs. Gedrueckt: Zeiger vor dem Loslassen wegziehen, damit kein Klick ausgeloest wird.
+async function knopfKontrast(s, karte, knopf) {
+  const miss = () => s.evaluate(({ karte, knopf }) => {
+    const farbe = (c) => { const p = (c.match(/rgba?\(([^)]+)\)/) || [, '0,0,0'])[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+    const ueber = (o, u) => [0, 1, 2].map((i) => o[i] * o[3] + u[i] * (1 - o[3])).concat(1);
+    const lum = (f) => f.slice(0, 3).map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((x, v, i) => x + v * [0.2126, 0.7152, 0.0722][i], 0);
+    const kontrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const stopps = (getComputedStyle(document.querySelector(karte)).backgroundImage.match(/rgba?\([^)]+\)/g) || []).map(farbe);
+    const st = getComputedStyle(document.querySelector(knopf));
+    const hell = Number((/brightness\(([\d.]+)\)/.exec(st.filter) || [, 1])[1]);
+    const auf = (f) => f.map((v, i) => (i < 3 ? Math.min(255, v * hell) : v));
+    return Math.round(Math.min(...stopps.map((u) => { const g = ueber(farbe(st.backgroundColor), u); return kontrast(auf(ueber(farbe(st.color), g)), auf(g)); })) * 100) / 100;
+  }, { karte, knopf });
+  const erg = {};
+  await s.mouse.move(2, 2);
+  erg.ruhe = await miss();
+  await s.locator(knopf).hover(); await warte(300);
+  erg.zeiger = await miss();
+  await s.mouse.move(2, 2);
+  await s.locator(knopf).focus(); await warte(300);
+  erg.fokus = await miss();
+  await s.locator(knopf).hover(); await s.mouse.down(); await warte(300);
+  erg.gedrueckt = await miss();
+  await s.mouse.move(2, 2); await s.mouse.up(); await warte(300);
+  return erg;
+}
 // B23 (R6 12.11.2026): am grossen Schirm (Seitenleiste links) steht der Seitentitel im Kopf wie am Handy
 const titelSichtbar = (s, sel) => s.evaluate((sel) => {
   const t = document.querySelector(sel + ' .haupt-kopf .marke-titel');
@@ -266,6 +294,10 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
       /Rätsel-Duell/.test(start.titel) && start.regeln === 3 && start.hash === '#raetsel-duell' && g0.breit && g0.klein.length === 0, { ...start, ...g0 });
     const farbe = await suchFarbe(s);
     pruefe('Start: "Gegner suchen" in derselben Farbe wie "Duell suchen" auf Online (Hauptknopf, B17)', farbe.gleich, farbe);
+    // R17 suchen: "Gegner suchen" in allen vier Zustaenden lesbar (die Aufhellung brightness(1.05) senkte es unter 4,5:1)
+    const kSuchen = await knopfKontrast(s, '.rd-start .rd-buehne', '.rd-start .rd-suchen');
+    pruefe('Start: "Gegner suchen" in Ruhe, unter dem Zeiger, mit Fokus und gedrueckt lesbar (Text mindestens 4,5:1)',
+      Math.min(...Object.values(kSuchen)) >= 4.5, kSuchen);
     await bild(s, bildName(geraet, schema, '1-start'));
 
     await s.locator('.rd-suchen').click();
@@ -380,9 +412,50 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
       fokus: document.activeElement?.classList.contains('rd-nochmal') }));
     pruefe('Ende: Gewonnen 3 zu 2, +20 Kronen, Fokus auf Nochmal', ende.erg === 'sieg' && ende.titel === 'Gewonnen' && ende.stand === '3 zu 2 gelöst'
       && ende.kronen === '+20 Kronen' && ende.fokus, ende);
+    // R16 D1: die Striche der Raetsel stehen auf der Ende-Karte mittig wie der Rest (vorher linksbuendig, rechts eine Luecke)
+    // R16 D2: das Ergebnis steht sichtbar nur einmal (gross "3 : 2"); "3 zu 2 gelöst" bleibt fuer Screenreader
+    const mitte = await s.evaluate(() => {
+      const karte = document.querySelector('.rd-ende').getBoundingClientRect();
+      const li = [...document.querySelectorAll('.rd-ende .rd-reihe li')].map((e) => e.getBoundingClientRect());
+      const links = Math.min(...li.map((r) => r.left)), rechts = Math.max(...li.map((r) => r.right));
+      const stand = document.querySelector('.rd-ende-stand').getBoundingClientRect();
+      return { striche: li.length, versatz: Math.round(((links + rechts) / 2 - (karte.left + karte.right) / 2) * 10) / 10,
+        breiteMin: Math.round(Math.min(...li.map((r) => r.width))), standSichtbar: stand.width > 1 && stand.height > 1,
+        gross: document.querySelector('.rd-ende .rd-gross').textContent.trim() };
+    });
+    pruefe('Ende: Raetsel-Striche mittig auf der Karte (Versatz hoechstens 2 px), jeder Strich mindestens 24 px breit',
+      mitte.striche > 0 && Math.abs(mitte.versatz) <= 2 && mitte.breiteMin >= 24, mitte);
+    pruefe('Ende: Ergebnis sichtbar nur einmal (gross 3 : 2), "3 zu 2 gelöst" nur fuer Screenreader', mitte.gross === '3 : 2' && !mitte.standSichtbar, mitte);
+    // R7 Duellknopf A (13.11.): "Nochmal" startet dieselbe Suche wie "Gegner suchen" und traegt dessen Farbe (Akzent)
+    const nochmalFarbe = await s.evaluate(() => {
+      const n = document.querySelector('.rd-ende .rd-nochmal');
+      const probe = document.createElement('button');
+      probe.className = 'rd-los dr rd-suchen';
+      n.parentElement.append(probe);
+      const f = (e) => { const st = getComputedStyle(e); return st.backgroundColor + ' / ' + st.color; };
+      const erg = { nochmal: f(n), suchen: f(probe) };
+      probe.remove();
+      return erg;
+    });
+    pruefe('Ende: Nochmal in der Farbe des Suchknopfs', nochmalFarbe.nochmal === nochmalFarbe.suchen, nochmalFarbe);
+    // R17 B1: die Ende-Karte mit beiden Knoepfen steht ohne Scrollen ganz im Bild (auch iPad quer und PC 1440)
+    const imBild = await s.evaluate(() => {
+      const r = (q) => document.querySelector(q).getBoundingClientRect();
+      const teile = [r('.rd-ende'), r('.rd-ende .rd-nochmal'), r('.rd-ende .rd-fertig')];
+      let gescrollt = 0;
+      for (let e = document.querySelector('.rd-ende'); e; e = e.parentElement) gescrollt += e.scrollTop;
+      return { ok: teile.every((t) => t.top >= -1 && t.bottom <= innerHeight + 1 && t.left >= -1 && t.right <= innerWidth + 1) && gescrollt === 0 && scrollY === 0,
+        unten: Math.round(teile[0].bottom), fenster: innerHeight, gescrollt, scrollY };
+    });
+    pruefe('Ende: Karte mit Nochmal und Fertig ohne Scrollen ganz im Bild', imBild.ok, imBild);
     const g2 = await geometrie(s);
     pruefe('Ende: nichts breiter, Tippflaechen ab 44 px', g2.breit && g2.klein.length === 0, g2);
     await bild(s, bildName(geraet, schema, '4-ende'));
+    // R17 B3: Nochmal und Fertig in Ruhe, unter dem Zeiger, mit Fokus und gedrueckt lesbar (Text mindestens 4,5:1)
+    const kNochmal = await knopfKontrast(s, '.rd-ende', '.rd-ende .rd-nochmal');
+    const kFertig = await knopfKontrast(s, '.rd-ende', '.rd-ende .rd-fertig');
+    pruefe('Ende: Nochmal und Fertig in Ruhe, unter dem Zeiger, mit Fokus und gedrueckt lesbar (Text mindestens 4,5:1)',
+      Math.min(...Object.values(kNochmal), ...Object.values(kFertig)) >= 4.5, { nochmal: kNochmal, fertig: kFertig });
     const nachEnde = p.aufrufe.length;
     await warte(900);
     pruefe('Nach dem Ende keine weiteren Abfragen', p.aufrufe.length === nachEnde, p.aufrufe.slice(nachEnde).map((a) => a.name));
@@ -611,6 +684,12 @@ try {
     { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'dark' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'dark' },
     { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'light' },
+    // R17 B1: Duell-Ende auch auf iPad quer und PC 1440 gemessen (R16-Kritik: "Nicht gemessen"); seit R17 suchen
+    // (Kaltreview raetsel, Befund 2) im Standardlauf je hell und dunkel, nicht erst mit --bilder
+    { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'light' },
+    { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'dark' },
+    { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'light' },
+    { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'dark' },
   ];
   if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'light' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' });

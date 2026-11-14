@@ -9,12 +9,14 @@
 //     gesendet. Offline, abgemeldet oder bei einer Absage null ohne Fehler (beim naechsten Mal nachgeholt).
 //   wahlFuerServer(wahl, stand) -> { banner, titel, vitrine, motiv, grund, rahmen }   die lokale Wahl in Server-Form;
 //     mit stand nur, was der Server als Besitz kennt (Rueckfall nach einer Absage)
+//     Besitzt das Konto den Erfinder- oder Pionier-Titel, meldet der Abgleich ihn danach mit karte_sondertitel_waehle.
 //   karteDerPartie(partieId, { frist }) -> Promise<{ w, s } | null>   beide Karten; nach frist ms (Standard 1200) null
 import { rpc } from './online.js';
 import { sitzung, userId } from './konto.js';
 import { profilWahl } from './profil.js';
 import { ladeBesitz, merkeServer } from './besitz.js';
 import { FAMILIEN, familieVonAlt } from './pakete/sammlung/stufen.js';
+import { istErfinder, pionierNummer, sonderstueckeBekannt, ladeSonderstuecke } from './sonderstuecke.js';
 
 export const KARTE_FRIST_MS = 1200;
 // feste Liste wie karte_konstanten() -> motive (Koenig und Kronli nur fuer den Erfinder, nie auf der Server-Karte)
@@ -88,13 +90,35 @@ async function abgleichEinmal(titel) {
   // Wahl der Karte: erst so, wie der Spieler sie gewaehlt hat; lehnt der Server ab (z. B. ein Titel, den er nicht kennt),
   // ein zweites Mal nur mit dem, was er als Besitz kennt. Scheitert auch das, bleibt die alte Karte stehen.
   const wahl = profilWahl();
+  let ergebnis = stand;
   for (const w of [wahlFuerServer(wahl, null, titel === undefined ? wahl.titel : titel), wahlFuerServer(wahl, stand)]) {
     try {
       const d = await rpc('karte_waehle', w);
-      if (istStand(d)) { merkeServer(uid, d); return d; }
+      if (istStand(d)) { merkeServer(uid, d); ergebnis = d; break; }
     } catch (e) { /* naechster Versuch */ }
   }
-  return stand;
+  await meldeSondertitel(uid);
+  return ergebnis;
+}
+
+// Sondertitel Erfinder und Pionier (R15, supabase/karte-sondertitel-schema.sql): sie gehen nie ueber karte_waehle (feste
+// Liste, SERVER_TITEL), sondern einzeln an den Server, der den Besitz in sonderstuecke prueft, beim Speichern und beim
+// Lesen. Nur Besitzer melden, je Konto einmal je Sitzung; ohne das SQL scheitert der Aufruf still und der Gegner sieht wie
+// bisher keinen Sondertitel. Ein gewaehlter normaler Titel geht beim Server vor.
+let sonderGemeldet = null;
+async function meldeSondertitel(uid, spaet = false) {
+  // hoechstens 1,5 s warten: ein haengender Abruf darf spaetere Abgleiche (Banner, Titel, Rahmen) nicht aufhalten;
+  // kommt die Antwort spaeter, wird danach EINMAL gemeldet (spaet: ohne neuen Abruf, also keine Schleife)
+  if (!spaet && !sonderstueckeBekannt()) {
+    const laden = ladeSonderstuecke();
+    const rechtzeitig = await Promise.race([laden.then(() => true, () => true), new Promise((r) => setTimeout(() => r(false), 1500))]);
+    if (!rechtzeitig) { laden.then(() => meldeSondertitel(uid, true), () => {}); return; }
+  }
+  const titel = istErfinder() ? 'erfinder' : pionierNummer() ? 'pionier' : null;
+  if (!titel || sonderGemeldet === uid + ':' + titel) return;
+  sonderGemeldet = uid + ':' + titel;
+  // altes SQL oder offline: kein Sondertitel beim Gegner, beim naechsten Abgleich (Start, neue Stufe) noch einmal
+  try { await rpc('karte_sondertitel_waehle', { titel }); } catch (e) { sonderGemeldet = null; }
 }
 
 export async function karteDerPartie(partieId, { frist = KARTE_FRIST_MS } = {}) {

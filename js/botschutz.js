@@ -12,8 +12,9 @@
 //
 // Datensparsamkeit: Das Skript kommt nur von challenges.cloudflare.com und erst, wenn die Anmeldung gezeichnet wird
 // (Konto-Gruppe ohne Sitzung), nie beim Start der App. sw.js laesst fremde Herkuenfte ohnehin am Cache vorbei.
-// Testmodus (?test): window.__botschutzTestKey ersetzt den Site-Key, damit die Browser-Tests ohne Konto bei Cloudflare
-// laufen; ausserhalb des Testmodus zaehlt nur TURNSTILE_SITEKEY.
+// Testmodus (?test): nur window.__botschutzTestKey zaehlt (ohne ihn ist der Bot-Schutz aus), damit die Browser-Tests ohne
+// Konto bei Cloudflare laufen und der echte Key (gilt nur auf crownmate.de) keine Suite veraendert; ausserhalb des
+// Testmodus zaehlt nur TURNSTILE_SITEKEY.
 import { TURNSTILE_SITEKEY } from './konto-config.js';
 
 export const TURNSTILE_SKRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
@@ -22,7 +23,7 @@ let laden = null;
 
 function siteKey() {
   try {
-    if (/[?&]test(?:[&=]|$)/.test(globalThis.location?.search || '') && globalThis.__botschutzTestKey) return String(globalThis.__botschutzTestKey);
+    if (/[?&]test(?:[&=]|$)/.test(globalThis.location?.search || '')) return String(globalThis.__botschutzTestKey || '');
   } catch (e) { /* kein location */ }
   return String(TURNSTILE_SITEKEY || '');
 }

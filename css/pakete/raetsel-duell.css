@@ -44,9 +44,14 @@
 .rd-los:active { transform: scale(.98); }
 .rd-los:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
 /* "Gegner suchen" ist dieselbe Handlung wie "Duell suchen" auf der Online-Seite: dieselbe Farbe wie dort (.knopf.primaer,
-   css/app.css), nicht Gold (R6 B17, 12.11.2026) */
-.rd-los.rd-suchen { background: var(--akzent); color: var(--auf-akzent); }
-.rd-los.rd-suchen:active { background: var(--akzent-tief); }
+   css/app.css), nicht Gold (R6 B17, 12.11.2026). "Nochmal" am Ende startet dieselbe Suche (bei Freundschaft den Start):
+   dieselbe Farbe (R7 A, 13.11.2026) */
+.rd-los:is(.rd-suchen, .rd-nochmal) { background: var(--akzent); color: var(--auf-akzent); }
+.rd-los:is(.rd-suchen, .rd-nochmal):active { background: var(--akzent-tief); }
+/* "Gegner suchen" und "Nochmal" unter dem Zeiger ohne Aufhellung wie .knopf.primaer: brightness(1.05) senkte die weisse
+   Schrift auf 4,28:1 (hell) bzw. 4,49:1 (dunkel), unter 4,5:1 (R17 B3 Nochmal, R17 suchen Gegner suchen). Die Aufhellung
+   bleibt nur am goldenen Grundknopf .rd-los, den heute keine Ansicht ohne eine der beiden Klassen benutzt */
+.rd-los:is(.rd-suchen, .rd-nochmal):hover { filter: none; }
 
 /* Mit einem Freund: Einladen und Code eingeben nebeneinander */
 .rd-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-self: stretch; }
@@ -211,6 +216,9 @@ html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: s
 .rd-ende h2 { margin: 0; font-size: 28px; font-weight: 850; color: var(--auf-buehne); }
 .rd-ende-stand { margin: -6px 0 0; font-size: 14px; color: var(--auf-buehne-2); }
 .rd-ende .rd-kronen { padding: 6px 16px; border-radius: var(--r-pille); background: var(--gold); color: var(--kg-stark); font-size: 15px; font-weight: 800; }
+/* R16 D1: auf der Ende-Karte stehen die Striche mittig wie der Rest (auto-fill legte leere Spalten an, rechts blieb eine
+   Luecke); im Spiel bleibt die Reihe ueber die ganze Breite */
+.rd-ende .rd-reihe { grid-template-columns: repeat(auto-fit, minmax(24px, 32px)); justify-content: center; }
 .rd-ende .rd-reihe li { background: rgba(255, 255, 255, .14); }
 .rd-ende .rd-reihe li[data-art="g"] { background: var(--gut); }
 .rd-ende .rd-reihe li[data-art="r"] { background: var(--warn); }
