@@ -509,14 +509,16 @@ gebuchte Kronen aus Duellen bleiben stehen. Die Function danach im Dashboard unt
 ## Weltrangliste nach Online-Elo (Stand 14.11.2026, vorbereitet, noch nicht eingespielt)
 
 Der Reiter „Welt“ in der Bestenliste zeigt Rang, Benutzername, Banner und Online-Elo. Gezeigt wird nur, wer selbst
-„Mitmachen“ tippt (Vorgabe aus), mindestens 15 gewertete Online-Partien hat und einen Benutzernamen trägt. Ein Banner,
-das dem Konto nicht gehört, erscheint als Start-Banner. **Vorher:** den neuen Absatz der Datenschutzerklärung prüfen
-und live stellen, denn die Online-Elo wird damit für alle angemeldeten Spieler sichtbar.
+„Mitmachen“ tippt (Vorgabe aus), mindestens 15 gewertete Online-Partien hat (30, wer seine Start-Elo selbst angegeben
+hat, Flo 14.11.2026) und einen Benutzernamen trägt. Ein Banner, das dem Konto nicht gehört, erscheint als Start-Banner.
+**Vorher:** den neuen Abschnitt „Weltrangliste“ der Datenschutzerklärung prüfen und live stellen, denn die Online-Elo
+wird damit für alle angemeldeten Spieler sichtbar. `weltrang-schema.sql` bringt `meine_daten()` zeichengleich mit
+`daten-schema.sql` mit; ein zweiter Lauf von `daten-schema.sql` ist nicht nötig.
 
 | Nr. | Was | Datei | Prüfen (Erwartung) |
 | --- | --- | --- | --- |
-| 1 | Weltrangliste | `weltrang-schema.sql` | `weltrang-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK` |
-| 2 | Datenauskunft auf den neuen Stand | `daten-schema.sql` (noch einmal) | `daten-rls-test.sql`: unten `Daten-RLS-Test erfolgreich` |
+| 1 | Weltrangliste und Datenauskunft | `weltrang-schema.sql` | `weltrang-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK` |
+| 2 | Datenauskunft prüfen | (nichts einspielen) | `daten-rls-test.sql`: unten `Daten-RLS-Test erfolgreich` |
 | 3 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
 
 Bis Schritt 1 eingespielt ist, zeigt der Reiter „Die Weltrangliste ist gerade nicht erreichbar“.
