@@ -53,6 +53,8 @@ import './sprachen/bots.js';
 
 const WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 export const ANLAESSE = ['begruessung', 'schlagen', 'spielerFehler', 'spielerGut', 'schach', 'verliert', 'gewinnt', 'remis'];
+// Ergebnis einer Partie aus Sicht des Spielers -> Anlass des Bot-Satzes aus Sicht des Bots (Sieg des Spielers: der Bot verliert)
+export const ANLASS_NACH_ERGEBNIS = Object.freeze({ sieg: 'verliert', niederlage: 'gewinnt', remis: 'remis' });
 
 // Staerke-Felder:
 //  tiefe, kurzTiefe, kurzChance  Rechentiefe; manchmal nur flach gerechnet (Uebersehen)

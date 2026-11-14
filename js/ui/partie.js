@@ -121,7 +121,7 @@
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
-import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
+import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo, ANLASS_NACH_ERGEBNIS } from '../bots.js';
 import { zugZufall } from '../tag.js';
 import {
   bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, sanAnzeige, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
@@ -1877,7 +1877,7 @@ export function zeige(root, params, app) {
       if (kompakt) coachEl.classList.add('kompakt');
     }
     klang.ende(ergebnis === 'sieg' ? true : ergebnis === 'niederlage' ? false : null);
-    zeigeBlase(ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis', 'ende', { dauer: 0, immer: true });
+    zeigeBlase(ANLASS_NACH_ERGEBNIS[ergebnis] || 'remis', 'ende', { dauer: 0, immer: true });
     melde({ typ: 'ende', ergebnis, grund });
     s.classList.add('ist-ende');
     if (grund !== 'aufgabe') balkenAktualisieren();
@@ -2087,7 +2087,7 @@ export function zeige(root, params, app) {
         <div class="erg-aktionen"><div class="erg-knoepfe"></div>
           <button class="erg-lobby" type="button" hidden>${icon('haus')}<span>${esc(t('partie.erg.lobby'))}</span></button></div>
       </div>`;
-    o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
+    o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ANLASS_NACH_ERGEBNIS[ergebnis] || 'remis') || '';
     // U7: Bot-Sprueche aus: auch kein Spruch im Ergebnis
     o.querySelector('.erg-bot').hidden = app.einstellungen().sprueche === 'aus';
     // R7 (Befund B13): der Spruch zieht ins Blatt um und steht nur noch dort; die Blase am Brett war bis hierher sein

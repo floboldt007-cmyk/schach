@@ -6,7 +6,8 @@ import { EREIGNISSE, hoere, sende, protokoll, zuruecksetzen } from '../js/ereign
 import { ORTE, anbieten, fuelle, waehle, angeboten, zuruecksetzen as orteZuruecksetzen } from '../js/orte.js';
 import { BUDGET, QUELLEN, BRETT_FEIER, melde, fuerOverlay, nachlese, setzeUhr } from '../js/feier.js';
 import { setzeSpeicher, MODUL_BUDGET } from '../js/storage.js';
-import { BOTS, botSatz, registriereSaetze, PLATZHALTER } from '../js/bots.js';
+import { BOTS, botSatz, registriereSaetze, PLATZHALTER, ANLASS_NACH_ERGEBNIS } from '../js/bots.js';
+import { setzeSprache } from '../js/sprache.js';
 import { icon, registriereIcon, iconNamen } from '../js/ui/icons.js';
 import { readFileSync } from 'node:fs';
 
@@ -439,6 +440,21 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELK
   pruefe('botSatz ohne werte: wie bisher (aus der Liste, keine direkte Wiederholung)', hilde.saetze.begruessung.includes(s1) && s1 !== s2
     && s1 === hilde.saetze.begruessung[0] && s2 === hilde.saetze.begruessung[1]);
   pruefe('botSatz: unbekannter Anlass und fehlender Bot -> null', botSatz(hilde, 'rueckkampf') === null && botSatz(null, 'schach') === null);
+  // R16 E2: das Ergebnis zaehlt aus Sicht des Spielers, der Anlass aus Sicht des Bots (Sieg -> der Bot verliert)
+  pruefe('ANLASS_NACH_ERGEBNIS: Sieg -> verliert, Niederlage -> gewinnt, Remis -> remis',
+    JSON.stringify(ANLASS_NACH_ERGEBNIS) === '{"sieg":"verliert","niederlage":"gewinnt","remis":"remis"}' && Object.isFrozen(ANLASS_NACH_ERGEBNIS));
+  // R16 E2: nach einer Niederlage las sich "Gewonnen, aber du warst nah dran!" als Lob an den Spieler. Saetze, mit denen
+  // der Bot gewinnt, sagen nie, dass der Spieler gewonnen hat, und umgekehrt; je Sprache
+  for (const sp of ['de', 'en']) {
+    setzeSprache(sp);
+    const LOB = { de: /du hast gewonnen|^gewonnen, aber du/i, en: /you won|^won, but you/i }[sp];
+    const ICH = { de: /ich ha(b|be) gewonnen/i, en: /I won/ }[sp];
+    const falschGewinnt = BOTS.flatMap((b) => (b.saetze.gewinnt || []).filter((x) => LOB.test(x)).map((x) => b.id + ': ' + x));
+    const falschVerliert = BOTS.flatMap((b) => (b.saetze.verliert || []).filter((x) => ICH.test(x)).map((x) => b.id + ': ' + x));
+    pruefe(`${sp}: kein Satz "gewinnt" (Bot siegt) lobt den Spieler als Sieger`, !falschGewinnt.length, falschGewinnt);
+    pruefe(`${sp}: kein Satz "verliert" (Bot verliert) sagt, der Bot habe gewonnen`, !falschVerliert.length, falschVerliert);
+  }
+  setzeSprache('de');
   pruefe('PLATZHALTER: zuege, genauigkeit, name, tage', JSON.stringify(PLATZHALTER) === '["zuege","genauigkeit","name","tage"]' && Object.isFrozen(PLATZHALTER));
   const ab = registriereSaetze('rueckkampf', {
     hilde: ['Nach {zuege} Zügen hast du mich erwischt.', 'Schon wieder du, {name}?', 'Du warst {tage} Tage weg und {unbekannt}.'],

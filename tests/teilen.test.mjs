@@ -415,8 +415,9 @@ async function browserTeil(browser) {
   // R14-G2: nach einem Sieg fuehrt der Knopf auch "Freund herausfordern" mit: EIN Knopf "Teilen …" mit Auswahl
   pruefe('Knopf "Teilen …" im Ort ergebnis:karte (mit Icon), kein eigener Knopf "Freund herausfordern" daneben', knopf.sichtbar && knopf.text === 'Teilen …' && knopf.zeile && knopf.icon
     && await seite.locator('.ergebnis-overlay .erg-freund').count() === 0, JSON.stringify(knopf));
-  const wahl = await seite.evaluate(() => [...document.querySelectorAll('.erg-karte-ort .tl-wahl [data-tl-wahl]')].map(b => b.dataset.tlWahl + ':' + b.textContent.trim()));
-  pruefe('Auswahl: Siegesbild und Freund herausfordern', wahl.join('|') === 'bild:Siegesbild|freund:Freund herausfordern', JSON.stringify(wahl));
+  // R16 E1: sichtbar kurz "Herausfordern", der Name bleibt "Freund herausfordern"; dazu ein Schliessen-Knopf
+  const wahl = await seite.evaluate(() => [...document.querySelectorAll('.erg-karte-ort .tl-wahl [data-tl-wahl]')].map(b => b.dataset.tlWahl + ':' + (b.getAttribute('aria-label') || b.textContent.trim())));
+  pruefe('Auswahl: Siegesbild, Freund herausfordern, Schliessen', wahl.join('|') === 'bild:Siegesbild|freund:Freund herausfordern|zu:Schließen', JSON.stringify(wahl));
   await seite.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 60000 });
   await warte(2600);   // Sterne und Genauigkeit fertig eingeblendet
   await seite.screenshot({ path: path.join(BILDER, 'ergebnis-ipad.png') });
