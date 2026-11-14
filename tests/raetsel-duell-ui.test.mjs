@@ -684,13 +684,15 @@ try {
     { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'dark' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'dark' },
     { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'light' },
-    // R17 B1: Duell-Ende auch auf iPad quer und PC 1440 gemessen (R16-Kritik: "Nicht gemessen")
+    // R17 B1: Duell-Ende auch auf iPad quer und PC 1440 gemessen (R16-Kritik: "Nicht gemessen"); seit R17 suchen
+    // (Kaltreview raetsel, Befund 2) im Standardlauf je hell und dunkel, nicht erst mit --bilder
     { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'light' },
+    { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'dark' },
+    { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'light' },
     { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'dark' },
   ];
   if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'light' },
-    { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' },
-    { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'dark' }, { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'light' });
+    { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' });
   if (!NUR) {
     for (const l of laeufe) await duellGegenKi(browser, l);
     await nebenwege(browser);
