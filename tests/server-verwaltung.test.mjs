@@ -295,6 +295,32 @@ ${fall.deleted ? `insert into public.stripe_ereignisse (id, typ, erstellt, kunde
         && JSON.stringify(vorher) === JSON.stringify(nachher), JSON.stringify([an, weg, nachher]));
     }
   }
+
+  // Frueherer Stripe-Kunde (letzter Fall, endgueltig beendet und jetzt manuell freigeschaltet) schliesst ueber den
+  // echten Webhook-Weg ein neues Abo mit neuer abo_id ab: danach ist die Zeile wieder an Stripe gebunden.
+  const uid = `d${FAELLE.length}000000-0000-4000-8000-00000000000${FAELLE.length}`;
+  const vorKauf = (await db.query(`select quelle, abo_id from public.abos where user_id = '${uid}'`)).rows[0];
+  await db.exec('set role service_role;');
+  let kauf;
+  try {
+    kauf = (await db.query(`select public.abo_stripe_ereignis('evt_Neukauf6', 'checkout.session.completed', now(),
+      'cus_Fall${FAELLE.length}', 'sub_Neukauf6', '${uid}', 'aktiv', now() + interval '30 days', 'monat') as w`)).rows[0].w;
+  } catch (e) {
+    kauf = 'Fehler: ' + e.message;
+  } finally {
+    await db.exec('reset role;');
+  }
+  const z = (await db.query(`select status, gueltig_bis, quelle, abo_id from public.abos where user_id = '${uid}'`)).rows[0];
+  pruefe('neues Abo nach manueller Freischaltung: Zeile traegt die neue abo_id und Quelle stripe',
+    vorKauf?.quelle === 'manuell' && kauf === 'zugeordnet' && z?.abo_id === 'sub_Neukauf6' && z?.quelle === 'stripe', JSON.stringify([vorKauf, kauf, z]));
+  const k3 = await wert(F, `public.verwaltung_kaeufe('${uid}')`);
+  pruefe('neues Abo: Kaeufe melden wieder stripe_gebunden', k3?.abo?.stripe_gebunden === true, JSON.stringify(k3?.abo));
+  const an = await wert(F, `public.verwaltung_premium('${uid}', now() + interval '90 days')`);
+  const weg = await wert(F, `public.verwaltung_premium('${uid}', null)`);
+  const z2 = (await db.query(`select status, gueltig_bis, quelle, abo_id from public.abos where user_id = '${uid}'`)).rows[0];
+  pruefe('neues Abo: verwaltung_premium lehnt freischalten und zuruecknehmen mit VERWALTUNG_STRIPE_ABO ab, Zeile unberuehrt',
+    /VERWALTUNG_STRIPE_ABO/.test(an?.fehler || '') && /VERWALTUNG_STRIPE_ABO/.test(weg?.fehler || '') && JSON.stringify(z) === JSON.stringify(z2),
+    JSON.stringify([an, weg, z2]));
 }
 
 // ---------- Protokoll geht mit dem Konto (Kaltreview 13.11.) ----------
