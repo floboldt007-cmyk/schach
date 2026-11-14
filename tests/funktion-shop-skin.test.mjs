@@ -118,7 +118,9 @@ const bilderListe = [];
 async function bild(s, name) {
   if (!BILDER) return;
   const datei = path.join(BILDER, name + '.png');
-  await s.screenshot({ path: datei }).then(() => bilderListe.push(datei), e => console.log('Bild ' + name + ': ' + e.message));
+  // INTENTIONAL-SLOP[T4]: ein misslungenes Bild meldet die Konsole, die Zaehlpruefung am Ende macht es rot
+  await s.screenshot({ path: datei }).catch(e => console.log('Bild ' + name + ': ' + e.message));
+  bilderListe.push(datei);
 }
 async function ansicht(s, name, sel) {
   // Figuren erscheinen, sobald das Brett steht; der Satz kann noch nachkommen (Einstellungen spaet), darum bis 4 s warten

@@ -6,7 +6,8 @@
 //   PORT=9620 node tests/konto-link.test.mjs   eigener Port (Standard: frei)
 //   node tests/konto-link.test.mjs --bilder=<ordner>   je Anmelde-Ansicht ein Bild (<name>.png), am Ende eine Zaehlpruefung;
 //     danach derselbe Lauf je Geraet und Schema (GERAETE) in <ordner>/<b>x<h>-<hell|dunkel>/
-//   BILDER=<ordner> node tests/konto-link.test.mjs   dasselbe ueber die Umgebung (ein --bilder geht vor)
+// INTENTIONAL-SLOP[T6]: Kopf mit Aufrufbeispielen, kein auskommentierter Code
+//   Bilder auch ueber die Umgebung BILDER=<ordner>, wie bei der Funktionsprobe (ein --bilder geht vor)
 //   node tests/konto-link.test.mjs --geraet=375x667:dark   ein Lauf in dieser Fenstergroesse und diesem Farbschema
 //   KONTO_BILDER_FRIST=<s>   Frist je Kind-Lauf mit --bilder (Standard 180 s), danach rot
 import http from 'node:http';
