@@ -4,10 +4,13 @@
 // den Cloud-Stand nicht ueberschreiben. Netzwerk nur simuliert: Anfragen an *.supabase.co beantwortet der Test,
 // alles ausser 127.0.0.1 wird abgebrochen.
 //   PORT=9620 node tests/konto-link.test.mjs   eigener Port (Standard: frei)
-//   node tests/konto-link.test.mjs --bilder=<ordner>   je Anmelde-Ansicht ein Bild (<name>.png), am Ende eine Zaehlpruefung
+//   node tests/konto-link.test.mjs --bilder=<ordner>   je Anmelde-Ansicht ein Bild (<name>.png), am Ende eine Zaehlpruefung;
+//     danach derselbe Lauf je Geraet und Schema (GERAETE) in <ordner>/<b>x<h>-<hell|dunkel>/
+//   node tests/konto-link.test.mjs --geraet=375x667:dark   ein Lauf in dieser Fenstergroesse und diesem Farbschema
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
@@ -46,7 +49,7 @@ const browser = await browserTyp(pw).launch({ headless: true });
 // otpAntwort / verifyAntwort: { status, body } statt der Erfolgsantwort; profil: Zeile in /rest/v1/profile (null = neues Konto)
 async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, neuBereit = false, botschutz = null,
   otpAntwort = null, verifyAntwort = null, profil = null } = {}) {
-  const k = await browser.newContext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'block' });
+  const k = await browser.newContext({ viewport: { width: GERAET.w, height: GERAET.h }, serviceWorkers: 'block', colorScheme: GERAET.schema, hasTouch: GERAET.w < 1000 });
   const zustand = { cloud, uploads: [], otp: [], otpBody: [], fehler: [], neu: [], cf: [], profil, profilPost: [], otpAntwort, verifyAntwort };
   await k.addInitScript((vorbelegt) => {
     try { Object.defineProperty(Navigator.prototype, 'standalone', { configurable: true, get: () => false }); } catch (e) { /* egal */ }
@@ -114,6 +117,12 @@ async function seite(k, zustand, adresse) {
 }
 const lokalePartien = (s) => s.evaluate(() => { try { return JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length; } catch (e) { return 0; } });
 const dialogTitel = (s) => s.evaluate(() => [...document.querySelectorAll('.dialog-ort:not(.weg) h2, .dialog:not(.weg) h2')].map((h) => h.textContent).join(' | '));
+// Fenster und Farbschema (R17, Kurz-Review 26: die Bilder kamen nur in 1024x768). Am Handy (bis 700 px, HANDY in
+// js/ui/einstellungen.js) ist die Konto-Gruppe eine eigene Seite: #einstellungen/konto statt #einstellungen
+const geraetArg = (process.argv.find((a) => a.startsWith('--geraet=')) || '').slice(9).match(/^(\d+)x(\d+):(light|dark)$/);
+const GERAET = geraetArg ? { w: +geraetArg[1], h: +geraetArg[2], schema: geraetArg[3] } : { w: 1024, h: 768, schema: 'light' };
+const EINST = GERAET.w <= 700 ? '#einstellungen/konto' : '#einstellungen';
+const GERAETE = ['375x667', '390x844', '820x1180', '1440x900'].flatMap((g) => ['light', 'dark'].map((sch) => `${g}:${sch}`));
 const status = (s) => s.evaluate(() => ({ text: document.querySelector('.konto-status')?.textContent || '', fehler: document.querySelector('.konto-status')?.dataset.fehler || '' }));
 // Bildausgabe (R17, 14.11.2026, R15-Kritik/funktion.md: diese Probe hatte als einzige keine): ohne --bilder macht bild()
 // nichts. Die Konto-Gruppe wird vorher ins Bild gerollt; offene Dialoge (Umzug) stehen ohnehin im Bild.
@@ -161,7 +170,8 @@ try {
       && ladungen === 2 && /anderen Gerät geladen/.test(await s.evaluate(() => window.__toasts.join(' | '))), { ladungen, dialog: await dialogTitel(s) });
     pruefe('Die 7 Cloud-Partien bleiben in der Cloud', zustand.uploads.every((u) => JSON.parse(u.stand['schach-arena:v1:partien'] || '[]').length === 7)
       && JSON.parse(zustand.cloud.stand['schach-arena:v1:partien']).length === 7, { uploads: zustand.uploads.length });
-    await s.evaluate(() => window.__app.gehe('einstellungen', { gruppe: 'konto' })); await s.waitForTimeout(700);
+    await s.evaluate((p) => window.__app.gehe('einstellungen', p), EINST.endsWith('/konto') ? { seite: 'konto' } : { gruppe: 'konto' });
+    await s.waitForTimeout(700);
     pruefe('Einstellungen > Konto bietet den ersetzten Stand (2 Partien) zum Zurückholen an',
       /2 Partien/.test(await s.evaluate(() => document.querySelector('.konto-verdraengt')?.textContent || '')));
     await s.locator('[data-konto="zurueckholen"]').click(); await s.waitForTimeout(400);
@@ -176,7 +186,7 @@ try {
   { // 3. Zwei Tabs: A hat angefordert, der Link oeffnet B. B laedt die Cloud, A laedt danach von selbst neu (sonst
     // schriebe A seinen alten Stand aus dem Arbeitsspeicher zurueck)
     const { k, zustand } = await speicher({ lokal: { 'schach-arena:v1:partien': partienJson(2, 'pc-'), 'schach-arena:konto:sichtbar': '1' } });
-    const a = await seite(k, zustand, BASIS + '#einstellungen');
+    const a = await seite(k, zustand, BASIS + EINST);
     let ladungenA = 0; a.on('load', () => { ladungenA++; });
     await a.waitForTimeout(1200);
     const b = await seite(k, zustand, LINK);
@@ -266,7 +276,7 @@ try {
   }
   { // 5. Code senden: App-Adresse ohne Hash als redirect_to, Hinweis auf den Link
     const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1' } });
-    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    const s = await seite(k, zustand, BASIS + EINST);
     await s.waitForTimeout(1000);
     await s.locator('.konto-email').fill('flo@example.invalid');
     await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
@@ -285,12 +295,12 @@ try {
     const s = await seite(k, zustand, BASIS + '#arena');
     await s.waitForTimeout(1000);
     pruefe('Bot-Schutz: beim Start der App lädt nichts von Cloudflare', zustand.cf.length === 0, zustand.cf);
-    await s.evaluate(() => { location.hash = '#einstellungen'; });
+    await s.evaluate((h) => { location.hash = h; }, EINST);
     await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
     pruefe('Bot-Schutz: mit der Anmeldung genau ein Skript, nur von challenges.cloudflare.com (explizit gezeichnet)',
       zustand.cf.length === 1 && zustand.cf[0] === '/turnstile/v0/api.js?render=explicit', zustand.cf);
-    pruefe('Bot-Schutz: Widget gezeichnet (hell, deutsch) und Hinweis auf den Bot-Schutz sichtbar',
-      await s.locator('.konto-botschutz').getAttribute('data-gerendert') === 'light|de' && await s.locator('.konto-botschutz-hinweis').isVisible(),
+    pruefe(`Bot-Schutz: Widget gezeichnet (${GERAET.schema === 'dark' ? 'dunkel' : 'hell'}, deutsch) und Hinweis auf den Bot-Schutz sichtbar`,
+      await s.locator('.konto-botschutz').getAttribute('data-gerendert') === `${GERAET.schema}|de` &&await s.locator('.konto-botschutz-hinweis').isVisible(),
       await s.locator('.konto-botschutz').getAttribute('data-gerendert'));
     await bild(s, 'botschutz-widget');
     const mehr = await s.locator('.konto-botschutz-hinweis a').evaluateAll((a) => a.map((x) => ({ href: x.href, ziel: x.target })));
@@ -310,7 +320,7 @@ try {
   }
   { // 7. Bot-Schutz schlaegt fehl: kein Code anfordern, eigener Text
     const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: '2x00000000000000000000AB' });
-    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    const s = await seite(k, zustand, BASIS + EINST);
     await s.waitForTimeout(1200);
     await s.locator('.konto-email').fill('flo@example.invalid');
     await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
@@ -323,7 +333,7 @@ try {
   { // 7b. Widget besteht (1x…AA), aber Supabase lehnt das Token ab (captcha_failed): klarer Text, neues Token fuer den naechsten Versuch
     const { k, zustand } = await speicher({ lokal: OHNE_HINWEIS, botschutz: '1x00000000000000000000AA',
       otpAntwort: { status: 400, body: { code: 400, error_code: 'captcha_failed', msg: 'captcha protection: request disallowed (captcha verification failed)' } } });
-    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    const s = await seite(k, zustand, BASIS + EINST);
     await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
     await s.locator('.konto-email').fill('flo@example.invalid');
     await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
@@ -346,7 +356,7 @@ try {
   const nameFeld = (s) => s.evaluate(() => document.querySelector('.konto-name')?.value ?? null);
   { // 8. Erstanmeldung per Code, neues Konto ohne Cloud-Daten: Geraetestand hochladen, Benutzername waehlen, sauberer Start
     const { k, zustand } = await speicher({ lokal: { ...OHNE_HINWEIS, 'schach-arena:v1:partien': partienJson(2, 'neu-') }, cloud: null });
-    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    const s = await seite(k, zustand, BASIS + EINST);
     await s.waitForTimeout(1000);
     await meldeMitCodeAn(s);
     pruefe('Erstanmeldung Code: angemeldet, Gerätestand (2 Partien) in die leere Cloud hochgeladen, Riegel offen, kein Dialog',
@@ -397,7 +407,7 @@ try {
     for (const sprache of ['de', 'en']) {
       const lokal = sprache === 'en' ? { ...OHNE_HINWEIS, 'schach-arena:v1:einstellungen': JSON.stringify({ sprache: 'en', spracheGewaehlt: true, fassung: 3 }) } : OHNE_HINWEIS;
       const { k, zustand } = await speicher({ lokal, otpAntwort: gesperrt });
-      const s = await seite(k, zustand, BASIS + '#einstellungen');
+      const s = await seite(k, zustand, BASIS + EINST);
       await s.waitForTimeout(1000);
       let st = await sendeCode(s);
       await bild(s, `${sprache}-code-gesperrt-422`);
@@ -444,7 +454,7 @@ try {
   { // 12. Kaltreview 13.11.: Ein Serverfehler landet ohne den Server-Text in der Konsole (darin kann die E-Mail stehen)
     const { k, zustand } = await speicher({ lokal: OHNE_HINWEIS,
       otpAntwort: { status: 500, body: { code: 500, error_code: 'unexpected_failure', msg: 'Error sending magic link email to neu@example.invalid' } } });
-    const s = await seite(k, zustand, BASIS + '#einstellungen');
+    const s = await seite(k, zustand, BASIS + EINST);
     const konsole = [];
     s.on('console', (m) => konsole.push(m.text()));
     await s.waitForTimeout(1000);
@@ -457,6 +467,25 @@ try {
   // 19 Bilder: Umzug 2, Link 1, Code 1, Bot-Schutz 3, Erstanmeldung 2, Google 2, Texte je Sprache 4 (de, en)
   if (BILDER) pruefe(`Bilder: alle 19 Anmelde-Ansichten abgelegt (${BILDER})`, bilder.length === 19 && bilder.every((d) => existsSync(d)),
     { anzahl: bilder.length, fehlen: bilder.filter((d) => !existsSync(d)) });
+  // Hauptlauf mit --bilder: dieselben Ansichten je Geraet und Schema, je ein eigener Prozess (zwei gleichzeitig)
+  if (BILDER && !geraetArg) {
+    const lauf = (g) => new Promise((fertig) => {
+      const [gr, sch] = g.split(':');
+      const ordner = path.join(BILDER, `${gr}-${sch === 'light' ? 'hell' : 'dunkel'}`);
+      const p = spawn(process.execPath, [fileURLToPath(import.meta.url), `--geraet=${g}`, `--bilder=${ordner}`], { env: { ...process.env, PORT: '' } });
+      let aus = '';
+      p.stdout.on('data', (d) => { aus += d; }); p.stderr.on('data', (d) => { aus += d; });
+      p.on('close', (code) => {
+        const zeilen = aus.trim().split(/\r?\n/);
+        fertig({ g, code, ende: zeilen.at(-1), fehler: zeilen.filter((z) => z.startsWith('FEHLER')) });
+      });
+    });
+    const offen = [...GERAETE], erg = [];
+    await Promise.all([0, 1].map(async () => { while (offen.length) erg.push(await lauf(offen.shift())); }));
+    for (const e of erg.sort((a, b) => GERAETE.indexOf(a.g) - GERAETE.indexOf(b.g))) {
+      pruefe(`Bilder ${e.g}: Lauf gruen, 19 Bilder (${e.ende})`, e.code === 0, e.fehler.slice(0, 4));
+    }
+  }
 } finally {
   await browser.close(); server.close();
 }
