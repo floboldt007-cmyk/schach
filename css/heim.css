@@ -266,3 +266,62 @@
 .heim-zurueck .heim-zeile-bild { background: var(--gold-weich); color: var(--kt-stark); }
 .heim-zurueck-knopf { flex: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: var(--r-pille);
   background: var(--text); color: var(--flaeche); font-size: 13.5px; font-weight: var(--gw-stark); white-space: nowrap; }
+
+/* ---------- R19 Shopleiste A: Neu im Shop (Karten mit grossem Brettbild, ohne Preis und ohne Kaufknopf) ---------- */
+.heim-shop-kopf { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 4px var(--a2); }
+.heim-shop-kopf h3 { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text-2); }
+.heim-shop-zum { display: inline-flex; align-items: center; gap: 4px; min-height: var(--tipp); padding: 0 4px; border: 0; background: none;
+  color: var(--kt-stark); font: inherit; font-size: 13.5px; font-weight: var(--gw-stark); cursor: pointer; }
+.heim-shop-zum svg { width: 16px; height: 16px; }
+.heim-shop-zum:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: var(--r-s, 6px); }
+.heim-shop-karten { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.heim-shop-karte { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px; border: 0; border-radius: var(--r-l);
+  background-color: var(--flaeche); box-shadow: var(--s1, none), var(--kante); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: transform var(--d-s) var(--feder-weich); }
+.heim-shop-karten[data-anzahl="1"] { grid-template-columns: minmax(0, 1fr); }
+.heim-shop-karten[data-anzahl="1"] .heim-shop-karte { flex-direction: row; align-items: center; gap: 16px; }
+.heim-shop-bild { display: block; width: 100%; aspect-ratio: 1; border-radius: var(--r-m, 10px); box-shadow: var(--kante); }
+.heim-shop-karten[data-anzahl="1"] .heim-shop-bild { flex: none; width: 112px; }
+.heim-shop-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.heim-shop-text small { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--kt-stark); }
+.heim-shop-neu { display: none; }
+.heim-shop-text b { font-size: 16px; font-weight: var(--gw-stark); line-height: 1.25; }
+.heim-shop-karte:active { transform: scale(.98); }
+.heim-shop-karte:focus-visible { outline: var(--fokus); outline-offset: 3px; }
+@media (hover: hover) { .heim-shop-karte:hover { transform: translateY(-2px); } }
+/* Platz (Flo 08.11.: auf dem Start scrollt nichts): quer ab 900 px steht die Leiste links unter der Leiter, wo Platz frei
+   ist, die rechte Spalte reicht dafuer ueber beide Zeilen. Hochkant nur, wo unter den Wegen genug Hoehe bleibt (Handy ab
+   721 px Hoehe als schmale Zeile); auf kleineren Handys und am iPad hoch faellt sie weg */
+@media (min-width: 900px) and (orientation: landscape) {
+  /* die erste Zeile so hoch wie die linke Spalte, sonst verteilt die rechte (ueber beide Zeilen) ihre Hoehe auf beide */
+  .heim-screen .heim-rumpf:has(> .heim-shop) { grid-template-rows: auto 1fr; }
+  .heim-screen .heim-rumpf > .heim-links { grid-column: 1; grid-row: 1; }
+  .heim-screen .heim-rumpf > .heim-rechts { grid-column: 2; grid-row: 1 / span 2; }
+  .heim-screen .heim-rumpf > .heim-shop { grid-column: 1; grid-row: 2; }
+  .heim-shop-karten[data-anzahl="1"] .heim-shop-bild { width: 132px; }
+}
+@media (max-width: 560px) and (orientation: portrait) {
+  .heim-shop-kopf { display: none; }
+  .heim-shop-karten[data-anzahl="1"] .heim-shop-karte { padding: 8px 12px; gap: 12px; }
+  .heim-shop-karten[data-anzahl="1"] .heim-shop-bild { width: 44px; border-radius: 6px; }
+  .heim-shop-neu { display: inline; }
+}
+@media (max-width: 560px) and (orientation: portrait) and (max-height: 720px), (min-width: 561px) and (orientation: portrait) {
+  .heim-shop { display: none; }
+}
+/* mit Partie macht das Brett links der Leiste Platz (ihre Hoehe samt Kopf und Abstand), auf niedrigen Querformaten
+   (unter 780 px, mit Partie unter 880 px: das Brett geht vor) faellt sie weg; am Handy nur, solange "Als Naechstes"
+   hoechstens zwei Zeilen hat (die Liga geht vor) */
+@media (min-width: 900px) and (orientation: landscape) and (min-height: 880px) {
+  .heim-screen:has(.heim-shop) .heim-buehne[data-art="partie"] { --heim-brett: max(220px, min(100cqw - 2 * var(--a5) - var(--a4) - 230px, 100dvh - 500px)); }
+}
+@container heimlinks (max-width: 639px) {
+  @media (min-width: 900px) and (orientation: landscape) and (min-height: 880px) {
+    .heim-screen:has(.heim-shop) .heim-buehne[data-art="partie"] { --heim-brett: max(220px, min(100cqw - 2 * var(--a5), 100dvh - 630px)); }
+  }
+}
+@media (orientation: landscape) and (max-height: 779px) { .heim-shop { display: none; } }
+@media (orientation: landscape) and (max-height: 879px) { .heim-screen:has(.heim-buehne[data-art="partie"]) .heim-shop { display: none; } }
+@media (max-width: 560px) and (orientation: portrait) and (min-height: 721px) {
+  .heim-screen:has(.heim-liste > :nth-child(3)) .heim-shop { display: none; }
+}

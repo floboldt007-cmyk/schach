@@ -118,7 +118,7 @@ pruefe('Fremde Karte ohne Paket: Banner und Name, kein Titel', fremdeKarte(roh).
 await import('../js/pakete/sammlung/profil.js');
 pruefe('Fremde Karte mit Paket: Titel aus der festen Liste', fremdeKarte(roh).titel?.name === 'Feuertaufe', fremdeKarte(roh).titel);
 pruefe('Liga-Namen nach Konzept 5a an einer Stelle', Object.values(LIGA_NAMEN).join() === 'bauer,springer,laeufer,turm,dame,koenig'
-  && kronenText(7) === 'Läufer II', kronenText(7));
+  && kronenText(7) === 'Warden II', kronenText(7));
 speichereModul('besitz', {});
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);

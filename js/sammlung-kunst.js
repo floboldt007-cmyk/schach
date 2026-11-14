@@ -98,16 +98,29 @@ export function klangKunst(kid) {
 // Flo 31.10.2026 (Foto der Brett-Auswahl): "der Koenig sieht ganz anders aus". Mit figuren (Ordner-URL des
 // ausgeruesteten Satzes, mit Schraegstrich am Ende) zeigt die Vorschau die echten Spielfiguren auf einem 3 x 3
 // Ausschnitt, gross genug zum Erkennen. Ohne figuren (Node-Tests, alte Aufrufer) die gezeichneten Ersatzfiguren.
-// muster (Welten-Bretter, js/labor.js): { h, d } SVG-Inhalt je Feld in viewBox 0 0 100 100, wie im Spiel ueber der Farbe
+const kennung = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
+function flaecheKunst(muster, N, Z, A) {
+  const id = 'skf' + kennung(muster.h + muster.d);
+  const felder = (d) => Array.from({ length: N * N }, (_, i) => [i % N, Math.floor(i / N)]).filter(([x, y]) => (x + y) % 2 === d)
+    .map(([x, y]) => `<rect x="${A + x * Z}" y="${A + y * Z}" width="${Z}" height="${Z}"/>`).join('');
+  const lage = `translate(${A} ${A}) scale(${Z / 100})`;
+  return `<defs><clipPath id="${id}h">${felder(0)}</clipPath><clipPath id="${id}d">${felder(1)}</clipPath></defs>`
+    + `<g class="sk-muster" clip-path="url(#${id}h)"><g transform="${lage}">${muster.h}</g></g>`
+    + `<g class="sk-muster" clip-path="url(#${id}d)"><g transform="${lage}">${muster.d}</g></g>`;
+}
+// muster (Welten-Bretter, js/labor.js): { h, d } SVG-Inhalt je Feld in viewBox 0 0 100 100, wie im Spiel ueber der Farbe;
+// mit ganz (Oberflaeche, js/brett-flaechen.js, viewBox 0 0 800 800): die Ecke oben links des Bretts, je Feldfarbe auf ihre
+// Felder beschnitten. Die clipPath-Ids leiten sich aus der Zeichnung ab, gleiche Bretter teilen sie ohne Widerspruch.
 export function brettKunst(hell, dunkel, rand = '#2A2A2A', figuren = '', muster = null) {
   const N = 3; const Z = 32; const A = (120 - N * Z) / 2;
+  const ganz = !!(muster && muster.ganz);
   const felder = Array.from({ length: N * N }, (_, i) => {
     const x = i % N; const y = Math.floor(i / N); const d = (x + y) % 2;
-    const zeichnung = muster && (d ? muster.d : muster.h);
+    const zeichnung = !ganz && muster && (d ? muster.d : muster.h);
     return `<rect x="${A + x * Z}" y="${A + y * Z}" width="${Z}" height="${Z}" fill="${d ? dunkel : hell}"/>`
       // als Gruppe, nicht als verschachteltes svg: css/pakete/sammlung.css setzt jedem svg in .sa-bild eine Groesse
       + (zeichnung ? `<g class="sk-muster" transform="translate(${A + x * Z} ${A + y * Z}) scale(${Z / 100})">${zeichnung}</g>` : '');
-  }).join('');
+  }).join('') + (ganz ? flaecheKunst(muster, N, Z, A) : '');
   // oben: schwarzer Bauer und Koenig, unten: weisser Koenig und Bauer (je eine Figur auf hellem und dunklem Feld)
   const stellung = [['bP', 1, 0], ['bK', 2, 0], ['wK', 0, 2], ['wP', 1, 2]];
   const bild = (f, x, y) => `<image href="${figuren}${f}.svg" x="${A + x * Z + 1}" y="${A + y * Z + 1}" width="${Z - 2}" height="${Z - 2}"/>`;
