@@ -240,10 +240,21 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
   .raetsel-duell[data-phase="start"] .rd-buehne { grid-row: 2; }
   .raetsel-duell[data-phase="start"] .rd-freund { grid-row: 4; }
 }
-/* R17 ende-pc, Variante A (Auswahlseite R17, Flo waehlt): am PC sass die Ende-Karte oben, darunter bis zu 560 px Leere
-   (1920x1080). Hier steht sie senkrecht mittig im Rumpf. Nur Querformat ab 1021 px MIT Maus (hover und pointer fine):
-   iPad quer (1180x820, Touch) hat dieselbe Breite und bleibt unveraendert; gemessen in tests/r17-ende-pc.test.mjs.
-   Unten derselbe Polster wie oben (wie die Lobby R9): sonst stuende die Karte um 24 px + Leistenhoehe zu hoch */
+/* R17 ende-pc, Variante B (Auswahlseite R17, Flo waehlt): am PC sass die Ende-Karte oben, darunter bis zu 560 px Leere
+   (1920x1080). Hier bleibt sie oben, waechst aber mit der Fensterhoehe (Avatare, Titel, Stand, Striche, Knoepfe; Karte
+   bis 880 px breit) und fuellt so den Rumpf. Nur Querformat ab 1021 px MIT Maus (hover und pointer fine): iPad quer
+   (1180x820, Touch) hat dieselbe Breite und bleibt unveraendert; gemessen in tests/r17-ende-pc.test.mjs */
 @media (orientation: landscape) and (min-width: 1021px) and (hover: hover) and (pointer: fine) {
-  .raetsel-duell[data-phase="beendet"] .rd-rumpf { align-content: center; padding-bottom: 6px; }
+  .raetsel-duell[data-phase="beendet"] .rd-rumpf { padding-inline: max(var(--rand), calc((100% - 880px) / 2 + var(--rand))); }
+  .rd-ende { gap: clamp(14px, 3vh, 32px); padding: clamp(22px, 4vh, 48px) clamp(18px, 4vh, 48px); }
+  .rd-ende-wer .rd-av { width: clamp(64px, 9vh, 100px); height: clamp(64px, 9vh, 100px); }
+  .rd-ende-wer[data-sieger="true"] .rd-av { width: clamp(96px, 14vh, 150px); height: clamp(96px, 14vh, 150px); }
+  .rd-ende .rd-krone .ico { width: clamp(30px, 4vh, 44px); height: clamp(30px, 4vh, 44px); }
+  .rd-ende h2 { font-size: clamp(28px, 4.4vh, 48px); }
+  .rd-ende .rd-gross { font-size: clamp(56px, 12vh, 130px); }
+  .rd-ende .rd-kronen { padding: 8px 20px; font-size: 18px; }
+  .rd-ende .rd-reihe { grid-template-columns: repeat(auto-fit, minmax(32px, 48px)); gap: 8px; }
+  .rd-ende .rd-reihe li { height: 12px; }
+  .rd-ende .rd-knoepfe { gap: 14px; }
+  .rd-ende .rd-knoepfe .knopf, .rd-ende .rd-knoepfe .rd-los { min-height: 64px; font-size: 18px; }
 }
