@@ -2,10 +2,13 @@
 // js/erweiterungen.js, ohne ?erw) und einen gefaelschten Supabase-Server ueber page.route; die echte Supabase wird nie
 // gerufen. Prueft: ohne Anmeldung, ohne Recht, offline und solange die SQL fehlt (404) bleibt die Gruppe "Verwaltung"
 // in den Einstellungen still unsichtbar, ohne Fehler in der Konsole. Gegenprobe: mit Recht erscheint sie (sonst
-// waere "unsichtbar" auch dann gruen, wenn das Paket gar nicht geladen wird).
+// waere "unsichtbar" auch dann gruen, wenn das Paket gar nicht geladen wird). Seit dem Kaltreview vom 14.11.2026 auch:
+// die Gruppe haengt an der Anmeldung, nicht am #konto-Merker; eigenes Menue-Zeichen; das Menue wird bei spaeter Antwort
+// genau einmal neu gebaut, nach dem Verlassen nie mehr; der Deep Link #einstellungen/verwaltung oeffnet am Handy.
 //   node tests/verwaltung-browser.test.mjs
 //   PORT=9800 node tests/verwaltung-browser.test.mjs   eigener Port (Standard: frei)
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -49,8 +52,11 @@ async function warteAufServer(url, ms = 10000) {
 // (Anfrage bricht ab) oder 'fehlt' (404 wie ohne verwaltung-schema.sql). Gemessen wird, nachdem ist_verwalter beantwortet
 // ist (bzw. ohne Anmeldung nach derselben Wartezeit). spaet: ist_verwalter antwortet erst nach so vielen ms (das Menue
 // ist dann laengst gebaut). konto: Konto freigeschaltet (schach-arena:konto:sichtbar). handy: Handybreite, dort tippt der
-// Test den Menue-Eintrag an und misst, ob die Seite des Bereichs aufgeht.
-async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, konto = true, handy = false } = {}) {
+// Test den Menue-Eintrag an und misst, ob die Seite des Bereichs aufgeht. hash: Ziel beim Laden (Deep Link). verlassen:
+// gleich nach dem Laden nach #heim, noch vor der Antwort. probe: wird zum Schluss mit der Seite gerufen, ihr Ergebnis
+// steht in probe. neubau zaehlt, wie oft das Menue (.es-nav) neu gefuellt wurde, nachdem die Seite stand.
+async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, konto = true, handy = false, hash = '#einstellungen',
+  verlassen = false, probe = null } = {}) {
   const [w, h] = handy ? [390, 844] : [1180, 820];
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
   const seite = await kontext.newPage();
@@ -83,34 +89,48 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, k
       if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
     } catch (e) { /* egal */ }
   }, { sitzung, konto });
-  await seite.goto(BASIS + '#einstellungen');
+  await seite.goto(BASIS + hash);
   // state attached: am Handy ist der Inhalt in der Liste verborgen
   await seite.waitForSelector('.es-inhalt', { state: 'attached', timeout: 15000 });
   const navVorher = await seite.locator('.es-nav-punkt').count();
+  await seite.evaluate(() => {
+    window.__neubau = 0;
+    const nav = document.querySelector('.es-nav');
+    if (nav) new MutationObserver(() => { window.__neubau++; }).observe(nav, { childList: true });
+  });
+  if (verlassen) await seite.evaluate(() => { location.hash = '#heim'; });
   const ende = Date.now() + 5000 + spaet;
-  while (sitzung && konto && !beantwortet && Date.now() < ende) await warte(50);
+  while (sitzung && !beantwortet && Date.now() < ende) await warte(50);
   await warte(600);
   const messe = () => seite.evaluate((titel) => {
     const g = document.querySelector('.vw-gruppe');
     const nav = [...document.querySelectorAll('.es-nav-punkt')].map((b) => b.textContent.trim());
+    const zeichen = (s) => document.querySelector(`.es-nav-punkt[data-seite="${s}"] .es-nav-zeichen`)?.innerHTML || '';
     return {
       da: !!g,
       sichtbar: !!g && !g.hidden && g.getClientRects().length > 0,
       inNav: nav.some((t) => t.includes(titel)),
       text: document.querySelector('.es-inhalt')?.innerText.includes(titel) || false,
+      offen: !!document.querySelector('.vw-gruppe.es-offen'),
+      kopf: document.querySelector('.kopf h2')?.textContent.trim() || '',
+      zeichen: zeichen('verwaltung'),
+      kontoZeichen: zeichen('konto'),
+      abschnitte: [...document.querySelectorAll('.es-nav-abschnitt')].map((a) => a.textContent.trim()),
+      neubau: window.__neubau,
     };
   }, DE.titel);
   const stand = await messe();
   let seiteAuf = null;
-  if (handy && stand.inNav) {
+  if (handy && stand.inNav && hash === '#einstellungen') {
     await seite.locator('.es-nav-punkt', { hasText: DE.titel }).first().click();
     await seite.waitForFunction(() => location.hash.startsWith('#einstellungen/'), null, { timeout: 5000 }).catch(() => {});
     await warte(600);
     seiteAuf = { hash: await seite.evaluate(() => location.hash), ...(await messe()),
       offen: await seite.evaluate(() => !!document.querySelector('.vw-gruppe.es-offen')) };
   }
+  const probeErg = probe ? await probe(seite) : null;
   await kontext.close();
-  return { ...stand, navVorher, seiteAuf, fehler, fragen: frage.length };
+  return { ...stand, navVorher, seiteAuf, fehler, fragen: frage.length, probe: probeErg };
 }
 
 async function browserTeil(browser) {
@@ -130,18 +150,96 @@ async function browserTeil(browser) {
   pruefe('SQL fehlt (404): Gruppe still unsichtbar', fehlt.fragen >= 1 && !fehlt.sichtbar && !fehlt.text, fehlt);
   pruefe('SQL fehlt (404): kein Konsolenfehler', fehlt.fehler.length === 0, fehlt.fehler);
 
-  // wie abo und schule: ohne Konto-Freischaltung fragt die Verwaltung gar nicht erst, auch mit Sitzung und Recht
-  const gesperrt = await zustand(browser, { recht: true, konto: false });
-  pruefe('ohne Konto-Freischaltung: keine Anfrage an ist_verwalter, Gruppe unsichtbar', gesperrt.fragen === 0 && !gesperrt.sichtbar && !gesperrt.text,
-    gesperrt);
-  pruefe('ohne Konto-Freischaltung: kein Konsolenfehler', gesperrt.fehler.length === 0, gesperrt.fehler);
+  // Die Gruppe haengt an der Anmeldung, nicht am #konto-Merker (Kaltreview 14.11.2026): wer sich ueber
+  // #einstellungen/konto anmeldet, hat den Merker nicht, der Verwalter sieht die Verwaltung trotzdem
+  const ohneMerker = await zustand(browser, { recht: true, konto: false });
+  pruefe('angemeldet ohne #konto-Merker: Verwalter sieht Gruppe und Menue-Eintrag', ohneMerker.fragen === 1 && ohneMerker.sichtbar
+    && ohneMerker.inNav, ohneMerker);
+  pruefe('angemeldet ohne #konto-Merker: kein Konsolenfehler', ohneMerker.fehler.length === 0, ohneMerker.fehler);
+  const nichts = await zustand(browser, { sitzung: null, konto: false });
+  pruefe('ohne Sitzung und ohne Merker: keine Anfrage an ist_verwalter, Gruppe unsichtbar', nichts.fragen === 0 && !nichts.sichtbar
+    && !nichts.text, nichts);
 
   // Gegenprobe: das Paket steht in PAKETE und zeigt die Gruppe dem Verwalter, ohne ?erw. ist_verwalter antwortet spaet,
   // das Menue ist dann schon gebaut und muss den Eintrag nachreichen
-  const flo = await zustand(browser, { recht: true, spaet: 1500 });
+  const flo = await zustand(browser, { recht: true, spaet: 1500, probe: (s) => s.evaluate(async () => {
+    // Verstecken und wieder Zeigen der Gruppe: je genau ein Neubau des Menues, keine Schleife
+    const g = document.querySelector('.vw-gruppe');
+    const pause = () => new Promise((r) => setTimeout(r, 300));
+    const a = window.__neubau;
+    g.hidden = true; await pause();
+    const b = window.__neubau;
+    g.hidden = false; await pause();
+    return { versteckt: b - a, gezeigt: window.__neubau - b };
+  }) });
   pruefe('Gegenprobe Verwalter: Gruppe da und sichtbar (Paket aus PAKETE geladen, ohne ?erw)', flo.da && flo.sichtbar && flo.text, flo);
   pruefe('Verwalter am PC: Eintrag im Menue, obwohl ist_verwalter erst nach dem Menue antwortet', flo.navVorher > 0 && flo.inNav, flo);
+  pruefe('Verwalter am PC: das Menue wird bei der spaeten Antwort genau einmal neu gebaut', flo.neubau === 1, flo.neubau);
+  pruefe('Verwalter am PC: Verstecken und Zeigen der Gruppe baut das Menue je genau einmal neu (keine Schleife)',
+    flo.probe?.versteckt === 1 && flo.probe?.gezeigt === 1, flo.probe);
+  pruefe('Menue-Zeichen der Verwaltung: das Konto-Zeichen aus dem Verzeichnis, nicht der Ersatz "regler"',
+    !!flo.zeichen && flo.zeichen === flo.kontoZeichen, { zeichen: flo.zeichen, konto: flo.kontoZeichen });
+  pruefe('Menue: kein Zwischentitel doppelt', flo.abschnitte.length > 0 && new Set(flo.abschnitte).size === flo.abschnitte.length, flo.abschnitte);
   pruefe('Verwalter am PC: kein Konsolenfehler', flo.fehler.length === 0, flo.fehler);
+
+  // Verlassen vor der Antwort: danach baut niemand mehr am alten Menue (Beobachter getrennt), zurueck ist alles wieder da
+  const weg = await zustand(browser, { recht: true, spaet: 1500, verlassen: true, probe: async (s) => {
+    await s.evaluate(() => { location.hash = '#einstellungen'; });
+    await s.waitForSelector('.es-inhalt', { state: 'attached', timeout: 15000 });
+    await warte(900);
+    return s.evaluate((titel) => [...document.querySelectorAll('.es-nav-punkt')].some((b) => b.textContent.includes(titel)), DE.titel);
+  } });
+  pruefe('Einstellungen vor der Antwort verlassen: danach kein Neubau des alten Menues, kein Fehler', weg.fragen === 1 && weg.neubau === 0
+    && weg.fehler.length === 0, weg);
+  pruefe('nach der Rueckkehr in die Einstellungen: Verwaltung wieder im Menue', weg.probe === true, weg.probe);
+
+  // Deep Link am Handy: die Seite der Verwaltung oeffnet, sobald die spaete Antwort sie sichtbar macht
+  const tief = await zustand(browser, { recht: true, spaet: 1500, handy: true, hash: '#einstellungen/verwaltung' });
+  pruefe('Deep Link #einstellungen/verwaltung am Handy: Seite der Verwaltung offen nach der spaeten Antwort', tief.offen && tief.sichtbar
+    && tief.kopf === DE.titel, tief);
+  pruefe('Deep Link am Handy: kein Konsolenfehler', tief.fehler.length === 0, tief.fehler);
+
+  // Kaltreview 14.11.2026 (Runde 2): An- und Abmelden, waehrend die Einstellungen offen sind. Die Konto-Gruppe zeichnet
+  // sich dabei neu (js/konto.js, Uhr 1 s); die Verwaltung folgt ohne Verlassen und Wiederkommen, je Wechsel ein Neubau
+  const imBlick = (s) => s.evaluate((titel) => {
+    const g = document.querySelector('.vw-gruppe');
+    return { sichtbar: !!g && !g.hidden && g.getClientRects().length > 0,
+      inNav: [...document.querySelectorAll('.es-nav-punkt')].some((b) => b.textContent.includes(titel)), neubau: window.__neubau };
+  }, DE.titel);
+  const an = await zustand(browser, { sitzung: null, recht: true, hash: '#einstellungen/konto', probe: async (s) => {
+    const vorher = await imBlick(s);
+    await s.evaluate((x) => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(x)), SITZUNG);
+    await warte(3000);
+    return { vorher, nachher: await imBlick(s) };
+  } });
+  pruefe('Anmeldung bei offenen Einstellungen: Verwaltung erscheint ohne Verlassen (Gruppe und Menue), genau eine Anfrage',
+    !an.probe.vorher.sichtbar && an.probe.nachher.sichtbar && an.probe.nachher.inNav && an.fragen === 1, { probe: an.probe, fragen: an.fragen });
+  pruefe('Anmeldung bei offenen Einstellungen: das Menue wird genau einmal neu gebaut', an.probe.nachher.neubau - an.probe.vorher.neubau === 1,
+    an.probe);
+  pruefe('Anmeldung bei offenen Einstellungen: kein Konsolenfehler', an.fehler.length === 0, an.fehler);
+  const ab = await zustand(browser, { recht: true, hash: '#einstellungen/konto', probe: async (s) => {
+    const vorher = await imBlick(s);
+    await s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+    await warte(3000);
+    return { vorher, nachher: await imBlick(s) };
+  } });
+  pruefe('Abmeldung bei offenen Einstellungen: Verwaltung verschwindet sofort (Gruppe und Menue), keine neue Anfrage',
+    ab.probe.vorher.sichtbar && !ab.probe.nachher.sichtbar && !ab.probe.nachher.inNav && ab.fragen === 1, { probe: ab.probe, fragen: ab.fragen });
+  pruefe('Abmeldung bei offenen Einstellungen: das Menue wird genau einmal neu gebaut', ab.probe.nachher.neubau - ab.probe.vorher.neubau === 1,
+    ab.probe);
+  pruefe('Abmeldung bei offenen Einstellungen: kein Konsolenfehler', ab.fehler.length === 0, ab.fehler);
+  // Kaltreview Runde 3: Abmelden verwirft die gemerkte Antwort auch im Weg ueber die Gruppe; meldet sich dasselbe Konto
+  // wieder an, wird neu gefragt (sonst bliebe ein inzwischen entzogenes Recht in der Anzeige stehen)
+  const wieder = await zustand(browser, { recht: true, hash: '#einstellungen/konto', probe: async (s) => {
+    await s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+    await warte(3000);
+    const zwischen = await imBlick(s);
+    await s.evaluate((x) => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(x)), SITZUNG);
+    await warte(3000);
+    return { zwischen, nachher: await imBlick(s) };
+  } });
+  pruefe('Ab- und Wiederanmeldung desselben Kontos bei offenen Einstellungen: neu gefragt (2 Anfragen), Gruppe wieder da',
+    !wieder.probe.zwischen.sichtbar && wieder.probe.nachher.sichtbar && wieder.fragen === 2, { probe: wieder.probe, fragen: wieder.fragen });
 
   const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true });
   pruefe('Verwalter am Handy: Eintrag in der Liste nach spaeter Antwort', floHandy.navVorher > 0 && floHandy.inNav, floHandy);
@@ -153,6 +251,13 @@ async function browserTeil(browser) {
   pruefe('ohne Recht am Handy: kein Eintrag in der Liste, Gruppe unsichtbar', keinHandy.fragen === 1 && !keinHandy.inNav && !keinHandy.sichtbar, keinHandy);
   pruefe('ohne Recht am Handy: kein Konsolenfehler', keinHandy.fehler.length === 0, keinHandy.fehler);
 }
+
+// Der Servertest der Verwaltung braucht PGlite und laeuft darum im CI-Job sql, nicht ueber tests/alle.mjs (dort fehlt
+// PGlite im Browser-Job, R17-sammelfix2)
+pruefe('CI-Job sql fuehrt die Suite server-verwaltung', /run: node tests\/server-verwaltung\.test\.mjs/
+  .test(readFileSync(path.join(WURZEL, '.github/workflows/tests.yml'), 'utf8')));
+pruefe('tests/alle.mjs fuehrt server-verwaltung nicht (PGlite nur im CI-Job sql)', !/name: 'server-verwaltung'/
+  .test(readFileSync(path.join(WURZEL, 'tests/alle.mjs'), 'utf8')));
 
 let server = null;
 let browser = null;

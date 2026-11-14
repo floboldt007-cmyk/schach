@@ -406,9 +406,47 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
       return erg;
     });
     pruefe('Ende: Nochmal in der Farbe des Suchknopfs', nochmalFarbe.nochmal === nochmalFarbe.suchen, nochmalFarbe);
+    // R17 B1: die Ende-Karte mit beiden Knoepfen steht ohne Scrollen ganz im Bild (auch iPad quer und PC 1440)
+    const imBild = await s.evaluate(() => {
+      const r = (q) => document.querySelector(q).getBoundingClientRect();
+      const teile = [r('.rd-ende'), r('.rd-ende .rd-nochmal'), r('.rd-ende .rd-fertig')];
+      let gescrollt = 0;
+      for (let e = document.querySelector('.rd-ende'); e; e = e.parentElement) gescrollt += e.scrollTop;
+      return { ok: teile.every((t) => t.top >= -1 && t.bottom <= innerHeight + 1 && t.left >= -1 && t.right <= innerWidth + 1) && gescrollt === 0 && scrollY === 0,
+        unten: Math.round(teile[0].bottom), fenster: innerHeight, gescrollt, scrollY };
+    });
+    pruefe('Ende: Karte mit Nochmal und Fertig ohne Scrollen ganz im Bild', imBild.ok, imBild);
     const g2 = await geometrie(s);
     pruefe('Ende: nichts breiter, Tippflaechen ab 44 px', g2.breit && g2.klein.length === 0, g2);
     await bild(s, bildName(geraet, schema, '4-ende'));
+    // R17 B3: Nochmal und Fertig in Ruhe und unter dem Zeiger lesbar, Text mindestens 4,5:1 gegen die eigene Flaeche
+    // (17 px ist keine grosse Schrift). Eine Aufhellung per filter zaehlt mit, durchscheinende Flaechen gegen beide Endfarben der Karte
+    const lesbar = () => s.evaluate(() => {
+      const farbe = (c) => { const p = (c.match(/rgba?\(([^)]+)\)/) || [, '0,0,0'])[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+      const ueber = (o, u) => [0, 1, 2].map((i) => o[i] * o[3] + u[i] * (1 - o[3])).concat(1);
+      const lum = (f) => f.slice(0, 3).map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((x, v, i) => x + v * [0.2126, 0.7152, 0.0722][i], 0);
+      const kontrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      const stopps = (getComputedStyle(document.querySelector('.rd-ende')).backgroundImage.match(/rgba?\([^)]+\)/g) || []).map(farbe);
+      const erg = {};
+      for (const k of ['rd-nochmal', 'rd-fertig']) {
+        const st = getComputedStyle(document.querySelector('.rd-ende .' + k));
+        const hell = Number((/brightness\(([\d.]+)\)/.exec(st.filter) || [, 1])[1]);
+        const auf = (f) => f.map((v, i) => (i < 3 ? Math.min(255, v * hell) : v));
+        erg[k] = Math.round(Math.min(...stopps.map((u) => { const g = ueber(farbe(st.backgroundColor), u); return kontrast(auf(ueber(farbe(st.color), g)), auf(g)); })) * 100) / 100;
+      }
+      return erg;
+    });
+    const ruhe = await lesbar();
+    await s.locator('.rd-ende .rd-nochmal').hover();
+    await warte(300);
+    const zeigerN = await lesbar();
+    await s.locator('.rd-ende .rd-fertig').hover();
+    await warte(300);
+    const zeigerF = await lesbar();
+    await s.mouse.move(2, 2);
+    const kontraste = { ruhe, nochmalZeiger: zeigerN['rd-nochmal'], fertigZeiger: zeigerF['rd-fertig'] };
+    pruefe('Ende: Nochmal und Fertig in Ruhe und unter dem Zeiger lesbar (Text mindestens 4,5:1)',
+      Math.min(ruhe['rd-nochmal'], ruhe['rd-fertig'], kontraste.nochmalZeiger, kontraste.fertigZeiger) >= 4.5, kontraste);
     const nachEnde = p.aufrufe.length;
     await warte(900);
     pruefe('Nach dem Ende keine weiteren Abfragen', p.aufrufe.length === nachEnde, p.aufrufe.slice(nachEnde).map((a) => a.name));
@@ -637,9 +675,13 @@ try {
     { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'dark' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'dark' },
     { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'light' },
+    // R17 B1: Duell-Ende auch auf iPad quer und PC 1440 gemessen (R16-Kritik: "Nicht gemessen")
+    { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'light' },
+    { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'dark' },
   ];
   if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'light' },
-    { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' });
+    { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' },
+    { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'dark' }, { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'light' });
   if (!NUR) {
     for (const l of laeufe) await duellGegenKi(browser, l);
     await nebenwege(browser);

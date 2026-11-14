@@ -49,6 +49,8 @@ const SUITEN = [
   { name: 'konto-loeschen', datei: 'konto-loeschen.test.mjs', args: [], was: 'Löschseite ohne App (Google Play): Anmeldung, zweistufig löschen, Mail-Weg (Browser)' },
   { name: 'server-abo', datei: 'server-abo.test.mjs', args: [], was: 'Abo: Stripe-Webhook und Schema-Vertrag (Server)' },
   { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Trainer“: Stand, Kauf, Blatt' },
+  // server-verwaltung steht wie alle PGlite-Suiten (server-karte*, server-daten*) nicht hier: PGlite gibt es nur im CI-Job
+  // sql (.github/workflows/tests.yml), im Browser-Job brach die Suite ab (R17-sammelfix2, Run 43587846003)
   { name: 'verwaltung', datei: 'verwaltung.test.mjs', args: [], was: 'Verwaltung fuer Flo: Recht still pruefen, Aufrufe, Fehlertexte, Ansichten (ohne Browser)' },
   { name: 'verwaltung-browser', datei: 'verwaltung-browser.test.mjs', args: [], was: 'Verwaltung im Browser: still unsichtbar ohne Recht, Menue-Eintrag nach spaeter Antwort (PC und Handy)' },
   { name: 'server-coach', datei: 'server-coach.test.mjs', args: [], was: 'Frag den Coach: Edge Function, Prompt, Tageslimit (Server)' },
@@ -99,6 +101,7 @@ const SUITEN = [
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
+  { name: 'info-lizenzen', datei: 'info-lizenzen.test.mjs', args: [], was: 'Info und Lizenzen: jede Fremdlizenz und der eigene Quellcode in DE und EN, Herkunft Kuerbis/Frost/Gold (Browser)' },
   { name: 'klang', datei: 'klang.test.mjs', args: [], was: 'Klangpakete: Katalog, Dateien, Pegel, Abspielen' },
   { name: 'musik', datei: 'musik.test.mjs', args: [], was: 'Lobby-Musik: Standard, Beruehrung, Welten und Freischaltung' },
   { name: 'navigation', datei: 'navigation.test.mjs', args: [], was: 'Reiter-Leiste, Kopf, Bauteile, Training-Hülle' },
