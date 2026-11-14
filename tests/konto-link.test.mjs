@@ -7,6 +7,7 @@
 //   node tests/konto-link.test.mjs --bilder=<ordner>   je Anmelde-Ansicht ein Bild (<name>.png), am Ende eine Zaehlpruefung;
 //     danach derselbe Lauf je Geraet und Schema (GERAETE) in <ordner>/<b>x<h>-<hell|dunkel>/
 //   node tests/konto-link.test.mjs --geraet=375x667:dark   ein Lauf in dieser Fenstergroesse und diesem Farbschema
+//   KONTO_BILDER_FRIST=<s>   Frist je Kind-Lauf mit --bilder (Standard 180 s), danach rot
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync, existsSync } from 'node:fs';
@@ -122,6 +123,7 @@ const dialogTitel = (s) => s.evaluate(() => [...document.querySelectorAll('.dial
 const geraetArg = (process.argv.find((a) => a.startsWith('--geraet=')) || '').slice(9).match(/^(\d+)x(\d+):(light|dark)$/);
 const GERAET = geraetArg ? { w: +geraetArg[1], h: +geraetArg[2], schema: geraetArg[3] } : { w: 1024, h: 768, schema: 'light' };
 const EINST = GERAET.w <= 700 ? '#einstellungen/konto' : '#einstellungen';
+const FRIST_KIND = Number(process.env.KONTO_BILDER_FRIST) || 180;   // Sekunden je Kind-Lauf (--bilder)
 const GERAETE = ['375x667', '390x844', '820x1180', '1440x900'].flatMap((g) => ['light', 'dark'].map((sch) => `${g}:${sch}`));
 const status = (s) => s.evaluate(() => ({ text: document.querySelector('.konto-status')?.textContent || '', fehler: document.querySelector('.konto-status')?.dataset.fehler || '' }));
 // Bildausgabe (R17, 14.11.2026, R15-Kritik/funktion.md: diese Probe hatte als einzige keine): ohne --bilder macht bild()
@@ -473,11 +475,20 @@ try {
       const [gr, sch] = g.split(':');
       const ordner = path.join(BILDER, `${gr}-${sch === 'light' ? 'hell' : 'dunkel'}`);
       const p = spawn(process.execPath, [fileURLToPath(import.meta.url), `--geraet=${g}`, `--bilder=${ordner}`], { env: { ...process.env, PORT: '' } });
-      let aus = '';
+      let aus = '', abgelaufen = false;
+      // Frist je Kind (Fix-Review 26): ein haengendes Kind meldet rot, statt den Hauptlauf bis zum aeusseren timeout zu halten.
+      // 4 Runden x 180 s + Hauptlauf bleiben unter 900 s. Unter Windows mit dem ganzen Baum (Browser, Server des Kinds).
+      const frist = setTimeout(() => {
+        abgelaufen = true;
+        if (process.platform === 'win32') spawn('taskkill', ['/pid', String(p.pid), '/T', '/F'], { stdio: 'ignore' });
+        else p.kill('SIGKILL');
+      }, FRIST_KIND * 1000);
       p.stdout.on('data', (d) => { aus += d; }); p.stderr.on('data', (d) => { aus += d; });
       p.on('close', (code) => {
+        clearTimeout(frist);
         const zeilen = aus.trim().split(/\r?\n/);
-        fertig({ g, code, ende: zeilen.at(-1), fehler: zeilen.filter((z) => z.startsWith('FEHLER')) });
+        fertig({ g, code: abgelaufen ? 'frist' : code, ende: abgelaufen ? `nach ${FRIST_KIND} s abgebrochen` : zeilen.at(-1),
+          fehler: zeilen.filter((z) => z.startsWith('FEHLER')) });
       });
     });
     const offen = [...GERAETE], erg = [];
