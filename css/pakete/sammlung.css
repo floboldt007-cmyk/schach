@@ -323,3 +323,23 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 /* R13-Shop (10.11.2026): volle Farben auch ohne Konto (Flo 10.11.) */
 .sh-karte[data-gast] .sh-brett { box-shadow: 0 0 0 2px var(--text-2); }
 .sh-karte[data-gast] .sh-name { color: var(--text-2); }
+
+/* R15 (R4-Banner A, Flo 13.11.2026): am PC (ab 1021 px, auch iPad quer) steht die Vitrine rechts IM Banner der Profilkarte
+   statt darunter; die rechte Bannerseite ist ruhig und dunkel fuer weisse Schrift (css/visitenkarte.css). Handy und iPad hoch
+   bleiben wie bisher: dort wirkt die Huelle .pr-vitrine-ort (js/pakete/sammlung/profil.js) nicht. */
+.pr-vitrine-ort { display: contents; }
+@media (min-width: 1021px) {
+  .pr-karte { --pr-vitrine-b: 336px; grid-template-columns: minmax(0, 1fr) var(--pr-vitrine-b); }
+  .pr-karte > * { grid-column: 1 / -1; }
+  /* das Banner reicht ueber beide Spalten, Bild und Name halten Abstand zur Vitrine */
+  .pr-karte:has(> .pr-vitrine-ort) > .pr-kopf { grid-row: 1; padding-right: calc(var(--pr-vitrine-b) + 14px + 16px); }
+  .pr-karte > .pr-vitrine-ort { grid-column: 2; grid-row: 1; align-self: center; position: relative; z-index: 2; display: grid; gap: 6px;
+    min-width: 0; padding: 0 0 12px; margin-top: -2px; }
+  .pr-vitrine-ort .pr-vitrine-titel { margin: 0; color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
+  .pr-vitrine-ort .pr-orden { min-height: 76px; padding: 8px 6px; gap: 4px; }
+  .pr-vitrine-ort .pr-orden-bild { width: 32px; height: 32px; }
+  .pr-vitrine-ort .pr-plus { font-size: 22px; line-height: 32px; }
+  /* leere Plaetze auf dem Banner: dunkel durchscheinend mit weisser Schrift statt durchsichtig (sonst kaum lesbar) */
+  .pr-vitrine-ort .pr-orden.leer { background: rgba(10, 12, 16, .62); border-color: rgba(255, 255, 255, .55); color: #FFFFFF; }
+  .pr-vitrine-ort .pr-vitrine[data-leer] .pr-orden { min-height: 44px; }
+}
