@@ -36,10 +36,11 @@ function pruefe(name, gut, detail = '') {
   console.log(`${gut ? 'ok  ' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`);
 }
 
-// die Ziele in den echten Screens; ziel = ein sichtbares Element, das nicht gerade gewaehlt ist
+// die Ziele in den echten Screens; gemessen wird JEDES sichtbare Element, das nicht gerade gewaehlt ist;
+// muss = mindestens eines der gemessenen Elemente trifft diesen Selektor (der antippbare Chip, nicht nur der Sterne-Zaehler)
 const ZIELE = [
   { name: 'Einstellungen: Navigation (.es-nav-punkt)', screen: 'einstellungen', ziel: '.es-nav-punkt:not([aria-current="true"])' },
-  { name: 'Kopf-Chip (.kopf-chips > .chip)', screen: 'arena', ziel: '.haupt-kopf .kopf-chips > .chip' },
+  { name: 'Kopf-Chip (.kopf-chips > .chip)', screen: 'arena', ziel: '.haupt-kopf .kopf-chips > .chip', muss: '[role="button"]' },
 ];
 
 async function oeffne(browser, { w, h, schema, touch, css }) {
@@ -66,15 +67,17 @@ async function oeffne(browser, { w, h, schema, touch, css }) {
   return { kontext, s, fehler };
 }
 
-// Ziel im sichtbaren Screen; null, wenn keins sichtbar ist
+// alle sichtbaren Ziele im Screen; leer, wenn keins sichtbar ist
 async function finde(s, z) {
   await s.goto(`${BASIS}#${z.screen}`);
-  const el = s.locator(`.screen:not([hidden]) ${z.ziel}`).filter({ visible: true }).first();
-  await el.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-  if (!(await el.count())) return null;
-  await el.scrollIntoViewIfNeeded(); await s.mouse.move(1, 1); await warte(400);
-  return el;
+  const alle = s.locator(`.screen:not([hidden]) ${z.ziel}`).filter({ visible: true });
+  await alle.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  return alle.all();
 }
+
+// die gemessenen Elemente decken z.muss ab (ohne muss: mindestens eins)
+const deckt = (z, els) => (els.length ? (z.muss ? Promise.all(els.map((e) => e.evaluate((x, m) => x.matches(m), z.muss))).then((t) => t.some(Boolean)) : true) : false);
+const kennung = (el) => el.evaluate((x) => `${x.tagName.toLowerCase()}.${[...x.classList].join('.')}${x.getAttribute('role') ? `[role=${x.getAttribute('role')}]` : ''}`);
 
 // Aussehen: Farbe, Flaeche, Rand, Schatten, Filter, Verschiebung des Elements und seiner Nachfahren
 const aussehen = (el) => el.evaluate((x) => [x, ...x.querySelectorAll('*')].map((k) => {
@@ -110,15 +113,20 @@ async function beruehrung(browser, { geraet, w, h, schema, css }) {
   const { kontext, s, fehler } = await oeffne(browser, { w, h, schema, touch: true, css });
   pruefe(`${name}: Geraet ohne Zeiger (hover: none)`, await s.evaluate(() => matchMedia('(hover: none)').matches));
   for (const z of ZIELE) {
-    const el = await finde(s, z);
-    if (!el) { pruefe(`${name} ${z.name}: sichtbar in #${z.screen}`, false, 'nicht gefunden'); continue; }
-    const ruhe = await aussehen(el);
-    await el.hover(); await warte(500);
-    const nach = await aussehen(el);
-    pruefe(`${name} ${z.name}: Zeiger an der Tippstelle sieht aus wie Ruhe`, nach === ruhe, { ruhe, nach });
-    const funde = await zeigerAusserhalb(el);
-    pruefe(`${name} ${z.name}: keine :hover-Regel ausserhalb von @media (hover: hover)`, funde.length === 0, funde);
-    await s.mouse.move(1, 1);
+    const els = await finde(s, z);
+    if (!(await deckt(z, els))) { pruefe(`${name} ${z.name}: sichtbar in #${z.screen}${z.muss ? ` inkl. ${z.muss}` : ''}`, false, `${els.length} gefunden`); continue; }
+    const anders = [], funde = new Set();
+    for (const el of els) {
+      await el.scrollIntoViewIfNeeded(); await s.mouse.move(1, 1); await warte(300);
+      const ruhe = await aussehen(el);
+      await el.hover(); await warte(500);
+      const nach = await aussehen(el);
+      if (nach !== ruhe) anders.push({ el: await kennung(el), ruhe, nach });
+      for (const f of await zeigerAusserhalb(el)) funde.add(f);
+      await s.mouse.move(1, 1);
+    }
+    pruefe(`${name} ${z.name} (${els.length} Elemente): Zeiger an der Tippstelle sieht aus wie Ruhe`, anders.length === 0, anders);
+    pruefe(`${name} ${z.name} (${els.length} Elemente): keine :hover-Regel ausserhalb von @media (hover: hover)`, funde.size === 0, [...funde]);
   }
   pruefe(`${name}: keine Seitenfehler`, fehler.length === 0, fehler);
   await kontext.close();
@@ -129,12 +137,17 @@ async function pc(browser, schema, css = null) {
   const { kontext, s, fehler } = await oeffne(browser, { w: 1440, h: 900, schema, touch: false, css });
   const erg = [];
   for (const z of ZIELE) {
-    const el = await finde(s, z);
-    if (!el) { erg.push(null); continue; }
-    const ruhe = await aussehen(el);
-    await el.hover(); await warte(500);
-    erg.push({ anders: ruhe !== await aussehen(el), bild: await el.screenshot() });
-    await s.mouse.move(1, 1);
+    const els = await finde(s, z);
+    if (!(await deckt(z, els))) { erg.push(null); continue; }
+    const je = [];
+    for (const el of els) {
+      await el.scrollIntoViewIfNeeded(); await s.mouse.move(1, 1); await warte(300);
+      const ruhe = await aussehen(el);
+      await el.hover(); await warte(500);
+      je.push({ el: await kennung(el), anders: ruhe !== await aussehen(el), bild: await el.screenshot() });
+      await s.mouse.move(1, 1);
+    }
+    erg.push({ anders: je.every((x) => x.anders), gleich: je.filter((x) => !x.anders).map((x) => x.el), bilder: je.map((x) => x.bild) });
   }
   await kontext.close();
   return { erg, fehler };
@@ -167,12 +180,13 @@ try {
     const name = `PC 1440 x 900 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
     const jetzt = await pc(browser, schema);
     pruefe(`${name}: keine Seitenfehler`, jetzt.fehler.length === 0, jetzt.fehler);
-    ZIELE.forEach((z, i) => pruefe(`${name} ${z.name}: unter dem Zeiger sichtbar anders als in Ruhe`, !!jetzt.erg[i]?.anders, jetzt.erg[i] ? '' : 'nicht gefunden'));
+    ZIELE.forEach((z, i) => pruefe(`${name} ${z.name}: unter dem Zeiger sichtbar anders als in Ruhe`, !!jetzt.erg[i]?.anders, jetzt.erg[i] ? { ohneAenderung: jetzt.erg[i].gleich } : 'nicht gefunden'));
     if (pcCss) {
       const vorher = await pc(browser, schema, pcCss);
       ZIELE.forEach((z, i) => pruefe(`${name} ${z.name}: unter dem Zeiger bildgleich mit ${PC_GLEICH}`,
-        !!(vorher.erg[i] && jetzt.erg[i] && vorher.erg[i].bild.equals(jetzt.erg[i].bild)),
-        { bytes: [vorher.erg[i]?.bild.length, jetzt.erg[i]?.bild.length] }));
+        !!(vorher.erg[i] && jetzt.erg[i] && vorher.erg[i].bilder.length === jetzt.erg[i].bilder.length
+          && vorher.erg[i].bilder.every((b, j) => b.equals(jetzt.erg[i].bilder[j]))),
+        { anzahl: [vorher.erg[i]?.bilder.length, jetzt.erg[i]?.bilder.length] }));
     }
   }
 } catch (e) {
