@@ -89,7 +89,7 @@ const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 999
 
 // rpc(name, daten) beantwortet abgefangene Aufrufe von /rest/v1/rpc/<name> (Etappe B: Gegnersuche); jeder Aufruf
 // landet in aufrufe. botMs verkuerzt die Wartezeit bis zum KI-Gegner (window.__lobbyBotMs, sonst 10 s).
-async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'arena', rpc = null, botMs = null }) {
+async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'arena', rpc = null, botMs = null, sprache = null }) {
   const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, serviceWorkers: 'block', hasTouch: true });
   const s = await k.newPage();
   const fehlerListe = [];
@@ -107,7 +107,7 @@ async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'are
     return r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify(r.request().url().includes('sonderstuecke') && erfinder ? [{ stueck_id: 'erfinder-titel' }] : []) });
   });
-  await s.addInitScript(({ sitzung, uid, erfinder, botMs }) => {
+  await s.addInitScript(({ sitzung, uid, erfinder, botMs, sprache }) => {
     try {
       window.__lobbySuche = 300;
       if (botMs != null) window.__lobbyBotMs = botMs;
@@ -116,8 +116,9 @@ async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'are
       localStorage.clear();
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
       if (erfinder) localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: ['erfinder-titel'] }));
+      if (sprache) localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ sprache, spracheGewaehlt: true }));
     } catch (e) { /* egal */ }
-  }, { sitzung: SITZUNG, uid: UID, erfinder, botMs });
+  }, { sitzung: SITZUNG, uid: UID, erfinder, botMs, sprache });
   await s.goto(`${BASIS}#${hash}`);
   return { k, s, fehlerListe, aufrufe };
 }
@@ -283,6 +284,30 @@ async function browserTeil() {
         pruefe('suche: Treffer schlaegt Bot (Online-Partie offen, kein KI-Gegner, kein Ende-Aufruf)', st.screen === 'online' && !st.partie
           && !st.namen.includes('online_suche_ende'), st);
         await p.k.close();
+      }
+      // Treffer schlaegt Bot: die Gegnerkarte nennt den Sondertitel vom Server wie das Duell-Intro (js/ui/online.js
+      // spielerDaten); ein unbekannter Titel bleibt ohne Zeile
+      for (const [titel, erwartet] of [['erfinder', { de: 'Der Erfinder', en: 'The Creator' }],
+        ['pionier-007', { de: 'Pionier Nr. 7', en: 'Pioneer No. 7' }], ['raetsel-titel', { de: null, en: null }]]) {
+        for (const sprache of ['de', 'en']) {
+          let start = 0;
+          const basis = antwort(() => start && Date.now() - start > 500);
+          const rpc = (name, daten) => name === 'karte_der_partie'
+            ? { w: { du: true, name: 'Ich', banner: 'start' }, s: { name: 'Rivale', titel, banner: 'start' } } : basis(name, daten);
+          const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc, sprache });
+          await zurLobby(p);
+          await p.s.evaluate(() => { window.__lobbyGefundenMs = 8000; });
+          start = Date.now();
+          await p.s.locator('.lb-suchen').click();
+          await p.s.waitForFunction(() => /Rivale/.test(document.querySelector('.lb-karte-gegner .vk-namenszeile')?.textContent || ''),
+            null, { timeout: 15000 }).catch(() => {});
+          const st = await p.s.evaluate(() => ({ name: document.querySelector('.lb-karte-gegner .vk-namenszeile')?.textContent.trim() || null,
+            titel: document.querySelector('.lb-karte-gegner .vk-titel')?.textContent.trim() ?? null }));
+          pruefe(`suche: Gegnerkarte zeigt Titel ${titel} (${sprache}) als ${erwartet[sprache] ?? 'keine Zeile'}`,
+            st.name === 'Rivale' && st.titel === erwartet[sprache], st);
+          pruefe(`suche: Gegnerkarte ${titel} (${sprache}) ohne Seitenfehler`, p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+          await p.k.close();
+        }
       }
       // Abbruch
       {

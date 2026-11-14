@@ -66,7 +66,8 @@ const KNOEPFE = {
   zuzweit: { erwartet: ['aufgeben', 'remis'], ohne: { hinweis: 'annahme: zwei Menschen, kein Trainer' } },
   lektion: { erwartet: ['hinweis'], ohne: { aufgeben: 'annahme: Lektion hat Neu starten statt Aufgeben', remis: 'annahme: Uebung ohne Gegner' },
     // R8 (13.11.2026): was die Lektion bewusst anders macht, wird nicht gegen die Bot-Partie gemessen, sondern genannt
-    anders: { leisten: 'gewollt: Uebung ohne Gegner und ohne Uhr, Name und Ziel stehen in der Karte (js/ui/lektion.js .ls-status)',
+    // R15 (R6-Leisten B): seit 13.11.2026 hat die Lektion die Leisten der Bot-Partie ("Lektion" gegen den eigenen Namen), nur ohne Uhr
+    anders: { uhr: 'gewollt: Uebung ohne Zeitdruck, die Leisten haben keine Uhr (js/ui/lektion.js)',
       intro: 'gewollt: statt des Duell-Intros die Idee-Phase mit dem Knopf Los geht (js/ui/lektion.js phase intro)' } },
 };
 
@@ -401,7 +402,7 @@ finally { await browser?.close(); await new Promise((r) => server.close(r)); }
 // anders: die Namensfarbe auf dem Banner der Visitenkarte (Online, css/online.css: helle Schrift mit Schatten) und die
 // Sprechblase des Bots: quer haelt die Gegnerkarte ihre groesste Hoehe mit Blase (js/ui/partie.js ruhig), dort ist
 // die eigene Leiste der Bot-Partie der Massstab fuer die Hoehe.
-function leistenAbweichung(l, v, vIch) {
+function leistenAbweichung(l, v, vIch, { ohneUhr = false } = {}) {
   const a = [];
   const gleich = (n, x, y, tol = 0) => { if (typeof x === 'number' ? !(typeof y === 'number' && Math.abs(x - y) <= tol) : x !== y) a.push(`${n} ${x} statt ${y}`); };
   gleich('Hoehe', l.hoehe, v.blase && vIch ? vIch.hoehe : v.hoehe, 2);
@@ -410,7 +411,8 @@ function leistenAbweichung(l, v, vIch) {
   gleich('Name Schrift', l.name?.schrift, v.name?.schrift); gleich('Name Gewicht', l.name?.gewicht, v.name?.gewicht);
   if (!l.banner) gleich('Name Farbe', l.name?.farbe, v.name?.farbe);
   gleich('Unterzeile', l.unterzeile, v.unterzeile); gleich('geschlagene Figuren', l.geschlagen, v.geschlagen);
-  if (!l.uhr || !v.uhr) gleich('Uhr', !!l.uhr, !!v.uhr);
+  if (ohneUhr) gleich('Uhr', !!l.uhr, false);
+  else if (!l.uhr || !v.uhr) gleich('Uhr', !!l.uhr, !!v.uhr);
   else for (const k of ['hoehe', 'breiteMin', 'schrift', 'radius', 'grund', 'farbe']) gleich(`Uhr ${k}`, l.uhr[k], v.uhr[k], k === 'hoehe' ? 1 : 0);
   return a;
 }
@@ -429,7 +431,8 @@ for (const [geraet, je] of Object.entries(ergebnisse)) {
     // R8 (13.11.2026): Online-Partie, Zu zweit und Raetsel-Duell sind angeglichen, ihre Gleichheits-Punkte zaehlen jetzt immer
     // (FEHLER statt ROT-ERWARTET). Seit R8-IntroZuzweit (Vorbau B) zaehlt auch das Intro vor Zu zweit: das Mini-Intro
     // "Weiss beginnt" (js/ui/duell.js spieleMiniIntro) ist ein .duell wie das Duell-Intro.
-    const gezogen = (name) => a === 'online' || a === 'zuzweit' || a === 'duell';
+    // R15 (R6-Leisten B): die Lektion zieht bei den Leisten nach, deren Punkte zaehlen fuer sie ebenfalls immer
+    const gezogen = (name) => a === 'online' || a === 'zuzweit' || a === 'duell' || (a === 'lektion' && /Leiste/.test(name));
     const hart = (name, gut, detail) => { if (!pruefe(`${geraet} ${NAME[a]}: ${name}`, gut, detail, { hart: !gezogen(name) })) abw.push(name); };
     pruefe(`${geraet} ${NAME[a]}: Gegenprobe Brett (Feldraster ${m.brett} px gegen .brett-felder ${m.brettRaster} px)`, m.brettRaster != null && Math.abs(m.brett - m.brettRaster) <= 1, m);
     const anders = KNOEPFE[a].anders || {};
@@ -441,10 +444,10 @@ for (const [geraet, je] of Object.entries(ergebnisse)) {
       else hart(`Duell-Intro wie in der Bot-Partie (${m.intro ? 'ja' : 'nein'} gegen ${bot.intro ? 'ja' : 'nein'})`, m.intro === bot.intro, { intro: m.intro, ideePhase: m.ideePhase });
     }
     if (a === 'online' || a === 'zuzweit') hart(`Zuege wie in der Bot-Partie (${m.zugStreifen} gegen ${bot.zugStreifen})`, m.zugStreifen === bot.zugStreifen, { hier: m.zugStreifen, bot: bot.zugStreifen });
-    if (a === 'online' || a === 'zuzweit') for (const modus of ['hell', 'dunkel']) for (const wer of ['gegner', 'ich']) {
+    if (a === 'online' || a === 'zuzweit' || a === 'lektion') for (const modus of ['hell', 'dunkel']) for (const wer of ['gegner', 'ich']) {
       const v = bot.stil?.[modus]?.find((l) => l.wer === wer), l = m.stil?.[modus]?.find((x) => x.wer === wer);
       const vIch = bot.stil?.[modus]?.find((x) => x.wer === 'ich');
-      const diff = v && l ? leistenAbweichung(l, v, vIch) : null;
+      const diff = v && l ? leistenAbweichung(l, v, vIch, { ohneUhr: !!anders.uhr }) : null;
       hart(`Leiste ${wer} (${modus}) wie in der Bot-Partie`, !!diff && diff.length === 0, diff || { bot: v, hier: l });
     }
     const ohneName = m.leisten.filter((l) => !l.name || !l.avatar);

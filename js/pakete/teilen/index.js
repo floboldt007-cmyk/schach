@@ -8,6 +8,8 @@
 // Endstellung mit letztem Zug, Sterne, Genauigkeit, Zuege, Datum, die Marke und die Adresse der App; keine E-Mail,
 // kein Klarname, nichts aus dem Konto ausser dem freiwillig gezeigten Benutzernamen.
 //
+// Nach einem Sieg mit "Freund herausfordern" (Kontext herausfordern) wird daraus EIN Knopf "Teilen …" mit Auswahl.
+//
 // Orte:       ergebnis:karte (Reihenfolge 60, nach der Abrechnungs-Huelle 3), analyse:oben (Reihenfolge 60)
 // Ereignisse: app:screen (offenes Blatt schliessen), partie:analysiert (offenes Bild mit der Genauigkeit neu zeichnen),
 //             speicher:zurueckgesetzt (gemerkten Benutzernamen vergessen)
@@ -397,16 +399,61 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
 }
 
 // ---------- Knoepfe an den Orten ----------
-function knopf({ app, partie, bot, ort }) {
+// R14-G2: bietet das Ergebnis zusaetzlich "Freund herausfordern" an (Kontext herausfordern { text, teile }, nur nach
+// einem Sieg), wird daraus EIN Knopf "Teilen …" mit einer kleinen Auswahl (Siegesbild, Freund herausfordern) an Stelle
+// der Zeile; data-mit-freund sagt dem Ergebnis, dass sein eigener Knopf entfaellt. Escape und "×" (R16 E1, am Handy der einzige
+// sichtbare Weg zurueck) klappen nur die Auswahl zu.
+function knopf({ app, partie, bot, ort, herausfordern = null }) {
   const el = document.createElement('div');
   el.className = 'tl-knopf-zeile';
   el.dataset.ort = ort;
   const sieg = partie.ergebnis === 'sieg';
-  const text = t(ort === 'analyse' ? 'p-teilen.knopf.bild' : sieg ? 'p-teilen.knopf.sieg' : 'p-teilen.knopf.bild');
+  const freund = ort === 'ergebnis' && herausfordern && typeof herausfordern.teile === 'function' ? herausfordern : null;
+  const text = t(freund ? 'p-teilen.knopf.mehr' : ort === 'analyse' ? 'p-teilen.knopf.bild' : sieg ? 'p-teilen.knopf.sieg' : 'p-teilen.knopf.bild');
   el.innerHTML = `<button class="knopf tl-teilen dr" type="button" data-partie="${esc(partie.id)}">${icon('teilen')}<span>${esc(text)}</span></button>`;
-  el.querySelector('button').addEventListener('click', (ev) => {
+  const haupt = el.querySelector('button');
+  const bild = () => oeffneBlatt({ app, partieId: partie.id, partie, bot });
+  if (!freund) {
+    haupt.addEventListener('click', (ev) => { ev.stopPropagation(); bild(); });
+    return el;
+  }
+  el.dataset.mitFreund = '';
+  const wahlId = `tl-wahl-${String(partie.id).replace(/[^\w-]/g, '')}`;
+  const wahl = document.createElement('div');
+  wahl.className = 'tl-wahl';
+  wahl.id = wahlId;
+  wahl.hidden = true;
+  wahl.setAttribute('role', 'group');
+  wahl.setAttribute('aria-label', t('allgemein.teilen'));
+  wahl.innerHTML = `<button class="knopf dr" type="button" data-tl-wahl="bild">${esc(t(sieg ? 'p-teilen.wahl.sieg' : 'p-teilen.wahl.bild'))}</button>
+    <button class="knopf dr" type="button" data-tl-wahl="freund" aria-label="${esc(freund.text || '')}">${esc(t('p-teilen.wahl.freund'))}</button>
+    <button class="knopf dr tl-wahl-zu" type="button" data-tl-wahl="zu" aria-label="${esc(t('allgemein.schliessen'))}">${icon('kreuz')}</button>`;
+  el.append(wahl);
+  haupt.setAttribute('aria-expanded', 'false');
+  haupt.setAttribute('aria-controls', wahlId);
+  const klappe = (auf) => {
+    wahl.hidden = !auf;
+    haupt.hidden = auf;
+    haupt.setAttribute('aria-expanded', String(auf));
+    (auf ? wahl.querySelector('button') : haupt).focus({ preventScroll: true });
+  };
+  haupt.addEventListener('click', (ev) => { ev.stopPropagation(); klappe(true); });
+  wahl.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-tl-wahl]');
+    if (!b) return;
     ev.stopPropagation();
-    oeffneBlatt({ app, partieId: partie.id, partie, bot });
+    klappe(false);
+    if (b.dataset.tlWahl === 'zu') return;
+    if (b.dataset.tlWahl === 'bild') bild();
+    else {
+      try { freund.teile(); } catch (e) { console.error('teilen: herausfordern', e); }
+    }
+  });
+  wahl.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    klappe(false);
   });
   return el;
 }
@@ -430,7 +477,7 @@ try {
     try {
       const p = k && k.erg && k.erg.partie;
       if (!teilbar(p)) return null;
-      return knopf({ app: k.app, partie: p, bot: k.bot, ort: 'ergebnis' });
+      return knopf({ app: k.app, partie: p, bot: k.bot, ort: 'ergebnis', herausfordern: k.herausfordern });
     } catch (e) {
       console.error('teilen: ergebnis:karte', e);
       return null;

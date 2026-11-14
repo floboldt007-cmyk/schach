@@ -317,6 +317,7 @@ registriereTexte('einstellungen', {
       + 'karte: deine Erfolgs-Stufen, Taler-Buchungen, Banner und die gewählte Visitenkarte. '
       + 'online_versuche: falsch eingegebene Einladungscodes je Tag. mengenzaehler: wie viele Zeilen dein Konto je Stunde geteilt hat '
       + '(nur Zahlen, für die Mengenbremse, nach 48 Stunden gelöscht). '
+      + 'verwaltung: was der Betreiber über die Verwaltung an deinem Konto geändert hat (Premium, Name, Banner, mit vorher und nachher). '
       + 'geraet: der Spielstand in diesem Browser. noch_nicht_gesendet: geteilte Daten, die noch auf diesem Gerät warten. '
       + 'zustimmung: wann du das Teilen eingeschaltet hast. widerruf_offen: ein Widerruf, der den Server noch nicht erreicht hat.',
     'daten.teilenTitel': 'Crownmate: meine Daten',
@@ -357,6 +358,9 @@ registriereTexte('einstellungen', {
     'konto.sitzungAbgelaufen': 'Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.',
     'konto.emailNichtFreigegeben': 'An diese E-Mail-Adresse kann die App im Moment noch keinen Code schicken (Testphase).',
     'konto.codeZuOft': 'Zu viele Versuche. Warte bitte kurz und versuche es dann erneut.',
+    'konto.mailZuOft': 'Gerade wurden zu viele Codes verschickt. Versuche es gleich noch einmal oder melde dich mit Google an.',
+    'konto.anmeldungGeschlossen': 'Neue Konten sind gerade noch nicht freigeschaltet. Bitte versuche es später noch einmal.',
+    'konto.nameWaehlen': 'Wähle jetzt einen Benutzernamen und tippe dann auf „Jetzt sichern“.',
     'konto.kontoGesperrt': 'Dieses Konto ist derzeit gesperrt.',
     'konto.emailUngueltig': 'Bitte eine gültige E-Mail-Adresse eingeben.',
     'konto.sitzungUnvollstaendig': 'Die Sitzung vom Server ist unvollständig.',
@@ -724,6 +728,7 @@ registriereTexte('einstellungen', {
       + 'karte: your achievement tiers, thaler entries, banners and the business card you chose. '
       + 'online_versuche: wrong invitation codes entered per day. mengenzaehler: how many rows your account shared per hour '
       + '(numbers only, for the rate limit, deleted after 48 hours). '
+      + 'verwaltung: what the operator changed on your account through the admin tools (Premium, name, banner, with before and after). '
       + 'geraet: the progress in this browser. noch_nicht_gesendet: shared data that is still waiting on this device. '
       + 'zustimmung: when you turned on sharing. widerruf_offen: a withdrawal of consent that has not reached the server yet.',
     'daten.teilenTitel': 'Crownmate: my data',
@@ -764,6 +769,9 @@ registriereTexte('einstellungen', {
     'konto.sitzungAbgelaufen': 'Your sign-in has expired. Please sign in again.',
     'konto.emailNichtFreigegeben': 'The app cannot send a code to this email address yet (test phase).',
     'konto.codeZuOft': 'Too many attempts. Please wait briefly and try again.',
+    'konto.mailZuOft': 'Too many codes were sent just now. Try again in a moment or sign in with Google.',
+    'konto.anmeldungGeschlossen': 'New accounts are not open yet. Please try again later.',
+    'konto.nameWaehlen': 'Choose a username now, then tap “Back up now”.',
     'konto.kontoGesperrt': 'This account is currently suspended.',
     'konto.emailUngueltig': 'Please enter a valid email address.',
     'konto.sitzungUnvollstaendig': 'The session from the server is incomplete.',

@@ -328,7 +328,9 @@ export function profilKarte({ app } = {}) {
   const krone = kronenText(eigeneKronenStufe());
   // Kundenblick 09.11.2026 (Befund 12): "Ich" zeigt wenigstens eine Spielzahl
   const partienZahl = ladePartien().filter(wertet).length;
-  // R4a (Kritik 09.11.): ganz leer zeigt die Vitrine einen schmalen Platz (waehlt Platz 1) statt drei grosser leerer Kaesten
+  // R4a (Kritik 09.11.): ganz leer zeigt die Vitrine einen schmalen Platz (waehlt Platz 1) statt drei grosser leerer Kaesten.
+  // R15 (R4-Banner A): Titel und Vitrine stehen in .pr-vitrine-ort; am Handy und iPad hoch wirkt die Huelle nicht (display:
+  // contents), am PC legt css/pakete/sammlung.css sie rechts in das Banner der Karte.
   const leer = vitrine.every((e) => !e);
   const plaetze = leer ? vitrine.slice(0, 1) : vitrine;
   k.innerHTML = `<div class="pr-kopf"><span class="pr-banner" aria-hidden="true" style="background-image:url('${bannerUrl(banner)}')"></span>
@@ -336,10 +338,10 @@ export function profilKarte({ app } = {}) {
       <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone">${esc(krone)}</span>` : ''}</div>
         <small class="pr-seit">${esc(seitText())}${partienZahl ? ' · ' + esc(S(partienZahl === 1 ? 'profil.partieEine' : 'profil.partien', { zahl: partienZahl })) : ''}</small></div></div>
     <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button></div>
-    <h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>
+    <div class="pr-vitrine-ort"><h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>
     <div class="pr-vitrine"${leer ? ' data-leer' : ''}>${plaetze.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"${e && e.stufe ? ` data-stufe="${e.stufe}"` : ''}
       aria-label="${esc(e ? (e.stufe ? `${e.name}, ${KT('stufe.' + e.stufe)}` : e.name) : S('profil.leer'))}">${e ? `<span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b>${e.stufe ? `<small class="pr-orden-stufe">${esc(KT('stufe.' + e.stufe))}</small>` : ''}`
-      : `<span class="pr-plus" aria-hidden="true">+</span><small>${esc(S('profil.leer'))}</small>`}</button>`).join('')}</div>
+      : `<span class="pr-plus" aria-hidden="true">+</span><small>${esc(S('profil.leer'))}</small>`}</button>`).join('')}</div></div>
     <p class="pr-hilfe">${esc(S('profil.vitrineHilfe'))}</p>`;
   k.querySelector('.pr-aendern').addEventListener('click', () => waehleAussehen(app));
   for (const b of k.querySelectorAll('.pr-orden')) b.addEventListener('click', () => waehleOrden(app, Number(b.dataset.platz)));

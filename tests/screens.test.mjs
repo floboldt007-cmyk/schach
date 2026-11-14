@@ -66,10 +66,19 @@ async function bild(seite, name) {
 // Neue Seite mit Fehler-Sammler
 // speicher: storageState mit den Testdaten (jeder Kontext hat sein eigenes localStorage)
 let SPEICHER;
+// Bot-Schutz (js/botschutz.js): screens.html laeuft ohne ?test, also mit dem echten Site-Key; das Skript von
+// challenges.cloudflare.com kommt aus einem Nachbau wie in tests/konto-link.test.mjs, damit kein Lauf das echte
+// Turnstile anfragt (auf 127.0.0.1 antwortet Cloudflare mit 400). Jede abgefangene Anfrage landet in CLOUDFLARE.
+const CLOUDFLARE = [];
+const TURNSTILE_NACHBAU = 'window.turnstile = { render() { return "w1"; }, reset() {}, remove() {} };';
 async function neueSeite(browser, { breite = 1180, hoehe = 820, touch = false, bewegung = 'no-preference', speicher = SPEICHER } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: breite, height: hoehe }, hasTouch: touch, isMobile: false, reducedMotion: bewegung, deviceScaleFactor: 1,
     ...(speicher ? { storageState: speicher } : {}),
+  });
+  await kontext.route('https://challenges.cloudflare.com/**', (route) => {
+    CLOUDFLARE.push(new URL(route.request().url()).pathname);
+    return route.fulfill({ status: 200, contentType: 'text/javascript', body: TURNSTILE_NACHBAU });
   });
   const seite = await kontext.newPage();
   const fehler = [];
@@ -685,7 +694,48 @@ async function testeEinstellungen(browser) {
   await oeffne(seite);
   await seite.evaluate(async () => { testseite.leere(); await testseite.opernpartie({ mitReview: false }); });
   await oeffne(seite, 'screen=einstellungen');
-  const lies = () => seite.evaluate(() => testseite.speicher.ladeEinstellungen());
+  // Bot-Schutz mit echtem Site-Key: Hinweis samt Link steht, das Skript kam aus dem Nachbau (kein echtes Cloudflare)
+  const botschutz = await seite.waitForSelector('.konto-botschutz-hinweis a', { timeout: 8000 }).then(() => true, () => false);
+  pruefe('Bot-Schutz: Hinweis mit Link steht, Turnstile kommt aus dem Nachbau statt von Cloudflare',
+    botschutz && CLOUDFLARE.includes('/turnstile/v0/api.js'), { botschutz, CLOUDFLARE });
+  // Trefferpruefung (Kaltreview 14.11.): das Polster des Links darf nicht in den Apple-Knopf darueber ragen; an den
+  // Raendern jedes Tippziels der Kontogruppe trifft elementFromPoint das eigene Element, auf Handy, SE, iPad quer, PC
+  for (const [name, breite, hoehe] of [['iphone-13', 390, 844], ['iphone-se', 375, 667], ['ipad-quer', 1180, 820], ['pc', 1440, 900]]) {
+    await seite.setViewportSize({ width: breite, height: hoehe });
+    // die Einstellungen schalten erst auf das matchMedia-Ereignis um (unter 900 px Liste statt Inhalt): warten, bis die
+    // Ansicht zur Breite passt, sonst misst der Lauf je nach Zeitablauf die alte Ansicht; am Handy dann die Konto-Seite oeffnen
+    const handy = breite < 900;
+    await seite.waitForFunction((h) => document.querySelector('.es-screen').classList.contains('es-liste') === h, handy);
+    if (handy) {
+      await seite.click('.es-nav-punkt[data-seite="konto"]');
+      await seite.waitForFunction(() => document.querySelector('.konto-botschutz-hinweis')?.getClientRects().length > 0);
+    }
+    const fehltreffer = await seite.evaluate(() => {
+      const hinweis = document.querySelector('.konto-botschutz-hinweis');
+      hinweis.scrollIntoView({ block: 'center' });
+      // nur die Nachbarn des Hinweises (bis 80 px darueber/darunter), fernere Ziele liegen evtl. unter der festen Menueleiste
+      const h = hinweis.getBoundingClientRect();
+      const ziele = [...document.querySelectorAll('.konto-gruppe :is(a, button, input, [role="button"])')];
+      const falsch = [];
+      let geprueft = 0;
+      for (const el of ziele) for (const r of el.getClientRects()) {
+        if (r.width < 2 || r.bottom < h.top - 80 || r.top > h.bottom + 80) continue;
+        geprueft++;
+        for (const fx of [0.25, 0.5, 0.75]) for (const y of [r.top + 1, r.bottom - 1]) {
+          const treffer = document.elementFromPoint(r.left + r.width * fx, y);
+          if (!treffer || !(treffer === el || el.contains(treffer))) falsch.push(`${el.className || el.tagName} y${Math.round(y)} -> ${treffer?.className || treffer?.tagName}`);
+        }
+      }
+      return { falsch, geprueft };
+    });
+    // mindestens Google, Apple und der Link, sonst hat die Pruefung nichts gemessen (Fix-Review 14.11.)
+    pruefe(`Bot-Schutz-Link ueberlappt kein Tippziel der Anmeldung (${name}, ${fehltreffer.geprueft} Ziele)`,
+      fehltreffer.geprueft >= 3 && fehltreffer.falsch.length === 0, fehltreffer);
+    if (handy) await seite.click('[data-aktion="liste"]');
+  }
+  await seite.setViewportSize({ width: 1180, height: 820 });
+  await seite.evaluate(() => scrollTo(0, 0));
+  const lies = () =>seite.evaluate(() => testseite.speicher.ladeEinstellungen());
   const an = (key) => seite.locator(`.es-schalter[data-key="${key}"]`).getAttribute('aria-checked');
 
   for (const key of ['klang', 'balken', 'liveBewertung', 'koordinaten']) {

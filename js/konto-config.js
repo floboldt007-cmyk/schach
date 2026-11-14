@@ -18,4 +18,4 @@ export const ANMELDEWEGE = Object.freeze({ email: true, google: true, apple: fal
 // geheime Schluessel gehoert nur in Supabase (Authentication -> Attack Protection), nie ins Repo. Leer = kein Widget, kein
 // Token, die Anmeldung verhaelt sich wie vorher. Erst eintragen, wenn das Widget fuer crownmate.de angelegt ist, und
 // CAPTCHA in Supabase erst danach einschalten (supabase/ANLEITUNG.md, Abschnitt Bot-Schutz).
-export const TURNSTILE_SITEKEY = '';
+export const TURNSTILE_SITEKEY = '0x4AAAAAAF__8i_6j1TS21Wm';

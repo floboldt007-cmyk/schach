@@ -52,6 +52,15 @@
 .erg-freund svg { width: 18px; height: 18px; }
 .erg-freund:hover, .erg-freund:focus-visible { color: var(--text); background: var(--flaeche-2); }
 .erg-freund:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+/* R14-G2: "Teilen …" (Paket teilen, Ort ergebnis:karte) klappt an seiner Stelle zwei gleich breite Knoepfe auf,
+   Siegesbild und Freund herausfordern; das Blatt wird dabei nicht hoeher. Aussehen wie der Teilen-Knopf. */
+.tl-knopf-zeile .tl-teilen[hidden], .tl-wahl[hidden] { display: none; }
+.tl-wahl { display: grid; grid-template-columns: 1fr 1fr 44px; gap: 8px; width: 100%; }
+/* R16 E1: "×" klappt die Auswahl zu, quadratisch wie die Icon-Knoepfe */
+.tl-wahl .tl-wahl-zu { padding: 0; }
+.tl-wahl-zu svg { width: 18px; height: 18px; }
+.tl-wahl .knopf { min-width: 0; padding: 0 10px; background-color: var(--flaeche-2); color: var(--text); box-shadow: var(--kante);
+  white-space: normal; text-align: center; line-height: 1.2; }
 .erg-lobby svg, .erg-link svg { width: 18px; height: 18px; }
 .erg-lobby:hover, .erg-lobby:focus-visible, .erg-link:hover, .erg-link:focus-visible { color: var(--text); background: var(--flaeche-2); }
 .erg-lobby:focus-visible, .erg-link:focus-visible { outline: var(--fokus); outline-offset: 2px; }
@@ -252,6 +261,9 @@
 /* Sieg: gewinnen (Sterne, Genauigkeit im mittleren Stern) und wachsen (Funken-Balken); Punkte und Wertung in der Liga */
 /* Ausnahme: bietet die Punkte-Zeile einen Ueberhol-Post an, bleibt sie stehen (sonst waere er nach Siegen unerreichbar) */
 .ergebnis-overlay.sieg :is(.erg-genau, .erg-f-zeile[data-quelle="level"], .abrechnung > .pk-abr:not(:has(.pk-post)), .abrechnung > .liga-abrechnung) { display: none; }
+/* Niederlage (R7 Ergebnis A, 13.11.2026): wie beim Sieg stehen Punkte und Wertung in der Liga, nur solange der Verweis
+   dorthin im Blatt steht (wertende Partien, js/ui/partie.js) */
+.ergebnis-overlay.niederlage:has(.erg-liga-verweis) :is(.abrechnung > .pk-abr:not(:has(.pk-post)), .abrechnung > .liga-abrechnung) { display: none; }
 .erg-liga-verweis { justify-self: center; min-height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-pille);
   background: none; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
   text-decoration: underline; text-underline-offset: 3px; }

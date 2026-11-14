@@ -20,8 +20,9 @@
 // als Pfeil (danach hoechstens 2 Sterne), "Neu
 // starten" stellt die Ausgangsstellung wieder her. Im Testmodus liefert window.__test.lektionZug(fen) -> uci die Zuege
 // der Engine (Verteidigung und Hinweis), damit Tests ohne Stockfish laufen.
-// DOM: section.screen.ls-screen > header.haupt-kopf, .ls-rumpf > .ls-inhalt (.ls-brettzone > .brett-rahmen.ls-rahmen >
-// .ls-brett; .ls-seite > .ls-status, .ls-meldung[data-art], .ls-aktionen). Optik: css/pakete/lernen.css.
+// DOM: section.screen.ls-screen > header.haupt-kopf, .ls-rumpf > .ls-inhalt (.ls-leiste.ls-oben > .spieler.gegner;
+// .ls-brettzone > .brett-rahmen.ls-rahmen > .ls-brett; .ls-leiste.ls-unten > .spieler.ich; .ls-seite > .ls-status,
+// .ls-meldung[data-art]; .ls-aktionen). Optik: css/pakete/lernen.css.
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
@@ -38,6 +39,8 @@ import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
 import { sterneHtml } from './lernen.js';
+import { meinName } from '../konto.js';
+import { floAvatar } from '../thema.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 // Ergebnisblatt wie in der Bot-Partie: "Brett ansehen" und "Ergebnis" kommen aus dem Woerterbuch der Partie (wie js/ui/online.js)
@@ -87,10 +90,24 @@ export function zeige(root, params, app) {
   const titel = S('titel.' + l.id);
   const einst = (() => { try { return typeof app.einstellungen === 'function' ? app.einstellungen() : ladeEinstellungen(); } catch (e) { return {}; } })();
   s.setAttribute('aria-label', titel);
+  // R15 (R6-Leisten B, Flo 13.11.2026): Spielerleisten wie in der Bot-Partie, oben "Lektion" (die Gegenseite, Koenig ihrer
+  // Farbe), unten der eigene Name (ohne Konto "Du") mit dem eigenen Bild. Aufbau und Optik der Karten .spieler.gegner/.ich
+  // aus js/ui/partie.js und css/partie.css (wie js/ui/zuzweit.js); css/partie.css gilt nur unter .partie, darum steht jede
+  // Leiste in einer Huelle .partie.ls-leiste (bewusst nicht der ganze Screen: sonst griffen die Brett-Regeln der Partie, und
+  // js/pakete/sammlung/moment.js hielte Erfolge bis zum Verlassen der Lektion zurueck). Keine Uhr: keine Bedenkzeit.
+  const gegner = flo === 'w' ? 'b' : 'w';
+  const farbwort = (f) => t(f === 'w' ? 'allgemein.weiss' : 'allgemein.schwarz');
+  const leisteName = t('rahmen.titel.lektion');
   s.innerHTML = `${hauptKopf({ titel: S('name'), unter: S('bereich.' + ber.id), zurueck: true, chips: '', marke: false })}
     <div class="ls-rumpf">
       <div class="ls-inhalt">
+        <div class="partie ls-leiste ls-oben"><div class="spieler gegner" role="group" aria-label="${esc(leisteName)}">
+          <span class="av"><img src="${new URL(`assets/pieces/${gegner}K.svg`, WURZEL).href}" alt="" draggable="false"></span>
+          <div class="info"><div class="name">${esc(leisteName)}</div><div class="unter bot-meta"><span class="p-meta">${esc(farbwort(gegner))}</span><span class="geschlagen-ort" data-wer="${gegner}"></span></div></div></div></div>
         <div class="ls-brettzone"><div class="brett-rahmen ls-rahmen"><div class="ls-brett" aria-label="${esc(titel)}"></div></div></div>
+        <div class="partie ls-leiste ls-unten"><div class="spieler ich" role="group" aria-label="${esc(meinName())}">
+          <span class="av">${floAvatar(flo)}</span><div class="name">${esc(meinName())}</div>
+          <div class="unter bot-meta"><span class="p-meta">${esc(farbwort(flo))}</span><span class="geschlagen-ort" data-wer="${flo}"></span></div></div></div>
         <div class="ls-seite">
           <div class="ls-status">
             <div class="ls-zeile"><span class="ms-marken"><span class="ms-stufe" data-stufe="${l.stufe}">${esc(S('stufe.' + l.stufe))}</span>${art !== 'matt'
@@ -101,8 +118,8 @@ export function zeige(root, params, app) {
             <div class="ls-zaehler"><b class="ls-zug zahl"></b><span>${esc(zielText)}</span></div>
           </div>
           <div class="ls-meldung" role="status" hidden></div>
-          <div class="ls-aktionen"></div>
         </div>
+        <div class="ls-aktionen"></div>
       </div>
     </div>`;
   const $ = (sel) => s.querySelector(sel);
@@ -506,7 +523,7 @@ export function zeige(root, params, app) {
   if (tempo() > 0) {
     kopfEintritt(s);
     anim($('.ls-brettzone'), [{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }], { d: 640, k: 'weich' });
-    staffel(s.querySelectorAll('.ls-seite > *:not([hidden])'), { d: 560, v: 90, abstand: 60 });
+    staffel(s.querySelectorAll('.ls-leiste, .ls-seite > *:not([hidden]), .ls-aktionen'), { d: 560, v: 90, abstand: 60 });
   }
   // Engine schon jetzt starten, damit der erste Gegenzug nicht auf den Start wartet (Zugfolge braucht keine)
   if (!folge && !(app.test && typeof window !== 'undefined' && window.__test && window.__test.lektionZug)) {

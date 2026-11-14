@@ -362,6 +362,11 @@ async function schaefermatt(seite) {
   await seite.evaluate(() => { window.__test = {}; });
 }
 
+// R14-G2: im Ergebnis nach einem Sieg "Teilen …" aufklappen und "Siegesbild" waehlen (die Auswahl klappt danach zu)
+async function oeffneSiegesbild(seite) {
+  await seite.locator('.erg-karte-ort .tl-teilen').click();
+  await seite.locator('.erg-karte-ort .tl-wahl [data-tl-wahl="bild"]').click();
+}
 const blattBereit = (seite, modus) => seite.waitForFunction((m) => {
   const b = document.querySelector('.tl-blatt:not(.weg)');
   return b && b.dataset.bereit === 'ja' && (!m || b.dataset.modus === m);
@@ -407,7 +412,12 @@ async function browserTeil(browser) {
     const k = o.querySelector('.tl-teilen');
     return { sichtbar: !o.hidden && k.getBoundingClientRect().width > 0, text: k.textContent.trim(), zeile: !!o.querySelector(':scope > .tl-knopf-zeile[data-ort="ergebnis"]'), icon: !!k.querySelector('svg.ico path') };
   });
-  pruefe('Knopf "Siegesbild teilen" im Ort ergebnis:karte (mit Icon)', knopf.sichtbar && knopf.text === 'Siegesbild teilen' && knopf.zeile && knopf.icon, JSON.stringify(knopf));
+  // R14-G2: nach einem Sieg fuehrt der Knopf auch "Freund herausfordern" mit: EIN Knopf "Teilen …" mit Auswahl
+  pruefe('Knopf "Teilen …" im Ort ergebnis:karte (mit Icon), kein eigener Knopf "Freund herausfordern" daneben', knopf.sichtbar && knopf.text === 'Teilen …' && knopf.zeile && knopf.icon
+    && await seite.locator('.ergebnis-overlay .erg-freund').count() === 0, JSON.stringify(knopf));
+  // R16 E1: sichtbar kurz "Herausfordern", der Name bleibt "Freund herausfordern"; dazu ein Schliessen-Knopf
+  const wahl = await seite.evaluate(() => [...document.querySelectorAll('.erg-karte-ort .tl-wahl [data-tl-wahl]')].map(b => b.dataset.tlWahl + ':' + (b.getAttribute('aria-label') || b.textContent.trim())));
+  pruefe('Auswahl: Siegesbild, Freund herausfordern, Schliessen', wahl.join('|') === 'bild:Siegesbild|freund:Freund herausfordern|zu:Schließen', JSON.stringify(wahl));
   await seite.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 60000 });
   await warte(2600);   // Sterne und Genauigkeit fertig eingeblendet
   await seite.screenshot({ path: path.join(BILDER, 'ergebnis-ipad.png') });
@@ -417,7 +427,7 @@ async function browserTeil(browser) {
 
   // ---------- Blatt, Leinwand, Hell ----------
   gruppe = 'Bild hell';
-  await seite.locator('.erg-karte-ort .tl-teilen').click();
+  await oeffneSiegesbild(seite);
   await blattBereit(seite, 'hell');
   await eingeglitten(seite);
   const z1 = await zustand(seite);
@@ -479,7 +489,7 @@ async function browserTeil(browser) {
       window.__geteilt.push({ title: d.title, text: d.text, url: d.url, anzahl: d.files.length, name: f.name, type: f.type, size: f.size, daten });
     } });
   });
-  await seite.locator('.erg-karte-ort .tl-teilen').click();
+  await oeffneSiegesbild(seite);
   await blattBereit(seite, 'hell');
   pruefe('mit navigator.share: Knopf "Teilen"', /^Teilen$/.test((await seite.locator('.tl-blatt [data-tl="los"]').innerText()).trim()));
   await seite.locator('.tl-blatt .segment .seg[data-wert="dunkel"]').click();
@@ -519,7 +529,7 @@ async function browserTeil(browser) {
     && nachTeilen.einst && nachTeilen.einst.bild === 'dunkel' && nachTeilen.einst.name === false, JSON.stringify(nachTeilen));
   // Das Geraet lehnt das Teilen ab (nicht der Nutzer, z. B. NotAllowedError): die fertige Datei wird gespeichert
   await seite.evaluate(() => { window.__teilenAntwort = 'verboten'; });
-  await seite.locator('.erg-karte-ort .tl-teilen').click();
+  await oeffneSiegesbild(seite);
   await blattBereit(seite, 'dunkel');
   const [dl2] = await Promise.all([seite.waitForEvent('download', { timeout: 10000 }).catch(() => null), seite.locator('.tl-blatt [data-tl="los"]').click()]);
   const zuNachAblehnen = await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 }).then(() => true, () => false);
@@ -549,7 +559,7 @@ async function browserTeil(browser) {
     });
     localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: 'a.b.c', refresh_token: 'r', expires_at: 9999999999, user: { id: 'u1' }, email: 'flo.privat@example.org' }));
   });
-  await seite.locator('.erg-karte-ort .tl-teilen').click();
+  await oeffneSiegesbild(seite);
   await seite.waitForSelector('.tl-blatt .tl-name:not([hidden])', { timeout: 6000 });
   await blattBereit(seite, 'dunkel');
   const n1 = await zustand(seite);
@@ -578,7 +588,7 @@ async function browserTeil(browser) {
     window.__profilName = 'Zweitkonto';
     localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: 'd.e.f', refresh_token: 'r2', expires_at: 9999999999, user: { id: 'u2' }, email: 'zweit@example.org' }));
   });
-  await seite.locator('.erg-karte-ort .tl-teilen').click();
+  await oeffneSiegesbild(seite);
   await blattBereit(seite, 'dunkel');
   const zweitName = await bis(async () => /Zweitkonto/.test(await seite.locator('.tl-blatt .tl-name').innerText().catch(() => '')), 6000);
   const zweit = await seite.evaluate(() => ({ zeile: document.querySelector('.tl-blatt .tl-name').textContent, sichtbar: !document.querySelector('.tl-blatt .tl-name').hidden,
