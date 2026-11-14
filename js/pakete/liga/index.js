@@ -135,6 +135,15 @@ if (typeof document !== 'undefined') {
   anbieten('arena:panel-bot', sicher((k) => botBilanz(k)), { reihenfolge: 15, paket: MODUL });
   anbieten('ergebnis:abrechnung', sicher((k) => abrechnungsZeile(k, lese())), { reihenfolge: 30, paket: MODUL });
   anbieten('verlauf:seite', sicher(() => verlaufKarte(kontext)), { reihenfolge: 20, paket: MODUL });
+  // R19 Season (supabase/saison-schema.sql, Vorschlag): Leiste im Profil gleich nach der Profilkarte (Paket sammlung, 10)
+  // saison.js erst hier nachladen (wie kronen.js oben): sie zieht Konto, Thema und Profil mit
+  anbieten('ich:kopf', sicher(() => {
+    const el = document.createElement('section');
+    el.className = 'ss-leiste liga-karte';
+    el.hidden = true;
+    import('./saison.js').then((m) => m.fuelleSaison(el)).catch(() => {});
+    return el;
+  }), { reihenfolge: 12, paket: MODUL });
   // Wochen-Gruppe der Kronen-Liga (07.11.2026): erster Reiter der Bestenliste, Freunde (Paket punkte, 8) gleich dahinter
   anbieten('bestenliste:reiter', sicher((k) => (k && k.reiter === 'gruppe' ? reiterGruppe(k) : { el: huelleGruppe(), verlasse() {} })),
     { reihenfolge: 5, paket: MODUL });

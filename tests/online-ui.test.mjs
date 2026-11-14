@@ -141,6 +141,8 @@ try {
       const karte = (name, du) => ({ name, banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du });
       return antwort(p ? { w: karte(p.weiss === 'u1' ? 'Spieler_1' : 'Gegner_2', p.weiss === 'u1'), s: karte(p.schwarz === 'u1' ? 'Spieler_1' : 'Gegner_2', p.schwarz === 'u1') } : {});
     }
+    // R19 Season (js/karte.js fragt parallel): ohne Abzeichen und Titel, die Karte bleibt wie bisher (Season prueft r19-saison)
+    if (rpc === 'saison_karte_der_partie') return antwort({ w: { abzeichen: null, titel: null }, s: { abzeichen: null, titel: null } });
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {
@@ -664,7 +666,7 @@ try {
     await oeffne(frisch);
     const bild = await seite.waitForFunction(() => { const d = document.querySelector('.duell'); return d && d.textContent.replace(/\s+/g, ' ').trim(); }, null, { timeout: 5000 })
       .then(h => h.jsonValue()).catch(() => '');
-    pruefe('Intro mit Bewegung zeigt Gegnername und Liga', /Gegner_2/.test(bild) && /Läufer II/.test(bild), bild);
+    pruefe('Intro mit Bewegung zeigt Gegnername und Liga', /Gegner_2/.test(bild) && /Warden II/.test(bild), bild);
     await seite.waitForFunction(() => !document.querySelector('.duell'), null, { timeout: 8000 }).catch(() => {});
     await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'aus' }));
     // beenden, damit "neueste" fuer die Groessenpruefung wieder die neueste ist (sonst steht dort der Hinweis-Streifen)

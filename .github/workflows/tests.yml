@@ -71,6 +71,7 @@ jobs:
         run: node tests/server-raetsel-duell.test.mjs
       - name: Datenauskunft-SQL ausfuehren (alle Schemata, Vollstaendigkeit)
         run: node tests/server-daten.test.mjs
+      - run: node tests/server-saison.test.mjs
       - name: Zwei-Ligen-SQL ausfuehren (vorbereitet, nicht eingespielt; Umstieg, Paarung, Rueckweg)
         run: node tests/server-zwei-ligen.test.mjs
       - name: Verwaltungs-SQL pruefen (vorbereitet, nicht eingespielt; Rechte, Premium, Kaeufe, Name, Banner, Rueckweg)

@@ -10,7 +10,8 @@
 //   wahlFuerServer(wahl, stand) -> { banner, titel, vitrine, motiv, grund, rahmen }   die lokale Wahl in Server-Form;
 //     mit stand nur, was der Server als Besitz kennt (Rueckfall nach einer Absage)
 //     Besitzt das Konto den Erfinder- oder Pionier-Titel, meldet der Abgleich ihn danach mit karte_sondertitel_waehle.
-//   karteDerPartie(partieId, { frist }) -> Promise<{ w, s } | null>   beide Karten; nach frist ms (Standard 1200) null
+//   karteDerPartie(partieId, { frist }) -> Promise<{ w, s } | null>   beide Karten; nach frist ms (Standard 1200) null;
+//     mit saison-schema.sql dazu je Karte saison: { abzeichen, titel } (saison_karte_der_partie, parallel, dieselbe Frist)
 import { rpc } from './online.js';
 import { sitzung, userId } from './konto.js';
 import { profilWahl } from './profil.js';
@@ -127,5 +128,14 @@ export async function karteDerPartie(partieId, { frist = KARTE_FRIST_MS } = {}) 
   const zeit = new Promise((r) => { uhr = setTimeout(() => r(null), frist); });
   const frage = rpc('karte_der_partie', { partie: partieId })
     .then((d) => (d && typeof d === 'object' && d.w && d.s ? d : null), () => null);
-  try { return await Promise.race([frage, zeit]); } finally { clearTimeout(uhr); }
+  // R19 Season (supabase/saison-schema.sql, Vorschlag): bestes Abzeichen und gewaehlter Titel kommen parallel und mit
+  // derselben Frist; altes SQL, Absage oder zu spaet: die Karte wie bisher, ohne Season
+  const saison = rpc('saison_karte_der_partie', { partie: partieId })
+    .then((d) => (d && typeof d === 'object' ? d : null), () => null);
+  try {
+    const [k, s] = await Promise.all([Promise.race([frage, zeit]), Promise.race([saison, zeit])]);
+    if (!k || !s) return k;
+    const mit = (karte, teil) => (teil && typeof teil === 'object' ? { ...karte, saison: { abzeichen: teil.abzeichen, titel: teil.titel } } : karte);
+    return { ...k, w: mit(k.w, s.w), s: mit(k.s, s.s) };
+  } finally { clearTimeout(uhr); }
 }

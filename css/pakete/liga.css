@@ -222,3 +222,23 @@
   transform: rotate(45deg) translateY(-2px); }
 .lg-gr-regeln[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
 .lg-gr-regeln p { margin: 0 0 8px; line-height: 1.45; }
+/* R19 Season: Leiste im Profil (ich:kopf) und Blatt am Season-Ende; nur Theme-Tokens */
+.ss-leiste[hidden] { display: none !important; }
+.ss-leiste .ss-kopf { margin-top: 0; }
+.ss-leiste p { margin: 0 0 var(--a2); line-height: 1.45; }
+.ss-lauf, .ss-hilfe { font-size: 13px; color: var(--text-2); }
+.ss-bisher, .ss-ende-abz { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.ss-symbol { flex: none; width: 18px; height: auto; }
+.ss-abzeichen { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--a2); padding: 0; list-style: none; }
+.ss-abzeichen li { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 10px; border-radius: 999px;
+  background: var(--flaeche-3); font-size: 13px; font-weight: 600; }
+.ss-wahl { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--a2); }
+.ss-titel { min-height: 44px; }
+.ss-titel[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.ss-titel:focus-visible { outline: 3px solid var(--fokus); outline-offset: 2px; }
+.ss-fehler:empty { display: none; }
+.ss-fehler { color: var(--warn); font-weight: 600; }
+.ss-ende { display: grid; gap: 10px; margin: 8px 0 4px; }
+.ss-ende p { margin: 0; line-height: 1.45; }
+.ss-ende-titel { font-weight: 700; }
+.ss-ende-abz { justify-content: center; }
