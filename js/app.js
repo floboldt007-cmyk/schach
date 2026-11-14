@@ -78,7 +78,7 @@ import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
-import { brettWahl, klangWahl } from './labor.js';
+import { brettWahl, klangWahl, brettFlaeche } from './labor.js';
 import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderstuecke.js';
 import { sitzung, eigenerName, ladeProfil } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
@@ -133,6 +133,8 @@ function wendeEinstellungenAn(e) {
   const html = document.documentElement;
   // Labor-Bretter nur fuer den Erfinder (js/labor.js); andere sehen still das Standardbrett
   html.dataset.brett = brettWahl(e.brett);
+  // Oberflaeche der seltenen Labor-Bretter (js/brett-flaechen.js, nur dann geladen)
+  brettFlaeche(html, html.dataset.brett);
   html.dataset.koordinaten = e.koordinaten ? 'an' : 'aus';
   html.dataset.balken = e.balken ? 'an' : 'aus';
   html.dataset.live = e.liveBewertung ? 'an' : 'aus';

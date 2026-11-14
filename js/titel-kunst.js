@@ -180,6 +180,40 @@ const ZEICHEN = {
     + `<path d="M42 62h12" stroke="${TINTE}" stroke-width="2" stroke-linecap="round"/>`
     + `<path d="M24 22l20 20M72 22L52 42" stroke="#E6EAF0" stroke-width="4" stroke-linecap="round"/><path d="M24 22l20 20M72 22L52 42" stroke="${TINTE}" stroke-width="1" stroke-linecap="round" opacity=".5"/>`
     + `${funke(48, 22, 3.4, GOLD)}`,
+  // Taten-Titel (R19, 14.11.2026, js/pakete/sammlung/taten.js): je ein Ding aus der Welt des Bots
+  strohhut: () => `<ellipse cx="48" cy="58" rx="28" ry="8" fill="#E8C15A" stroke="${TINTE}" stroke-width="2.2"/><path d="M34 57c0-14 6-22 14-22s14 8 14 22" fill="#F0D070" stroke="${TINTE}" stroke-width="2.2" stroke-linejoin="round"/>`
+    + `<path d="M35 52h26" stroke="${ROT}" stroke-width="4"/><path d="M40 40l3 6M48 37v7M56 40l-3 6" stroke="#B08A2A" stroke-width="1.4" stroke-linecap="round"/>`,
+  postsack: () => `<path d="M32 36c-6 8-8 18-8 24 0 9 10 14 24 14s24-5 24-14c0-6-2-16-8-24z" fill="#C9A46A" stroke="${TINTE}" stroke-width="2.2" stroke-linejoin="round"/>`
+    + `<path d="M34 36h28l-3-6H37z" fill="#A87E44" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/><rect x="36" y="48" width="24" height="15" rx="2" fill="${CREME}" stroke="${TINTE}" stroke-width="1.8"/><path d="M36 49l12 8 12-8" fill="none" stroke="${TINTE}" stroke-width="1.6"/>`,
+  strickkorb: () => `<path d="M24 50h48l-5 22H29z" fill="#A86B3C" stroke="${TINTE}" stroke-width="2.2" stroke-linejoin="round"/><path d="M28 58h40M30 65h36" stroke="${TINTE}" stroke-width="1.2" opacity=".4"/>`
+    + `<circle cx="40" cy="44" r="9" fill="#E26A8A" stroke="${TINTE}" stroke-width="2"/><circle cx="56" cy="45" r="8" fill="#6AA8E2" stroke="${TINTE}" stroke-width="2"/><path d="M58 38l12-14M62 40l12-12" stroke="#E6EAF0" stroke-width="2.4" stroke-linecap="round"/>`,
+  honigwabe: () => [[48, 34], [37, 47], [59, 47], [48, 60], [37, 73], [59, 73]].slice(0, 5).map(([x, y]) => `<path d="M${x} ${y - 9}l8 4.5v9l-8 4.5-8-4.5v-9z" fill="${GOLD}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`).join('')
+    + `<path d="M48 51q0 5 3 8" fill="none" stroke="${GOLD_TIEF}" stroke-width="3" stroke-linecap="round"/>`,
+  axtstiel: () => `<path d="M34 72L58 30" stroke="#8A5530" stroke-width="6" stroke-linecap="round"/><path d="M52 24c8-2 16 2 18 10-6 0-12 2-16 6z" fill="#C8D2E0" stroke="${TINTE}" stroke-width="2.2" stroke-linejoin="round"/>${funke(30, 34, 3.4)}`,
+  gabelzinke: () => `<path d="M48 74V44M36 44c0-10 4-16 4-16M60 44c0-10-4-16-4-16M36 44h24" fill="none" stroke="#C8D2E0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<path d="M48 74V44M36 44h24" fill="none" stroke="${TINTE}" stroke-width="1" opacity=".5"/>${funke(26, 30, 3.4, GOLD)}${funke(70, 30, 3.4, GOLD)}`,
+  zauberstab: () => `<path d="M30 72L60 36" stroke="${TINTE}" stroke-width="6" stroke-linecap="round"/><path d="M30 72L60 36" stroke="#5A3A8C" stroke-width="3.6" stroke-linecap="round"/>`
+    + `${stern(62, 32, 9, 5, GOLD)}${funke(38, 34, 3.4)}${funke(70, 54, 3)}`,
+  spurlupe: () => `<circle cx="44" cy="44" r="15" fill="#BFF0FF" fill-opacity=".55" stroke="${TINTE}" stroke-width="3.4"/><path d="M55 55l14 14" stroke="#8A5530" stroke-width="6" stroke-linecap="round"/>`
+    + `<path d="M38 46c2-3 4-3 5 0M46 40c2-3 4-3 5 0" fill="none" stroke="${TINTE}" stroke-width="2" stroke-linecap="round"/>`,
+  rettungsring: () => `<circle cx="48" cy="50" r="22" fill="none" stroke="${TINTE}" stroke-width="13"/><circle cx="48" cy="50" r="22" fill="none" stroke="${CREME}" stroke-width="10"/>`
+    + `<circle cx="48" cy="50" r="22" fill="none" stroke="${ROT}" stroke-width="10" stroke-dasharray="17.3 17.3"/>`,
+  taucherhelm: () => `<circle cx="48" cy="48" r="22" fill="#C9883A" stroke="${TINTE}" stroke-width="2.4"/><circle cx="48" cy="48" r="11" fill="#9EDCF0" stroke="${TINTE}" stroke-width="2.4"/>`
+    + `<path d="M40 44l6-4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".8"/><path d="M30 70h36" stroke="${TINTE}" stroke-width="4" stroke-linecap="round"/>`,
+  torschluessel: () => `<circle cx="36" cy="46" r="10" fill="none" stroke="${GOLD}" stroke-width="5"/><path d="M46 46h26M64 46v9M70 46v7" stroke="${GOLD}" stroke-width="5" stroke-linecap="round"/>`
+    + `<path d="M46 46h26" stroke="${TINTE}" stroke-width="1" opacity=".4"/>${funke(36, 26, 3.4)}`,
+  kerze: () => `<rect x="40" y="40" width="16" height="32" rx="2" fill="${CREME}" stroke="${TINTE}" stroke-width="2.2"/><path d="M40 48c4 2 4 5 8 5" fill="none" stroke="${TINTE}" stroke-width="1.2" opacity=".35"/>`
+    + `${flamme(48, 34, .55)}<path d="M30 72h36" stroke="${GOLD_TIEF}" stroke-width="3" stroke-linecap="round"/>`,
+  kartenfaecher: () => [-24, -8, 8, 24].map((w, i) => `<rect x="38" y="30" width="20" height="30" rx="2" fill="${['#7C87B6', '#769656', '#B58863', '#E4E8F6'][i]}" stroke="${TINTE}" stroke-width="2" transform="rotate(${w} 48 70)"/>`).join('')
+    + `${funke(48, 22, 3.6, GOLD)}`,
+  graete: () => `<path d="M24 50h40" stroke="${CREME}" stroke-width="3.4" stroke-linecap="round"/><path d="M32 42l4 8-4 8M42 40l4 10-4 10M52 42l4 8-4 8" fill="none" stroke="${CREME}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<path d="M64 50l10-9v18z" fill="${CREME}" stroke="${TINTE}" stroke-width="1.6" stroke-linejoin="round"/><circle cx="24" cy="50" r="5" fill="${CREME}" stroke="${TINTE}" stroke-width="1.6"/>`,
+  // Liga-Siegel: Siegelwachs mit so vielen Kronen-Zacken wie die Liga hoch ist (n = 1 Knight bis 4 Sovereign)
+  siegel: (n = 1) => {
+    const k = Math.max(1, Math.min(4, Math.floor(Number(n) || 1)));
+    return `<circle cx="48" cy="50" r="21" fill="${ROT}" stroke="${TINTE}" stroke-width="2.4"/><circle cx="48" cy="50" r="15" fill="none" stroke="#FFFFFF" stroke-width="1.4" opacity=".4"/>`
+      + `${krone(48, 50, .55)}` + Array.from({ length: k }, (_, i) => stern(48 + (i - (k - 1) / 2) * 9, 66, 3.2, 5, GOLD)).join('');
+  },
 };
 export const TITEL_ZEICHEN = Object.freeze(Object.keys(ZEICHEN));
 
