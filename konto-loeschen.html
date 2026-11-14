@@ -36,7 +36,7 @@
   .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
   .kasten > :last-child { margin-bottom: 0; }
   .kasten[hidden], [hidden] { display: none !important; }
-  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+  .zurueck, .sprung { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
     border: 1px solid var(--text-2); text-decoration: none; font-weight: var(--gw-stark); }
   .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
   .fuss a { margin-right: var(--a3); }
@@ -66,6 +66,7 @@
   <h1>Konto löschen</h1>
   <p>Hier löschst du dein Crownmate-Konto, auch ohne die App. In der App geht es unter Einstellungen → Daten →
   „Konto löschen“.</p>
+  <p><a class="sprung" href="#selbst-loeschen">Direkt zu „Selbst löschen“</a></p>
 
   <h2>Was gelöscht wird</h2>
   <div class="kasten">
@@ -87,7 +88,7 @@
     <p><b>Abo:</b> Ein laufendes Abo endet mit dem Konto nicht. Kündige es vorher.</p>
   </div>
 
-  <h2>Selbst löschen</h2>
+  <h2 id="selbst-loeschen">Selbst löschen</h2>
   <p class="kl-status" aria-live="polite" data-fehler="nein"></p>
 
   <section class="kl-anmelden kasten" aria-labelledby="kl-anmelden-titel">
@@ -132,7 +133,7 @@
 
   <h2>Löschen per E-Mail</h2>
   <p>Kannst du dich nicht mehr anmelden? Dann schreib von der Adresse deines Kontos an
-  <a class="kl-mail" href="mailto:kontakt@anfrageprofi.de?subject=Crownmate%3A%20Konto%20l%C3%B6schen&amp;body=Bitte%20l%C3%B6scht%20mein%20Crownmate-Konto.%0A%0AE-Mail-Adresse%20des%20Kontos%3A%20%0ABenutzername%20(falls%20bekannt)%3A%20">kontakt@anfrageprofi.de</a>
+  <a class="kl-mail" href="mailto:kontakt@crownmate.de?subject=Crownmate%3A%20Konto%20l%C3%B6schen&amp;body=Bitte%20l%C3%B6scht%20mein%20Crownmate-Konto.%0A%0AE-Mail-Adresse%20des%20Kontos%3A%20%0ABenutzername%20(falls%20bekannt)%3A%20">kontakt@crownmate.de</a>
   mit dem Betreff „Crownmate: Konto löschen“. Nenne die E-Mail-Adresse des Kontos und, falls du ihn weißt, deinen
   Benutzernamen. Wir löschen das Konto innerhalb eines Monats und bestätigen es dir per E-Mail.</p>
 
@@ -142,7 +143,7 @@
 {"wort": "LÖSCHEN", "codeGesendet": "Der Code ist unterwegs. Schau in dein Postfach (auch im Spam-Ordner) und gib die 6 Ziffern ein.",
  "zuGoogle": "Weiter zu Google …", "loescht": "Konto wird gelöscht …", "fehler": "Das hat nicht geklappt. Bitte versuche es noch einmal.",
  "offline": "Keine Verbindung. Du bist weiter angemeldet. Bitte versuche es gleich noch einmal.",
- "abgelehnt": "Der Server hat deine Anmeldung nicht angenommen. Bitte melde dich neu an. Klappt es danach wieder nicht, schreib uns an kontakt@anfrageprofi.de.",
+ "abgelehnt": "Der Server hat deine Anmeldung nicht angenommen. Bitte melde dich neu an. Klappt es danach wieder nicht, schreib uns an kontakt@crownmate.de.",
  "googleFehler": "Die Anmeldung mit Google wurde nicht abgeschlossen. Bitte versuche es noch einmal."}
 </script>
 <script type="module">

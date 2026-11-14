@@ -31,13 +31,8 @@
   ul { padding-left: 1.2em; }
   a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
   .stand { color: var(--text-2); font-size: var(--fs-klein); }
-  .entwurf { margin: 0 0 var(--a5); padding: var(--a4); border: 2px solid var(--warn); border-radius: var(--r-l); background: var(--warn-weich); }
-  .entwurf p { margin: 0; }
-  .entwurf b { display: block; margin-bottom: var(--a1); }
   .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
   .kasten p:last-child, .kasten ul:last-child { margin-bottom: 0; }
-  .platz { padding: 0 .3em; border-radius: var(--r-s); background: var(--flaeche-2); border: 1px dashed var(--linie-2); color: var(--text-2);
-    -webkit-box-decoration-break: clone; box-decoration-break: clone; overflow-wrap: anywhere; }
   .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
     border: 1px solid var(--linie); text-decoration: none; font-weight: var(--gw-stark); }
   .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
@@ -49,20 +44,15 @@
   <p><a class="zurueck" href="./#einstellungen">Zurück zu Crownmate</a></p>
   <p class="stand"><a href="datenschutz-en.html" lang="en" hreflang="en">English version</a></p>
   <h1>Datenschutzerklärung</h1>
-  <p class="stand">Entwurf, Stand November 2026</p>
+  <p class="stand">Stand November 2026</p>
 
-  <div class="entwurf" role="note">
-    <p><b>Entwurf. Vor der Veröffentlichung von einer fachkundigen Person prüfen lassen.</b>
-    Offen sind nur noch die Anbieter-Angaben in eckigen Klammern. Bis zur Prüfung gilt dieser Text nicht.</p>
-  </div>
 
   <h2>1. Wer ist verantwortlich?</h2>
   <div class="kasten">
     <p>Florian Boldt<br>
     Gartenstraße 49<br>
     51379 Leverkusen, Deutschland<br>
-    E-Mail: <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a>
-    <span class="platz">[Anbieter-Angaben wie im Impressum; eigene E-Mail-Adresse für Crownmate festlegen]</span></p>
+    E-Mail: <a href="mailto:kontakt@crownmate.de">kontakt@crownmate.de</a></p>
   </div>
   <p>Crownmate ist eine Schach-App im Browser (Web-App). Diese Erklärung beschreibt, welche Daten die App verarbeitet,
   wozu, auf welcher Rechtsgrundlage und welche Rechte du hast.</p>
@@ -172,7 +162,7 @@
        https://www.gesetze-im-internet.de/ttdsg/__25.html; DSK OH Digitale Dienste 1.2 (Nov. 2024) Rn. 24, 74, 83;
        EDSA Guidelines 2/2023 v2.0 Rn. 33; localStorage cf.turnstile.u gemessen am 09.11.2026 (Beleg in
        .code-guardian-rechtsbelege.md). Ob § 25 Abs. 2 Nr. 2 auch Cloudflares eigenen Zweck traegt, ist offen. Pruefung durch eine fachkundige Person
-       steht aus (Entwurf, siehe Kasten oben). -->
+       steht aus. -->
   <p id="botschutz"><b>Bot-Schutz bei der Anmeldung (Cloudflare Turnstile, sobald eingeschaltet):</b> Damit keine Programme massenhaft
   Konten anlegen oder Anmelde-E-Mails auslösen, prüft ein Dienst von Cloudflare, Inc., 101 Townsend St., San Francisco,
   CA 94107, USA, ob ein Mensch die Anmeldung nutzt. Das Prüfprogramm lädt die App erst, wenn du in den Einstellungen die
@@ -195,18 +185,21 @@
   gespeichert, bis du dein Konto löschst. Das geht jederzeit in der App unter Einstellungen → Daten → „Konto löschen“.
   Dabei löschen wir sofort alles, was in unserer Datenbank zu deinem Konto gehört: Konto und Anmeldedaten (auch die
   Verknüpfung mit Google oder Apple), Benutzername, Freundschaften, Anfragen, Einladungscode und Wochenwertung, Cloud-Spielstand,
-  geteilte Partien und Nutzungsdaten sowie das Anmeldeprotokoll und das Protokoll der Verwaltung.
+  geteilte Partien und Nutzungsdaten sowie das Anmeldeprotokoll und das Protokoll der Verwaltung, außerdem alles, was die Abschnitte unten nennen
+  (Visitenkarte, Liga, Rätsel-Duelle, Online-Partien, Schulmodus), der Stand deines Abos (Abschnitt 7) und die Zähler
+  des Coachs (Abschnitt 8).
   Ausnahme beim Abo: Technische Zahlungsereignisse von Stripe (Abschnitt 7) bleiben ohne deine Konto-Kennung, aber mit der
   Stripe-Kundennummer stehen, bis sie nach Ablauf von 90 Tagen beim nächsten eingehenden Zahlungsereignis gelöscht werden. Ein laufendes Abo endet mit dem Konto nicht; kündige
   es vorher (bei einem aktiven Abo weist die App beim Löschen darauf hin).
-  Weitere Ausnahmen nennen die Abschnitte „Shop: Editionen“ und „Pionier-Titel“ unten: Dort bleiben einzelne Angaben
-  ohne deine Konto-Kennung stehen.
+  Weitere Ausnahmen: Bezahlte Reservierungen von Editionen, deine Erklärungen zum Widerrufsrecht, dein Besitz an Editionen,
+  einmalig vergebene Sonderstücke und deine Pionier-Nummer bleiben ohne deine Konto-Kennung stehen, damit Nachweise erhalten
+  bleiben und nichts doppelt vergeben wird. Einzelheiten nennen die Abschnitte „Shop: Editionen“ und „Pionier-Titel“ unten.
   Nicht sofort erreichbar sind die technischen Protokolle (Server-Logs) und die Datensicherungen von Supabase: Supabase
   bewahrt Server-Logs je nach Tarif höchstens 7 Tage auf und Datensicherungen, sofern der Tarif sie enthält, ebenfalls
   höchstens 7 Tage. Danach werden sie automatisch gelöscht und bis dahin nicht weiter verwendet. Der Spielstand auf deinem
   Gerät bleibt davon unberührt.</p>
 
-  <!-- ENTWURF Etappe 4b (Visitenkarte): Rechtspruefung durch Flo vor dem Live-Gang nach main -->
+  <!-- Etappe 4b (Visitenkarte), Stand 14.11.2026: Pruefung durch eine fachkundige Person steht aus -->
   <h3>Visitenkarte, Erfolge und Taler</h3>
   <p>Mit Konto speichern wir, welche Erfolgs-Stufen (Bronze, Silber, Gold) du erreicht hast, die Taler, die diese Stufen
   dir gutgeschrieben haben, welche Banner du besitzt und wie deine Visitenkarte aussieht (Banner, Titel aus einer festen
@@ -223,7 +216,7 @@
   Unter „Meine Daten herunterladen“ erhältst du diese Daten mit. Wird dein Konto gelöscht, werden sie automatisch
   mitgelöscht.</p>
 
-  <!-- ENTWURF Etappe B (Liga mit Wochen-Gruppen): Rechtspruefung durch Flo vor dem Live-Gang nach main -->
+  <!-- Etappe B (Liga mit Wochen-Gruppen), Stand 14.11.2026: Pruefung durch eine fachkundige Person steht aus -->
   <h3>Liga mit Kronen und Wochen-Gruppen</h3>
   <p>Mit Konto nimmst du an der Liga teil. Dafür speichern wir:</p>
   <ul>
@@ -273,7 +266,7 @@
   liegen wie dein Konto bei Supabase in Frankfurt und bleiben gespeichert, bis du dein Konto löschst; dann werden sie
   automatisch mitgelöscht. Unter „Meine Daten herunterladen“ erhältst du sie mit.</p>
 
-  <!-- ENTWURF Etappe B (Raetsel-Duell): Rechtspruefung durch Flo vor dem Live-Gang nach main -->
+  <!-- Etappe B (Raetsel-Duell), Stand 14.11.2026: Pruefung durch eine fachkundige Person steht aus -->
   <h3>Rätsel-Duell</h3>
   <p>Im Rätsel-Duell lösen zwei Spieler drei Minuten lang dieselben Schach-Rätsel. Mit Konto speichern wir je Duell die
   Art (gewertet, unter Freunden oder gegen die KI), die Konto-Kennungen beider Spieler, bei einem Duell unter Freunden den
@@ -332,7 +325,8 @@
   in Frankfurt. Verlässt du eine Klasse, wird deine Zeile gelöscht, löscht die Leitung eine Klasse, die ganze Klasse.
   Geschlossene Klassen löschen wir 90 Tage nach dem Schließen beim nächsten Aufräumen. Gegen das Durchprobieren von Codes
   zählen wir falsche Codes je Konto und Tag und löschen diese Zähler nach zwei Tagen (Art. 6 Abs. 1 lit. f DSGVO). Mit
-  deinem Konto wird alles automatisch mitgelöscht.</p>
+  deinem Konto wird alles automatisch mitgelöscht. Löscht die Leitung ihr Konto, werden ihre Klassen mit allen
+  Mitgliederzeilen, Kennzahlen und Aufgaben ebenfalls gelöscht; die Konten der Mitglieder bleiben bestehen.</p>
 
   <h3>Shop: Editionen</h3>
   <p>Im Shop gibt es limitierte, nummerierte Editionen. Sie sieht nur, wer angemeldet ist und angegeben hat, 18 Jahre oder
@@ -361,7 +355,7 @@
        bfdi.bund.de; EUR-Lex lieferte am Abruftag 404); Gegenprobe EDSA Leitlinien 01/2022 zum Auskunftsrecht, Version 2.0
        vom 28.03.2023 (Aktivitaetsprotokolle gehoeren zur Auskunft). Technik: supabase/verwaltung-schema.sql auf
        so/R15-verwaltung (ziel_user on delete cascade, verwaltung_stripe_gebunden). Pruefung durch eine fachkundige Person
-       steht aus (Entwurf, siehe Kasten oben). -->
+       steht aus. -->
   <h3>Verwaltung durch den Betreiber</h3>
   <p>Der Betreiber (Abschnitt 1) kann einzelne Konten über eine interne Verwaltung einsehen: E-Mail-Adresse, Zeitpunkt
   von Anlage und letzter Anmeldung, Anmeldeart, Benutzername, Premium- und Abo-Stand, Käufe, Sonderstücke und Banner samt Herkunft. In Einzelfällen, etwa auf deine
@@ -453,7 +447,7 @@
   anlegst. Einwilligungen, zum Beispiel in das Teilen von Partien und Nutzungsdaten (Abschnitt 6), kannst du erst ab
   16 Jahren selbst geben, vorher nur mit Zustimmung deiner Eltern (Art. 8 Abs. 1 DSGVO); der Schalter ist deshalb
   standardmäßig aus, und die App weist direkt daneben darauf hin. Editionen im Shop gibt es erst ab 18 Jahren (Abschnitt
-  „Shop: Editionen“). Eltern können über <a href="mailto:kontakt@anfrageprofi.de">kontakt@anfrageprofi.de</a> Auskunft
+  „Shop: Editionen“). Eltern können über <a href="mailto:kontakt@crownmate.de">kontakt@crownmate.de</a> Auskunft
   über ein Konto oder seine Löschung verlangen.</p>
 
   <h2>13. Deine Rechte</h2>

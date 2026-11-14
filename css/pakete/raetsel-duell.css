@@ -40,7 +40,8 @@
   border-radius: var(--r-knopf-gross, var(--r-l)); cursor: pointer; font: inherit; font-size: 17px; font-weight: 800;
   background: var(--gold); color: var(--kg-stark); box-shadow: var(--s2, none);
   transition: transform var(--d-s) var(--feder-weich), filter var(--d-s) var(--gleiten); }
-.rd-los:hover { filter: brightness(1.05); }
+/* Zeiger-Zustand nur auf Geraeten mit Zeiger: auf dem Handy bliebe :hover nach dem Tippen stehen (R18 rd-los-hover) */
+@media (hover: hover) { .rd-los:hover { filter: brightness(1.05); } }
 .rd-los:active { transform: scale(.98); }
 .rd-los:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
 /* "Gegner suchen" ist dieselbe Handlung wie "Duell suchen" auf der Online-Seite: dieselbe Farbe wie dort (.knopf.primaer,
@@ -51,7 +52,7 @@
 /* "Gegner suchen" und "Nochmal" unter dem Zeiger ohne Aufhellung wie .knopf.primaer: brightness(1.05) senkte die weisse
    Schrift auf 4,28:1 (hell) bzw. 4,49:1 (dunkel), unter 4,5:1 (R17 B3 Nochmal, R17 suchen Gegner suchen). Die Aufhellung
    bleibt nur am goldenen Grundknopf .rd-los, den heute keine Ansicht ohne eine der beiden Klassen benutzt */
-.rd-los:is(.rd-suchen, .rd-nochmal):hover { filter: none; }
+@media (hover: hover) { .rd-los:is(.rd-suchen, .rd-nochmal):hover { filter: none; } }
 
 /* Mit einem Freund: Einladen und Code eingeben nebeneinander */
 .rd-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-self: stretch; }
@@ -243,4 +244,11 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
   .raetsel-duell[data-phase="start"] .rd-start { gap: 0; grid-template-rows: minmax(0, 1fr) auto minmax(14px, 60px) auto minmax(0, 1fr); }
   .raetsel-duell[data-phase="start"] .rd-buehne { grid-row: 2; }
   .raetsel-duell[data-phase="start"] .rd-freund { grid-row: 4; }
+}
+/* R17 ende-pc, Variante A (Auswahlseite R17, Flo waehlt): am PC sass die Ende-Karte oben, darunter bis zu 560 px Leere
+   (1920x1080). Hier steht sie senkrecht mittig im Rumpf. Nur Querformat ab 1021 px MIT Maus (hover und pointer fine):
+   iPad quer (1180x820, Touch) hat dieselbe Breite und bleibt unveraendert; gemessen in tests/r17-ende-pc.test.mjs.
+   Unten derselbe Polster wie oben (wie die Lobby R9): sonst stuende die Karte um 24 px + Leistenhoehe zu hoch */
+@media (orientation: landscape) and (min-width: 1021px) and (hover: hover) and (pointer: fine) {
+  .raetsel-duell[data-phase="beendet"] .rd-rumpf { align-content: safe center; padding-bottom: 6px; }
 }

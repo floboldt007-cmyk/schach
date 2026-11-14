@@ -6,6 +6,8 @@
 //   PORT=9620 node tests/konto-link.test.mjs   eigener Port (Standard: frei)
 //   node tests/konto-link.test.mjs --bilder=<ordner>   je Anmelde-Ansicht ein Bild (<name>.png), am Ende eine Zaehlpruefung;
 //     danach derselbe Lauf je Geraet und Schema (GERAETE) in <ordner>/<b>x<h>-<hell|dunkel>/
+// INTENTIONAL-SLOP[T6]: Kopf mit Aufrufbeispielen, kein auskommentierter Code
+//   Bilder auch ueber die Umgebung BILDER=<ordner>, wie bei der Funktionsprobe (ein --bilder geht vor)
 //   node tests/konto-link.test.mjs --geraet=375x667:dark   ein Lauf in dieser Fenstergroesse und diesem Farbschema
 //   KONTO_BILDER_FRIST=<s>   Frist je Kind-Lauf mit --bilder (Standard 180 s), danach rot
 import http from 'node:http';
@@ -129,7 +131,7 @@ const status = (s) => s.evaluate(() => ({ text: document.querySelector('.konto-s
 // Bildausgabe (R17, 14.11.2026, R15-Kritik/funktion.md: diese Probe hatte als einzige keine): ohne --bilder macht bild()
 // nichts. Die Konto-Gruppe wird vorher ins Bild gerollt; offene Dialoge (Umzug) stehen ohnehin im Bild.
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = bilderArg ? path.resolve(bilderArg.slice(9)) : null;
+const BILDER = bilderArg ? path.resolve(bilderArg.slice(9)) : (process.env.BILDER ? path.resolve(process.env.BILDER) : null);   // BILDER=<ordner> wie die Funktionsprobe
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 const bilder = [];
 async function bild(s, name) {
