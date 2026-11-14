@@ -1,6 +1,15 @@
 -- Rueckweg zur Datenauskunft-Erweiterung vom 09.11.2026 (AC-06): stellt meine_daten() auf den Stand von main 7c434c7
 -- zurueck (ohne coach, schule, abo_ereignisse und werkstatt.edition_ereignisse). Loescht keine Daten, ersetzt nur die
 -- Funktion. Ausfuehren im Supabase SQL Editor, danach: notify pgrst, 'reload schema';
+-- Reihenfolge (R19, 14.11.2026): Diese Fassung kennt die Saison nicht. Solange saison-schema.sql eingespielt ist, bricht
+-- sie ab, damit Abzeichen und Titel nicht still aus der Datenauskunft fallen: zuerst supabase/saison-zurueck.sql.
+do $$
+begin
+  if pg_catalog.to_regclass('public.saison_abzeichen') is not null then
+    raise exception 'ZUERST supabase/saison-zurueck.sql einspielen: diese Fassung von meine_daten() kennt die Saison nicht';
+  end if;
+end;
+$$;
 
 create or replace function public.meine_daten()
 returns jsonb

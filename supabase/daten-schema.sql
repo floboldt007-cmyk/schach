@@ -330,6 +330,7 @@ declare
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
   duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
+  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null);
   raetsel jsonb;
   verwaltung jsonb := jsonb_build_object('verwalter', null, 'protokoll', '[]'::jsonb); -- [verwaltung]
 begin
@@ -468,6 +469,16 @@ begin
                ''wahl'', (select to_jsonb(w) - ''user_id'' from public.karte_wahl w where w.user_id = $1))'
       into karte using uid;
   end if;
+  -- Saison (saison-schema.sql, R19): Abzeichen je Saison (hoechste Stufe), verdiente Saison-Titel, der gewaehlte Titel
+  if to_regclass('public.saison_abzeichen') is not null then
+    execute 'select jsonb_build_object(
+               ''abzeichen'', coalesce((select jsonb_agg(jsonb_build_object(''saison'', a.saison, ''stufe'', a.stufe) order by a.saison)
+                 from public.saison_abzeichen a where a.user_id = $1), ''[]''::jsonb),
+               ''titel'', coalesce((select jsonb_agg(jsonb_build_object(''saison'', t.saison, ''art'', t.art) order by t.saison, t.art)
+                 from public.saison_titel t where t.user_id = $1), ''[]''::jsonb),
+               ''gewaehlt'', (select w.titel from public.saison_wahl w where w.user_id = $1))'
+      into saison using uid;
+  end if;
   -- Raetsel-Duell (raetsel-duell-schema.sql): die eigenen Duelle mit dem eigenen Stand darin und die laufende Suche.
   -- Ohne Saat und Raetsel-Folge: beide sind keine Daten ueber das Konto, und waehrend eines laufenden Duells verrieten
   -- sie die kommenden Raetsel (Schummelschutz).
@@ -520,6 +531,8 @@ begin
     'kronen', kronen,
     -- Visitenkarte und Erfolge: Stufen, Taler-Buchungen, Banner, gewaehlte Karte (leer ohne karte-schema.sql)
     'karte', karte,
+    -- Saison: Abzeichen, Saison-Titel, gewaehlter Titel (leer ohne saison-schema.sql)
+    'saison', saison,
     -- Raetsel-Duell: eigene Duelle mit eigenem Stand, laufende Suche (leer ohne raetsel-duell-schema.sql)
     'raetsel_duell', duelle,
     'partien_online', online,
