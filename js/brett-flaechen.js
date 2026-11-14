@@ -8,9 +8,9 @@
 //   ARTEN                                die Namen der Arten
 //   GROESSE                              '800% 800%' (Hintergrund-Groesse je Feld)
 //   svgUrl(innen) -> 'url("data:...")'   fuer CSS-Variablen
-// Farben nur als rgba(): tief = Randfarbe des Bretts, licht = Weiss, sonst ein eigener Ton. Jede Deckkraft ist [hell, dunkel].
-// tests/bretter-oberflaechen.test.mjs misst Kontrast und Figuren-Lesbarkeit an der schlechtesten Stelle, also dort, wo
-// alle aufhellenden (oder alle abdunkelnden) Toene eines Feldes uebereinander liegen.
+// Je Ebene eine Gruppe <g opacity> mit deckenden rgb()-Formen: tief = Randfarbe des Bretts, licht = Weiss, sonst ein eigener
+// Ton. Jede Deckkraft ist [hell, dunkel]. tests/bretter-oberflaechen.test.mjs misst Kontrast und Figuren-Lesbarkeit an der
+// schlechtesten Stelle (alle aufhellenden bzw. alle abdunkelnden Ebenen uebereinander) und an gerasterten Pixeln.
 
 export const GROESSE = '800% 800%';
 const kodiert = (s) => s.replace(/[<>(),#%"]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
@@ -191,7 +191,9 @@ const RASTER = {
     let d = '';
     for (const [cx, cy] of [[0, 0], [800, 800], [800, 0]]) {
       const n = 9;
-      for (let i = 0; i <= n; i++) { const a = Math.atan2(400 - cy, 400 - cx) + (i / n - 0.5) * 1.6; d += `M${cx} ${cy}l${z(Math.cos(a) * 420)} ${z(Math.sin(a) * 420)}`; }
+      // die Speichen beginnen 14 px neben der Nabe: laufen alle Teilpfade eines Pfads durch einen Punkt, stapelt Chrome dort
+      // die Kantenglaettung (fast schwarzer Fleck trotz Gruppen-Deckkraft)
+      for (let i = 0; i <= n; i++) { const a = Math.atan2(400 - cy, 400 - cx) + (i / n - 0.5) * 1.6; d += `M${z(cx + Math.cos(a) * 14)} ${z(cy + Math.sin(a) * 14)}l${z(Math.cos(a) * 406)} ${z(Math.sin(a) * 406)}`; }
       for (let r = 50; r < 420; r += 46 + R() * 10) {
         for (let i = 0; i <= n; i++) {
           const a = Math.atan2(400 - cy, 400 - cx) + (i / n - 0.5) * 1.6, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
@@ -276,9 +278,32 @@ const zahl = (a) => String(Math.round(a * 100) / 100).replace(/^0\./, '.');
 
 // Wo sich Ebenen kreuzen, addiert sich ihre Deckkraft. Darum je Feldfarbe eine Obergrenze fuer die Summe der aufhellenden
 // und der abdunkelnden Toene (auf dunklen Feldern weniger Licht, wenn der Glanz noch darueber laeuft); darueber wird
-// anteilig gedaempft. So haelt auch die Stelle, an der alles uebereinander liegt, die Boeden.
+// anteilig gedaempft. Haelt die Stelle, an der alle Ebenen einer Richtung uebereinander liegen, die Boeden danach noch
+// nicht, wird das ganze Brett schrittweise leiser (boedenHalten).
 const GRENZE = { h: { licht: 0.34, tief: 0.18 }, d: { licht: 0.2, tief: 0.2 } };
-const hellt = (ton) => ton === 'licht' || (ton !== 'tief' && ton.split(',').reduce((s, v) => s + Number(v), 0) > 450);
+// die Boeden wie tests/bretter-oberflaechen.test.mjs: Feld 2,2, weisse und schwarze Figur auf dunkel 3,0, schwarz auf hell 7,0
+const BODEN = { feld: 2.2, weiss: 3.0, schwarz: 3.0, hell: 7.0 };
+const kontrast = (x, y) => (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+const auf = (u, [r, g, bl, a]) => [u[0] * (1 - a) + r * a, u[1] * (1 - a) + g * a, u[2] * (1 - a) + bl * a];
+function boedenHalten(b, teile) {
+  const glanz = /rgba\(([\d.]+),([\d.]+),([\d.]+),([\d.]+)\)/.exec(String(b.glanz || '').replace(/\s/g, ''));
+  const stellen = (grund, seite) => {
+    const g = rgb(grund).split(',').map(Number);
+    const oben = teile.filter((t) => Number(zahl(t[seite])) > 0.005).map((t) => [...tonFarbe(t.ton, b).split(',').map(Number), Number(zahl(t[seite]))]);
+    if (glanz) oben.push(glanz.slice(1).map(Number));
+    const L = (c) => hellig(...c);
+    const hell = oben.filter((o) => L(auf(g, o)) > L(g)), tief = oben.filter((o) => L(auf(g, o)) <= L(g));
+    return [g, hell.reduce(auf, g), tief.reduce(auf, g)].map(L);
+  };
+  const H = stellen(b.hell, 'h'), D = stellen(b.dunkel, 'd');
+  return H.every((h) => kontrast(h, 0) >= BODEN.hell && D.every((d) => kontrast(h, d) >= BODEN.feld))
+    && D.every((d) => kontrast(1, d) >= BODEN.weiss && kontrast(d, 0) >= BODEN.schwarz);
+}
+// ob ein Ton die Feldfarbe aufhellt, entscheidet seine Helligkeit gegen DIESE Feldfarbe (ein warmes Gelb hellt das dunkle
+// Feld auf und dunkelt das helle ab)
+const hellig = (r, g, b) => [r, g, b].map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+  .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+const hellt = (ton, b, grund) => hellig(...tonFarbe(ton, b).split(',').map(Number)) > hellig(...rgb(grund).split(',').map(Number));
 
 const zwischen = new Map();
 export function brettMuster(b) {
@@ -296,13 +321,18 @@ export function brettMuster(b) {
   const m = { h: '', d: '', ganz: true };
   [['h', 0], ['d', 1]].forEach(([seite, k]) => {
     for (const richtung of ['licht', 'tief']) {
-      const gruppe = teile.filter((t) => (hellt(t.ton) ? 'licht' : 'tief') === richtung);
+      const gruppe = teile.filter((t) => (hellt(t.ton, b, seite === 'h' ? b.hell : b.dunkel) ? 'licht' : 'tief') === richtung);
       const summe = gruppe.reduce((s, t) => s + t.a[k], 0);
       const grenze = GRENZE[seite][richtung] - (seite === 'd' && richtung === 'licht' && b.glanz ? 0.08 : 0);
       for (const t of gruppe) t[seite] = summe > grenze ? t.a[k] * grenze / summe : t.a[k];
     }
-    for (const t of teile) if (t[seite] > 0.005) m[seite] += t.teil.replaceAll(S, `rgba(${tonFarbe(t.ton, b)},${zahl(t[seite])})`);
   });
+  for (let i = 0; i < 40 && !boedenHalten(b, teile); i++) for (const t of teile) { t.h *= 0.93; t.d *= 0.93; }
+  // je Ebene EINE Deckkraft an der Gruppe, die Formen darin deckend: ueberlappende Formen einer Ebene stapeln sich so
+  // nicht (Kaltreview 14.11.: mit rgba je Form lagen 19 von 55 Brettern an echten Pixeln unter einem Boden)
+  for (const seite of ['h', 'd']) {
+    for (const t of teile) if (t[seite] > 0.005) m[seite] += `<g opacity="${zahl(t[seite])}">${t.teil.replaceAll(S, `rgb(${tonFarbe(t.ton, b)})`)}</g>`;
+  }
   Object.freeze(m);
   zwischen.set(b.id, m);
   return m;

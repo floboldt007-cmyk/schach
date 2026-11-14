@@ -135,8 +135,10 @@ const FLAECHEN_VARS = ['--feld-muster-hell', '--feld-muster-dunkel', '--feld-mus
 export function brettFlaeche(html, id, frei = laborFrei()) {
   const b = frei ? LABOR_BRETTER.find((x) => x.id === id && x.flaeche) : null;
   if (!b) { for (const v of FLAECHEN_VARS) html.style.removeProperty(v); return Promise.resolve(); }
-  return import('./brett-flaechen.js').then(({ brettMuster, svgUrl, GROESSE }) => {
-    if (html.dataset.brett !== id) return;
+  // offline und nicht im Cache: still bei den Farben bleiben; ein Fehler beim Zeichnen meldet sich weiter
+  return import('./brett-flaechen.js').catch(() => null).then((mod) => {
+    if (!mod || html.dataset.brett !== id) return;
+    const { brettMuster, svgUrl, GROESSE } = mod;
     const m = brettMuster(b);
     html.style.setProperty('--feld-muster-hell', svgUrl(m.h));
     html.style.setProperty('--feld-muster-dunkel', svgUrl(m.d));

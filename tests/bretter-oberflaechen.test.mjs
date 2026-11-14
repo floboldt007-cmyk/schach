@@ -43,7 +43,10 @@ pruefe('Nacht, Gruen und Holz sind gewoehnlich', frei.every((b) => b.seltenheit 
 // ---------- Oberflaeche
 const formen = (s) => (String(s || '').match(/<(circle|ellipse|rect|polygon)\b/g) || []).length
   + [...String(s || '').matchAll(/\sd="([^"]*)"/g)].reduce((n, m) => n + (m[1].match(/[Mm]/g) || []).length, 0);
-const toene = (s) => new Set(String(s || '').match(/rgba\([^)]*\)/g) || []).size;
+// Ebenen der Oberflaeche: <g opacity="a"> mit deckenden rgb()-Formen -> [r, g, b, a] je Ebene (Farbe der ersten Form)
+const ebenen = (s) => [...String(s || '').matchAll(/<g opacity="([\d.]+)">[\s\S]*?rgb\(([\d.]+),([\d.]+),([\d.]+)\)/g)]
+  .map((m) => [+m[2], +m[3], +m[4], +m[1]]);
+const toene = (s) => new Set(ebenen(s).map((e) => e.join())).size;
 const MINDEST = { selten: [20, 1], episch: [30, 2], legende: [40, 2] };
 const besonders = LABOR_BRETTER.filter((b) => b.seltenheit !== 'gewoehnlich');
 pruefe('Jedes seltene, epische und legendaere Brett hat eine bekannte Oberflaechen-Art', besonders.length >= 50 && besonders.every((b) => b.flaeche && ARTEN.includes(b.flaeche.art)),
@@ -57,10 +60,12 @@ const hs = besonders.map((b) => (muster(b) || {}).h || '');
 pruefe('Keine zwei Oberflaechen gleich', new Set(hs).size === hs.length);
 const jeArt = {}; for (const b of besonders) if (b.flaeche) jeArt[b.flaeche.art] = (jeArt[b.flaeche.art] || 0) + 1;
 pruefe('Jede Art hoechstens zweimal', Object.values(jeArt).every((n) => n <= 2), Object.entries(jeArt).filter(([, n]) => n > 2));
-const nurRgba = (s) => !/(fill|stroke|stop-color)="(?!none"|rgba\()/.test(s) && !/opacity=/.test(s);
-pruefe('Farben der Oberflaechen nur als rgba, ohne opacity (sonst misst der Boden nicht alles)',
-  besonders.every((b) => { const m = muster(b); return !m || (nurRgba(m.h) && nurRgba(m.d)); }),
-  besonders.filter((b) => { const m = muster(b); return m && !(nurRgba(m.h) && nurRgba(m.d)); }).map((b) => b.id));
+// deckende Formen in je einer Gruppe mit Deckkraft: so stapeln sich ueberlappende Formen einer Ebene nicht
+const ebenenTreu = (s) => !/(fill|stroke|stop-color)="(?!none"|rgb\()/.test(s) && !/(fill|stroke)-opacity|rgba\(/.test(s)
+  && (s.match(/opacity=/g) || []).length === (s.match(/<g opacity="[\d.]+">/g) || []).length && ebenen(s).length > 0;
+pruefe('Oberflaechen: je Ebene eine Gruppe mit opacity, Formen darin deckend in rgb (sonst stapeln Ueberlappungen)',
+  besonders.every((b) => { const m = muster(b); return !m || (ebenenTreu(m.h) && ebenenTreu(m.d)); }),
+  besonders.filter((b) => { const m = muster(b); return m && !(ebenenTreu(m.h) && ebenenTreu(m.d)); }).map((b) => b.id));
 const schlicht = alle.filter((b) => b.seltenheit === 'gewoehnlich');
 pruefe('Gewoehnliche bleiben schlicht: keine Oberflaeche, hoechstens 6 Formen je Feld', schlicht.every((b) => !b.flaeche && (!b.muster || (formen(b.muster.h) <= 6 && formen(b.muster.d) <= 6))),
   schlicht.filter((b) => b.flaeche || (b.muster && (formen(b.muster.h) > 6 || formen(b.muster.d) > 6))).map((b) => b.id));
@@ -78,10 +83,12 @@ const ueber = (u, o) => u.map((v, i) => (i < 3 ? v * (1 - o[3]) + o[i] * o[3] : 
 const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
   .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
 const kontrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-// schlechteste Stellen: alle aufhellenden Toene uebereinander, alle abdunkelnden uebereinander (der Glanz hellt auf)
+// schlechteste Stellen: alle aufhellenden Ebenen uebereinander, alle abdunkelnden uebereinander (der Glanz hellt auf).
+// Oberflaechen: je Ebene einmal (Gruppen-Deckkraft); Zeichnung je Feld der gewoehnlichen: je rgba-Ton einmal
 const stellen = (grund, zeichnung, glanz) => {
   const g = farbe(grund);
-  const oben = [...new Set(String(zeichnung || '').match(/rgba\([^)]*\)/g) || [])].map(farbe).filter(Boolean);
+  const z = String(zeichnung || '');
+  const oben = /<g opacity=/.test(z) ? ebenen(z) : [...new Set(z.match(/rgba\([^)]*\)/g) || [])].map(farbe).filter(Boolean);
   if (glanz) oben.push(farbe(glanz));
   const hell = oben.filter((o) => lum(ueber(g, o)) > lum(g)), dunkel = oben.filter((o) => lum(ueber(g, o)) <= lum(g));
   return [g, hell.reduce(ueber, g), dunkel.reduce(ueber, g)];
@@ -197,6 +204,53 @@ else {
     pruefe('Browser: beim Glanz behaelt die Oberflaeche ihren Ausschnitt', /^800% 800%, 400% 100%$/.test(g[2][0]) && /^100% 100%, /.test(g[2][1]), g);
     const schlichtes = await lage('schiefer');
     pruefe('Browser: Zeichnung je Feld bleibt 100 % (schiefer)', schlichtes[0][0] === '100% 100%' && /^url\(/.test(schlichtes[0][2]), schlichtes);
+    // Boeden an gerasterten Pixeln (Kaltreview 14.11., Probe rv-boden): je Brett die Zeichnung in Spielgroesse (360 px) als
+    // CSS-Hintergrund ueber der Feldfarbe, also auf demselben Weg wie im Spiel, als Bildschirmfoto; Glanz voll deckend dazu,
+    // nur die Pixel der hellen bzw. dunklen Felder. Kein Canvas-drawImage: das stapelt bei einer Gruppe mit nur einem Pfad
+    // die Kantenglaettung der Teilpfade (Nabe eines Netzes 79 statt 228), der CSS-Hintergrund nicht. Gemessen am
+    // 0,5-%-Quantil (ein einzelnes Kantenpixel ist kein Lesbarkeitsproblem); der extremste Pixel steht in der Ausgabe
+    const svg = (innen, vb) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${vb} ${vb}' preserveAspectRatio='none'>${innen}</svg>`);
+    const r = await browser.newPage({ viewport: { width: 720, height: 360 }, deviceScaleFactor: 1 });
+    const raster = [];
+    for (const b of alle) {
+      const f = typeof brettMuster === 'function' ? brettMuster(b) : null;
+      const m = f || b.muster || null;
+      const flaeche = (grund, innen) => `<div style="width:360px;height:360px;background-color:${grund};${m ? `background-image:url(&quot;${svg(innen, f ? 800 : 100)}&quot;);background-size:${f ? '100% 100%' : '12.5% 12.5%'}` : ''}"></div>`;
+      await r.setContent(`<body style="margin:0;display:flex">${flaeche(b.hell, m && m.h)}${flaeche(b.dunkel, m && m.d)}</body>`);
+      const foto = (await r.screenshot({ clip: { x: 0, y: 0, width: 720, height: 360 } })).toString('base64');
+      raster.push(await r.evaluate(async ({ foto, glanz, id, BODEN }) => {
+        const lum = (R, G, B) => [R, G, B].map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+          .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const k = (x, y) => (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+        const N = 360, F = N / 8;
+        const bild = new Image(); await new Promise((ok, f) => { bild.onload = ok; bild.onerror = f; bild.src = 'data:image/png;base64,' + foto; });
+        const c = document.createElement('canvas'); c.width = 2 * N; c.height = N; const x = c.getContext('2d'); x.drawImage(bild, 0, 0);
+        const d = x.getImageData(0, 0, 2 * N, N).data;
+        const g = /rgba\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\)/.exec(glanz || '');
+        const q = (arr, p) => arr[Math.min(arr.length - 1, Math.max(0, Math.round(p * (arr.length - 1))))];
+        const werte = (links, paritaet) => {
+          const L = [], Lg = [];
+          for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
+            if ((Math.floor(px / F) + Math.floor(py / F)) % 2 !== paritaet) continue;
+            const i = (py * 2 * N + px + links) * 4;
+            L.push(lum(d[i], d[i + 1], d[i + 2]));
+            if (g) { const a = +g[4]; Lg.push(lum(...[0, 1, 2].map((j) => d[i + j] * (1 - a) + +g[j + 1] * a))); }
+          }
+          const s = L.sort((a, b) => a - b), sg = g ? Lg.sort((a, b) => a - b) : s;
+          return { min: s[0], max: Math.max(s[s.length - 1], sg[sg.length - 1]), q005: q(s, 0.005), q995: Math.max(q(s, 0.995), q(sg, 0.995)) };
+        };
+        const H = werte(0, 0), D = werte(N, 1);
+        const mass = (hMin, dMax, dMin) => ({ feld: k(hMin, dMax), weissAufDunkel: k(1, dMax), schwarzAufDunkel: k(0, dMin), schwarzAufHell: k(0, hMin) });
+        const qu = mass(H.q005, D.q995, D.q005), px = mass(H.min, D.max, D.min);
+        return { id, unterQ: Object.entries(BODEN).filter(([n, v]) => qu[n] < v).map(([n]) => n + ' ' + qu[n].toFixed(2)),
+          unterPx: Object.entries(BODEN).filter(([n, v]) => px[n] < v).map(([n]) => n + ' ' + px[n].toFixed(2)) };
+      }, { foto, glanz: b.glanz || null, id: b.id, BODEN }));
+    }
+    const unterQ = raster.filter((e) => e.unterQ.length), unterPx = raster.filter((e) => e.unterPx.length);
+    console.log(`Raster: ${raster.length} Bretter, am 0,5-%-Quantil unter einem Boden ${unterQ.length}, am extremsten Pixel ${unterPx.length}`
+      + (unterPx.length ? ' (' + unterPx.map((e) => e.id + ' ' + e.unterPx.join('/')).join('; ') + ')' : ''));
+    pruefe('Raster: alle 65 halten die vier Boeden an gerasterten Pixeln (0,5-%-Quantil, Glanz voll deckend)', raster.length === 65 && unterQ.length === 0,
+      unterQ.map((e) => [e.id, e.unterQ]));
     pruefe('Browser: keine Seitenfehler', fehler.length === 0, fehler);
   } finally {
     if (browser) await browser.close();

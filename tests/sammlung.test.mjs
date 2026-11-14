@@ -471,6 +471,11 @@ async function erfinderTeil(browser) {
   pruefe('Erfinder: „Der Erfinder“ und „Nr. 0 · 1 von 1“, Knopf für die Blaupause', !!info && info.chips === 'Der Erfinder|Nr. 0 · 1 von 1'
     && info.knopf === 'Blaupause-Figuren benutzen', info);
   pruefe('Erfinder: Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // Befund ed (14.11.2026): Erfinder auf neuem Geraet, der Status kommt erst nach dem Laden; die Oberflaechen der seltenen
+  // Bretter muessen trotzdem im Sammelbild erscheinen (vorher entschied eine Modul-Konstante beim Laden fuer immer)
+  const flaechen = await p.s.waitForFunction(() => document.querySelectorAll('.sa-bereich[data-bereich="bretter"] clipPath[id^="skf"]').length,
+    null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => 0);
+  pruefe('Erfinder auf neuem Gerät: Sammelbild der Bretter zeigt die Oberflächen, sobald der Server den Erfinder meldet', flaechen > 0, flaechen);
   // G-002 (Sammlung B): Plaetze statt Reiter; auf dem Handy alle im Bild, gross genug, ohne Ueberlappung
   pruefe('Handy: alle Plätze der Sammlung sichtbar (mindestens 44 px hoch, keiner überlappt, nichts ragt rechts heraus)', await p.s.evaluate((seg) => {
     const ueber = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;

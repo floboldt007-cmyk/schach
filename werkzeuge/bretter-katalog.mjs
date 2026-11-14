@@ -48,10 +48,14 @@ const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.04045 
   .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
 const kontrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 const ueber = (u, o) => u.map((v, i) => (i < 3 ? v * (1 - o[3]) + o[i] * o[3] : 1));
+// Oberflaechen: je Ebene eine Gruppe <g opacity> mit deckenden rgb()-Formen (js/brett-flaechen.js), jede Ebene zaehlt einmal
+const ebenen = (s) => [...String(s || '').matchAll(/<g opacity="([\d.]+)">[\s\S]*?rgb\(([\d.]+),([\d.]+),([\d.]+)\)/g)]
+  .map((m) => [+m[2], +m[3], +m[4], +m[1]]);
 // schlechteste Stellen: alle aufhellenden bzw. alle abdunkelnden Toene uebereinander (Oberflaechen kreuzen sich)
 const stellen = (grund, zeichnung, glanz) => {
   const g = farbe(grund);
-  const oben = [...new Set(String(zeichnung || '').match(/rgba\([^)]*\)/g) || [])].map(farbe).filter(Boolean);
+  const z = String(zeichnung || '');
+  const oben = /<g opacity=/.test(z) ? ebenen(z) : [...new Set(z.match(/rgba\([^)]*\)/g) || [])].map(farbe).filter(Boolean);
   if (glanz) oben.push(farbe(glanz));
   const hell = oben.filter((o) => lum(ueber(g, o)) > lum(g)), dunkel = oben.filter((o) => lum(ueber(g, o)) <= lum(g));
   return [g, hell.reduce(ueber, g), dunkel.reduce(ueber, g)];

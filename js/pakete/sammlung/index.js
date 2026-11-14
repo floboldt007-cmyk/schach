@@ -13,9 +13,6 @@ import { PAKETE_KLANG } from '../../sounds.js';
 import { klangKunst, brettKunst, erfolgKunst, erfolgSeltenheit } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
 import { LABOR_BRETTER, LABOR_FIGUREN, LABOR_KLAENGE, laborFrei, brettWahl, klangWahl } from '../../labor.js';
-// Oberflaechen der seltenen Labor-Bretter (14.11.2026): nur das Erfinder-Konto laedt sie; fehlt die Datei (offline, nicht im
-// Cache), zeigt das Sammelbild die Farben ohne Oberflaeche
-const FLAECHEN = laborFrei() ? await import('../../brett-flaechen.js').catch(() => null) : null;
 import { figurenSatz, figurenPfad } from '../../figurensatz.js';
 import { hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { shopBereich } from './shop.js';
@@ -47,7 +44,25 @@ const sternBild = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5
 // Ausruesten per Tipp (js/ui/ich.js): wahl() setzt die Einstellung ueber die App; ohne App (Node-Tests) keine Wahl
 const wahlVon = (app, teil) => (app && typeof app.setzeEinstellungen === 'function' ? () => app.setzeEinstellungen(teil) : undefined);
 
+// Oberflaechen der seltenen Labor-Bretter (14.11.2026): nur das Erfinder-Konto laedt sie, und zwar beim ersten Sammelbild mit
+// freiem Labor (Befund ed: auf einem neuen Geraet kommt der Erfinder-Status erst nach dem Laden). Ist die Datei da, wird der
+// offene Screen "Ich" ruhig neu gezeigt; fehlt sie (offline, nicht im Cache), bleiben die Farben ohne Oberflaeche und das
+// naechste Sammelbild fragt noch einmal
+let FLAECHEN = null;
+let flaechenLaden = null;
+function flaechenAnstossen(app) {
+  if (FLAECHEN || flaechenLaden || !laborFrei()) return;
+  flaechenLaden = import('../../brett-flaechen.js').then((m) => {
+    FLAECHEN = m;
+    const s = typeof document !== 'undefined' && document.querySelector('.sa-screen');
+    if (!s || !app || typeof app.gehe !== 'function') return;
+    const oben = s.querySelector('.sa-rumpf')?.scrollTop || 0;
+    app.gehe('ich', { ...(s.dataset.bereich ? { bereich: s.dataset.bereich } : {}), oben, ruhig: true }, { ersetzen: true });
+  }).catch(() => {}).finally(() => { flaechenLaden = null; });
+}
+
 export function teileBretter(e = ladeEinstellungen(), app = null) {
+  flaechenAnstossen(app);
   const an = brettWahl(e.brett);
   // Labor (Flo 31.10.2026): Kuerbis, Frost, Marmor, Nussbaum, Thron nur im Erfinder-Konto (js/labor.js)
   const liste = [...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, (b.flaeche && FLAECHEN && FLAECHEN.brettMuster(b)) || b.muster]) : [])];
