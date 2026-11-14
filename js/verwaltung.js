@@ -5,6 +5,7 @@
 //
 //   istVerwalter({ neu }) -> Promise<boolean>   false ohne Anmeldung, ohne Recht, offline und solange die SQL fehlt
 //                                               (still, nie ein Fehler). Gemerkt je Konto, bis neu: true oder Abmelden.
+//   vergissVerwalter()                          verwirft die gemerkte Antwort (beim Abmelden; die Gruppe ruft es auf)
 //   konten({ suche, grenze })                   Liste neueste zuerst (verwaltung_konten)
 //   kaeufe(id)                                  Abo, Editionen, Sonderstuecke, Banner (verwaltung_kaeufe, nur lesend)
 //   setzePremium(id, bis)                       bis = Date oder ISO-Text freischalten, null zuruecknehmen
@@ -62,11 +63,13 @@ async function rpc(name, daten = {}) {
   return d;
 }
 
+export function vergissVerwalter() { merker = null; }
+
 export function istVerwalter({ neu = false } = {}) {
   const s = sitzung();
   const uid = uidVon(s);
   // abgemeldet: die gemerkte Antwort verwerfen, die naechste Anmeldung fragt neu
-  if (!s?.access_token || !uid) { merker = null; return Promise.resolve(false); }
+  if (!s?.access_token || !uid) { vergissVerwalter(); return Promise.resolve(false); }
   if (!neu && merker && merker.uid === uid) return merker.p;
   const p = rpc('ist_verwalter').then((d) => d === true).catch(() => false);
   merker = { uid, p };

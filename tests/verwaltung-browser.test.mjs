@@ -228,6 +228,18 @@ async function browserTeil(browser) {
   pruefe('Abmeldung bei offenen Einstellungen: das Menue wird genau einmal neu gebaut', ab.probe.nachher.neubau - ab.probe.vorher.neubau === 1,
     ab.probe);
   pruefe('Abmeldung bei offenen Einstellungen: kein Konsolenfehler', ab.fehler.length === 0, ab.fehler);
+  // Kaltreview Runde 3: Abmelden verwirft die gemerkte Antwort auch im Weg ueber die Gruppe; meldet sich dasselbe Konto
+  // wieder an, wird neu gefragt (sonst bliebe ein inzwischen entzogenes Recht in der Anzeige stehen)
+  const wieder = await zustand(browser, { recht: true, hash: '#einstellungen/konto', probe: async (s) => {
+    await s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+    await warte(3000);
+    const zwischen = await imBlick(s);
+    await s.evaluate((x) => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(x)), SITZUNG);
+    await warte(3000);
+    return { zwischen, nachher: await imBlick(s) };
+  } });
+  pruefe('Ab- und Wiederanmeldung desselben Kontos bei offenen Einstellungen: neu gefragt (2 Anfragen), Gruppe wieder da',
+    !wieder.probe.zwischen.sichtbar && wieder.probe.nachher.sichtbar && wieder.fragen === 2, { probe: wieder.probe, fragen: wieder.fragen });
 
   const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true });
   pruefe('Verwalter am Handy: Eintrag in der Liste nach spaeter Antwort', floHandy.navVorher > 0 && floHandy.inNav, floHandy);

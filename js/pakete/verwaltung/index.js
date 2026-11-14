@@ -18,7 +18,7 @@ import { sitzung, userId } from '../../konto.js';
 import { MENSCHEN_BANNER } from '../../ui/visitenkarte.js';
 import '../sammlung/karte-texte.js';
 import './texte.js';
-import { istVerwalter, konten, kaeufe, setzePremium, setzeName, setzeBanner, protokoll } from '../../verwaltung.js';
+import { istVerwalter, vergissVerwalter, konten, kaeufe, setzePremium, setzeName, setzeBanner, protokoll } from '../../verwaltung.js';
 
 const V = (k, w) => t('p-verwaltung.' + k, w);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -146,7 +146,8 @@ export function verwaltungGruppe() {
   let uid;
   el.addEventListener('click', (e) => { if (e.target.closest('[data-vw="oeffnen"]')) zeigeVerwaltung(); });
   // js/konto.js zeichnet beim An- und Abmelden nur die eigene Gruppe neu und meldet nichts: wie js/pakete/abo/index.js an
-  // jeder DOM-Aenderung die Nutzer-ID vergleichen, dazu "storage" fuer andere Tabs. Abgemeldet: sofort weg, ohne Anfrage;
+  // jeder DOM-Aenderung die Nutzer-ID vergleichen, dazu "storage" fuer andere Tabs. Abgemeldet: sofort weg, ohne Anfrage,
+  // und die gemerkte Antwort ist verworfen (die naechste Anmeldung fragt neu);
   // eine spaete Antwort fuer ein Konto, das nicht mehr angemeldet ist, aendert nichts.
   const pruefeAnmeldung = () => {
     if (weg) return;
@@ -154,7 +155,7 @@ export function verwaltungGruppe() {
     const jetzt = (s && userId(s)) || null;
     if (jetzt === uid) return;
     uid = jetzt;
-    if (!jetzt) { el.hidden = true; return; }
+    if (!jetzt) { el.hidden = true; vergissVerwalter(); return; }
     istVerwalter().then((ja) => { if (!weg && uid === jetzt) el.hidden = !ja; }).catch(() => {});
   };
   let beobachter = null;
