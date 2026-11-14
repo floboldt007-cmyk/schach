@@ -492,7 +492,7 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELK
   const appText = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   pruefe('icon: wie bisher, app.js importiert aus ui/icons.js und exportiert weiter', icon('stern').startsWith('<svg class="ico"')
     && icon('stern', 'gross').includes('class="ico gross"') && /<path/.test(icon('pokal'))
-    && /import \{ icon \} from '\.\/ui\/icons\.js';/.test(appText) && /export \{ icon \};/.test(appText) && !/const ICONS/.test(appText));
+    && /import \{ icon(, spielSymbol)? \} from '\.\/ui\/icons\.js';/.test(appText) && /export \{ icon \};/.test(appText) && !/const ICONS/.test(appText));
   pruefe('icon: unbekannter Name -> leeres SVG', /^<svg[^>]*><\/svg>$/.test(icon('gibtsnicht')) && icon('constructor').endsWith('"false"></svg>'));
   const vorher = iconNamen().length;
   pruefe('registriereIcon: neues Icon', registriereIcon('perle', '<circle cx="12" cy="12" r="5"/>') === true && icon('perle').includes('<circle cx="12"')
