@@ -170,6 +170,8 @@ const ARENA_NACHHOLEN_MS = 2500;
 const ZIELE = ['sieg', 'genau', 'hilfe'];
 // Mindesthoehe der hohen Welt auf schmalen Karten (px): Stationen mit Sternen, Fahne und Schild ueberdecken sich nicht
 const WELT_MIN_H = 820;
+// Handy hoch, Weg (R19 A): Hoehe der zugeklappten Gegner-Karte unten (Griff, Kopf, Spielen-Knopf; css/arena.css .karte-weg)
+const WEG_KARTE_ZU = 168;
 // Dauer der Freischalt-Choreografie (tests/app.test.mjs misst 2,7 s zwischen Beginn und Ende von .wird-frei)
 const FREI_DAUER_MS = 2700;
 
@@ -479,8 +481,9 @@ export function zeige(root, params, app) {
       return;
     }
     if (gewaehlt === b.id) {
-      // schon gewaehlt: auf dem Handy zum Panel, dazu ein kurzer Wink des Spielen-Knopfs
-      if (modus === 'hoch') detail.scrollIntoView({ behavior: reduziert() ? 'auto' : 'smooth', block: 'nearest' });
+      // schon gewaehlt: auf dem Handy zum Panel (Weg: die Karte geht auf), dazu ein kurzer Wink des Spielen-Knopfs
+      if (s.classList.contains('karte-weg')) setzeKarteOffen(true);
+      else if (modus === 'hoch') detail.scrollIntoView({ behavior: reduziert() ? 'auto' : 'smooth', block: 'nearest' });
       const sp = detail.querySelector('[data-aktion="spielen"]');
       if (sp) anim(sp, [{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }, { transform: 'none' }], { d: 420, k: 'feder' });
       return;
@@ -491,7 +494,20 @@ export function zeige(root, params, app) {
     // Station federt (Portraet hebt sich kurz), das Namensschild federt auf (entwurf-a/SYSTEM.md "Bot waehlen")
     anim(el.querySelector('.avatar'), [{ transform: 'scale(.86)' }, { transform: 'translateY(-5px) scale(1.04)', offset: 0.55 }, { transform: 'none' }], { d: 560, k: 'hupf' });
     anim(el.querySelector('.k-schild'), [{ transform: 'translateX(-50%) scale(.84)' }, { transform: 'translateX(-50%)' }], { d: 460, k: 'feder' });
+    if (s.classList.contains('karte-weg')) karteOffen = true;
     zeigeDetail(true, true);
+  }
+
+  // Weg (R19 A): die Gegner-Karte unten ist zu (Kopf und Spielen-Knopf) oder offen (dazu Spruch, Ziele, Farbe)
+  let karteOffen = false;
+  function setzeKarteOffen(an) {
+    karteOffen = an;
+    detail.classList.toggle('offen', an);
+    const griff = detail.querySelector('.karte-griff');
+    if (griff) {
+      griff.setAttribute('aria-expanded', an ? 'true' : 'false');
+      griff.setAttribute('aria-label', t(an ? 'arena.karte.zu' : 'arena.karte.auf'));
+    }
   }
 
   function markiereGewaehlt() {
@@ -522,23 +538,29 @@ export function zeige(root, params, app) {
     const quer = !window.matchMedia('(orientation: portrait), (max-width: 760px)').matches && kh >= 420;
     const vorher = modus;
     modus = quer ? 'quer' : 'hoch';
-    // Handy hoch (schmale Karte, Hochformat): ganze Welt auf einen Blick, kein Scrollen in der Karte
-    const kompakt = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
-    lageModus = quer ? 'quer' : kompakt ? 'kompakt' : 'hoch';
+    // Handy hoch, Variante R19 A (Flo 14.11.: "sieht gequetscht aus"): statt der flachen Karte ein senkrechter Weg ueber
+    // die ganze Hoehe, der mit dem Daumen scrollt; der Gegner steht in einer Karte von unten (.karte-weg, css/arena.css)
+    const kompakt = false;
+    const wegModus = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
+    lageModus = quer ? 'quer' : 'hoch';
     s.classList.toggle('karte-quer', quer);
     s.classList.toggle('karte-hoch', !quer);
     s.classList.toggle('karte-kompakt', kompakt);
+    s.classList.toggle('karte-weg', wegModus);
     const lage = LAGEN[lageModus];
     const w = kw;
     weltEl.dataset.welt = welt.id;
     weltEl.classList.toggle('gesperrt', !weltFrei);
     // Hochformat: Handy gestreckter (Platz fuer Schilder, Sterne und Fahne zwischen den Stationen), iPad hoch wie C;
     // schmale Karten (Handy quer: Karte neben dem Panel) mindestens WELT_MIN_H hoch, sonst rueckten die Stationen so eng
-    // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen
-    const h = quer || kompakt ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
-    // kompakt: kleinere Stationen, damit die ganze Welt in die Karte passt
+    // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen. Der Weg (R19 A) ist hoeher, damit
+    // jede Station ihren eigenen Platz hat
+    const h = quer || kompakt ? kh : wegModus ? Math.max(kh + 200, Math.round(kw * 2.5), 980)
+      : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
+    // kompakt: kleinere Stationen, damit die ganze Welt in die Karte passt; auf dem Weg grosse Stationen (Daumen)
     const sk = kompakt ? Math.max(0.56, Math.min(0.78, Math.min(w, h * 1.25) / 560))
-      : Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
+      : wegModus ? Math.max(0.9, Math.min(1.05, w / 400))
+        : Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
     // senkrechte Abbildung: quer 1:1 (die Lage ist dafuer gezeichnet); hoch mit Rand oben (Krone und Fahne ueber dem
     // Endgegner) und unten (Schild unter Station 1), damit keine Beschriftung aus der Karte ragt
     let y0 = 0;
@@ -554,7 +576,8 @@ export function zeige(root, params, app) {
       // runde Ecke der Karte es ab (Handy-Runde 08.11.2026: "Willi 100"); sonst bleibt der Rand knapp, weil jeder Pixel
       // hier die Stationen enger zusammenrueckt (SE: Sterne auf dem Schild der Station darueber)
       const untenAktuell = LBOTS[ys.indexOf(fMax)]?.id === aktuellId;
-      const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : 36);
+      // Weg (R19 A): unten liegt die zugeklappte Gegner-Karte ueber der Welt, die erste Station bleibt darueber
+      const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : wegModus ? WEG_KARTE_ZU + 24 : 36);
       hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
       y0 = oben - fMin * hy;
     }
@@ -591,6 +614,8 @@ export function zeige(root, params, app) {
     // aus dem sichtbaren Teil geraten ist
     if (!quer && !kompakt && vorher && vorher !== modus) scrolleZu(gewaehlt, false);
     else if (!quer && !kompakt && vorher && kh !== letzteKh && !ganzImBild(gewaehlt)) scrolleZu(gewaehlt, false);
+    // Weg (R19 A): war die Karte beim Start noch nicht vermessen, holt das erste echte Layout den Gegner ins Bild
+    else if (wegModus && !vorher) scrolleZu(gewaehlt, false);
     letzteKh = kh;
   }
 
@@ -599,8 +624,10 @@ export function zeige(root, params, app) {
     const el = knoten[idx(id)];
     if (!el) return true;
     const k = karte.getBoundingClientRect();
+    // Weg (R19 A): was unter der zugeklappten Gegner-Karte liegt, ist nicht im Bild
+    const unten = k.bottom - (s.classList.contains('karte-weg') ? WEG_KARTE_ZU + 18 : 0);
     const teile = [el, el.querySelector('.k-schild'), el.querySelector('.fahne')].filter(Boolean).map((t) => t.getBoundingClientRect());
-    return teile.every((n) => n.top >= k.top - 1 && n.bottom <= k.bottom + 1);
+    return teile.every((n) => n.top >= k.top - 1 && n.bottom <= unten + 1);
   }
 
   // Flo steht neben der zuletzt bezwungenen Station (sonst am Start des Wegs); beim Freischalten noch beim alten Platz
@@ -635,7 +662,9 @@ export function zeige(root, params, app) {
     if (i < 0) return;
     const y = yVon(LAGEN.hoch.stationen[i][1]);
     // Hoehe aus der Rechnung (masse.h), nicht offsetHeight: das gilt erst nach einer Transition (Bewegung aus: 0,01 ms)
-    const ziel = Math.max(0, Math.min((masse.h || weltEl.offsetHeight) - karte.clientHeight, y - karte.clientHeight * 0.55));
+    // Weg (R19 A): unten deckt die zugeklappte Gegner-Karte, die Station steht in der Mitte des freien Teils darueber
+    const frei = s.classList.contains('karte-weg') ? karte.clientHeight - WEG_KARTE_ZU - 18 : karte.clientHeight;
+    const ziel = Math.max(0, Math.min((masse.h || weltEl.offsetHeight) - karte.clientHeight, y - frei * 0.55));
     if (sanft && !reduziert() && karte.scrollTo) {
       try { karte.scrollTo({ top: ziel, behavior: 'smooth' }); } catch (e) { karte.scrollTop = ziel; }
     } else karte.scrollTop = ziel;
@@ -662,6 +691,7 @@ export function zeige(root, params, app) {
       // Spruch, Stern-Ziele, Farbe, Spielen). Liga-Karte (Ort arena:panel-oben), Heute-Karte (arena:heute, jetzt auf der
       // Startseite), Bot-Zeilen (arena:panel-bot), Merkmale und Bilanz entfallen; oben bleibt nur die Nachlese.
       detail.innerHTML = `
+      <button class="karte-griff" type="button" aria-expanded="false" aria-label="${esc(t('arena.karte.auf'))}"><span aria-hidden="true"></span></button>
       <div class="ort-panel-oben" hidden></div>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${botFarbe(laufBot)}">
@@ -706,6 +736,8 @@ export function zeige(root, params, app) {
       for (const k of seg.el.querySelectorAll('.seg')) k.dataset.farbe = k.dataset.wert;
       detail.querySelector('.farbwahl-ort').replaceWith(seg.el);
 
+      detail.querySelector('.karte-griff').addEventListener('click', () => setzeKarteOffen(!karteOffen));
+      setzeKarteOffen(karteOffen);
       detail.querySelector('[data-aktion="spielen"]').addEventListener('click', () => spielen(b));
       detail.querySelector('[data-aktion="steckbrief"]').addEventListener('click', () => zeigeSteckbrief(b));
       const fort = detail.querySelector('[data-aktion="fortsetzen"]');

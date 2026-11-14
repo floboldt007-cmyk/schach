@@ -532,6 +532,31 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
   /* Meldungen bleiben wie im Hochformat ueber dem Spielen-Knopf (Regel oben) */
 }
 
+/* ---------- Handy hoch, Weg mit Gegner-Karte von unten (R19 A, js/ui/arena.js layout(): .karte-weg) ----------
+   Flo 14.11.2026: "Bot-Seite am Handy sieht gequetscht aus". Die Welt fuellt die ganze Hoehe und scrollt senkrecht mit
+   dem Daumen (jede Station hat ihren Platz); der Gegner steht in einer Karte, die unten ueber der Welt liegt. Zu zeigt sie
+   Kopf und Spielen-Knopf, offen (Tipp auf den Griff oder die gewaehlte Station) dazu Spruch, Ziele und Farbe. */
+.arena .karte-griff { display: none; }
+.arena.karte-weg .inhalt { position: relative; display: block; overflow: hidden; padding: 0 var(--rand) 10px; }
+.arena.karte-weg .karte { height: 100%; min-height: 0; }
+.arena.karte-weg .detail { position: absolute; z-index: 20; left: calc(var(--rand) + 6px); right: calc(var(--rand) + 6px); bottom: 18px;
+  max-height: calc(100% - 96px); overflow-y: auto; overflow-x: hidden; gap: 10px; padding: 0 16px; border-radius: 24px;
+  background: var(--flaeche); box-shadow: var(--s3), var(--kante); overscroll-behavior: contain; }
+.arena.karte-weg .karte-griff { display: flex; justify-content: center; align-items: center; flex: none; width: calc(100% + 32px); min-height: 26px;
+  margin: 0 -16px -6px; padding: 0; border: 0; background: none; cursor: pointer; }
+.arena.karte-weg .karte-griff span { width: 40px; height: 5px; border-radius: 3px; background: var(--text-3, #9A948A); opacity: .7; }
+.arena.karte-weg .karte-griff:focus-visible { outline: var(--fokus); outline-offset: -4px; border-radius: 24px 24px 0 0; }
+.arena.karte-weg .detail-kopf { gap: 12px; }
+.arena.karte-weg .detail-kopf .av { width: 52px; height: 52px; border-radius: 16px; }
+.arena.karte-weg .detail h2 { font-size: 20px; }
+.arena.karte-weg .detail .elo, .arena.karte-weg .detail .mini-sterne { display: inline-flex; vertical-align: middle; }
+.arena.karte-weg .detail .mini-sterne { margin-left: 8px; }
+.arena.karte-weg .detail-welt { display: none; }
+.arena.karte-weg .detail:not(.offen) :is(.sprechblase, .ziel-sterne, .wahl-farbe, .ort-tempo) { display: none; }
+.arena.karte-weg .cta-platz { position: static; margin: 0 -16px; padding: 4px 16px 14px; border-radius: 0 0 24px 24px; }
+.arena.karte-weg .spielen { min-height: 56px; }
+.arena.karte-weg .knoten .fahne { bottom: calc(100% + 8px); }
+
 /* ---------- Weniger Bewegung ---------- */
 @media (prefers-reduced-motion: reduce) {
   .arena .knoten.aktuell .avatar, .arena .knoten.ruettel .avatar { animation: none; }
