@@ -3,12 +3,17 @@
 //   alle Bedienpunkte der Bots-Seite, je Ziel die Ueberdeckung mit .cta-platz in px. Ganz nach unten gerollt liegt nichts aus
 //   dem Panel unter dem Knopf. In Ruhe (nicht gerollt, kein Fokus) sieht die Seite aus wie mit dem CSS der Basis
 //   (origin/sammel-1114-r18, per Route ausgeliefert): Bild fuer Bild gleich.
+//   Seit dem Botwelt-Paket (R19, Flos Wahl Handy B + Welthintergrund A, 14.11.2026) ist die Basis die ganze Arena von
+//   origin/feinschliff-20261111 (css/arena.css, js/ui/arena.js, js/sprachen/arena.js), nicht nur das CSS: der neue Griff
+//   der Gegner-Karte kommt aus dem JS, mit altem CSS stand er sichtbar im Panel. Absichtlich neu und darum ausserhalb des
+//   Vergleichs: die Zeichnung der Welt (.welt-svg, nur Deko, aria-hidden), der Griff (.karte-griff) und das
+//   Handy-Hochformat (dort ist die Leiste der neue Aufbau; das prueft tests/r19-botwelt-probe.test.mjs).
 // Teil B Loeschseite: oben ein Sprunglink zu "Selbst loeschen", mindestens 44 px hoch, auf dem Handy im ersten Bild,
 //   Tippen landet am Abschnitt.
 //
 //   node tests/r19-bots-se.test.mjs
 //   PORT=9791 node tests/r19-bots-se.test.mjs    Port des Testservers (sonst: frei)
-//   BASIS_CSS=<datei> node tests/r19-bots-se.test.mjs    Vergleichs-CSS fuer Teil A (sonst: git show origin/sammel-1114-r18)
+//   BASIS_CSS=<datei> node tests/r19-bots-se.test.mjs    Vergleichs-CSS fuer Teil A (sonst: git show origin/feinschliff-20261111)
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
 import { spawn, execFileSync } from 'node:child_process';
@@ -33,9 +38,12 @@ function pruefe(name, gut, detail = '') {
 
 // CSS der Basis fuer den Bildvergleich in Ruhe; ohne git (CI mit flachem Klon) entfaellt nur dieser Vergleich
 let basisCss = null;
+const zeige = (d) => execFileSync('git', ['show', `origin/feinschliff-20261111:${d}`], { cwd: WURZEL, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 try {
-  basisCss = process.env.BASIS_CSS ? readFileSync(process.env.BASIS_CSS, 'utf8')
-    : execFileSync('git', ['show', 'origin/sammel-1114-r18:css/arena.css'], { cwd: WURZEL, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  basisCss = {
+    'css/arena.css': process.env.BASIS_CSS ? readFileSync(process.env.BASIS_CSS, 'utf8') : zeige('css/arena.css'),
+    'js/ui/arena.js': zeige('js/ui/arena.js'), 'js/sprachen/arena.js': zeige('js/sprachen/arena.js'),
+  };
 } catch (e) { basisCss = null; }
 
 // Langes Panel (Kaltreview R19 B3): laufende Partie ("Fortsetzen" oben im Panel) und zwei besiegte Bots
@@ -48,7 +56,9 @@ const LANG = {
 async function bots(browser, { w, h, schema, css = null, lang = false }) {
   const k = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: w < 1000, colorScheme: schema, reducedMotion: 'reduce',
     deviceScaleFactor: 1, serviceWorkers: 'block' });
-  if (css) await k.route((u) => new URL(u).pathname.endsWith('/css/arena.css'), (r) => r.fulfill({ status: 200, contentType: 'text/css', body: css }));
+  if (css) for (const [d, body] of Object.entries(css)) {
+    await k.route((u) => new URL(u).pathname.endsWith('/' + d), (r) => r.fulfill({ status: 200, contentType: d.endsWith('.css') ? 'text/css' : 'text/javascript', body }));
+  }
   await k.addInitScript(({ modus, lang }) => {
     try {
       if (sessionStorage.getItem('probe-start')) return;
@@ -129,7 +139,8 @@ try {
   for (const schema of ['light', 'dark']) for (const [w, h] of GROESSEN) {
     const name = `Bots ${w}x${h} ${schema === 'dark' ? 'dunkel' : 'hell'}`;
     // Bild in Ruhe gegen die Basis
-    if (basisCss) {
+    // Handy hoch: der Aufbau ist absichtlich neu (Gegner-Leiste), siehe Kopf
+    if (basisCss && !(w < 600 && h > w)) {
       const neu = await bots(browser, { w, h, schema });
       const alt = await bots(browser, { w, h, schema, css: basisCss });
       // Fingerabdruck statt Bildbytes: ein Bildvergleich zweier Seiten wich unter Suitenlast um wenige Bytes ab, auch auf
@@ -139,7 +150,8 @@ try {
         await document.fonts.ready;
         const r1 = (v) => Math.round(v * 2) / 2;
         const sc = document.querySelector('.screen.arena');
-        return [sc, ...sc.querySelectorAll('*')].map((e) => {
+        // Welt-Zeichnung und Griff sind absichtlich neu (Kopf), alles andere muss gleich bleiben
+        return [sc, ...sc.querySelectorAll('*')].filter((e) => !e.closest('.welt-svg, .karte-griff')).map((e) => {
           const r = e.getBoundingClientRect(), st = getComputedStyle(e);
           return `${e.tagName}.${String(e.className.baseVal ?? e.className).split(' ')[0]} ${r1(r.x)},${r1(r.y)},${r1(r.width)},${r1(r.height)} `
             + [st.display, st.visibility, st.opacity, st.color, st.backgroundColor, st.padding, st.margin, st.fontSize, st.borderRadius].join('|');

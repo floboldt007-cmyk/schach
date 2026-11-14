@@ -635,6 +635,10 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-leiste .detail:not(.offen) h2 { font-size: 17px; line-height: 1.15; }
 .arena.karte-leiste .detail:not(.offen) .elo { margin-top: 1px; font-size: 12px; }
 .arena.karte-leiste .detail:not(.offen) .mini-sterne { display: none; }
+/* zu: je eine Zeile, sonst wird die Leiste hoeher und deckt die unteren Stationen ("Vogelscheuch-e Willi" am SE) */
+.arena.karte-leiste .detail:not(.offen) :is(.detail-ueber, h2) { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+/* offen: der Spielen-Knopf bleibt unten in der Karte stehen, auch wenn Spruch und Ziele nicht ganz hineinpassen */
+.arena.karte-leiste .detail.offen .cta-platz { position: sticky; bottom: 0; z-index: 5; background-color: var(--flaeche); }
 /* die Leiste nennt den naechsten Gegner schon; die Fahne ueber der Station verdeckte in der engen Welt Nachbar-Schilder */
 .arena.karte-leiste .knoten .fahne { display: none; }
 .arena.karte-leiste .detail:not(.offen) .fortsetzen { flex-basis: 100%; margin-bottom: 8px; }

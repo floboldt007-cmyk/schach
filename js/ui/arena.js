@@ -174,6 +174,10 @@ const WELT_MIN_H = 820;
 // Handy hoch, Leiste (R19 B): Hoehe der zugeklappten Gegner-Leiste unten (Griff, Kopf und runder Spielen-Knopf in einer
 // Zeile; css/arena.css .karte-leiste)
 const WEG_KARTE_ZU = 96;
+// Handy hoch, Leiste: Innenrand unten (css/arena.css .karte-weg .inhalt) und senkrechte Luft zwischen zwei
+// uebereinander liegenden Stationen (Sterne und Schild)
+const WEG_RAND_UNTEN = 10;
+const STATION_LUFT = 24;
 // Dauer der Freischalt-Choreografie (tests/app.test.mjs misst 2,7 s zwischen Beginn und Ende von .wird-frei)
 const FREI_DAUER_MS = 2700;
 
@@ -644,6 +648,33 @@ export function zeige(root, params, app) {
   // das neue Stueck Fortschritt (Freischalten) ist schon sichtbar; ohne Bewegung von Anfang an (kein Ausblenden, das
   // sonst ueber eine Transition wieder einblendet)
   let wegGezeichnet = reduziert();
+  const skLeiste = (w, h) => Math.max(0.66, Math.min(0.9, Math.min(w, (h - WEG_KARTE_ZU) * 1.1) / 430));
+  // senkrechte Raender der Welt: oben Krone und Fahne des Endgegners unter der Weltwahl, unten das Schild der Station 1
+  function raender(sk, kompakt, wegModus, ys) {
+    const kn = 76 * sk;
+    // kompakt ist die Weltwahl kleiner und die Karte flach; Leiste (R19 B): etwas mehr Rand oben, das Schild "Endgegner"
+    // lag am iPhone SE unter der Weltwahl
+    const oben = kn * 0.65 + (kompakt ? 70 : wegModus ? 92 : 118);
+    // kompakt: ist die unterste Station die aktuelle (vergroessert), braucht ihr Schild mehr Rand, sonst schneidet die
+    // runde Ecke der Karte es ab (Handy-Runde 08.11.2026: "Willi 100"); sonst bleibt der Rand knapp, weil jeder Pixel
+    // hier die Stationen enger zusammenrueckt (SE: Sterne auf dem Schild der Station darueber)
+    const untenAktuell = LBOTS[ys.indexOf(Math.max(...ys))]?.id === aktuellId;
+    // Leiste (R19 B): unten schwebt die zugeklappte Gegner-Leiste ueber der Welt, die Stationen bleiben darueber
+    const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : wegModus ? WEG_KARTE_ZU + (untenAktuell ? 40 : 24) : 36);
+    return { oben, unten };
+  }
+  // passt die Welt ueber die Leiste? Je zwei Stationen, die waagerecht keine Viertel-Station Luft haben, brauchen senkrecht
+  // eine Station plus STATION_LUFT Abstand (Sterne darueber, Schild darunter); schraeg versetzte (5 und 6) beruehren sich nicht
+  function leistePasst(w, h) {
+    const st = LAGEN.kompakt.stationen;
+    const ys = st.map((p) => p[1]);
+    const sk = skLeiste(w, h);
+    const kn = Math.max(44, 76 * sk);
+    const { oben, unten } = raender(sk, false, true, ys);
+    const hy = (h - oben - unten) / (Math.max(...ys) - Math.min(...ys));
+    return hy > 0 && st.every(([ax, ay], i) => st.every(([bx, by], j) => j <= i
+      || Math.abs(ax - bx) * w >= kn * 1.25 || Math.abs(ay - by) * hy >= kn + STATION_LUFT));
+  }
   function layout() {
     if (weg) return;
     const kw = karte.clientWidth;
@@ -655,10 +686,14 @@ export function zeige(root, params, app) {
     // Handy hoch, Variante R19 B (Flo 14.11.: "sieht gequetscht aus"): die ganze Welt bleibt auf einen Blick (Flo 31.10.:
     // "alles auf einmal sehen"), bekommt aber die volle Hoehe; der Gegner schwebt als schmale Leiste unten ueber der Welt
     // und geht als Karte auf (.karte-weg.karte-leiste, css/arena.css). Kein Scrollen in der Karte.
-    const kompakt = false;
-    const wegModus = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
+    const handyHoch = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
+    // kurze Handys (iPhone SE mit Safari-Leiste, 375 x 548): ueber der Leiste lagen die Stationen aufeinander und unter
+    // ihr; dort bleibt die kompakte Welt mit dem Panel darunter wie vor R19. Gerechnet aus der Hoehe von .inhalt (gleich in
+    // jeder Lage), nicht aus der Karte, deren Hoehe von der vorigen Lage abhaengt
+    const wegModus = handyHoch && leistePasst(kw, s.querySelector('.inhalt').clientHeight - WEG_RAND_UNTEN);
+    const kompakt = handyHoch && !wegModus;
     s.classList.toggle('karte-leiste', wegModus);
-    lageModus = quer ? 'quer' : wegModus ? 'kompakt' : 'hoch';
+    lageModus = quer ? 'quer' : handyHoch ? 'kompakt' : 'hoch';
     s.classList.toggle('karte-quer', quer);
     s.classList.toggle('karte-hoch', !quer);
     s.classList.toggle('karte-kompakt', kompakt);
@@ -677,26 +712,17 @@ export function zeige(root, params, app) {
     const h = quer || kompakt || wegModus ? khNeu : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
     // kompakt: kleinere Stationen, damit die ganze Welt in die Karte passt; mit der Leiste (R19 B) nach der freien Hoehe
     const sk = kompakt ? Math.max(0.56, Math.min(0.78, Math.min(w, h * 1.25) / 560))
-      : wegModus ? Math.max(0.66, Math.min(0.9, Math.min(w, (h - WEG_KARTE_ZU) * 1.1) / 430))
+      : wegModus ? skLeiste(w, h)
         : Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
     // senkrechte Abbildung: quer 1:1 (die Lage ist dafuer gezeichnet); hoch mit Rand oben (Krone und Fahne ueber dem
     // Endgegner) und unten (Schild unter Station 1), damit keine Beschriftung aus der Karte ragt
     let y0 = 0;
     let hy = h;
     if (lageModus === 'hoch' || lageModus === 'kompakt') {
-      const kn = 76 * sk;
       const ys = lage.stationen.map((p) => p[1]);
       const fMin = Math.min(...ys);
       const fMax = Math.max(...ys);
-      // Krone und Fahne des Endgegners unter der Weltwahl; kompakt ist die Weltwahl kleiner und die Karte flach
-      // Leiste (R19 B): etwas mehr Rand oben, das Schild "Endgegner" lag am iPhone SE unter der Weltwahl
-      const oben = kn * 0.65 + (kompakt ? 70 : wegModus ? 92 : 118);
-      // kompakt: ist die unterste Station die aktuelle (vergroessert), braucht ihr Schild mehr Rand, sonst schneidet die
-      // runde Ecke der Karte es ab (Handy-Runde 08.11.2026: "Willi 100"); sonst bleibt der Rand knapp, weil jeder Pixel
-      // hier die Stationen enger zusammenrueckt (SE: Sterne auf dem Schild der Station darueber)
-      const untenAktuell = LBOTS[ys.indexOf(fMax)]?.id === aktuellId;
-      // Leiste (R19 B): unten schwebt die zugeklappte Gegner-Leiste ueber der Welt, die Stationen bleiben darueber
-      const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : wegModus ? WEG_KARTE_ZU + (untenAktuell ? 40 : 24) : 36);
+      const { oben, unten } = raender(sk, kompakt, wegModus, ys);
       hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
       y0 = oben - fMin * hy;
     }

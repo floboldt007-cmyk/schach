@@ -1,6 +1,7 @@
 // Funktionsprobe Bot-Welt (R19, Flos Wahl 14.11.2026: Botwelt Handy B + Welthintergrund A), im Browser wie ein Mensch.
-// Je Geraet (iPhone 13, iPhone SE, iPad hoch, PC 1280) und Modus (hell mit Bewegung, dunkel mit prefers-reduced-motion):
+// Je Geraet (iPhone 13, iPhone SE 375 x 667 und mit Safari-Leiste 375 x 548, iPad hoch, PC 1280) und Modus (hell mit Bewegung, dunkel mit prefers-reduced-motion):
 //   Welt: am Handy die ganze Welt ohne Scrollen (Karte rollt nicht, jede Station darueber und ueber der Gegner-Leiste), die
+//     Leiste nur, wo sie passt (zu kurz, SE mit Safari-Leiste: kompakte Welt mit Panel wie vor R19), die
 //     Stationen ueberdecken sich nicht (nicht gequetscht); kein waagerechter Ueberlauf der Seite.
 //   Hintergrund: Welt 1 (Karofelder) hat Voegel; mit Bewegung laufen sie, mit reduced-motion steht alles.
 //   Kein Rueckschritt gegen die Basis: dieselbe Seite mit css/arena.css, js/ui/arena.js und js/sprachen/arena.js aus
@@ -50,10 +51,11 @@ try {
 } catch (e) { basis = null; }
 
 const { defaultBrowserType: _a, ...IPHONE13 } = pw.devices['iPhone 13'];
-const { defaultBrowserType: _b, ...IPHONESE } = pw.devices['iPhone SE'];
 const GERAETE = [
-  { name: 'iphone13', optionen: IPHONE13, handy: true },
-  { name: 'iphonese', optionen: IPHONESE, handy: true },
+  { name: 'iphone13', optionen: IPHONE13, handy: 'leiste' },
+  // iPhone SE wie im Rest der Suite (tests/ansicht.test.mjs), dazu mit Safari-Leiste (tests/arena.test.mjs)
+  { name: 'iphonese', optionen: { ...IPHONE13, viewport: { width: 375, height: 667 }, screen: { width: 375, height: 667 } }, handy: 'leiste' },
+  { name: 'iphonese-safari', optionen: { ...IPHONE13, viewport: { width: 375, height: 548 }, screen: { width: 375, height: 667 } }, handy: 'kompakt' },
   { name: 'ipad', optionen: { viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }, handy: false },
   { name: 'pc1280', optionen: { viewport: { width: 1280, height: 800 } }, handy: false },
 ];
@@ -159,7 +161,8 @@ try {
       await s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-nachher.png`) }).catch(() => {});
       const w = await weltMessung(s);
       if (g.handy) {
-        pruefe(`${name}: Handy-Welt als Leiste (karte-weg, karte-leiste)`, /karte-weg/.test(w.klassen) && /karte-leiste/.test(w.klassen), w.klassen);
+        if (g.handy === 'leiste') pruefe(`${name}: Handy-Welt als Leiste (karte-weg, karte-leiste)`, /karte-weg/.test(w.klassen) && /karte-leiste/.test(w.klassen), w.klassen);
+        else pruefe(`${name}: zu kurz fuer die Leiste, kompakte Welt mit Panel (karte-kompakt)`, /karte-kompakt/.test(w.klassen) && !/karte-leiste|karte-weg/.test(w.klassen), w.klassen);
         pruefe(`${name}: ganze Welt ohne Scrollen (Karte rollt nicht)`, !w.karteRollt, { h: w.karteH, inhalt: w.inhaltH });
         pruefe(`${name}: jede Station in der Karte und ueber der Gegner-Leiste`, w.stationen >= 6 && !w.ausserhalb.length, w);
       } else {
@@ -185,9 +188,10 @@ try {
         const sc = document.querySelector('.screen.arena');
         const sp = d.querySelector('[data-aktion="spielen"]').getBoundingClientRect();
         return { offen: d.classList.contains('offen'), weg: sc.classList.contains('karte-weg'), name: d.querySelector('h2')?.textContent.trim(),
-          spielenSichtbar: sp.width > 0 && sp.bottom <= innerHeight + 1 && sp.top >= 0 };
+          // im Fenster und im sichtbaren Teil der (rollenden) Karte
+          spielenSichtbar: sp.width > 0 && sp.bottom <= innerHeight + 1 && sp.top >= 0 && sp.bottom <= d.getBoundingClientRect().bottom + 1 && sp.top >= d.getBoundingClientRect().top - 1 };
       });
-      pruefe(`${name}: Gegner ${erster} gewaehlt, ${g.handy ? 'Karte geht auf, ' : ''}Spielen-Knopf im Bild`, (!g.handy || wahl.offen) && wahl.spielenSichtbar && !!wahl.name, wahl);
+      pruefe(`${name}: Gegner ${erster} gewaehlt, ${g.handy === 'leiste' ? 'Karte geht auf, ' : ''}Spielen-Knopf im Bild`, (g.handy !== 'leiste' || wahl.offen) && wahl.spielenSichtbar && !!wahl.name, wahl);
       await s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-gegner.png`) }).catch(() => {});
       const weiss = s.locator('.screen.arena .detail .seg[data-wert="w"]');
       if (await weiss.count()) await weiss.first().click();

@@ -266,6 +266,8 @@ const abgeschnitten = (seite) => seite.evaluate(() => [...document.querySelector
   + '.merkmal, .m-label, .m-wert, .ziel-sterne > div, .fortsetzen .ft-text, .fortsetzen .ft-text > *, .farbwahl .seg')]
   .filter((el) => {
     const cs = getComputedStyle(el);
+    // nur fuer Vorleser verborgen (1 px, clip; R19 B: runder Spielen-Knopf in der Gegner-Leiste) ist nicht abgeschnitten
+    if (cs.position === 'absolute' && el.getBoundingClientRect().width <= 1 && /rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)/.test(cs.clip)) return false;
     const schneidetY = cs.overflowY !== 'visible';
     return el.scrollWidth > el.clientWidth + 1 || (schneidetY && el.scrollHeight > el.clientHeight + 2) || cs.textOverflow === 'ellipsis' || cs.display === 'none' && el.matches('.k-name');
   }).map((el) => el.className + ':' + el.textContent.trim()));
@@ -631,7 +633,14 @@ async function testeSpielenFrei(browser) {
     });
     const frei = m.spielen && m.reiter && m.spielen.b <= m.reiter.t && m.spielen.t >= 0 && m.spielen.b <= m.ih;
     pruefe(`${w} × ${h}: Spielen-Knopf ganz ueber der Reiterleiste und im Fenster, ohne Scrollen`, frei, JSON.stringify(m));
-    // Auswahl W2 B (Flo 09.11.2026): die drei Sterne-Ziele stehen auch kompakt da, als eine Zeile
+    // R19 B (Flos Wahl 14.11.2026): zu ist die Gegner-Karte eine schmale Leiste ohne Ziele; die Ziele zeigt die offene Karte
+    if (await seite.evaluate(() => document.querySelector('.arena').classList.contains('karte-leiste'))) {
+      await seite.locator('.arena .karte-griff').click();
+      await warte(500);
+      m.ziele = await seite.evaluate(() => { const zs = document.querySelector('.arena .detail.offen .ziel-sterne');
+        return zs ? { n: zs.children.length, h: Math.round(zs.getBoundingClientRect().height), zeilen: new Set([...zs.children].map((c) => Math.round(c.getBoundingClientRect().top))).size } : null; });
+    }
+    // Auswahl W2 B (Flo 09.11.2026): die drei Sterne-Ziele stehen auch kompakt da, als eine Zeile (R19 B: in der offenen Karte)
     pruefe(`${w} × ${h}: Sterne-Ziele sichtbar als eine Zeile`, m.ziele && m.ziele.n === 3 && m.ziele.h > 0 && m.ziele.zeilen === 1, JSON.stringify(m.ziele));
     if (w >= 375) pruefe(`${w} × ${h}: die Karte bleibt mindestens 250 px hoch`, m.karte && m.karte.b - m.karte.t >= 250, JSON.stringify(m.karte));
     pruefe(`${w} × ${h}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
@@ -709,7 +718,8 @@ async function testeHochformate(browser) {
       const radius = parseFloat(getComputedStyle(karte).borderBottomLeftRadius) || 0;
       const schild = document.querySelector('.knoten.aktuell .k-schild')?.getBoundingClientRect();
       const flo = document.querySelector('.flo-figur').getBoundingClientRect();
-      return { kompakt: document.querySelector('.arena').classList.contains('karte-kompakt'), knoten: document.querySelectorAll('.knoten').length,
+      // R19 B (Flos Wahl 14.11.2026): die ganze Welt mit Gegner-Leiste unten (karte-leiste) loest karte-kompakt ab
+      return { kompakt: /karte-kompakt|karte-leiste/.test(document.querySelector('.arena').className), knoten: document.querySelectorAll('.knoten').length,
         scrollt: karte.scrollHeight > karte.clientHeight + 2, drin, hinweis: document.querySelectorAll('.karte-zieh-hinweis:not([hidden])').length,
         farbeVorKnopf: fw.bottom <= sp.top + 1, knopfDrin: sp.bottom <= inh.bottom + 1,
         schildAbstand: schild ? Math.round(kb.bottom - schild.bottom) : null, radius, floLinks: Math.round(flo.left - kb.left), floRechts: Math.round(kb.right - flo.right) };
@@ -743,7 +753,7 @@ async function testeHochformate(browser) {
           aktuellDrin: a.top >= kb.top && a.bottom <= kb.bottom, karteBreit: Math.abs(kb.width - (innerWidth - 32)) <= 1,
           spielen: { t: sp.top, b: sp.bottom, l: sp.left, r: sp.right, h: sp.height }, leiste: nb ? { t: nb.top, b: nb.bottom } : null, reiter: document.documentElement.dataset.reiter || null, ih: innerHeight, iw: innerWidth };
       });
-      pruefe('Karte kompakt (ganze Welt, scrollt nicht), naechster Gegner sichtbar, volle Breite', /karte-hoch/.test(m.klasse) && /karte-kompakt/.test(m.klasse)
+      pruefe('Karte kompakt (ganze Welt, scrollt nicht), naechster Gegner sichtbar, volle Breite', /karte-hoch/.test(m.klasse) && /karte-kompakt|karte-leiste/.test(m.klasse)
         && !m.scrollbar && m.scrollTop === 0 && m.aktuellDrin && m.karteBreit, JSON.stringify(m));
       pruefe('Spielen-Knopf klebt sichtbar im Viewport, ueber der Reiter-Leiste, mindestens 56 px hoch', m.reiter === 'unten' && !!m.leiste && m.spielen.t >= 0 && m.spielen.b <= m.leiste.t && m.spielen.l >= 0 && m.spielen.r <= m.iw && m.spielen.h >= 56, JSON.stringify(m));
       // nach dem Scrollen des Panels bleibt der Knopf im Bild (sticky)
