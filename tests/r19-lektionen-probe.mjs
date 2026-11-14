@@ -6,7 +6,11 @@
 // gegen genau diese Verteidigung (dann muss "geschafft" kommen); alle anderen (lange Matts, Endspiele) spielen legal, bis
 // die App die Lektion selbst beendet (Grenze, Remis, verloren ...). Dort zaehlt jedes Ende mit Ergebnisblatt.
 // Zugang ohne Konto: Willkommenswoche (modul:start.gesehen gestern), dann sind alle Lektionen offen (js/pakete/lernen/zugang.js).
-// Geraet und Modus wechseln je Lektion reihum: iPhone 13 hell, iPhone 13 dunkel, PC hell, PC dunkel.
+// Geraet und Modus wechseln je Lektion reihum: iPhone 13 hell, iPhone 13 dunkel, PC hell, PC dunkel. Gewollt so (Hauptfenster
+// 14.11.2026): jede Lektion laeuft auf GENAU EINER der vier Arten, damit die Probe in CI bei rund 4 Minuten bleibt; je Bereich
+// kommt jede Art vor, und die Handlaeufe im Vault-Bericht R19-Kritik/lektionen.md decken alle vier ab.
+// Jede Lektion hat eine Gesamtfrist (FRIST_MS); wer haengt, wird mit Grund rot und die naechste kommt dran.
+// ergebnis.json wird nach jeder Lektion neu geschrieben, damit ein Abbruch von aussen die bisherigen Ergebnisse behaelt.
 // Netzwerk: jede Anfrage an Supabase wird leer beantwortet.
 //
 //   node tests/r19-lektionen-probe.mjs
@@ -51,6 +55,7 @@ const ARTEN = [
   { name: 'pc1280-dunkel', optionen: { viewport: { width: 1280, height: 800 } }, modus: 'dunkel' },
 ];
 const NUR = process.env.NUR ? new Set(process.env.NUR.split(',')) : null;
+const UNBEKANNT = NUR ? [...NUR].filter(id => !ALLE.some(l => l.id === id)) : [];
 const LEKTIONEN = ALLE.filter(l => !NUR || NUR.has(l.id));
 
 let ok = 0, gesamt = 0;
@@ -60,6 +65,8 @@ function pruefe(name, gut, detail = '') {
   return gut;
 }
 const warte = ms => new Promise(r => setTimeout(r, ms));
+const FRIST_MS = 120000; // je Lektion; der laengste gruene Durchlauf (Endspiel, 80 Zuege) braucht weit weniger
+const mitFrist = (p, ms, text) => Promise.race([p, new Promise((_, nein) => setTimeout(() => nein(new Error(text)), ms).unref())]);
 // App-Tag gestern (Europe/Berlin): liegt immer in der Willkommenswoche, auch kurz nach Mitternacht (Tag beginnt um 4:00)
 const GESTERN = new Date(Date.now() - 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
 
@@ -115,10 +122,16 @@ async function probe(s, l, art) {
   r.start = await s.waitForFunction(() => window.__lektion.zustand().phase === 'flo', null, { timeout: 10000 }).then(() => true, () => false);
   if (!r.start) { r.fehler.push('nach los nicht am Zug: ' + JSON.stringify(await lz(s))); return r; }
   const c = new Chess(l.fen || undefined), startMat = material(c);
+  const frist = Date.now() + FRIST_MS;
   for (let runde = 0; runde < 80; runde++) {
     const z = await lz(s);
     if (z.phase === 'ende') break;
-    if (z.phase !== 'flo') { await s.waitForFunction(() => ['flo', 'ende'].includes(window.__lektion.zustand().phase), null, { timeout: 10000 }).catch(() => {}); continue; }
+    if (Date.now() > frist) { r.fehler.push(`Gesamtfrist ${FRIST_MS / 1000} s ueberschritten in Phase ${z.phase}`); break; }
+    if (z.phase !== 'flo') {
+      const weiter = await s.waitForFunction(() => ['flo', 'ende'].includes(window.__lektion.zustand().phase), null, { timeout: 10000 }).then(() => true, () => false);
+      if (!weiter) { r.fehler.push(`steht 10 s in Phase ${z.phase}: ${JSON.stringify(await lz(s))}`); break; }
+      continue;
+    }
     c.load(z.fen); // die App fuehrt: ihre Stellung ist die Wahrheit
     if (artVon(l) === 'folge') { c.reset(); for (const san of l.folge.slice(0, z.schritt)) c.move(san); }
     const m = artVon(l) === 'folge' ? new Chess(c.fen()).move(l.folge[z.schritt]) : floZug(l, c, startMat, z.zuege);
@@ -149,6 +162,7 @@ async function probe(s, l, art) {
 const ergebnisse = [];
 let browser;
 try {
+  if (NUR) pruefe(`NUR nennt nur bekannte Lektionen`, !UNBEKANNT.length, `unbekannte Id: ${UNBEKANNT.join(', ')}`);
   browser = await browserTyp(pw).launch({ headless: true });
   for (const [ai, art] of ARTEN.entries()) {
     const liste = LEKTIONEN.filter((_, i) => i % ARTEN.length === ai);
@@ -163,6 +177,7 @@ try {
     const fehler = [];
     s.on('pageerror', e => fehler.push(e.message));
     s.on('console', m => { if (m.type() === 'error') fehler.push(m.text()); });
+    const f0Start = fehler.length;
     await s.goto(BASIS + '#lernen');
     // window.__lektion kommt erst mit dem Lektions-Modul (beim ersten Oeffnen einer Lektion)
     await s.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen, null, { timeout: 30000 });
@@ -171,12 +186,14 @@ try {
       const { Chess: C } = await import('/vendor/chess/chess.js');
       window.__test.lektionZug = fen => { const m = new C(fen).moves({ verbose: true })[0]; return m ? m.from + m.to + (m.promotion || '') : null; };
     });
+    pruefe(`${art.name}: App-Start ohne Konsolenfehler`, fehler.length === f0Start, fehler.slice(f0Start));
     for (const l of liste) {
       const f0 = fehler.length;
-      const r = await probe(s, l, art).catch(e => ({ id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, fehler: ['Abbruch: ' + e.message] }));
+      const r = await mitFrist(probe(s, l, art), FRIST_MS + 30000, `haengt laenger als ${FRIST_MS / 1000 + 30} s`).catch(e => ({ id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, fehler: ['Abbruch: ' + e.message] }));
       r.konsole = fehler.slice(f0);
       r.geht = !!(r.start && r.handlung && r.ende && !r.fehler.length && !r.konsole.length && (!mitLoesung(l) || r.grund === 'geschafft'));
       ergebnisse.push(r);
+      await writeFile(path.join(BILDER, 'ergebnis.json'), JSON.stringify(ergebnisse, null, 1));
       pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt${mitLoesung(l) ? ' (geschafft)' : ''}`, r.geht,
         { start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, fehler: r.fehler, konsole: r.konsole });
     }
@@ -184,8 +201,11 @@ try {
   }
   pruefe(`alle ${LEKTIONEN.length} Lektionen geprueft`, ergebnisse.length === LEKTIONEN.length, ergebnisse.length);
 } finally {
-  await browser?.close(); await new Promise(r => server.close(r));
+  // nach einem Absturz der Seite kann close() haengen: begrenzt warten, das Ergebnis steht schon auf der Platte
+  await mitFrist(Promise.all([browser?.close(), new Promise(r => server.close(r))]), 20000, 'close').catch(() => {});
   await writeFile(path.join(BILDER, 'ergebnis.json'), JSON.stringify(ergebnisse, null, 1));
 }
 console.log(`\nBilder und ergebnis.json: ${BILDER}`);
-console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;
+console.log(`\n${ok}/${gesamt} bestanden`);
+// explizit beenden: eine abgestuerzte Seite haelt sonst den Prozess offen (gemessen: Ausgang erst ueber timeout, 124)
+process.exit(ok === gesamt ? 0 : 1);
