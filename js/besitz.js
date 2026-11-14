@@ -5,7 +5,8 @@
 //   ladeBesitz() -> { stufen: { [familie]: 0..3 }, buch: { [ref]: taler }, raetsel: { n, ids }, server }
 //   abgleichen(stand) -> [{ familie, stufe, taler, lohn }]   neu erreichte Stufen; jede Stufe wird genau einmal gebucht
 //   talerLokal(b) -> Summe des eigenen Buchs
-//   zaehleRaetsel({ id, richtig }) -> boolean   je Raetsel-Id hoechstens einmal (die letzten 400 Ids)
+//   zaehleRaetsel({ id, richtig }) -> boolean   je Raetsel-Id hoechstens einmal (die letzten 400 Ids); merkt dazu Tag, laufende
+//                                               und beste Folge von Tagen (raetsel.tag, folge, beste; R19 Raetselserie)
 //   eigeneBanner(b) -> [banner-id]   'start' immer, dazu Gold-Banner; Saison-Banner gibt es nur vom Server
 //   merkeServer(konto, stand) / serverStand(konto) -> { taler, stufen, banner } | null
 import { ladeModul, speichereModul } from './storage.js';
@@ -16,6 +17,7 @@ export const START_BANNER = 'start';
 const RAETSEL_IDS = 400;
 const REF = /^[a-z-]{2,30}:(bronze|silber|gold)$/;
 const BANNER = /^[a-z0-9-]{2,40}$/;
+const TAG = /^\d{4}-\d{2}-\d{2}$/;
 
 function sauber(roh) {
   const o = roh && typeof roh === 'object' && !Array.isArray(roh) ? roh : {};
@@ -36,7 +38,10 @@ function sauber(roh) {
     stufen: Object.fromEntries(FAMILIEN_IDS.filter((f) => Number.isInteger(s.stufen && s.stufen[f])).map((f) => [f, Math.max(0, Math.min(3, s.stufen[f]))])),
     banner: Array.isArray(s.banner) ? s.banner.filter((x) => typeof x === 'string' && BANNER.test(x)).slice(0, 80) : [],
   } : null;
-  return { stufen, buch, raetsel: { n: Number.isInteger(r.n) && r.n >= 0 ? r.n : 0, ids }, server };
+  // R19 Raetselserie: Tag des letzten geloesten Raetsels, laufende und beste Folge von Tagen
+  const folge = (x) => (Number.isInteger(x) && x >= 0 ? x : 0);
+  const tag = typeof r.tag === 'string' && TAG.test(r.tag) ? { tag: r.tag, folge: folge(r.folge), beste: folge(r.beste) } : {};
+  return { stufen, buch, raetsel: { n: Number.isInteger(r.n) && r.n >= 0 ? r.n : 0, ids, ...tag }, server };
 }
 
 export function ladeBesitz() {
@@ -72,7 +77,18 @@ export function zaehleRaetsel(d = {}) {
   if (id && b.raetsel.ids.includes(id)) return false;
   b.raetsel.n += 1;
   if (id) b.raetsel.ids = [...b.raetsel.ids, id].slice(-RAETSEL_IDS);
+  const heute = ortsTag(d.jetzt);
+  if (b.raetsel.tag !== heute) {
+    b.raetsel.folge = b.raetsel.tag === ortsTag((d.jetzt ?? Date.now()) - 864e5) ? (b.raetsel.folge || 0) + 1 : 1;
+    b.raetsel.beste = Math.max(b.raetsel.beste || 0, b.raetsel.folge);
+    b.raetsel.tag = heute;
+  }
   return speichere(b);
+}
+// Kalendertag in Ortszeit (die Serie zaehlt Tage, wie der Spieler sie erlebt); jetzt: Millisekunden, fuer Tests
+function ortsTag(jetzt = Date.now()) {
+  const d = new Date(jetzt ?? Date.now());
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function eigeneBanner(b = ladeBesitz(), konto = null) {

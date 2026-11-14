@@ -6,7 +6,7 @@
 import { anbieten, waehle } from '../../orte.js';
 import { freischalten, bereich } from '../../ui/ich.js';
 import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl, ladeModul, ladePartien, wertet } from '../../storage.js';
-import { erspielteErfolge, merkeErspielteErfolge } from '../../profil.js';
+import { erspielteErfolge, merkeErspielteErfolge, erspielteLokalStufen, merkeLokalStufen } from '../../profil.js';
 import { BEREICHE as SCHUL_BEREICHE, ALLE as SCHUL_LEKTIONEN, summe as schulSumme } from '../lernen/mattbilder.js';
 import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
@@ -23,7 +23,9 @@ import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
 import { lade as ladePunkte, tafelStatistik } from '../punkte/stand.js';
 import { FAMILIEN, familienStand } from './stufen.js';
 import { zeigeStufen } from './moment.js';
-import { titelJetzt, talerJetzt } from './profil.js';
+import { titelJetzt, talerJetzt, titelFreiZahl } from './profil.js';
+import { lokalStand, lokaleStufen } from './taten.js';
+import { titelWappen } from '../../titel-kunst.js';
 import './texte.js';
 import './karte-texte.js';
 
@@ -140,9 +142,13 @@ export function titelDaten(f = ladeFortschritt(), schule = schulStand()) {
     kartei: zahl(kartei && kartei.zaehler && kartei.zaehler.richtig),
     schulKapitel: schule ? schule.bereiche.filter((b) => b.alle > 0 && b.geschafft >= b.alle).length : 0,
     erzfeind: Object.keys(erzfeind).length,
+    // R19 (./taten.js): Bretter in der Sammlung
+    bretterFrei: bretterFrei(),
   };
 }
-export const LIGA_STUFEN = 6;                      // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
+// so viele Bretter zeigt die Sammlung (teileBretter): die freien und fuer den Erfinder das Labor
+export const bretterFrei = () => BRETTER.length + (laborFrei() ? LABOR_BRETTER.length : 0);
+export const LIGA_STUFEN = 6;                     // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
 export const SERIE_ZIELE = Object.freeze([7, 30, 100]);
 export const LEVEL_ZIELE = Object.freeze([10, 20, 30]);
 export const SIEGE_ZIELE = Object.freeze([10, 50, 100]);
@@ -305,6 +311,37 @@ export function teileErfolgsStufen(stand = stufenStand(), gemerkt = ladeBesitz()
   });
 }
 
+// R19 lokale Familien (./taten.js): Stand aus Partien-Archiv, Fortschritt, Raetsel-Folge, Kartei, Sammlung und Titeln
+export function lokalerStand(f = ladeFortschritt()) {
+  const sicher = (fn, ersatz) => { try { const x = fn(); return x == null ? ersatz : x; } catch (e) { return ersatz; } };
+  const d = titelDaten(f, null);
+  return lokalStand(sicher(() => ladePartien().filter(wertet), []), {
+    besiegt: BOTS.filter((b) => f.bots[b.id] && f.bots[b.id].sterne[0]).map((b) => b.id),
+    dreiSterne: sicher(() => BOTS.filter((b) => sterneZahl(b.id, f) === 3).length, 0),
+    raetselFolge: sicher(() => ladeBesitz().raetsel.beste, 0), kartei: d.kartei, bretterFrei: d.bretterFrei,
+    titelFrei: sicher(() => titelFreiZahl(), 0),
+  });
+}
+// Abzeichen der lokalen Familien: ihr Wappen in der Stufenfarbe (ohne Stufe grau)
+const STUFEN_FARBE = [['#C8CED8', '#6A7486', '#434B5A'], ['#E8B48A', '#9A5A2A', '#5E3414'], ['#E4E8F0', '#8C97AB', '#4E5868'], ['#FFE6A0', '#C8901E', '#7A5610']];
+// Teile wie teileErfolgsStufen, ohne Taler und ohne Server; geheime erst ab Bronze. Neu erreichte Stufen werden gemerkt.
+// Name: der Name der erreichten Stufe (Hofbesuch, Waldrunde ...), vorher der Name der Familie
+export function teileLokaleStufen(stand = lokalerStand(), gemerkt = erspielteLokalStufen()) {
+  const liste = lokaleStufen(stand, gemerkt);
+  const neu = liste.flatMap((x) => Array.from({ length: x.stufe }, (_, i) => `${x.familie}-${i + 1}`)).filter((id) => !gemerkt.includes(id));
+  if (neu.length) { try { merkeLokalStufen(neu); } catch (e) { /* ohne Speicher nur fuer jetzt */ } }
+  return liste.filter((x) => !x.geheim || x.stufe > 0).map((x) => {
+    const n = Math.min(x.wert, x.naechstes ?? x.wert);
+    const zeile = x.stufe === 3 ? K('zeile.gold') : x.stufe === 0 ? K('zeile.start', { n, ziel: x.naechstes, was: K('was.' + x.familie) })
+      : K('zeile.weiter', { stufe: K('stufe.' + x.stufe), n, ziel: x.naechstes, naechste: K('stufe.' + (x.stufe + 1)) });
+    const vorher = x.stufe > 0 ? x.ziele[x.stufe - 1] : 0;
+    return { id: 'stufe-' + x.familie, familie: x.familie, stufe: x.stufe, lokal: true, name: x.stufe ? K(`sn.${x.familie}.${x.stufe}`) : K('fam.' + x.familie),
+      frei: x.stufe > 0, zeile, bild: titelWappen(x.zeichen, { farbe: STUFEN_FARBE[x.stufe], seltenheit: SELTEN[x.stufe], klasse: 'sk-orden' }),
+      seltenheit: SELTEN[x.stufe], gruppe: S('gruppe.' + x.gruppe),
+      fortschritt: x.naechstes ? Math.max(0, Math.min(1, (x.wert - vorher) / Math.max(1, x.naechstes - vorher))) : undefined };
+  });
+}
+
 // Name und Abzeichen einer Familie fuer die Karte eines anderen Spielers (seine Stufe kommt vom Server)
 export function familienOrden(familie, stufe = 3) {
   if (!FAMILIEN.some((x) => x.id === familie)) return null;
@@ -352,6 +389,6 @@ anbieten('sammlung:bereich', ({ app }) => {
 }, { reihenfolge: 45, paket: PAKET });
 anbieten('sammlung:bereich', ({ app }) => bereich({ id: 'klaenge', name: S('klaenge'), teile: teileKlaenge(undefined, app) }), { reihenfolge: 50, paket: PAKET });
 // Etappe 4b: jede Stufe zahlt Taler; der Stand steht als Hinweis ueber den Erfolgen (mit Konto der des Servers)
-anbieten('sammlung:bereich', () => bereich({ id: 'erfolge', name: S('erfolge'), teile: teileErfolgsStufen(),
+anbieten('sammlung:bereich', () => bereich({ id: 'erfolge', name: S('erfolge'), teile: [...teileErfolgsStufen(), ...teileLokaleStufen()],
   hinweis: K('taler.stand', { n: talerJetzt() }) }), { reihenfolge: 90, paket: PAKET });
 anbieten('sammlung:bereich', ({ app }) => shopBereich({ app }), { reihenfolge: 95, paket: PAKET });

@@ -18,6 +18,7 @@
 //   setzeProfilWahl(teil)              merkt figur, grund, rahmen, vitrine, titel oder banner (unbekannte Werte fallen auf den Standard)
 //   erspielteTitel() -> [id], merkeErspielteTitel(ids)   Koennen-Titel, die einmal erspielt bleiben
 //   erspielteErfolge() -> [id], merkeErspielteErfolge(ids) Erfolge aus dem Partien-Archiv, die einmal erspielt bleiben
+//   erspielteLokalStufen() -> [id], merkeLokalStufen(ids)  Stufen der lokalen Familien (R19, ohne Server und ohne Taler)
 //   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
 //                                      Aufrufs; einmal gemerkt (bleibt beim Speichern der Wahl erhalten)
 import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien } from './storage.js';
@@ -114,6 +115,9 @@ export const erspielteTitel = () => gemerkt('titelFrei');
 export const merkeErspielteTitel = (ids = []) => merke('titelFrei', ids);
 export const erspielteErfolge = () => gemerkt('erfolgeFrei');
 export const merkeErspielteErfolge = (ids = []) => merke('erfolgeFrei', ids);
+// R19: erreichte Stufen der lokalen Familien ('<familie>-<1..3>', js/pakete/sammlung/taten.js), nichts faellt zurueck
+export const erspielteLokalStufen = () => gemerkt('lokalStufen');
+export const merkeLokalStufen = (ids = []) => merke('lokalStufen', ids);
 
 const TAG = /^\d{4}-\d{2}-\d{2}$/;
 export function dabeiSeit() {
