@@ -62,6 +62,9 @@ const warte = ms => new Promise(r => setTimeout(r, ms));
 
 async function zug(s, uci) {
   await s.waitForFunction(() => window.__partie.phase() === 'flo', null, { timeout: 30000 });
+  // Vorprobe Sammel R18 (14.11.2026): unter Last war das Brett nach dem Wechsel in die Partie laenger als die 15 s des
+  // Klicks verdeckt ("element is not visible"). Erst sichtbar abwarten, mit derselben Frist wie die anderen Wartestellen
+  await s.locator(`${SCREEN} .brett-felder`).waitFor({ state: 'visible', timeout: 30000 });
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) await s.locator(`${SCREEN} .brett-felder .feld[data-feld="${f}"]`).click();
   if (await s.locator(`${SCREEN} .brett .lage.vorschau`).count()) await s.locator(`${SCREEN} .brett-felder .feld[data-feld="${uci.slice(2, 4)}"]`).click();
 }

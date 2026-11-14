@@ -30,7 +30,8 @@
   border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--s1), var(--kante); color: var(--text); font: inherit;
   text-align: left; cursor: pointer; transition: transform var(--d-s) var(--sanft), box-shadow var(--d-s) var(--sanft); }
 .ms-bkarte > b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 17px; letter-spacing: -.01em; line-height: 1.15; }
-.ms-bkarte:hover { transform: translateY(-1px); box-shadow: var(--s2), var(--kante); }
+/* Zeiger-Zustand nur mit Zeiger: am Handy bliebe er nach dem Tippen haengen (R17, tests/r17-hover-handy.test.mjs) */
+@media (hover: hover) { .ms-bkarte:hover { transform: translateY(-1px); box-shadow: var(--s2), var(--kante); } }
 .ms-bkarte[aria-pressed="true"] { background: var(--tinte); color: var(--auf-tinte); box-shadow: var(--s2); }
 .ms-bk-zeile { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; font-size: 13px; font-weight: 750; }
 .ms-bk-sterne { display: inline-flex; align-items: center; gap: 4px; }
@@ -55,7 +56,7 @@
   padding: 7px 12px 7px 8px; border: 0; border-radius: var(--r-l); background-color: var(--flaeche); background-image: var(--textur-flaeche, none);
   box-shadow: var(--s1), var(--kante); color: var(--text); font: inherit; text-align: left; cursor: pointer;
   transition: transform var(--d-s) var(--sanft), box-shadow var(--d-s) var(--sanft); }
-.ms-lektion:hover { transform: translateY(-1px); box-shadow: var(--s2), var(--kante); }
+@media (hover: hover) { .ms-lektion:hover { transform: translateY(-1px); box-shadow: var(--s2), var(--kante); } }
 .ms-lektion:active { transform: scale(.99); }
 .ms-mini { width: 48px; border-radius: 7px; }
 .ms-nr { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--r-pille); background: var(--flaeche-2);
@@ -214,6 +215,16 @@
    "Ergebnis" ragte unter den Rand (Bild R8 lektion-ende); der Name der Lektion steht im Ergebnisblatt */
 @container ls (max-width: 520px) and (max-height: 640px) {
   .ls-screen[data-phase="ende"] .ls-status { display: none; }
+  /* R16 L1: auf dem iPhone SE nahmen die zwei Leisten der Karte die Aufgabe ("Matt in einem Zug ...") weg. Brett und
+     Leisten bleiben so gross wie in der Bot-Partie (tests/gleichheit-ansichten.test.mjs); enger werden Abstaende, Karte und
+     Knoepfe (noch 44 px), und waehrend der Aufgabe faellt die Zeile "Leicht · Lektion 1 von 20" weg (vor dem Start steht sie da) */
+  .ls-inhalt { row-gap: 4px; padding-bottom: 6px; }
+  .ls-screen:not([data-phase="intro"]) .ls-zeile { display: none; }
+  .ls-seite { gap: 6px; }
+  .ls-status { gap: 4px; padding: 8px 14px; }
+  .ls-status h2 { font-size: 20px; }
+  .ls-zaehler { padding-top: 4px; }
+  .ls-aktionen .knopf { min-height: var(--tipp); }
 }
 .ls-screen > .kopf, .ls-screen > .ls-rumpf { transform-origin: 50% 40%; transition: transform var(--d-l) var(--gleiten); }
 .ls-screen.mit-ergebnis > .kopf, .ls-screen.mit-ergebnis > .ls-rumpf { transform: scale(.975); }

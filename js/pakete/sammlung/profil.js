@@ -109,9 +109,13 @@ export function eigeneKartenDaten() {
     titel: tj ? { name: tj.name, bild: titelBild(tj, 'vk-wappen') } : null,
     orden: vitrineTeile(erfolge).filter(Boolean).map((e) => ({ name: e.name, bild: e.bild || '', stufe: e.stufe })) };
 }
-// Titel eines anderen Spielers (Id vom Server): Name und Wappen aus der festen Liste, unbekannte Ids ohne Titel
+// Titel eines anderen Spielers (Id vom Server): Name und Wappen aus der festen Liste, unbekannte Ids ohne Titel. Die
+// Sondertitel (supabase/karte-sondertitel-schema.sql: 'erfinder', 'pionier-001' bis 'pionier-100') kommen aus derselben
+// Liste wie bei der eigenen Karte, damit sie dasselbe Wappen tragen (R16 K2)
 export function titelVonId(id) {
-  const x = titelListe({ level: 1000, alle: true }).find((y) => y.id === id);
+  const pi = /^pionier-(\d{3})$/.exec(typeof id === 'string' ? id : '');
+  const x = titelListe({ level: 1000, alle: true, erfinder: id === 'erfinder', pionier: pi ? Number(pi[1]) : null })
+    .find((y) => y.id === (pi ? 'pionier' : id));
   return x ? { name: x.name, bild: titelBild(x, 'vk-wappen') } : null;
 }
 
@@ -341,8 +345,8 @@ export function profilKarte({ app } = {}) {
     <div class="pr-vitrine-ort"><h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>
     <div class="pr-vitrine"${leer ? ' data-leer' : ''}>${plaetze.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"${e && e.stufe ? ` data-stufe="${e.stufe}"` : ''}
       aria-label="${esc(e ? (e.stufe ? `${e.name}, ${KT('stufe.' + e.stufe)}` : e.name) : S('profil.leer'))}">${e ? `<span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b>${e.stufe ? `<small class="pr-orden-stufe">${esc(KT('stufe.' + e.stufe))}</small>` : ''}`
-      : `<span class="pr-plus" aria-hidden="true">+</span><small>${esc(S('profil.leer'))}</small>`}</button>`).join('')}</div></div>
-    <p class="pr-hilfe">${esc(S('profil.vitrineHilfe'))}</p>`;
+      : `<span class="pr-plus" aria-hidden="true">+</span><small>${esc(S('profil.leer'))}</small>`}</button>`).join('')}</div>
+    <p class="pr-hilfe">${esc(S('profil.vitrineHilfe'))}</p></div>`;
   k.querySelector('.pr-aendern').addEventListener('click', () => waehleAussehen(app));
   for (const b of k.querySelectorAll('.pr-orden')) b.addEventListener('click', () => waehleOrden(app, Number(b.dataset.platz)));
   return k;

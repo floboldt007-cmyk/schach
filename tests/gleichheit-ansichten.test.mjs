@@ -5,7 +5,8 @@
 //
 //   node tests/gleichheit-ansichten.test.mjs                   Probe: Abweichungen melden sich als ROT-ERWARTET, Exit 0
 //   PROBE_STRENG=1 node tests/gleichheit-ansichten.test.mjs    Abweichungen zaehlen als FEHLER (fuer die Reparatur)
-//   ... --bilder=<ordner> --tabelle=<datei.md>                 dazu je Geraet und Ansicht ein Bild und die Tabelle
+//   ... --bilder=<ordner> --tabelle=<datei.md>                 dazu je Geraet und Ansicht ein Bild (nach dem Zug und am Ende) und die Tabelle
+//   BILDER=<ordner> node tests/gleichheit-ansichten.test.mjs   Bilder ueber die Umgebung (wie die Funktionsprobe)
 //   PORT=8977 node tests/gleichheit-ansichten.test.mjs         eigener Port (Standard: frei)
 //
 // Massstab ist die Bot-Partie (ueber die Arena gestartet, wie Flo sie beginnt, damit ihr Duell-Intro mitzaehlt). Je
@@ -18,7 +19,7 @@
 // dazu das Aussehen der Spielerleisten hell und dunkel (messeLeistenStil) und die Lage der Zuege zu den Knoepfen.
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
@@ -33,7 +34,7 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 if (!pw) throw new Error('Playwright fehlt (PLAYWRIGHT_PFAD setzen)');
 const STRENG = process.env.PROBE_STRENG === '1';
 const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : null; };
-const BILDER = arg('bilder');
+const BILDER = arg('bilder') || process.env.BILDER || null;
 const TABELLE = arg('tabelle');
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 
@@ -270,6 +271,7 @@ const ABLAUF = {
     await s.locator('.spielknoepfe > [data-aktion="aufgeben"]').click();
     await bestaetige(s);
     m.ergebnis = await sichtbarDa(s, '.ergebnis-overlay', 15000);
+    await bild(s, m, 'ende');
     return m;
   },
   async online(s, ctx) {
@@ -286,6 +288,7 @@ const ABLAUF = {
     await s.locator('[data-online="aufgeben"]').filter({ visible: true }).first().click();
     await bestaetige(s);
     m.ergebnis = await sichtbarDa(s, '.on-ergebnis');
+    await bild(s, m, 'ende');
     return m;
   },
   async duell(s, ctx) {
@@ -300,6 +303,7 @@ const ABLAUF = {
     await bild(s, m);
     m.zustand.duell.beendet = true;
     m.ergebnis = await s.waitForSelector('.screen.raetsel-duell[data-phase="beendet"]', { timeout: 10000 }).then(() => true).catch(() => false);
+    await bild(s, m, 'ende');
     return m;
   },
   async zuzweit(s, ctx) {
@@ -314,6 +318,7 @@ const ABLAUF = {
     await s.locator('[data-zz="aufgeben"]').filter({ visible: true }).first().click();
     await bestaetige(s);
     m.ergebnis = await sichtbarDa(s, '.zz-ergebnis');
+    await bild(s, m, 'ende');
     return m;
   },
   async lektion(s, ctx) {
@@ -331,6 +336,7 @@ const ABLAUF = {
     m.klang = await klangBeimZug(s, '.ls-screen .brett-felder', 'a1a8');
     await bild(s, m);
     m.ergebnis = await sichtbarDa(s, '.ls-meldung[data-art="geschafft"]');
+    await bild(s, m, 'ende');
     return m;
   },
 };
@@ -344,7 +350,12 @@ const messeK = async (s, ctx, screen) => {
   await s.emulateMedia({ colorScheme: 'light' }); await warte(1000);
   return m;
 };
-async function bild(s, m) { if (BILDER) await s.screenshot({ path: path.join(BILDER, `${m.datei}.png`) }); }
+const bilderListe = [];
+async function bild(s, m, teil = '') {
+  if (!BILDER) return;
+  const datei = path.join(BILDER, `${m.datei}${teil ? '-' + teil : ''}.png`);
+  await s.screenshot({ path: datei }); bilderListe.push(datei);
+}
 
 function initSkript({ sitzung, erfinder }) {
   try {
@@ -488,5 +499,6 @@ if (TABELLE) {
   console.log(`Tabelle: ${TABELLE}`);
 }
 if (arg('stil')) { writeFileSync(arg('stil'), JSON.stringify(Object.fromEntries(Object.entries(ergebnisse).map(([g, je]) => [g, Object.fromEntries(Object.entries(je).map(([a, m]) => [a, m.stil || null]))])), null, 1), 'utf8'); console.log(`Stil: ${arg('stil')}`); }
+if (BILDER) pruefe(`Bilder abgelegt: ${bilderListe.length}`, bilderListe.length > 0 && bilderListe.every((d) => existsSync(d)), bilderListe.filter((d) => !existsSync(d)));
 if (rotErwartet) console.log(`\n${rotErwartet} harte Pruefung(en) ROT-ERWARTET (zaehlen erst mit PROBE_STRENG=1): ${rot.join(' | ')}`);
 console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;

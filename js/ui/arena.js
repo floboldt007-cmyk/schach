@@ -405,6 +405,19 @@ export function zeige(root, params, app) {
   karte.addEventListener('pointermove', beiZiehen, { passive: true });
   karte.addEventListener('pointerup', beiZiehEnde, { passive: true });
   karte.addEventListener('pointercancel', beiZiehEnde, { passive: true });
+  // Fokus nicht unter dem klebenden Spielen-Knopf (WCAG 2.4.11, Kaltreview R19): Chrome rollt ein Ziel, das im
+  // Scrollbereich liegt, beim Tab nicht, auch wenn der Knopf darueber klebt. Dann den naechsten rollenden Vorfahren
+  // (.inhalt, im kurzen Querformat .detail) um die Ueberdeckung plus Luft hochrollen; die Hoehe kommt vom Knopf selbst
+  s.querySelector('.inhalt').addEventListener('focusin', (e) => {
+    const cta = s.querySelector('.cta-platz');
+    const ziel = e.target;
+    if (!cta || cta.contains(ziel) || !ziel.matches(':focus-visible')) return;
+    const c = cta.getBoundingClientRect(), b = ziel.getBoundingClientRect();
+    if (b.bottom <= c.top || b.top >= c.bottom || b.right <= c.left || b.left >= c.right) return;
+    for (let el = ziel.parentElement; el && el !== s; el = el.parentElement) {
+      if (el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY)) { el.scrollTop += b.bottom - c.top + 8; return; }
+    }
+  });
   // nur wenn die Karte scrollt: Handy hoch zeigt seit dem 31.10.2026 die ganze Welt (karte-kompakt), dort kein Hinweis
   if (!ziehErledigt && window.matchMedia('(max-width: 600px) and (orientation: landscape)').matches) {
     ziehHinweis.hidden = false;

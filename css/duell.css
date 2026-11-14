@@ -126,6 +126,12 @@
   .duell.lang .duell-seite.bot.mit-karte .duell-banner { display: none; }
   .duell.lang .duell-seite.bot.mit-karte .duell-orden.mit-bild > svg { display: none; }
   .duell.lang .duell-seite.bot.mit-karte .duell-av { width: clamp(56px, 9vh, 128px); width: clamp(56px, 9svh, 128px); }
+  /* Sondertitel des Gegners tragen seit R16 K2 ihr Wappen (30 px): auf 360x640 schob das die Gegnerhaelfte 11 px hoeher,
+     das Portraet (schon bei 56 px) rutschte unter den Chip. Das Wappen waechst darum mit der Hoehe wie das Portraet.
+     Wappen (3.4) und Polster (.567) erreichen ihr Maximum beide bei 883 px Hoehe: darueber bildgleich mit vorher */
+  .duell.lang .duell-seite.bot.mit-karte .duell-titel:has(.titel-wappen) { padding-block: clamp(2px, .567vh, 5px); padding-block: clamp(2px, .567svh, 5px); }
+  .duell.lang .duell-seite.bot.mit-karte .duell-titel .titel-wappen { width: clamp(20px, 3.4vh, 30px); height: clamp(20px, 3.4vh, 30px);
+    width: clamp(20px, 3.4svh, 30px); height: clamp(20px, 3.4svh, 30px); }
   .duell.lang .duell-paar .duell-seite.bot.mit-karte { gap: clamp(2px, .5vh, 8px); gap: clamp(2px, .5svh, 8px); }
   .duell.lang .duell-vitrine { flex-wrap: nowrap; width: 100%; max-width: 420px; gap: 6px; margin-top: 2px; }
   .duell.lang .duell-orden { min-width: 0; }

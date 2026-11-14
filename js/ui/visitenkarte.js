@@ -5,7 +5,7 @@
 // (js/karte.js karteDerPartie, dann karteVomServer) oder der Bot (botKarte, festes Banner mit Zeichen KI).
 //
 //   visitenkarte(karte, { groesse }) -> div.vk[data-groesse][data-banner][data-ki?]
-//     karte { name, titel: { name, bild? } | null, banner, avatar (SVG), kronenStufe (0..17 | null), ki,
+//     karte { name, titel: { name, bild? } | null, banner, avatar (SVG), kronenStufe (0..17 | null), elo (100..4000 | null), ki,
 //             orden: [{ name, bild, stufe 1..3 }] }
 //   bannerUrl(id) -> URL des Banners (unbekannte Ids: das Start-Banner)
 //   BOT_BANNER, botBanner(bot) -> 'bot-…'   fest je Bot-Id, nie fuer Menschen
@@ -78,6 +78,8 @@ export function karteVomServer(d, { orden = () => null, titel = () => null } = {
     banner: MENSCHEN_BANNER.includes(o.banner) ? o.banner : 'start',
     titel: typeof o.titel === 'string' && /^[a-z0-9-]{2,60}$/.test(o.titel) ? titel(o.titel) : null,
     kronenStufe: Number.isInteger(o.kronen_stufe) && o.kronen_stufe >= 0 && o.kronen_stufe < 18 ? o.kronen_stufe : null,
+    // Online-Elo nur, wenn der Server sie mitschickt (supabase/karte-elo-schema.sql), Grenzen wie js/ui/online.js
+    elo: Number.isInteger(o.elo) && o.elo >= 100 && o.elo <= 4000 ? o.elo : null,
     avatar: profilAvatar({ figur: o.motiv, grund: o.grund, rahmen: o.rahmen }, 'w'),
     orden: vitrine.map((v) => {
       if (!v || typeof v.familie !== 'string' || !Number.isInteger(v.stufe) || v.stufe < 1 || v.stufe > 3) return null;
@@ -122,6 +124,7 @@ export function visitenkarte(karte = {}, { groesse = 'mittel' } = {}) {
     return el;
   }
   const krone = kronenText(k.kronenStufe);
+  const elo = Number.isInteger(k.elo) ? ` · ${K('karte.elo', { elo: k.elo })}` : '';
   const titel = k.titel ? `<span class="vk-titel">${k.titel.bild || ''}<span>${esc(k.titel.name)}</span></span>` : '';
   const orden = (k.orden || []).slice(0, 3);
   el.innerHTML = `${bild}
@@ -130,7 +133,7 @@ export function visitenkarte(karte = {}, { groesse = 'mittel' } = {}) {
       <div class="vk-text">
         <span class="vk-namenszeile">${name}${ki}</span>
         ${titel}
-        <span class="vk-krone${krone ? '' : ' leer'}">${esc(krone || (k.ki ? K('karte.kiGegner') : K('karte.ohneLiga')))}</span>
+        <span class="vk-krone${krone ? '' : ' leer'}">${esc((krone || (k.ki ? K('karte.kiGegner') : K('karte.ohneLiga'))) + elo)}</span>
       </div>
     </div>
     ${k.ki ? '' : `<ul class="vk-orden" aria-label="${esc(K('karte.orden'))}">${orden.length ? orden.map((o) => {

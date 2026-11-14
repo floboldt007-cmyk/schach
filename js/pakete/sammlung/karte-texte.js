@@ -16,7 +16,7 @@ registriereTexte('p-karte', {
     'moment.titel': 'Erfolg freigeschaltet', 'moment.weiter': 'Weiter', 'moment.ziel': 'Ziel für Gold: {n} {was}',
     taler: 'Taler', 'taler.stand': '{n} Taler', banner: 'Banner', 'banner.hinweis': 'Banner gibt es für Gold-Erfolge und in der Liga. Erfolge kann man nie kaufen.',
     'karte.ki': 'KI', 'karte.kiGegner': 'KI-Gegner', 'karte.gegner': 'Gegner', 'karte.du': 'Du',
-    'karte.keineErfolge': 'Noch keine Erfolge ausgestellt', 'karte.ohneLiga': 'Ohne Liga', 'karte.orden': 'Ausgestellte Erfolge',
+    'karte.keineErfolge': 'Noch keine Erfolge ausgestellt', 'karte.ohneLiga': 'Ohne Liga', 'karte.elo': 'Elo {elo}', 'karte.orden': 'Ausgestellte Erfolge',
     'karte.bannerFrei': 'Frei', 'karte.bannerAn': 'Getragen',
     // Liga-Namen nach Konzept 5a; welche Kronen-Liga welchen Namen zeigt, steht in js/ui/visitenkarte.js LIGA_NAMEN
     'liga.bauer': 'Bauer', 'liga.springer': 'Springer', 'liga.laeufer': 'Läufer', 'liga.turm': 'Turm', 'liga.dame': 'Dame', 'liga.koenig': 'König',
@@ -43,7 +43,7 @@ registriereTexte('p-karte', {
     'moment.titel': 'Achievement unlocked', 'moment.weiter': 'Continue', 'moment.ziel': 'Gold goal: {n} {was}',
     taler: 'Thalers', 'taler.stand': '{n} thalers', banner: 'Banners', 'banner.hinweis': 'Banners come from gold achievements and from the league. Achievements can never be bought.',
     'karte.ki': 'AI', 'karte.kiGegner': 'AI opponent', 'karte.gegner': 'Opponent', 'karte.du': 'You',
-    'karte.keineErfolge': 'No achievements on show yet', 'karte.ohneLiga': 'No league', 'karte.orden': 'Achievements on show',
+    'karte.keineErfolge': 'No achievements on show yet', 'karte.ohneLiga': 'No league', 'karte.elo': 'Elo {elo}', 'karte.orden': 'Achievements on show',
     'karte.bannerFrei': 'Unlocked', 'karte.bannerAn': 'Worn',
     'liga.bauer': 'Pawn', 'liga.springer': 'Knight', 'liga.laeufer': 'Bishop', 'liga.turm': 'Rook', 'liga.dame': 'Queen', 'liga.koenig': 'King',
     'gefunden.los': 'Starting in a moment',
