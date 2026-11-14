@@ -556,6 +556,22 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-weg .cta-platz { position: static; margin: 0 -16px; padding: 4px 16px 14px; border-radius: 0 0 24px 24px; }
 .arena.karte-weg .spielen { min-height: 56px; }
 .arena.karte-weg .knoten .fahne { bottom: calc(100% + 8px); }
+/* Variante R19 B (.karte-leiste): zu ist die Karte eine schmale Leiste, Kopf und runder Spielen-Knopf in einer Zeile; die
+   Welt darueber zeigt alles auf einen Blick. Der Name des Knopfs bleibt fuer Vorleser da (Text nur optisch verborgen). */
+.arena.karte-leiste .detail { bottom: 14px; }
+.arena.karte-leiste .detail:not(.offen) { flex-flow: row wrap; align-items: center; gap: 0 10px; padding-bottom: 10px; }
+.arena.karte-leiste .detail:not(.offen) .karte-griff { flex-basis: calc(100% + 32px); min-height: 18px; margin-bottom: 0; }
+.arena.karte-leiste .detail:not(.offen) .detail-kopf { flex: 1 1 0; min-width: 0; gap: 10px; }
+.arena.karte-leiste .detail:not(.offen) .detail-kopf .av { width: 48px; height: 48px; border-radius: 14px; }
+.arena.karte-leiste .detail:not(.offen) .detail-ueber { margin-bottom: 1px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena.karte-leiste .detail:not(.offen) h2 { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena.karte-leiste .detail:not(.offen) .elo { margin-top: 1px; font-size: 12px; }
+.arena.karte-leiste .detail:not(.offen) .mini-sterne { display: none; }
+.arena.karte-leiste .detail:not(.offen) .fortsetzen { flex-basis: 100%; margin-bottom: 8px; }
+.arena.karte-leiste .detail:not(.offen) .cta-platz { flex: none; margin: 0; padding: 0; background: none; }
+.arena.karte-leiste .detail:not(.offen) .spielen { width: 56px; min-height: 56px; padding: 0; justify-content: center; border-radius: 18px; }
+.arena.karte-leiste .detail:not(.offen) .spielen .sp-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.arena.karte-leiste .detail:not(.offen) .spielen .pf { width: 40px; height: 40px; background: none; }
 
 /* ---------- Weniger Bewegung ---------- */
 @media (prefers-reduced-motion: reduce) {
