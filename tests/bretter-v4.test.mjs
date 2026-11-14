@@ -48,8 +48,11 @@ pruefe('Katalog: Ids eindeutig, [a-z-], kein vorhandenes Brett', MOTIVE.length >
 pruefe('Katalog: Name, Idee und Konkret-Satz je Motiv, Namen eindeutig', MOTIVE.length > 0 && MOTIVE.every((m) => m.name && m.idee && m.konkret && m.konkret.length > 30)
   && new Set(MOTIVE.map((m) => m.name)).size === MOTIVE.length);
 pruefe('Katalog: Seltenheit selten, episch oder legende', MOTIVE.length > 0 && MOTIVE.every((m) => SELTEN.includes(m.seltenheit)));
-pruefe('Katalog: Weg aus vorhandener Mechanik, in Worten lesbar', MOTIVE.length > 0 && typeof wegText === 'function'
-  && MOTIVE.every((m) => m.weg && ['level', 'welt', 'endgegner', 'stufe'].includes(m.weg.art) && wegText(m.weg).length > 4));
+// Flo 14.11.2026: "man soll die eher kaufen oder eben wenn man was krasses erreicht" -> keiner der normalen Labor-Wege,
+// vorerst "geplant: Shop oder harter Erfolg", ohne Preis (die Verteilung entscheidet Flo spaeter)
+pruefe('Katalog: Weg vorerst "geplant: Shop oder harter Erfolg", kein normaler Weg, kein Preis', MOTIVE.length > 0 && typeof wegText === 'function'
+  && MOTIVE.every((m) => m.weg && m.weg.art === 'geplant' && wegText(m.weg) === 'geplant: Shop oder harter Erfolg'
+    && !/preis|euro|cent|kosten/i.test(JSON.stringify(m.weg))), MOTIVE.map((m) => [m.id, m.weg]).filter(([, w]) => !w || w.art !== 'geplant'));
 pruefe('Katalog: Rahmen-Ornament und Koordinaten-Stil je Motiv', MOTIVE.length > 0 && MOTIVE.every((m) => m.rahmen && typeof m.rahmen.zeichne === 'function' && m.koord && m.koord.schrift));
 
 // ---------- Textur und Rahmen (Text)

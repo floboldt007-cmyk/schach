@@ -4,7 +4,8 @@
 // und im RAHMEN (Ornament, Koordinaten-Schrift). Kein Bild ueber die Felder hinweg: jede Feldtextur ist eine eigene
 // SVG-Zelle, die an der Feldkante abschneidet. Ideen aus Fassung 3 (Kirchenfenster als Bleiglas-Rahmen, Seekarte mit
 // Kompassrose, Sternbilder nur als feine Punkte im dunklen Feld ...).
-// NUR fuer die Vorschau (werkzeuge/bretter-vorschau-v4.html), nicht in der App, nicht im Service Worker, nicht freischaltbar.
+// Seit Flos Wahl (14.11.2026 "ja die Schachbretter sehen gut aus") in der App, im Labor (nur Erfinder, js/labor.js
+// MOTIV_BRETTER: Seltenheit und Weg stehen dort); dazu die Vorschau werkzeuge/bretter-vorschau-v4.html.
 //
 //   MOTIVE                 [{ id, name, idee, konkret, seltenheit, weg, bewegung?, feld, textur(R, art), rahmen, koord }]
 //                          feld: { h: [Ton, L], d: [Ton, L], akzent?: { h, d } }   L = relative Leuchtdichte (WCAG)
@@ -13,13 +14,17 @@
 //   feldFarben(m) -> { h, d }    Grundfarbe der Felder
 //   koordFarben(m) -> { h, d }   Koordinaten auf hellen bzw. dunklen Feldern
 //   rahmenBild(m) -> string      SVG-Inhalt des Rahmens (viewBox 0 0 1000 1000, Band = rahmen.breite)
-//   motivCss(m) -> string        Rahmen, Felder, Koordinaten und (nur ohne "weniger Bewegung") ein Glanz NUR auf dem Rahmen
+//   motivCss(m, sel?, glanzSel?) -> string   Rahmen, Felder, Koordinaten und (nur ohne "weniger Bewegung") ein Glanz NUR
+//                                auf dem Rahmen; sel ist das Element um .brett (Vorschau .motiv-brett, App .brett-rahmen)
+//   motivAppCss(id) -> string    dasselbe fuer html[data-brett="<id>"] .brett-rahmen, Handy-Partie ohne Rahmen
+//   motivMuster(id) -> { h, d, ganz }   Feldtextur fuers Sammelbild
 //
 // Textur durch Bauart leise: jede Farbe einer Feldart hat die Leuchtdichte der Grundfarbe, um hoechstens den Faktor TON
 // auf (L + 0,05) verschoben (Rollen g, l, ll, t, tt, a, b). Das allein haelt 1,15 nicht ganz: an Kanten zwischen zwei
 // Farbtoenen mischt der Browser etwas dunkler. Darum misst der Test zusaetzlich das echte Brett (Herleitung B), und die
 // gilt.
 import { inBand } from './brett-motive.js';
+import { MOTIV_BRETTER } from './labor.js';
 import { svgUrl, GROESSE } from './brett-flaechen.js';
 
 export const GRENZE = Object.freeze({ textur: 1.15, feld: 3.0, koord: 3.0 });
@@ -68,7 +73,7 @@ const verlauf = (id, stopps) => `<defs><linearGradient id="${id}" gradientTransf
 // textur(R, art) zeichnet EINE Feldzelle (0..100) mit den Rollen §g§ (Grund) §l§ §ll§ (heller) §t§ §tt§ (dunkler) §a§ §b§ (Akzentton heller/dunkler)
 const M = [];
 
-M.push({ id: 'kirchenfenster', name: 'Kirchenfenster', seltenheit: 'episch', weg: { art: 'level', n: 60 },
+M.push({ id: 'kirchenfenster', name: 'Kirchenfenster',
   idee: 'Rahmen aus Bleiglas, Felder wie gehaemmertes Glas',
   konkret: 'Helle Felder bernsteinfarben, dunkle Felder tiefblau, beide mit feiner Glaskörnung; der Rahmen ist ein Bleiglasband aus Rubin, Saphir, Smaragd und Bernstein mit kleinen Rosetten in den Ecken.',
   feld: { h: ['#f0d890', 0.62], d: ['#3040b0', 0.12] },
@@ -90,7 +95,7 @@ M.push({ id: 'kirchenfenster', name: 'Kirchenfenster', seltenheit: 'episch', weg
   } },
   koord: { schrift: '"Palatino Linotype", Palatino, Georgia, serif', gewicht: 700, ton: '#2a2440' } });
 
-M.push({ id: 'seekarte', name: 'Alte Seekarte', seltenheit: 'episch', weg: { art: 'welt', welt: 4 },
+M.push({ id: 'seekarte', name: 'Alte Seekarte',
   idee: 'Kartenrand mit Gradskala und Kompassrosen, Felder aus Pergament und Meer',
   konkret: 'Helle Felder pergamentfarben mit feinen Fasern, dunkle Felder meerblau mit ganz leisen Wellenlinien; der Rahmen ist die schwarz-weiße Gradskala alter Seekarten mit einer Kompassrose in jeder Ecke.',
   feld: { h: ['#e8d4a0', 0.62], d: ['#1f5a8a', 0.12] },
@@ -111,7 +116,7 @@ M.push({ id: 'seekarte', name: 'Alte Seekarte', seltenheit: 'episch', weg: { art
   } },
   koord: { schrift: 'Georgia, "Times New Roman", serif', gewicht: 700, ton: '#3a2a18' } });
 
-M.push({ id: 'sternbilder', name: 'Sternbilder', seltenheit: 'legende', weg: { art: 'stufe', familie: 'sterne', stufe: 'gold' }, bewegung: true,
+M.push({ id: 'sternbilder', name: 'Sternbilder', bewegung: true,
   idee: 'Nachtblaue Felder mit feinem Sternenstaub, Rahmen mit Sternbildern',
   konkret: 'Helle Felder silberblau und fast glatt, dunkle Felder mitternachtsblau mit feinen hellblauen Pünktchen (Sterne nur als Punkte, kein Himmel über dem Brett); der Rahmen zeigt kleine Sternbilder auf Nachtblau, ein Glanz läuft leise darüber.',
   // Sterne blassblau-weiss statt gold: zwischen Gold und Nachtblau mischte die Kante zu dunkel (am Brett 1,17)
@@ -134,7 +139,7 @@ M.push({ id: 'sternbilder', name: 'Sternbilder', seltenheit: 'legende', weg: { a
   } },
   koord: { schrift: '"Trebuchet MS", "Segoe UI", sans-serif', gewicht: 700, ton: '#1a2a6c' } });
 
-M.push({ id: 'intarsie', name: 'Holzintarsie', seltenheit: 'episch', weg: { art: 'welt', welt: 2 },
+M.push({ id: 'intarsie', name: 'Holzintarsie',
   idee: 'Ahorn und Nussbaum mit wechselnder Maserung, Rahmen mit Zahnband',
   konkret: 'Helle Felder aus Ahorn, dunkle aus Nussbaum, die feine Maserung läuft von Feld zu Feld abwechselnd quer und längs wie bei echten Einlegearbeiten; der Rahmen ist ein Zahnband aus hellen und dunklen Holzdreiecken.',
   feld: { h: ['#e8c890', 0.58], d: ['#6a3a1a', 0.12] },
@@ -151,7 +156,7 @@ M.push({ id: 'intarsie', name: 'Holzintarsie', seltenheit: 'episch', weg: { art:
   } },
   koord: { schrift: 'Georgia, serif', gewicht: 700, ton: '#3a1e0a' } });
 
-M.push({ id: 'orientteppich', name: 'Orientteppich', seltenheit: 'episch', weg: { art: 'level', n: 80 },
+M.push({ id: 'orientteppich', name: 'Orientteppich',
   idee: 'Gewebte Felder in Elfenbein und Karminrot, Teppichborduere als Rahmen',
   konkret: 'Helle Felder elfenbein, dunkle karminrot, beide mit einem feinen Webraster wie Knoten im Teppich; der Rahmen ist eine indigoblaue Bordüre mit Rosetten, Zickzack und Safrangelb.',
   feld: { h: ['#f0e0b8', 0.64], d: ['#b01828', 0.12] },
@@ -170,7 +175,7 @@ M.push({ id: 'orientteppich', name: 'Orientteppich', seltenheit: 'episch', weg: 
   } },
   koord: { schrift: 'Georgia, serif', gewicht: 700, ton: '#3a0a0a' } });
 
-M.push({ id: 'goldthron', name: 'Goldthron', seltenheit: 'legende', weg: { art: 'stufe', familie: 'liga', stufe: 'gold' }, bewegung: true,
+M.push({ id: 'goldthron', name: 'Goldthron', bewegung: true,
   idee: 'Goldrahmen mit Filigran und Edelsteinen, Felder mit leisem Damastmuster',
   konkret: 'Helle Felder champagnerfarben, dunkle Felder weinrot, beide mit einem ganz leisen Damast-Lilienmuster; der Rahmen ist poliertes Gold mit Ranken und Rubinen und Saphiren, ein Glanz läuft darüber.',
   feld: { h: ['#f4e4b0', 0.66], d: ['#6a1840', 0.12] },
@@ -188,7 +193,7 @@ M.push({ id: 'goldthron', name: 'Goldthron', seltenheit: 'legende', weg: { art: 
   } },
   koord: { schrift: '"Palatino Linotype", Palatino, serif', gewicht: 700, ton: '#4a0a2a' } });
 
-M.push({ id: 'honigwabe', name: 'Honigwabe', seltenheit: 'selten', weg: { art: 'welt', welt: 1 },
+M.push({ id: 'honigwabe', name: 'Honigwabe',
   idee: 'Felder mit feinen Wabenlinien, Rahmen aus Wachswaben mit Bienen',
   konkret: 'Helle Felder hellhonigfarben, dunkle bernsteinbraun, beide mit ganz feinen Sechseck-Linien; der Rahmen ist eine goldgelbe Wabe mit verdeckelten Zellen und vier Bienen in den Ecken.',
   feld: { h: ['#f4d890', 0.62], d: ['#8a5010', 0.12] },
@@ -209,7 +214,7 @@ M.push({ id: 'honigwabe', name: 'Honigwabe', seltenheit: 'selten', weg: { art: '
   } },
   koord: { schrift: '"Segoe UI", system-ui, sans-serif', gewicht: 800, ton: '#3a2008' } });
 
-M.push({ id: 'marmorsaal', name: 'Marmorsaal', seltenheit: 'episch', weg: { art: 'level', n: 66 },
+M.push({ id: 'marmorsaal', name: 'Marmorsaal',
   idee: 'Weisser und gruener Marmor mit feinen Adern, Rahmen aus kanneliertem Stein',
   konkret: 'Helle Felder weißer Carrara-Marmor, dunkle grüner Marmor, je Feld ein paar feine, leise Adern, die an der Feldkante enden; der Rahmen ist hellgrauer Stein mit Rillen wie eine Säule und Eckblöcken.',
   feld: { h: ['#eeeeea', 0.70], d: ['#2a7050', 0.12] },
@@ -226,7 +231,7 @@ M.push({ id: 'marmorsaal', name: 'Marmorsaal', seltenheit: 'episch', weg: { art:
   } },
   koord: { schrift: '"Times New Roman", Georgia, serif', gewicht: 700, ton: '#1a3a2a' } });
 
-M.push({ id: 'jadepalast', name: 'Jadepalast', seltenheit: 'episch', weg: { art: 'stufe', familie: 'raetsel', stufe: 'silber' },
+M.push({ id: 'jadepalast', name: 'Jadepalast',
   idee: 'Seladon und Jade mit Wolkenspiralen, Rahmen aus rotem Lack mit Goldmaeander',
   konkret: 'Helle Felder zartes Seladon, dunkle Felder Jadegrün, je Feld eine leise Wolkenspirale; der Rahmen ist roter Lack mit einem goldenen Mäanderband.',
   feld: { h: ['#d8ead8', 0.66], d: ['#1a8050', 0.12] },
@@ -243,7 +248,7 @@ M.push({ id: 'jadepalast', name: 'Jadepalast', seltenheit: 'episch', weg: { art:
   } },
   koord: { schrift: '"Segoe UI", system-ui, sans-serif', gewicht: 700, ton: '#0a3a20' } });
 
-M.push({ id: 'eiskristall', name: 'Eiskristall', seltenheit: 'selten', weg: { art: 'stufe', familie: 'serie', stufe: 'silber' },
+M.push({ id: 'eiskristall', name: 'Eiskristall',
   idee: 'Eisweisse und tiefblaue Felder mit Kristallfacetten, Rahmen aus Frostkristallen',
   konkret: 'Helle Felder eisweiß, dunkle tief petrolblau, jedes Feld mit ein paar leisen Kristallflächen; der Rahmen ist eisblau mit weißen Schneekristallen.',
   feld: { h: ['#e4f2f8', 0.74], d: ['#1a6a90', 0.12] },
@@ -262,7 +267,7 @@ M.push({ id: 'eiskristall', name: 'Eiskristall', seltenheit: 'selten', weg: { ar
   } },
   koord: { schrift: '"Segoe UI", system-ui, sans-serif', gewicht: 700, ton: '#0a3048' } });
 
-M.push({ id: 'lavafeld', name: 'Lavafeld', seltenheit: 'legende', weg: { art: 'level', n: 75 }, bewegung: true,
+M.push({ id: 'lavafeld', name: 'Lavafeld', bewegung: true,
   idee: 'Asche und Basalt mit feinen Rissen, der Rahmen gluehende Lava',
   konkret: 'Helle Felder aschgrau-sandig, dunkle Felder Basalt mit ganz feinen Rissen, nichts glüht auf den Feldern; der Rahmen ist schwarzes Gestein mit glühend orangen Lavaadern, ein Glanz läuft darüber.',
   feld: { h: ['#e0d0c0', 0.60], d: ['#4a3a38', 0.12] },
@@ -279,7 +284,7 @@ M.push({ id: 'lavafeld', name: 'Lavafeld', seltenheit: 'legende', weg: { art: 'l
   } },
   koord: { schrift: '"Trebuchet MS", "Segoe UI", sans-serif', gewicht: 700, ton: '#2a1008' } });
 
-M.push({ id: 'urwald', name: 'Urwald', seltenheit: 'selten', weg: { art: 'level', n: 52 },
+M.push({ id: 'urwald', name: 'Urwald',
   idee: 'Blassgruene und waldgruene Felder mit Blattadern, Rahmen aus Ranken und Blaettern',
   konkret: 'Helle Felder blassgrün, dunkle waldgrün, in jedem Feld die leisen Adern eines Blattes; der Rahmen ist eine dunkle Ranke mit frischgrünen Blättern.',
   feld: { h: ['#dfe8c0', 0.62], d: ['#2a6a2a', 0.12] },
@@ -297,7 +302,7 @@ M.push({ id: 'urwald', name: 'Urwald', seltenheit: 'selten', weg: { art: 'level'
   } },
   koord: { schrift: '"Segoe UI", system-ui, sans-serif', gewicht: 700, ton: '#14300a' } });
 
-M.push({ id: 'zahnwerk', name: 'Zahnwerk', seltenheit: 'episch', weg: { art: 'level', n: 85 },
+M.push({ id: 'zahnwerk', name: 'Zahnwerk',
   idee: 'Messing und Stahl, gebuerstet, der Rahmen aus Kupfer mit Zahnraedern',
   konkret: 'Helle Felder aus gebürstetem Messing, dunkle aus blauem Stahl, mit feinen Schleifspuren; der Rahmen ist Kupfer mit Nieten und je einem Zahnrad in den Ecken.',
   feld: { h: ['#e8d8a8', 0.60], d: ['#2a4a70', 0.12] },
@@ -314,7 +319,7 @@ M.push({ id: 'zahnwerk', name: 'Zahnwerk', seltenheit: 'episch', weg: { art: 'le
   } },
   koord: { schrift: '"Courier New", Consolas, monospace', gewicht: 700, ton: '#2a1a08' } });
 
-M.push({ id: 'papyrus', name: 'Papyrus', seltenheit: 'episch', weg: { art: 'endgegner', welt: 3 },
+M.push({ id: 'papyrus', name: 'Papyrus',
   idee: 'Papyrusfasern und Lapislazuli mit Goldflittern, Rahmen mit Lotosband',
   konkret: 'Helle Felder Papyrus mit feinen Kreuzfasern, dunkle Felder Lapislazuli mit kleinen goldenen Flittern; der Rahmen ist ein Band aus Lotosblüten in Türkis und Gold.',
   feld: { h: ['#ecdcb0', 0.62], d: ['#1a3a9a', 0.12], akzent: { h: '#c8b080', d: '#e0b040' } },
@@ -332,7 +337,7 @@ M.push({ id: 'papyrus', name: 'Papyrus', seltenheit: 'episch', weg: { art: 'endg
   } },
   koord: { schrift: '"Palatino Linotype", Palatino, serif', gewicht: 700, ton: '#2a2008' } });
 
-M.push({ id: 'kirschgarten', name: 'Kirschgarten', seltenheit: 'episch', weg: { art: 'level', n: 70 },
+M.push({ id: 'kirschgarten', name: 'Kirschgarten',
   idee: 'Washi-Papier in Blassrosa und Pflaume, Rahmen als bluehender Kirschzweig',
   konkret: 'Helle Felder blassrosa, dunkle pflaumenfarben, beide mit feinen Fasern wie japanisches Papier; der Rahmen ist ein dunkler Zweig mit rosa Kirschblüten.',
   feld: { h: ['#f8e4e8', 0.70], d: ['#7a2a50', 0.12] },
@@ -349,7 +354,7 @@ M.push({ id: 'kirschgarten', name: 'Kirschgarten', seltenheit: 'episch', weg: { 
   } },
   koord: { schrift: '"Yu Gothic", "Segoe UI", sans-serif', gewicht: 700, ton: '#3a0a20' } });
 
-M.push({ id: 'art-deco', name: 'Art déco', seltenheit: 'legende', weg: { art: 'stufe', familie: 'siege', stufe: 'gold' }, bewegung: true,
+M.push({ id: 'art-deco', name: 'Art déco', bewegung: true,
   idee: 'Creme und Schwarzpetrol mit Nadelstreifen, Rahmen mit goldenen Faechern',
   konkret: 'Helle Felder creme, dunkle schwarz-petrol, beide mit feinen schrägen Nadelstreifen; der Rahmen ist schwarz mit goldenen Fächern und Stufenlinien wie in den 1920ern, ein Glanz läuft darüber.',
   feld: { h: ['#f0e6d0', 0.68], d: ['#1a4a4a', 0.12] },
@@ -366,7 +371,7 @@ M.push({ id: 'art-deco', name: 'Art déco', seltenheit: 'legende', weg: { art: '
   } },
   koord: { schrift: '"Century Gothic", "Futura", "Segoe UI", sans-serif', gewicht: 700, ton: '#0a2020' } });
 
-M.push({ id: 'unterwasser', name: 'Unterwasser', seltenheit: 'episch', weg: { art: 'endgegner', welt: 5 }, bewegung: true,
+M.push({ id: 'unterwasser', name: 'Unterwasser', bewegung: true,
   idee: 'Meerschaum und Tiefsee mit leisem Lichtnetz, Rahmen aus Korallen und Blasen',
   konkret: 'Helle Felder meerschaumgrün, dunkle Felder tiefseeblau, beide mit dem ganz leisen Lichtnetz, das die Sonne unter Wasser malt; der Rahmen zeigt Korallen in Orange und Pink und aufsteigende Blasen, ein Glanz läuft darüber.',
   feld: { h: ['#d0ece6', 0.66], d: ['#0a4a7a', 0.12] },
@@ -383,7 +388,7 @@ M.push({ id: 'unterwasser', name: 'Unterwasser', seltenheit: 'episch', weg: { ar
   } },
   koord: { schrift: '"Trebuchet MS", "Segoe UI", sans-serif', gewicht: 700, ton: '#06283a' } });
 
-M.push({ id: 'galaxie', name: 'Galaxie', seltenheit: 'legende', weg: { art: 'stufe', familie: 'endgegner', stufe: 'gold' }, bewegung: true,
+M.push({ id: 'galaxie', name: 'Galaxie', bewegung: true,
   idee: 'Lavendel und Tiefviolett mit leisen Nebelschleiern, Rahmen als bunter Nebel mit Sternen',
   konkret: 'Helle Felder lavendel, dunkle tiefviolett, in jedem Feld ein ganz leiser Nebelschleier und ein paar Staubpunkte; der Rahmen ist ein bunter Nebel in Pink, Blau und Türkis mit Sternen, ein Glanz läuft darüber.',
   feld: { h: ['#e6dcf4', 0.64], d: ['#4a1a8a', 0.12] },
@@ -401,7 +406,7 @@ M.push({ id: 'galaxie', name: 'Galaxie', seltenheit: 'legende', weg: { art: 'stu
   } },
   koord: { schrift: '"Trebuchet MS", "Segoe UI", sans-serif', gewicht: 700, ton: '#1a0a3a' } });
 
-M.push({ id: 'mosaik', name: 'Römisches Mosaik', seltenheit: 'selten', weg: { art: 'level', n: 58 },
+M.push({ id: 'mosaik', name: 'Römisches Mosaik',
   idee: 'Travertin und Terrakotta aus kleinen Steinchen, Rahmen mit Wellenband',
   konkret: 'Helle Felder Travertin, dunkle Terrakotta, beide aus leise sichtbaren kleinen Mosaiksteinen; der Rahmen ist das schwarz-weiße Wellenband römischer Böden.',
   feld: { h: ['#ece0c8', 0.64], d: ['#9a3a20', 0.12] },
@@ -418,7 +423,7 @@ M.push({ id: 'mosaik', name: 'Römisches Mosaik', seltenheit: 'selten', weg: { a
   } },
   koord: { schrift: '"Times New Roman", Georgia, serif', gewicht: 700, ton: '#3a1408' } });
 
-M.push({ id: 'buchleder', name: 'Bucheinband', seltenheit: 'selten', weg: { art: 'level', n: 62 },
+M.push({ id: 'buchleder', name: 'Bucheinband',
   idee: 'Pergament und braunes Leder mit Narbung, Rahmen mit Goldpraegung',
   konkret: 'Helle Felder Pergament mit feinen Fasern, dunkle Felder braunes Leder mit leiser Narbung; der Rahmen ist dunkles Leder mit goldener Prägung, Doppellinien und Eckbeschlägen wie ein alter Bucheinband.',
   feld: { h: ['#efe2c4', 0.66], d: ['#6a3014', 0.12] },
@@ -436,7 +441,9 @@ M.push({ id: 'buchleder', name: 'Bucheinband', seltenheit: 'selten', weg: { art:
   } },
   koord: { schrift: 'Georgia, "Times New Roman", serif', gewicht: 700, ton: '#2a1406' } });
 
-export const MOTIVE = Object.freeze(M.map((m) => Object.freeze(m)));
+// Seltenheit und Weg stehen nur im Katalog (js/labor.js MOTIV_BRETTER), damit die Zuordnung eine Liste bleibt
+const KATALOG = new Map(MOTIV_BRETTER.map((b) => [b.id, b]));
+export const MOTIVE = Object.freeze(M.map((m) => Object.freeze({ ...m, seltenheit: KATALOG.get(m.id)?.seltenheit, weg: KATALOG.get(m.id)?.weg })));
 
 // ---------- Farben, Bilder, CSS
 const genau = (ton, L) => inBand(ton, [L, L], 0.5);
@@ -471,11 +478,12 @@ export function rahmenBild(m) {
 }
 const rahmenUrl = (innen) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 1000' preserveAspectRatio='none'>${innen}</svg>`).replace(/'/g, '%27')}")`;
 
-export function motivCss(m) {
+export function motivCss(m, sel = `.motiv-brett[data-motiv="${m.id}"]`, glanzSel = sel) {
   const b = texturBild(m), feld = feldFarben(m), k = koordFarben(m), r = m.rahmen;
-  const sel = `.motiv-brett[data-motiv="${m.id}"]`, grund = `${rahmenUrl(rahmenBild(m))} 0 0 / 100% 100% no-repeat`;
-  // padding in % bezieht sich auf die Breite: das Band ist damit immer rahmen.breite / 1000 der Brettbreite
-  let css = `${sel} { padding: ${r.breite / 10}%; border-radius: ${r.radius}px; background: ${grund}; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); `
+  const grund = `${rahmenUrl(rahmenBild(m))} 0 0 / 100% 100% no-repeat`;
+  // padding in % bezieht sich auf die Breite: das Band ist damit immer rahmen.breite / 1000 der Brettbreite; --sockel-abstand
+  // gleich, damit die Effekte der App (.brett-effekte) ueber den Feldern bleiben
+  let css = `${sel} { --sockel-abstand: ${r.breite / 10}%; padding: ${r.breite / 10}%; border-radius: ${r.radius}px; background: ${grund}; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); `
     + `--feld-hell: ${feld.h}; --feld-dunkel: ${feld.d}; --feld-muster-hell: ${svgUrl(b.h)}; --feld-muster-dunkel: ${svgUrl(b.d)}; --feld-muster-groesse: ${GROESSE}; }\n`
     // kleine Brett-Ecke: mit dem App-Rund (12 px) blieb zwischen Feld und Rahmen ein heller Zwickel
     + `${sel} .brett { --brett-radius: 3px; border-radius: 3px; box-shadow: 0 0 0 2px ${r.linie}; }\n`
@@ -485,9 +493,24 @@ export function motivCss(m) {
   // leiser Glanz NUR auf dem Rahmen (.motiv-brett, die Felder liegen darueber) und nur ohne "weniger Bewegung"
   if (m.bewegung) {
     css += `@media (prefers-reduced-motion: no-preference) {\n`
-      + `  ${sel} { background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, .28) 50%, transparent 65%) 0 0 / 300% 100% no-repeat, ${grund}; `
+      + `  ${glanzSel} { background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, .28) 50%, transparent 65%) 0 0 / 300% 100% no-repeat, ${grund}; `
       + `animation: motiv-glanz-${m.id} 9s ease-in-out infinite alternate; }\n`
       + `  @keyframes motiv-glanz-${m.id} { from { background-position: 100% 0, 0 0; } to { background-position: 0 0, 0 0; } }\n}\n`;
   }
   return css;
 }
+
+// In der App (js/labor.js brettFlaeche): am Sockel jeder Brett-Ansicht (.brett-rahmen), der Glanz nie bei
+// html[data-bewegung="aus"] (js/bewegung.js). Handy hochkant in der Partie bleibt das Brett von Rand zu Rand ohne Rahmen
+// (Flo 31.10.2026, css/partie.css), die Felder tragen das Motiv weiter.
+export function motivAppCss(id) {
+  const m = MOTIVE.find((x) => x.id === id);
+  if (!m) return '';
+  const html = `html[data-brett="${id}"]`, sel = `${html} .brett-rahmen`;
+  return motivCss(m, sel, `${html}:not([data-bewegung="aus"]) .brett-rahmen`)
+    + `@media (orientation: portrait) and (max-width: 600px) {\n`
+    + `  ${html} .partie .brett-rahmen { --sockel-abstand: 0px; padding: 0; border-radius: 0; background: none; box-shadow: none; animation: none; }\n`
+    + `  ${html} .partie .brett-rahmen .brett { --brett-radius: 0px; border-radius: 0; box-shadow: none; }\n}\n`;
+}
+// Sammelbild (js/sammlung-kunst.js brettKunst): die Feldtextur als Oberflaeche (viewBox 800, Ecke oben links)
+export const motivMuster = (id) => { const m = MOTIVE.find((x) => x.id === id); return m ? { ...texturBild(m), ganz: true } : null; };

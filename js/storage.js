@@ -196,7 +196,10 @@ export const EINSTELLUNG_WERTE = Object.freeze({
     'ahorn', 'schiefer', 'turnier', 'elfenbein', 'ebenholz', 'kirsche', 'wiese', 'duene', 'birke', 'herbst', 'kirschbluete', 'lavendel', 'bambus',
     'sonnenblume', 'gletscher', 'vulkan', 'topas', 'amethyst', 'perlmutt', 'jade', 'bernstein', 'smaragd', 'saphir', 'rubin', 'opal', 'onyx',
     'scheune', 'heuboden', 'lichtung', 'koehlerglut', 'rathausuhr', 'bibliothek', 'leuchtturm', 'watt', 'leuchtqualle', 'schatzkammer', 'sternennacht', 'mondschein', 'daemmerung',
-    'nachtmarkt', 'geisterstunde', 'gewitter', 'neon', 'synthwave', 'cyber', 'nordlicht', 'sonnenkrone', 'drachenglut', 'sternenstaub', 'kronjuwel', 'phoenix', 'tiefenleuchten']),
+    'nachtmarkt', 'geisterstunde', 'gewitter', 'neon', 'synthwave', 'cyber', 'nordlicht', 'sonnenkrone', 'drachenglut', 'sternenstaub', 'kronjuwel', 'phoenix', 'tiefenleuchten',
+    // 20 Motiv-Bretter Fassung 4 (Flo 14.11.2026), Katalog js/labor.js MOTIV_BRETTER
+    'kirchenfenster', 'seekarte', 'sternbilder', 'intarsie', 'orientteppich', 'goldthron', 'honigwabe', 'marmorsaal', 'jadepalast', 'eiskristall',
+    'lavafeld', 'urwald', 'zahnwerk', 'papyrus', 'kirschgarten', 'art-deco', 'unterwasser', 'galaxie', 'mosaik', 'buchleder']),
   klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall', 'juwel']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),

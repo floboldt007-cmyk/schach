@@ -63,7 +63,7 @@
   const motivEl = (m) => { const r = document.createElement('div'); r.className = 'motiv-brett'; r.dataset.motiv = m.id; r.innerHTML = '<div class="brett-platz"></div>'; return r; };
   const liste = id ? MOTIVE.filter((m) => m.id === id) : MOTIVE;
   if (id && !liste.length) throw new Error('unbekanntes Motiv ' + id);
-  document.getElementById('motive').textContent = liste.map(motivCss).join('\n');
+  document.getElementById('motive').textContent = liste.map((m) => motivCss(m)).join('\n');
 
   if (id && nurFelder) {
     document.body.classList.add('felder');

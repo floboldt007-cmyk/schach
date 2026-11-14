@@ -12,7 +12,13 @@
 //                   Oberflaeche ueber das ganze Brett aus js/brett-flaechen.js, gesetzt von brettFlaeche.
 //                   bewegung 'glanz' (nur Legendaer): leiser Lichtstreif, glanz = Farbe
 //                   weg (geplant, schaltet noch nichts frei): { art: 'start' | 'level', n | 'welt'|'endgegner', welt |
-//                   'stufe', familie, stufe } aus vorhandenen Mechaniken (js/pakete/sammlung/stufen.js); nie ein Preis
+//                   'stufe', familie, stufe } aus vorhandenen Mechaniken (js/pakete/sammlung/stufen.js); nie ein Preis;
+//                   bei den Motiv-Brettern vorerst { art: 'geplant', wie: 'shop-oder-erfolg' }
+//   MOTIV_BRETTER   [{ id, hell, dunkel, rand, seltenheit, weg }]  die 20 Motiv-Bretter Fassung 4 (Flo 14.11.2026: "ja die
+//                   Schachbretter sehen gut aus"), Gestaltung in js/brett-motive-v4.js. Seltenheit und Weg stehen NUR hier
+//                   (eine Liste zum Umverteilen, die Gestaltung uebernimmt sie); hell/dunkel/rand fuers Sammelbild, gleich
+//                   wie feldFarben und rahmen.linie (tests/bretter-v4-app.test.mjs). Kein Block in css/tokens.css: Rahmen,
+//                   Felder und Koordinaten setzt brettFlaeche als Stylesheet am Sockel (.brett-rahmen)
 //   BRETT_FAMILIEN  die sechs Familien in Reihenfolge; FREIE_BRETTER_PLAN dieselben Angaben fuer Nacht, Gruen, Holz
 //   LABOR_FIGUREN   ['kuerbis', ...]          Saetze unter assets/pieces/<id>/ (werkzeuge/figuren-3d.mjs, figuren-stile.mjs)
 //   LABOR_KLAENGE   ['juwel', 'grusel', 'kristall']  Klangsets unter assets/klang/<id>/ (werkzeuge/klang-juwel.mjs,
@@ -24,6 +30,8 @@
 //   brettFlaeche(html, id, frei?) -> Promise   setzt --feld-muster-hell/-dunkel/-groesse am html fuer ein Brett mit
 //                                              flaeche (nur Erfinder), sonst raeumt es sie ab; laedt js/brett-flaechen.js
 //                                              erst dann. Wechselt das Brett waehrend des Ladens, bleibt nichts stehen.
+//                                              Ein Motiv-Brett laedt js/brett-motive-v4.js und schreibt sein Stylesheet
+//                                              (style#brett-motiv) fuer html[data-brett] .brett-rahmen; jedes andere leert es.
 import { istErfinder } from './sonderstuecke.js';
 
 export const BRETT_FAMILIEN = Object.freeze(['klassik', 'natur', 'edelstein', 'welten', 'nacht-neon', 'legendaer']);
@@ -110,6 +118,33 @@ export const LABOR_BRETTER = Object.freeze([
   Object.freeze({ id: 'phoenix', hell: '#fafafa', dunkel: '#d52f16', rand: '#202020', familie: 'legendaer', seltenheit: 'legende', weg: Object.freeze({ art: 'stufe', familie: 'siege', stufe: 'gold' }), bewegung: 'glanz', glanz: 'rgba(255,200,140,.12)', flaeche: Object.freeze({ art: 'federn' }) }),
   Object.freeze({ id: 'tiefenleuchten', hell: '#c0ebf8', dunkel: '#486968', rand: '#061f1f', familie: 'legendaer', seltenheit: 'legende', weg: Object.freeze({ art: 'stufe', familie: 'level', stufe: 'gold' }), bewegung: 'glanz', glanz: 'rgba(170,230,255,.12)', flaeche: Object.freeze({ art: 'tiefenleuchten' }) }),
 ]);
+const motiv = (id, hell, dunkel, rand, seltenheit, weg) => Object.freeze({ id, hell, dunkel, rand, seltenheit, weg });
+// Weg (Flo 14.11.2026: "man soll die eher kaufen oder eben wenn man was krasses erreicht"): keiner der normalen Labor-Wege,
+// vorerst nur "geplant: Shop oder harter Erfolg", ohne Preis. Welches Brett in den Shop kommt und welches es fuer welchen
+// Erfolg gibt, entscheidet Flo spaeter: dann hier je Brett den Weg eintragen (wegText in werkzeuge/bretter-katalog.mjs)
+const GEPLANT = Object.freeze({ art: 'geplant', wie: 'shop-oder-erfolg' });
+export const MOTIV_BRETTER = Object.freeze([
+  motiv('kirchenfenster', '#e4cd89', '#3e51da', '#d9b45a', 'episch', GEPLANT),
+  motiv('seekarte', '#e1cd9b', '#24659a', '#c9a15a', 'episch', GEPLANT),
+  motiv('sternbilder', '#ced5e2', '#3752e5', '#a8c4ff', 'legende', GEPLANT),
+  motiv('intarsie', '#e4c48d', '#905127', '#e8c890', 'episch', GEPLANT),
+  motiv('orientteppich', '#dfd0ab', '#bf1b2c', '#f0e0c0', 'episch', GEPLANT),
+  motiv('goldthron', '#e3d4a3', '#ae2e6c', '#fff0b0', 'legende', GEPLANT),
+  motiv('honigwabe', '#e7cc88', '#8f5311', '#f8d060', 'selten', GEPLANT),
+  motiv('marmorsaal', '#dadad6', '#296d4e', '#f0f0ea', 'episch', GEPLANT),
+  motiv('jadepalast', '#c8d9c8', '#156f45', '#e8c060', 'episch', GEPLANT),
+  motiv('eiskristall', '#d4e2e7', '#19688d', '#e8f8ff', 'selten', GEPLANT),
+  motiv('lavafeld', '#d9c9ba', '#735c59', '#ff8a30', 'legende', GEPLANT),
+  motiv('urwald', '#cad3ae', '#2c6f2c', '#a8d070', 'selten', GEPLANT),
+  motiv('zahnwerk', '#dacb9e', '#3a6394', '#f0b080', 'episch', GEPLANT),
+  motiv('papyrus', '#ddcea4', '#2955d9', '#e0b040', 'episch', GEPLANT),
+  motiv('kirschgarten', '#e8d5d9', '#a33b6c', '#f8c0d0', 'episch', GEPLANT),
+  motiv('art-deco', '#e0d6c2', '#296b6b', '#e8c870', 'legende', GEPLANT),
+  motiv('unterwasser', '#c0dad4', '#1165a3', '#70e0e0', 'episch', GEPLANT),
+  motiv('galaxie', '#d7cee4', '#7d31e2', '#d8a0ff', 'legende', GEPLANT),
+  motiv('mosaik', '#dcd0ba', '#a74024', '#f0e8d8', 'selten', GEPLANT),
+  motiv('buchleder', '#e0d3b7', '#9c4a22', '#d8b050', 'selten', GEPLANT),
+]);
 // Flo 31.10.2026 abends ("coole Figur-Designs ... in mein Konto", dann "Bessere Designs"): gedrechselte Formen mit Licht
 // und Schatten (werkzeuge/figuren-3d.mjs: Elfenbein, Holz, Marmor, Gold, Glas, Neon, Frost, Kuerbis) und eigene Stile
 // (werkzeuge/figuren-stile.mjs: Pixel, Geo)
@@ -123,7 +158,7 @@ export const LABOR_FIGUREN = Object.freeze(['drachen', 'zombies', 'geister', 'la
 export const LABOR_KLAENGE = Object.freeze(['juwel', 'grusel', 'kristall']);
 
 export function istLabor(art, id) {
-  if (art === 'brett') return LABOR_BRETTER.some((b) => b.id === id);
+  if (art === 'brett') return LABOR_BRETTER.some((b) => b.id === id) || MOTIV_BRETTER.some((b) => b.id === id);
   if (art === 'figuren') return LABOR_FIGUREN.includes(id);
   if (art === 'klang') return LABOR_KLAENGE.includes(id);
   return false;
@@ -132,9 +167,23 @@ export const laborFrei = () => istErfinder();
 export const brettWahl = (id) => (istLabor('brett', id) && !laborFrei() ? 'nacht' : id);
 export const klangWahl = (id) => (istLabor('klang', id) && !laborFrei() ? '' : id);
 const FLAECHEN_VARS = ['--feld-muster-hell', '--feld-muster-dunkel', '--feld-muster-groesse'];
+// Motiv-Brett: ein Stylesheet fuer Rahmen, Felder und Koordinaten am Sockel; jedes andere Brett leert es
+function motivStil(html, id, frei) {
+  const doc = html.ownerDocument;
+  if (!doc) return Promise.resolve();
+  const m = frei ? MOTIV_BRETTER.find((x) => x.id === id) : null;
+  let stil = doc.getElementById('brett-motiv');
+  if (!m) { if (stil) stil.textContent = ''; return Promise.resolve(); }
+  return import('./brett-motive-v4.js').catch(() => null).then((mod) => {
+    if (!mod || html.dataset.brett !== id) return;
+    if (!stil) { stil = doc.createElement('style'); stil.id = 'brett-motiv'; doc.head.append(stil); }
+    stil.textContent = mod.motivAppCss(id);
+  }).catch((f) => console.error(f));
+}
 export function brettFlaeche(html, id, frei = laborFrei()) {
+  const motivFertig = motivStil(html, id, frei);
   const b = frei ? LABOR_BRETTER.find((x) => x.id === id && x.flaeche) : null;
-  if (!b) { for (const v of FLAECHEN_VARS) html.style.removeProperty(v); return Promise.resolve(); }
+  if (!b) { for (const v of FLAECHEN_VARS) html.style.removeProperty(v); return motivFertig; }
   // offline und nicht im Cache: still bei den Farben bleiben; ein Fehler beim Zeichnen meldet sich weiter
   return import('./brett-flaechen.js').catch(() => null).then((mod) => {
     if (!mod || html.dataset.brett !== id) return;

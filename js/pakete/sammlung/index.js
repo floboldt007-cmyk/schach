@@ -12,7 +12,7 @@ import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
 import { klangKunst, brettKunst, erfolgKunst, erfolgSeltenheit } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
-import { LABOR_BRETTER, LABOR_FIGUREN, LABOR_KLAENGE, laborFrei, brettWahl, klangWahl } from '../../labor.js';
+import { LABOR_BRETTER, MOTIV_BRETTER, LABOR_FIGUREN, LABOR_KLAENGE, laborFrei, brettWahl, klangWahl } from '../../labor.js';
 import { figurenSatz, figurenPfad } from '../../figurensatz.js';
 import { hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { shopBereich } from './shop.js';
@@ -48,12 +48,13 @@ const wahlVon = (app, teil) => (app && typeof app.setzeEinstellungen === 'functi
 // freiem Labor (Befund ed: auf einem neuen Geraet kommt der Erfinder-Status erst nach dem Laden). Ist die Datei da, wird der
 // offene Screen "Ich" ruhig neu gezeigt; fehlt sie (offline, nicht im Cache), bleiben die Farben ohne Oberflaeche und das
 // naechste Sammelbild fragt noch einmal
-let FLAECHEN = null;
+// Dasselbe fuer die Feldtextur der Motiv-Bretter (js/brett-motive-v4.js), im selben Zug geladen
+let FLAECHEN = null, MOTIVKUNST = null;
 let flaechenLaden = null;
 function flaechenAnstossen(app) {
   if (FLAECHEN || flaechenLaden || !laborFrei()) return;
-  flaechenLaden = import('../../brett-flaechen.js').then((m) => {
-    FLAECHEN = m;
+  flaechenLaden = Promise.all([import('../../brett-flaechen.js'), import('../../brett-motive-v4.js')]).then(([m, v4]) => {
+    FLAECHEN = m; MOTIVKUNST = v4;
     const s = typeof document !== 'undefined' && document.querySelector('.sa-screen');
     if (!s || !app || typeof app.gehe !== 'function') return;
     const oben = s.querySelector('.sa-rumpf')?.scrollTop || 0;
@@ -65,7 +66,8 @@ export function teileBretter(e = ladeEinstellungen(), app = null) {
   flaechenAnstossen(app);
   const an = brettWahl(e.brett);
   // Labor (Flo 31.10.2026): Kuerbis, Frost, Marmor, Nussbaum, Thron nur im Erfinder-Konto (js/labor.js)
-  const liste = [...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, (b.flaeche && FLAECHEN && FLAECHEN.brettMuster(b)) || b.muster]) : [])];
+  const liste = [...BRETTER, ...(laborFrei() ? [...LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, (b.flaeche && FLAECHEN && FLAECHEN.brettMuster(b)) || b.muster]),
+    ...MOTIV_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, MOTIVKUNST && MOTIVKUNST.motivMuster(b.id)])] : [])];
   // echte Figuren des ausgeruesteten Satzes (Flo 31.10.: "der Koenig sieht ganz anders aus")
   const figuren = new URL('../../../' + figurenPfad(e), import.meta.url).href;
   return liste.map(([id, h, d, r, labor, muster]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: an === id, zeile: an === id ? S('an') : S('frei'),
