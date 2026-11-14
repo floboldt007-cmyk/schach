@@ -82,14 +82,15 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
   const { brettKunst } = await import('../js/sammlung-kunst.js');
   const css = readFileSync(path.join(WURZEL, 'css/tokens.css'), 'utf8');
   const innen = (url) => decodeURIComponent(url).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+  // seit den 65 Brettern (14.11.2026) je Welt drei; die Zeichnung muss bei jedem Brett mit muster gleich sein
   const welten = LABOR_BRETTER.filter((b) => b.welt);
-  const abweichend = welten.filter((b) => {
+  const abweichend = LABOR_BRETTER.filter((b) => b.muster).filter((b) => {
     const block = new RegExp(`html\\[data-brett="${b.id}"\\] \\{([^}]*)\\}`).exec(css);
     const url = (n) => (block && new RegExp(`--feld-muster-${n}: url\\("data:image/svg\\+xml,([^"]+)"\\)`).exec(block[1]) || [])[1] || '';
     return !block || innen(url('hell')) !== b.muster.h || innen(url('dunkel')) !== b.muster.d;
   }).map((b) => b.id);
-  pruefe('Welten-Bretter: fünf (Welt 1 bis 5), Zeichnung im Spiel und im Sammelbild gleich', welten.map((b) => b.welt).join() === '1,2,3,4,5'
-    && abweichend.length === 0, abweichend);
+  pruefe('Welten-Bretter: je Welt drei (Welt 1 bis 5), jede Zeichnung im Spiel und im Sammelbild gleich',
+    welten.map((b) => b.welt).sort().join() === '1,1,1,2,2,2,3,3,3,4,4,4,5,5,5' && abweichend.length === 0, abweichend);
   pruefe('Welten-Bretter: das Sammelbild trägt die Zeichnung je Feld, die Themen-Bretter ohne', (brettKunst('#fff', '#000', '#111', '', welten[0].muster).match(/class="sk-muster"/g) || []).length === 9
     && !/sk-muster/.test(brettKunst('#fff', '#000', '#111', '')));
 }
@@ -571,7 +572,10 @@ async function laborTeil(browser) {
   const bretter = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="bretter"] .sa-teil')]
     .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
   const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
-  pruefe('Labor: zehn Bretter mit Schild (fünf Themen, fünf Welten), nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker,brett-moos,brett-pflaster,brett-brandung,brett-tiefsee', bretter);
+  // seit den 65 Brettern (14.11.2026): alle 62 Labor-Bretter in der Reihenfolge von js/labor.js
+  const laborIds = (await import('../js/labor.js')).LABOR_BRETTER.map((b) => 'brett-' + b.id).join();
+  pruefe('Labor: alle 62 Labor-Bretter mit Schild, nur diese markiert', lab === laborIds && lab.split(',').length === 62
+    && lab.startsWith('brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker'), bretter.length);
   await ruesteAus(p.s, 'brett-kuerbis');
   pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
     && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));

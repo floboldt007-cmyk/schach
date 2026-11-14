@@ -114,6 +114,382 @@ html[data-brett="tiefsee"] {
   --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2860%2C110%2C140%2C.18%29' stroke-width='1.6'%3E%3Ccircle cx='24' cy='70' r='5'/%3E%3Ccircle cx='34' cy='54' r='3'/%3E%3Ccircle cx='76' cy='28' r='4'/%3E%3C/g%3E%3C/svg%3E");
   --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28225%2C245%2C255%2C.2%29' stroke-width='2'%3E%3Ccircle cx='26' cy='74' r='7'/%3E%3Ccircle cx='38' cy='52' r='4'/%3E%3Ccircle cx='44' cy='36' r='2.5'/%3E%3Ccircle cx='74' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
 }
+/* BRETTER-65 ANFANG (werkzeuge/bretter-css.mjs schreibt diesen Block, nicht von Hand aendern) */
+html[data-brett="ahorn"] {
+  --feld-hell: #f3e3c3; --feld-dunkel: #a8814f;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(90, 62, 30, .28); --punkt: rgba(90, 62, 30, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+}
+html[data-brett="schiefer"] {
+  --feld-hell: #dfe3e6; --feld-dunkel: #6f7f8c;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(44, 52, 59, .28); --punkt: rgba(44, 52, 59, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2844%2C52%2C59%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M0 34l100-12M0 70l100-14'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2844%2C52%2C59%2C.16%29' stroke-width='1.6'%3E%3Cpath d='M0 34l100-12M0 70l100-14'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="turnier"] {
+  --feld-hell: #e8edf2; --feld-dunkel: #6b8bb0;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(36, 54, 77, .28); --punkt: rgba(36, 54, 77, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+}
+html[data-brett="elfenbein"] {
+  --feld-hell: #f8f1e0; --feld-dunkel: #94795a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(75, 59, 38, .28); --punkt: rgba(75, 59, 38, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2875%2C59%2C38%2C.12%29' stroke-width='2'%3E%3Cpath d='M0 22q50 9 100 0M0 50q50-9 100 0M0 78q50 9 100 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2875%2C59%2C38%2C.16%29' stroke-width='2'%3E%3Cpath d='M0 22q50 9 100 0M0 50q50-9 100 0M0 78q50 9 100 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="ebenholz"] {
+  --feld-hell: #e9dcc6; --feld-dunkel: #765a48;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(42, 29, 21, .28); --punkt: rgba(42, 29, 21, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2842%2C29%2C21%2C.12%29' stroke-width='2'%3E%3Cpath d='M0 22q50 9 100 0M0 50q50-9 100 0M0 78q50 9 100 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2'%3E%3Cpath d='M0 22q50 9 100 0M0 50q50-9 100 0M0 78q50 9 100 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="kirsche"] {
+  --feld-hell: #f1d3b9; --feld-dunkel: #a0584a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(74, 34, 24, .28); --punkt: rgba(74, 34, 24, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2874%2C34%2C24%2C.12%29' stroke-width='2'%3E%3Cpath d='M0 22q50 9 100 0M0 50q50-9 100 0M0 78q50 9 100 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2'%3E%3Cpath d='M0 22q50 9 100 0M0 50q50-9 100 0M0 78q50 9 100 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="wiese"] {
+  --feld-hell: #eef3cf; --feld-dunkel: #6a9148;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(52, 80, 31, .28); --punkt: rgba(52, 80, 31, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2852%2C80%2C31%2C.12%29'%3E%3Ccircle cx='22' cy='24' r='3'/%3E%3Ccircle cx='70' cy='36' r='2.4'/%3E%3Ccircle cx='40' cy='72' r='3.2'/%3E%3Ccircle cx='82' cy='80' r='2'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2852%2C80%2C31%2C.16%29'%3E%3Ccircle cx='22' cy='24' r='3'/%3E%3Ccircle cx='70' cy='36' r='2.4'/%3E%3Ccircle cx='40' cy='72' r='3.2'/%3E%3Ccircle cx='82' cy='80' r='2'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="duene"] {
+  --feld-hell: #f4e6c4; --feld-dunkel: #ad8448;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(91, 65, 32, .28); --punkt: rgba(91, 65, 32, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2891%2C65%2C32%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2891%2C65%2C32%2C.16%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="birke"] {
+  --feld-hell: #f3f1ea; --feld-dunkel: #80827a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(51, 52, 47, .28); --punkt: rgba(51, 52, 47, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%2851%2C52%2C47%2C.12%29' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M18 20h16M60 34h22M30 62h14M64 80h18'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%2851%2C52%2C47%2C.16%29' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M18 20h16M60 34h22M30 62h14M64 80h18'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="herbst"] {
+  --feld-hell: #f5dfb8; --feld-dunkel: #b0663a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(82, 37, 15, .28); --punkt: rgba(82, 37, 15, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2882%2C37%2C15%2C.12%29'%3E%3Cellipse cx='26' cy='30' rx='9' ry='4' transform='rotate%28-30 26 30%29'/%3E%3Cellipse cx='72' cy='68' rx='10' ry='4.5' transform='rotate%2825 72 68%29'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2882%2C37%2C15%2C.16%29'%3E%3Cellipse cx='26' cy='30' rx='9' ry='4' transform='rotate%28-30 26 30%29'/%3E%3Cellipse cx='72' cy='68' rx='10' ry='4.5' transform='rotate%2825 72 68%29'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="kirschbluete"] {
+  --feld-hell: #fbe6ec; --feld-dunkel: #ad6680;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(90, 42, 58, .28); --punkt: rgba(90, 42, 58, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2890%2C42%2C58%2C.12%29'%3E%3Ccircle cx='22' cy='24' r='3'/%3E%3Ccircle cx='70' cy='36' r='2.4'/%3E%3Ccircle cx='40' cy='72' r='3.2'/%3E%3Ccircle cx='82' cy='80' r='2'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2890%2C42%2C58%2C.16%29'%3E%3Ccircle cx='22' cy='24' r='3'/%3E%3Ccircle cx='70' cy='36' r='2.4'/%3E%3Ccircle cx='40' cy='72' r='3.2'/%3E%3Ccircle cx='82' cy='80' r='2'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="lavendel"] {
+  --feld-hell: #eee8f6; --feld-dunkel: #8f7bb8;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(58, 44, 90, .28); --punkt: rgba(58, 44, 90, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%2858%2C44%2C90%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M16 84l8-26M30 86l3-30M70 40l6-24M84 44l-2-26'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%2858%2C44%2C90%2C.16%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M16 84l8-26M30 86l3-30M70 40l6-24M84 44l-2-26'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="bambus"] {
+  --feld-hell: #eef0cf; --feld-dunkel: #7a8a3c;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(58, 68, 24, .28); --punkt: rgba(58, 68, 24, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%2858%2C68%2C24%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M16 84l8-26M30 86l3-30M70 40l6-24M84 44l-2-26'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%2858%2C68%2C24%2C.16%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M16 84l8-26M30 86l3-30M70 40l6-24M84 44l-2-26'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="sonnenblume"] {
+  --feld-hell: #fbefc0; --feld-dunkel: #a87620;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(90, 58, 8, .28); --punkt: rgba(90, 58, 8, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2890%2C58%2C8%2C.12%29'%3E%3Ccircle cx='22' cy='24' r='3'/%3E%3Ccircle cx='70' cy='36' r='2.4'/%3E%3Ccircle cx='40' cy='72' r='3.2'/%3E%3Ccircle cx='82' cy='80' r='2'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2890%2C58%2C8%2C.16%29'%3E%3Ccircle cx='22' cy='24' r='3'/%3E%3Ccircle cx='70' cy='36' r='2.4'/%3E%3Ccircle cx='40' cy='72' r='3.2'/%3E%3Ccircle cx='82' cy='80' r='2'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="gletscher"] {
+  --feld-hell: #e6f3f6; --feld-dunkel: #5f93a8;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(28, 63, 76, .28); --punkt: rgba(28, 63, 76, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2828%2C63%2C76%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10 30l18 10l10-6l20 14M56 74l14-10l20 8'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2828%2C63%2C76%2C.16%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10 30l18 10l10-6l20 14M56 74l14-10l20 8'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="vulkan"] {
+  --feld-hell: #e8cdb6; --feld-dunkel: #a2503a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(58, 18, 10, .28); --punkt: rgba(58, 18, 10, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2858%2C18%2C10%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10 30l18 10l10-6l20 14M56 74l14-10l20 8'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10 30l18 10l10-6l20 14M56 74l14-10l20 8'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="topas"] {
+  --feld-hell: #fbeccc; --feld-dunkel: #b87a2a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(92, 58, 8, .28); --punkt: rgba(92, 58, 8, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2892%2C58%2C8%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2892%2C58%2C8%2C.16%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="amethyst"] {
+  --feld-hell: #efe4f6; --feld-dunkel: #8a5cb0;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(58, 26, 82, .28); --punkt: rgba(58, 26, 82, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2858%2C26%2C82%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="perlmutt"] {
+  --feld-hell: #f6f2ee; --feld-dunkel: #7f8aa0;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(58, 64, 80, .28); --punkt: rgba(58, 64, 80, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2858%2C64%2C80%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2858%2C64%2C80%2C.16%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="jade"] {
+  --feld-hell: #e6f0dc; --feld-dunkel: #5e8f6a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(31, 59, 38, .28); --punkt: rgba(31, 59, 38, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2831%2C59%2C38%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2831%2C59%2C38%2C.16%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="bernstein"] {
+  --feld-hell: #f8e2b8; --feld-dunkel: #b46a1e;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(79, 42, 6, .28); --punkt: rgba(79, 42, 6, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2879%2C42%2C6%2C.12%29' stroke-width='1.6'%3E%3Ccircle cx='26' cy='70' r='6'/%3E%3Ccircle cx='40' cy='48' r='3.5'/%3E%3Ccircle cx='72' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2879%2C42%2C6%2C.16%29' stroke-width='1.6'%3E%3Ccircle cx='26' cy='70' r='6'/%3E%3Ccircle cx='40' cy='48' r='3.5'/%3E%3Ccircle cx='72' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="smaragd"] {
+  --feld-hell: #e3f2e8; --feld-dunkel: #3f8a62;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(18, 58, 38, .28); --punkt: rgba(18, 58, 38, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2818%2C58%2C38%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2818%2C58%2C38%2C.16%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="saphir"] {
+  --feld-hell: #e2e9f8; --feld-dunkel: #4566b0;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(20, 38, 80, .28); --punkt: rgba(20, 38, 80, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2820%2C38%2C80%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="rubin"] {
+  --feld-hell: #f6e0e2; --feld-dunkel: #b0414f;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(74, 15, 24, .28); --punkt: rgba(74, 15, 24, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2874%2C15%2C24%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="opal"] {
+  --feld-hell: #eef3f4; --feld-dunkel: #658c9a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(30, 58, 68, .28); --punkt: rgba(30, 58, 68, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2830%2C58%2C68%2C.12%29'%3E%3Ccircle cx='18' cy='22' r='1.6'/%3E%3Ccircle cx='66' cy='14' r='1.2'/%3E%3Ccircle cx='44' cy='52' r='1.8'/%3E%3Ccircle cx='84' cy='62' r='1.3'/%3E%3Ccircle cx='26' cy='82' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2830%2C58%2C68%2C.16%29'%3E%3Ccircle cx='18' cy='22' r='1.6'/%3E%3Ccircle cx='66' cy='14' r='1.2'/%3E%3Ccircle cx='44' cy='52' r='1.8'/%3E%3Ccircle cx='84' cy='62' r='1.3'/%3E%3Ccircle cx='26' cy='82' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="onyx"] {
+  --feld-hell: #dcdcdc; --feld-dunkel: #63636c;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(26, 26, 30, .28); --punkt: rgba(26, 26, 30, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2826%2C26%2C30%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="scheune"] {
+  --feld-hell: #f1dcc0; --feld-dunkel: #a35a3c;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(74, 34, 20, .28); --punkt: rgba(74, 34, 20, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2874%2C34%2C20%2C.12%29' stroke-width='1.8'%3E%3Cpath d='M0 33h100M0 66h100M50 0v33M25 33v33M75 33v33M50 66v34'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.8'%3E%3Cpath d='M0 33h100M0 66h100M50 0v33M25 33v33M75 33v33M50 66v34'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="heuboden"] {
+  --feld-hell: #f6eab8; --feld-dunkel: #9e7e2c;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(80, 64, 14, .28); --punkt: rgba(80, 64, 14, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%2880%2C64%2C14%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M16 84l8-26M30 86l3-30M70 40l6-24M84 44l-2-26'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%2880%2C64%2C14%2C.16%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M16 84l8-26M30 86l3-30M70 40l6-24M84 44l-2-26'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="lichtung"] {
+  --feld-hell: #ecf1d2; --feld-dunkel: #6c8f4a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(42, 60, 26, .28); --punkt: rgba(42, 60, 26, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2842%2C60%2C26%2C.12%29'%3E%3Cellipse cx='26' cy='30' rx='9' ry='4' transform='rotate%28-30 26 30%29'/%3E%3Cellipse cx='72' cy='68' rx='10' ry='4.5' transform='rotate%2825 72 68%29'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2842%2C60%2C26%2C.16%29'%3E%3Cellipse cx='26' cy='30' rx='9' ry='4' transform='rotate%28-30 26 30%29'/%3E%3Cellipse cx='72' cy='68' rx='10' ry='4.5' transform='rotate%2825 72 68%29'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="koehlerglut"] {
+  --feld-hell: #ead7c4; --feld-dunkel: #7a5a48;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(42, 26, 16, .28); --punkt: rgba(42, 26, 16, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2842%2C26%2C16%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10 30l18 10l10-6l20 14M56 74l14-10l20 8'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10 30l18 10l10-6l20 14M56 74l14-10l20 8'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="rathausuhr"] {
+  --feld-hell: #efe6d6; --feld-dunkel: #8a7a64;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(58, 48, 32, .28); --punkt: rgba(58, 48, 32, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2858%2C48%2C32%2C.12%29' stroke-width='1.8'%3E%3Cpath d='M0 33h100M0 66h100M50 0v33M25 33v33M75 33v33M50 66v34'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2858%2C48%2C32%2C.16%29' stroke-width='1.8'%3E%3Cpath d='M0 33h100M0 66h100M50 0v33M25 33v33M75 33v33M50 66v34'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="bibliothek"] {
+  --feld-hell: #ecdcc4; --feld-dunkel: #5e6f8e;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(30, 38, 56, .28); --punkt: rgba(30, 38, 56, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2830%2C38%2C56%2C.12%29' stroke-width='2'%3E%3Cpath d='M14 20v60M28 26v54M42 18v62M64 24v56M80 20v60'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2'%3E%3Cpath d='M14 20v60M28 26v54M42 18v62M64 24v56M80 20v60'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="leuchtturm"] {
+  --feld-hell: #f4ecdc; --feld-dunkel: #b0505a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(74, 20, 24, .28); --punkt: rgba(74, 20, 24, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2874%2C20%2C24%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="watt"] {
+  --feld-hell: #e6e2d4; --feld-dunkel: #7f8a80;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(44, 50, 44, .28); --punkt: rgba(44, 50, 44, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2844%2C50%2C44%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2844%2C50%2C44%2C.16%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="leuchtqualle"] {
+  --feld-hell: #dcd8f0; --feld-dunkel: #56639f;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(20, 24, 56, .28); --punkt: rgba(20, 24, 56, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2820%2C24%2C56%2C.12%29' stroke-width='1.6'%3E%3Ccircle cx='26' cy='70' r='6'/%3E%3Ccircle cx='40' cy='48' r='3.5'/%3E%3Ccircle cx='72' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Ccircle cx='26' cy='70' r='6'/%3E%3Ccircle cx='40' cy='48' r='3.5'/%3E%3Ccircle cx='72' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="schatzkammer"] {
+  --feld-hell: #f0e0b0; --feld-dunkel: #7a6a3a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(42, 34, 10, .28); --punkt: rgba(42, 34, 10, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2842%2C34%2C10%2C.12%29' stroke-width='1.8'%3E%3Ccircle cx='30' cy='34' r='9'/%3E%3Ccircle cx='68' cy='66' r='11'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.8'%3E%3Ccircle cx='30' cy='34' r='9'/%3E%3Ccircle cx='68' cy='66' r='11'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="sternennacht"] {
+  --feld-hell: #c3c8e6; --feld-dunkel: #56609a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(22, 26, 54, .28); --punkt: rgba(22, 26, 54, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2822%2C26%2C54%2C.12%29'%3E%3Ccircle cx='18' cy='22' r='1.6'/%3E%3Ccircle cx='66' cy='14' r='1.2'/%3E%3Ccircle cx='44' cy='52' r='1.8'/%3E%3Ccircle cx='84' cy='62' r='1.3'/%3E%3Ccircle cx='26' cy='82' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%28255%2C255%2C255%2C.12%29'%3E%3Ccircle cx='18' cy='22' r='1.6'/%3E%3Ccircle cx='66' cy='14' r='1.2'/%3E%3Ccircle cx='44' cy='52' r='1.8'/%3E%3Ccircle cx='84' cy='62' r='1.3'/%3E%3Ccircle cx='26' cy='82' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="mondschein"] {
+  --feld-hell: #d8dde8; --feld-dunkel: #5a6680;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(30, 36, 51, .28); --punkt: rgba(30, 36, 51, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2830%2C36%2C51%2C.12%29'%3E%3Ccircle cx='18' cy='22' r='1.6'/%3E%3Ccircle cx='66' cy='14' r='1.2'/%3E%3Ccircle cx='44' cy='52' r='1.8'/%3E%3Ccircle cx='84' cy='62' r='1.3'/%3E%3Ccircle cx='26' cy='82' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%28255%2C255%2C255%2C.12%29'%3E%3Ccircle cx='18' cy='22' r='1.6'/%3E%3Ccircle cx='66' cy='14' r='1.2'/%3E%3Ccircle cx='44' cy='52' r='1.8'/%3E%3Ccircle cx='84' cy='62' r='1.3'/%3E%3Ccircle cx='26' cy='82' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="daemmerung"] {
+  --feld-hell: #f0cdb8; --feld-dunkel: #6a5a8a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(36, 29, 54, .28); --punkt: rgba(36, 29, 54, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2836%2C29%2C54%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="nachtmarkt"] {
+  --feld-hell: #f2d8a8; --feld-dunkel: #6e5e92;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(34, 26, 54, .28); --punkt: rgba(34, 26, 54, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2834%2C26%2C54%2C.12%29' stroke-width='1.8'%3E%3Ccircle cx='30' cy='34' r='9'/%3E%3Ccircle cx='68' cy='66' r='11'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.8'%3E%3Ccircle cx='30' cy='34' r='9'/%3E%3Ccircle cx='68' cy='66' r='11'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="geisterstunde"] {
+  --feld-hell: #d6e6dc; --feld-dunkel: #5a6a7a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(30, 38, 48, .28); --punkt: rgba(30, 38, 48, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2830%2C38%2C48%2C.12%29' stroke-width='1.6'%3E%3Ccircle cx='26' cy='70' r='6'/%3E%3Ccircle cx='40' cy='48' r='3.5'/%3E%3Ccircle cx='72' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Ccircle cx='26' cy='70' r='6'/%3E%3Ccircle cx='40' cy='48' r='3.5'/%3E%3Ccircle cx='72' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="gewitter"] {
+  --feld-hell: #d8dce6; --feld-dunkel: #55627c;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(26, 32, 48, .28); --punkt: rgba(26, 32, 48, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2826%2C32%2C48%2C.12%29'%3E%3Cpath d='M58 10L36 54h14L40 90l26-48H52Z'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%28255%2C255%2C255%2C.12%29'%3E%3Cpath d='M58 10L36 54h14L40 90l26-48H52Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="neon"] {
+  --feld-hell: #b8f0ea; --feld-dunkel: #94469a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(42, 14, 48, .28); --punkt: rgba(42, 14, 48, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2842%2C14%2C48%2C.12%29' stroke-width='1.8'%3E%3Cpath d='M0 30h30v40h40v-20h30M50 0v20'/%3E%3Ccircle cx='30' cy='30' r='3'/%3E%3Ccircle cx='70' cy='50' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.8'%3E%3Cpath d='M0 30h30v40h40v-20h30M50 0v20'/%3E%3Ccircle cx='30' cy='30' r='3'/%3E%3Ccircle cx='70' cy='50' r='3'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="synthwave"] {
+  --feld-hell: #f2c4e6; --feld-dunkel: #7254b0;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(30, 18, 64, .28); --punkt: rgba(30, 18, 64, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2830%2C18%2C64%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M0 34l100-12M0 70l100-14'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M0 34l100-12M0 70l100-14'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="cyber"] {
+  --feld-hell: #c8f0c8; --feld-dunkel: #3a7a5a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(14, 42, 30, .28); --punkt: rgba(14, 42, 30, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2814%2C42%2C30%2C.12%29' stroke-width='1.8'%3E%3Cpath d='M0 30h30v40h40v-20h30M50 0v20'/%3E%3Ccircle cx='30' cy='30' r='3'/%3E%3Ccircle cx='70' cy='50' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.8'%3E%3Cpath d='M0 30h30v40h40v-20h30M50 0v20'/%3E%3Ccircle cx='30' cy='30' r='3'/%3E%3Ccircle cx='70' cy='50' r='3'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="nordlicht"] {
+  --feld-hell: #d8f0e6; --feld-dunkel: #2f6f6a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(14, 42, 40, .28); --punkt: rgba(14, 42, 40, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2814%2C42%2C40%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M0 30q25-10 50 0t50 0M0 66q25-10 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-glanz: rgba(160,255,220,.12);
+}
+html[data-brett="sonnenkrone"] {
+  --feld-hell: #fbefc4; --feld-dunkel: #a87818;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(74, 48, 6, .28); --punkt: rgba(74, 48, 6, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2874%2C48%2C6%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2874%2C48%2C6%2C.16%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-glanz: rgba(255,236,170,.12);
+}
+html[data-brett="drachenglut"] {
+  --feld-hell: #f6d2b0; --feld-dunkel: #a4402a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(58, 18, 10, .28); --punkt: rgba(58, 18, 10, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2858%2C18%2C10%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10 30l18 10l10-6l20 14M56 74l14-10l20 8'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M10 30l18 10l10-6l20 14M56 74l14-10l20 8'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-glanz: rgba(255,180,110,.12);
+}
+html[data-brett="sternenstaub"] {
+  --feld-hell: #dcd6f4; --feld-dunkel: #6656aa;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(30, 22, 64, .28); --punkt: rgba(30, 22, 64, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2830%2C22%2C64%2C.12%29'%3E%3Ccircle cx='18' cy='22' r='1.6'/%3E%3Ccircle cx='66' cy='14' r='1.2'/%3E%3Ccircle cx='44' cy='52' r='1.8'/%3E%3Ccircle cx='84' cy='62' r='1.3'/%3E%3Ccircle cx='26' cy='82' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%28255%2C255%2C255%2C.12%29'%3E%3Ccircle cx='18' cy='22' r='1.6'/%3E%3Ccircle cx='66' cy='14' r='1.2'/%3E%3Ccircle cx='44' cy='52' r='1.8'/%3E%3Ccircle cx='84' cy='62' r='1.3'/%3E%3Ccircle cx='26' cy='82' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-glanz: rgba(220,210,255,.12);
+}
+html[data-brett="kronjuwel"] {
+  --feld-hell: #f4e4f0; --feld-dunkel: #96447a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(58, 14, 42, .28); --punkt: rgba(58, 14, 42, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2858%2C14%2C42%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Cpath d='M50 8L92 50L50 92L8 50ZM50 8V92M8 50H92'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-glanz: rgba(255,200,236,.12);
+}
+html[data-brett="phoenix"] {
+  --feld-hell: #fbe0c4; --feld-dunkel: #b0482a;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(74, 22, 8, .28); --punkt: rgba(74, 22, 8, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2874%2C22%2C8%2C.12%29'%3E%3Cellipse cx='26' cy='30' rx='9' ry='4' transform='rotate%28-30 26 30%29'/%3E%3Cellipse cx='72' cy='68' rx='10' ry='4.5' transform='rotate%2825 72 68%29'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%28255%2C255%2C255%2C.12%29'%3E%3Cellipse cx='26' cy='30' rx='9' ry='4' transform='rotate%28-30 26 30%29'/%3E%3Cellipse cx='72' cy='68' rx='10' ry='4.5' transform='rotate%2825 72 68%29'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-glanz: rgba(255,200,140,.12);
+}
+html[data-brett="tiefenleuchten"] {
+  --feld-hell: #cfe4ec; --feld-dunkel: #36687f;
+  --zuletzt: rgba(255, 206, 80, .55); --auswahl: rgba(14, 36, 48, .28); --punkt: rgba(14, 36, 48, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2814%2C36%2C48%2C.12%29' stroke-width='1.6'%3E%3Ccircle cx='26' cy='70' r='6'/%3E%3Ccircle cx='40' cy='48' r='3.5'/%3E%3Ccircle cx='72' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.12%29' stroke-width='1.6'%3E%3Ccircle cx='26' cy='70' r='6'/%3E%3Ccircle cx='40' cy='48' r='3.5'/%3E%3Ccircle cx='72' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-glanz: rgba(170,230,255,.12);
+}
+/* Legendaer: ein leiser Lichtstreif zieht ueber jedes Feld (9 s, ein Drittel davon sichtbar) */
+@keyframes brett-glanz { from { background-position: 0 0, 0 0; } to { background-position: 0 0, 100% 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  :is(html[data-brett="nordlicht"]:not([data-bewegung="aus"]), html[data-brett="sonnenkrone"]:not([data-bewegung="aus"]), html[data-brett="drachenglut"]:not([data-bewegung="aus"]), html[data-brett="sternenstaub"]:not([data-bewegung="aus"]), html[data-brett="kronjuwel"]:not([data-bewegung="aus"]), html[data-brett="phoenix"]:not([data-bewegung="aus"]), html[data-brett="tiefenleuchten"]:not([data-bewegung="aus"])) .brett .feld { background-size: 100% 100%, 400% 100%; animation: brett-glanz 9s linear infinite; }
+  :is(html[data-brett="nordlicht"]:not([data-bewegung="aus"]), html[data-brett="sonnenkrone"]:not([data-bewegung="aus"]), html[data-brett="drachenglut"]:not([data-bewegung="aus"]), html[data-brett="sternenstaub"]:not([data-bewegung="aus"]), html[data-brett="kronjuwel"]:not([data-bewegung="aus"]), html[data-brett="phoenix"]:not([data-bewegung="aus"]), html[data-brett="tiefenleuchten"]:not([data-bewegung="aus"])) .brett .feld.h { background-image: var(--feld-muster-hell, none), linear-gradient(105deg, transparent 40%, var(--feld-glanz) 50%, transparent 60%); }
+  :is(html[data-brett="nordlicht"]:not([data-bewegung="aus"]), html[data-brett="sonnenkrone"]:not([data-bewegung="aus"]), html[data-brett="drachenglut"]:not([data-bewegung="aus"]), html[data-brett="sternenstaub"]:not([data-bewegung="aus"]), html[data-brett="kronjuwel"]:not([data-bewegung="aus"]), html[data-brett="phoenix"]:not([data-bewegung="aus"]), html[data-brett="tiefenleuchten"]:not([data-bewegung="aus"])) .brett .feld.d { background-image: var(--feld-muster-dunkel, none), linear-gradient(105deg, transparent 40%, var(--feld-glanz) 50%, transparent 60%); }
+}
+/* BRETTER-65 ENDE */
 :root {
   --hinweis: rgba(76, 110, 245, .34);
   /* Flos eigene Pfeile und Marken: das Theme setzt --pfeil-nutzer/--marke-nutzer hell und dunkel, hier der Rueckfall */

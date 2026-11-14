@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="de" data-brett="nacht">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bretter-Auswahl</title>
+<!-- Vorschau der 65 Bretter (Flo 14.11.2026, nur im Zweig, nicht in der App und nicht im Service Worker).
+     Raster:  werkzeuge/bretter-vorschau.html            alle 65 nach Familie, je ein echtes Brett (js/board.js)
+     Einzeln: werkzeuge/bretter-vorschau.html?brett=<id>  ein grosses Brett mit html[data-brett], also mit Glanz
+     Die Farben im Raster liest die Seite aus css/tokens.css: je Brett kurz html[data-brett] setzen und die Variablen
+     an die Karte schreiben. Bilder und Liste fuer den Vault macht werkzeuge/bretter-vorschau.mjs. -->
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/board.css">
+<style>
+  :root { --grund: #14161c; --text: #eef0f6; --leise: #a9b0c2; --linie: #2a2f3a; }
+  body { margin: 0; background: var(--grund); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 1360px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 28px 0 10px; color: var(--leise); font-weight: 600; letter-spacing: .02em; }
+  .raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 14px; }
+  .karte { background: #1c1f27; border: 1px solid var(--linie); border-radius: 12px; padding: 10px; }
+  .karte .brett { width: 100%; aspect-ratio: 1; position: relative; border-radius: 6px; overflow: hidden; }
+  .name { margin-top: 8px; font-weight: 700; display: flex; gap: 6px; align-items: baseline; }
+  .nr { color: var(--leise); font-weight: 500; font-size: 12px; }
+  .zeile { color: var(--leise); font-size: 12px; }
+  .sel { display: inline-block; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+  .sel.frei { background: #2c3340; } .sel.selten { background: #1d4a7a; } .sel.episch { background: #5a2a8a; } .sel.legende { background: #8a5a10; }
+  .neu { color: #ffd27a; font-size: 11px; font-weight: 700; }
+  body.einzeln main { max-width: none; padding: 0; }
+  body.einzeln .einzel { width: 560px; height: 560px; position: relative; }
+</style>
+</head>
+<body>
+<main id="haupt"></main>
+<script type="module">
+  import { Brett } from '../js/board.js';
+  import { BRETT_FAMILIEN } from '../js/labor.js';
+  import { WELTEN } from '../js/bots.js';
+  import { t } from '../js/sprache.js';
+  import '../js/pakete/sammlung/texte.js';
+  import { alleBretter, wegText, brettMass } from './bretter-katalog.mjs';
+
+  const FEN = 'r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 7';
+  const FAMILIE = { klassik: 'Klassik', natur: 'Natur', edelstein: 'Edelstein', welten: 'Welten', 'nacht-neon': 'Nacht und Neon', legendaer: 'Legendär' };
+  const SELTEN = { frei: 'Frei', selten: 'Selten', episch: 'Episch', legende: 'Legende' };
+  const VARS = ['--feld-hell', '--feld-dunkel', '--zuletzt', '--auswahl', '--punkt', '--auswahl-kante', '--feld-muster-hell', '--feld-muster-dunkel'];
+  const weltName = (n) => (WELTEN.find((w) => w.nr === n) || {}).name || 'Welt ' + n;
+  const name = (id) => t('p-sammlung.brett.' + id);
+  const haupt = document.getElementById('haupt');
+  const html = document.documentElement;
+  const bretter = alleBretter();
+  const nummer = new Map(bretter.map((b, i) => [b.id, i + 1]));
+  const brett = (el) => { const x = new Brett(el, { figurenPfad: '../assets/pieces/', koordinaten: false, animation: 0, pfeile: false }); x.setzeStellung(FEN, { animieren: false, letzterZug: 'f8c5' }); return x; };
+
+  const einzeln = new URLSearchParams(location.search).get('brett');
+  if (einzeln) {
+    document.body.classList.add('einzeln');
+    html.dataset.brett = einzeln;
+    const el = document.createElement('div');
+    el.className = 'einzel';
+    haupt.append(el);
+    brett(el);
+  } else {
+    haupt.insertAdjacentHTML('beforeend', `<h1>65 Bretter zur Auswahl</h1><div class="zeile">13 vorhandene und 52 neue in sechs Familien. Streichen in Bretter-Auswahl.md (Vault). Der Glanz der Legendären steht in den Einzelbildern.</div>`);
+    for (const f of BRETT_FAMILIEN) {
+      const liste = bretter.filter((b) => b.familie === f);
+      haupt.insertAdjacentHTML('beforeend', `<h2>${FAMILIE[f]} · ${liste.length}</h2><div class="raster" data-familie="${f}"></div>`);
+      const raster = haupt.lastElementChild;
+      for (const b of liste) {
+        html.dataset.brett = b.id;
+        const cs = getComputedStyle(html);
+        const werte = VARS.map((v) => [v, cs.getPropertyValue(v).trim()]);
+        const m = brettMass(b);
+        const karte = document.createElement('div');
+        karte.className = 'karte';
+        karte.dataset.brett = b.id;
+        for (const [v, w] of werte) karte.style.setProperty(v, w || 'none');
+        karte.innerHTML = `<div class="brett-platz"></div><div class="name"><span class="nr">${nummer.get(b.id)}</span>${name(b.id)}${b.alt ? '' : ' <span class="neu">neu</span>'}</div>`
+          + `<div class="zeile"><span class="sel ${b.seltenheit}">${SELTEN[b.seltenheit]}</span> ${wegText(b.weg, weltName)}</div>`
+          + `<div class="zeile">Kontrast ${m.feld.toFixed(1)} · weiß ${m.weissAufDunkel.toFixed(1)} · schwarz ${m.schwarzAufDunkel.toFixed(1)}</div>`;
+        raster.append(karte);
+        brett(karte.querySelector('.brett-platz'));
+      }
+    }
+    html.dataset.brett = 'nacht';
+  }
+  window.vorschauFertig = true;
+</script>
+</body>
+</html>
