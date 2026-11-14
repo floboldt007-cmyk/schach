@@ -240,3 +240,10 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
   .raetsel-duell[data-phase="start"] .rd-buehne { grid-row: 2; }
   .raetsel-duell[data-phase="start"] .rd-freund { grid-row: 4; }
 }
+/* R17 ende-pc, Variante A (Auswahlseite R17, Flo waehlt): am PC sass die Ende-Karte oben, darunter bis zu 560 px Leere
+   (1920x1080). Hier steht sie senkrecht mittig im Rumpf. Nur Querformat ab 1021 px MIT Maus (hover und pointer fine):
+   iPad quer (1180x820, Touch) hat dieselbe Breite und bleibt unveraendert; gemessen in tests/r17-ende-pc.test.mjs.
+   Unten derselbe Polster wie oben (wie die Lobby R9): sonst stuende die Karte um 24 px + Leistenhoehe zu hoch */
+@media (orientation: landscape) and (min-width: 1021px) and (hover: hover) and (pointer: fine) {
+  .raetsel-duell[data-phase="beendet"] .rd-rumpf { align-content: center; padding-bottom: 6px; }
+}
