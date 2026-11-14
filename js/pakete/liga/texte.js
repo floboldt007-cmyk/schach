@@ -37,8 +37,9 @@ export const DE = {
   'verlauf.fuss': 'Liga-Wertung mit Verlustschutz · Rechenstand {stand}. Die Bot-Skala ist vorläufig.',
   // Kronen-Liga mit Wochen-Gruppen (kronen.js LIGEN, Umbau 07.11.2026). Ruhige Fakten, kein Druck (fairness Regel 9/10):
   // der untere Abschnitt heisst "Eine Stufe tiefer", die Woche "Ende am Sonntag"
-  'kliga.bauer': 'Bauer', 'kliga.springer': 'Springer', 'kliga.laeufer': 'Läufer', 'kliga.turm': 'Turm', 'kliga.dame': 'Dame',
-  'kliga.koenig': 'König',
+  // Liga-Namen Satz A (Flo 14.11.2026), auch deutsch englisch; die IDs bleiben die Figuren aus kronen.js LIGEN
+  'kliga.bauer': 'Squire', 'kliga.springer': 'Knight', 'kliga.laeufer': 'Warden', 'kliga.turm': 'Baron', 'kliga.dame': 'Sovereign',
+  'kliga.koenig': 'Crownmate',
   'gruppe.reiter': 'Gruppe',
   'gruppe.aria': 'Deine Gruppe dieser Woche',
   'gruppe.platz': 'Platz {platz} von {n}',
@@ -123,8 +124,8 @@ export const EN = {
   'stufe.4': 'Platinum',
   'stufe.5': 'Diamond',
   'stufe.6': 'Crown',
-  'kliga.bauer': 'Pawn', 'kliga.springer': 'Knight', 'kliga.laeufer': 'Bishop', 'kliga.turm': 'Rook', 'kliga.dame': 'Queen',
-  'kliga.koenig': 'King',
+  'kliga.bauer': 'Squire', 'kliga.springer': 'Knight', 'kliga.laeufer': 'Warden', 'kliga.turm': 'Baron', 'kliga.dame': 'Sovereign',
+  'kliga.koenig': 'Crownmate',
   'gruppe.reiter': 'Group',
   'gruppe.aria': 'Your group this week',
   'gruppe.platz': 'Place {platz} of {n}',
@@ -179,7 +180,7 @@ export const EN = {
 
 registriereTexte('p-liga', { de: DE, en: EN });
 
-// Name einer Kronen-Stufe wie "Läufer II" (0 Bauer III bis 17 König I), in der eingestellten Sprache
+// Name einer Kronen-Stufe wie "Warden II" (0 Squire III bis 17 Crownmate I), in der eingestellten Sprache
 const ROEMISCH = ['', 'I', 'II', 'III'];
 export function stufenName(index) {
   const s = stufeInfo(index);
