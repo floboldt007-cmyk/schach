@@ -76,3 +76,69 @@ export function registriereIcon(name, svgInhalt) {
 export function iconNamen() {
   return Object.keys(ICONS);
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Spiel-Symbole (R19, Flo 14.11.2026: "ist nur orange und schwarz, die Symbole da unten sind so herzlos"): gefuellt,
+// mehrfarbig, mit Verlauf, Glanz und dunklem Rand, im 48er Raster. Die Farben kommen aus CSS (--sy-hell, --sy-mitte,
+// --sy-rand, --sy-glut je .sy-<name>, css/bauteile.css), so faerbt die Leiste ein Symbol erst im aktiven Reiter. Der
+// dunkle Rand traegt den Kontrast auf hellem Grund, die helle Fuellung auf dunklem (tests/r19-lobby-farbe.test.mjs).
+//   spielSymbol(name, klasse = '') -> SVG-Text (<svg class="sy sy-<name> ...">); unbekannter Name: Strich-Icon gleichen Namens
+//   SYMBOL_SATZ   'a' Spiel-Symbole oder 'b' Schach-Figuren (Flo waehlt, R19-Auswahl lobby-farbe)
+export const SYMBOL_SATZ = 'a';
+let syZaehler = 0;
+// Bausteine: F Hauptflaeche (Verlauf, Rand), R Randfarbe, H hell, G Glanz, W Weiss, glut Id des Glut-Verlaufs
+const SY = {
+  blitz: ({ F, R, G, glut }) => `<circle cx="24" cy="25" r="23" style="fill:url(#${glut})"/>`
+    + `<path d="M27 3 9 27h12l-4 18 22-26H26z" ${F}/><path d="M25.5 7.5 12.5 25h3.5l9.5-13z" ${G}/>`
+    + `<circle cx="8" cy="11" r="2.2" ${R}/><circle cx="41" cy="34" r="1.8" ${R}/><circle cx="39.5" cy="8.5" r="1.4" ${R}/>`,
+  schnell: ({ F, H }) => `<path d="M13 10h22c0 8-7 11-7 14s7 6 7 14H13c0-8 7-11 7-14s-7-6-7-14z" ${H} fill-opacity=".85" stroke-width="2.4"/>`
+    + `<path d="M17 15h14c-1.5 3.5-5 5.5-7 7.5-2-2-5.5-4-7-7.5z" ${F}/><path d="M15 36.5c1.5-4 5-6.5 9-6.5s7.5 2.5 9 6.5z" ${F}/>`
+    + `<rect x="23" y="22" width="2" height="9" rx="1" style="fill:var(--sy-mitte)"/>`
+    + `<rect x="8" y="3.5" width="32" height="7" rx="3.2" ${F}/><rect x="8" y="37.5" width="32" height="7" rx="3.2" ${F}/>`
+    + `<path d="M16.5 12.5c.5 4.5 2.5 7 4.5 9" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"/>`,
+  klassisch: ({ F, R }) => `<rect x="10" y="8" width="10" height="6" rx="2" ${R}/><rect x="28" y="10" width="10" height="4" rx="2" ${R}/>`
+    + `<rect x="3" y="13" width="42" height="29" rx="8" ${F}/>`
+    + `<circle cx="15" cy="27.5" r="8.5" style="fill:#fff;stroke:var(--sy-rand)" stroke-width="2"/><circle cx="33" cy="27.5" r="8.5" style="fill:#fff;stroke:var(--sy-rand)" stroke-width="2"/>`
+    + `<path d="M15 27.5V22M15 27.5l3.5 2M33 27.5V21.5M33 27.5l-3 2.5" fill="none" style="stroke:var(--sy-rand)" stroke-width="2.2" stroke-linecap="round"/>`
+    + `<path d="M8 17.5h32" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>`,
+  freunde: ({ F }) => `<circle cx="32.5" cy="14.5" r="7" style="fill:var(--sy-mitte);stroke:var(--sy-rand)" stroke-width="2.2"/>`
+    + `<path d="M21 40c0-8 5-13 11.5-13S44 32 44 40z" style="fill:var(--sy-mitte);stroke:var(--sy-rand)" stroke-width="2.2" stroke-linejoin="round"/>`
+    + `<circle cx="17.5" cy="17" r="8" ${F}/><path d="M3 44c0-9 6-15 14.5-15S32 35 32 44z" ${F}/>`
+    + `<ellipse cx="15" cy="14" rx="2.6" ry="2.6" fill="#fff" fill-opacity=".6"/><path d="M7.5 40c.5-4 2.5-6.5 5-8" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>`,
+  turniere: ({ F }) => `<path d="M12 9.5H5.5c0 10 4 14.5 10 15.5M36 9.5h6.5c0 10-4 14.5-10 15.5" fill="none" style="stroke:var(--sy-rand)" stroke-width="5" stroke-linecap="round"/>`
+    + `<path d="M12 9.5H5.5c0 10 4 14.5 10 15.5M36 9.5h6.5c0 10-4 14.5-10 15.5" fill="none" style="stroke:var(--sy-mitte)" stroke-width="2.2" stroke-linecap="round"/>`
+    + `<path d="M10.5 4h27v10c0 9.5-6 15.5-13.5 15.5S10.5 23.5 10.5 14z" ${F}/><path d="M20 28.5h8l1.6 6.5H18.4z" ${F}/>`
+    + `<rect x="11" y="35" width="26" height="9.5" rx="2.6" ${F}/><rect x="18" y="38.3" width="12" height="3" rx="1.2" style="fill:var(--sy-rand)" fill-opacity=".55"/>`
+    + `<path d="M24 8.5l1.9 3.9 4.3.6-3.1 3 .7 4.3L24 18.3l-3.8 2 .7-4.3-3.1-3 4.3-.6z" fill="#fff" fill-opacity=".92"/>`
+    + `<path d="M14.5 7.5v6c0 5 2 8.5 5 11" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2.2" stroke-linecap="round"/>`,
+  raetsel: ({ F, R }) => `<path d="M6 13h9.5c-2-5 1-9.5 5.5-9.5s7.5 4.5 5.5 9.5H36v9c5-2 9.5 1 9.5 5.5S41 35 36 33v10.5H6z" ${F}/>`
+    + `<path d="M13 39h15c0-6-1.2-10.5-3.4-13.6l2-4.2c-3.2-1-6.4 0-8.6 2.2l-4.3 2.4c-1.2 1-1 3 .9 3.2l3.3-1c-1 3-3.8 6.3-4.9 11z" fill="#fff" fill-opacity=".94"/>`
+    + `<circle cx="22.4" cy="24.6" r="1.3" ${R}/>`
+    + `<path d="M9.5 17v12" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2.2" stroke-linecap="round"/>`,
+  heim: ({ F, R }) => `<path d="M4 23 24 6l20 17v1.5h-4.5V42h-31V24.5H4z" ${F}/><rect x="19.5" y="29" width="9" height="13" rx="2.2" ${R}/>`
+    + `<path d="M9.5 21.5 24 9.5" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2.2" stroke-linecap="round"/>`,
+  bots: ({ F, R, W }) => `<path d="M24 4.5v6" fill="none" style="stroke:var(--sy-rand)" stroke-width="2.6" stroke-linecap="round"/><circle cx="24" cy="4.5" r="3" style="fill:var(--sy-glut)"/>`
+    + `<rect x="2.5" y="20" width="5" height="10" rx="2.2" ${R}/><rect x="40.5" y="20" width="5" height="10" rx="2.2" ${R}/>`
+    + `<rect x="6.5" y="10" width="35" height="30" rx="9.5" ${F}/>`
+    + `<circle cx="17" cy="23.5" r="4.6" ${W}/><circle cx="31" cy="23.5" r="4.6" ${W}/><circle cx="17.6" cy="24" r="2" ${R}/><circle cx="31.6" cy="24" r="2" ${R}/>`
+    + `<rect x="17" y="31" width="14" height="3.4" rx="1.7" ${R}/><path d="M11 15.5h10" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2.2" stroke-linecap="round"/>`,
+  liga: ({ F }) => `<path d="M24 3.5l18 6.5v12c0 11.5-7.5 18.5-18 22.5C13.5 40.5 6 33.5 6 22V10z" ${F}/>`
+    + `<path d="M14.5 28.5 13.4 17.6l5.8 4.6L24 14.3l4.8 7.9 5.8-4.6-1.1 10.9z" fill="#fff" fill-opacity=".92"/><rect x="14.5" y="30.5" width="19" height="3" rx="1.3" fill="#fff" fill-opacity=".92"/>`
+    + `<path d="M10.5 12.5v9c0 4 1 7 3 10" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.2" stroke-linecap="round"/>`,
+  ich: ({ F }) => `<circle cx="24" cy="15" r="9.5" ${F}/><path d="M5 44c0-10.5 8.5-16.5 19-16.5S43 33.5 43 44z" ${F}/>`
+    + `<circle cx="20.5" cy="11.5" r="3" fill="#fff" fill-opacity=".6"/><path d="M10.5 40c.8-4.5 3.5-7.5 7-9" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.2" stroke-linecap="round"/>`,
+};
+
+export function spielSymbol(name, klasse = '') {
+  if (!Object.prototype.hasOwnProperty.call(SY, name)) return icon(name, klasse);
+  const id = 'sy' + (++syZaehler);
+  const teile = {
+    F: `style="fill:url(#${id}f);stroke:var(--sy-rand)" stroke-width="2.4" stroke-linejoin="round"`,
+    R: 'style="fill:var(--sy-rand)"', H: 'style="fill:var(--sy-hell);stroke:var(--sy-rand)"', W: 'fill="#fff"',
+    G: 'fill="#fff" fill-opacity=".5"', glut: id + 'g',
+  };
+  return `<svg class="sy sy-${name}${klasse ? ' ' + klasse : ''}" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><defs>`
+    + `<linearGradient id="${id}f" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" style="stop-color:var(--sy-hell)"/><stop offset="1" style="stop-color:var(--sy-mitte)"/></linearGradient>`
+    + `<radialGradient id="${id}g"><stop offset="0" style="stop-color:var(--sy-glut);stop-opacity:.7"/><stop offset="1" style="stop-color:var(--sy-glut);stop-opacity:0"/></radialGradient>`
+    + `</defs>${SY[name](teile)}</svg>`;
+}
