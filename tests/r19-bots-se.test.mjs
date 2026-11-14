@@ -119,8 +119,17 @@ try {
     if (basisCss) {
       const neu = await bots(browser, { w, h, schema });
       const alt = await bots(browser, { w, h, schema, css: basisCss });
-      const [bn, ba] = [await neu.s.screenshot({ animations: 'disabled' }), await alt.s.screenshot({ animations: 'disabled' })];
-      pruefe(`${name}: in Ruhe bildgleich mit dem CSS der Basis`, bn.equals(ba), `${bn.length} gegen ${ba.length} Bytes`);
+      // erst Schriften und Bilder fertig; unter Last (volle Suite) wich ein Bild sonst um wenige Bytes ab. Ein echter
+      // CSS-Unterschied bleibt bei jedem Versuch, darum bis zu drei Aufnahmen beider Seiten
+      const bereit = (s) => s.evaluate(async () => { await document.fonts.ready;
+        await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; })))); });
+      await bereit(neu.s); await bereit(alt.s);
+      let bn, ba, versuche = 0;
+      do {
+        if (versuche) await warte(700);
+        [bn, ba] = [await neu.s.screenshot({ animations: 'disabled' }), await alt.s.screenshot({ animations: 'disabled' })];
+      } while (!bn.equals(ba) && ++versuche < 3);
+      pruefe(`${name}: in Ruhe bildgleich mit dem CSS der Basis`, bn.equals(ba), `${bn.length} gegen ${ba.length} Bytes nach ${versuche + 1} Aufnahmen`);
       await neu.k.close(); await alt.k.close();
     }
     const { k, s, fehler } = await bots(browser, { w, h, schema });
