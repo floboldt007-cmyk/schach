@@ -136,6 +136,27 @@ try {
         && (!produktion || (!!m.hinweis && m.hinweis.u <= m.code.o + 1)), m);
       pruefe(`A3 Konto ${geraet} ${schema}: "Code senden" und Google gleich breit (${m.code?.b} / ${m.google?.b} px)`,
         !!(m.code && m.google) && Math.abs(m.code.b - m.google.b) <= 2, m);
+      if (produktion) {
+        // Hinweis 80 (R18-info-links): der Link im Bot-Schutz-Hinweis hat 13 px Polster; Mitte und Raender muessen ihn treffen
+        const link = await s.evaluate(() => {
+          const a = document.querySelector('.konto-gruppe .konto-botschutz-hinweis a');
+          if (!a) return { fehlt: true };
+          a.scrollIntoView({ block: 'center' });
+          const falsch = [];
+          for (const r of a.getClientRects()) {
+            const punkte = [[0.5, 0.5], [0.25, 0], [0.5, 0], [0.75, 0], [0.25, 1], [0.5, 1], [0.75, 1], [0, 0.5], [1, 0.5]];
+            for (const [fx, fy] of punkte) {
+              const x = Math.min(r.right - 1, Math.max(r.left + 1, r.left + r.width * fx));
+              const y = Math.min(r.bottom - 1, Math.max(r.top + 1, r.top + r.height * fy));
+              const z = document.elementFromPoint(x, y);
+              if (z !== a) falsch.push(`${Math.round(x)},${Math.round(y)} -> ${z?.className || z?.tagName}`);
+            }
+          }
+          return { falsch, hoehe: Math.round(a.getBoundingClientRect().height) };
+        });
+        pruefe(`A2 Konto ${geraet}: Link im Bot-Schutz-Hinweis in Mitte und an allen Raendern getroffen (${link.hoehe} px hoch)`,
+          !link.fehlt && link.falsch.length === 0 && link.hoehe >= 44, link);
+      }
       if (schema === 'dunkel') await bild(s, `A-konto-${geraet.replace(/\s+/g, '').toLowerCase()}-${schema}`);
       pruefe(`Konto ${geraet} ${schema}: keine Seitenfehler`, !fehler.length, fehler);
       await k.close();
