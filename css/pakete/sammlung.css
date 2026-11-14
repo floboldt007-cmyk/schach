@@ -335,7 +335,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   .pr-karte:has(> .pr-vitrine-ort) > .pr-kopf { grid-row: 1; padding-right: calc(var(--pr-vitrine-b) + 14px + 16px); }
   .pr-karte > .pr-vitrine-ort { grid-column: 2; grid-row: 1; align-self: center; position: relative; z-index: 2; display: grid; gap: 6px;
     min-width: 0; padding: 0 0 12px; margin-top: -2px; }
-  .pr-vitrine-ort .pr-vitrine-titel { margin: 0; color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
+  .pr-vitrine-ort .pr-vitrine-titel, .pr-vitrine-ort .pr-hilfe { margin: 0; color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
   .pr-vitrine-ort .pr-orden { min-height: 76px; padding: 8px 6px; gap: 4px; }
   .pr-vitrine-ort .pr-orden-bild { width: 32px; height: 32px; }
   .pr-vitrine-ort .pr-plus { font-size: 22px; line-height: 32px; }

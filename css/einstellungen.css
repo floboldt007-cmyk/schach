@@ -66,8 +66,9 @@
    ueberlappen die Tippflaechen und ein Tipp oeffnet den falschen Link (R17-Sammelfix, tests/info-lizenzen.test.mjs) */
 .es-info > p:has(a) ~ p:has(a) { margin-top: 26px; }
 /* Link im Bot-Schutz-Hinweis der Anmeldung (js/konto.js): dieselbe Tippflaeche wie .es-info a; der Abstand am Absatz
-   haelt das Polster aus den Anmelde-Knoepfen darueber (sonst trifft ein Tipp auf deren Unterkante den Link) */
-.konto-botschutz-hinweis { margin-block-start: 14px; }
+   haelt das Polster aus den Anmelde-Knoepfen darueber (sonst trifft ein Tipp auf deren Unterkante den Link). Seit dem
+   Kaltreview R16-p1 A2 steht der Hinweis vor "Code senden": der Abstand unten haelt das Polster auch aus diesem Knopf */
+.konto-botschutz-hinweis { margin-block: 14px; }
 .konto-botschutz-hinweis a { padding-block: 13px; }
 .es-lizenzen { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .es-lizenzen li { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 12px; background: var(--flaeche-2); border: 1px solid var(--linie); }
@@ -189,5 +190,6 @@
 .konto-gruppe .konto-ziffern { display: flex; gap: .4rem; }
 .konto-gruppe .konto-ziffern input { width: 2.6rem; padding-inline: .2rem; text-align: center; font-size: 1.25rem; }
 .konto-gruppe .konto-status { font-size: .9rem; }
-.konto-gruppe .konto-status[data-fehler="ja"] { color: var(--gefahr, #a32626); }
+/* R16 A1: --gefahr gab es in keinem Thema, das feste Dunkelrot stand dunkel bei 2,2:1; Warnfarbe wie css/daten.css */
+.konto-gruppe .konto-status[data-fehler="ja"] { color: var(--warn); }
 
