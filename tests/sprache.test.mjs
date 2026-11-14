@@ -367,6 +367,8 @@ async function schrittZwei(browser) {
         bots_besiegt: 2, sterne: 4, partien: 5, genauigkeit_schnitt: 61.5, haeufigste_fehler: { arten: [{ art: 'fehler', anzahl: 2 }] }, erledigt: [], aktualisiert_am: '2026-10-22' } }],
       aufgaben: [{ id: 'aufgabe', titel: 'Play Thorsten', art: 'bot', ziel: { bot: 'rudi', sterne: 2 }, faellig: '2026-10-30', erledigt: 0 }] };
       else if (u.pathname.endsWith('/ist_premium')) body = false;
+      // G-006 M3: die Gruppe "Verwaltung" fragt bei freigeschaltetem Konto, ob es ein Verwalter ist (hier: nein)
+      else if (u.pathname.endsWith('/ist_verwalter')) body = false;
       else if (u.pathname === '/rest/v1/produkte') body = [{ id: 'trainer', name: 'Crownmate Trainer', preis_text: 'Test price from server', beschreibung: 'Training for your chess', kauf_link: 'https://buy.stripe.com/test_probe' }];
       // Sonderstuecke: die App fragt seit dem 31.10.2026 fuer jedes angemeldete Konto nach (Erfinder-Status, js/app.js)
       else if (['/rest/v1/abos', '/rest/v1/profile', '/rest/v1/spielstaende', '/rest/v1/sonderstuecke'].includes(u.pathname) || u.pathname.endsWith('/online_meine') || u.pathname === '/rest/v1/partien_online') body = [];

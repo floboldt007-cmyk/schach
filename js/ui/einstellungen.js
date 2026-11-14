@@ -510,6 +510,18 @@ export function zeige(root, params = {}, app) {
 
   baue();
   if (mq) lausche(mq, 'change', () => { if (!beendet) wendeModusAn(); });
+  // Gruppen der Pakete, die erst nach dem Bauen erscheinen oder verschwinden (z. B. Verwaltung nach der Antwort von
+  // ist_verwalter): Menue neu bauen, sonst fehlt der Bereich im Menue und am Handy ist seine Seite nicht erreichbar
+  if (typeof MutationObserver === 'function') {
+    let geplant = false;
+    const beobachter = new MutationObserver((liste) => {
+      if (beendet || geplant || !liste.some((m) => m.target.classList?.contains('es-gruppe') && m.target.closest('.es-ort'))) return;
+      geplant = true;
+      queueMicrotask(() => { geplant = false; if (!beendet) baueNav(); });
+    });
+    beobachter.observe(sec, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    aufraeumen.push(() => beobachter.disconnect());
+  }
 
   return {
     verlasse() {
