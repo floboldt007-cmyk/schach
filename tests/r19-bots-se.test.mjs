@@ -38,11 +38,18 @@ try {
     : execFileSync('git', ['show', 'origin/sammel-1114-r18:css/arena.css'], { cwd: WURZEL, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 } catch (e) { basisCss = null; }
 
-async function bots(browser, { w, h, schema, css = null }) {
+// Langes Panel (Kaltreview R19 B3): laufende Partie ("Fortsetzen" oben im Panel) und zwei besiegte Bots
+const LANG = {
+  fortschritt: { bots: Object.fromEntries(['fridolin', 'benno'].map((id) => [id, { sterne: [true, true, false], partien: 2, siege: 1, remis: 0,
+    niederlagen: 1, besteGenauigkeit: 80 }])), brillanteZuege: [] },
+  laufend: { botId: 'paula', zuege: ['e2e4', 'e7e5', 'g1f3', 'b8c6'], spielerFarbe: 'w', modus: 'normal' },
+};
+
+async function bots(browser, { w, h, schema, css = null, lang = false }) {
   const k = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: w < 1000, colorScheme: schema, reducedMotion: 'reduce',
     deviceScaleFactor: 1, serviceWorkers: 'block' });
   if (css) await k.route((u) => new URL(u).pathname.endsWith('/css/arena.css'), (r) => r.fulfill({ status: 200, contentType: 'text/css', body: css }));
-  await k.addInitScript((modus) => {
+  await k.addInitScript(({ modus, lang }) => {
     try {
       if (sessionStorage.getItem('probe-start')) return;
       sessionStorage.setItem('probe-start', '1');
@@ -52,8 +59,12 @@ async function bots(browser, { w, h, schema, css = null }) {
       localStorage.setItem('schach-arena:v1:modul:start', JSON.stringify({ gesehen: `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` }));
       localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ sprache: 'de', spracheGewaehlt: true, klang: false, modus }));
       localStorage.setItem('schach-arena:v1:hinweis-installieren', '1');
+      if (lang) {
+        localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(lang.fortschritt));
+        localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(lang.laufend));
+      }
     } catch (e) { /* egal */ }
-  }, schema === 'dark' ? 'dunkel' : 'hell');
+  }, { modus: schema === 'dark' ? 'dunkel' : 'hell', lang: lang ? LANG : null });
   const s = await k.newPage();
   const fehler = []; s.on('pageerror', (e) => fehler.push(e.message));
   await s.goto(BASIS + 'index.html?test#arena');
@@ -88,10 +99,12 @@ const fokusRunde = async (s) => {
   return { ziele: ziele.size, funde };
 };
 
-// ganz nach unten gerollt: kein sichtbares Blatt des Panels (ausser dem Knopf selbst) liegt unter dem Knopf
+// ganz nach unten gerollt: kein sichtbares Blatt des Panels (ausser dem Knopf selbst) liegt unter dem Knopf.
+// Im kurzen Querformat rollt das Panel (.detail) selbst, deshalb beide ans Ende
 const panelAmEnde = (s) => s.evaluate(() => {
   const a = document.querySelector('.screen.arena .inhalt');
   a.scrollTop = a.scrollHeight;
+  const d = a.querySelector('.detail'); if (d) d.scrollTop = d.scrollHeight;
   const cta = a.querySelector('.cta-platz'); const c = cta.getBoundingClientRect();
   const unter = [];
   for (const e of a.querySelectorAll('.detail *')) {
@@ -146,6 +159,16 @@ try {
     pruefe(`${name}: ganz unten gerollt liegt nichts aus dem Panel unter dem Knopf`, p.anzahl === 0, p.unter);
     pruefe(`${name}: keine Seitenfehler`, fehler.length === 0, fehler);
     await k.close();
+    // dasselbe mit langem Panel (laufende Partie, Fortschritt)
+    const l = await bots(browser, { w, h, schema, lang: true });
+    const fortsetzen = await l.s.evaluate(() => !!document.querySelector('.screen.arena .detail .fortsetzen'));
+    pruefe(`${name}, langes Panel: Karte "Fortsetzen" steht im Panel`, fortsetzen);
+    const lf = await fokusRunde(l.s);
+    pruefe(`${name}, langes Panel: kein Fokusziel liegt unter dem klebenden Spielen-Knopf (WCAG 2.4.11)`, lf.ziele >= 3 && lf.funde.length === 0, lf);
+    const lp = await panelAmEnde(l.s);
+    pruefe(`${name}, langes Panel: ganz unten gerollt liegt nichts aus dem Panel unter dem Knopf`, lp.anzahl === 0, lp.unter);
+    pruefe(`${name}, langes Panel: keine Seitenfehler`, l.fehler.length === 0, l.fehler);
+    await l.k.close();
   }
 
   // ---------- Teil B: Loeschseite ----------
