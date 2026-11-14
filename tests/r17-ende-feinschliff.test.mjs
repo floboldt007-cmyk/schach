@@ -61,7 +61,7 @@ function duellStand() {
     ich: { geloest: 3, fehler: 1, ende_am: jetzt }, gegner: { geloest: 2, fehler: 0, ende_am: jetzt, ki: true, elo: 1200 } };
 }
 
-async function seite(browser, g, schema, { sitzung = false, vitrine = null, lauf = false } = {}) {
+async function seite(browser, g, schema, { sitzung = false, vitrine = null, lauf = false, sprache = null } = {}) {
   const k = await browser.newContext({ viewport: g.viewport, deviceScaleFactor: 1, hasTouch: g.touch, locale: 'de-DE',
     timezoneId: 'Europe/Berlin', serviceWorkers: 'block', colorScheme: schema === 'dunkel' ? 'dark' : 'light' });
   await k.route('**/*', (route) => {
@@ -72,13 +72,13 @@ async function seite(browser, g, schema, { sitzung = false, vitrine = null, lauf
     const body = name === 'duell_stand' ? duellStand() : [];
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
-  await k.addInitScript(({ sitzung, vitrine, sieg, modus, lauf, duell }) => {
+  await k.addInitScript(({ sitzung, vitrine, sieg, modus, lauf, duell, sprache }) => {
     try {
       if (sessionStorage.getItem('probe-start')) return;
       sessionStorage.setItem('probe-start', '1');
       localStorage.clear();
       localStorage.setItem('schach-arena:v1:modul:start', JSON.stringify({ v: 1, gesehen: '2026-11-01' }));
-      localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, modus }));
+      localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify(sprache ? { klang: false, modus, sprache, spracheGewaehlt: true } : { klang: false, modus }));
       localStorage.setItem('schach-arena:v1:hinweis-installieren', '1');
       if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
       if (vitrine) {
@@ -88,7 +88,7 @@ async function seite(browser, g, schema, { sitzung = false, vitrine = null, lauf
       if (lauf) sessionStorage.setItem('schach-arena:raetsel-duell:laufend', JSON.stringify({ id: duell, reihe: ['g', 'g', 'r', 'g'], um: Date.now() }));
       // INTENTIONAL-SLOP[F1]: ohne Speicher (privates Fenster) startet die Probe trotzdem, die Pruefungen zeigen es dann
     } catch (e) { /* egal */ }
-  }, { sitzung: sitzung ? SITZUNG : null, vitrine, sieg: SIEG, modus: schema, lauf, duell: DUELL });
+  }, { sitzung: sitzung ? SITZUNG : null, vitrine, sieg: SIEG, modus: schema, lauf, duell: DUELL, sprache });
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   const seitenfehler = [];
   s.on('pageerror', (e) => seitenfehler.push(e.message));
@@ -105,6 +105,8 @@ async function partie(browser, g, schema, art) {
   const SCREEN = '.screen.partie:not(.online-screen)';
   const pt = art === 'niederlage'
     ? { zuege: ['f2f3', 'g2g4'], plan: { f2f3: 'e7e5', g2g4: 'd8h4' } }
+    // Springer hin und her: nach dem vierten Bot-Zug steht die Grundstellung zum dritten Mal (Remis durch Wiederholung)
+    : art === 'remis' ? { zuege: ['g1f3', 'f3g1', 'g1f3', 'f3g1'], plan: { g1f3: 'g8f6', f3g1: 'f6g8' } }
     : { zuege: ['e2e4', 'f1c4', 'd1h5', 'h5f7'], plan: { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' } };
   const p = await seite(browser, g, schema);
   const s = p.s;
@@ -156,8 +158,8 @@ async function streifen(s) {
 }
 
 // ---------- D3: Namen auf der Ende-Karte des Raetsel-Duells ----------
-async function duellEnde(browser, g, schema) {
-  const p = await seite(browser, g, schema, { sitzung: true, lauf: true });
+async function duellEnde(browser, g, schema, sprache = null) {
+  const p = await seite(browser, g, schema, { sitzung: true, lauf: true, sprache });
   await p.s.evaluate(() => window.__app.gehe('raetsel-duell'));
   await p.s.waitForSelector('.screen.raetsel-duell[data-phase="beendet"] .rd-ende', { timeout: 15000 });
   await ruhe(p.s);
@@ -200,6 +202,10 @@ try {
     await bild(n.s, `e3-niederlage-${g.name}-${schema}`);
     await n.p.k.close();
   }
+  const rm = await partie(browser, IPHONE13, 'hell', 'remis');
+  pruefe('E3 iphone13: nach Remis liegt der Fokus auf "Zur Analyse"', rm.f.ziel === 'analyse' && rm.f.imBlatt && rm.f.sichtbar, rm.f);
+  pruefe('E3 iphone13: nach Remis nur ein Knopf hervorgehoben', rm.f.orange.length === 1, rm.f.orange);
+  await rm.p.k.close();
   const sg = await partie(browser, IPHONE13, 'hell', 'sieg');
   pruefe('E3 iphone13: nach einem Sieg bleibt der Fokus auf der Folgeaktion (nicht "Zur Analyse")', sg.f.ziel !== 'analyse' && sg.f.imBlatt, sg.f);
   await sg.p.k.close();
@@ -230,6 +236,10 @@ try {
     await bild(d.s, `d3-duell-ende-${g.name}-${schema}`);
     await d.k.close();
   }
+  const en = await duellEnde(browser, IPHONESE, 'hell', 'en');
+  pruefe('D3 iphonese englisch: "You" und "AI opponent · 1200" unter den Bildern', en.m.texte[0] === 'You' && en.m.texte[1] === 'AI opponent · 1200' && en.m.unterBild, en.m);
+  pruefe('D3 iphonese englisch: Knoepfe ohne Scrollen im Bild', en.m.knoepfeImBild && en.m.scroll === 0 && en.m.mit - en.m.ohne <= 24, en.m);
+  await en.k.close();
 } catch (e) {
   fehler++;
   // INTENTIONAL-SLOP[T4]: Ablauffehler gehen wie alle Zeilen auf die Konsole (tests/alle.mjs liest sie)
