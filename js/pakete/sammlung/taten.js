@@ -44,6 +44,11 @@ function nachspielen(p) {
 }
 const unterverwandelt = (p) => (Array.isArray(p.zuege) ? p.zuege : []).some((u, i) => (i % 2 === eigen(p)) && /^[a-h][1-8][a-h][1-8][nbr]$/.test(String(u)));
 
+// Noch schaltet kein Weg Bretter frei (frei sind die drei Grundbretter, ./index.js bretterFrei): Brettsammler und Brettfaecher
+// bleiben bis dahin unsichtbar wie Geheimes, statt als unerreichbar dazustehen (Entscheid 14.11.). Auf true, sobald
+// Shop- oder Weg-Bretter als frei geschaltet zaehlen.
+export const BRETTER_FREISCHALTBAR = false;
+
 export const TAT_TITEL = Object.freeze([
   // Bots: je ein Ding aus der Welt des Bots, die Bedingung spielt mit seiner Eigenart
   { id: 'strohhut', gruppe: 'bots', zeichen: 'strohhut', farbe: ['#F0D88A', '#B8862A', '#6E4E14'], seltenheit: 'frei',
@@ -76,7 +81,7 @@ export const TAT_TITEL = Object.freeze([
     pruef: (l) => l.some((p) => gegen('alva')(p) && sieg(p) && !p.hinweise && !p.zuruecknahmen) },
   // Raetsel und Sammeln
   { id: 'raetselkerze', gruppe: 'raetsel', zeichen: 'kerze', farbe: ['#FFC285', '#D2611E', '#8A3A10'], seltenheit: 'legende', pruef: (l, d) => d.raetsel >= 500 },
-  { id: 'kartenfaecher', gruppe: 'sammeln', zeichen: 'kartenfaecher', farbe: ['#A8D8C8', '#2F7A6A', '#1C4E44'], seltenheit: 'legende', pruef: (l, d) => d.bretterFrei >= 40 },
+  { id: 'kartenfaecher', gruppe: 'sammeln', zeichen: 'kartenfaecher', farbe: ['#A8D8C8', '#2F7A6A', '#1C4E44'], seltenheit: 'legende', geheim: !BRETTER_FREISCHALTBAR, pruef: (l, d) => d.bretterFrei >= 40 },
   // Liga (Kronen-Stufe 0 = Squire III, js/pakete/liga/kronen.js): je Liga ein Siegel; Crownmate ist die Kroenung (titel.js)
   { id: 'siegel-knight', gruppe: 'liga', zeichen: 'siegel', n: 1, farbe: ['#C8E59A', '#5E9440', '#3A6428'], seltenheit: 'frei', pruef: (l, d) => d.kronenStufe >= 3 },
   { id: 'siegel-warden', gruppe: 'liga', zeichen: 'siegel', n: 2, farbe: ['#9EDCF0', '#2A7A98', '#174E64'], seltenheit: 'selten', pruef: (l, d) => d.kronenStufe >= 6 },
@@ -104,7 +109,7 @@ export const LOKALE_FAMILIEN = Object.freeze([
   { id: 'friedenspfeife', zeichen: 'waage', gruppe: 'partien', ziele: [1, 10, 30], wert: (s) => s.remis },
   { id: 'raetselfolge', zeichen: 'kerze', gruppe: 'raetsel', ziele: [3, 7, 30], wert: (s) => s.raetselFolge },
   { id: 'kartei', zeichen: 'lupe', gruppe: 'raetsel', ziele: [10, 50, 200], wert: (s) => s.kartei },
-  { id: 'brettsammler', zeichen: 'kartenfaecher', gruppe: 'sammeln', ziele: [5, 20, 50], wert: (s) => s.bretterFrei },
+  { id: 'brettsammler', zeichen: 'kartenfaecher', gruppe: 'sammeln', ziele: [5, 20, 50], wert: (s) => s.bretterFrei, geheim: !BRETTER_FREISCHALTBAR },
   { id: 'titeltraeger', zeichen: 'banner', gruppe: 'sammeln', ziele: [5, 15, 30], wert: (s) => s.titelFrei },
   { id: 'pattretter', zeichen: 'rettungsring', gruppe: 'geheim', ziele: [1, 3, 10], wert: (s) => s.patt, geheim: true },
   { id: 'unterverwandlung', zeichen: 'zauberstab', gruppe: 'geheim', ziele: [1, 3, 10], wert: (s) => s.unterverwandlung, geheim: true },

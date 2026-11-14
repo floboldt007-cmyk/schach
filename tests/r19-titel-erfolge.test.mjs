@@ -169,5 +169,14 @@ if (I.bretterFrei && I.teileBretter && A.lokaleStufen) {
     !!stufe && stufe.stufe === 0 && !A.tatenFrei([], { bretterFrei: erfinder }).includes('tat-kartenfaecher'), { stufe });
 } else pruefe('Bretter: bretterFrei, teileBretter und lokaleStufen exportiert', false);
 
+// Entscheid 14.11. (Hauptfenster): solange kein Weg Bretter frei schaltet, sind Brettsammler und Brettfaecher unsichtbar wie
+// Geheimes (nicht als unerreichbar gezeigt); die Kennung BRETTER_FREISCHALTBAR schaltet sie spaeter ein
+if (I.teileLokaleStufen && T.titelListe) {
+  const sichtbar = I.teileLokaleStufen(A.lokalStand([], { bretterFrei: 3 }), []).map((x) => x.id || x.familie).join();
+  pruefe('Bretter: bei 3 Grundbrettern ist Brettsammler unsichtbar', A.BRETTER_FREISCHALTBAR === false && !/brettsammler/.test(sichtbar), sichtbar);
+  pruefe('Bretter: bei 3 Grundbrettern ist der Titel Brettfaecher unsichtbar', !T.titelListe({ level: 1 }).some((x) => x.id === 'tat-kartenfaecher'));
+  pruefe('Bretter: Titeltraeger bleibt sichtbar (nur die Bretter-Ziele sind aus)', /titeltraeger/.test(sichtbar), sichtbar);
+}
+
 console.log(`\n${ok}/${ok + fehler} bestanden`);
 process.exit(fehler ? 1 : 0);
