@@ -22,7 +22,7 @@
 // .heim-leiter? ohne Partie), .heim-rechts (.heim-naechstes?, .heim-wege > button.heim-modus[data-aktion]). Optik:
 // css/heim.css, nur Tokens.
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
-import { icon, spielSymbol } from './icons.js';
+import { icon } from './icons.js';
 import { Brett } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
@@ -165,7 +165,7 @@ registriereTexte('heim', {
 });
 
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const WEGE = [['online', 'blitz'], ['raetsel', 'raetsel'], ['zuzweit', 'freunde']];
+const WEGE = [['online', 'blitz'], ['raetsel', 'ziel'], ['zuzweit', 'personen']];
 // Untertitel des Wegs Online: Art und Bedenkzeit der gewerteten Partie aus RANKED_ZEIT, wie die Online-Seite sie nennt
 // ("Bedenkzeit 5 + 3 · Blitz", js/ui/online.js); vorher stand hier "Schnellpartie" (Feinschliff R6, B26)
 const wegWerte = () => ({ art: t('online.zeit.' + RANKED_ZEIT.art), zeit: RANKED_ZEIT.id.replace('+', ' + ') });
@@ -450,7 +450,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
       <div class="heim-rechts">
         <div class="heim-wege">
           ${WEGE.map(([id, ic]) => `<button class="heim-modus dr" type="button" data-aktion="heim-${id}" data-weg="${id}">
-            <span class="heim-symbol" aria-hidden="true">${spielSymbol(ic)}</span>
+            <span class="heim-symbol" aria-hidden="true">${icon(ic)}</span>
             <span class="heim-text"><b>${esc(t('heim.' + id + '.titel'))}</b><span>${esc(t('heim.' + id + '.text', wegWerte()))}</span></span>
           </button>`).join('')}
         </div>
