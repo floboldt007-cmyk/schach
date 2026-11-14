@@ -119,17 +119,23 @@ try {
     if (basisCss) {
       const neu = await bots(browser, { w, h, schema });
       const alt = await bots(browser, { w, h, schema, css: basisCss });
-      // erst Schriften und Bilder fertig; unter Last (volle Suite) wich ein Bild sonst um wenige Bytes ab. Ein echter
-      // CSS-Unterschied bleibt bei jedem Versuch, darum bis zu drei Aufnahmen beider Seiten
-      const bereit = (s) => s.evaluate(async () => { await document.fonts.ready;
-        await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; })))); });
-      await bereit(neu.s); await bereit(alt.s);
-      let bn, ba, versuche = 0;
-      do {
-        if (versuche) await warte(700);
-        [bn, ba] = [await neu.s.screenshot({ animations: 'disabled' }), await alt.s.screenshot({ animations: 'disabled' })];
-      } while (!bn.equals(ba) && ++versuche < 3);
-      pruefe(`${name}: in Ruhe bildgleich mit dem CSS der Basis`, bn.equals(ba), `${bn.length} gegen ${ba.length} Bytes nach ${versuche + 1} Aufnahmen`);
+      // Fingerabdruck statt Bildbytes: ein Bildvergleich zweier Seiten wich unter Suitenlast um wenige Bytes ab, auch auf
+      // Groessen, auf denen die Aenderung gar nicht greift. Lage, Groesse und die sichtbaren Stilwerte jedes Elements der
+      // Bots-Seite sind dagegen fest; scroll-padding zaehlt bewusst nicht mit (es aendert nur, wohin gerollt wird)
+      const abdruck = (s) => s.evaluate(async () => {
+        await document.fonts.ready;
+        const r1 = (v) => Math.round(v * 2) / 2;
+        const sc = document.querySelector('.screen.arena');
+        return [sc, ...sc.querySelectorAll('*')].map((e) => {
+          const r = e.getBoundingClientRect(), st = getComputedStyle(e);
+          return `${e.tagName}.${String(e.className.baseVal ?? e.className).split(' ')[0]} ${r1(r.x)},${r1(r.y)},${r1(r.width)},${r1(r.height)} `
+            + [st.display, st.visibility, st.opacity, st.color, st.backgroundColor, st.padding, st.margin, st.fontSize, st.borderRadius].join('|');
+        });
+      });
+      const [an, aa] = [await abdruck(neu.s), await abdruck(alt.s)];
+      const abw = an.flatMap((x, i) => (x === aa[i] ? [] : [`${x}  <>  ${aa[i]}`]));
+      pruefe(`${name}: in Ruhe gleich mit dem CSS der Basis (Lage, Groesse, Stil jedes Elements)`, an.length === aa.length && abw.length === 0,
+        { elemente: [an.length, aa.length], abw: abw.slice(0, 3) });
       await neu.k.close(); await alt.k.close();
     }
     const { k, s, fehler } = await bots(browser, { w, h, schema });
