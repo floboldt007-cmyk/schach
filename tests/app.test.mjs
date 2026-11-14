@@ -1588,7 +1588,8 @@ async function testeErweiterungen(browser) {
   pruefe('Ort ergebnis:karte zwischen .erg-feier und .erg-bot', ov.karte && iF >= 0 && ov.kinder[iF + 1] === 'erg-karte-ort' && iB > iF + 1
     && ov.kinder.slice(iF + 2, iB).every((k) => k === 'erg-liga-verweis'), ov.kinder.join(' '));
   // W0+a: dazu boss (Modus boss, sonst null)
-  pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
+  // R14-G2: herausfordern { text, teile } (nach einem Sieg, sonst null) fuer den gemeinsamen Teilen-Knopf
+  pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'herausfordern', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
   pruefe('Feier im Ergebnis: höchstens 3, höchstens 1 groß, nach prio (doppelte Meldung zählt einmal)', JSON.stringify(ov.feier) === JSON.stringify(['G:GROSS A', 'Zeile C', 'Zeile D']), JSON.stringify(ov.feier));
   pruefe('Feier-Zeile groß mit Symbol (Icon)', ov.symbol);
   await h.tippe('.ergebnis-karte .erg-wort');
@@ -2393,7 +2394,7 @@ async function testeSpielFundament(browser) {
     });
     pruefe('Abrechnung: Hülle an ergebnis:karte, Punkte vor Funken vor Liga, rollen im Abstand von 200 ms ein', abr.zeilen === 'punkte,funken,liga' && abr.t === '300ms,500ms,700ms'
       && abr.rollt && abr.rollen === 'listitem,listitem,listitem' && abr.erstes && !abr.tipp, JSON.stringify(abr));
-    pruefe('Abrechnung: Kontext der Zeilen wie ergebnis:karte (mit boss)', JSON.stringify(abr.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(abr.kontext));
+    pruefe('Abrechnung: Kontext der Zeilen wie ergebnis:karte (mit boss)', JSON.stringify(abr.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'herausfordern', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(abr.kontext));
     pruefe('Matt ohne Finisher-Anbieter: kein Matt-Hook, Ablauf wie vorher', abr.hook === false);
     await seite.evaluate(() => { window.__abrVorher = document.querySelector('.ergebnis-overlay .abrechnung'); });
     await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 90000 });

@@ -126,10 +126,12 @@ try {
       await bild('03-sieg');
       const siegBlatt = await offenesBlatt(s, 'sieg');
       pruefe(`${g.name}: Schaefermatt, das Sieg-Blatt erscheint`, sieg && siegBlatt.da, { sieg, ...siegBlatt, zuege: await s.evaluate(() => window.__partie.chess().history()) });
-      const siegKnoepfe = await bedienbar(s, '.ergebnis-overlay.sieg :is(.erg-knoepfe [data-ziel], .erg-zu, .erg-lobby, .erg-freund)');
+      // R14-G2: "Siegesbild teilen" und "Freund herausfordern" sind EIN Knopf "Teilen …" (Paket teilen) mit Auswahl
+      const siegKnoepfe = await bedienbar(s, '.ergebnis-overlay.sieg :is(.erg-knoepfe [data-ziel], .erg-zu, .erg-lobby, .erg-freund, .tl-teilen)');
       const ziele = siegKnoepfe.filter(b => b.ok).map(b => b.ziel);
-      pruefe(`${g.name}: Sieg-Blatt zeigt bedienbar "Naechster Gegner", "Zur Analyse", "Zu den Bots", "Freund herausfordern", "Brett ansehen"`,
-        ['weiter', 'analyse'].every(z => ziele.includes(z)) && ['erg-zu', 'erg-lobby', 'erg-freund'].every(c => ziele.some(z => z.includes(c))), siegKnoepfe);
+      pruefe(`${g.name}: Sieg-Blatt zeigt bedienbar "Naechster Gegner", "Zur Analyse", "Zu den Bots", "Teilen …" (statt eigenem "Freund herausfordern"), "Brett ansehen"`,
+        ['weiter', 'analyse'].every(z => ziele.includes(z)) && ['erg-zu', 'erg-lobby', 'tl-teilen'].every(c => ziele.some(z => z.includes(c)))
+        && !ziele.some(z => z.includes('erg-freund')), siegKnoepfe);
       // "Brett ansehen" schliesst das Blatt, "Ergebnis" holt es zurueck
       await s.locator('.ergebnis-overlay.sieg .erg-zu').click();
       const brettFrei = await klappt(s.waitForFunction(() => { const o = document.querySelector('.ergebnis-overlay'); return !o || o.hidden || o.getBoundingClientRect().height === 0; }, null, { timeout: 5000 }));
