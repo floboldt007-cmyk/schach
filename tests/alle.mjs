@@ -49,7 +49,8 @@ const SUITEN = [
   { name: 'konto-loeschen', datei: 'konto-loeschen.test.mjs', args: [], was: 'Löschseite ohne App (Google Play): Anmeldung, zweistufig löschen, Mail-Weg (Browser)' },
   { name: 'server-abo', datei: 'server-abo.test.mjs', args: [], was: 'Abo: Stripe-Webhook und Schema-Vertrag (Server)' },
   { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Trainer“: Stand, Kauf, Blatt' },
-  { name: 'server-verwaltung', datei: 'server-verwaltung.test.mjs', args: [], was: 'Verwaltung: Schema-Vertrag, Rechte, Premium, Kaeufe, Name, Banner, Rueckweg (Server)' },
+  // server-verwaltung steht wie alle PGlite-Suiten (server-karte*, server-daten*) nicht hier: PGlite gibt es nur im CI-Job
+  // sql (.github/workflows/tests.yml), im Browser-Job brach die Suite ab (R17-sammelfix2, Run 43587846003)
   { name: 'verwaltung', datei: 'verwaltung.test.mjs', args: [], was: 'Verwaltung fuer Flo: Recht still pruefen, Aufrufe, Fehlertexte, Ansichten (ohne Browser)' },
   { name: 'verwaltung-browser', datei: 'verwaltung-browser.test.mjs', args: [], was: 'Verwaltung im Browser: still unsichtbar ohne Recht, Menue-Eintrag nach spaeter Antwort (PC und Handy)' },
   { name: 'server-coach', datei: 'server-coach.test.mjs', args: [], was: 'Frag den Coach: Edge Function, Prompt, Tageslimit (Server)' },
