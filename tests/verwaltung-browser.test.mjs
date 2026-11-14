@@ -55,25 +55,32 @@ async function warteAufServer(url, ms = 10000) {
 // Test den Menue-Eintrag an und misst, ob die Seite des Bereichs aufgeht. hash: Ziel beim Laden (Deep Link). verlassen:
 // gleich nach dem Laden nach #heim, noch vor der Antwort. probe: wird zum Schluss mit der Seite gerufen, ihr Ergebnis
 // steht in probe. neubau zaehlt, wie oft das Menue (.es-nav) neu gefuellt wurde, nachdem die Seite stand.
+// folge: je Anfrage an ist_verwalter eigene Antwort und Verzoegerung ([{ recht, spaet }, ...], die n-te Anfrage nimmt
+// den n-ten Eintrag); reihenfolge haelt fest, in welcher Reihenfolge die Antworten fertig wurden (Anfrage-Nummern ab 1).
 async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, konto = true, handy = false, hash = '#einstellungen',
-  verlassen = false, probe = null } = {}) {
+  verlassen = false, probe = null, folge = null } = {}) {
   const [w, h] = handy ? [390, 844] : [1180, 820];
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
   const seite = await kontext.newPage();
   const fehler = [];
   const frage = [];
+  const [rechtStandard, spaetStandard] = [recht, spaet];
   seite.on('pageerror', (e) => fehler.push('pageerror: ' + e.message));
   // wie tests/abo.test.mjs: Netzmeldungen des Browsers (404, abgebrochen) sind kein Fehler der App
   seite.on('console', (m) => {
     if (m.type() === 'error' && !/404|ERR_FAILED|net::/.test(m.text())) fehler.push('console: ' + m.text());
   });
   let beantwortet = 0;
+  const reihenfolge = [];
   await seite.route(SUPA + '/**', async (r) => {
     const u = r.request().url();
     if (u.endsWith('/rest/v1/rpc/ist_verwalter')) {
       frage.push(u);
+      const nr = frage.length;
+      const { recht, spaet } = folge?.[nr - 1] || { recht: rechtStandard, spaet: spaetStandard };
       if (spaet) await warte(spaet);
       beantwortet++;
+      reihenfolge.push(nr);
       if (recht === 'offline') return r.abort('internetdisconnected');
       if (recht === 'fehlt') {
         return r.fulfill({ status: 404, contentType: 'application/json',
@@ -128,9 +135,9 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, k
     seiteAuf = { hash: await seite.evaluate(() => location.hash), ...(await messe()),
       offen: await seite.evaluate(() => !!document.querySelector('.vw-gruppe.es-offen')) };
   }
-  const probeErg = probe ? await probe(seite) : null;
+  const probeErg = probe ? await probe(seite, { fragen: () => frage.length, beantwortet: () => beantwortet }) : null;
   await kontext.close();
-  return { ...stand, navVorher, seiteAuf, fehler, fragen: frage.length, probe: probeErg };
+  return { ...stand, navVorher, seiteAuf, fehler, fragen: frage.length, reihenfolge, probe: probeErg };
 }
 
 async function browserTeil(browser) {
@@ -240,6 +247,42 @@ async function browserTeil(browser) {
   } });
   pruefe('Ab- und Wiederanmeldung desselben Kontos bei offenen Einstellungen: neu gefragt (2 Anfragen), Gruppe wieder da',
     !wieder.probe.zwischen.sichtbar && wieder.probe.nachher.sichtbar && wieder.fragen === 2, { probe: wieder.probe, fragen: wieder.fragen });
+
+  // R18: zwei sich kreuzende Antworten. Die Anfrage der ersten Anmeldung antwortet erst, nachdem das Konto ab- und wieder
+  // angemeldet ist und die zweite Anfrage schon beantwortet wurde. Gezaehlt wird nur die juengste Anfrage: die spaete
+  // Antwort einer frueheren Anmeldung ueberschreibt sie nie, und wer nicht Verwalter ist, sieht die Verwaltung nie, auch
+  // nicht kurz (Abtastung alle 10 ms und bei jeder Aenderung des hidden-Attributs)
+  const kreuz = (folge) => zustand(browser, { sitzung: null, hash: '#einstellungen/konto', folge, probe: async (s, z) => {
+    await s.evaluate(() => {
+      window.__gesehen = 0;
+      const sieh = () => { const g = document.querySelector('.vw-gruppe'); if (g && !g.hidden && g.getClientRects().length) window.__gesehen++; };
+      setInterval(sieh, 10);
+      new MutationObserver(sieh).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    });
+    const bis = async (f, ms = 8000) => { const ende = Date.now() + ms; while (!f() && Date.now() < ende) await warte(25); };
+    const an = () => s.evaluate((x) => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(x)), SITZUNG);
+    await an();
+    await bis(() => z.fragen() >= 1);
+    await s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+    await warte(1500);
+    await an();
+    await bis(() => z.fragen() >= 2);
+    await bis(() => z.beantwortet() >= 2, 10000);
+    await warte(600);
+    return { ...(await imBlick(s)), gesehen: await s.evaluate(() => window.__gesehen) };
+  } });
+  const spaetJa = await kreuz([{ recht: true, spaet: 5000 }, { recht: false, spaet: 0 }]);
+  pruefe('R18 sich kreuzende Antworten: die spaete Antwort kam zuletzt (Anfrage 2 vor Anfrage 1)',
+    spaetJa.fragen === 2 && spaetJa.reihenfolge.join() === '2,1', { fragen: spaetJa.fragen, reihenfolge: spaetJa.reihenfolge });
+  pruefe('R18 spaete Antwort "Verwalter" der frueheren Anmeldung: wer nicht Verwalter ist, sieht die Verwaltung nie, auch nicht kurz',
+    !spaetJa.probe.sichtbar && !spaetJa.probe.inNav && spaetJa.probe.gesehen === 0, spaetJa.probe);
+  pruefe('R18 spaete Antwort "Verwalter": kein Konsolenfehler', spaetJa.fehler.length === 0, spaetJa.fehler);
+  const spaetNein = await kreuz([{ recht: false, spaet: 5000 }, { recht: true, spaet: 0 }]);
+  pruefe('R18 Gegenrichtung: die spaete Antwort kam zuletzt', spaetNein.fragen === 2 && spaetNein.reihenfolge.join() === '2,1',
+    { fragen: spaetNein.fragen, reihenfolge: spaetNein.reihenfolge });
+  pruefe('R18 spaete Antwort "kein Recht" der frueheren Anmeldung: die neuere Antwort bleibt, Verwaltung sichtbar',
+    spaetNein.probe.sichtbar && spaetNein.probe.inNav, spaetNein.probe);
+  pruefe('R18 spaete Antwort "kein Recht": kein Konsolenfehler', spaetNein.fehler.length === 0, spaetNein.fehler);
 
   const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true });
   pruefe('Verwalter am Handy: Eintrag in der Liste nach spaeter Antwort', floHandy.navVorher > 0 && floHandy.inNav, floHandy);

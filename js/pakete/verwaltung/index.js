@@ -144,19 +144,22 @@ export function verwaltungGruppe() {
     <div class="es-knoepfe"><button class="knopf dr" type="button" data-vw="oeffnen">${esc(V('oeffnen'))}</button></div>`;
   let weg = false;
   let uid;
+  let runde = 0;
   el.addEventListener('click', (e) => { if (e.target.closest('[data-vw="oeffnen"]')) zeigeVerwaltung(); });
   // js/konto.js zeichnet beim An- und Abmelden nur die eigene Gruppe neu und meldet nichts: wie js/pakete/abo/index.js an
   // jeder DOM-Aenderung die Nutzer-ID vergleichen, dazu "storage" fuer andere Tabs. Abgemeldet: sofort weg, ohne Anfrage,
-  // und die gemerkte Antwort ist verworfen (die naechste Anmeldung fragt neu);
-  // eine spaete Antwort fuer ein Konto, das nicht mehr angemeldet ist, aendert nichts.
+  // und die gemerkte Antwort ist verworfen (die naechste Anmeldung fragt neu).
+  // Es zaehlt nur die Antwort der juengsten Anfrage (runde): eine spaete Antwort fuer ein abgemeldetes Konto oder aus einer
+  // frueheren Anmeldung desselben Kontos aendert nichts (R18, tests/verwaltung-browser.test.mjs).
   const pruefeAnmeldung = () => {
     if (weg) return;
     const s = sitzung();
     const jetzt = (s && userId(s)) || null;
     if (jetzt === uid) return;
     uid = jetzt;
+    const nr = ++runde;
     if (!jetzt) { el.hidden = true; vergissVerwalter(); return; }
-    istVerwalter().then((ja) => { if (!weg && uid === jetzt) el.hidden = !ja; }).catch(() => {});
+    istVerwalter().then((ja) => { if (!weg && nr === runde) el.hidden = !ja; }).catch(() => {});
   };
   let beobachter = null;
   try { beobachter = new MutationObserver(pruefeAnmeldung); beobachter.observe(document.body, { childList: true, subtree: true }); } catch (e) { beobachter = null; }
