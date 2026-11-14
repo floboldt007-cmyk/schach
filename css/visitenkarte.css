@@ -40,6 +40,13 @@
 .vk-titel svg, .vk-titel .vk-wappen { width: 20px; height: 20px; flex: none; }
 .vk-krone { font-size: 12.5px; font-weight: 600; opacity: .92; }
 .vk-krone.leer { opacity: .75; font-weight: 500; }
+/* R19 Season: Rang-Symbol der Liga, bestes Season-Abzeichen und gewaehlter Season-Titel (auf dem dunklen Banner) */
+.vk-liga-symbol { display: inline-block; width: 14px; height: 16px; margin-right: 5px; vertical-align: -3px; }
+.vk-season { display: flex; flex-wrap: wrap; gap: 4px 6px; min-width: 0; margin-top: 2px; }
+.vk-season-abz, .vk-season-titel { display: inline-flex; align-items: center; min-height: 20px; padding: 0 7px; border-radius: 6px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; text-shadow: none; }
+.vk-season-abz { color: #FFF; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .32); }
+.vk-season-titel { color: #2A1A00; background: #FFD47A; }
 .vk-ki { flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 20px; padding: 0 6px; border-radius: 6px; font-size: 11.5px; font-weight: 800;
   letter-spacing: .06em; color: #0D1B2A; background: #7FE3FF; text-shadow: none; }
 .vk-orden { list-style: none; margin: 0; padding: 10px 12px 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }

@@ -141,6 +141,8 @@ try {
       const karte = (name, du) => ({ name, banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du });
       return antwort(p ? { w: karte(p.weiss === 'u1' ? 'Spieler_1' : 'Gegner_2', p.weiss === 'u1'), s: karte(p.schwarz === 'u1' ? 'Spieler_1' : 'Gegner_2', p.schwarz === 'u1') } : {});
     }
+    // R19 Season (js/karte.js fragt parallel): ohne Abzeichen und Titel, die Karte bleibt wie bisher (Season prueft r19-saison)
+    if (rpc === 'saison_karte_der_partie') return antwort({ w: { abzeichen: null, titel: null }, s: { abzeichen: null, titel: null } });
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {

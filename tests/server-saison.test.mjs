@@ -221,6 +221,7 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
   {
     const r = (await als(db, U2, 'select public.saison_mein_stand() s')).s;
     pruefe('saison_mein_stand: Saison 3, Woche 2 von 8, Ende 2027-06-20', r?.saison === 3 && r?.woche === 2 && r?.ende === '2027-06-20', JSON.stringify(r));
+    pruefe('saison_mein_stand: Stufe nach dem Reset (11), ohne Ligawoche in Saison 3 kein "bisher"', r?.stufe === 11 && r?.bisher === null, JSON.stringify(r));
     pruefe('saison_mein_stand: eigene Abzeichen und Titel, nichts gewaehlt', (r?.abzeichen || []).map((a) => `${a.saison}:${a.stufe}`).join() === '1:17,2:14'
       && JSON.stringify(r?.titel) === '["crownmaster-s1"]' && r?.gewaehlt === null, JSON.stringify(r));
     pruefe('saison_mein_stand: ohne Konto-Kennung', !JSON.stringify(r).includes(U2));

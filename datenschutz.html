@@ -214,7 +214,8 @@
   Gerät. Diese Daten sind für die Funktionen der App erforderlich (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto
   bei Supabase in Frankfurt.</p>
   <p>Deine Visitenkarte sieht nur, wer mit dir in derselben Online-Partie sitzt (eingeladen oder über die Gegnersuche):
-  dein Benutzername, Titel, Banner, Profilbild, deine Liga-Stufe, die ausgestellten Erfolge und in gewerteten Partien deine
+  dein Benutzername, Titel, Banner, Profilbild, deine Liga-Stufe mit ihrem Symbol, die ausgestellten Erfolge, dein bestes
+  Season-Abzeichen und ein Season-Titel, falls du einen ausgewählt hast (siehe „Seasons“), und in gewerteten Partien deine
   Online-Elo. Freundespartien bleiben ohne Elo. Besondere Titel wie „Erfinder“ oder „Pionier“ (mit Nummer) sieht nur dein
   Gegner in einer gemeinsamen Online-Partie, und nur, wenn der Server bestätigt, dass du sie besitzt; sonst zeigt die App
   sie nur auf deiner eigenen Karte. Deine Wochen-Gruppe in der
@@ -253,6 +254,24 @@
   Sammlung; noch nicht ausgezahlte Taler aus diesen Wochen verfallen dabei. Deine Stufe, deine Kronen-Summe und deine
   Buchungen bleiben gespeichert, bis du dein Konto löschst; dann werden sie automatisch mitgelöscht. Unter „Meine Daten
   herunterladen“ erhältst du alles, was zu diesem Zeitpunkt gespeichert ist.</p>
+
+  <!-- ENTWURF R19 (Seasons, supabase/saison-schema.sql): Rechtspruefung durch Flo vor dem Live-Gang nach main -->
+  <h3>Seasons</h3>
+  <p>Die Online-Liga läuft in Seasons zu je 8 Wochen, die erste beginnt am 4. Januar 2027. Am Ende einer Season rechnet die
+  Datenbank selbst ab und speichert für jedes Konto, das in ihr gespielt hat:</p>
+  <ul>
+    <li>ein Abzeichen mit der Nummer der Season und der besten Liga-Stufe, die du in ihr erreicht hast,</li>
+    <li>einen Season-Titel, wenn du ihn verdient hast: „Crownmaster“ für die Stufe Crownmate I, „Top 10“ oder „Top 100“ für
+    die Plätze nach Online-Elo unter allen Konten mit mindestens 20 Online-Partien mit Kronen in dieser Season (das sind
+    gewertete Partien mit mindestens 4 Halbzügen, höchstens 3 je Gegner und Tag),</li>
+    <li>welchen deiner Season-Titel du zeigen möchtest; ohne Auswahl wird keiner gezeigt.</li>
+  </ul>
+  <p>Zu Beginn der neuen Season sinkt deine Liga-Stufe um 3 Stufen (höchstens bis Squire III). Eine Rangliste mit Namen
+  veröffentlichen wir nicht: die Plätze nach Elo dienen nur der Vergabe der Titel. Dein bestes Abzeichen und deinen
+  ausgewählten Titel sieht nur, wer mit dir in derselben Online-Partie sitzt (siehe „Visitenkarte“); deine eigenen
+  Abzeichen und Titel siehst nur du im Profil. Diese Daten sind für die Liga erforderlich (Art. 6 Abs. 1 lit. b DSGVO),
+  liegen wie dein Konto bei Supabase in Frankfurt und bleiben gespeichert, bis du dein Konto löschst; dann werden sie
+  automatisch mitgelöscht. Unter „Meine Daten herunterladen“ erhältst du sie mit.</p>
 
   <!-- ENTWURF Etappe B (Raetsel-Duell): Rechtspruefung durch Flo vor dem Live-Gang nach main -->
   <h3>Rätsel-Duell</h3>

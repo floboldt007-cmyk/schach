@@ -211,7 +211,8 @@
   This data is necessary for the app's features (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in
   Frankfurt, just like your account.</p>
   <p>Your player card is visible only to the person playing the same online game with you (invited or via matchmaking):
-  your username, title, banner, profile picture, league tier, the achievements on show and, in rated games, your online
+  your username, title, banner, profile picture, league tier with its symbol, the achievements on show, your best season
+  badge and a season title if you have chosen one (see "Seasons") and, in rated games, your online
   Elo. Games with friends remain without Elo. Special titles such as "Creator" or "Pioneer" (with a number) are seen only
   by your opponent in a shared online game, and only if the server confirms that you own them; otherwise the app shows
   them only on your own card. Your weekly league group and
@@ -249,6 +250,24 @@
   thalers from those weeks that have not been paid out yet expire. Your tier, your crown total and your entries remain
   stored until you delete your account; they are then deleted automatically. Download my data includes everything that
   is stored at that time.</p>
+
+  <!-- DRAFT R19 (seasons, supabase/saison-schema.sql): legal review by Flo before going live on main -->
+  <h3>Seasons</h3>
+  <p>The online league runs in seasons of 8 weeks each; the first one starts on 4 January 2027. At the end of a season the
+  database itself settles it and stores for every account that played in it:</p>
+  <ul>
+    <li>a badge with the number of the season and the best league tier you reached in it,</li>
+    <li>a season title if you earned it: "Crownmaster" for the tier Crownmate I, "Top 10" or "Top 100" for the places by
+    online Elo among all accounts with at least 20 online games with crowns in that season (rated games with at least 4
+    half-moves, at most 3 per opponent and day),</li>
+    <li>which of your season titles you want to show; without a choice none is shown.</li>
+  </ul>
+  <p>When the new season begins, your league tier drops by 3 tiers (at most down to Squire III). We do not publish a ranking
+  with names: the places by Elo are only used to award the titles. Your best badge and your chosen title are seen only by
+  the person playing the same online game with you (see "Player card"); only you see your own badges and titles in your
+  profile. This data is necessary for the league (Art. 6 Abs. 1 lit. b DSGVO, GDPR), is stored with Supabase in Frankfurt
+  just like your account and remains stored until you delete your account; it is then deleted automatically. Download my
+  data includes it.</p>
 
   <!-- DRAFT stage B (puzzle duel): legal review by Flo before going live on main -->
   <h3>Puzzle duel</h3>

@@ -91,6 +91,23 @@ export const DE = {
   'gruppe.regeln.titel': 'So zählen Kronen',
   'gruppe.regeln.kronen': 'Online und im Rätsel-Duell gegen Menschen: Sieg +{os}, Remis +{or}, Niederlage −{on}. Gegen den KI-Gegner: Sieg +{ks}, Remis +{kr}, Niederlage −{kn}. Bot-Leiter: Sieg +{bs}, Remis +{br}, eine Niederlage kostet nichts.',
   'gruppe.regeln.woche': 'Jede Woche spielst du in einer Gruppe mit {gruppe} Plätzen. Am Sonntag steigen die besten {auf} eine Stufe auf, die letzten {ab} gehen eine Stufe tiefer. Belohnung gibt es bis Platz {lohn}. Gewertet werden je Tag {botTag} Bot-Partien und {kiTag} Partien gegen den KI-Gegner, zusammen höchstens {woche} Kronen je Woche.',
+  // R19 Season (supabase/saison-schema.sql): "Season" bleibt auch deutsch (Flo: "Crownmaster Season N"), damit sie sich
+  // klar von den alten Saison-Abzeichen im Verlauf (verlauf.saison) unterscheidet
+  'season.titel': 'Season {n}',
+  'season.vorsaison': 'Season 1 beginnt am {datum}. Bis dahin läuft die Wochen-Liga wie gewohnt.',
+  'season.lauf': 'Woche {woche} von {wochen} · endet am {datum}',
+  'season.bisher': 'Beste Stufe dieser Season: {stufe}',
+  'season.keineWoche': 'Noch keine Liga-Woche in dieser Season.',
+  'season.abzeichen': 'Deine Season-Abzeichen',
+  'season.titelWahl': 'Season-Titel auf deiner Karte',
+  'season.keinTitel': 'Keinen zeigen',
+  'season.hilfe': 'Am Ende jeder Season wird deine beste Stufe ein Abzeichen, danach geht es 3 Stufen tiefer weiter. Deine Elo bleibt. Für Top 10 und Top 100 nach Elo zählen 20 Online-Partien mit Kronen in der Season (ab 4 Halbzügen, höchstens 3 je Gegner und Tag).',
+  'season.fehler': 'Das hat gerade nicht geklappt. Später noch einmal versuchen.',
+  'season.ende.titel': 'Season {n} ist vorbei',
+  'season.ende.abzeichen': 'Dein Abzeichen: {stufe}',
+  'season.ende.titelNeu': 'Neuer Titel: {name}',
+  'season.ende.neu': 'Season {n} startet für dich bei {stufe}.',
+  'season.ende.weiter': 'Weiter',
   ...stufenDe,
 };
 
@@ -176,6 +193,21 @@ export const EN = {
   'gruppe.regeln.titel': 'How crowns count',
   'gruppe.regeln.kronen': 'Online and in the puzzle duel against people: win +{os}, draw +{or}, loss −{on}. Against the AI opponent: win +{ks}, draw +{kr}, loss −{kn}. Bot ladder: win +{bs}, draw +{br}, a loss costs nothing.',
   'gruppe.regeln.woche': 'Every week you play in a group of {gruppe}. On Sunday the top {auf} move up a tier, the last {ab} move down a tier. Rewards go up to place {lohn}. Each day {botTag} bot games and {kiTag} games against the AI opponent count, together at most {woche} crowns a week.',
+  'season.titel': 'Season {n}',
+  'season.vorsaison': 'Season 1 starts on {datum}. Until then the weekly league runs as usual.',
+  'season.lauf': 'Week {woche} of {wochen} · ends on {datum}',
+  'season.bisher': 'Best tier this season: {stufe}',
+  'season.keineWoche': 'No league week in this season yet.',
+  'season.abzeichen': 'Your season badges',
+  'season.titelWahl': 'Season title on your card',
+  'season.keinTitel': 'Show none',
+  'season.hilfe': 'At the end of every season your best tier becomes a badge, then you carry on 3 tiers lower. Your Elo stays. Top 10 and Top 100 by Elo count 20 online games with crowns in the season (from 4 half-moves, at most 3 per opponent and day).',
+  'season.fehler': 'That did not work just now. Please try again later.',
+  'season.ende.titel': 'Season {n} is over',
+  'season.ende.abzeichen': 'Your badge: {stufe}',
+  'season.ende.titelNeu': 'New title: {name}',
+  'season.ende.neu': 'Season {n} starts for you at {stufe}.',
+  'season.ende.weiter': 'Continue',
 };
 
 registriereTexte('p-liga', { de: DE, en: EN });

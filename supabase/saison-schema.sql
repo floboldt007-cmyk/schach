@@ -202,6 +202,7 @@ begin
     'wochen', wochen,
     'ende', case when n > 0 then beginn + 7 * wochen - 1 end,
     'bisher', bisher,
+    'stufe', st.stufe,
     'abzeichen', coalesce((select jsonb_agg(jsonb_build_object('saison', a.saison, 'stufe', a.stufe) order by a.saison)
       from public.saison_abzeichen a where a.user_id = uid), '[]'::jsonb),
     'titel', coalesce((select jsonb_agg(t.art || '-s' || t.saison order by t.saison, t.art)
