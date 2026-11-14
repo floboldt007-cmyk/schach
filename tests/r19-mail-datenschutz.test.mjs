@@ -44,11 +44,15 @@ pruefe('keine anfrageprofi-Adresse in den ausgelieferten Dateien', funde.length 
 const FAELLE = [
   { sprache: 'de', datei: 'datenschutz.html', abschnitt1: '<h2>1. Wer ist verantwortlich?</h2>', dauer: '<h3>Rechtsgrundlage und Dauer</h3>',
     schule: '<h3>Schulmodus (Klassen)</h3>', kasten: /Bis zur Prüfung gilt dieser Text nicht/,
-    liste: [/der Stand deines Abos \(Abschnitt 7\)/, /die Zähler des Coachs \(Abschnitt 8\)/, /Schulmodus\)/],
+    liste: [/der Stand deines Abos \(Abschnitt 7\)/, /die Zähler des Coachs \(Abschnitt 8\)/, /Schulmodus\)/,
+      /Bezahlte Reservierungen von Editionen, deine Erklärungen zum Widerrufsrecht, dein Besitz an Editionen, einmalig vergebene Sonderstücke und deine Pionier-Nummer bleiben ohne deine Konto-Kennung stehen/],
+    altKommentar: /ENTWURF|Rechtspruefung durch Flo/,
     leitung: /Löscht die Leitung ihr Konto, werden ihre Klassen mit allen Mitgliederzeilen, Kennzahlen und Aufgaben ebenfalls gelöscht; die Konten der Mitglieder bleiben bestehen\./ },
   { sprache: 'en', datei: 'datenschutz-en.html', abschnitt1: '<h2>1. Who is responsible?</h2>', dauer: '<h3>Legal basis and retention</h3>',
     schule: '<h3>School mode (classes)</h3>', kasten: /[Hh]ave a qualified person review this before publication|does not apply until/,
-    liste: [/your subscription status \(section 7\)/, /the coach counters \(section 8\)/, /school mode\)/],
+    liste: [/your subscription status \(section 7\)/, /the coach counters \(section 8\)/, /school mode\)/,
+      /paid edition reservations, your declarations on the right of withdrawal, your ownership of editions, one-off special pieces and your pioneer number remain without your account ID/],
+    altKommentar: /DRAFT|legal review by Flo/,
     leitung: /If the leader deletes their account, their classes are deleted too, with all member rows, figures and tasks; the members' accounts remain\./ },
 ];
 const zahlen = {};
@@ -58,6 +62,7 @@ for (const f of FAELLE) {
   pruefe(`${f.sprache}: Abschnitt 1 gefunden`, a1.length > 0);
   pruefe(`${f.sprache}: Abschnitt 1 nennt ${MAIL} als Link`, a1.includes(`href="mailto:${MAIL}"`) && a1.includes(`>${MAIL}<`), a1.slice(0, 400));
   pruefe(`${f.sprache}: Abschnitt 1 ohne Platzhalter in eckigen Klammern`, !/class="platz"|\[[^\]]+\]/.test(ohneTags(a1)) && !a1.includes('class="platz"'), ohneTags(a1));
+  pruefe(`${f.sprache}: keine ueberholten Entwurfs-Kommentare (Flos Entscheidung)`, !f.altKommentar.test(html));
   pruefe(`${f.sprache}: kein Entwurfs-Kasten mehr`, !html.includes('class="entwurf"') && !f.kasten.test(ohneTags(html)));
   const dauer = ohneTags(zwischen(html, f.dauer, '</p>'));
   for (const r of f.liste) pruefe(`${f.sprache}: Loeschliste in Abschnitt 5 nennt ${r.source}`, r.test(dauer), dauer.slice(0, 200));
