@@ -41,6 +41,25 @@ function pruefe(name, gut, detail = '') {
 }
 
 // ---------- Teil 2: Info-Seite je Sprache ----------
+const warte = (ms) => new Promise((w) => setTimeout(w, ms));
+// Am Handy ist die Info-Gruppe hinter der Einstellungs-Navigation: den Punkt antippen, wo er sichtbar ist (am breiten
+// Schirm springt er nur dorthin). Dann den Lizenztext-Knopf in die Mitte holen.
+async function oeffneInfo(s) {
+  await s.evaluate(() => { const b = document.querySelector('.es-nav-punkt[data-ziel="es-g-info"]'); if (b && b.getClientRects().length) b.click(); });
+  await warte(600);
+  await s.evaluate(() => document.querySelector('.es-lizenztext summary').scrollIntoView({ block: 'center' }));
+  await warte(300);
+}
+// Kurz-Review rechte (37), Befund 2: die Tippflaeche "Lizenztext" ist mindestens 44 px hoch und an neun Punkten (Ecken
+// 2 px eingerueckt, Kantenmitten, Mitte) trifft ein Tippen wirklich sie, nicht etwas darueber (Muster screens, Treffer)
+const tippflaeche = (s) => s.evaluate(() => {
+  const su = document.querySelector('.es-lizenztext summary');
+  const r = su.getBoundingClientRect();
+  const xs = [r.left + 2, r.left + r.width / 2, r.right - 2], ys = [r.top + 2, r.top + r.height / 2, r.bottom - 2];
+  const daneben = [];
+  for (const x of xs) for (const y of ys) { const e = document.elementFromPoint(x, y); if (!e || e.closest('summary') !== su) daneben.push(`${Math.round(x)},${Math.round(y)}:${e ? e.tagName + '.' + e.className : 'nichts'}`); }
+  return { h: Math.round(r.height * 10) / 10, b: Math.round(r.width), treffer: 9 - daneben.length, daneben };
+});
 const BSD = flach(lies('vendor/chess/LICENSE'));
 let pw;
 try { pw = require(process.env.PLAYWRIGHT_PFAD || 'playwright'); } catch (e) { pw = require('/opt/node-tools/node_modules/playwright'); }
@@ -85,7 +104,42 @@ try {
     const li = posten(/Lichess/);
     pruefe(`${sp}: Rätsel-Duell aus der Lichess-Rätsel-Datenbank, CC0, Quelle verlinkt`,
       /CC0/.test(li) && info.links.includes('https://database.lichess.org/'), li);
+    // Kurz-Review rechte (37), Befund 1: die Nennungen stehen nicht nur im DOM, sie sind sichtbar, und der Lizenztext ist
+    // nach dem Antippen aufgeklappt lesbar
+    await oeffneInfo(s);
+    const sicht = await s.evaluate(() => {
+      const el = document.querySelector('.es-info');
+      const zu = (e) => !!e && e.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && e.getBoundingClientRect().height > 0;
+      const quelle = el.querySelector('a[href="https://github.com/floboldt007-cmyk/schach"]');
+      const unsichtbar = [...el.querySelectorAll('.es-lizenzen li')].filter((li) => !zu(li)).map((li) => li.textContent.trim().slice(0, 30));
+      const su = el.querySelector('.es-lizenztext summary');
+      return { quelle: zu(quelle), unsichtbar, posten: el.querySelectorAll('.es-lizenzen li').length, summary: zu(su) };
+    });
+    pruefe(`${sp}: Quellcode-Link, alle Lizenz-Eintraege und der Knopf Lizenztext sichtbar`,
+      sicht.quelle && sicht.posten >= 6 && sicht.unsichtbar.length === 0 && sicht.summary, sicht);
+    // per DOM statt s.click: ein verdeckter Knopf soll als Befund im Bericht stehen (Treffer prueft tippflaeche), nicht den Lauf abbrechen
+    await s.evaluate(() => document.querySelector('.es-lizenztext summary').click());
+    await warte(300);
+    const offen = await s.evaluate(() => {
+      const d = document.querySelector('.es-lizenztext'); const t = d.querySelector('[data-lizenztext="chess.js"]');
+      const r = t.getBoundingClientRect();
+      return { offen: d.open, sichtbar: t.checkVisibility({ opacityProperty: true, visibilityProperty: true }), h: Math.round(r.height), b: Math.round(r.width) };
+    });
+    pruefe(`${sp}: Lizenztext nach dem Antippen aufgeklappt und lesbar`, offen.offen && offen.sichtbar && offen.h > 40 && offen.b > 150, offen);
     pruefe(`${sp}: keine Fehler und keine fehlenden Texte`, fehler.length === 0, fehler);
+    await k.close();
+  }
+  for (const [sp, w, h] of [['de', 375, 667], ['en', 390, 844], ['de', 820, 1180], ['de', 1180, 820], ['de', 1440, 900]]) {
+    const k = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: w < 1000 });
+    const s = await k.newPage();
+    await s.addInitScript((sprache) => {
+      try { localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ sprache, spracheGewaehlt: true })); } catch (e) { /* egal */ }
+    }, sp);
+    await s.goto(BASIS + 'index.html?test#einstellungen');
+    await s.waitForSelector('.es-info', { state: 'attached', timeout: 15000 });
+    await oeffneInfo(s);
+    const t = await tippflaeche(s);
+    pruefe(`${sp} ${w}x${h}: Tippflaeche Lizenztext mindestens 44 px, 9 von 9 Punkten treffen sie`, t.h >= 44 && t.treffer === 9, t);
     await k.close();
   }
 } finally {
