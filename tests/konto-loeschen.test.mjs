@@ -206,6 +206,18 @@ try {
       && !(await sichtbar(s, '[data-kl="weiter"]')) && !(await sitzungDa(s)) && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
     await k.close();
   }
+  { // 8c. R17: wie 8, Refresh tot im alten Format (error invalid_grant): beim Laden Text "abgelaufen" (de) / "expired" (en)
+    for (const [name, adresse, wort] of [['de', DE, /abgelaufen/i], ['en', EN, /expired/i]]) {
+      const { k, z } = await umgebung({ token: { status: 400, body: { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' } },
+        lokal: { 'schach-arena:konto:sitzung': JSON.stringify({ ...SITZUNG, expires_at: 1 }) } });
+      const s = await seite(k, z, adresse);
+      const st = await status(s);
+      pruefe(`${name}: Sitzung abgelaufen, Refresh tot (invalid_grant): beim Laden Text abgelaufen, Anmeldung sichtbar, nichts geloescht`,
+        st.fehler === 'ja' && wort.test(st.text) && (await sichtbar(s, '.kl-anmelden')) && !(await sichtbar(s, '.kl-angemeldet'))
+        && !(await sitzungDa(s)) && z.aufrufe.token === 1 && z.aufrufe.loeschen === 0, { st, aufrufe: z.aufrufe });
+      await k.close();
+    }
+  }
   { // 8b. Gegenprobe: abgelaufene Sitzung, Refresh klappt -> beim Laden erneuert, angemeldet, keine Meldung
     const { k, z } = await umgebung({ lokal: { 'schach-arena:konto:sitzung': JSON.stringify({ ...SITZUNG, expires_at: 1 }) } });
     const s = await seite(k, z, DE);
@@ -294,6 +306,14 @@ try {
     pruefe('401, Refresh tot: Text "abgelaufen"', /abgelaufen/i.test(b.st.text), b.st);
     const bEn = await lauf({ rpc: abgelehnt, token: { status: 400, body: { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' } } }, EN);
     pruefe('en: 401, Refresh tot: lokal abgemeldet, Text "expired"', !bEn.sitzung && bEn.anmelden && /expired/i.test(bEn.st.text), bEn.st);
+    // R17: totes Refresh-Token im alten Format (error invalid_grant, kein error_code) wie oben, de und en
+    const TOT_ALT = { status: 400, body: { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' } };
+    for (const [name, adresse, wort] of [['de', DE, /abgelaufen/i], ['en', EN, /expired/i]]) {
+      const b2 = await lauf({ rpc: abgelehnt, token: TOT_ALT }, adresse);
+      pruefe(`${name}: 401, Refresh tot (invalid_grant): lokal abgemeldet, Anmeldung sichtbar, Text abgelaufen, kein Server-Text, kein weiterer rpc`,
+        b2.anmelden && !b2.angemeldet && !b2.sitzung && b2.st.fehler === 'ja' && wort.test(b2.st.text) && !/invalid|Refresh Token|Serverfehler|Server error/i.test(b2.st.text)
+        && b2.z.aufrufe.token === 1 && b2.z.aufrufe.loeschen === 1, { aufrufe: b2.z.aufrufe, st: b2.st });
+    }
     const c = await lauf({ rpc: [abgelehnt, abgelehnt] });
     pruefe('401, Refresh klappt, wieder 401: lokal abgemeldet, Anmeldung sichtbar, genau zwei rpc',
       c.anmelden && !c.angemeldet && !c.sitzung && c.st.fehler === 'ja' && c.z.aufrufe.token === 1 && c.z.aufrufe.loeschen === 2, { aufrufe: c.z.aufrufe, st: c.st });

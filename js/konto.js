@@ -56,10 +56,12 @@ export function sitzung() { return jsonLies(SITZUNG_SCHLUESSEL); }
 // Kennungen von Supabase Auth (GoTrue) in eigenen Worten. Nie den Server-Text (msg) zeigen: Darin kann die E-Mail-Adresse
 // stehen. Unbekannte Kennungen erscheinen im Sammeltext ("Serverfehler (400, kennung)"), damit Flo sie im Tester-Bericht
 // sieht. Ein falscher und ein abgelaufener Code liefern beide otp_expired, darum ein Text fuer beides.
+// invalid_grant: altes OAuth2-Format von GoTrue (nur error, kein error_code) fuer ein totes Refresh-Token. Die App ruft
+// /auth/v1/token nur mit grant_type=refresh_token auf (erneuere), also bedeutet es hier immer "Sitzung tot" (R17).
+const SITZUNG_TOT = new Set(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'session_expired', 'bad_jwt', 'invalid_grant']);
 // Neue Konten gesperrt ("Allow new users to sign up" aus): /otp legt Konten ueber Signup an und meldet signup_disabled,
 // mit create_user:false otp_disabled; die Google-Rueckkehr traegt signup_disabled als #error_code (supabase/auth
 // internal/api signup.go, otp.go, external.go getErrorQueryString, gelesen 13.11.2026).
-const SITZUNG_TOT = new Set(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'session_expired', 'bad_jwt']);
 const KENNUNG_TEXT = Object.freeze({
   email_address_invalid: 'emailUngueltig', otp_expired: 'codeUngueltig',
   over_email_send_rate_limit: 'mailZuOft', over_request_rate_limit: 'codeZuOft', user_banned: 'kontoGesperrt',
