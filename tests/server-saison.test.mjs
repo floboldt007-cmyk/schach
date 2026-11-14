@@ -71,10 +71,17 @@ const T = (n) => `b0000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')
 const U1 = U(1), U2 = U(2), U3 = U(3), U4 = U(4), U5 = U(5);
 const ALS = (uid) => `select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', false);`;
 
-async function neueDb({ saison = true } = {}) {
+// daten-schema.sql ohne die drei Saison-Bloecke von meine_daten() = die Fassung auf main (live, ohne R19)
+const ohneSaison = (s) => s
+  .replace(/\n {2}saison jsonb := jsonb_build_object\('abzeichen'[^\n]*/, '')
+  .replace(/\n {2}-- Saison \(saison-schema\.sql, R19\)[\s\S]*?into saison using uid;\n {2}end if;/, '')
+  .replace(/\n {4}-- Saison: Abzeichen, Saison-Titel[^\n]*\n {4}'saison', saison,/, '');
+
+// ersetze: { datei: inhalt } spielt statt einer Datei einen anderen Stand ein (z. B. die live Fassung ohne R19)
+async function neueDb({ saison = true, ersetze = {} } = {}) {
   const db = new PGlite();
   let f = await lauf(db, 'Attrappe', ATTRAPPE);
-  for (const d of BISHER) f = f || await lauf(db, d, lies(d));
+  for (const d of BISHER) f = f || await lauf(db, d, ersetze[d] ?? lies(d));
   if (saison) f = f || await lauf(db, 'saison-schema.sql', lies('supabase/saison-schema.sql'));
   f = f || await lauf(db, 'Testuhr', UHR);
   return { db, fehler: f };
@@ -155,6 +162,24 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
     const z = koerper('supabase/saison-zurueck.sql');
     const ohne = zwei && zwei.replace(/\n {2,4}-- Saison[^\n]*\n {2,4}if pg_catalog\.to_regprocedure\('public\.saison_abrechnen\(\)'\) is not null then\n\s+perform public\.saison_abrechnen\(\);\n {2,4}end if;/g, '');
     pruefe('saison-zurueck.sql: liga_abrechnen = live Fassung ohne Haken, zeichengleich', !!z && z === ohne && !z.includes('saison_abrechnen'));
+  }
+  {
+    // Kaltreview 14.11.: Flo spielt NUR saison-schema.sql ein, live ist meine_daten() die Fassung ohne Saison. Darum bringt
+    // saison-schema.sql meine_daten() zeichengleich mit daten-schema.sql mit, der Rueckweg die Fassung ohne Saison.
+    const fn = (datei) => {
+      const s = lies(datei);
+      const a = s.indexOf('create or replace function public.meine_daten()');
+      return a < 0 ? null : s.slice(a, s.indexOf('$$;', s.indexOf('$$', a) + 2) + 3);
+    };
+    const daten = fn('supabase/daten-schema.sql');
+    const ohne = daten && ohneSaison(daten);
+    pruefe('Hilfe ohneSaison entfernt genau die Saison-Bloecke (danach kein "saison" mehr)', !!ohne && ohne !== daten && !/saison/i.test(ohne));
+    pruefe('meine_daten in saison-schema.sql == daten-schema.sql, zeichengleich', fn('supabase/saison-schema.sql') === daten);
+    pruefe('saison-schema.sql: meine_daten nur fuer authenticated',
+      /revoke execute on function public\.meine_daten\(\) from public, anon;\s+grant execute on function public\.meine_daten\(\) to authenticated;/
+        .test(lies('supabase/saison-schema.sql')));
+    pruefe('saison-zurueck.sql: meine_daten = Fassung ohne Saison, zeichengleich', fn('supabase/saison-zurueck.sql') === ohne);
+    pruefe('saison-zurueck.sql: Kopf nennt, dass ein schon angewandter Reset bleibt', /Reset/.test(lies('supabase/saison-zurueck.sql').split('\n').slice(0, 12).join('\n')));
   }
   const kopf = lies('supabase/saison-schema.sql').split('\n').slice(0, 3).join('\n');
   pruefe('Kopf: VORSCHLAG, NOCH NICHT EINGESPIELT, Einspielen Flo, nie Claude', /VORSCHLAG, NOCH NICHT EINGESPIELT/.test(kopf) && /Flo, nie Claude/.test(kopf), kopf);
@@ -304,11 +329,26 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
   pruefe('Rueckweg: Tabellen und Funktionen weg', Object.values(weg).every((v) => v === null), JSON.stringify(weg));
   const lz = (await db.query(`select prosrc from pg_proc where proname = 'liga_abrechnen'`)).rows[0]?.prosrc || '';
   pruefe('Rueckweg: liga_abrechnen wieder die live Fassung ohne Haken', !lz.includes('saison_abrechnen') && lz.includes("g.liga = 'raetsel'"));
+  const md = (await db.query(`select prosrc from pg_proc where proname = 'meine_daten'`)).rows[0]?.prosrc || '';
+  pruefe('Rueckweg: meine_daten wieder die Fassung ohne Saison', !!md && !/saison/i.test(md));
   await db.exec(HEUTE('2027-07-05'));
   const nach = await lauf(db, 'liga_abrechnen nach Rueckweg', 'select public.liga_abrechnen();');
   pruefe('liga_abrechnen laeuft nach dem Rueckweg', !nach, nach);
   const wieder = await lauf(db, 'saison-schema.sql erneut', lies('supabase/saison-schema.sql'));
   pruefe('saison-schema.sql danach wieder einspielbar', !wieder, wieder);
+}
+
+// ---------- 2b. Live-Stand (Kaltreview 14.11.): daten-schema.sql ohne R19, Flo spielt NUR saison-schema.sql ein ----------
+{
+  const { db, fehler } = await neueDb({ ersetze: { 'supabase/daten-schema.sql': ohneSaison(lies('supabase/daten-schema.sql')) } });
+  pruefe('live Fassung von daten-schema.sql + saison-schema.sql laufen', !fehler, fehler);
+  if (!fehler) {
+    await lage(db);
+    await db.exec(`insert into public.saison_abzeichen (user_id, saison, stufe) values ('${U1}', 1, 13)`);
+    const d = (await als(db, U1, 'select public.meine_daten() d'))?.d;
+    pruefe('nur saison-schema.sql: Datenauskunft nennt das Abzeichen', d?.saison?.abzeichen?.length === 1
+      && d.saison.abzeichen[0].stufe === 13 && Array.isArray(d.saison.titel) && d.saison.gewaehlt === null, JSON.stringify(d?.saison));
+  }
 }
 
 // ---------- 3. Ohne den Vorschlag: liga_abrechnen wie bisher ----------
