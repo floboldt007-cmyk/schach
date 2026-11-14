@@ -56,12 +56,16 @@ const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 999
 const SIEG = JSON.stringify({ bots: { benno: { sterne: [true, false, false] } }, brillanteZuege: [] });
 
 async function seite(browser, viewport, { schema = 'hell', touch = false, sitzung = false, erfinder = false, rpc = null, otp = null,
-  vitrine = null, hash = 'heim' } = {}) {
+  vitrine = null, hash = 'heim', produktion = false } = {}) {
   const k = await browser.newContext({ viewport, deviceScaleFactor: 1, hasTouch: touch, locale: 'de-DE', timezoneId: 'Europe/Berlin',
     serviceWorkers: 'block', colorScheme: schema === 'dunkel' ? 'dark' : 'light' });
   await k.route('**/*', (route) => {
     const req = route.request(); const u = new URL(req.url());
     if (u.hostname === '127.0.0.1') return route.continue();
+    // Kaltreview R16-p1 (A2): ohne ?test laedt die App Turnstile; Nachbau wie tests/screens.test.mjs, nie das echte Skript.
+    // render() liefert sofort ein Token, damit "Code senden" die (nachgebaute) Anfrage abschickt
+    if (u.hostname === 'challenges.cloudflare.com') return route.fulfill({ status: 200, contentType: 'text/javascript',
+      body: 'window.turnstile = { render(el, o) { setTimeout(() => o && o.callback && o.callback("probe-token"), 0); return "w1"; }, reset() {}, remove() {}, getResponse() { return "probe-token"; } };' });
     if (u.hostname.endsWith('.supabase.co')) {
       if (u.pathname.startsWith('/auth/v1/otp') && otp) return route.fulfill({ status: otp.status, contentType: 'application/json', body: JSON.stringify(otp.body) });
       const name = (u.pathname.match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1];
@@ -89,8 +93,9 @@ async function seite(browser, viewport, { schema = 'hell', touch = false, sitzun
   }, { sitzung: sitzung ? SITZUNG : null, erfinder, uid: UID, vitrine, sieg: SIEG, modus: schema });
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   const fehler = []; s.on('pageerror', (e) => fehler.push(e.message));
-  await s.goto(BASIS + '#' + hash);
-  await s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.documentElement.dataset.screen, null, { timeout: 30000 });
+  await s.goto((produktion ? BASIS.replace('?test', '') : BASIS) + '#' + hash);
+  // ohne ?test gibt es kein window.__app; dort wartet der Aufrufer auf sein Element
+  if (!produktion) await s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.documentElement.dataset.screen, null, { timeout: 30000 });
   return { k, s, fehler };
 }
 const ruhe = (s) => s.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'
@@ -103,9 +108,12 @@ try {
   browser = await browserTyp(pw).launch({ headless: true });
 
   // ---------- A: Konto-Fehler ----------
-  for (const [geraet, width, height, touch] of [['iPhone 13', 390, 844, true], ['PC 1440', 1440, 900, false]]) {
-    for (const schema of ['hell', 'dunkel']) {
-      const { k, s, fehler } = await seite(browser, { width, height }, { schema, touch, hash: 'einstellungen/konto',
+  // Die Durchgaenge "mit Bot-Schutz" laufen ohne ?test (Produktionsweg: Turnstile-Nachbau, Hinweis zum Bot-Schutz)
+  for (const [geraet, width, height, touch, schemata, produktion] of [['iPhone 13', 390, 844, true, ['hell', 'dunkel'], false],
+    ['PC 1440', 1440, 900, false, ['hell', 'dunkel'], false], ['iPhone 13 mit Bot-Schutz', 390, 844, true, ['hell'], true],
+    ['PC 1440 mit Bot-Schutz', 1440, 900, false, ['hell'], true]]) {
+    for (const schema of schemata) {
+      const { k, s, fehler } = await seite(browser, { width, height }, { schema, touch, hash: 'einstellungen/konto', produktion,
         otp: { status: 422, body: { code: 422, error_code: 'signup_disabled', msg: 'Signups not allowed for otp' } } });
       await s.waitForSelector('.konto-gruppe .konto-email', { timeout: 15000 });
       await s.locator('.konto-gruppe .konto-email').fill('neu@example.invalid');
@@ -117,13 +125,15 @@ try {
         const r = (sel) => { const e = document.querySelector(sel); if (!e || !e.getClientRects().length) return null; const b = e.getBoundingClientRect();
           return { o: Math.round(b.top), u: Math.round(b.bottom), b: Math.round(b.width) }; };
         return { status: r('.konto-gruppe .konto-status'), text: document.querySelector('.konto-gruppe .konto-status')?.textContent.trim() || '',
-          code: r('.konto-gruppe [data-konto="code"]'), google: r('.konto-gruppe .konto-google'), oder: r('.konto-gruppe .konto-oder') };
+          code: r('.konto-gruppe [data-konto="code"]'), google: r('.konto-gruppe .konto-google'), oder: r('.konto-gruppe .konto-oder'),
+          hinweis: r('.konto-gruppe .konto-botschutz-hinweis') };
       });
       const kb = await kontrastBefunde(s);
       pruefe(`A1 Konto ${geraet} ${schema}: Fehlertext da und lesbar (>= 4,5:1)`, !!m.text && !kontrastVon(kb, [m.text.slice(0, 30)]).length,
         { text: m.text, befunde: kontrastVon(kb, [m.text.slice(0, 30)]) });
       pruefe(`A2 Konto ${geraet} ${schema}: Meldung direkt unter "Code senden", vor "oder" und Google`, !!(m.status && m.code && m.google)
-        && m.status.o >= m.code.u - 1 && m.status.u <= m.google.o + 1 && (!m.oder || m.status.u <= m.oder.o + 1), m);
+        && m.status.o >= m.code.u - 1 && m.status.o - m.code.u <= 16 && m.status.u <= m.google.o + 1 && (!m.oder || m.status.u <= m.oder.o + 1)
+        && (!produktion || (!!m.hinweis && m.hinweis.u <= m.code.o + 1)), m);
       pruefe(`A3 Konto ${geraet} ${schema}: "Code senden" und Google gleich breit (${m.code?.b} / ${m.google?.b} px)`,
         !!(m.code && m.google) && Math.abs(m.code.b - m.google.b) <= 2, m);
       if (schema === 'dunkel') await bild(s, `A-konto-${geraet.replace(/\s+/g, '').toLowerCase()}-${schema}`);

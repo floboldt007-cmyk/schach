@@ -503,7 +503,8 @@ export function kontoGruppe({ app } = {}) {
     if (s) zeigeName();
     if (!s) {
       schutz = botschutz(el.querySelector('.konto-botschutz'), { modus: aufgeloesterModus(), sprache: sprache() });
-      if (schutz) el.querySelector('.konto-status').insertAdjacentHTML('beforebegin', `<p class="es-hilfe konto-botschutz-hinweis">${K('botschutzHinweis')} <a href="${datenschutzBotschutz()}" target="_blank" rel="noopener">${K('botschutzMehr')}</a></p>`);
+      // Kaltreview R16-p1 A2: der Hinweis steht vor "Code senden", damit die Statuszeile direkt unter dem Knopf bleibt
+      if (schutz) el.querySelector('[data-konto="code"]').insertAdjacentHTML('beforebegin', `<p class="es-hilfe konto-botschutz-hinweis">${K('botschutzHinweis')} <a href="${datenschutzBotschutz()}" target="_blank" rel="noopener">${K('botschutzMehr')}</a></p>`);
     }
   };
   // Eigener Name im Feld; ein Konto ohne Namen (neues Konto) bekommt den Hinweis, einen zu waehlen. Erst nach der
