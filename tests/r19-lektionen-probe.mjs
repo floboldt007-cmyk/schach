@@ -3,8 +3,10 @@
 // Ergebnisblatt steht. Je Lektion "geht / geht nicht" und ein Bild vom Ergebnisblatt.
 // Die Gegenseite zieht ueber window.__test.lektionZug (erster legaler Zug, ohne Stockfish, wie tests/lernen.test.mjs).
 // Flos Zuege: Eroeffnungen die Folge der Lektion; Mattbilder bis Matt in 3 und Taktik der Gewinnweg aus einer Vollsuche
-// gegen genau diese Verteidigung (dann muss "geschafft" kommen); alle anderen (lange Matts, Endspiele) spielen legal, bis
-// die App die Lektion selbst beendet (Grenze, Remis, verloren ...). Dort zaehlt jedes Ende mit Ergebnisblatt.
+// gegen genau diese Verteidigung (dann muss "geschafft" kommen). Lange Matts und Endspiele (R19-lektionen-13, 14.11.2026:
+// vorher mit dem ersten legalen Zug gespielt, 11 Remis und 2 Material verloren, also nichts gemessen): dort zieht Flo mit der
+// Hinweis-Engine der App (Stockfish, feste Knotenzahl), und die Gegenseite ist die ECHTE Verteidigung der App (Stockfish,
+// ZEIT_GEGNER), nicht der Test-Haken. Auch dort muss "geschafft" kommen: der gemeinte Weg schafft die Lektion in der Grenze.
 // Zugang ohne Konto: Willkommenswoche (modul:start.gesehen gestern), dann sind alle Lektionen offen (js/pakete/lernen/zugang.js).
 // Geraet und Modus wechseln je Lektion reihum: iPhone 13 hell, iPhone 13 dunkel, PC hell, PC dunkel. Gewollt so (Hauptfenster
 // 14.11.2026): jede Lektion laeuft auf GENAU EINER der vier Arten, damit die Probe in CI bei rund 4 Minuten bleibt; je Bereich
@@ -65,7 +67,7 @@ function pruefe(name, gut, detail = '') {
   return gut;
 }
 const warte = ms => new Promise(r => setTimeout(r, ms));
-const FRIST_MS = 120000; // je Lektion; der laengste gruene Durchlauf (Endspiel, 80 Zuege) braucht weit weniger
+const FRIST_MS = 240000; // je Lektion; Engine-Lektionen (bis 56 Zuege, je Zug Flo + echte Verteidigung) brauchen am laengsten
 const mitFrist = (p, ms, text) => Promise.race([p, new Promise((_, nein) => setTimeout(() => nein(new Error(text)), ms).unref())]);
 // App-Tag gestern (Europe/Berlin): liegt immer in der Willkommenswoche, auch kurz nach Mitternacht (Tag beginnt um 4:00)
 const GESTERN = new Date(Date.now() - 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
@@ -100,6 +102,15 @@ function floZug(l, c, start, gemacht) {
   return kandidaten(c)[0] || null;
 }
 const mitLoesung = l => ['folge', 'taktik'].includes(artVon(l)) || (artVon(l) === 'matt' && l.ziel <= 3);
+const mitEngine = l => !mitLoesung(l);
+const ENGINE_KNOTEN = 400000; // Flos Zug: feste Knotenzahl statt Zeit, damit der Lauf auf jedem Rechner gleich zieht
+async function engineZug(s, fen) {
+  return s.evaluate(async ({ fen, knoten }) => {
+    const e = await window.__app.engine('bewertung');
+    const a = await e.analyse(fen, { nodes: knoten, prioritaet: 'sofort' });
+    return a && typeof a.bestmove === 'string' ? a.bestmove : null;
+  }, { fen, knoten: ENGINE_KNOTEN });
+}
 
 // ---------- Browser ----------
 async function klickFeld(s, f) {
@@ -113,6 +124,10 @@ const blattDa = s => s.evaluate(() => { const o = document.querySelector('.ls-sc
 async function probe(s, l, art) {
   const r = { id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, start: false, handlung: false, ende: false, grund: null, zuege: 0, sterne: 0, fehler: [] };
   await s.evaluate(m => window.__app.setzeEinstellungen({ modus: m, autoDame: true, klang: false }), art.modus);
+  // echte Verteidigung: ohne Test-Haken zieht die App selbst mit Stockfish (js/ui/lektion.js engineZug)
+  // Haken einmal sichern (zwei Engine-Lektionen nacheinander duerfen ihn nicht mit undefined ueberschreiben)
+  await s.evaluate(echt => { const t = window.__test; if (t.lektionZug) t.lektionZugAus = t.lektionZug;
+    if (echt) delete t.lektionZug; else t.lektionZug = t.lektionZugAus; }, mitEngine(l));
   await s.evaluate(id => window.__app.gehe('lektion', { id }), l.id);
   await s.waitForFunction(id => { const z = window.__lektion?.zustand(); return z && z.id === id && z.phase === 'intro'; }, l.id, { timeout: 10000 }).catch(() => {});
   const los = s.locator('.ls-screen .ls-aktionen [data-a="los"]');
@@ -123,7 +138,7 @@ async function probe(s, l, art) {
   if (!r.start) { r.fehler.push('nach los nicht am Zug: ' + JSON.stringify(await lz(s))); return r; }
   const c = new Chess(l.fen || undefined), startMat = material(c);
   const frist = Date.now() + FRIST_MS;
-  for (let runde = 0; runde < 80; runde++) {
+  for (let runde = 0; runde < 300; runde++) { // Warte-Runden zaehlen mit: lange Matts brauchen bis grenze(ziel) = 56 Zuege
     const z = await lz(s);
     if (z.phase === 'ende') break;
     if (Date.now() > frist) { r.fehler.push(`Gesamtfrist ${FRIST_MS / 1000} s ueberschritten in Phase ${z.phase}`); break; }
@@ -134,7 +149,10 @@ async function probe(s, l, art) {
     }
     c.load(z.fen); // die App fuehrt: ihre Stellung ist die Wahrheit
     if (artVon(l) === 'folge') { c.reset(); for (const san of l.folge.slice(0, z.schritt)) c.move(san); }
-    const m = artVon(l) === 'folge' ? new Chess(c.fen()).move(l.folge[z.schritt]) : floZug(l, c, startMat, z.zuege);
+    let m;
+    if (artVon(l) === 'folge') m = new Chess(c.fen()).move(l.folge[z.schritt]);
+    else if (mitEngine(l)) { const u = await engineZug(s, z.fen); try { m = u ? new Chess(z.fen).move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }) : null; } catch (e) { m = null; } }
+    else m = floZug(l, c, startMat, z.zuege);
     if (!m) { r.fehler.push(`kein Zug fuer Flo in ${z.fen}`); break; }
     const vorher = z.zuege;
     await klickFeld(s, m.from); await warte(60); await klickFeld(s, m.to);
@@ -191,10 +209,10 @@ try {
       const f0 = fehler.length;
       const r = await mitFrist(probe(s, l, art), FRIST_MS + 30000, `haengt laenger als ${FRIST_MS / 1000 + 30} s`).catch(e => ({ id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, fehler: ['Abbruch: ' + e.message] }));
       r.konsole = fehler.slice(f0);
-      r.geht = !!(r.start && r.handlung && r.ende && !r.fehler.length && !r.konsole.length && (!mitLoesung(l) || r.grund === 'geschafft'));
+      r.geht = !!(r.start && r.handlung && r.ende && !r.fehler.length && !r.konsole.length && r.grund === 'geschafft');
       ergebnisse.push(r);
       await writeFile(path.join(BILDER, 'ergebnis.json'), JSON.stringify(ergebnisse, null, 1));
-      pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt${mitLoesung(l) ? ' (geschafft)' : ''}`, r.geht,
+      pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft${mitEngine(l) ? ' (Engine gegen echte Verteidigung)' : ''}`, r.geht,
         { start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, fehler: r.fehler, konsole: r.konsole });
     }
     await k.close();
