@@ -8,7 +8,12 @@
 //   node tests/r17-hover-handy.test.mjs
 //   node tests/r17-hover-handy.test.mjs --pc-gleich=<rev>   dazu: am PC unter dem Zeiger bildgleich mit <rev>
 //                                                           (geaenderte css/-Dateien kommen dann aus git show <rev>:...)
+//   node tests/r17-hover-handy.test.mjs --handy-css=<rev>   Gegenprobe: der Handy-Teil mit den css/-Dateien aus <rev>
+//                                                           (auf dbe3c55 muss er rot werden)
 //   PORT=8973 node tests/r17-hover-handy.test.mjs            eigener Port (Standard: frei)
+//
+// Dazu am Handy die echten Screens #lernen und #bestenliste (Zeiger bleibt an der Tippstelle stehen, wie nach einem
+// Tippen) und ein CSSOM-Check: keine :hover-Regel, die einen der 8 Knoepfe trifft, steht ausserhalb von @media (hover: hover).
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn, execFileSync } from 'node:child_process';
@@ -23,6 +28,7 @@ const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs'
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const P = 'schach-arena:v1:';
 const PC_GLEICH = (process.argv.find((a) => a.startsWith('--pc-gleich=')) || '').slice('--pc-gleich='.length);
+const HANDY_CSS = (process.argv.find((a) => a.startsWith('--handy-css=')) || '').slice('--handy-css='.length);
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let ok = 0, gesamt = 0;
@@ -55,7 +61,7 @@ const aussehen = (s, sel) => s.evaluate((sel) => {
   }).join(' || ');
 }, sel);
 
-async function seite(browser, { w, h, schema, touch, basisCss }) {
+async function kontextMit(browser, { w, h, schema, touch, basisCss }) {
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: schema, deviceScaleFactor: 1,
     hasTouch: touch, isMobile: touch, serviceWorkers: 'block' });
   if (basisCss) {
@@ -66,6 +72,11 @@ async function seite(browser, { w, h, schema, touch, basisCss }) {
   const s = await kontext.newPage();
   const fehler = [];
   s.on('pageerror', (e) => fehler.push(e.message));
+  return { kontext, s, fehler };
+}
+
+async function seite(browser, { w, h, schema, touch, basisCss }) {
+  const { kontext, s, fehler } = await kontextMit(browser, { w, h, schema, touch, basisCss });
   // Tag des Willkommens wie im Paket start (Grenze 4:00), Sprache gewaehlt, keine Hinweise
   await s.addInitScript(({ P }) => {
     if (!location.protocol.startsWith('http')) return; // about:blank hat keinen Speicher
@@ -106,12 +117,35 @@ async function seite(browser, { w, h, schema, touch, basisCss }) {
   return { kontext, s, fehler, geladen };
 }
 
+// :hover-Regeln ausserhalb von @media (hover: hover), die einen der Knoepfe (oder ein gemessenes Kind) treffen; Muster wie
+// zeigerAusserhalb() in tests/r17-kopf.test.mjs (so/R17-kopf)
+const zeigerAusserhalb = (s, selektoren) => s.evaluate((selektoren) => {
+  const knoepfe = selektoren.flatMap((x) => [...document.querySelectorAll(x)]);
+  const funde = [];
+  const geh = (regeln, unterHover) => {
+    for (const r of regeln) {
+      if (r.cssRules && r.media) { geh(r.cssRules, unterHover || /\(\s*hover\s*:\s*hover\s*\)/.test(r.media.mediaText)); continue; }
+      if (r.cssRules && !r.selectorText) { geh(r.cssRules, unterHover); continue; }
+      if (!r.selectorText || !r.selectorText.includes(':hover') || unterHover) continue;
+      for (const teil of r.selectorText.split(',')) {
+        if (!teil.includes(':hover')) continue;
+        const ohne = teil.replace(/:hover/g, '').trim() || '*';
+        // INTENTIONAL-SLOP[F1]: matches() wirft bei Pseudo-Elementen und bei :not() ohne Inhalt; die treffen keinen Knopf selbst
+        try { if (knoepfe.some((k) => k.matches(ohne))) funde.push(teil.trim()); } catch (e) { /* kein Element-Selektor */ }
+      }
+    }
+  };
+  // ein unlesbares Blatt koennte eine Zeiger-Regel verstecken: es zaehlt als Fund statt still uebersprungen
+  for (const blatt of document.styleSheets) { try { geh(blatt.cssRules, false); } catch (e) { funde.push(`Blatt nicht lesbar: ${blatt.href}`); } }
+  return { anzahl: knoepfe.length, funde: [...new Set(funde)] };
+}, selektoren);
+
 // getippt wird k.ziel (sonst der Knopf selbst), gemessen k.mess (sonst das getippte Element)
 const sel = (i, k, art) => `#hh-buehne [data-hh="${i}"] ${(art === 'mess' && k.mess) || k.ziel || '> *'}`;
 
-async function handy(browser, schema) {
+async function handy(browser, schema, basisCss = null) {
   const name = `Handy 390 x 844 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
-  const { kontext, s, fehler, geladen } = await seite(browser, { w: 390, h: 844, schema, touch: true });
+  const { kontext, s, fehler, geladen } = await seite(browser, { w: 390, h: 844, schema, touch: true, basisCss });
   pruefe(`${name}: Geraet ohne Zeiger (hover: none), Paket-Stylesheets geladen`, geladen && await s.evaluate(() => matchMedia('(hover: none)').matches), { geladen });
   const ort = await s.evaluate(() => location.hash);
   for (const [i, k] of KNOEPFE.entries()) {
@@ -125,6 +159,55 @@ async function handy(browser, schema) {
     pruefe(`${name} ${k.name}: nach dem Tippen wie in Ruhe`, nach === ruhe, { ruhe, nach });
   }
   pruefe(`${name}: Tippen hat die Seite nicht verlassen`, (await s.evaluate(() => location.hash)) === ort);
+  const zeiger = await zeigerAusserhalb(s, KNOEPFE.flatMap((k, i) => [sel(i, k, 'ziel'), `${sel(i, k, 'ziel')} *`]));
+  pruefe(`${name}: keine :hover-Regel der Knoepfe ausserhalb von @media (hover: hover) (${zeiger.anzahl} Elemente)`,
+    zeiger.anzahl >= KNOEPFE.length && zeiger.funde.length === 0, zeiger.funde);
+  pruefe(`${name}: keine Seitenfehler`, fehler.length === 0, fehler);
+  await kontext.close();
+}
+
+// Echte Screens am Handy (Kaltreview hover-handy): der Zeiger bleibt per hover() an der Stelle stehen, wie nach einem Tippen
+const ECHT = [
+  { screen: 'lernen', ziel: '.ms-bkarte[aria-pressed="false"]' },
+  { screen: 'lernen', ziel: '.ms-lektion' },
+  { screen: 'bestenliste', ziel: '.bl-fenster-wahl select' },
+];
+async function echteScreens(browser, schema, basisCss = null) {
+  const name = `Handy 390 x 844 ${schema === 'dark' ? 'dunkel' : 'hell'} echter Screen`;
+  const { kontext, s, fehler } = await kontextMit(browser, { w: 390, h: 844, schema, touch: true, basisCss });
+  await s.addInitScript(({ P, schema }) => {
+    if (sessionStorage.getItem('hh-echt')) return;
+    sessionStorage.setItem('hh-echt', '1');
+    localStorage.clear();
+    const d = new Date(); if (d.getHours() < 4) d.setDate(d.getDate() - 1);
+    const z = (n) => String(n).padStart(2, '0');
+    localStorage.setItem(P + 'modul:start', JSON.stringify({ gesehen: `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` }));
+    localStorage.setItem(P + 'einstellungen', JSON.stringify({ sprache: 'de', spracheGewaehlt: true, modus: schema === 'dark' ? 'dunkel' : 'hell' }));
+    localStorage.setItem(P + 'hinweis-installieren', '1');
+  }, { P, schema });
+  for (const e of ECHT) {
+    await s.goto(`${BASIS}#${e.screen}`);
+    const el = s.locator(`.screen:not([hidden]) ${e.ziel}`).filter({ visible: true }).first();
+    await el.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    // der Zeitraum der Bestenliste steht nur bei Reitern mit Zeitraum: dann die Reiter der Reihe nach waehlen
+    for (const r of (await el.count()) ? [] : await s.locator('.screen:not([hidden]) .bl-steuer-reiter :is(button, [role="tab"])').all()) {
+      await r.click().catch(() => {}); await warte(800);
+      if (await el.count()) break;
+    }
+    if (!(await el.count())) { pruefe(`${name} #${e.screen} ${e.ziel}: sichtbar`, false, 'nicht gefunden'); continue; }
+    await el.scrollIntoViewIfNeeded(); await s.mouse.move(1, 1); await warte(400);
+    const merke = () => el.evaluate((x) => [x, ...x.querySelectorAll('*')].map((k) => {
+      const st = getComputedStyle(k);
+      return [st.color, st.backgroundColor, st.borderTopColor, st.boxShadow, st.filter, st.transform].join(' | ');
+    }).join(' || '));
+    const ruhe = await merke();
+    await el.hover(); await warte(500);
+    const nach = await merke();
+    await s.mouse.move(1, 1);
+    pruefe(`${name} #${e.screen} ${e.ziel}: Zeiger an der Tippstelle sieht aus wie Ruhe`, nach === ruhe, { ruhe, nach });
+    const zeiger = await zeigerAusserhalb(s, [`.screen:not([hidden]) ${e.ziel}`, `.screen:not([hidden]) ${e.ziel} *`]);
+    pruefe(`${name} #${e.screen} ${e.ziel}: keine :hover-Regel ausserhalb von @media (hover: hover)`, zeiger.anzahl > 0 && zeiger.funde.length === 0, zeiger.funde);
+  }
   pruefe(`${name}: keine Seitenfehler`, fehler.length === 0, fehler);
   await kontext.close();
 }
@@ -157,16 +240,18 @@ try {
   }
   if (!bereit) throw new Error(`Testserver nicht erreichbar: ${letzter?.message || 'keine 200-Antwort'}`);
   browser = await browserTyp(pw).launch({ headless: true });
-  // geaenderte Stylesheets im Stand <rev> (nur mit --pc-gleich)
-  let basisCss = null;
-  if (PC_GLEICH) {
+  // geaenderte Stylesheets im Stand <rev> (nur mit --pc-gleich bzw. --handy-css)
+  const cssAus = (rev, schalter) => {
     const git = (...a) => execFileSync('git', a, { cwd: WURZEL, encoding: 'utf8' });
-    const dateien = git('diff', '--name-only', PC_GLEICH, '--', 'css').split(/\r?\n/).filter(Boolean);
-    basisCss = dateien.map((d) => [d, git('show', `${PC_GLEICH}:${d}`)]);
-    pruefe(`--pc-gleich=${PC_GLEICH}: geaenderte Stylesheets gefunden (${dateien.join(', ')})`, dateien.length > 0, dateien);
-  }
+    const dateien = git('diff', '--name-only', rev, '--', 'css').split(/\r?\n/).filter(Boolean);
+    pruefe(`${schalter}=${rev}: geaenderte Stylesheets gefunden (${dateien.join(', ')})`, dateien.length > 0, dateien);
+    return dateien.map((d) => [d, git('show', `${rev}:${d}`)]);
+  };
+  const basisCss = PC_GLEICH ? cssAus(PC_GLEICH, '--pc-gleich') : null;
+  const handyCss = HANDY_CSS ? cssAus(HANDY_CSS, '--handy-css') : null;
   for (const schema of ['light', 'dark']) {
-    await handy(browser, schema);
+    await handy(browser, schema, handyCss);
+    await echteScreens(browser, schema, handyCss);
     const name = `PC 1440 x 900 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
     const jetzt = await pc(browser, schema);
     pruefe(`${name}: Paket-Stylesheets geladen, keine Seitenfehler`, jetzt.geladen && jetzt.fehler.length === 0, jetzt.fehler);
