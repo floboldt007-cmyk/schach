@@ -698,7 +698,31 @@ async function testeEinstellungen(browser) {
   const botschutz = await seite.waitForSelector('.konto-botschutz-hinweis a', { timeout: 8000 }).then(() => true, () => false);
   pruefe('Bot-Schutz: Hinweis mit Link steht, Turnstile kommt aus dem Nachbau statt von Cloudflare',
     botschutz && CLOUDFLARE.includes('/turnstile/v0/api.js'), { botschutz, CLOUDFLARE });
-  const lies = () => seite.evaluate(() => testseite.speicher.ladeEinstellungen());
+  // Trefferpruefung (Kaltreview 14.11.): das Polster des Links darf nicht in den Apple-Knopf darueber ragen; an den
+  // Raendern jedes Tippziels der Kontogruppe trifft elementFromPoint das eigene Element, auf Handy, SE, iPad quer, PC
+  for (const [name, breite, hoehe] of [['iphone-13', 390, 844], ['iphone-se', 375, 667], ['ipad-quer', 1180, 820], ['pc', 1440, 900]]) {
+    await seite.setViewportSize({ width: breite, height: hoehe });
+    const fehltreffer = await seite.evaluate(() => {
+      const hinweis = document.querySelector('.konto-botschutz-hinweis');
+      hinweis.scrollIntoView({ block: 'center' });
+      // nur die Nachbarn des Hinweises (bis 80 px darueber/darunter), fernere Ziele liegen evtl. unter der festen Menueleiste
+      const h = hinweis.getBoundingClientRect();
+      const ziele = [...document.querySelectorAll('.konto-gruppe :is(a, button, input, [role="button"])')];
+      const falsch = [];
+      for (const el of ziele) for (const r of el.getClientRects()) {
+        if (r.width < 2 || r.bottom < h.top - 80 || r.top > h.bottom + 80) continue;
+        for (const fx of [0.25, 0.5, 0.75]) for (const y of [r.top + 1, r.bottom - 1]) {
+          const treffer = document.elementFromPoint(r.left + r.width * fx, y);
+          if (!treffer || !(treffer === el || el.contains(treffer))) falsch.push(`${el.className || el.tagName} y${Math.round(y)} -> ${treffer?.className || treffer?.tagName}`);
+        }
+      }
+      return falsch;
+    });
+    pruefe(`Bot-Schutz-Link ueberlappt kein Tippziel der Anmeldung (${name})`, fehltreffer.length === 0, fehltreffer);
+  }
+  await seite.setViewportSize({ width: 1180, height: 820 });
+  await seite.evaluate(() => scrollTo(0, 0));
+  const lies =() => seite.evaluate(() => testseite.speicher.ladeEinstellungen());
   const an = (key) => seite.locator(`.es-schalter[data-key="${key}"]`).getAttribute('aria-checked');
 
   for (const key of ['klang', 'balken', 'liveBewertung', 'koordinaten']) {
