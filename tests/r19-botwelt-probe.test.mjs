@@ -128,7 +128,10 @@ const weltMessung = s => s.evaluate(() => {
     if (x > 1 && y > 1) ueber.push(`${a.id}/${b.id}`);
   }
   const zug = sc.querySelector('.welt-svg .w-zug');
+  const ww = sc.querySelector('.weltwahl')?.getBoundingClientRect();
+  const krone = sc.querySelector('.knoten.boss .boss-krone')?.getBoundingClientRect();
   return {
+    kroneFrei: !ww || !krone || krone.top >= ww.bottom - 1 || krone.right <= ww.left + 1 || krone.left >= ww.right - 1,
     klassen: sc.className, stationen: stationen.length, ausserhalb, ueber,
     karteRollt: karte.scrollHeight > karte.clientHeight + 1, karteH: karte.clientHeight, inhaltH: karte.scrollHeight,
     seiteBreit: document.documentElement.scrollWidth > innerWidth + 1,
@@ -169,6 +172,7 @@ try {
         pruefe(`${name}: Stationen in der Welt (${w.stationen})`, w.stationen >= 6, w);
       }
       pruefe(`${name}: Stationen ueberdecken sich nicht (nicht gequetscht)`, !w.ueber.length, w.ueber);
+      if (g.handy) pruefe(`${name}: Schild "Endgegner" nicht unter der Weltwahl`, w.kroneFrei, w);
       pruefe(`${name}: kein waagerechter Ueberlauf der Seite`, !w.seiteBreit);
       pruefe(`${name}: Welt 1 Karofelder mit Panorama (Voegel)`, w.welt === 'karofelder' && w.voegel, w);
       pruefe(`${name}: Hintergrund ${m.ruhe ? 'steht bei prefers-reduced-motion' : 'hat leichtes Leben'}`,

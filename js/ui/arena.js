@@ -172,12 +172,14 @@ const ZIELE = ['sieg', 'genau', 'hilfe'];
 // Mindesthoehe der hohen Welt auf schmalen Karten (px): Stationen mit Sternen, Fahne und Schild ueberdecken sich nicht
 const WELT_MIN_H = 820;
 // Handy hoch, Leiste (R19 B): Hoehe der zugeklappten Gegner-Leiste unten (Griff, Kopf und runder Spielen-Knopf in einer
-// Zeile; css/arena.css .karte-leiste)
-const WEG_KARTE_ZU = 96;
+// Zeile; css/arena.css .karte-leiste) samt Abstand zum Kartenrand; gemessen 97 + 14 px, die Ueberzeile bricht um
+const WEG_KARTE_ZU = 112;
 // Handy hoch, Leiste: Innenrand unten (css/arena.css .karte-weg .inhalt) und senkrechte Luft zwischen zwei
 // uebereinander liegenden Stationen (Sterne und Schild)
 const WEG_RAND_UNTEN = 10;
-const STATION_LUFT = 24;
+const STATION_LUFT = 20;
+// Platz fuer einen besonderen Satz (Mutmacher aus dem Gedaechtnis) ueber der Leiste, wie --blase-platz in css/arena.css
+const BLASE_LEISTE = 64;
 // Dauer der Freischalt-Choreografie (tests/app.test.mjs misst 2,7 s zwischen Beginn und Ende von .wird-frei)
 const FREI_DAUER_MS = 2700;
 
@@ -648,19 +650,24 @@ export function zeige(root, params, app) {
   // das neue Stueck Fortschritt (Freischalten) ist schon sichtbar; ohne Bewegung von Anfang an (kein Ausblenden, das
   // sonst ueber eine Transition wieder einblendet)
   let wegGezeichnet = reduziert();
+  // ein besonderer Satz steht ab 720 px Fensterhoehe auch in der zugeklappten Leiste (css/arena.css, wie kompakt)
+  const leisteBlase = () => window.matchMedia('(min-height: 720px)').matches && !!detail.querySelector('.sprechblase.besonders');
+  let blaseGelegt = false;
+  // gemessen (drei Zeilen bei langem Satz), mindestens BLASE_LEISTE; 8 px Abstand zur Zeile darueber
+  const blasePlatz = () => (leisteBlase() ? Math.max(BLASE_LEISTE, detail.querySelector('.sprechblase.besonders').offsetHeight + 8) : 0);
   const skLeiste = (w, h) => Math.max(0.66, Math.min(0.9, Math.min(w, (h - WEG_KARTE_ZU) * 1.1) / 430));
   // senkrechte Raender der Welt: oben Krone und Fahne des Endgegners unter der Weltwahl, unten das Schild der Station 1
   function raender(sk, kompakt, wegModus, ys) {
     const kn = 76 * sk;
     // kompakt ist die Weltwahl kleiner und die Karte flach; Leiste (R19 B): etwas mehr Rand oben, das Schild "Endgegner"
-    // lag am iPhone SE unter der Weltwahl
-    const oben = kn * 0.65 + (kompakt ? 70 : wegModus ? 92 : 118);
+    // lag am iPhone SE unter der Weltwahl (tests/r19-botwelt-probe.test.mjs misst den Abstand)
+    const oben = kn * 0.65 + (kompakt ? 70 : wegModus ? 84 : 118);
     // kompakt: ist die unterste Station die aktuelle (vergroessert), braucht ihr Schild mehr Rand, sonst schneidet die
     // runde Ecke der Karte es ab (Handy-Runde 08.11.2026: "Willi 100"); sonst bleibt der Rand knapp, weil jeder Pixel
     // hier die Stationen enger zusammenrueckt (SE: Sterne auf dem Schild der Station darueber)
     const untenAktuell = LBOTS[ys.indexOf(Math.max(...ys))]?.id === aktuellId;
     // Leiste (R19 B): unten schwebt die zugeklappte Gegner-Leiste ueber der Welt, die Stationen bleiben darueber
-    const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : wegModus ? WEG_KARTE_ZU + (untenAktuell ? 40 : 24) : 36);
+    const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : wegModus ? WEG_KARTE_ZU + blasePlatz() + (untenAktuell ? 40 : 24) : 36);
     return { oben, unten };
   }
   // passt die Welt ueber die Leiste? Je zwei Stationen, die waagerecht keine Viertel-Station Luft haben, brauchen senkrecht
@@ -686,6 +693,7 @@ export function zeige(root, params, app) {
     // Handy hoch, Variante R19 B (Flo 14.11.: "sieht gequetscht aus"): die ganze Welt bleibt auf einen Blick (Flo 31.10.:
     // "alles auf einmal sehen"), bekommt aber die volle Hoehe; der Gegner schwebt als schmale Leiste unten ueber der Welt
     // und geht als Karte auf (.karte-weg.karte-leiste, css/arena.css). Kein Scrollen in der Karte.
+    blaseGelegt = leisteBlase();
     const handyHoch = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
     // kurze Handys (iPhone SE mit Safari-Leiste, 375 x 548): ueber der Leiste lagen die Stationen aufeinander und unter
     // ihr; dort bleibt die kompakte Welt mit dem Panel darunter wie vor R19. Gerechnet aus der Hoehe von .inhalt (gleich in
@@ -903,6 +911,8 @@ export function zeige(root, params, app) {
     // Bot wechseln: das neue Panel steht sofort (Orte und Hooks gleich da, tests/app.test.mjs zaehlt direkt nach dem
     // Tipp) und kommt gestaffelt herein (bau() oben)
     bau();
+    // kommt oder geht ein besonderer Satz, aendert sich die Leiste, nicht die Karte: neu legen (der ResizeObserver sieht es nicht)
+    if (leisteBlase() !== blaseGelegt) layout();
   }
 
   // Steckbrief als Blatt (bauteile.js sheet): Kopf, Merkmale, darunter der Ort arena:steckbrief (ohne Zeilen versteckt)

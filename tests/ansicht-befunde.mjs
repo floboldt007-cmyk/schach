@@ -28,7 +28,9 @@ export function befundeDerSeite() {
     }
     return false;
   };
-  const versteckt = (el) => !!el.closest('[aria-hidden="true"], [hidden], .sr, [inert]') || unsichtbarerVorfahr(el);
+  // .sr oder gleich gebaut (1 px, clip: R19 B, Name des runden Spielen-Knopfs in der Gegner-Leiste): nur fuer Vorleser
+  const nurVorleser = (el) => { const st = getComputedStyle(el); return st.position === 'absolute' && el.getBoundingClientRect().width <= 1 && /rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)/.test(st.clip); };
+  const versteckt = (el) => !!el.closest('[aria-hidden="true"], [hidden], .sr, [inert]') || nurVorleser(el) || unsichtbarerVorfahr(el);
   const aus = { ueberlauf: document.documentElement.scrollWidth - W, klein: [], knopf: [], rand: [], ueberlapp: [], abgeschnitten: [], gekappt: [] };
   // Inhalt, der unten abgeschnitten ist und sich nicht scrollen laesst (Flo 30.10.: "kann den unteren Teil nicht sehen")
   for (const el of document.querySelectorAll('.screen, .screen *')) {
