@@ -9,7 +9,7 @@
 // ZEIT_GEGNER), nicht der Test-Haken. Auch dort muss "geschafft" kommen: der gemeinte Weg schafft die Lektion in der Grenze.
 // Zugang ohne Konto: Willkommenswoche (modul:start.gesehen gestern), dann sind alle Lektionen offen (js/pakete/lernen/zugang.js).
 // Geraet und Modus wechseln je Lektion reihum: iPhone 13 hell, iPhone 13 dunkel, PC hell, PC dunkel. Gewollt so (Hauptfenster
-// 14.11.2026): jede Lektion laeuft auf GENAU EINER der vier Arten, damit die Probe in CI bei rund 4 Minuten bleibt; je Bereich
+// 14.11.2026): jede Lektion laeuft auf GENAU EINER der vier Arten, damit die Probe kurz bleibt (gemessen 14.11.2026: knapp 7 Minuten fuer alle 65, davon rund 250 s fuer die 19 Engine-Lektionen); je Bereich
 // kommt jede Art vor, und die Handlaeufe im Vault-Bericht R19-Kritik/lektionen.md decken alle vier ab.
 // Jede Lektion hat eine Gesamtfrist (FRIST_MS); wer haengt, wird mit Grund rot und die naechste kommt dran.
 // ergebnis.json wird nach jeder Lektion neu geschrieben, damit ein Abbruch von aussen die bisherigen Ergebnisse behaelt.
@@ -103,7 +103,30 @@ function floZug(l, c, start, gemacht) {
 }
 const mitLoesung = l => ['folge', 'taktik'].includes(artVon(l)) || (artVon(l) === 'matt' && l.ziel <= 3);
 const mitEngine = l => !mitLoesung(l);
+const ZEIT_GEGNER = 450; // js/ui/lektion.js: so lange rechnet die echte Verteidigung je Gegenzug
 const ENGINE_KNOTEN = 400000; // Flos Zug: feste Knotenzahl statt Zeit, damit der Lauf auf jedem Rechner gleich zieht
+// Jede Analyse der Engine 'bewertung' wird in der Seite mitgeschrieben (Kaltreview 14.11.: ohne das blieb die Probe gruen,
+// wenn die echte Verteidigung ausfiel und gegnerZieht() einen Zufallszug machte). Ein neu gestarteter, nicht umhuellter
+// Engine-Prozess schreibt nichts mit, dann wird die Probe rot: so soll es sein.
+const protokolliere = s => s.evaluate(async () => {
+  const e = await window.__app.engine('bewertung');
+  if (e.__probeLog) return;
+  const an = e.analyse.bind(e);
+  e.__probeLog = window.__engineLog = [];
+  e.analyse = async (fen, opt = {}) => { const a = await an(fen, opt); window.__engineLog.push({ fen, movetime: opt.movetime ?? null, bestmove: a && a.bestmove }); return a; };
+});
+const stellung = fen => fen.split(' ').slice(0, 4).join(' ');
+// Gegenzug von fenVor nach fenNach: kam er von der echten Verteidigung (Analyse mit ZEIT_GEGNER, ihr bestmove, kein Test-Haken)?
+async function gegenzugEcht(s, fenVor, fenNach) {
+  const { log, haken } = await s.evaluate(() => ({ log: window.__engineLog || [], haken: typeof window.__test.lektionZug === 'function' }));
+  if (haken) return 'Test-Haken lektionZug war gesetzt';
+  const a = [...log].reverse().find(x => stellung(x.fen) === stellung(fenVor) && x.movetime === ZEIT_GEGNER);
+  if (!a || !a.bestmove) return `keine Analyse mit movetime ${ZEIT_GEGNER} fuer ${fenVor}`;
+  let m = null;
+  try { m = new Chess(fenVor).move({ from: a.bestmove.slice(0, 2), to: a.bestmove.slice(2, 4), promotion: a.bestmove[4] }); } catch (e) { m = null; }
+  if (!m || stellung(m.after) !== stellung(fenNach)) return `gespielt ist nicht bestmove ${a.bestmove} (${fenVor} -> ${fenNach})`;
+  return null;
+}
 async function engineZug(s, fen) {
   return s.evaluate(async ({ fen, knoten }) => {
     const e = await window.__app.engine('bewertung');
@@ -138,8 +161,18 @@ async function probe(s, l, art) {
   if (!r.start) { r.fehler.push('nach los nicht am Zug: ' + JSON.stringify(await lz(s))); return r; }
   const c = new Chess(l.fen || undefined), startMat = material(c);
   const frist = Date.now() + FRIST_MS;
+  if (mitEngine(l)) await protokolliere(s);
+  let offen = null; r.gegenzuege = 0; // nach Flos Zug: Stellung, auf die die Verteidigung antworten muss
   for (let runde = 0; runde < 300; runde++) { // Warte-Runden zaehlen mit: lange Matts brauchen bis grenze(ziel) = 56 Zuege
     const z = await lz(s);
+    if (offen && ['flo', 'ende'].includes(z.phase)) {
+      if (stellung(z.fen) !== stellung(offen)) { // die Gegenseite hat gezogen
+        const falsch = await gegenzugEcht(s, offen, z.fen);
+        if (falsch) { r.fehler.push('Verteidigung nicht echt: ' + falsch); break; }
+        r.gegenzuege++;
+      }
+      offen = null;
+    }
     if (z.phase === 'ende') break;
     if (Date.now() > frist) { r.fehler.push(`Gesamtfrist ${FRIST_MS / 1000} s ueberschritten in Phase ${z.phase}`); break; }
     if (z.phase !== 'flo') {
@@ -160,6 +193,7 @@ async function probe(s, l, art) {
       .then(() => true, () => false);
     if (!weiter) { r.fehler.push(`Klick ${uci(m)} nicht angenommen (${JSON.stringify(await lz(s))})`); break; }
     if (vorher === 0) r.handlung = true;
+    if (mitEngine(l)) offen = m.after;
   }
   await s.waitForSelector('.ls-screen > .ergebnis-overlay:not([hidden]) .ergebnis-karte', { timeout: 8000 }).catch(() => {});
   // Blatt und Knoepfe gleiten gestaffelt herein: erst messen und fotografieren, wenn alles steht
@@ -209,11 +243,12 @@ try {
       const f0 = fehler.length;
       const r = await mitFrist(probe(s, l, art), FRIST_MS + 30000, `haengt laenger als ${FRIST_MS / 1000 + 30} s`).catch(e => ({ id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, fehler: ['Abbruch: ' + e.message] }));
       r.konsole = fehler.slice(f0);
-      r.geht = !!(r.start && r.handlung && r.ende && !r.fehler.length && !r.konsole.length && r.grund === 'geschafft');
+      r.geht = !!(r.start && r.handlung && r.ende && !r.fehler.length && !r.konsole.length && r.grund === 'geschafft'
+        && (!mitEngine(l) || r.gegenzuege > 0));
       ergebnisse.push(r);
       await writeFile(path.join(BILDER, 'ergebnis.json'), JSON.stringify(ergebnisse, null, 1));
       pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft${mitEngine(l) ? ' (Engine gegen echte Verteidigung)' : ''}`, r.geht,
-        { start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, fehler: r.fehler, konsole: r.konsole });
+        { start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, gegenzuege: r.gegenzuege, fehler: r.fehler, konsole: r.konsole });
     }
     await k.close();
   }
