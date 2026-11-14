@@ -10,11 +10,14 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ZIEL = path.join(WURZEL, 'design/figuren-entwurf');
 const FIGUREN = ['K', 'Q', 'R', 'B', 'N', 'P'];
+// kleinster erlaubter Helligkeitsabstand Weiss gegen Schwarz (0..1, mittlere Helligkeit der deckenden Pixel)
+const HELL_ABSTAND = 0.12; // gemessen 14.11.: engster Satz 0,16 (Bleiglas, Dame)
 
 // ---------- Umrisse im 45er-Raster: Vielecke [[x,y],...] und Kreise {k:[x,y,r]} ----------
 const SOCKEL = [[10, 40], [35, 40], [34, 36], [11, 36]];
@@ -278,23 +281,41 @@ async function pruefen() {
       if (/<image|href="(?!#)|url\((?!#)/.test(t) || (t.match(/http/g) || []).length !== 1) fehler.push(`${ordnerName(s)}/${n}: externer Verweis`);
     }
   }
-  // jede Figur im Browser zeichnen und deckende Pixel zaehlen (ein kaputter Filter malt nichts)
+  // keine Figur doppelt, weder im Satz noch ueber Saetze hinweg (ein kopierter Stil saehe auf der Auswahlseite wie zwei aus)
+  const gesehen = new Map();
+  for (const s of SAETZE) for (const [n, inhalt] of Object.entries(dateienVon(s))) {
+    const h = createHash('sha256').update(inhalt).digest('hex');
+    if (gesehen.has(h)) fehler.push(`${ordnerName(s)}/${n}: gleich wie ${gesehen.get(h)}`);
+    else gesehen.set(h, `${ordnerName(s)}/${n}`);
+  }
+  // jede Figur im Browser zeichnen: deckende Pixel zaehlen (ein kaputter Filter malt nichts) und die mittlere Helligkeit
+  // der deckenden Pixel messen; Weiss und Schwarz derselben Figur muessen sich darin um HELL_ABSTAND unterscheiden
   const b = await browser();
+  let engster = { abstand: 1, wo: '' };
   const seite = await b.newPage();
   for (const s of SAETZE) {
     const dateien = dateienVon(s);
     const werte = await seite.evaluate(async (liste) => Promise.all(liste.map(([n, t]) => new Promise((ok) => {
       const i = new Image();
       i.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 90; const g = c.getContext('2d'); g.drawImage(i, 0, 0, 90, 90);
-        const d = g.getImageData(0, 0, 90, 90).data; let n2 = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 128) n2++; ok([n, n2]); };
-      i.onerror = () => ok([n, -1]);
+        const d = g.getImageData(0, 0, 90, 90).data; let n2 = 0, summe = 0;
+        for (let k = 3; k < d.length; k += 4) if (d[k] > 128) { n2++; summe += (0.2126 * d[k - 3] + 0.7152 * d[k - 2] + 0.0722 * d[k - 1]) / 255; }
+        ok([n, n2, n2 ? summe / n2 : 0]); };
+      i.onerror = () => ok([n, -1, 0]);
       i.src = 'data:image/svg+xml;base64,' + btoa(t);
     }))), Object.entries(dateien));
     for (const [n, deckend] of werte) if (deckend < 600) fehler.push(`${ordnerName(s)}/${n}: im Browser ${deckend < 0 ? 'nicht ladbar' : `nur ${deckend} deckende Pixel`}`);
+    const hell = Object.fromEntries(werte.map(([n, , h]) => [n, h]));
+    for (const f of FIGUREN) {
+      const abstand = hell[`w${f}.svg`] - hell[`b${f}.svg`];
+      if (abstand < engster.abstand) engster = { abstand, wo: `${ordnerName(s)} ${f}` };
+      if (abstand < HELL_ABSTAND) fehler.push(`${ordnerName(s)}/${f}: Weiss nur ${abstand.toFixed(2)} heller als Schwarz (mindestens ${HELL_ABSTAND})`);
+    }
   }
   await b.close();
   if (fehler.length) { console.log(fehler.join('\n')); console.log(`FEHLER ${fehler.length}`); process.exit(1); }
-  console.log(`OK ${SAETZE.length} Saetze, ${SAETZE.length * 12} Figuren, alle im Browser gezeichnet`);
+  console.log(`OK ${SAETZE.length} Saetze, ${SAETZE.length * 12} Figuren, alle im Browser gezeichnet, keine doppelt, `
+    + `Weiss/Schwarz-Abstand mindestens ${engster.abstand.toFixed(2)} (${engster.wo})`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
