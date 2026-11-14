@@ -525,6 +525,32 @@ Nummer hat, sieht den Titel gar nicht.
 Nummer genau einmal, höchstens 100. Ein gelöschtes Konto gibt seine Nummer nicht frei. Geht bei der Vergabe etwas
 schief, klappt die Anmeldung trotzdem (nur ohne Nummer).
 
+## Verwaltung für Flo (Stand 13.11.2026, vorbereitet, noch nicht eingespielt)
+
+In der App unter Einstellungen erscheint dann die Gruppe „Verwaltung“, aber nur für dein Konto: Konten mit E-Mail und
+letzter Anmeldung ansehen, Premium freischalten oder zurücknehmen, Käufe ansehen, Benutzername ändern, Banner vergeben
+oder wegnehmen. Jede Änderung steht im Protokoll; wird ein Konto gelöscht, gehen seine Protokollzeilen mit. Ein
+Stripe-Abo, das nicht endgültig beendet ist (auch in der Mahnphase, wenn eine Zahlung offen ist), kann die Verwaltung
+nicht ändern, das geht nur in Stripe. Taler, Kronen, Liga und Sonderstücke bleiben unberührt.
+
+1. Vorher müssen `schema.sql`, `abo-schema.sql`, `werkstatt-schema.sql`, `pionier-schema.sql` und `karte-schema.sql`
+   eingespielt sein.
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/verwaltung-schema.sql`
+   einfügen und **Run** drücken. Die Datei darf mehrfach laufen.
+3. Dein Konto eintragen (deine ID steht unter **Authentication → Users**):
+   `insert into public.verwalter (user_id) values ('<deine id>');`
+4. `supabase/daten-schema.sql` noch einmal ausführen: Ab dann zeigt die Datenauskunft jedem Konto, was die Verwaltung
+   an ihm geändert hat (Art. 15). Rückweg nur für diesen Teil: `supabase/daten-verwaltung-zurueck.sql`.
+5. `notify pgrst, 'reload schema';` ausführen.
+6. Prüfen: den Inhalt von `supabase/verwaltung-rls-test.sql` ausführen. Am Ende steht „Verwaltung-RLS-Test
+   erfolgreich“, und nichts bleibt zurück.
+
+**Was der Server sicherstellt:** Jede Verwaltungsfunktion prüft zuerst, ob das angemeldete Konto in `verwalter` steht.
+Kein Konto kann sich selbst eintragen oder die Liste lesen. Ohne Anmeldung gibt es gar keinen Aufruf.
+
+**Rückweg:** `supabase/verwaltung-zurueck.sql` (vorher die Sicherungszeilen oben in der Datei lesen). Freigeschaltetes
+Premium und geänderte Namen bleiben dabei, die Banner aus der Verwaltung und das Protokoll sind danach weg.
+
 ## Google-Anmeldung einrichten
 
 Die App hat in der Konto-Gruppe den Knopf „Mit Google anmelden“. Er leitet zu Supabase
@@ -559,6 +585,13 @@ Besitzer im Supabase-Dashboard ein, **nie** in App-Dateien, Git, Screenshots ode
 **Hinweis für eine spätere App im Apple App Store:** Wer dort eine Anmeldung über einen fremden Anbieter wie Google
 anbietet, muss nach Apples Regeln zusätzlich „Sign in with Apple“ anbieten (oder eine gleichwertige datensparsame
 Anmeldung). Das betrifft nur eine native App im App Store, nicht die Web-App.
+
+**Löschseite für Google Play (Stand 13.11.2026):** `konto-loeschen.html` und `konto-loeschen-en.html` löschen das
+Konto auch ohne die App, mit E-Mail-Code oder Google und demselben Server-Aufruf `konto_loeschen` wie die App. Damit
+die Google-Anmeldung dorthin zurückkommt, unter **Authentication > URL Configuration > Redirect URLs** zusätzlich genau
+`https://crownmate.de/konto-loeschen.html#konto` und `https://crownmate.de/konto-loeschen-en.html#konto` eintragen
+(keine Wildcard). Fehlt der Eintrag, landet man nach Google auf der Startseite der App, angemeldet; gelöscht ist dann
+noch nichts. Die Adresse für die Play Console ist `https://crownmate.de/konto-loeschen.html`.
 
 ## Bot-Schutz für die Anmeldung (Cloudflare Turnstile, Stand 09.11.2026)
 
