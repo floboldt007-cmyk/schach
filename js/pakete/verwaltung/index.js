@@ -6,13 +6,15 @@
 //                           istVerwalter() true meldet. Sie haengt an der Anmeldung, nicht am #konto-Merker
 //                           (Kaltreview 14.11.2026: wer sich ueber #einstellungen/konto anmeldet, hat den Merker nie);
 //                           ohne Sitzung fragt istVerwalter() gar nicht. Ohne Anmeldung, ohne Recht, offline oder
-//                           solange die SQL fehlt bleibt sie still weg (kein Fehler, keine Meldung).
+//                           solange die SQL fehlt bleibt sie still weg (kein Fehler, keine Meldung). An- und Abmelden
+//                           bei offenen Einstellungen folgt sie ohne Neuladen (Kaltreview 14.11.2026, Runde 2).
 // Blatt: Kontoliste mit Suche (AC-06), je Konto Premium an/aus (AC-07), Kaeufe (AC-08), Name und Banner (AC-09),
 // dazu das Protokoll. Jede Aenderung laedt das Konto danach neu vom Server, die Anzeige zeigt nie einen erratenen Stand.
 // Defensiv: ein Fehler hier haelt die App nie an.
 import { anbieten } from '../../orte.js';
 import { t, datum } from '../../sprache.js';
 import { sheet } from '../../ui/bauteile.js';
+import { sitzung, userId } from '../../konto.js';
 import { MENSCHEN_BANNER } from '../../ui/visitenkarte.js';
 import '../sammlung/karte-texte.js';
 import './texte.js';
@@ -141,9 +143,32 @@ export function verwaltungGruppe() {
   el.innerHTML = `<h3 class="es-titel" id="es-g-verwaltung">${esc(V('titel'))}</h3><p class="es-hilfe">${esc(V('gruppe'))}</p>
     <div class="es-knoepfe"><button class="knopf dr" type="button" data-vw="oeffnen">${esc(V('oeffnen'))}</button></div>`;
   let weg = false;
+  let uid;
   el.addEventListener('click', (e) => { if (e.target.closest('[data-vw="oeffnen"]')) zeigeVerwaltung(); });
-  istVerwalter().then((ja) => { if (!weg) el.hidden = !ja; }).catch(() => {});
-  return { el, verlasse() { weg = true; } };
+  // js/konto.js zeichnet beim An- und Abmelden nur die eigene Gruppe neu und meldet nichts: wie js/pakete/abo/index.js an
+  // jeder DOM-Aenderung die Nutzer-ID vergleichen, dazu "storage" fuer andere Tabs. Abgemeldet: sofort weg, ohne Anfrage;
+  // eine spaete Antwort fuer ein Konto, das nicht mehr angemeldet ist, aendert nichts.
+  const pruefeAnmeldung = () => {
+    if (weg) return;
+    const s = sitzung();
+    const jetzt = (s && userId(s)) || null;
+    if (jetzt === uid) return;
+    uid = jetzt;
+    if (!jetzt) { el.hidden = true; return; }
+    istVerwalter().then((ja) => { if (!weg && uid === jetzt) el.hidden = !ja; }).catch(() => {});
+  };
+  let beobachter = null;
+  try { beobachter = new MutationObserver(pruefeAnmeldung); beobachter.observe(document.body, { childList: true, subtree: true }); } catch (e) { beobachter = null; }
+  globalThis.addEventListener?.('storage', pruefeAnmeldung);
+  pruefeAnmeldung();
+  return {
+    el,
+    verlasse() {
+      weg = true;
+      if (beobachter) beobachter.disconnect();
+      globalThis.removeEventListener?.('storage', pruefeAnmeldung);
+    },
+  };
 }
 
 try {

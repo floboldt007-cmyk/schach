@@ -199,6 +199,36 @@ async function browserTeil(browser) {
     && tief.kopf === DE.titel, tief);
   pruefe('Deep Link am Handy: kein Konsolenfehler', tief.fehler.length === 0, tief.fehler);
 
+  // Kaltreview 14.11.2026 (Runde 2): An- und Abmelden, waehrend die Einstellungen offen sind. Die Konto-Gruppe zeichnet
+  // sich dabei neu (js/konto.js, Uhr 1 s); die Verwaltung folgt ohne Verlassen und Wiederkommen, je Wechsel ein Neubau
+  const imBlick = (s) => s.evaluate((titel) => {
+    const g = document.querySelector('.vw-gruppe');
+    return { sichtbar: !!g && !g.hidden && g.getClientRects().length > 0,
+      inNav: [...document.querySelectorAll('.es-nav-punkt')].some((b) => b.textContent.includes(titel)), neubau: window.__neubau };
+  }, DE.titel);
+  const an = await zustand(browser, { sitzung: null, recht: true, hash: '#einstellungen/konto', probe: async (s) => {
+    const vorher = await imBlick(s);
+    await s.evaluate((x) => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(x)), SITZUNG);
+    await warte(3000);
+    return { vorher, nachher: await imBlick(s) };
+  } });
+  pruefe('Anmeldung bei offenen Einstellungen: Verwaltung erscheint ohne Verlassen (Gruppe und Menue), genau eine Anfrage',
+    !an.probe.vorher.sichtbar && an.probe.nachher.sichtbar && an.probe.nachher.inNav && an.fragen === 1, { probe: an.probe, fragen: an.fragen });
+  pruefe('Anmeldung bei offenen Einstellungen: das Menue wird genau einmal neu gebaut', an.probe.nachher.neubau - an.probe.vorher.neubau === 1,
+    an.probe);
+  pruefe('Anmeldung bei offenen Einstellungen: kein Konsolenfehler', an.fehler.length === 0, an.fehler);
+  const ab = await zustand(browser, { recht: true, hash: '#einstellungen/konto', probe: async (s) => {
+    const vorher = await imBlick(s);
+    await s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+    await warte(3000);
+    return { vorher, nachher: await imBlick(s) };
+  } });
+  pruefe('Abmeldung bei offenen Einstellungen: Verwaltung verschwindet sofort (Gruppe und Menue), keine neue Anfrage',
+    ab.probe.vorher.sichtbar && !ab.probe.nachher.sichtbar && !ab.probe.nachher.inNav && ab.fragen === 1, { probe: ab.probe, fragen: ab.fragen });
+  pruefe('Abmeldung bei offenen Einstellungen: das Menue wird genau einmal neu gebaut', ab.probe.nachher.neubau - ab.probe.vorher.neubau === 1,
+    ab.probe);
+  pruefe('Abmeldung bei offenen Einstellungen: kein Konsolenfehler', ab.fehler.length === 0, ab.fehler);
+
   const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true });
   pruefe('Verwalter am Handy: Eintrag in der Liste nach spaeter Antwort', floHandy.navVorher > 0 && floHandy.inNav, floHandy);
   pruefe('Verwalter am Handy: Tipp oeffnet die Seite der Verwaltung', !!floHandy.seiteAuf?.offen && floHandy.seiteAuf.sichtbar
