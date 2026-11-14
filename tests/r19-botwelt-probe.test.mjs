@@ -197,6 +197,22 @@ try {
       });
       pruefe(`${name}: Gegner ${erster} gewaehlt, ${g.handy === 'leiste' ? 'Karte geht auf, ' : ''}Spielen-Knopf im Bild`, (g.handy !== 'leiste' || wahl.offen) && wahl.spielenSichtbar && !!wahl.name, wahl);
       await s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-gegner.png`) }).catch(() => {});
+      if (g.handy === 'leiste') {
+        // Weltwechsel bei offener Karte (Kaltreview 15.11.): zu ist zu, auch fuer Vorleser (Griff aria-expanded), in einer
+        // gesperrten Welt und zurueck in die Welt des Gegners, wo das Panel nicht neu gebaut wird
+        const griffZu = () => s.evaluate(() => { const d = document.querySelector('.screen.arena .detail');
+          return { offen: d.classList.contains('offen'), expanded: d.querySelector('.karte-griff')?.getAttribute('aria-expanded') }; });
+        await s.locator('.screen.arena .ww-pfeil[data-richtung="1"]').click();
+        await warte(500);
+        const hin = await griffZu();
+        await s.locator('.screen.arena .ww-pfeil[data-richtung="-1"]').click();
+        await warte(500);
+        const zurueck = await griffZu();
+        pruefe(`${name}: Weltwechsel klappt die Karte zu, der Griff sagt es auch (aria-expanded)`,
+          [hin, zurueck].every((x) => !x.offen && x.expanded === 'false'), { hin, zurueck });
+        await s.locator('.screen.arena .karte-griff').click();
+        await warte(500);
+      }
       const weiss = s.locator('.screen.arena .detail .seg[data-wert="w"]');
       if (await weiss.count()) await weiss.first().click();
       await s.evaluate(plan => {

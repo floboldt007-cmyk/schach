@@ -1170,8 +1170,8 @@ export function zeige(root, params, app) {
     if (!WELTEN.some((w) => w.nr === nr) || nr === weltNr) return;
     weltNr = nr;
     // Gegner-Karte unten (R19): in der neuen Welt zugeklappt, sie zeigt einen anderen Gegner
-    karteOffen = false;
-    detail.classList.remove('offen');
+    // ueber setzeKarteOffen, sonst meldet der Griff weiter aria-expanded="true", wenn das Panel nicht neu gebaut wird
+    setzeKarteOffen(false);
     welt = WELTEN.find((w) => w.nr === nr);
     LBOTS = botsDerWelt(nr);
     weltFrei = istWeltFrei(nr, fortschritt);
