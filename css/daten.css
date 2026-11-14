@@ -13,7 +13,8 @@
   display: inline-flex; align-items: center; min-height: 44px; }
 /* Konto-Gruppe (js/konto.js): "oder" und "Mit Google anmelden" (nur Text, kein fremdes Logo) */
 .konto-gruppe .konto-oder { margin: 12px 0 8px; }
-.konto-gruppe .konto-google, .konto-gruppe .konto-apple { width: 100%; max-width: 320px; }
+/* R16 A3: "Code senden" so breit wie die Anbieter-Knoepfe (zwei gleichrangige Wege) */
+.konto-gruppe .konto-google, .konto-gruppe .konto-apple, .konto-gruppe [data-konto="code"] { width: 100%; max-width: 320px; }
 .konto-gruppe .konto-anbieter { flex-direction: column; align-items: stretch; }
 /* Abgeschaltete Anmeldewege (js/konto-config.js, zeigeWege in js/konto.js) tragen hidden. Das Attribut verliert sonst
    gegen .knopf { display: inline-flex } (css/app.css), und "Mit Apple anmelden" stand sichtbar da (R6, 12.11.2026). */

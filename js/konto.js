@@ -56,10 +56,12 @@ export function sitzung() { return jsonLies(SITZUNG_SCHLUESSEL); }
 // Kennungen von Supabase Auth (GoTrue) in eigenen Worten. Nie den Server-Text (msg) zeigen: Darin kann die E-Mail-Adresse
 // stehen. Unbekannte Kennungen erscheinen im Sammeltext ("Serverfehler (400, kennung)"), damit Flo sie im Tester-Bericht
 // sieht. Ein falscher und ein abgelaufener Code liefern beide otp_expired, darum ein Text fuer beides.
+// invalid_grant: altes OAuth2-Format von GoTrue (nur error, kein error_code) fuer ein totes Refresh-Token. Die App ruft
+// /auth/v1/token nur mit grant_type=refresh_token auf (erneuere), also bedeutet es hier immer "Sitzung tot" (R17).
+const SITZUNG_TOT = new Set(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'session_expired', 'bad_jwt', 'invalid_grant']);
 // Neue Konten gesperrt ("Allow new users to sign up" aus): /otp legt Konten ueber Signup an und meldet signup_disabled,
 // mit create_user:false otp_disabled; die Google-Rueckkehr traegt signup_disabled als #error_code (supabase/auth
 // internal/api signup.go, otp.go, external.go getErrorQueryString, gelesen 13.11.2026).
-const SITZUNG_TOT = new Set(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'session_expired', 'bad_jwt']);
 const KENNUNG_TEXT = Object.freeze({
   email_address_invalid: 'emailUngueltig', otp_expired: 'codeUngueltig',
   over_email_send_rate_limit: 'mailZuOft', over_request_rate_limit: 'codeZuOft', user_banned: 'kontoGesperrt',
@@ -486,22 +488,25 @@ export function kontoGruppe({ app } = {}) {
     schutz?.entferne(); schutz = null;
     if (s) sitzungTot = false;
     gezeichnetMit = !!s;
+    // R16 A2: ohne Sitzung steht die Statuszeile direkt unter "Code senden" (dort entstehen ihre Meldungen), vor "oder"
+    const status = `<p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>`;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
       <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
       <p class="es-hilfe konto-name-hinweis" hidden>${K('nameWaehlen')}</p>
       <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>${verdraengtZeile()}` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <div class="konto-botschutz" hidden></div><button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
-      <p class="es-hilfe konto-oder">${K('oder')}</p><div class="es-knoepfe konto-anbieter"><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`
+      ${status}<p class="es-hilfe konto-oder">${K('oder')}</p><div class="es-knoepfe konto-anbieter"><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`
       + `<button class="knopf konto-apple" type="button" data-konto="apple" hidden>${K('apple')}</button></div>`
       + (alsApp() ? `<p class="es-hilfe konto-app-hinweis">${K('appHinweis')}</p>` : '')}
-      <p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>
+      ${s ? status : ''}
       <p class="es-hilfe">${K('gespeichert')}${s ? ' ' + K('datenHinweis') : ''}</p>`;
     zeigeWege();
     if (s) zeigeName();
     if (!s) {
       schutz = botschutz(el.querySelector('.konto-botschutz'), { modus: aufgeloesterModus(), sprache: sprache() });
-      if (schutz) el.querySelector('.konto-status').insertAdjacentHTML('beforebegin', `<p class="es-hilfe konto-botschutz-hinweis">${K('botschutzHinweis')} <a href="${datenschutzBotschutz()}" target="_blank" rel="noopener">${K('botschutzMehr')}</a></p>`);
+      // Kaltreview R16-p1 A2: der Hinweis steht vor "Code senden", damit die Statuszeile direkt unter dem Knopf bleibt
+      if (schutz) el.querySelector('[data-konto="code"]').insertAdjacentHTML('beforebegin', `<p class="es-hilfe konto-botschutz-hinweis">${K('botschutzHinweis')} <a href="${datenschutzBotschutz()}" target="_blank" rel="noopener">${K('botschutzMehr')}</a></p>`);
     }
   };
   // Eigener Name im Feld; ein Konto ohne Namen (neues Konto) bekommt den Hinweis, einen zu waehlen. Erst nach der

@@ -192,8 +192,14 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   font-family: var(--display); font-weight: var(--gw-titel); font-size: 14.5px; letter-spacing: -.01em; white-space: nowrap;
   color: var(--text); background: var(--gold-weich); box-shadow: inset 0 0 0 1.5px var(--gold), var(--s1); cursor: pointer;
   transition: transform var(--d-s) var(--feder), box-shadow var(--d-s) var(--sanft); }
-.haupt-kopf .kopf-premium .ico { width: 20px; height: 20px; color: var(--gold); }
-.haupt-kopf .kopf-premium:hover { box-shadow: inset 0 0 0 2px var(--gold), var(--s2); }
+/* --gold pur hatte als Krone hell 1,79:1 auf der Goldflaeche (R17 kopf; ein Symbol braucht 3:1, und zwischen 521 und
+   1020 px ist die Krone allein das Erkennungszeichen): zur Textfarbe hin gemischt wie .erg-wort .ausruf, bleibt golden */
+.haupt-kopf .kopf-premium .ico { width: 20px; height: 20px; color: color-mix(in srgb, var(--gold) 70%, var(--text)); }
+/* Zeiger-Zustaende nur auf Geraeten mit Zeiger: auf dem Handy bliebe :hover nach dem Tippen stehen (R17 kopf) */
+@media (hover: hover) {
+  .haupt-kopf .kopf-premium:hover { box-shadow: inset 0 0 0 2px var(--gold), var(--s2); }
+  .screen .haupt-kopf .kopf-knopf:hover { background: var(--flaeche-2); box-shadow: var(--s2), var(--kante); }
+}
 .haupt-kopf .kopf-premium:active { transform: scale(.96); }
 .haupt-kopf .kopf-premium:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 

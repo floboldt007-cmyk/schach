@@ -119,7 +119,9 @@
 /* Groessen: im Rad gross und lebendig (jeder Sticker mit eigenem Takt, darum laufen sie nie gleich), in der Blase klein und nur solange sie spricht,
    in der Sammlung gross; gedaempft steht er still */
 .em-wahl svg.emote-sticker { width: 44px; height: 44px; margin-bottom: 3px; }
-.em-wahl:hover svg.emote-sticker, .em-wahl:focus-visible svg.emote-sticker { transform: scale(1.08); }
+.em-wahl:focus-visible svg.emote-sticker { transform: scale(1.08); }
+/* Zeiger-Zustand nur mit Zeiger: am Handy bliebe er nach dem Tippen haengen (R17, tests/r17-hover-handy.test.mjs) */
+@media (hover: hover) { .em-wahl:hover svg.emote-sticker { transform: scale(1.08); } }
 .em-wahl svg.emote-sticker { transition: transform .2s cubic-bezier(.34, 1.36, .64, 1); }
 .em-blase .em-text svg.emote-sticker { width: 30px; height: 30px; margin-right: 8px; }
 .em-blase.still .emote-sticker, .em-blase.still .emote-sticker * { animation: none; }

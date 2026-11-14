@@ -143,6 +143,12 @@ mitAntwort(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invali
 serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
 pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel zu (die Gruppe zeigt dann "abgemeldet")',
   /Anmeldung ist abgelaufen/.test(serverFehler) && sitzung() === null && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null, serverFehler);
+// R17: altes OAuth2-Format von Supabase Auth (error invalid_grant, kein error_code) ist dieselbe tote Sitzung
+localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
+mitAntwort(400, { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' });
+serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
+pruefe('Tote Sitzung im alten Format (invalid_grant): Text "Anmeldung abgelaufen", lokal abgemeldet, Riegel zu, kein Server-Text',
+  /Anmeldung ist abgelaufen/.test(serverFehler) && !/invalid|Refresh Token/i.test(serverFehler) && sitzung() === null && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null, serverFehler);
 { // Anmelde-Link (Rueckfall ohne SMTP): Sitzung uebernehmen, Token aus der Adresse entfernen
   const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u9', email: 'link@b.de' })).toString('base64url') + '.x';
   let neu = null; const ort = { hash: `#access_token=${tok}&expires_in=3600&refresh_token=rl&token_type=bearer&type=magiclink`, pathname: '/schach/', search: '' };

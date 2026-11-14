@@ -50,7 +50,9 @@
 .erg-freund { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; margin: 0 auto 2px; padding: 0 18px;
   border: 0; border-radius: var(--r-pille); background: none; color: var(--text-2); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
 .erg-freund svg { width: 18px; height: 18px; }
-.erg-freund:hover, .erg-freund:focus-visible { color: var(--text); background: var(--flaeche-2); }
+.erg-freund:focus-visible { color: var(--text); background: var(--flaeche-2); }
+/* Zeiger-Zustand nur mit Zeiger: am Handy bliebe er nach dem Tippen haengen (R17, tests/r17-hover-handy.test.mjs) */
+@media (hover: hover) { .erg-freund:hover { color: var(--text); background: var(--flaeche-2); } }
 .erg-freund:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 /* R14-G2: "Teilen …" (Paket teilen, Ort ergebnis:karte) klappt an seiner Stelle zwei gleich breite Knoepfe auf,
    Siegesbild und Freund herausfordern; das Blatt wird dabei nicht hoeher. Aussehen wie der Teilen-Knopf. */
@@ -62,7 +64,8 @@
 .tl-wahl .knopf { min-width: 0; padding: 0 10px; background-color: var(--flaeche-2); color: var(--text); box-shadow: var(--kante);
   white-space: normal; text-align: center; line-height: 1.2; }
 .erg-lobby svg, .erg-link svg { width: 18px; height: 18px; }
-.erg-lobby:hover, .erg-lobby:focus-visible, .erg-link:hover, .erg-link:focus-visible { color: var(--text); background: var(--flaeche-2); }
+.erg-lobby:focus-visible, .erg-link:focus-visible { color: var(--text); background: var(--flaeche-2); }
+@media (hover: hover) { .erg-lobby:hover, .erg-link:hover { color: var(--text); background: var(--flaeche-2); } }
 .erg-lobby:focus-visible, .erg-link:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 /* R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner ein grosser Knopf "Nächster Gegner" ueber die ganze
    Breite, darunter klein "Zur Analyse" (links) und "Zu den Bots" (rechts); die Knoepfe-Zeile loest sich ins Raster auf */

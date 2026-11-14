@@ -85,6 +85,7 @@ const SUITEN = [
   { name: 'zuzweit-lektion-figurensatz', datei: 'zuzweit-lektion-figurensatz.test.mjs', args: [], was: 'Zu zweit und Meisterschule-Lektion: Figurensatz wechselt ohne Neuladen (spaeter Erfinder-Status, Wahl in den Einstellungen)' },
   { name: 'funktion-partie', datei: 'funktion-partie.test.mjs', args: [], was: 'Funktionsprobe Bot-Partie: Start, Zug, Hinweis, Sieg, Aufgeben, Ergebnisblatt (iPhone 13 + PC)' },
   { name: 'ergebnis-einmal', datei: 'ergebnis-einmal.test.mjs', args: [], was: 'Ergebnisblatt der Bot-Partie: Spruch einmal, ein Nochmal-Knopf (Revanche), Knoepfe ab 44 px (iPhone 13 + PC)' },
+  { name: 'r17-ende-feinschliff', datei: 'r17-ende-feinschliff.test.mjs', args: [], was: 'R17: Fokus nach Niederlage auf Zur Analyse, Namen auf der Duell-Ende-Karte, kein Streifen unter dem Profilbanner (Browser)' },
   { name: 'liga-kontrast', datei: 'liga-kontrast.test.mjs', args: [], was: 'Kritik R6: Marke "neu" als Chip, Code-Teilen als Knopf, Kontraste Bronze/Gold/Aufstieg/"!", Knoepfe hinter dem Ergebnis-Blatt gesperrt (Browser)' },
   { name: 'liga-wertung-text', datei: 'liga-wertung-text.test.mjs', args: [], was: 'Liga-Texte: die Wertung heisst Liga-Wertung / League rating, nie Arena' },
   { name: 'datenschutz-karte', datei: 'datenschutz-karte.test.mjs', args: [], was: 'Datenschutz Visitenkarte: Online-Elo nur in gewerteten Partien, Erfinder/Pionier nur auf der eigenen Karte' },
@@ -135,7 +136,10 @@ const SUITEN = [
   { name: 'einfuehrung-rand', datei: 'einfuehrung-rand.test.mjs', args: [], was: 'Einführung: jeder Knopf ohne Scrollen ganz sichtbar, mind. 44 px (SE, 13, iPad, PC), Klartext Bauernmarsch' },
   { name: 'systeme-texte', datei: 'systeme-texte.test.mjs', args: [], was: 'Spielsysteme: Funken, Duell, Liga nennen in DE und EN dieselben Zahlen wie der Code' },
   { name: 'start-befunde', datei: 'start-befunde.test.mjs', args: [], was: 'Feinschliff R6: Serie "1 Tag", Bot-Spruch ohne angeschnittene Zeile, Leiter auf Start quer, ein Begriff fuer Online (Browser)' },
+  { name: 'r17-heim-hover', datei: 'r17-heim-hover.test.mjs', args: [], was: 'Feinschliff R17: Knoepfe der Startseite in Ruhe, Zeiger, Fokus, gedrueckt mind. 4,5:1, Zeiger sichtbar (Browser)' },
+  { name: 'r17-hover-handy', datei: 'r17-hover-handy.test.mjs', args: [], was: 'Feinschliff R17: Zeiger-Zustand bleibt am Handy nach dem Tippen nicht haengen, am PC unveraendert (Browser)' },
   { name: 'geschmack-r8', datei: 'geschmack-r8.test.mjs', args: [], was: 'Feinschliff R8: Serien-Chip neben dem Gruss auf kurzen Handys, Erfolgs-Fenster nie ueber einem offenen Blatt (Browser)' },
+  { name: 'r17-kopf', datei: 'r17-kopf.test.mjs', args: [], was: 'Feinschliff R17: Kopf-Knoepfe (Premium, rund) in Ruhe, Zeiger, Fokus, gedrueckt lesbar, Zeiger nur bei hover:hover, Handy ohne haengenden Zustand (Browser)' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
