@@ -60,7 +60,6 @@
   background: var(--gold); color: var(--kg-stark); box-shadow: var(--s2, none);
   transition: transform var(--d-s) var(--feder-weich), filter var(--d-s) var(--gleiten); }
 .heim-los .ico, .heim-los svg { width: 18px; height: 18px; }
-.heim-los:hover { filter: brightness(1.05); }
 .heim-los:active { transform: scale(.98); }
 .heim-los:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
 
@@ -115,6 +114,7 @@
 /* Zeiger-Zustand (R17): Karten heben sich wie in der Sammlung (sammlung.css), die Zeile bekommt die zweite Flaeche wie die
    Einstellungs-Navigation; die Schrift bleibt dabei mindestens 4,5:1 (tests/r17-heim-hover.test.mjs) */
 @media (hover: hover) {
+  .heim-los:hover { filter: brightness(1.05); }
   .heim-modus:hover, .heim-leiter-liste:hover { box-shadow: var(--s3, var(--s2)), var(--kante); }
   .heim-zeile:hover { background: var(--flaeche-2); }
 }

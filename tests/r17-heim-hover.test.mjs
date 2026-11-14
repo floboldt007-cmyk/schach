@@ -1,8 +1,8 @@
 // Knoepfe der Startseite (css/heim.css) in Ruhe, unter dem Zeiger, mit Fokus und gedrueckt (R17 heim-hover, 14.11.2026):
 // jeder Text im Knopf mindestens 4,5:1 gegen seine Flaeche, unter dem Zeiger sichtbar anders als in Ruhe, mit Tastatur-Fokus
 // ein Rahmen. Hell und dunkel, iPad hoch (820 x 1180, dort steht ohne Partie die Leiter) und PC (1440 x 900), ohne und mit
-// laufender Partie (dann "Weiter" und die Zeile "Zurueck zur Partie"). Nur Geraete mit Zeiger (hasTouch aus): der Zeiger-
-// Zustand steht in css/heim.css unter @media (hover: hover).
+// laufender Partie (dann "Weiter" und die Zeile "Zurueck zur Partie"). Der Zeiger-Zustand steht in css/heim.css unter
+// @media (hover: hover); dazu Handy 390 x 844 (Touch, hover: none): nach dem Tippen bleibt kein Zeiger-Zustand haengen.
 //
 //   node tests/r17-heim-hover.test.mjs
 //   PORT=8973 node tests/r17-heim-hover.test.mjs   eigener Port (Standard: frei)
@@ -85,9 +85,18 @@ async function vierZustaende(s, sel) {
   return erg;
 }
 
-async function lauf(browser, { w, h, schema, mitPartie }) {
+// Handy (Kaltreview R17 heim-hover, Befund 2): nach dem Tippen sieht der Knopf aus wie in Ruhe, es bleibt kein
+// Zeiger-Zustand haengen. Der Klick selbst wird abgefangen, damit die Seite stehen bleibt.
+async function getippt(s, sel) {
+  await s.evaluate(() => document.activeElement?.blur());
+  const ruhe = await zustand(s, sel);
+  await s.tap(sel); await warte(450);
+  return { ruhe, nach: await zustand(s, sel) };
+}
+
+async function lauf(browser, { w, h, schema, mitPartie, touch = false }) {
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: schema, deviceScaleFactor: 1,
-    hasTouch: false, serviceWorkers: 'block' });
+    hasTouch: touch, isMobile: touch, serviceWorkers: 'block' });
   const s = await kontext.newPage();
   const fehler = [];
   s.on('pageerror', (e) => fehler.push(e.message));
@@ -107,7 +116,7 @@ async function lauf(browser, { w, h, schema, mitPartie }) {
   await s.goto(BASIS + '#heim');
   await s.waitForSelector('.heim-los', { state: 'visible', timeout: 20000 });
   await warte(1200);
-  const name = `${w} x ${h} ${schema === 'dark' ? 'dunkel' : 'hell'} ${mitPartie ? 'mit Partie' : 'ohne Partie'}`;
+  const name = `${w} x ${h}${touch ? ' Handy' : ''} ${schema === 'dark' ? 'dunkel' : 'hell'} ${mitPartie ? 'mit Partie' : 'ohne Partie'}`;
   // alle sichtbaren Knoepfe aus css/heim.css (jede Zeile, jeder Weg einzeln), markiert mit data-hh fuer eindeutige Selektoren
   const ziele = await s.evaluate(() => {
     const sichtbar = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
@@ -123,6 +132,24 @@ async function lauf(browser, { w, h, schema, mitPartie }) {
   });
   const erwartet = ['.heim-los', '.heim-modus'].concat(mitPartie ? ['.heim-zeile'] : w === 820 ? ['.heim-leiter-liste'] : []);
   pruefe(`${name}: alle Knopfarten da (${erwartet.join(', ')})`, erwartet.every((k) => ziele.some((z) => z.startsWith(k))), ziele);
+  if (touch) {
+    pruefe(`${name}: Geraet ohne Zeiger (hover: none)`, await s.evaluate(() => matchMedia('(hover: none)').matches));
+    await s.evaluate(() => document.addEventListener('click', (e) => {
+      if (e.target.closest('[data-hh]')) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true));
+    const ort = await s.evaluate(() => location.hash);
+    for (const sel of ziele) {
+      await s.evaluate((sel) => document.querySelector(sel).scrollIntoView({ block: 'center' }), sel);
+      await warte(200);
+      const z = await getippt(s, sel);
+      pruefe(`${name} ${sel}: nach dem Tippen wie in Ruhe (kein haengender Zeiger-Zustand)`, z.nach.sicht === z.ruhe.sicht,
+        { ruhe: z.ruhe.sicht, nach: z.nach.sicht });
+    }
+    pruefe(`${name}: Tippen hat die Seite nicht verlassen`, (await s.evaluate(() => location.hash)) === ort);
+    pruefe(`${name}: keine Seitenfehler`, fehler.length === 0, fehler);
+    await kontext.close();
+    return;
+  }
   for (const sel of ziele) {
     await s.evaluate((sel) => document.querySelector(sel).scrollIntoView({ block: 'center' }), sel);
     await warte(200);
@@ -153,6 +180,9 @@ try {
     for (const schema of ['light', 'dark']) {
       for (const mitPartie of [false, true]) await lauf(browser, { w, h, schema, mitPartie });
     }
+  }
+  for (const schema of ['light', 'dark']) {
+    for (const mitPartie of [false, true]) await lauf(browser, { w: 390, h: 844, schema, mitPartie, touch: true });
   }
 } catch (e) {
   pruefe('Lauf ohne Ausnahme', false, String(e && e.stack || e));
