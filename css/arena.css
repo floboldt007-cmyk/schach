@@ -640,6 +640,8 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
    die Welt haelt ihm BLASE_LEISTE frei (js/ui/arena.js) */
 @media (min-height: 720px) {
   .arena.karte-leiste .detail:not(.offen) .sprechblase.besonders { display: block; flex-basis: 100%; order: 5; margin: 8px 0 0; }
+  /* auf zwei ganze Zeilen gekuerzt wie kompakt (tests/start-befunde.test.mjs B20), der volle Satz bleibt im Text */
+  .arena.karte-leiste .detail:not(.offen) .spruch-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 }
 .arena.karte-leiste .detail.offen .cta-platz { position: sticky; bottom: 0; z-index: 5; background-color: var(--flaeche); }
 /* die Leiste nennt den naechsten Gegner schon; die Fahne ueber der Station verdeckte in der engen Welt Nachbar-Schilder */

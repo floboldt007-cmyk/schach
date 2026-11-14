@@ -111,9 +111,11 @@ try {
   }
 
   // ---------- B20: Bot-Spruch in der kompakten Karte (iPhone 13, SE) ohne angeschnittene Zeile ----------
+  // R19 B: wo die Welt ueber die Gegner-Leiste passt (.karte-leiste), steht der Satz in der zugeklappten Leiste unter Kopf
+  // und rundem Spielen-Knopf; dort gilt "nicht unter dem Knopf" als "ueberdeckt den Knopf nicht", die Ziele sind zu
   for (const [name, w, h] of [['iPhone 13', 390, 844], ['iPhone 13 Safari', 390, 664], ['iPhone SE', 375, 667]]) {
     const { k, s, fehler } = await seite(browser, { w, h, touch: true, speicher: gesehen, hash: '#arena' });
-    await s.waitForFunction(() => !!document.querySelector('.arena.karte-kompakt .detail .sprechblase'));
+    await s.waitForFunction(() => !!document.querySelector('.arena:is(.karte-kompakt, .karte-leiste) .detail .sprechblase'));
     const SATZ = 'Ein neuer Name auf meiner Route! Schön, dich kennenzulernen. Ich hab’s immer ein bisschen eilig, also los, bevor die Post wartet.';
     await s.waitForTimeout(1200);
     // ein langer besonderer Satz (wie die Begruessung eines neuen Bots), danach die Karte neu legen lassen
@@ -132,9 +134,11 @@ try {
       const z = kuerzt.map((e) => { const cs = getComputedStyle(e); const lh = parseFloat(cs.lineHeight);
         return { unten: parseFloat(cs.paddingBottom), oben: parseFloat(cs.paddingTop), hoch: e.clientHeight, zeilen: (e.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) / lh, mehr: e.scrollHeight > e.clientHeight + 1 }; });
       const br = b.getBoundingClientRect(), cta = document.querySelector('.arena .cta-platz')?.getBoundingClientRect();
+      const leiste = document.querySelector('.arena').classList.contains('karte-leiste');
       const ziele = document.querySelector('.arena .ziel-sterne')?.getBoundingClientRect();
       const kb = document.querySelector('.arena .karte').getBoundingClientRect();
       return { z, text: b.textContent, sichtbar: getComputedStyle(b).display !== 'none', blaseUnten: br.bottom, ctaOben: cta?.top, zieleOben: ziele?.top,
+        leiste, blaseOben: br.top, ctaUnten: cta?.bottom, karteUnten: Math.round(kb.bottom),
         karteHoch: Math.round(kb.height) };
     });
     pruefe(`B20 ${name}: Karte bleibt mindestens 300 px hoch (Stationen ueberdecken einander sonst)`, m.karteHoch >= 300, m);
@@ -150,7 +154,9 @@ try {
     pruefe(`B20 ${name}: gekuerzt auf ganze Zeilen ohne Innenabstand unten (keine halbe Zeile sichtbar)`,
       z.unten === 0 && z.oben === 0 && Math.abs(z.zeilen - Math.round(z.zeilen)) < 0.05 && Math.round(z.zeilen) === 2, z);
     pruefe(`B20 ${name}: der volle Satz steht im Text (Vorlesen)`, m.text.includes(SATZ), m.text);
-    pruefe(`B20 ${name}: Sprechblase liegt ueber dem Spielen-Knopf und den Zielen, nicht darunter`,
+    if (m.leiste) pruefe(`B20 ${name}: Sprechblase in der Leiste unter dem Spielen-Knopf, ueberdeckt ihn nicht, ganz in der Karte`,
+      m.blaseOben >= m.ctaUnten - 0.5 && m.blaseUnten <= m.karteUnten + 0.5, m);
+    else pruefe(`B20 ${name}: Sprechblase liegt ueber dem Spielen-Knopf und den Zielen, nicht darunter`,
       m.blaseUnten <= m.ctaOben + 0.5 && m.blaseUnten <= m.zieleOben + 0.5, m);
     pruefe(`B20 ${name}: keine Seitenfehler`, fehler.length === 0, fehler);
     await k.close();
