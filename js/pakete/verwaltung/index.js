@@ -162,7 +162,7 @@ export function verwaltungGruppe() {
     const nr = ++runde;
     if (!el.hidden) el.hidden = true;
     if (!jetzt) { vergissVerwalter(); return; }
-    istVerwalter().then((ja) => { if (!weg && nr === runde) el.hidden = !ja; }).catch(() => {});
+    istVerwalter().then((ja) => { if (!weg && nr === runde && el.hidden !== !ja) el.hidden = !ja; }).catch(() => {});
   };
   let beobachter = null;
   try { beobachter = new MutationObserver(pruefeAnmeldung); beobachter.observe(document.body, { childList: true, subtree: true }); } catch (e) { beobachter = null; }

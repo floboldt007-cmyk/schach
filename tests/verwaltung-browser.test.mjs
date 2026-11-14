@@ -155,6 +155,13 @@ async function browserTeil(browser) {
   pruefe('offline: Gruppe still unsichtbar', offline.fragen >= 1 && !offline.sichtbar && !offline.text, offline);
   pruefe('offline: kein Konsolenfehler', offline.fehler.length === 0, offline.fehler);
 
+  // Kaltreview R18 (Befund 1): eine spaete Antwort, die nichts aendert, setzt hidden nicht erneut; sonst meldet Chromium eine
+  // Mutation und das Menue wird bei jedem normalen Nutzer neu gebaut
+  for (const [art, recht] of [['ohne Recht', false], ['offline', 'offline']]) {
+    const still = await zustand(browser, { recht, spaet: 1500 });
+    pruefe(`${art}, spaete Antwort: das Menue wird nicht neu gebaut`, still.fragen >= 1 && !still.sichtbar && still.neubau === 0, still.neubau);
+  }
+
   const fehlt = await zustand(browser, { recht: 'fehlt' });
   pruefe('SQL fehlt (404): Gruppe still unsichtbar', fehlt.fragen >= 1 && !fehlt.sichtbar && !fehlt.text, fehlt);
   pruefe('SQL fehlt (404): kein Konsolenfehler', fehlt.fehler.length === 0, fehlt.fehler);
