@@ -107,7 +107,7 @@ const DE = {
         'Was, ich hab gewonnen? Das muss ich der Kuh Elsa erzählen!',
         'Juhu! Heute gibt’s Pfannkuchen zur Feier!',
         'Ich glaub’s nicht! Willst du gleich noch mal?',
-        'Gewonnen! Das lag bestimmt an meinem Glücksstrohhalm.',
+        'Ich hab gewonnen! Das lag bestimmt an meinem Glücksstrohhalm.',
       ],
       remis: [
         'Unentschieden? Dann teilen wir uns die Ernte.',
@@ -154,9 +154,9 @@ const DE = {
         'Glückwunsch! Hinter der Mühle freut sich Imker Maik schon auf dich.',
       ],
       gewinnt: [
-        'Gewonnen! Und pünktlich zur Mittagspause.',
+        'Ich hab gewonnen! Und pünktlich zur Mittagspause.',
         'Zugestellt! Revanche gern, ich dreh heute noch eine Runde.',
-        'Sieg! Meine Dame war heute mal wieder als Erste da.',
+        'Ich hab gewonnen! Meine Dame war heute mal wieder als Erste da.',
       ],
       remis: [
         'Unentschieden! Dann geht die Post an uns beide.',
@@ -203,9 +203,9 @@ const DE = {
         'Glückwunsch! Oma Hilde hat bestimmt schon Tee für dich aufgesetzt.',
       ],
       gewinnt: [
-        'Gewonnen! Geduld bringt Honig, sag ich immer.',
-        'Sieg! Mein Stock hat gehalten. Magst du noch mal?',
-        'Gewonnen, ganz ohne Stich. Revanche gibt’s jederzeit hinter der Mühle.',
+        'Ich hab gewonnen! Geduld bringt Honig, sag ich immer.',
+        'Ich hab gewonnen! Mein Stock hat gehalten. Magst du noch mal?',
+        'Ich hab gewonnen, ganz ohne Stich. Revanche gibt’s jederzeit hinter der Mühle.',
       ],
       remis: [
         'Unentschieden! Dann teilen wir uns die Wabe.',
@@ -258,7 +258,7 @@ const DE = {
       ],
       gewinnt: [
         'Ach herrje, jetzt hab ich gewonnen. Möchtest du zum Trost einen Keks?',
-        'Gewonnen! Und mein Tee ist nicht mal kalt geworden.',
+        'Ich hab gewonnen! Und mein Tee ist nicht mal kalt geworden.',
         'Siehste, die Oma kann’s noch! Nächstes Mal klappt’s bei dir.',
         'Na, wer hat da so viel rumstehen lassen? Nicht traurig sein, Schätzchen.',
       ],
@@ -307,7 +307,7 @@ const DE = {
         'Glückwunsch! Im Springerforst freut sich Holzfäller Jan auf dich.',
       ],
       gewinnt: [
-        'Gewonnen! Komm wieder, die Scheune hat immer offen.',
+        'Ich hab gewonnen! Komm wieder, die Scheune hat immer offen.',
         'Sieg für den Scheunenclub! Revanche? Ich hol schon mal einen Strohballen.',
         'Gute Partie! Schau dir die Analyse an, das ist wie Training an der Tafel.',
       ],
@@ -356,9 +356,9 @@ const DE = {
         'Glückwunsch! Maxi vom Stammtisch freut sich schon auf eine Runde mit dir.',
       ],
       gewinnt: [
-        'Gewonnen! Kahlschlag, wie geplant.',
-        'Sieg! Auf der Lichtung war am Ende alles klar.',
-        'Gewonnen! Holzhacken lernt man auch nicht an einem Tag. Revanche?',
+        'Ich hab gewonnen! Kahlschlag, wie geplant.',
+        'Ich hab gewonnen! Auf der Lichtung war am Ende alles klar.',
+        'Ich hab gewonnen! Holzhacken lernt man auch nicht an einem Tag. Revanche?',
       ],
       remis: [
         'Unentschieden! Die Lichtung gehört uns beiden.',
@@ -411,7 +411,7 @@ const DE = {
       ],
       gewinnt: [
         'Jawoll! Angriff ist die beste Verteidigung, sag ich doch!',
-        'Gewonnen! Das wird heute Abend gefeiert!',
+        'Ich hab gewonnen! Das wird heute Abend gefeiert!',
         'Siehste, vorwärts lohnt sich! Revanche gibt’s jederzeit.',
         'Ha! Platt gemacht! Nimm’s nicht persönlich, Kollege.',
       ],
@@ -460,9 +460,9 @@ const DE = {
         'Glückwunsch! Am Waldrand macht sich Lisa Läufer schon für dich warm.',
       ],
       gewinnt: [
-        'Gewonnen! Am Ende hat eine Falle zugeschnappt.',
-        'Sieg! Schau in der Analyse nach, wo der Stolperdraht lag.',
-        'Gewonnen! Morgen lege ich neue Fallen. Bring eine Taschenlampe mit.',
+        'Ich hab gewonnen! Am Ende hat eine Falle zugeschnappt.',
+        'Ich hab gewonnen! Schau in der Analyse nach, wo der Stolperdraht lag.',
+        'Ich hab gewonnen! Morgen lege ich neue Fallen. Bring eine Taschenlampe mit.',
       ],
       remis: [
         'Unentschieden! Wir sind beide heil durch den Forst gekommen.',
@@ -513,9 +513,9 @@ const DE = {
         'Du warst heute schneller. Köhlerin Irmi hat schon die Glut für dich angefacht!',
       ],
       gewinnt: [
-        'Gewonnen! Ziellinie überquert!',
+        'Ich hab gewonnen! Ziellinie überquert!',
         'Jaaa! Meine Läufer haben’s wieder gerockt.',
-        'Gewonnen! Willst du Revanche? Ich hab noch fünf Minuten.',
+        'Ich hab gewonnen! Willst du Revanche? Ich hab noch fünf Minuten.',
         'Erster Platz! Nächstes Mal schaffst du das bestimmt.',
       ],
       remis: [
@@ -563,9 +563,9 @@ const DE = {
         'Glückwunsch! Ritter Thorsten sattelt schon sein Ross für dich.',
       ],
       gewinnt: [
-        'Gewonnen. Gute Glut braucht eben Zeit.',
-        'Sieg! Der Druck ist am Ende durchgebrannt.',
-        'Gewonnen! Komm wieder ans Feuer, wann immer du magst.',
+        'Ich hab gewonnen. Gute Glut braucht eben Zeit.',
+        'Ich hab gewonnen! Der Druck ist am Ende durchgebrannt.',
+        'Ich hab gewonnen! Komm wieder ans Feuer, wann immer du magst.',
       ],
       remis: [
         'Unentschieden. Die Glut reicht für uns beide.',
@@ -616,9 +616,9 @@ const DE = {
         'Geschlagen … aber mit Würde! Gut gekämpft.',
       ],
       gewinnt: [
-        'Sieg! Die Tafelrunde wird davon singen!',
+        'Ich hab gewonnen! Die Tafelrunde wird davon singen!',
         'Mein Ross und ich danken für das Turnier!',
-        'Gewonnen! Komm wieder, wenn deine Rüstung geflickt ist.',
+        'Ich hab gewonnen! Komm wieder, wenn deine Rüstung geflickt ist.',
         'Ha! Der Gabelritter siegt! Revanche sei dir gewährt.',
       ],
       remis: [
@@ -666,9 +666,9 @@ const DE = {
         'Respekt! Im Hörsaal nebenan freut sich Professor Turm auf dich.',
       ],
       gewinnt: [
-        'Gewonnen! Und die Rathausuhr hat nicht mal die Viertelstunde geschlagen.',
-        'Sieg! Gleich noch eine? Hier gibt’s immer eine Revanche.',
-        'Gewonnen! Der Bauer am Anfang hat sich gelohnt.',
+        'Ich hab gewonnen! Und die Rathausuhr hat nicht mal die Viertelstunde geschlagen.',
+        'Ich hab gewonnen! Gleich noch eine? Hier gibt’s immer eine Revanche.',
+        'Ich hab gewonnen! Der Bauer am Anfang hat sich gelohnt.',
       ],
       remis: [
         'Unentschieden! Handschlag, und weiter zur nächsten Runde.',
@@ -719,7 +719,7 @@ const DE = {
         'Eine verdiente Niederlage. Wissenschaftlich einwandfrei.',
       ],
       gewinnt: [
-        'Gewonnen. Geduld ist eben die stärkste Figur.',
+        'Ich hab gewonnen. Geduld ist eben die stärkste Figur.',
         'Prüfung leider nicht bestanden. Wiederholung jederzeit möglich.',
         'Lektion beendet. Bitte die Hausaufgaben nicht vergessen.',
         'Siehst du? Kleine Vorteile, große Wirkung.',
@@ -769,9 +769,9 @@ const DE = {
         'Glückwunsch! Dame Delia hat schon die Bühne für dich vorbereitet.',
       ],
       gewinnt: [
-        'Gewonnen! Und keiner hat gesehen, wie.',
+        'Ich hab gewonnen! Und keiner hat gesehen, wie.',
         'Ta-daa! Ein Zauberer verrät seine Tricks nie. Die Analyse schon.',
-        'Sieg! Komm wieder, ich hab noch Tauben im Hut.',
+        'Ich hab gewonnen! Komm wieder, ich hab noch Tauben im Hut.',
       ],
       remis: [
         'Unentschieden! Der Trick ist bei uns beiden aufgegangen.',
@@ -823,9 +823,9 @@ const DE = {
         'Bravo! Bei Bibliothekar Florian wird es leiser, aber nicht leichter.',
       ],
       gewinnt: [
-        'Gewonnen! Ein Opfer zur rechten Zeit, und der Vorhang fällt.',
+        'Ich hab gewonnen! Ein Opfer zur rechten Zeit, und der Vorhang fällt.',
         'Ah, das war ein Fest! Danke für den Tanz.',
-        'Sieg! Wer nicht wagt, der nicht gewinnt, Schätzchen.',
+        'Ich hab gewonnen! Wer nicht wagt, der nicht gewinnt, Schätzchen.',
         'Applaus, Applaus! Komm wieder, ich hab noch mehr Opfer im Ärmel.',
       ],
       remis: [
@@ -873,9 +873,9 @@ const DE = {
         'Glückwunsch! Kommissar König hat schon eine Akte über dich angelegt.',
       ],
       gewinnt: [
-        'Gewonnen. Wie es im Buch steht.',
-        'Sieg. Ich leih dir gern ein Buch über diese Eröffnung.',
-        'Gewonnen! Die Bibliothek hat jeden Tag geöffnet, komm gern wieder.',
+        'Ich hab gewonnen. Wie es im Buch steht.',
+        'Ich hab gewonnen. Ich leih dir gern ein Buch über diese Eröffnung.',
+        'Ich hab gewonnen! Die Bibliothek hat jeden Tag geöffnet, komm gern wieder.',
       ],
       remis: [
         'Remis. Ein Klassiker, schon oft gelesen, immer wieder schön.',
@@ -927,7 +927,7 @@ const DE = {
       ],
       gewinnt: [
         'Fall abgeschlossen. Schuldig im Sinne der Anklage.',
-        'Gewonnen. Am Ende entscheidet immer das Endspiel.',
+        'Ich hab gewonnen. Am Ende entscheidet immer das Endspiel.',
         'Ich hab dir ja gesagt: Ich gebe nie auf.',
         'Feierabend auf dem Revier. Revanche? Ich bin jederzeit im Dienst.',
       ],
@@ -976,9 +976,9 @@ const DE = {
         'Glückwunsch! Hafenmeisterin Wiebke hat schon einen Liegeplatz für dich.',
       ],
       gewinnt: [
-        'Gewonnen! Guter Fang heute.',
-        'Sieg! Das Netz hat gehalten.',
-        'Gewonnen! Komm wieder, das Meer ist jeden Tag neu.',
+        'Ich hab gewonnen! Guter Fang heute.',
+        'Ich hab gewonnen! Das Netz hat gehalten.',
+        'Ich hab gewonnen! Komm wieder, das Meer ist jeden Tag neu.',
       ],
       remis: [
         'Unentschieden. Heute teilen wir uns den Fang.',
@@ -1025,9 +1025,9 @@ const DE = {
         'Glückwunsch! Großmeisterin Greta hat ihr Brett schon aufgebaut.',
       ],
       gewinnt: [
-        'Gewonnen. Alles lief nach Plan, wie im Hafen.',
-        'Sieg. Gute Planung ist die halbe Überfahrt.',
-        'Gewonnen. Der Hafen ist immer offen für eine Revanche.',
+        'Ich hab gewonnen. Alles lief nach Plan, wie im Hafen.',
+        'Ich hab gewonnen. Gute Planung ist die halbe Überfahrt.',
+        'Ich hab gewonnen. Der Hafen ist immer offen für eine Revanche.',
       ],
       remis: [
         'Remis. Beide Schiffe liegen sicher vertäut.',
@@ -1078,7 +1078,7 @@ const DE = {
         'Sauber gespielt. Ich analysiere das heute Nacht.',
       ],
       gewinnt: [
-        'Gewonnen. Schau dir die Analyse an, da steht alles drin.',
+        'Ich hab gewonnen. Schau dir die Analyse an, da steht alles drin.',
         'Das war’s. Manchmal reicht ein einziger Fehler.',
         'Gute Partie. Aber nicht gut genug. Noch nicht.',
         'Danke für das Spiel. Komm wieder, wenn du bereit bist.',
@@ -1128,9 +1128,9 @@ const DE = {
         'Glückwunsch! Seenotretterin Ilka hat ihr Boot schon für dich klargemacht.',
       ],
       gewinnt: [
-        'Gewonnen. Alles eine Frage des richtigen Moments.',
-        'Sieg. Die Flut kam pünktlich wie immer.',
-        'Gewonnen. Komm wieder, die nächste Ebbe kommt bestimmt.',
+        'Ich hab gewonnen. Alles eine Frage des richtigen Moments.',
+        'Ich hab gewonnen. Die Flut kam pünktlich wie immer.',
+        'Ich hab gewonnen. Komm wieder, die nächste Ebbe kommt bestimmt.',
       ],
       remis: [
         'Unentschieden. Stillwasser, keiner bewegt sich mehr.',
@@ -1177,9 +1177,9 @@ const DE = {
         'Glückwunsch! Johann vom Leuchtturm hat schon das Licht für dich angemacht.',
       ],
       gewinnt: [
-        'Gewonnen! Unsinkbar, wie versprochen.',
-        'Sieg! Ich war schon fast unter Wasser, aber eben nur fast.',
-        'Gewonnen. Gib nie auf, das hab ich auf See gelernt.',
+        'Ich hab gewonnen! Unsinkbar, wie versprochen.',
+        'Ich hab gewonnen! Ich war schon fast unter Wasser, aber eben nur fast.',
+        'Ich hab gewonnen. Gib nie auf, das hab ich auf See gelernt.',
       ],
       remis: [
         'Remis! Gerettet, und zwar wir beide.',
@@ -1226,9 +1226,9 @@ const DE = {
         'Glückwunsch! In der Stockfisch-Tiefe zeigt dir Taucher Keetan den Weg.',
       ],
       gewinnt: [
-        'Gewonnen. Vierzig Jahre Nachtschicht zahlen sich aus.',
-        'Sieg. Das Licht brennt weiter, komm jederzeit wieder.',
-        'Gewonnen. Schau dir die Analyse an, dort ist alles ausgeleuchtet.',
+        'Ich hab gewonnen. Vierzig Jahre Nachtschicht zahlen sich aus.',
+        'Ich hab gewonnen. Das Licht brennt weiter, komm jederzeit wieder.',
+        'Ich hab gewonnen. Schau dir die Analyse an, dort ist alles ausgeleuchtet.',
       ],
       remis: [
         'Remis. Zwei Leuchtfeuer, ein Horizont.',
@@ -1275,9 +1275,9 @@ const DE = {
         'Glückwunsch! Lotse Anestis bringt dich jetzt noch tiefer.',
       ],
       gewinnt: [
-        'Gewonnen! Wer sich traut, kommt weiter.',
-        'Sieg! Das Opfer hat sich gelohnt.',
-        'Gewonnen! Spring gleich noch mal mit mir rein.',
+        'Ich hab gewonnen! Wer sich traut, kommt weiter.',
+        'Ich hab gewonnen! Das Opfer hat sich gelohnt.',
+        'Ich hab gewonnen! Spring gleich noch mal mit mir rein.',
       ],
       remis: [
         'Unentschieden! Wir tauchen beide gleichzeitig auf.',
@@ -1324,9 +1324,9 @@ const DE = {
         'Glückwunsch. Im alten Wrack freut sich Schatzsucher Silas auf dich.',
       ],
       gewinnt: [
-        'Gewonnen. Langsam, leise, sicher.',
-        'Sieg. Geduld ist das beste Echolot.',
-        'Gewonnen. Komm wieder, ich lotse dich gern noch einmal.',
+        'Ich hab gewonnen. Langsam, leise, sicher.',
+        'Ich hab gewonnen. Geduld ist das beste Echolot.',
+        'Ich hab gewonnen. Komm wieder, ich lotse dich gern noch einmal.',
       ],
       remis: [
         'Remis. Wir haben beide nirgends angestoßen.',
@@ -1373,9 +1373,9 @@ const DE = {
         'Glückwunsch! Forscherin Viki macht ihre Tauchkugel schon für dich klar.',
       ],
       gewinnt: [
-        'Gewonnen. Am Ende hat ein halber Bauer gereicht.',
-        'Sieg. Kleine Vorteile, großer Schatz.',
-        'Gewonnen. Schau dir das Endspiel in der Analyse an, da glänzt es.',
+        'Ich hab gewonnen. Am Ende hat ein halber Bauer gereicht.',
+        'Ich hab gewonnen. Kleine Vorteile, großer Schatz.',
+        'Ich hab gewonnen. Schau dir das Endspiel in der Analyse an, da glänzt es.',
       ],
       remis: [
         'Remis. Wir teilen uns die Truhe.',
@@ -1422,9 +1422,9 @@ const DE = {
         'Glückwunsch. Am letzten Durchgang hält Hüterin Alva schon Wache.',
       ],
       gewinnt: [
-        'Gewonnen. Gründlichkeit zahlt sich aus.',
-        'Sieg. Alles sauber protokolliert.',
-        'Gewonnen. Lies gern meine Notizen, ich meine: die Analyse.',
+        'Ich hab gewonnen. Gründlichkeit zahlt sich aus.',
+        'Ich hab gewonnen. Alles sauber protokolliert.',
+        'Ich hab gewonnen. Lies gern meine Notizen, ich meine: die Analyse.',
       ],
       remis: [
         'Remis. Ergebnis ausgeglichen, Versuch gelungen.',
@@ -1471,9 +1471,9 @@ const DE = {
         'Glückwunsch. Unten am Grund erwartet dich der Stockfisch.',
       ],
       gewinnt: [
-        'Gewonnen. Das Tor bleibt heute zu.',
-        'Sieg. Komm wieder, das Tor ist immer da.',
-        'Gewonnen. In der Analyse siehst du, wo der Spalt war.',
+        'Ich hab gewonnen. Das Tor bleibt heute zu.',
+        'Ich hab gewonnen. Komm wieder, das Tor ist immer da.',
+        'Ich hab gewonnen. In der Analyse siehst du, wo der Spalt war.',
       ],
       remis: [
         'Remis. Das Tor steht einen Spalt offen.',
@@ -1525,7 +1525,7 @@ const DE = {
       ],
       gewinnt: [
         'Blubb. Das Ergebnis stand schon lange fest.',
-        'Gewonnen. Wie erwartet. Aber du hast gekämpft!',
+        'Ich hab gewonnen. Wie erwartet. Aber du hast gekämpft!',
         'Der Fisch gewinnt. Nimm’s sportlich, das passiert fast allen.',
         'Schachmatt. In der Analyse siehst du, wo du mich fast hattest.',
       ],
@@ -1705,7 +1705,7 @@ const EN = {
       gewinnt: [
         'I won! And right on time for my lunch break.',
         'Delivered! Happy to give you a rematch, I’m doing another round today.',
-        'Victory! My queen got there first again today.',
+        'I won! My queen got there first again today.',
       ],
       remis: [
         'A draw! Then the mail goes to both of us.',
@@ -1753,7 +1753,7 @@ const EN = {
       ],
       gewinnt: [
         'I won! Patience brings honey, I always say.',
-        'Victory! My hive held up. Want to go again?',
+        'I won! My hive held up. Want to go again?',
         'I won without a single sting. There’s always a rematch behind the mill.',
       ],
       remis: [
@@ -1906,7 +1906,7 @@ const EN = {
       ],
       gewinnt: [
         'I won! Clear-cut, just as planned.',
-        'Victory! In the clearing, everything was plain to see in the end.',
+        'I won! In the clearing, everything was plain to see in the end.',
         'I won! Nobody learns to chop wood in a day either. Rematch?',
       ],
       remis: [
@@ -2010,7 +2010,7 @@ const EN = {
       ],
       gewinnt: [
         'I won! In the end, a trap snapped shut.',
-        'Victory! Check the analysis to see where the tripwire was.',
+        'I won! Check the analysis to see where the tripwire was.',
         'I won! Tomorrow I’ll set new traps. Bring a flashlight.',
       ],
       remis: [
@@ -2113,7 +2113,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. Good embers just take time.',
-        'Victory! In the end, the pressure burned right through.',
+        'I won! In the end, the pressure burned right through.',
         'I won! Come back to the fire whenever you like.',
       ],
       remis: [
@@ -2165,7 +2165,7 @@ const EN = {
         'Beaten … but with dignity! Well fought.',
       ],
       gewinnt: [
-        'Victory! The Round Table will sing of this!',
+        'I won! The Round Table will sing of this!',
         'My steed and I thank you for the tournament!',
         'I won! Come back once your armor is mended.',
         'Ha! The Knight of Forks prevails! A rematch shall be granted to thee.',
@@ -2216,7 +2216,7 @@ const EN = {
       ],
       gewinnt: [
         'I won! And the town hall clock hasn’t even struck the quarter hour.',
-        'Victory! Another one? There’s always a rematch here.',
+        'I won! Another one? There’s always a rematch here.',
         'I won! That pawn at the start paid off.',
       ],
       remis: [
@@ -2268,7 +2268,7 @@ const EN = {
         'A well-deserved defeat. Scientifically sound.',
       ],
       gewinnt: [
-        'Won. Patience is simply the strongest piece.',
+        'I won. Patience is simply the strongest piece.',
         'Exam not passed, I’m afraid. You may retake it anytime.',
         'Lesson over. Please don’t forget your homework.',
         'You see? Small advantages, big effects.',
@@ -2320,7 +2320,7 @@ const EN = {
       gewinnt: [
         'I won! And nobody saw how.',
         'Ta-da! A magician never reveals his tricks. The analysis does, though.',
-        'Victory! Come back, I still have doves in my hat.',
+        'I won! Come back, I still have doves in my hat.',
       ],
       remis: [
         'A draw! The trick worked for both of us.',
@@ -2374,7 +2374,7 @@ const EN = {
       gewinnt: [
         'I won! One sacrifice at the right moment, and the curtain falls.',
         'Ah, what a feast! Thank you for the dance.',
-        'Victory! Nothing ventured, nothing gained, darling.',
+        'I won! Nothing ventured, nothing gained, darling.',
         'Applause, applause! Come back, I have more sacrifices up my sleeve.',
       ],
       remis: [
@@ -2423,7 +2423,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. Just as it says in the book.',
-        'Victory. I’d be happy to lend you a book on this opening.',
+        'I won. I’d be happy to lend you a book on this opening.',
         'I won! The library is open every day, come back anytime.',
       ],
       remis: [
@@ -2476,7 +2476,7 @@ const EN = {
       ],
       gewinnt: [
         'Case closed. Guilty as charged.',
-        'Won. In the end, the endgame always decides.',
+        'I won. In the end, the endgame always decides.',
         'I told you: I never give up.',
         'End of shift at the precinct. Rematch? I’m always on duty.',
       ],
@@ -2526,7 +2526,7 @@ const EN = {
       ],
       gewinnt: [
         'I won! Good catch today.',
-        'Victory! The net held.',
+        'I won! The net held.',
         'I won! Come back, the sea is new every day.',
       ],
       remis: [
@@ -2575,7 +2575,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. Everything went to plan, just like in the harbor.',
-        'Victory. Good planning is half the voyage.',
+        'I won. Good planning is half the voyage.',
         'I won. The harbor is always open for a rematch.',
       ],
       remis: [
@@ -2627,7 +2627,7 @@ const EN = {
         'Cleanly played. I’ll analyze it tonight.',
       ],
       gewinnt: [
-        'Won. Look at the analysis, it’s all in there.',
+        'I won. Look at the analysis, it’s all in there.',
         'That’s it. Sometimes a single slip is enough.',
         'Good game. But not good enough. Not yet.',
         'Thanks for the game. Come back when you’re ready.',
@@ -2678,7 +2678,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. It’s all a matter of the right moment.',
-        'Victory. The tide came in right on time, as always.',
+        'I won. The tide came in right on time, as always.',
         'I won. Come back, there’s always another low tide.',
       ],
       remis: [
@@ -2727,7 +2727,7 @@ const EN = {
       ],
       gewinnt: [
         'I won! Unsinkable, as promised.',
-        'Victory! I was almost underwater, but only almost.',
+        'I won! I was almost underwater, but only almost.',
         'I won. Never give up, I learned that at sea.',
       ],
       remis: [
@@ -2776,7 +2776,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. Forty years of night shifts pay off.',
-        'Victory. The light keeps burning, come back anytime.',
+        'I won. The light keeps burning, come back anytime.',
         'I won. Look at the analysis, everything is lit up there.',
       ],
       remis: [
@@ -2825,7 +2825,7 @@ const EN = {
       ],
       gewinnt: [
         'I won! Those who dare go further.',
-        'Victory! The sacrifice paid off.',
+        'I won! The sacrifice paid off.',
         'I won! Jump back in with me anytime.',
       ],
       remis: [
@@ -2874,7 +2874,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. Slow, quiet, sure.',
-        'Victory. Patience is the finest sonar.',
+        'I won. Patience is the finest sonar.',
         'I won. Come back, I’ll gladly guide you again.',
       ],
       remis: [
@@ -2923,7 +2923,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. In the end, half a pawn was enough.',
-        'Victory. Small advantages, big treasure.',
+        'I won. Small advantages, big treasure.',
         'I won. Look at the endgame in the analysis, that’s where it shines.',
       ],
       remis: [
@@ -2972,7 +2972,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. Thoroughness pays off.',
-        'Victory. Everything neatly recorded.',
+        'I won. Everything neatly recorded.',
         'I won. Feel free to read my notes, I mean: the analysis.',
       ],
       remis: [
@@ -3021,7 +3021,7 @@ const EN = {
       ],
       gewinnt: [
         'I won. The gate stays shut today.',
-        'Victory. Come back, the gate is always here.',
+        'I won. Come back, the gate is always here.',
         'I won. The analysis shows you where the gap was.',
       ],
       remis: [
@@ -3074,7 +3074,7 @@ const EN = {
       ],
       gewinnt: [
         'Blub. The result was decided long ago.',
-        'Won. As expected. But you put up a fight!',
+        'I won. As expected. But you put up a fight!',
         'The fish wins. Be a good sport, it happens to almost everyone.',
         'Checkmate. The analysis shows where you almost had me.',
       ],

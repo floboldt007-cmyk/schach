@@ -448,10 +448,17 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELK
   for (const sp of ['de', 'en']) {
     setzeSprache(sp);
     const LOB = { de: /du hast gewonnen|^gewonnen, aber du/i, en: /you won|^won, but you/i }[sp];
-    const ICH = { de: /ich ha(b|be) gewonnen/i, en: /I won/ }[sp];
+    const ICH = { de: /\bich ha(b|be) gewonnen|^(gewonnen|sieg)[!.,]/i, en: /\bI won\b|\bI've won\b|^(victory|won)[!.,]/i }[sp];
+    // R16 p3: ein blosses "Gewonnen!"/"Sieg!" (en "Victory!"/"Won.") liest sich nach einer Niederlage wie ein Sieg des
+    // Spielers; der Bot sagt "Ich hab gewonnen" bzw. "I won". Bis R16 p2 standen in ICH Steuerzeichen 0x08 statt \b,
+    // die Pruefung fand dadurch nie etwas.
+    const BLOSS = { de: /^(gewonnen|sieg)[!.,]/i, en: /^(victory|won)[!.,]/i }[sp];
     const falschGewinnt = BOTS.flatMap((b) => (b.saetze.gewinnt || []).filter((x) => LOB.test(x)).map((x) => b.id + ': ' + x));
+    const falschBloss = BOTS.flatMap((b) => (b.saetze.gewinnt || []).filter((x) => BLOSS.test(x)).map((x) => b.id + ': ' + x));
     const falschVerliert = BOTS.flatMap((b) => (b.saetze.verliert || []).filter((x) => ICH.test(x)).map((x) => b.id + ': ' + x));
     pruefe(`${sp}: kein Satz "gewinnt" (Bot siegt) lobt den Spieler als Sieger`, !falschGewinnt.length, falschGewinnt);
+    pruefe(`${sp}: kein Satz "gewinnt" beginnt mit blossem Gewonnen/Sieg (alle ${BOTS.length} Bots; ${falschBloss.length} gefunden)`,
+      !falschBloss.length, falschBloss.slice(0, 5));
     pruefe(`${sp}: kein Satz "verliert" (Bot verliert) sagt, der Bot habe gewonnen`, !falschVerliert.length, falschVerliert);
   }
   setzeSprache('de');

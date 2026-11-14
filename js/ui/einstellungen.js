@@ -92,6 +92,15 @@ const TIEFEN = [
   { wert: 16, name: 'gruendlich' },
 ];
 function E(k, w) { return t('einstellungen.' + k, w); }
+// Voller Lizenztext von chess.js (BSD-2-Clause verlangt Vermerk und Bedingungen bei der Weitergabe), wortgleich mit
+// vendor/chess/LICENSE (tests/info-lizenzen.test.mjs). Im Code statt verlinkt: die Datei liegt nicht im Offline-Cache.
+const CHESSJS_LIZENZ = Object.freeze([
+  'Copyright (c) 2025, Jeff Hlywa (jhlywa@gmail.com) All rights reserved.',
+  'Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:',
+  '1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.',
+  '2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.',
+  'THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.',
+]);
 // der Bot, bei dem die Leiter nach dem Zuruecksetzen wieder beginnt (Name aus bots.js, beim Zeichnen gelesen)
 // Erster Gegner der Leiter (seit den Welten Vogelscheuche Willi, vorher Bauer Lukas): dort beginnt sie nach dem Zuruecksetzen
 function ersterGegner() {
@@ -214,6 +223,7 @@ export function zeige(root, params = {}, app) {
         <section class="es-gruppe flaeche es-info" aria-labelledby="es-g-info">
           <h3 class="es-titel" id="es-g-info">${E('gruppe.infoLizenzen')}</h3>
           <p>${E('info.frei', { app: '<b>Crownmate</b>', lizenz: `<a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>` })}</p>
+          <p>${E('info.quellcode', { app: 'Crownmate', link: '<a href="https://github.com/floboldt007-cmyk/schach" target="_blank" rel="noopener">GitHub</a>' })}</p>
           <p class="es-hilfe es-version" hidden></p>
           <p class="es-recht"><a href="${esc(pfad(sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'))}" target="_blank" rel="noopener">${E('info.datenschutz')}</a> · <a href="${esc(pfad(sprache() === 'en' ? 'impressum-en.html' : 'impressum.html'))}" target="_blank" rel="noopener">${E('info.impressum')}</a></p>
           <div class="es-bericht">
@@ -222,12 +232,14 @@ export function zeige(root, params = {}, app) {
           </div>
           <ul class="es-lizenzen">
             <li><b>Stockfish 19</b><span>${E('info.stockfish', { link: '<a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">github.com/nmrugg/stockfish.js</a>' })}</span></li>
-            <li><b>chess.js 1.4.0</b><span>${E('info.chessjs')}</span></li>
+            <li><b>chess.js 1.4.0</b><span>${E('info.chessjs')}</span>
+              <details class="es-lizenztext"><summary>${E('info.lizenztext')}</summary><div data-lizenztext="chess.js">${CHESSJS_LIZENZ.map((a) => `<p>${esc(a)}</p>`).join('')}</div></details></li>
             <li><b>${E('info.figuren')}</b><span>${E('info.figurenText')}</span></li>
             <li><b>${E('info.schriften')}</b><span>SIL Open Font License 1.1: <a href="${esc(pfad('assets/schriften/OFL-Manrope.txt'))}" target="_blank" rel="noopener">Manrope</a>, <a href="${esc(pfad('assets/schriften/OFL-Bricolage-Grotesque.txt'))}" target="_blank" rel="noopener">Bricolage Grotesque</a></span></li>
             <li><b>${E('info.tagesraetsel')}</b><span>${E('info.tagesraetselText')}</span></li>
             <li><b>${E('info.klaenge')}</b><span>${E('info.klaengeText')}</span></li>
             <li><b>${E('info.bilder')}</b><span>${E('info.bilderText')}</span></li>
+            <li><b>${E('info.lichess')}</b><span>${E('info.lichessText', { link: `<a href="https://database.lichess.org/" target="_blank" rel="noopener">${E('info.lichessDb')}</a>` })}</span></li>
           </ul>
         </section>
        </div>
