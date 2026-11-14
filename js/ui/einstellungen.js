@@ -223,7 +223,7 @@ export function zeige(root, params = {}, app) {
         <section class="es-gruppe flaeche es-info" aria-labelledby="es-g-info">
           <h3 class="es-titel" id="es-g-info">${E('gruppe.infoLizenzen')}</h3>
           <p>${E('info.frei', { app: '<b>Crownmate</b>', lizenz: `<a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>` })}</p>
-          <p>${E('info.quellcode', { app: 'Crownmate', link: '<a href="https://github.com/floboldt007-cmyk/schach" target="_blank" rel="noopener">github.com/floboldt007-cmyk/schach</a>' })}</p>
+          <p>${E('info.quellcode', { app: 'Crownmate', link: '<a href="https://github.com/floboldt007-cmyk/schach" target="_blank" rel="noopener">GitHub</a>' })}</p>
           <p class="es-hilfe es-version" hidden></p>
           <p class="es-recht"><a href="${esc(pfad(sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'))}" target="_blank" rel="noopener">${E('info.datenschutz')}</a> · <a href="${esc(pfad(sprache() === 'en' ? 'impressum-en.html' : 'impressum.html'))}" target="_blank" rel="noopener">${E('info.impressum')}</a></p>
           <div class="es-bericht">
@@ -239,7 +239,7 @@ export function zeige(root, params = {}, app) {
             <li><b>${E('info.tagesraetsel')}</b><span>${E('info.tagesraetselText')}</span></li>
             <li><b>${E('info.klaenge')}</b><span>${E('info.klaengeText')}</span></li>
             <li><b>${E('info.bilder')}</b><span>${E('info.bilderText')}</span></li>
-            <li><b>${E('info.lichess')}</b><span>${E('info.lichessText', { link: '<a href="https://database.lichess.org/" target="_blank" rel="noopener">database.lichess.org</a>' })}</span></li>
+            <li><b>${E('info.lichess')}</b><span>${E('info.lichessText', { link: `<a href="https://database.lichess.org/" target="_blank" rel="noopener">${E('info.lichessDb')}</a>` })}</span></li>
           </ul>
         </section>
        </div>
