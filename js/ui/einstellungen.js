@@ -63,7 +63,7 @@ const NAV_ICON = Object.freeze({ spiel: 'spiel', anzeige: 'anzeige', klang: 'kla
   fortschritt: 'fortschritt', sprache: 'sprache', info: 'info' });
 const PAKET_ICON = Object.freeze([['konto-gruppe', 'konto'], ['daten-gruppe', 'daten'], ['abo-gruppe', 'abo'], ['schule-gruppe', 'schule'],
   ['st-gruppe', 'start'], ['se-es', 'serie'], ['si-gruppe', 'sicherung'], ['em-einstellungen', 'emotes'], ['fi-einstellungen', 'finisher'],
-  ['on-', 'online']]);
+  ['vw-gruppe', 'konto'], ['on-', 'online']]);
 // Reihenfolge (Flo 31.10.2026): Spielen zuerst, Sprache und Info unten
 const KERN_ORDNUNG = Object.freeze(['spiel', 'anzeige', 'klang', 'coach', 'bewegung']);
 // G-002 (08.11.2026): die Gruppen der Pakete erst zum Spielen (Emotes, Finisher, Bauernmarsch, Erste Schritte), dann
