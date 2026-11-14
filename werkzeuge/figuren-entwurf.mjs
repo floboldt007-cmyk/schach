@@ -36,7 +36,7 @@ const FORM = {
 const AUGE = { N: [18.5, 14, 1.3] };
 
 const z = (n) => +n.toFixed(2);
-const kreisPunkte = ([x, y, r], n = 10) => Array.from({ length: n }, (_, i) => [x + r * Math.cos((i / n) * 2 * Math.PI), y + r * Math.sin((i / n) * 2 * Math.PI)]);
+const kreisPunkte = ([x, y, r]) => Array.from({ length: 10 }, (_, i) => [x + r * Math.cos((i / 10) * 2 * Math.PI), y + r * Math.sin((i / 10) * 2 * Math.PI)]);
 const vielecke = (f) => FORM[f].map((s) => (s.k ? kreisPunkte(s.k) : s));
 const pfadVon = (pts) => `M${pts.map(([x, y]) => `${z(x)} ${z(y)}`).join('L')}Z`;
 const kreisPfad = ([x, y, r]) => `M${z(x - r)} ${y}a${r} ${r} 0 1 0 ${z(2 * r)} 0a${r} ${r} 0 1 0 ${z(-2 * r)} 0Z`;
@@ -52,13 +52,14 @@ function drinnenVieleck(pts, x, y) {
 }
 const drinnen = (f, x, y) => FORM[f].some((s) => (s.k ? (x - s.k[0]) ** 2 + (y - s.k[1]) ** 2 <= s.k[2] ** 2 : drinnenVieleck(s, x, y)));
 // fester Zufall, damit jeder Lauf dieselben Dateien schreibt (--pruefen vergleicht)
+// Zahlenfolge nach Numerical Recipes (LCG), nur fuer feste Muster
 function zufall(saat) { let s = saat >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
 const saatVon = (t) => [...t].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 
 const svg = (defs, inhalt) => `<svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 45 45">${defs ? `<defs>${defs}</defs>` : ''}${inhalt}</svg>\n`;
-const schnitt = (f, id = 's') => `<clipPath id="${id}"><path d="${D(f)}"/></clipPath>`;
+const schnitt = (f) => `<clipPath id="s"><path d="${D(f)}"/></clipPath>`;
 // Umriss aussen: breiter Strich hinten, Flaeche vorn, damit Ueberlappungen der Teilformen keine Innenlinien zeigen
-const umriss = (f, linie, breite, flaeche, extra = '') => `<path d="${D(f)}" fill="${linie}" stroke="${linie}" stroke-width="${breite * 2}" stroke-linejoin="round"/><path d="${D(f)}" fill="${flaeche}"${extra}/>`;
+const umriss = (f, linie, breite, flaeche) => `<path d="${D(f)}" fill="${linie}" stroke="${linie}" stroke-width="${breite * 2}" stroke-linejoin="round"/><path d="${D(f)}" fill="${flaeche}"/>`;
 const auge = (f, farbe) => (AUGE[f] ? `<path d="${kreisPfad(AUGE[f])}" fill="${farbe}"/>` : '');
 const linienSchraeg = (abstand, von = -45, bis = 90) => { let d = ''; for (let i = von; i < bis; i += abstand) d += `M${z(i)} 45L${z(i + 45)} 0`; return d; };
 
