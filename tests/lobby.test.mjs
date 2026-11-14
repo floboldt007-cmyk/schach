@@ -162,28 +162,28 @@ async function browserTeil() {
       await warte(700);
       const lobby = await p.s.evaluate(() => ({
         aktiv: document.querySelector('.screen.lobby .lb-modus')?.dataset.aktiv,
-        zeiten: [...document.querySelectorAll('.lb-zeit')].map((b) => b.dataset.zeit + (b.getAttribute('aria-checked') === 'true' ? '*' : '')),
-        werte: [...document.querySelectorAll('.lb-wert')].map((w) => w.dataset.art + ':' + w.querySelector('b').textContent),
+        // R19 Lobby B: sechs Freundschafts-Kacheln, eine gewertete Kachel, Rang-Wappen statt drei gleicher Zahlen
+        zeiten: [...document.querySelectorAll('.lb-frei')].map((b) => b.dataset.zeit), gewertet: document.querySelector('.lb-gewertet.lb-suchen b')?.textContent.replace(/\s/g, ''),
+        segment: !!document.querySelector('.lb-spielen .segment'),
+        werte: document.querySelectorAll('.lb-wert, .lb-wertungen').length, rang: document.querySelector('.lb-rang small')?.textContent || '',
         liga: document.querySelectorAll('.lb-liga, .lb-tabelle li').length, beispiel: /Beispiel|Turmfalke/.test(document.querySelector('.screen.lobby').textContent), mehr: [...document.querySelectorAll('.lb-modus-karte')].map((b) => b.dataset.ziel + (b.disabled ? '-' : '+')),
         reiter: document.querySelector('.reiter-leiste .reiter[aria-current="page"], .reiter-leiste .reiter.aktiv')?.dataset.reiter || null,
-        hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1, zeitenZu: document.querySelector('.lb-zeiten').hidden,
-        klein: [...document.querySelectorAll('.lb-zeit, .lb-suchen, .lb-modus-karte')].filter((e) => e.getClientRects().length && e.getBoundingClientRect().height < 44).length,
+        hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1,
+        klein: [...document.querySelectorAll('.lb-kachel, .lb-modus-karte')].filter((e) => e.getClientRects().length && e.getBoundingClientRect().height < 44).length,
       }));
-      pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), keine Beispiel-Liga (Flo 08.11.2026)',
-        lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2*,5+0,10+0,15+10,30+0' && lobby.werte.join() === 'blitz:400,schnell:400,klassisch:400'
+      pruefe('Lobby: Online aktiv, sechs Freundschafts-Kacheln, Rang-Wappen mit 400 statt drei Wertungen, keine Beispiel-Liga (Flo 08.11.2026)',
+        lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2,5+0,10+0,15+10,30+0' && lobby.werte === 0 && /^400 /.test(lobby.rang)
         && lobby.liga === 0 && !lobby.beispiel, lobby);
-      // Punkt 40: Ranked (gewertet) hat die feste Zeit 5 + 3, die Wahl gibt es nur fuer Freundschaft
-      pruefe('Lobby: gewertet ohne Bedenkzeit-Wahl (feste Zeit), Freundschaft zeigt sie', lobby.zeitenZu, lobby);
+      // Punkt 40: Ranked (gewertet) hat die feste Zeit 5 + 3; in Lobby B ist das eine eigene Kachel statt eines Umschalters
+      pruefe('Lobby: gewertet als eigene Kachel mit fester Zeit 5 + 3, kein Umschalter', lobby.gewertet === '5+3' && !lobby.segment, lobby);
       pruefe('Lobby: Gegen Freunde und Raetsel-Duell offen, Turniere bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
         lobby.mehr.join() === 'online+,turniere-,duell+' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
       // Etappe B Task 4: gewertet sucht jetzt echt auf dem Server; die Vorschau mit Bot bleibt bei Freundschaft
-      await p.s.locator('.lb-spielen [data-wert="freundschaft"]').click();
-      await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
-      const zeile = await p.s.locator('.lb-zeile').innerText();
-      pruefe('Bedenkzeit 10 + 0 waehlen: Haken wandert, Zeile nennt Schnellschach', await p.s.locator('.lb-zeit[aria-checked="true"]').getAttribute('data-zeit') === '10+0'
-        && /Schnellschach/.test(zeile), zeile);
-      await p.s.locator('.lb-suchen').click();
+      await p.s.locator('.lb-frei[data-zeit="10+0"]').click();
       await p.s.waitForSelector('.lb-suche[data-phase="suche"]', { timeout: 3000 });
+      const zeile = await p.s.locator('.lb-suche-zeile').innerText();
+      pruefe('Kachel 10 + 0: die Suche startet sofort als Freundschaft im Schnellschach', /Schnellschach/.test(zeile) && /Freundschaft/.test(zeile)
+        && /10\s*\+\s*0/.test(zeile), zeile);
       pruefe('Gegner suchen: Radar und Abbrechen, deckt die Reiter-Leiste ab', await p.s.evaluate(() => {
         const el = document.querySelector('.lb-suche');
         const r = document.querySelector('.reiter-leiste');
@@ -200,18 +200,15 @@ async function browserTeil() {
       pruefe('Escape schliesst die Suche', await p.s.locator('.lb-suche').count() === 0);
       // Flo 01.11.2026 (Handy): "Bin auf Gegner suchen gegangen, konnte danach nichts mehr anklicken". Mit dem Finger wie
       // auf dem Handy: Suche, Zurueck, danach reagiert die Lobby; Suche, Spielen, danach reagiert die Partie (auch in WebKit)
-      await p.s.tap('.lb-suchen');
+      await p.s.tap('.lb-frei[data-zeit="5+0"]');
       await p.s.waitForSelector('.lb-suche[data-phase="gefunden"]', { timeout: 3000 });
       await p.s.tap('.lb-abbrechen');
       await warte(250);
-      await p.s.tap('.lb-zeit[data-zeit="5+0"]');
-      await warte(150);
-      const nachZurueck = await p.s.evaluate(() => ({ suche: document.querySelectorAll('.lb-suche').length, zeit: document.querySelector('.lb-zeit[aria-checked="true"]')?.dataset.zeit,
-        oben: (() => { const k = document.querySelector('.lb-suchen').getBoundingClientRect(); const e = document.elementFromPoint(k.left + k.width / 2, k.top + k.height / 2); return !!(e && e.closest('.lb-suchen')); })() }));
-      pruefe('Getippt: Zurueck schliesst die Suche, danach reagiert die Lobby (Bedenkzeit 5 + 0, Gegner suchen wieder oben)',
-        nachZurueck.suche === 0 && nachZurueck.zeit === '5+0' && nachZurueck.oben, nachZurueck);
-      await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
-      await p.s.tap('.lb-suchen');
+      const nachZurueck = await p.s.evaluate(() => ({ suche: document.querySelectorAll('.lb-suche').length,
+        oben: ['.lb-frei[data-zeit="5+0"]', '.lb-suchen'].every((sel) => { const k = document.querySelector(sel).getBoundingClientRect(); const e = document.elementFromPoint(k.left + k.width / 2, k.top + k.height / 2); return !!(e && e.closest(sel)); }) }));
+      pruefe('Getippt: Zurueck schliesst die Suche, danach reagiert die Lobby (Kacheln wieder oben)',
+        nachZurueck.suche === 0 && nachZurueck.oben, nachZurueck);
+      await p.s.tap('.lb-frei[data-zeit="10+0"]');
       await p.s.waitForSelector('.lb-suche[data-phase="gefunden"]', { timeout: 3000 });
       await p.s.tap('.lb-spielen-bot');
       await p.s.waitForFunction(() => window.__partie && window.__partie.z, null, { timeout: 15000 });
@@ -343,11 +340,14 @@ async function browserTeil() {
       await p.s.waitForSelector('.screen.lobby .lb-spielen', { timeout: 30000 });
       await warte(700);
       const lage = await p.s.evaluate(() => {
+        // R19 Lobby A: ohne Wertungen-Kasten steht die Karte Spielen mittig, Mehr Spielarten darunter
         const a = document.querySelector('.lb-spielen').getBoundingClientRect();
-        const b = document.querySelector('.lb-wertungen').getBoundingClientRect();
-        return { nebeneinander: b.left >= a.right - 1 && Math.abs(a.top - b.top) < 4, breit: document.documentElement.scrollWidth <= innerWidth + 1 };
+        const r = document.querySelector('.lb-rumpf').getBoundingClientRect();
+        const m = document.querySelector('.lb-mehr').getBoundingClientRect();
+        return { mittig: Math.abs((a.left + a.right) / 2 - (r.left + r.right) / 2) < 4, darunter: m.top >= a.bottom - 1,
+          breit: document.documentElement.scrollWidth <= innerWidth + 1 };
       });
-      pruefe('iPad quer: Spielen links, Wertungen rechts daneben', lage.nebeneinander && lage.breit, lage);
+      pruefe('iPad quer: Spielen mittig, Mehr Spielarten darunter', lage.mittig && lage.darunter && lage.breit, lage);
       // am Rand gewischt rollt die Lobby (vorher nur die 1040-px-Spalte in der Mitte, Flo 01.11.2026 bei Premium und Lektionen)
       // seit der Seitenleiste (Etappe A) beginnt der Rand des Screens rechts neben ihr
       // seit die Beispiel-Liga weg ist (Flo 08.11.2026) passt die Lobby auf 820 px Hoehe: zum Rollen-Test niedriger machen

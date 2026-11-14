@@ -51,6 +51,34 @@
 .lb-suchen { width: 100%; min-height: 56px; justify-content: space-between; font-size: 18px; padding: 0 20px; }
 .lb-zeile { margin: -4px 0 0; color: var(--text-2); font-size: 13.5px; font-weight: 650; text-align: center; }
 
+/* R19 Lobby B "Schnellstart": Kopfzeile mit Rang-Wappen, eine grosse gewertete Kachel, darunter sechs Freundschafts-Kacheln */
+.lb-kopfzeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lb-kopfzeile .ueberzeile { display: block; }
+.lb-spielen .lb-kopfzeile .ueberzeile + h2 { margin-top: 2px; font-size: 26px; }
+.lb-rang { display: flex; align-items: center; gap: 10px; flex: none; }
+.lb-rang img { width: 44px; height: 53px; display: block; }
+.lb-rang > span { display: flex; flex-direction: column; gap: 1px; }
+.lb-rang b { font-size: 15px; font-weight: 800; }
+.lb-rang small { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.lb-kachel { border: 0; font: inherit; cursor: pointer; color: var(--text); border-radius: var(--r-m);
+  transition: transform var(--d-s, .2s) var(--sanft, ease), background-color var(--d-s, .2s) var(--sanft, ease); }
+.lb-kachel:active { transform: scale(.97); }
+.lb-gewertet { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "ueber pfeil" "zeit pfeil" "text pfeil";
+  align-items: center; row-gap: 2px; padding: 16px 20px; min-height: 112px; text-align: left; background: var(--akzent); color: var(--auf-akzent); box-shadow: var(--s1); }
+.lb-kachel-ueber { grid-area: ueber; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.lb-kachel-ueber .ico { width: 16px; height: 16px; }
+.lb-gewertet > b { grid-area: zeit; font-size: 34px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.lb-gewertet > small { grid-area: text; font-size: 14px; font-weight: 650; opacity: .92; }
+.lb-gewertet > .ico { grid-area: pfeil; width: 26px; height: 26px; }
+.lb-raster-titel { margin: 4px 0 -4px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.lb-raster { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lb-frei { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 84px; padding: 10px 6px;
+  background: var(--flaeche-2); box-shadow: var(--kante); }
+.lb-frei > b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.lb-frei > small { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.lb-frei > small .ico { width: 15px; height: 15px; color: var(--akzent); }
+@media (hover: hover) { .lb-frei:hover { background: var(--flaeche); box-shadow: var(--s1), var(--kante); } }
+
 /* Wertungen */
 .lb-werte { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .lb-wert { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border-radius: var(--r-m); background: var(--flaeche-2);
@@ -79,6 +107,9 @@
   .lobby .lb-rumpf { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 18px; }
   .lobby .lb-rumpf > .lb-modus, .lobby .lb-rumpf > .lb-mehr { grid-column: 1 / -1; }
   .lobby .lb-spielen { grid-row: span 2; align-self: start; }
+  /* R19 Lobby B: ohne den Kasten "Deine Wertungen" bleibt eine Spalte; die Karte steht mittig */
+  .lobby .lb-rumpf:has(> .lb-spielen[data-variante]) { grid-template-columns: minmax(0, 1fr); }
+  .lobby .lb-spielen[data-variante] { grid-row: auto; justify-self: center; width: min(100%, 680px); }
 }
 /* Handy: Gruppe ueber den Zeiten, dichter */
 @media (max-width: 520px) {
