@@ -60,8 +60,9 @@
 
 .es-info p { margin: 0 0 10px; font-size: 14px; color: var(--text-2); }
 .es-info a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere;
-  /* Tippflaeche >= 44 px: Polster nur fuer den Finger, die Zeilenhoehe bleibt (Polster an inline-Elementen zaehlt nicht zur Zeile) */
-  padding-block: 13px; }
+  /* Tippflaeche >= 44 px: Polster nur fuer den Finger, die Zeilenhoehe bleibt (Polster an inline-Elementen zaehlt nicht zur Zeile);
+     positioniert liegt das Polster ueber den Textzeilen davor und danach, sonst fing am Handy die Nachbarzeile den Tipp (R18) */
+  padding-block: 13px; position: relative; }
 /* Absaetze mit Link untereinander (GPL-3.0 und GitHub, GitHub und Datenschutz): 26 px Abstand = beide Polster, sonst
    ueberlappen die Tippflaechen und ein Tipp oeffnet den falschen Link (R17-Sammelfix, tests/info-lizenzen.test.mjs) */
 .es-info > p:has(a) ~ p:has(a) { margin-top: 26px; }
