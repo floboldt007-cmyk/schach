@@ -116,7 +116,7 @@ async function pixelKontrast(s, el) {
     }
     rand.sort((a, b) => a - b); const g = rand[rand.length >> 1];
     const k = (l) => (Math.max(l, g) + 0.05) / (Math.min(l, g) + 0.05);
-    return { anteil: innen.filter((l) => k(l) >= 3).length / innen.length, grund: +g.toFixed(3) };
+    return { anteil: innen.filter((l) => k(l) >= 3).length / innen.length, grund: +g.toFixed(3), max: +Math.max(...innen.map(k)).toFixed(2) };
   }, { bild, w: Math.round(box.width), h: Math.round(box.height) });
 }
 
@@ -174,6 +174,29 @@ try {
         await warte(300);
         await p.s.screenshot({ path: path.join(ziel, `lobby-${breite}x${hoehe}-${modus}.png`) });
       }
+      // Zustaende (design-beweis): Ruhe, Zeiger, Fokus, gedrueckt je bedienbarer Kachel; Symbol mind. 3:1 (Anteil),
+      // Beschriftung mind. 4.5:1 (staerkster Textpixel gegen den Kachelgrund), im Fokus ein sichtbarer Ring
+      const zustand = [];
+      const bedienbar = await p.s.locator('.lb-art:not(:disabled), .lb-modus-karte:not(:disabled)').all();
+      if (bedienbar.length < 3) zustand.push({ bedienbar: bedienbar.length });
+      for (const el of bedienbar) {
+        const name = (await el.getAttribute('data-art')) || (await el.getAttribute('data-ziel'));
+        const box = await el.boundingBox();
+        for (const z of ['ruhe', 'zeiger', 'fokus', 'gedrueckt']) {
+          await p.s.mouse.move(0, 0);
+          await p.s.evaluate(() => document.activeElement && document.activeElement.blur());
+          if (z === 'zeiger') await p.s.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          if (z === 'fokus') { await p.s.keyboard.press('Shift'); await el.focus(); }
+          if (z === 'gedrueckt') { await p.s.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await p.s.mouse.down(); }
+          await warte(260);
+          const sy = await pixelKontrast(p.s, el.locator('> .sy'));
+          const tx = await pixelKontrast(p.s, el.locator('b').first());
+          const ring = z !== 'fokus' || await el.evaluate((e) => { const c = getComputedStyle(e); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) >= 2; });
+          if (z === 'gedrueckt') { await p.s.mouse.move(0, 0); await p.s.mouse.up(); }
+          if (!(sy.anteil >= 0.1 && tx.max >= 4.5 && ring)) zustand.push({ name, z, symbol: sy.anteil, text: tx.max, ring });
+        }
+      }
+      pruefe(`${wer} Lobby: Ruhe, Zeiger, Fokus, gedrueckt: Symbol 3:1, Text 4.5:1, Fokusring`, zustand.length === 0, zustand);
       pruefe(`${wer} Lobby: keine Seitenfehler`, p.fehlerListe.length === 0, p.fehlerListe);
       await p.k.close();
     }
