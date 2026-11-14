@@ -8,6 +8,9 @@
 //   node tests/r17-ende-pc.test.mjs                                  Pruefung
 //   node tests/r17-ende-pc.test.mjs --bilder=<ordner> --name=<A|B|C>  dazu PC-Bilder (je Breite und Schema); mit
 //     --name=basis werden die Bilder mit der Basis-CSS aufgenommen
+//   --css=<commit>   die Variante aus diesem Commit messen (raetsel-duell.css per route), sonst der Arbeitsbaum
+//   Dazu je PC-Breite ein Durchgang mit Namenszeile unter den Bildern ("Du", Gegnername): so/R17-ende-feinschliff setzt
+//   sie ohne diese CSS, die Karte waechst dort von 431 auf 452 px. Hier nachgestellt (14 px, Zeile 21 px)
 //   BASIS_REF=<commit> (Standard dbe3c55, feinschliff-20261111 vor R17 ende-pc)
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +28,8 @@ const BILDER = arg('bilder');
 const NAME = arg('name') || 'variante';
 const BASIS_REF = process.env.BASIS_REF || 'dbe3c55';
 const BASIS_CSS = execFileSync('git', ['show', `${BASIS_REF}:css/pakete/raetsel-duell.css`], { cwd: WURZEL, encoding: 'utf8' });
+const CSS_REF = arg('css');
+const VARIANTE_CSS = CSS_REF ? execFileSync('git', ['show', `${CSS_REF}:css/pakete/raetsel-duell.css`], { cwd: WURZEL, encoding: 'utf8' }) : null;
 if (BILDER) fs.mkdirSync(BILDER, { recursive: true });
 
 let ok = 0; let fehler = 0;
@@ -55,12 +60,13 @@ const STAND = () => ({ duell: DUELL, art: 'ki', status: 'beendet', jetzt: new Da
   gegner: { geloest: 2, fehler: 0, ende_am: new Date(Date.now() - 20000).toISOString(), ki: true, elo: 1200 },
   raetsel: null, ergebnis: 'sieg', kronen_delta: 20 });
 
-async function ende(browser, { breite, hoehe, schema, touch, basisCss }) {
+async function ende(browser, { breite, hoehe, schema, touch, basisCss, namen = false }) {
   const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, serviceWorkers: 'block', hasTouch: touch, colorScheme: schema, deviceScaleFactor: 1 });
   const s = await k.newPage();
   const fehlerListe = [];
   s.on('pageerror', (e) => fehlerListe.push(e.message));
-  if (basisCss) await s.route('**/css/pakete/raetsel-duell.css*', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: BASIS_CSS }));
+  const css = basisCss ? BASIS_CSS : VARIANTE_CSS;
+  if (css) await s.route('**/css/pakete/raetsel-duell.css*', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: css }));
   await s.route(SUPA + '/**', (r) => {
     const name = (r.request().url().match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1];
     const body = name === 'duell_stand' ? STAND() : [];
@@ -79,6 +85,10 @@ async function ende(browser, { breite, hoehe, schema, touch, basisCss }) {
   await s.waitForSelector('.screen.raetsel-duell[data-phase="beendet"] .rd-ende', { timeout: 8000 });
   // Einblendung der Karte ans Ende springen lassen, dann ruhen lassen (Fokus sitzt auf "Nochmal")
   await s.evaluate(() => document.getAnimations().forEach((a) => { try { a.finish(); } catch (e) { /* unendlich */ } }));
+  if (namen) {
+    await s.evaluate(() => document.querySelectorAll('.rd-ende-wer').forEach((w, i) => w.insertAdjacentHTML('beforeend',
+      `<span class="probe-name" style="font-size:14px;line-height:21px;font-weight:700">${i ? 'Kira' : 'Du'}</span>`)));
+  }
   await s.waitForTimeout(250);
   return { k, s, fehlerListe };
 }
@@ -100,15 +110,15 @@ try {
 
   // 1. PC: Karte im Bild, keine Leere-Wueste darunter
   for (const [breite, hoehe] of [[1440, 900], [1920, 1080]]) {
-    for (const schema of ['light', 'dark']) {
-      const g = `PC ${breite}x${hoehe} ${schema === 'dark' ? 'dunkel' : 'hell'}`;
-      const { k, s, fehlerListe } = await ende(browser, { breite, hoehe, schema, touch: false, basisCss: NAME === 'basis' });
+    for (const [schema, namen] of [['light', false], ['dark', false], ['light', true]]) {
+      const g = `PC ${breite}x${hoehe} ${schema === 'dark' ? 'dunkel' : 'hell'}${namen ? ' mit Namenszeile' : ''}`;
+      const { k, s, fehlerListe } = await ende(browser, { breite, hoehe, schema, touch: false, basisCss: NAME === 'basis', namen });
       const m = await s.evaluate(() => {
         const rumpf = document.querySelector('.rd-rumpf').getBoundingClientRect();
         const karte = document.querySelector('.rd-ende').getBoundingClientRect();
         const knoepfe = [...document.querySelectorAll('.rd-ende .rd-knoepfe > *')].map((e) => e.getBoundingClientRect());
         const sc = document.querySelector('.rd-rumpf');
-        return { rumpfOben: rumpf.top, rumpfH: rumpf.height, oben: karte.top, unten: karte.bottom, links: karte.left, rechts: karte.right,
+        return { kartenH: karte.height, rumpfOben: rumpf.top, rumpfH: rumpf.height, oben: karte.top, unten: karte.bottom, links: karte.left, rechts: karte.right,
           leereUnten: rumpf.bottom - karte.bottom, knoepfeImBild: knoepfe.every((b) => b.bottom <= innerHeight && b.top >= 0),
           scrollt: sc.scrollHeight > sc.clientHeight + 1, quer: document.documentElement.scrollWidth > innerWidth,
           maus: matchMedia('(hover: hover) and (pointer: fine)').matches };
@@ -121,7 +131,8 @@ try {
           m.leereUnten <= m.rumpfH * 0.3, m);
       }
       pruefe(`${g}: keine Seitenfehler`, fehlerListe.length === 0, fehlerListe);
-      if (BILDER) await s.screenshot({ path: path.join(BILDER, `raetsel-duell-ende-${NAME}-pc-${breite}-${schema === 'dark' ? 'dunkel' : 'hell'}.png`) });
+      if (namen) pruefe(`${g}: Namenszeile macht die Karte hoeher (${Math.round(m.kartenH)} px)`, m.kartenH > 440, m);
+      if (BILDER) await s.screenshot({ path: path.join(BILDER, `raetsel-duell-ende-${NAME}-pc-${breite}-${schema === 'dark' ? 'dunkel' : 'hell'}${namen ? '-namen' : ''}.png`) });
       await k.close();
     }
   }
