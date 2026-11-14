@@ -321,5 +321,17 @@ for (const n of ['anna', 'bert', 'carl', 'emil', 'fritz']) {
   }
 }
 
+// ---------- Gegenprobe (Kaltreview 14.11.): faellt die Grenze 30 auf 15, wird die Probe fuer den SQL-Editor rot ----------
+{
+  const echt = lies('supabase/weltrang-schema.sql');
+  const falsch = echt.replace('ab_start constant integer := 30;', 'ab_start constant integer := 15;');
+  const g = new PGlite();
+  let x = await lauf(g, 'Attrappe', ATTRAPPE);
+  for (const d of BISHER) x = x || await lauf(g, d, lies(d));
+  x = x || await lauf(g, 'weltrang-schema.sql (Grenze 15)', falsch);
+  const probe = !x && await lauf(g, 'weltrang-rls-test.sql (Grenze 15)', lies('supabase/weltrang-rls-test.sql'));
+  pruefe('Gegenprobe: mit Grenze 15 statt 30 meldet weltrang-rls-test.sql den Fehler bei D', falsch !== echt && !x && /FEHLER: D \(Startwert selbst, 29 Partien\)/.test(probe || ''), x || probe);
+}
+
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);

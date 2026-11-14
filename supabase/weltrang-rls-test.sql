@@ -1,7 +1,8 @@
 -- Prueft supabase/weltrang-schema.sql im Supabase SQL Editor (als Besitzer, wie dort ueblich). Alles wird am Ende
--- zurueckgerollt. Drei kurzlebige Nutzer A, B und C. Jeder Fehler bricht mit "FEHLER: ..." ab; ohne Fehler endet der
+-- zurueckgerollt. Sechs kurzlebige Nutzer A bis F. Jeder Fehler bricht mit "FEHLER: ..." ab; ohne Fehler endet der
 -- Lauf mit ROLLBACK.
 -- Abschnitte: 1 ohne Zustimmung niemand; 2 nur ab 15 Partien und mit Name, fremdes Banner als 'start';
+-- 2b Start-Elo selbst gesetzt erst ab 30 Partien (D 29 nicht, E 30 drin, F 15 ohne Startwert drin);
 -- 3 keine Tabellenrechte, anon darf nichts; 4 Zuruecknehmen wirkt sofort.
 begin;
 
@@ -16,6 +17,18 @@ insert into public.kronen_stand (user_id, elo, elo_n)
 values ('a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 3990, 15), ('b2b2b2b2-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 3980, 14),
        ('c3c3c3c3-cccc-4ccc-8ccc-cccccccccccc', 3970, 99)
 on conflict (user_id) do update set elo = excluded.elo, elo_n = excluded.elo_n;
+insert into auth.users (id, email)
+values
+  ('d4d4d4d4-dddd-4ddd-8ddd-dddddddddddd', 'weltrang-d@example.invalid'),
+  ('e5e5e5e5-eeee-4eee-8eee-eeeeeeeeeeee', 'weltrang-e@example.invalid'),
+  ('f6f6f6f6-ffff-4fff-8fff-ffffffffffff', 'weltrang-f@example.invalid');
+insert into public.profile (user_id, benutzername)
+values ('d4d4d4d4-dddd-4ddd-8ddd-dddddddddddd', 'weltrang_probe_d'), ('e5e5e5e5-eeee-4eee-8eee-eeeeeeeeeeee', 'weltrang_probe_e'),
+       ('f6f6f6f6-ffff-4fff-8fff-ffffffffffff', 'weltrang_probe_f');
+insert into public.kronen_stand (user_id, elo, elo_n, start_gesetzt)
+values ('d4d4d4d4-dddd-4ddd-8ddd-dddddddddddd', 3960, 29, true), ('e5e5e5e5-eeee-4eee-8eee-eeeeeeeeeeee', 3950, 30, true),
+       ('f6f6f6f6-ffff-4fff-8fff-ffffffffffff', 3940, 15, false)
+on conflict (user_id) do update set elo = excluded.elo, elo_n = excluded.elo_n, start_gesetzt = excluded.start_gesetzt;
 insert into public.karte_wahl (user_id, banner) values ('a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'kein-besitz')
 on conflict (user_id) do update set banner = excluded.banner;
 
@@ -67,6 +80,41 @@ declare
 begin
   if l->'ich'->>'status' <> 'ohne_name' or jsonb_array_length(l->'liste') > 100 then
     raise exception 'FEHLER: C ohne Name falsch (%)', l;
+  end if;
+end;
+$$;
+
+-- ---------- 2b. Start-Elo selbst gesetzt (Flo 14.11.2026): erst ab 30 Partien, ohne Startwert weiter ab 15 ----------
+select set_config('request.jwt.claims', '{"sub":"d4d4d4d4-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
+do $$
+declare
+  l jsonb := public.weltrang_mitmachen(true);
+begin
+  if (l->>'ab_start')::int <> 30 or l->'ich'->>'status' <> 'zaehlt_noch' or (l->'ich'->>'fehlen')::int <> 1
+     or exists (select 1 from jsonb_array_elements(l->'liste') z where z->>'name' = 'weltrang_probe_d') then
+    raise exception 'FEHLER: D (Startwert selbst, 29 Partien) falsch (%)', l;
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"e5e5e5e5-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
+do $$
+declare
+  l jsonb := public.weltrang_mitmachen(true);
+begin
+  if l->'ich'->>'status' <> 'dabei'
+     or not exists (select 1 from jsonb_array_elements(l->'liste') z where z->>'name' = 'weltrang_probe_e') then
+    raise exception 'FEHLER: E (Startwert selbst, 30 Partien) falsch (%)', l;
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"f6f6f6f6-ffff-4fff-8fff-ffffffffffff","role":"authenticated"}', true);
+do $$
+declare
+  l jsonb := public.weltrang_mitmachen(true);
+begin
+  if l->'ich'->>'status' <> 'dabei'
+     or not exists (select 1 from jsonb_array_elements(l->'liste') z where z->>'name' = 'weltrang_probe_f') then
+    raise exception 'FEHLER: F (ohne Startwert, 15 Partien) falsch (%)', l;
   end if;
 end;
 $$;

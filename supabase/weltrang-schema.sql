@@ -8,7 +8,9 @@
 -- Gezeigt werden Rang, Name, Banner und Elo. Keine Kennung, keine Mail, keine Liga-Stufe, kein Titel.
 -- Voraussetzung: schema.sql, kronen-schema.sql und karte-schema.sql sind eingespielt. Diese Datei bringt meine_daten()
 -- zeichengleich mit daten-schema.sql mit (ganz unten), damit die Datenauskunft die Zustimmung auch dann nennt, wenn nur diese
--- Datei eingespielt wird (live laeuft die Fassung ohne Weltrangliste). Einspielen: im SQL Editor ausfuehren.
+-- Datei eingespielt wird (live laeuft die Fassung ohne Weltrangliste). Damit geht die GANZE aktuelle Fassung von meine_daten()
+-- live, auch die Bloecke anderer Teile (Saison, Verwaltung ...); gewollt, jeder Block prueft seine Tabelle mit to_regclass und
+-- laeuft ohne sie weiter (Kaltreview 14.11.2026). Einspielen: im SQL Editor ausfuehren.
 -- Wiederholbar, bestehende Zustimmungen bleiben. Probe: supabase/weltrang-rls-test.sql. Rueckweg: supabase/weltrang-zurueck.sql.
 -- NICHT von Claude einspielen: Flo spielt Supabase-Aenderungen selbst ein.
 
