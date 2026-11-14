@@ -273,8 +273,8 @@ function nodeTeil() {
     && /@fontsource-variable\/bricolage-grotesque@5\.3\.0/.test(modernCss));
 
   gruppe = 'tokens.css';
-  const probe = leseCss('@keyframes k { from { opacity: 0; } to { opacity: 1; } } :root { --nach: 1; }');
-  pruefe('Selbstprobe Leser: Regel nach @keyframes wird gelesen', probe.some((r) => r.selektor === ':root' && r.decls.some(([k]) => k === '--nach')));
+  const leserProbe = leseCss('@keyframes k { from { opacity: 0; } to { opacity: 1; } } :root { --nach: 1; }');
+  pruefe('Selbstprobe Leser: Regel nach @keyframes wird gelesen', leserProbe.some((r) => r.selektor === ':root' && r.decls.some(([k]) => k === '--nach')));
   const tok = lies('css/tokens.css');
   const tr = leseCss(tok);
   const tn = new Set(tr.flatMap((r) => r.decls.map(([k]) => k)));
