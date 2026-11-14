@@ -112,6 +112,12 @@
   transition: transform var(--d-s) var(--feder-weich), box-shadow var(--d-s) var(--gleiten); }
 .heim-modus:active { transform: scale(.98); }
 .heim-modus:focus-visible { outline: var(--fokus); outline-offset: 3px; }
+/* Zeiger-Zustand (R17): Karten heben sich wie in der Sammlung (sammlung.css), die Zeile bekommt die zweite Flaeche wie die
+   Einstellungs-Navigation; die Schrift bleibt dabei mindestens 4,5:1 (tests/r17-heim-hover.test.mjs) */
+@media (hover: hover) {
+  .heim-modus:hover, .heim-leiter-liste:hover { box-shadow: var(--s3, var(--s2)), var(--kante); }
+  .heim-zeile:hover { background: var(--flaeche-2); }
+}
 .heim-symbol { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--auf-akzent); }
 .heim-symbol svg { width: 20px; height: 20px; }
 .heim-modus[data-weg="online"] .heim-symbol { background: var(--akzent); }
