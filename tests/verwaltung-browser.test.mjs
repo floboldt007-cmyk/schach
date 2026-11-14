@@ -47,8 +47,11 @@ async function warteAufServer(url, ms = 10000) {
 
 // Oeffnet die Einstellungen mit gefaelschtem Supabase. recht: Antwort von ist_verwalter (true/false), 'offline'
 // (Anfrage bricht ab) oder 'fehlt' (404 wie ohne verwaltung-schema.sql). Gemessen wird, nachdem ist_verwalter beantwortet
-// ist (bzw. ohne Anmeldung nach derselben Wartezeit).
-async function zustand(browser, { sitzung = SITZUNG, recht = false, w = 1180, h = 820 } = {}) {
+// ist (bzw. ohne Anmeldung nach derselben Wartezeit). spaet: ist_verwalter antwortet erst nach so vielen ms (das Menue
+// ist dann laengst gebaut). konto: Konto freigeschaltet (schach-arena:konto:sichtbar). handy: Handybreite, dort tippt der
+// Test den Menue-Eintrag an und misst, ob die Seite des Bereichs aufgeht.
+async function zustand(browser, { sitzung = SITZUNG, recht = false, spaet = 0, konto = true, handy = false } = {}) {
+  const [w, h] = handy ? [390, 844] : [1180, 820];
   const kontext = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
   const seite = await kontext.newPage();
   const fehler = [];
@@ -63,6 +66,7 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, w = 1180, h 
     const u = r.request().url();
     if (u.endsWith('/rest/v1/rpc/ist_verwalter')) {
       frage.push(u);
+      if (spaet) await warte(spaet);
       beantwortet++;
       if (recht === 'offline') return r.abort('internetdisconnected');
       if (recht === 'fehlt') {
@@ -73,20 +77,22 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, w = 1180, h 
     }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
-  await seite.addInitScript(({ sitzung }) => {
+  await seite.addInitScript(({ sitzung, konto }) => {
     try {
-      localStorage.setItem('schach-arena:konto:sichtbar', '1');
+      if (konto) localStorage.setItem('schach-arena:konto:sichtbar', '1');
       if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
     } catch (e) { /* egal */ }
-  }, { sitzung });
+  }, { sitzung, konto });
   await seite.goto(BASIS + '#einstellungen');
-  await seite.waitForSelector('.es-inhalt', { timeout: 15000 });
-  const ende = Date.now() + 5000;
-  while (sitzung && !beantwortet && Date.now() < ende) await warte(50);
+  // state attached: am Handy ist der Inhalt in der Liste verborgen
+  await seite.waitForSelector('.es-inhalt', { state: 'attached', timeout: 15000 });
+  const navVorher = await seite.locator('.es-nav-punkt').count();
+  const ende = Date.now() + 5000 + spaet;
+  while (sitzung && konto && !beantwortet && Date.now() < ende) await warte(50);
   await warte(600);
-  const stand = await seite.evaluate((titel) => {
+  const messe = () => seite.evaluate((titel) => {
     const g = document.querySelector('.vw-gruppe');
-    const nav = [...document.querySelectorAll('.es-nav button')].map((b) => b.textContent.trim());
+    const nav = [...document.querySelectorAll('.es-nav-punkt')].map((b) => b.textContent.trim());
     return {
       da: !!g,
       sichtbar: !!g && !g.hidden && g.getClientRects().length > 0,
@@ -94,8 +100,17 @@ async function zustand(browser, { sitzung = SITZUNG, recht = false, w = 1180, h 
       text: document.querySelector('.es-inhalt')?.innerText.includes(titel) || false,
     };
   }, DE.titel);
+  const stand = await messe();
+  let seiteAuf = null;
+  if (handy && stand.inNav) {
+    await seite.locator('.es-nav-punkt', { hasText: DE.titel }).first().click();
+    await seite.waitForFunction(() => location.hash.startsWith('#einstellungen/'), null, { timeout: 5000 }).catch(() => {});
+    await warte(600);
+    seiteAuf = { hash: await seite.evaluate(() => location.hash), ...(await messe()),
+      offen: await seite.evaluate(() => !!document.querySelector('.vw-gruppe.es-offen')) };
+  }
   await kontext.close();
-  return { ...stand, fehler, fragen: frage.length };
+  return { ...stand, navVorher, seiteAuf, fehler, fragen: frage.length };
 }
 
 async function browserTeil(browser) {
@@ -115,13 +130,28 @@ async function browserTeil(browser) {
   pruefe('SQL fehlt (404): Gruppe still unsichtbar', fehlt.fragen >= 1 && !fehlt.sichtbar && !fehlt.text, fehlt);
   pruefe('SQL fehlt (404): kein Konsolenfehler', fehlt.fehler.length === 0, fehlt.fehler);
 
-  // Gegenprobe: das Paket steht in PAKETE und zeigt die Gruppe dem Verwalter, ohne ?erw
-  const flo = await zustand(browser, { recht: true });
+  // wie abo und schule: ohne Konto-Freischaltung fragt die Verwaltung gar nicht erst, auch mit Sitzung und Recht
+  const gesperrt = await zustand(browser, { recht: true, konto: false });
+  pruefe('ohne Konto-Freischaltung: keine Anfrage an ist_verwalter, Gruppe unsichtbar', gesperrt.fragen === 0 && !gesperrt.sichtbar && !gesperrt.text,
+    gesperrt);
+  pruefe('ohne Konto-Freischaltung: kein Konsolenfehler', gesperrt.fehler.length === 0, gesperrt.fehler);
+
+  // Gegenprobe: das Paket steht in PAKETE und zeigt die Gruppe dem Verwalter, ohne ?erw. ist_verwalter antwortet spaet,
+  // das Menue ist dann schon gebaut und muss den Eintrag nachreichen
+  const flo = await zustand(browser, { recht: true, spaet: 1500 });
   pruefe('Gegenprobe Verwalter: Gruppe da und sichtbar (Paket aus PAKETE geladen, ohne ?erw)', flo.da && flo.sichtbar && flo.text, flo);
-  pruefe('Gegenprobe Verwalter: kein Konsolenfehler', flo.fehler.length === 0, flo.fehler);
-  // Nur gemeldet, nicht geprueft: js/ui/einstellungen.js baut das Menue (am Handy die Liste der Seiten) einmal beim
-  // Oeffnen, die Gruppe wird erst danach sichtbar (istVerwalter antwortet spaeter)
-  console.log('Hinweis: Menue-Eintrag "' + DE.titel + '" fuer den Verwalter ' + (flo.inNav ? 'da' : 'fehlt (Menue entsteht vor der Antwort von ist_verwalter)'));
+  pruefe('Verwalter am PC: Eintrag im Menue, obwohl ist_verwalter erst nach dem Menue antwortet', flo.navVorher > 0 && flo.inNav, flo);
+  pruefe('Verwalter am PC: kein Konsolenfehler', flo.fehler.length === 0, flo.fehler);
+
+  const floHandy = await zustand(browser, { recht: true, spaet: 1500, handy: true });
+  pruefe('Verwalter am Handy: Eintrag in der Liste nach spaeter Antwort', floHandy.navVorher > 0 && floHandy.inNav, floHandy);
+  pruefe('Verwalter am Handy: Tipp oeffnet die Seite der Verwaltung', !!floHandy.seiteAuf?.offen && floHandy.seiteAuf.sichtbar
+    && floHandy.seiteAuf.hash === '#einstellungen/verwaltung', floHandy.seiteAuf);
+  pruefe('Verwalter am Handy: kein Konsolenfehler', floHandy.fehler.length === 0, floHandy.fehler);
+
+  const keinHandy = await zustand(browser, { recht: false, spaet: 1500, handy: true });
+  pruefe('ohne Recht am Handy: kein Eintrag in der Liste, Gruppe unsichtbar', keinHandy.fragen === 1 && !keinHandy.inNav && !keinHandy.sichtbar, keinHandy);
+  pruefe('ohne Recht am Handy: kein Konsolenfehler', keinHandy.fehler.length === 0, keinHandy.fehler);
 }
 
 let server = null;

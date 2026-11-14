@@ -3,14 +3,16 @@
 //
 // Orte:
 //   einstellungen:gruppen   Gruppe "Verwaltung", reihenfolge 8. Sie ist zuerst unsichtbar und erscheint nur, wenn
-//                           istVerwalter() true meldet. Ohne Anmeldung, ohne Recht, offline oder solange die SQL fehlt
-//                           bleibt sie still weg (kein Fehler, keine Meldung).
+//                           istVerwalter() true meldet. Ohne Konto-Freischaltung (kontoFreigeschaltet, wie abo und
+//                           schule) gibt es sie nicht und keine Anfrage. Ohne Anmeldung, ohne Recht, offline oder solange
+//                           die SQL fehlt bleibt sie still weg (kein Fehler, keine Meldung).
 // Blatt: Kontoliste mit Suche (AC-06), je Konto Premium an/aus (AC-07), Kaeufe (AC-08), Name und Banner (AC-09),
 // dazu das Protokoll. Jede Aenderung laedt das Konto danach neu vom Server, die Anzeige zeigt nie einen erratenen Stand.
 // Defensiv: ein Fehler hier haelt die App nie an.
 import { anbieten } from '../../orte.js';
 import { t, datum } from '../../sprache.js';
 import { sheet } from '../../ui/bauteile.js';
+import { kontoFreigeschaltet } from '../../konto.js';
 import { MENSCHEN_BANNER } from '../../ui/visitenkarte.js';
 import '../sammlung/karte-texte.js';
 import './texte.js';
@@ -131,7 +133,7 @@ export function zeigeVerwaltung() {
 }
 
 export function verwaltungGruppe() {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || !kontoFreigeschaltet()) return null;
   const el = document.createElement('section');
   el.className = 'es-gruppe flaeche vw-gruppe';
   el.hidden = true;
