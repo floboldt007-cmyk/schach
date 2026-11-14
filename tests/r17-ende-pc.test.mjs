@@ -101,6 +101,55 @@ const masse = (s) => s.evaluate(() => {
     .map((e) => `${e.tagName.toLowerCase()}.${[...e.classList].join('.')} ${r(e).join(',')} ${getComputedStyle(e).fontSize}`);
 });
 
+// Ueberlappung, Kontrast und Fokus der Ende-Karte (Kaltreview 37: deckte der Test noch nicht selbst ab).
+// Kontrast nach WCAG (relative Leuchtdichte): Text der Knoepfe gegen ihre Fuellung mindestens 4,5:1, Ergebniszeile (h2)
+// gegen die Karte ebenso. Durchscheinende Fuellungen werden auf den Grund darunter gerechnet; ist der Grund ein Verlauf
+// (die Karte), zaehlt der schlechteste Farbstopp. Fokus sitzt auf "Nochmal", sichtbar (outline oder box-shadow), und am
+// grossen Schirm ganz im Bild (im niedrigen Fenster rollt der Rumpf, dort genuegt "per Scrollen erreichbar", siehe 1b)
+async function pruefeKarte(s, g, { fokusImBild = true } = {}) {
+  const m = await s.evaluate(() => {
+    const rgb = (t) => { const z = (t.match(/[\d.]+/g) || []).map(Number); return { r: z[0], g: z[1], b: z[2], a: z.length > 3 ? z[3] : 1 }; };
+    const lum = ({ r, g, b }) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+      .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+    const misch = (o, u) => ({ r: o.r * o.a + u.r * (1 - o.a), g: o.g * o.a + u.g * (1 - o.a), b: o.b * o.a + u.b * (1 - o.a), a: 1 });
+    // moegliche Gruende unter e: durchscheinende Schichten sammeln bis zu einer deckenden Farbe oder einem Verlauf
+    const gruende = (e) => {
+      const schichten = [];
+      for (let x = e; x; x = x.parentElement) {
+        const cs = getComputedStyle(x);
+        const verlauf = cs.backgroundImage.includes('gradient') ? (cs.backgroundImage.match(/rgba?\([^)]*\)/g) || []).map(rgb) : [];
+        const f = rgb(cs.backgroundColor);
+        if (verlauf.length) return verlauf.map((v) => schichten.reduceRight((u, o) => misch(o, u), misch(v, f.a ? f : { r: 255, g: 255, b: 255, a: 1 })));
+        if (f.a >= 0.99) return [schichten.reduceRight((u, o) => misch(o, u), f)];
+        if (f.a > 0) schichten.push(f);
+      }
+      return [];
+    };
+    const kontrast = (e) => { const gs = gruende(e); if (!gs.length) return null; const a = lum(rgb(getComputedStyle(e).color));
+      return Math.min(...gs.map((f) => { const b = lum(f); return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100; })); };
+    const karte = document.querySelector('.rd-ende');
+    const kb = karte.getBoundingClientRect();
+    const kinder = [...karte.querySelectorAll('.rd-ende > *')].filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0);
+    const ueber = [];
+    for (let i = 0; i < kinder.length; i++) for (let j = i + 1; j < kinder.length; j++) {
+      const a = kinder[i].getBoundingClientRect(); const b = kinder[j].getBoundingClientRect();
+      if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1)
+        ueber.push(`${kinder[i].className} / ${kinder[j].className}`);
+    }
+    const knoepfe = [...karte.querySelectorAll('.rd-knoepfe > *')];
+    const ausserhalb = knoepfe.filter((e) => { const b = e.getBoundingClientRect(); return b.left < kb.left - 0.5 || b.right > kb.right + 0.5 || b.bottom > kb.bottom + 0.5; }).length;
+    const titel = karte.querySelector('.rd-ende-titel') || karte.querySelector('h2, h3');
+    const f = document.activeElement; const fs = getComputedStyle(f); const fb = f.getBoundingClientRect();
+    return { ueber, ausserhalb, knopfKontrast: knoepfe.map((e) => kontrast(e)), titelKontrast: titel ? kontrast(titel) : null,
+      fokusNochmal: f.classList.contains('rd-nochmal'), fokusSichtbar: (fs.outlineStyle !== 'none' && parseFloat(fs.outlineWidth) > 0) || fs.boxShadow !== 'none',
+      fokusImBild: fb.top >= 0 && fb.bottom <= innerHeight && fb.left >= 0 && fb.right <= innerWidth };
+  });
+  pruefe(`${g}: nichts in der Karte ueberlappt, Knoepfe in der Karte`, m.ueber.length === 0 && m.ausserhalb === 0, m);
+  pruefe(`${g}: Kontrast Knoepfe und Ergebnis mindestens 4,5:1 (${m.knopfKontrast.join(' / ')}; ${m.titelKontrast})`,
+    m.knopfKontrast.length > 1 && m.knopfKontrast.every((k) => k >= 4.5) && m.titelKontrast >= 4.5, m);
+  pruefe(`${g}: Fokus auf "Nochmal", sichtbar${fokusImBild ? ' und im Bild' : ''}`, m.fokusNochmal && m.fokusSichtbar && (!fokusImBild || m.fokusImBild), m);
+}
+
 const pw = ladePlaywright();
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
@@ -132,7 +181,36 @@ try {
       }
       pruefe(`${g}: keine Seitenfehler`, fehlerListe.length === 0, fehlerListe);
       if (namen) pruefe(`${g}: Namenszeile macht die Karte hoeher (${Math.round(m.kartenH)} px)`, m.kartenH > 440, m);
+      await pruefeKarte(s, g);
       if (BILDER) await s.screenshot({ path: path.join(BILDER, `raetsel-duell-ende-${NAME}-pc-${breite}-${schema === 'dark' ? 'dunkel' : 'hell'}${namen ? '-namen' : ''}.png`) });
+      await k.close();
+    }
+  }
+
+  // 1b. Niedrige PC-Fenster (Kaltreview 37: align-content center schnitt die Karte oben ab, ohne Zurueckscrollen; etwa
+  // ein 1366er-Laptop mit 125 %): Kartenoberkante nie ueber dem Rumpf, Knoepfe per Scrollen im Rumpf erreichbar
+  for (const [breite, hoehe] of [[1100, 480], [1280, 520], [1366, 650]]) {
+    for (const schema of ['light', 'dark']) {
+      const g = `PC niedrig ${breite}x${hoehe} ${schema === 'dark' ? 'dunkel' : 'hell'} mit Namenszeile`;
+      const { k, s, fehlerListe } = await ende(browser, { breite, hoehe, schema, touch: false, basisCss: NAME === 'basis', namen: true });
+      const m = await s.evaluate(() => {
+        const sc = document.querySelector('.rd-rumpf');
+        sc.scrollTop = 0;
+        const oben = { rumpf: sc.getBoundingClientRect().top, karte: document.querySelector('.rd-ende').getBoundingClientRect().top };
+        sc.scrollTop = sc.scrollHeight;
+        const r = sc.getBoundingClientRect();
+        const knoepfe = [...document.querySelectorAll('.rd-ende .rd-knoepfe > *')].map((e) => e.getBoundingClientRect());
+        const unten = { knoepfeImRumpf: knoepfe.every((b) => b.top >= r.top - 0.5 && b.bottom <= Math.min(r.bottom, innerHeight) + 0.5) };
+        sc.scrollTop = 0;
+        return { ...oben, ...unten, abgeschnitten: Math.round(oben.rumpf - oben.karte), quer: document.documentElement.scrollWidth > innerWidth,
+          maus: matchMedia('(hover: hover) and (pointer: fine)').matches };
+      });
+      pruefe(`${g}: Maus erkannt`, m.maus, m);
+      pruefe(`${g}: Karte oben nicht abgeschnitten (${m.abgeschnitten} px ueber dem Rumpf)`, m.abgeschnitten <= 0, m);
+      pruefe(`${g}: Knoepfe per Scrollen im Rumpf ganz erreichbar, kein Querscrollen`, m.knoepfeImRumpf && !m.quer, m);
+      pruefe(`${g}: keine Seitenfehler`, fehlerListe.length === 0, fehlerListe);
+      await pruefeKarte(s, g, { fokusImBild: false });
+      if (BILDER) await s.screenshot({ path: path.join(BILDER, `raetsel-duell-ende-${NAME}-pc-${breite}x${hoehe}-${schema === 'dark' ? 'dunkel' : 'hell'}-namen.png`) });
       await k.close();
     }
   }
