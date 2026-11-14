@@ -19,7 +19,7 @@ registriereTexte('p-karte', {
     'karte.keineErfolge': 'Noch keine Erfolge ausgestellt', 'karte.ohneLiga': 'Ohne Liga', 'karte.orden': 'Ausgestellte Erfolge',
     'karte.bannerFrei': 'Frei', 'karte.bannerAn': 'Getragen',
     // Liga-Namen nach Konzept 5a; welche Kronen-Liga welchen Namen zeigt, steht in js/ui/visitenkarte.js LIGA_NAMEN
-    'liga.bauer': 'Bauer', 'liga.springer': 'Springer', 'liga.laeufer': 'Läufer', 'liga.turm': 'Turm', 'liga.dame': 'Dame', 'liga.koenig': 'König',
+    'liga.bauer': 'Squire', 'liga.springer': 'Knight', 'liga.laeufer': 'Warden', 'liga.turm': 'Baron', 'liga.dame': 'Sovereign', 'liga.koenig': 'Crownmate',
     'gefunden.los': 'Gleich geht es los',
     // Banner-Ids saison-* bleiben (Bilder aus dem Vorrat und Server); benannt nach der Liga-Stufe, je Stufe genau eines
     // (G-002, Flos Wahl 08.11.2026; Zuordnung Farbe -> Stufe in js/ui/visitenkarte.js LIGA_NAMEN)
@@ -45,7 +45,7 @@ registriereTexte('p-karte', {
     'karte.ki': 'AI', 'karte.kiGegner': 'AI opponent', 'karte.gegner': 'Opponent', 'karte.du': 'You',
     'karte.keineErfolge': 'No achievements on show yet', 'karte.ohneLiga': 'No league', 'karte.orden': 'Achievements on show',
     'karte.bannerFrei': 'Unlocked', 'karte.bannerAn': 'Worn',
-    'liga.bauer': 'Pawn', 'liga.springer': 'Knight', 'liga.laeufer': 'Bishop', 'liga.turm': 'Rook', 'liga.dame': 'Queen', 'liga.koenig': 'King',
+    'liga.bauer': 'Squire', 'liga.springer': 'Knight', 'liga.laeufer': 'Warden', 'liga.turm': 'Baron', 'liga.dame': 'Sovereign', 'liga.koenig': 'Crownmate',
     'gefunden.los': 'Starting in a moment',
     'b.start': 'First move', 'b.saison-holz': 'Pawn banner', 'b.saison-bronze': 'Knight banner', 'b.saison-silber': 'Bishop banner',
     'b.saison-gold': 'Rook banner', 'b.saison-diamant': 'Queen banner', 'b.saison-krone': 'King banner',
