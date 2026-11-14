@@ -66,6 +66,10 @@
 .es-lizenzen li { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 12px; background: var(--flaeche-2); border: 1px solid var(--linie); }
 .es-lizenzen b { font-size: 14px; }
 .es-lizenzen span { font-size: 13px; color: var(--text-2); }
+.es-lizenztext { font-size: 12px; color: var(--text-2); }
+/* Tippflaeche >= 44 px wie die Links der Info-Gruppe */
+.es-lizenztext summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--akzent-text); }
+.es-lizenztext p { margin: 0 0 6px; font-size: 12px; overflow-wrap: anywhere; }
 
 /* ---------- Tester-Bericht (Luecken-Check 10): Eintrag in "Info und Lizenzen" und das Blatt (js/bericht.js) ---------- */
 .es-bericht { margin: var(--a2) 0 var(--a4); padding: var(--a3); border-radius: var(--r-m); background: var(--flaeche-2); border: 1px solid var(--linie); }
