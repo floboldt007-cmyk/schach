@@ -125,6 +125,9 @@ const SUITEN = [
   { name: 'sammlung', datei: 'sammlung.test.mjs', args: [], was: 'Paket Sammlung: Reiter Ich, Bereiche mit Schloss, Erfolge' },
   { name: 'bretter-65', datei: 'bretter-65.test.mjs', args: [], was: '65 Bretter: Katalog, Gleichlauf mit tokens.css, Kontrast und Figuren-Lesbarkeit, Glanz nur ohne weniger Bewegung' },
   { name: 'bretter-oberflaechen', datei: 'bretter-oberflaechen.test.mjs', args: [], was: 'Brett-Oberflaechen: Seltenheit gewoehnlich, Oberflaeche je seltenem Brett, Farbabstand, Kontrast mit Oberflaeche, Feldausschnitt im Browser' },
+  { name: 'bretter-v3', datei: 'bretter-v3.test.mjs', args: [], was: 'Motiv-Bretter Fassung 3 (Entwurf): 20 Motive, Helligkeitsbaender, Kontrast am echten Brett, Bewegung nur ohne weniger Bewegung' },
+  { name: 'bretter-v4', datei: 'bretter-v4.test.mjs', args: [], was: 'Motiv-Bretter Fassung 4: 20 Motive, Textur je Feld, Feld 3,0, Textur 1,15, Koordinaten 3,0, Bewegung nur am Rahmen' },
+  { name: 'bretter-v4-app', datei: 'bretter-v4-app.test.mjs', args: [], was: 'Motiv-Bretter in der App: Katalog nur Erfinder, Rahmen in Bot/Online/Zu zweit/Raetsel-Duell, Handy ohne Rahmen, Sammlung' },
   { name: 'lernen', datei: 'lernen.test.mjs', args: [], was: 'Paket lernen: Meisterschule, leicht gratis, Rest im Trainer, Lektionen mit Engine-Verteidigung' },
   { name: 'lobby', datei: 'lobby.test.mjs', args: [], was: 'Paket lobby: Online-Lobby als Vorschau im Labor (Umschalter, Bedenkzeiten, Suche, Partie mit Uhr)' },
   { name: 'finisher', datei: 'finisher.test.mjs', args: [], was: 'Paket Finisher: Freischaltung und sichere Standardwahl' },
@@ -155,6 +158,7 @@ const SUITEN = [
   { name: 'r18-hover-rest', datei: 'r18-hover-rest.test.mjs', args: [], was: 'Feinschliff R18: Einstellungen-Navigation und Kopf-Chips am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover (Browser)' },
   { name: 'r18-rd-hover', datei: 'r18-rd-hover.test.mjs', args: [], was: 'Feinschliff R18: Knoepfe des Raetsel-Duells (Start, Ende) am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover, Kontrast in vier Zustaenden mind. 4,5:1 (Browser)' },
   { name: 'r19-rand-handy', datei: 'r19-rand-handy.mjs', args: [], was: 'Feinschliff R19: Brett mit Koordinaten am Rand ragt auf 6 Geraeten nicht ueber Sockel oder Seite, auch nach Brettwechsel in der Partie (<= 0,5 px) (Browser)' },
+  { name: 'r19-effekt-ebene', datei: 'r19-effekt-ebene.mjs', args: [], was: 'Feinschliff R19: mit jedem Motiv-Brett deckt sich die Effekt-Ebene auf 5 Geraeten (ecke/rand) auf 0,5 px mit dem Brett, nie breiter, kein Ueberlauf (Browser)' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
