@@ -43,13 +43,16 @@ const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
 const token = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 9999999999, user: { id: UID, email: 'probe@example.invalid' } };
 const KI_REF = '11111111-2222-4333-8444-555555555555';
-function rpcAntwort(name, daten) {
+// neuesSql: die Suche nennt Wartezeit und Beginn (SQL #213, lage().vomServer), erst dann kommt der Hinweis "Verlassen zaehlt"
+function rpcAntwort(name, daten, neuesSql = false) {
   if (name === 'online_suche_ende') return daten && daten.ki ? { ki_ref: KI_REF } : {};
-  if (name === 'online_suche_start' || name === 'online_suche_stand') return { wartet: true, zeit: '5+3' };
+  if (name === 'online_suche_start' || name === 'online_suche_stand') {
+    return neuesSql ? { wartet: true, zeit: '5+3', warte_s: 1, ki_ab_s: 0, seit: new Date().toISOString() } : { wartet: true, zeit: '5+3' };
+  }
   return [];
 }
 
-async function seite(browser, { breite = 1280, hoehe = 800, mobil = false, hash = 'heim', sprache = 'de', name = 'Bigbananajoe007' } = {}) {
+async function seite(browser, { breite = 1280, hoehe = 800, mobil = false, hash = 'heim', sprache = 'de', name = 'Bigbananajoe007', neuesSql = false } = {}) {
   const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1, hasTouch: mobil, isMobile: mobil, serviceWorkers: 'block' });
   const s = await k.newPage();
   const fehlerListe = [];
@@ -57,7 +60,7 @@ async function seite(browser, { breite = 1280, hoehe = 800, mobil = false, hash 
   await s.route(SUPA + '/**', (r) => {
     const n = (r.request().url().match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1];
     let d = null; try { d = r.request().postDataJSON(); } catch (e) { /* ohne Rumpf */ }
-    const body = n ? rpcAntwort(n, d) : (r.request().url().includes('sonderstuecke') ? [{ stueck_id: 'erfinder-titel' }] : []);
+    const body = n ? rpcAntwort(n, d, neuesSql) : (r.request().url().includes('sonderstuecke') ? [{ stueck_id: 'erfinder-titel' }] : []);
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body ?? []) });
   });
   await s.addInitScript(({ sitzung, uid, sprache, name }) => {
@@ -161,6 +164,60 @@ try {
     pruefe('Labor-Lobby: Duell-Intro mit anlass liga vor dem KI-Ersatz', g.prot.includes('liga'), g);
     pruefe('Labor-Lobby: Kopf "Online · gewertet · 5 + 3", keine Stufe, kein Streifen', g.kopf === 'Online · gewertet · 5 + 3' && !g.stufe && g.vk === 0, g);
     pruefe('Labor-Lobby: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+    await p.k.close();
+  }
+
+  // Kaltreview f1 Befund 2: der Hinweis "Verlassen zaehlt als Niederlage" gehoert nur in die KI-Partie, die ihn ausloest.
+  // Wer waehrend des Intros die Online-Seite verlaesst, bekommt ihn nicht in der naechsten fremden Partie.
+  const meldungenMitschreiben = (s) => s.evaluate(() => {
+    window.__meldungen = [];
+    const alt = window.__app.meldung;
+    window.__app.meldung = function (text, opt) { window.__meldungen.push(String(text)); return alt.call(this, text, opt); };
+  });
+  const VERLASSEN = 'Verlassen zählt als Niederlage';
+  {
+    const p = await seite(browser, { hash: 'online', neuesSql: true });
+    await p.s.waitForSelector('[data-online="suchen"]:not([disabled])', { timeout: 30000 });
+    await meldungenMitschreiben(p.s);
+    await p.s.locator('[data-online="suchen"]').click();
+    await lesePartie(p.s);
+    await warte(600);
+    const m = await p.s.evaluate(() => window.__meldungen);
+    pruefe('Online-Seite, neues SQL: der Hinweis "Verlassen zaehlt" kommt in der KI-Partie', m.filter((x) => x === VERLASSEN).length === 1, m);
+    await p.k.close();
+  }
+  {
+    const p = await seite(browser, { hash: 'online', neuesSql: true });
+    await p.s.waitForSelector('[data-online="suchen"]:not([disabled])', { timeout: 30000 });
+    await meldungenMitschreiben(p.s);
+    await p.s.locator('[data-online="suchen"]').click();
+    await p.s.waitForFunction(() => document.documentElement.dataset.duell === 'laeuft', null, { timeout: 15000 });
+    await p.s.evaluate(() => window.__app.gehe('arena'));
+    await warte(3000);
+    const kiPartie = await p.s.evaluate(() => !!(window.__partie && window.__partie.z && window.__partie.z.ki));
+    await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
+    await p.s.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+    await warte(800);
+    const m = await p.s.evaluate(() => window.__meldungen);
+    pruefe('Online-Seite: waehrend des Intros verlassen -> keine KI-Partie', !kiPartie, { kiPartie });
+    pruefe('Online-Seite: waehrend des Intros verlassen -> kein Hinweis "Verlassen zaehlt" in der naechsten Bot-Partie', !m.includes(VERLASSEN), m);
+    pruefe('Online-Seite verlassen: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+    await p.k.close();
+  }
+  // Labor-Lobby: nach "Gegner gefunden" fuehrt Wegnavigieren bewusst trotzdem in die Partie (js/ui/lobby.js verlasse:
+  // der Beleg ist ausgestellt, sonst zaehlt die Vorab-Niederlage ohne Partie); das gilt auch waehrend des Intros
+  {
+    const p = await seite(browser, { hash: 'lobby', neuesSql: true });
+    await p.s.waitForSelector('.screen.lobby .lb-suchen', { timeout: 30000 });
+    await warte(400);
+    await meldungenMitschreiben(p.s);
+    await p.s.locator('.lb-suchen').click();
+    await p.s.waitForFunction(() => document.documentElement.dataset.duell === 'laeuft', null, { timeout: 15000 });
+    await p.s.evaluate(() => window.__app.gehe('arena'));
+    await p.s.waitForFunction(() => window.__partie && window.__partie.z && window.__partie.z.ki, null, { timeout: 30000 });
+    await warte(800);
+    const m = await p.s.evaluate(() => window.__meldungen);
+    pruefe('Labor-Lobby: waehrend des Intros verlassen -> die KI-Partie startet trotzdem, mit Hinweis "Verlassen zaehlt"', m.filter((x) => x === VERLASSEN).length === 1, m);
     await p.k.close();
   }
 
