@@ -11,6 +11,7 @@
 //   probe(serverIso, empfangMs, frisch)  eine Probe merken (frisch: true nur mit belegter Kuerze, s. o.)
 //   versatz(jetztMs)                      ms, die zur Geraeteuhr kommen; jetzt() = Date.now() + versatz()
 //   sicher(jetztMs)                       gibt es eine frische Probe?
+//   seit(stempel, gesehen, spiel, jetzt)  Verbrauch seit einem Serverstempel, ohne frische Probe mit Ansichts-Schranke
 export const FRISCH_MS = 6000;
 // Proben veralten: eine spaeter gestellte Geraeteuhr soll nicht fuer immer mit dem alten Versatz rechnen
 export const PROBE_GILT_MS = 10 * 60 * 1000;
@@ -38,6 +39,15 @@ export function versatz(jetztMs = Date.now()) {
 }
 
 export function jetzt(jetztMs = Date.now()) { return jetztMs + versatz(jetztMs); }
+
+// Verbrauch seit einem Serverstempel: mit frischer Probe nach der Serveruhr; ohne sie hoechstens seit die Ansicht den
+// Stand zuerst sah (gesehenMs, Geraeteuhr) plus spielMs, damit eine vorgehende Geraeteuhr keine Frist und keine Uhr
+// vorzeitig beendet (jede Reklamation setzt busy und schluckt Tipps)
+export function seit(stempelMs, gesehenMs, spielMs, jetztMs = Date.now()) {
+  if (!Number.isFinite(stempelMs)) return 0;
+  const roh = jetzt(jetztMs) - stempelMs;
+  return Math.max(0, sicher(jetztMs) ? roh : Math.min(roh, jetztMs - gesehenMs + spielMs));
+}
 
 // nur fuer Tests
 export function vergiss() { proben = []; }

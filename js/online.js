@@ -195,7 +195,11 @@ export async function erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, i
 export async function tritteBei(code) {
   const c = normalisiereCode(code);
   if (!CODE_RE.test(c)) throw new Error(FEHLER_TEXTE.ONLINE_CODE_UNGUELTIG);
-  return schreibend(async () => partieAus(await rpc('online_tritt_bei', { code: c })));
+  // nicht schreibend(): fuer "schon am Brett" gibt online_tritt_bei die alte Zeile ohne Schreibung zurueck
+  // (supabase/online-schema.sql), ihr aktualisiert_am ist dann nur eine Schranke (Kaltreview R19)
+  const p = partieAus(await rpc('online_tritt_bei', { code: c }));
+  zeitProbe(p.aktualisiert_am, Date.now(), false);
+  return p;
 }
 
 function zeilenPfad(id, filter = '') {

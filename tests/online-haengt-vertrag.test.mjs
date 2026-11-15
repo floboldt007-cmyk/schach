@@ -50,8 +50,11 @@ pruefe('Client: tick vergleicht mit haengtNachMs(p), nicht mit der festen Zahl',
     && !/>= HAENGT_MS\b/.test(js));
 // R19 (15.11.2026): die Frist vor dem 2. Halbzug rechnet nach der Serveruhr (js/serverzeit.js), nie allein nach dem
 // Geraet, und die angezeigte Frist ist genau die des Servers
-pruefe('Client: Erstzug-Frist nach Serveruhr, begrenzt durch die erste Sicht',
-  /Math\.min\(serverJetzt\(\) - s, Date\.now\(\) - ersteSicht\.am \+ SICHT_SPIEL_MS\)/.test(js));
+pruefe('Client: Erstzug-Frist nach Serveruhr, ohne frische Probe begrenzt durch die erste Sicht (serverzeit seit)',
+  /return zeitSeit\(s, ersteSicht\.am, SICHT_SPIEL_MS\);/.test(js));
+// Kaltreview F3: die Uhr loest pruefeZeit mit derselben Schranke aus, nie allein nach einer vorgehenden Geraeteuhr
+pruefe('Client: tick loest die Zeitpruefung der laufenden Uhr mit der Ansichts-Schranke aus',
+  /halbzuege >= 2 && rest\(p\.am_zug, vorlaufMs\(\)\) === 0/.test(js));
 pruefe('Client: angezeigte Erstzug-Frist ist ranked_haengt_s bzw. 10 Minuten',
   /const erstzugFristMs = p => p\.gewertet \? HAENGT_RANKED_MS - 1000 : HAENGT_MS;/.test(js) && rankedMs - 1000 === rankedS * 1000);
 // Steht der Server beim ersten Nachfragen noch nicht auf "haengt" (Uhren weichen ab), darf die gewertete Partie nicht

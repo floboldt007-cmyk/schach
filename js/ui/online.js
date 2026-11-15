@@ -28,7 +28,7 @@ import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { hoere } from '../ereignisse.js';
 import { spieleDuell } from './duell.js';
-import { jetzt as serverJetzt } from '../serverzeit.js';
+import { jetzt as serverJetzt, seit as zeitSeit } from '../serverzeit.js';
 import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie } from '../storage.js';
 
 const WURZEL = new URL('../../', import.meta.url);
@@ -918,19 +918,22 @@ export function zeige(root, params, app) {
       if (ort._html !== html) { ort._html = html; ort.innerHTML = html; }
     }
   }
-  function rest(f) {
+  // verbraucht: Zeit seit dem letzten Zug fuer die Ausloesung der Zeitpruefung (vorlaufMs, mit Schranke); ohne die
+  // Angabe zeigt die Uhr die Zeit nach der Serveruhr
+  function rest(f, verbraucht = null) {
     const wert = Number(f === 'w' ? p.uhr_weiss_ms : p.uhr_schwarz_ms) || 0;
     const laeuft = p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2 && p.letzter_zug_am;
-    return Math.max(0, wert - (laeuft ? Math.max(0, serverJetzt() - Date.parse(p.letzter_zug_am)) : 0));
+    if (!laeuft) return Math.max(0, wert);
+    return Math.max(0, wert - (verbraucht ?? Math.max(0, serverJetzt() - Date.parse(p.letzter_zug_am))));
   }
-  // R19: Zeit seit dem letzten Zug vor dem 2. Halbzug (Erstzug-Frist) nach der Serveruhr (js/serverzeit.js), aber nie
-  // mehr als seit diese Ansicht den Stand zuerst sah plus SICHT_SPIEL_MS: eine vorgehende Geraeteuhr ohne frische Probe
-  // beendet die Frist so nicht vorzeitig (jede Reklamation setzt busy und schluckt Tipps, Flo gegen Opa 15.11.)
+  // R19: Zeit seit dem letzten Zug nach der Serveruhr (js/serverzeit.js seit), ohne frische Probe nie mehr als seit diese
+  // Ansicht den Stand zuerst sah plus SICHT_SPIEL_MS: eine vorgehende Geraeteuhr beendet so weder Frist noch Uhr
+  // vorzeitig (jede Reklamation setzt busy und schluckt Tipps, Flo gegen Opa 15.11.)
   function vorlaufMs() {
     const s = Date.parse(p.letzter_zug_am || '');
     if (!Number.isFinite(s)) return 0;
     if (ersteSicht.stand !== p.letzter_zug_am) ersteSicht = { stand: p.letzter_zug_am, am: Date.now() };
-    return Math.max(0, Math.min(serverJetzt() - s, Date.now() - ersteSicht.am + SICHT_SPIEL_MS));
+    return zeitSeit(s, ersteSicht.am, SICHT_SPIEL_MS);
   }
   // R19 (Flo 15.11., e7: "Opa beginnt, er hat noch 0:25"): vor dem 2. Halbzug steht die Uhr, es laeuft aber die
   // Erstzug-Frist des Servers. Beide Seiten sehen sie als Zahl und als schmalen Gold-Balken, der schrumpft (matt, ohne Schein)
@@ -967,7 +970,7 @@ export function zeige(root, params, app) {
     }
     if (blockiert || busy || widerspruch || p.status !== 'laeuft' || Date.now() < zeitPruefung) return;
     const halbzuege = online.zuegeListe(p).length;
-    if (halbzuege >= 2 && rest(p.am_zug) === 0) {
+    if (halbzuege >= 2 && rest(p.am_zug, vorlaufMs()) === 0) {
       zeitPruefung = Date.now() + 5000;
       aktion(() => online.pruefeZeit(p.id));
     } else if (halbzuege < 2 && p.letzter_zug_am && vorlaufMs() >= haengtNachMs(p)) {

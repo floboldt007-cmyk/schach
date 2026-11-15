@@ -1,6 +1,7 @@
 // Serveruhr minus Geraeteuhr (js/serverzeit.js, R19 15.11.2026: Flo gegen Opa, Uhr stand, Intro nur auf einer Seite).
 // Node, ohne Browser.   node tests/serverzeit.test.mjs
 import { probe, versatz, sicher, jetzt, vergiss, FRISCH_MS, PROBE_GILT_MS, PLAUSIBEL_MS } from '../js/serverzeit.js';
+import * as SZ from '../js/serverzeit.js';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, bedingung, info) {
@@ -42,6 +43,16 @@ pruefe('leere oder kaputte Zeitstempel zaehlen nicht', versatz(T) === 0 && !sich
 vergiss(); probe(iso(5), T, true); probe(iso(T - PLAUSIBEL_MS - 1), T, true);
 pruefe('unplausible Stempel (mehr als ein Tag daneben) zaehlen nicht', versatz(T) === 0 && !sicher(T), versatz(T));
 pruefe('FRISCH_MS ist eine kurze Spanne (hoechstens 10 s)', FRISCH_MS > 0 && FRISCH_MS <= 10000, FRISCH_MS);
+
+// Verbrauch seit einem Serverstempel (Kaltreview F2/F3): ohne frische Probe hoechstens seit der ersten Sicht plus Spiel,
+// mit frischer Probe nach der Serveruhr (sonst ist die Frist nach spaetem Oeffnen oder Neuladen zu lang)
+const seit = typeof SZ.seit === 'function' ? SZ.seit : null;
+vergiss();
+pruefe('seit: ohne Probe, Geraet 40 s vor, Ansicht seit 5 s: hoechstens 5 s + Spiel', seit && seit(T, T + 40000, 2000, T + 45000) === 7000, seit && seit(T, T + 40000, 2000, T + 45000));
+vergiss(); probe(iso(T), T + 300, true);
+pruefe('seit: mit frischer Probe zaehlt die Serveruhr, auch vor der ersten Sicht (Beitritt vor 20 s)', seit && seit(T - 20000, T + 300, 2000, T + 1000) === 20700, seit && seit(T - 20000, T + 300, 2000, T + 1000));
+pruefe('seit: nie negativ, ohne Stempel 0', seit && seit(T + 60000, T, 2000, T + 1000) === 0 && seit(NaN, T, 2000, T) === 0);
+vergiss();
 
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);

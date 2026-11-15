@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { setzeKontoFetch, sitzung, SITZUNG_SCHLUESSEL, SICHTBAR_SCHLUESSEL } from '../js/konto.js';
 import { SUPABASE_URL, SUPABASE_KEY, FUNKTION_REGION, mitRegion } from '../js/konto-config.js';
+import { versatz as szVersatz, sicher as szSicher, vergiss as szVergiss } from '../js/serverzeit.js';
 import {
   erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte, pruefeZeit, meldeStrittig,
   einladungsLink, codeAusLink, uebernimmEinladungsLink, gemerkteEinladung, vergissEinladung, meineFarbe, binAmZug,
@@ -85,6 +86,15 @@ anmelden();
 }
 
 // ---------- beitreten ----------
+// R19 Kaltreview F1: online_tritt_bei gibt fuer "schon am Brett" die alte Zeile ohne Schreibung zurueck
+// (supabase/online-schema.sql); ihr aktualisiert_am ist keine frische Probe der Serveruhr
+{
+  szVergiss();
+  antworten.push({ status: 200, body: { ...partie, status: 'laeuft', schwarz: 'u2', aktualisiert_am: new Date(Date.now() - 540000).toISOString() } });
+  await tritteBei('ABC234');
+  pruefe('tritteBei: alte Zeile (schon am Brett) ist keine frische Probe, kein Versatz', szVersatz() === 0 && !szSicher(), szVersatz());
+  szVergiss();
+}
 {
   antworten.push({ status: 200, body: { ...partie, status: 'laeuft', schwarz: 'u2' } });
   const p = await tritteBei(' ab-c2 34 ');
