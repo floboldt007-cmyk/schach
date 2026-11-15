@@ -245,5 +245,5 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-mehr[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
 .on-mehr > ul { margin: 0 0 4px; padding: 10px 14px 10px 30px; border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--kante);
   font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
-.online-screen .on-tuer-text p, .online-screen .on-zeit-fest, .online-screen .on-bild-uhr { display: none; }
+.online-screen .on-tueren[data-mehr] :is(.on-tuer-text p, .on-zeit-fest, .on-bild-uhr) { display: none; }
 .online-screen .on-tuer-kopf { align-items: center; }

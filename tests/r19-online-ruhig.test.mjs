@@ -94,6 +94,7 @@ function bediener(z) {
       const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, elo: GEGNER_ELO[u], du: u === UID });
       return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
     }
+    if (rpc === 'kronen_mein_stand' && z.standKaputt) return antwort({ message: 'kaputt' }, 500);
     if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...('elo' in z ? { elo: z.elo } : {}) });
     return antwort(rpc === 'karte_melde_stufen' ? {} : []);
   };
@@ -103,7 +104,7 @@ function initSkript({ sitzung, liga }) {
     if (!sessionStorage.getItem('ruhig-start')) {
       sessionStorage.setItem('ruhig-start', '1');
       localStorage.clear();
-      localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+      if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
       if (liga) localStorage.setItem('schach-arena:v1:modul:liga', JSON.stringify(liga));
       localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ haltenAufgeben: false, duellIntro: 'aus' }));
     }
@@ -128,6 +129,13 @@ const zahlenIn = (s, wurzel, ohne = '') => s.evaluate(([wurzel, ohne]) => {
   return raus;
 }, [wurzel, ohne]);
 
+// Jeder Tuertext (js/ui/online.js tuer()): sichtbar an der Tuer oder als Punkt in "Mehr" (Kaltreview 15.11., Befund 1).
+const leseTuerTexte = (s) => s.evaluate(() => {
+  const mehr = [...document.querySelectorAll('.online-screen details.on-mehr li')].map((li) => li.textContent.trim());
+  return [...document.querySelectorAll('.online-screen .on-tuer-text p')].map((p) => ({ text: p.textContent.trim(),
+    sichtbar: p.checkVisibility({ visibilityProperty: true, opacityProperty: true }), inMehr: mehr.includes(p.textContent.trim()) }));
+});
+
 async function tippe(s, uci) {
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
     const r = await s.locator(`.on-brett .feld[data-feld="${f}"]`).first().boundingBox();
@@ -139,11 +147,11 @@ async function tippe(s, uci) {
 const GERAETE = [['iPhone 13', 390, 844], ['PC', 1280, 720]];
 const seitenfehler = [];
 
-async function neueSeite(browser, [w, h], z, { liga = null, gruppe }) {
+async function neueSeite(browser, [w, h], z, { liga = null, gruppe, sitzung = SITZUNG }) {
   const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
     colorScheme: 'light', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
   await k.route('**/*.supabase.co/**', bediener(z));
-  await k.addInitScript(initSkript, { sitzung: SITZUNG, liga });
+  await k.addInitScript(initSkript, { sitzung, liga });
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
   return { k, s };
@@ -178,6 +186,9 @@ async function lauf(browser, [geraet, w, h], kennung = '') {
       return d ? { offen: d.open, text: d.textContent.replace(/\s+/g, ' ') } : null;
     });
     pruefe(`${gruppe}: Stufe, Platz und Kronen hinter "Mehr" (zu)`, !!mehr && !mehr.offen && /Platz 3 von 30/.test(mehr.text) && /140/.test(mehr.text), mehr);
+    const tuerTexte = await leseTuerTexte(s);
+    pruefe(`${gruppe}: jeder Tuertext sichtbar oder in "Mehr" (auch das Duell)`, tuerTexte.length >= 2
+      && tuerTexte.every((t) => t.sichtbar || t.inMehr) && tuerTexte.some((t) => t.text === 'Gleiche Rätsel für beide, live'), tuerTexte);
     const alt = await s.evaluate(() => document.querySelectorAll('.online-screen :is(.on-rk, .on-ich-leiste, .on-abzeichen, .on-chip)').length);
     pruefe(`${gruppe}: keine Bausteine der Entwuerfe B und C`, alt === 0, alt);
     const duell = await s.evaluate(() => document.querySelector('#on-duell-t')?.textContent.trim() ?? null);
@@ -254,12 +265,35 @@ async function ohneElo(browser, [name, felder, liga]) {
   await k.close().catch(() => {});
 }
 
+// Ohne "Mehr" (kronen_mein_stand 500, oder ohne Konto) bleiben die Tuertexte an der Tuer stehen (Kaltreview 15.11.,
+// Befund 2): ausgeblendet wird nur, was "Mehr" auch zeigt.
+async function ohneMehr(browser, [name, felder, sitzung]) {
+  const gruppe = `ohne "Mehr" (${name})`;
+  const z = { partien: new Map(), treffer: false, sucheSeit: null, ...felder };
+  const { k, s } = await neueSeite(browser, [390, 844], z, { gruppe, sitzung });
+  try {
+    await s.goto(`http://127.0.0.1:${PORT}/index.html?test#online`);
+    const da = await s.waitForFunction((konto) => konto ? document.querySelector('.on-suche-text:not([hidden])')
+      : document.querySelector('.on-tueren[data-zustand="ohne"]'), !!sitzung, { timeout: 30000 }).then(() => true).catch(() => false);
+    pruefe(`${gruppe}: Lobby geladen`, da);
+    await warte(300);
+    const mehr = await s.evaluate(() => document.querySelectorAll('.online-screen details.on-mehr').length);
+    const texte = await leseTuerTexte(s);
+    pruefe(`${gruppe}: kein "Mehr", beide Tuertexte sichtbar`, mehr === 0 && texte.length === 2 && texte.every((t) => t.sichtbar), { mehr, texte });
+  } catch (e) {
+    pruefe(`${gruppe}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
+  }
+  await k.close().catch(() => {});
+}
+
 let browser;
 try {
   browser = await browserTyp(pw).launch({ headless: true });
   for (const g of GERAETE) await lauf(browser, g);
   await lauf(browser, GERAETE[0], '&onlineStil=b'); // alte Kennung: schaltet nichts mehr um
   for (const fall of OHNE) await ohneElo(browser, fall);
+  await ohneMehr(browser, ['kronen_mein_stand 500', { standKaputt: true }, SITZUNG]);
+  await ohneMehr(browser, ['ohne Konto', {}, null]);
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();

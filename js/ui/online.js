@@ -294,8 +294,12 @@ export function zeige(root, params, app) {
     wrap.className = 'on-ruhig';
     el.replaceWith(wrap);
     wrap.append(el);
+    // die Texte JEDER Tuer kommen mit nach "Mehr"; erst dann blendet data-mehr sie an den Tueren aus (css/online.css).
+    // Ohne "Mehr" (Stand kaputt, ohne Konto) bleiben sie an der Tuer stehen (Kaltreview 15.11.).
+    const tuerTexte = [...inhalt.querySelectorAll('.on-tuer-text p')].map(p => p.textContent);
     wrap.insertAdjacentHTML('beforeend', `<details class="on-mehr"><summary class="dr">${esc(O('ruhig.mehr'))}</summary><ul>`
-      + [stufe, zeile, O('liga.kronen', { n: zahlKronen }), zeitFest, O('tuer.partie.text')].map(x => `<li>${esc(x)}</li>`).join('') + '</ul></details>');
+      + [stufe, zeile, O('liga.kronen', { n: zahlKronen }), zeitFest, ...tuerTexte].map(x => `<li>${esc(x)}</li>`).join('') + '</ul></details>');
+    inhalt.querySelector('.on-tueren')?.setAttribute('data-mehr', '');
   }
   // Laeuft fuer das Konto eine Partie (online_meine), wird die Partie-Tuer zur Karte "Laufende Partie fortsetzen" und
   // oeffnet die NEUESTE laufende (Befund 3 vom 11.11.: kein Weg zurueck; Befund 2: zwei laufende zugleich). Solange eine
