@@ -26,7 +26,6 @@ import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
 import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
-import { hoere } from '../ereignisse.js';
 import { spieleDuell } from './duell.js';
 import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie } from '../storage.js';
 
@@ -320,9 +319,9 @@ export function zeige(root, params, app) {
         if (!bot) { sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); return; }
         // gewertet mit Beleg und neuem SQL (#213: Vorab-Niederlage, ein offener Beleg): Verlassen zaehlt als Niederlage.
         // Mit altem SQL stimmt der Satz nicht, dort kein Hinweis.
-        // erst wenn die Partie steht: der Seitenwechsel leert die Meldungen (js/app.js zeigeScreen)
-        if (kiRef && lage().vomServer) { const ab = hoere('app:screen', (d) => { if (d.name !== 'partie') return; ab(); app.meldung(O('suche.kiVerlassen'), { dauer: 4500 }); }); }
-        import('./ki-ersatz.js').then((m) => m.starteKiErsatz(app, { bot, tempo: tempoWahl(lage), kiRef, weg: () => weg })).catch((e) => { console.error(e); sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); });
+        // die Meldung zeigt starteKiErsatz erst, wenn die Partie wirklich startet (nicht nach dem Verlassen)
+        const hinweis = kiRef && lage().vomServer ? O('suche.kiVerlassen') : null;
+        import('./ki-ersatz.js').then((m) => m.starteKiErsatz(app, { bot, tempo: tempoWahl(lage), kiRef, weg: () => weg, hinweis })).catch((e) => { console.error(e); sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); });
       },
       beiFehler: (e) => { suche = null; sucheZustand('bereit', O('suche.erklaert')); melde(e?.message || O('fehler')); },
     });
