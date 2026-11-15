@@ -189,6 +189,26 @@ async function testeAussehen(browser, d) {
     pruefe('Eigene Fehler im Verlauf gross markiert (mindestens 14 px)', s.punkte.length >= 1 && s.punkte.every((w) => w >= 14), JSON.stringify(s.punkte));
     pruefe('Ergebnis-Karte mit Gold-Kante', s.kanteBreite >= 1 && s.kante !== s.linie && /rgb/.test(s.kante), JSON.stringify(s));
     pruefe('Ergebnis-Karte mit grossen Bildern (mindestens 56 px)', s.avatar >= 56, String(s.avatar));
+    // Kontrast, den design-beweis nicht messen kann: das Zeichen liegt auf der SVG-Kachel, nicht auf dem Kartengrund
+    // (die Probe nahm den Kartengrund, "1.00:1" bei weissem Zeichen auf weisser Karte). Kante der Karten und Flaeche
+    // von Abspielen gegen den naechsten deckenden Grund darueber (WCAG 1.4.11, 3:1)
+    const k = await seite.evaluate(() => {
+      const rgb = (c) => (c.match(/[\d.]+/g) || []).map(Number);
+      const lum = (c) => { const v = rgb(c).slice(0, 3).map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+      const kontrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return Math.round((x + 0.05) / (y + 0.05) * 100) / 100; };
+      const grundVon = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if ((rgb(c)[3] ?? 1) === 1 && !/rgba\(0, 0, 0, 0\)/.test(c)) return c; } return getComputedStyle(document.body).backgroundColor; };
+      const zeichen = [...document.querySelectorAll('.an-momente .an-sym svg, .an-kl-mitte .an-sym svg')].map((svg) => {
+        const kachel = getComputedStyle(svg.querySelector('rect, circle, path')).fill;
+        return { kachel, zeichen: getComputedStyle(svg).color, k: kontrast(kachel, getComputedStyle(svg).color) };
+      });
+      const kanten = [...document.querySelectorAll('.an-moment')].map((b) => kontrast(getComputedStyle(b).borderTopColor, grundVon(b.parentElement)));
+      const play = document.querySelector('.an-navi .an-abspielen');
+      return { zeichen, kanten, play: kontrast(getComputedStyle(play).backgroundColor, grundVon(play.parentElement)),
+        playZeichen: kontrast(getComputedStyle(play).backgroundColor, getComputedStyle(play).color) };
+    });
+    pruefe('Zeichen auf der Kachel mindestens 4,5:1', k.zeichen.length >= 5 && k.zeichen.every((z) => z.k >= 4.5), JSON.stringify(k.zeichen.filter((z) => z.k < 4.5).slice(0, 4)));
+    pruefe('Kante der Momente mindestens 3:1', k.kanten.length >= 2 && k.kanten.every((x) => x >= 3), JSON.stringify(k.kanten));
+    pruefe('Abspielen: Flaeche mindestens 3:1, Zeichen mindestens 4,5:1', k.play >= 3 && k.playZeichen >= 4.5, JSON.stringify(k));
     if (BILDER) await seite.screenshot({ path: path.join(BILDER, `${NAME}-pc-detail-${schema === 'dark' ? 'dunkel' : 'hell'}.png`) });
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();

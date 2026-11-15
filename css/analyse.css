@@ -92,7 +92,10 @@
 /* R19 Analyse neu: Play/Pause zwischen den Pfeilen, das Tempo als Wort dahinter (reihum Normal, Ruhig, Zuegig) */
 .an-navi { flex: none; display: grid; grid-template-columns: repeat(5, minmax(44px, 1fr)) auto auto; gap: 6px; align-items: center; }
 .an-navi .knopf { padding: 0; min-height: 52px; min-width: 44px; }
-.an-navi .an-abspielen.laeuft { background: var(--gold-weich); box-shadow: inset 0 0 0 1.5px var(--gold); }
+/* Abspielen ist die Hauptaktion der Leiste: gefuellt in der Textfarbe (hell dunkel, dunkel hell), laufend gold mit
+   dunklem Zeichen und Textfarben-Kante (design-beweis: Flaeche >= 3:1 gegen die Umgebung) */
+.an-navi .an-abspielen { background: var(--text); color: var(--flaeche); box-shadow: none; }
+.an-navi .an-abspielen.laeuft { background: var(--gold); color: #1C1B19; box-shadow: inset 0 0 0 2px var(--text); }
 .an-navi .an-tempo { padding: 0 12px; font-size: 13.5px; font-weight: 750; color: var(--text-2); }
 /* der Zugstand darf in schmalen Spalten zweizeilig stehen ("Zug 17 / 17"), damit die Knoepfe 44 px behalten */
 .an-stand { min-width: 0; padding: 0 2px; font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--text-2); text-align: right; }
@@ -272,8 +275,10 @@
 .an-moment.knopf { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; justify-content: stretch; gap: 4px 12px;
   min-height: 76px; height: auto; padding: 12px 14px; border-radius: 16px; text-align: left; white-space: normal;
   font-size: 14px; font-weight: 650; color: var(--text); background: var(--flaeche);
-  border: 1px solid color-mix(in srgb, var(--kf) 55%, var(--linie)); box-shadow: var(--s1); }
-.an-moment.knopf:not(.du) { background: var(--flaeche-2); border-color: color-mix(in srgb, var(--kf) 30%, var(--linie)); box-shadow: none; }
+  border: 1.5px solid var(--kt); box-shadow: var(--s1); }
+/* Kante in der Klassen-Textfarbe (--kt-*, im Theme auf >= 4,5:1 gegen den Grund abgestimmt): als Knopf erkennbar
+   (design-beweis 3:1); die Momente des Gegners ruhiger auf der zweiten Flaeche */
+.an-moment.knopf:not(.du) { background: var(--flaeche-2); box-shadow: none; }
 .an-moment .an-sym { grid-row: span 2; align-self: start; width: 40px; height: 40px; }
 .an-moment .an-sym svg { display: block; width: 100%; height: 100%; }
 .an-m-text { display: grid; gap: 2px; min-width: 0; }
@@ -284,8 +289,8 @@
 .an-m-besser { font-size: 13.5px; font-weight: 750; color: var(--kt-bester); }
 .an-m-eval { grid-column: 2; justify-self: start; padding: 2px 8px; border-radius: 8px; background: var(--flaeche-3); color: var(--text-2);
   font-size: 12.5px; font-weight: 800; white-space: nowrap; }
-.an-moment.an { border-color: var(--kf); box-shadow: 0 0 0 2px var(--kf), var(--s1); }
-@media (hover: hover) { .an-moment.knopf:hover { border-color: var(--kf); } }
+.an-moment.an { box-shadow: 0 0 0 2px var(--kt), var(--s1); }
+@media (hover: hover) { .an-moment.knopf:hover { box-shadow: 0 0 0 1px var(--kt), var(--s1); } }
 .an-momente-leer { font-size: 14px; color: var(--text-2); padding: 4px 2px; }
 
 /* ---------- Klassen-Zaehler ---------- */
