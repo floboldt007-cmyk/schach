@@ -7,8 +7,13 @@
 //     schon verbraucht (Bot-Partie, die Uhr hielt beim Schliessen an); laufSeit + jetzt: Wanduhr seit Beginn des
 //     laufenden Zugs (gewertete KI-Partie, die Uhr laeuft weiter wie online).
 //   zeitErgebnis(fen, abgelaufen) -> 'w' | 'b' | 'remis'   Remis, wenn der Gegner kein Mattmaterial hat
+// Browser-Teil: Partie mit Bedenkzeit gegen benno, Server nur simuliert (nie Supabase).
 // node tests/r19-uhr.test.mjs
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
 
 const ergebnisse = [];
 async function pruefe(name, fn) {
@@ -107,6 +112,251 @@ if (U) {
     assert.equal(U.zeitErgebnis(K_GEGEN('4kb2'), 'w'), 'remis', 'Koenig und Laeufer');
     assert.equal(U.zeitErgebnis(K_GEGEN('4kn2'), 'w'), 'remis', 'Koenig und Springer');
   });
+}
+
+// ---------- Browser-Teil: die Uhr in der Partie (js/ui/partie.js) ----------
+// Vertrag: laeuft erst nach dem Intro und nur fuer die Seite am Zug (auch waehrend der Bot denkt), Zuschlag nach dem
+// Zug, Zeitende = Niederlage/Sieg (Remis ohne Mattmaterial des Gegners), gewertete KI-Partie (kiRef) laeuft im
+// Hintergrund und beim Fortsetzen nach der Wanduhr weiter, die Bot-Partie haelt an, der Bot-Zug haengt nicht an der Uhr.
+const require = createRequire(import.meta.url);
+const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+const SUPA_MUSTER = '**/*.supabase.co/**';
+const KI_REF = '11111111-2222-4333-8444-555555555555';
+const SCREEN = '.screen.partie';
+let BASIS = null;
+
+function ladePlaywright() {
+  for (const k of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
+    try { return require(k); } catch (e) { /* naechster */ }
+  }
+  return null;
+}
+async function warteAufServer(url, ms = 10000) {
+  const ende = Date.now() + ms;
+  while (Date.now() < ende) {
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    await warte(150);
+  }
+  throw new Error('Server startet nicht: ' + url);
+}
+// "2:59" -> 179000, "0:07,4" -> 7400
+function uhrMs(text) {
+  const m = String(text || '').match(/^(\d+):(\d{2})(?:[.,](\d))?$/);
+  return m ? (Number(m[1]) * 60 + Number(m[2])) * 1000 + Number(m[3] || 0) * 100 : NaN;
+}
+const leseUhr = (s, wer) => s.evaluate((w) => {
+  const el = document.querySelector(`.screen.partie .uhr[data-wer="${w}"]`);
+  return el ? { text: el.querySelector('.uhr-zeit').textContent.trim(), laeuft: el.classList.contains('laeuft'), da: !el.hidden } : null;
+}, wer).then((u) => (u ? { ...u, ms: uhrMs(u.text) } : null));
+
+async function neueSeite(browser) {
+  const k = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'de-DE', serviceWorkers: 'block' });
+  await k.route(SUPA_MUSTER, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  const s = await k.newPage();
+  const fehlerListe = [];
+  s.on('pageerror', (e) => fehlerListe.push(e.message));
+  await s.addInitScript(() => {
+    if (sessionStorage.getItem('probe-start')) return;
+    sessionStorage.setItem('probe-start', '1');
+    localStorage.clear();
+    localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ sprache: 'de', spracheGewaehlt: true, duellIntro: 'aus' }));
+  });
+  await s.goto(`${BASIS}#arena`);
+  await s.waitForSelector('.screen.arena', { timeout: 20000 }); await warte(300);
+  return { k, s, fehlerListe };
+}
+// startet eine Partie; test: Inhalt von window.__test (null = echter Bot), intro: html[data-duell="laeuft"] vorher
+async function starte(s, params, { test = 'schnell', intro = false } = {}) {
+  await s.evaluate(({ params, test, intro }) => {
+    localStorage.removeItem('schach-arena:v1:laufend');
+    window.__test = test === 'schnell'
+      ? { maxWarten: 0, botPause: 30, botZug: () => window.__partie.chess().moves({ verbose: true }).map((m) => m.lan).sort()[0] }
+      : (test || { maxWarten: 0 });
+    if (intro) { document.documentElement.dataset.duell = 'laeuft'; document.documentElement.dataset.duellMax = '6000'; }
+    window.__app.gehe('partie', params);
+  }, { params, test, intro });
+  await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.z.tempo, null, { timeout: 30000 });
+}
+async function zug(s, uci) {
+  await s.waitForFunction(() => window.__partie.phase() === 'flo', null, { timeout: 30000 });
+  for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) await s.locator(`${SCREEN} .brett-felder .feld[data-feld="${f}"]`).click();
+  if (await s.locator(`${SCREEN} .brett .lage.vorschau`).count()) await s.locator(`${SCREEN} .brett-felder .feld[data-feld="${uci.slice(2, 4)}"]`).click();
+}
+const letztePartie = (s) => s.evaluate(async () => (await import('./js/storage.js')).ladePartien()[0] || null);
+const warteEnde = (s, ms) => s.waitForFunction(() => window.__partie && window.__partie.phase() === 'ende', null, { timeout: ms });
+// simuliert das Verlassen und Zurueckkommen der App (Tab im Hintergrund)
+const sichtbar = (s, an) => s.evaluate((an) => {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (an ? 'visible' : 'hidden') });
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => !an });
+  document.dispatchEvent(new Event('visibilitychange'));
+}, an);
+
+const pw = ladePlaywright();
+if (!pw) {
+  ergebnisse.push(false);
+  console.error('FEHLER Browser-Teil: Playwright nicht gefunden (PLAYWRIGHT_PFAD setzen)');
+} else {
+  const { browserTyp } = await import('./browser.mjs');
+  const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
+  BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+  const server = spawn(process.execPath, [path.join(WURZEL, 'tests', 'testserver.mjs'), String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  let browser = null;
+  try {
+    await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
+    browser = await browserTyp(pw).launch({ headless: true });
+    const T3 = { grund: 180, zuschlag: 10 };
+
+    await pruefe('Uhr steht waehrend des Intros, laeuft danach fuer die Seite am Zug', async () => {
+      const { k, s } = await neueSeite(browser);
+      try {
+        await starte(s, { botId: 'benno', farbe: 'w', tempo: T3 }, { intro: true });
+        await warte(1500);
+        const vor = await leseUhr(s, 'flo');
+        assert.ok(vor && vor.da, 'Uhr sichtbar');
+        assert.equal(vor.text, '3:00', 'waehrend des Intros unveraendert');
+        assert.equal(vor.laeuft, false, 'waehrend des Intros nicht laufend');
+        await s.evaluate(() => { delete document.documentElement.dataset.duell; document.dispatchEvent(new Event('duell:fertig')); });
+        await warte(2200);
+        const nach = await leseUhr(s, 'flo');
+        const bot = await leseUhr(s, 'bot');
+        assert.equal(nach.laeuft, true, 'nach dem Intro laufend');
+        assert.ok(nach.ms <= 178000, 'Zeit nimmt ab: ' + nach.text);
+        assert.equal(bot.laeuft, false, 'Bot-Uhr steht');
+        assert.equal(bot.text, '3:00');
+      } finally { await k.close(); }
+    });
+
+    await pruefe('Zug: Zuschlag fuer den Ziehenden, danach laeuft die Bot-Uhr, solange der Bot denkt', async () => {
+      const { k, s } = await neueSeite(browser);
+      try {
+        await starte(s, { botId: 'benno', farbe: 'w', tempo: T3 }, { test: { maxWarten: 0, botAnhalten: true } });
+        await warte(1200);
+        await zug(s, 'e2e4');
+        await warte(1600);
+        const flo = await leseUhr(s, 'flo');
+        const bot = await leseUhr(s, 'bot');
+        assert.ok(flo.ms >= 186000 && flo.ms <= 190000, 'Zuschlag 10 s: ' + flo.text);
+        assert.equal(flo.laeuft, false, 'eigene Uhr steht nach dem Zug');
+        assert.equal(bot.laeuft, true, 'Bot-Uhr laeuft beim Nachdenken');
+        assert.ok(bot.ms <= 179000, 'Bot-Zeit nimmt ab: ' + bot.text);
+      } finally { await k.close(); }
+    });
+
+    await pruefe('Zeitende: eigene Zeit abgelaufen = Niederlage, Grund zeit, Text nennt die Zeit', async () => {
+      const { k, s, fehlerListe } = await neueSeite(browser);
+      try {
+        await starte(s, { botId: 'benno', farbe: 'w', tempo: { grund: 3, zuschlag: 0 } });
+        await warteEnde(s, 10000);
+        const p = await letztePartie(s);
+        assert.ok(p, 'Partie gespeichert');
+        assert.equal(p.ergebnis, 'niederlage'); assert.equal(p.grund, 'zeit');
+        const text = await s.locator('.ergebnis-overlay').first().textContent();
+        assert.match(text, /Zeit/, 'Ergebnistext: ' + text.slice(0, 120));
+        assert.deepEqual(fehlerListe, []);
+      } finally { await k.close(); }
+    });
+
+    await pruefe('Zeitende des Bots = Sieg', async () => {
+      const { k, s } = await neueSeite(browser);
+      try {
+        await starte(s, { botId: 'benno', farbe: 'w', tempo: { grund: 3, zuschlag: 0 } }, { test: { maxWarten: 0, botAnhalten: true } });
+        await zug(s, 'e2e4');
+        await warteEnde(s, 10000);
+        const p = await letztePartie(s);
+        assert.equal(p.ergebnis, 'sieg'); assert.equal(p.grund, 'zeit');
+      } finally { await k.close(); }
+    });
+
+    await pruefe('Zeitende: Remis, wenn der Gegner kein Mattmaterial hat (Koenig und Laeufer)', async () => {
+      const { k, s } = await neueSeite(browser);
+      try {
+        await starte(s, { botId: 'benno', farbe: 'w', tempo: { grund: 3, zuschlag: 0 }, startFen: '4kb2/8/8/8/8/8/8/3QK3 w - - 0 1' });
+        await warteEnde(s, 10000);
+        const p = await letztePartie(s);
+        assert.equal(p.ergebnis, 'remis'); assert.equal(p.grund, 'zeit');
+      } finally { await k.close(); }
+    });
+
+    for (const [name, params, laeuftWeiter] of [
+      ['Hintergrund: Bot-Partie haelt die Uhr an', { botId: 'benno', farbe: 'w', tempo: T3 }, false],
+      ['Hintergrund: gewertete KI-Partie laeuft weiter wie online', { botId: 'benno', farbe: 'w', tempo: T3, ki: true, kiRef: KI_REF }, true],
+    ]) {
+      await pruefe(name, async () => {
+        const { k, s } = await neueSeite(browser);
+        try {
+          await starte(s, params);
+          await warte(800);
+          const a = await leseUhr(s, 'flo');
+          await sichtbar(s, false);
+          await warte(3500);
+          await sichtbar(s, true);
+          await warte(300);
+          const b = await leseUhr(s, 'flo');
+          const weg = a.ms - b.ms;
+          if (laeuftWeiter) assert.ok(weg >= 3000, `weiter gelaufen: ${a.text} -> ${b.text}`);
+          else assert.ok(weg <= 1500, `angehalten: ${a.text} -> ${b.text}`);
+          assert.equal(b.laeuft, true, 'laeuft nach der Rueckkehr');
+        } finally { await k.close(); }
+      });
+    }
+
+    for (const [name, params, wanduhr] of [
+      ['Fortsetzen Bot-Partie: die Zeit, in der die App zu war, zaehlt nicht', { botId: 'benno', farbe: 'w', tempo: T3 }, false],
+      ['Fortsetzen gewertete KI-Partie: die Zeit, in der die App zu war, zaehlt (Wanduhr)', { botId: 'benno', farbe: 'w', tempo: T3, ki: true, kiRef: KI_REF }, true],
+    ]) {
+      await pruefe(name, async () => {
+        const { k, s } = await neueSeite(browser);
+        try {
+          await starte(s, params);
+          await zug(s, 'e2e4');
+          await s.waitForFunction(() => window.__partie.phase() === 'flo' && window.__partie.chess().history().length === 2, null, { timeout: 15000 });
+          await warte(1500);
+          const a = await leseUhr(s, 'flo');
+          const zu = Date.now();
+          await s.goto('about:blank');
+          await warte(4000);
+          await s.goto(`${BASIS}#arena`);
+          await s.waitForSelector('.screen.arena', { timeout: 20000 }); await warte(300);
+          await s.evaluate(() => { window.__test = { maxWarten: 0, botPause: 30 }; window.__app.gehe('partie', { fortsetzen: true }); });
+          await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.chess().history().length === 2, null, { timeout: 30000 });
+          await warte(300);
+          const b = await leseUhr(s, 'flo');
+          const zuMs = Date.now() - zu;
+          const weg = a.ms - b.ms;
+          assert.equal(b.laeuft, true, 'eigene Uhr laeuft nach dem Fortsetzen');
+          if (wanduhr) assert.ok(weg >= zuMs - 1500, `Wanduhr: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
+          else assert.ok(weg <= 2500, `angehalten: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
+          const bot = await leseUhr(s, 'bot');
+          assert.ok(bot.ms >= 180000, 'Bot-Uhr mit Zuschlag nach seinem Zug: ' + bot.text);
+        } finally { await k.close(); }
+      });
+    }
+
+    await pruefe('Bot-Zug haengt nicht an der Uhr (gleicher Seed, 3+2, 15+10, ohne Uhr)', async () => {
+      const antworten = [];
+      for (const tempo of [{ grund: 180, zuschlag: 2 }, { grund: 900, zuschlag: 10 }, undefined]) {
+        const { k, s } = await neueSeite(browser);
+        try {
+          await s.evaluate(({ tempo }) => {
+            localStorage.removeItem('schach-arena:v1:laufend');
+            window.__test = { maxWarten: 0 };
+            window.__app.gehe('partie', { botId: 'benno', farbe: 'w', seed: 4242, ...(tempo ? { tempo } : {}) });
+          }, { tempo });
+          await s.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+          await zug(s, 'e2e4');
+          await s.waitForFunction(() => window.__partie.chess().history().length === 2, null, { timeout: 30000 });
+          antworten.push(await s.evaluate(() => window.__partie.chess().history()[1]));
+        } finally { await k.close(); }
+      }
+      assert.equal(new Set(antworten).size, 1, 'Antworten: ' + antworten.join(', '));
+    });
+  } catch (e) {
+    ergebnisse.push(false); console.error('FEHLER Browser-Teil: ' + e.message);
+  } finally {
+    if (browser) await browser.close();
+    server.kill();
+  }
 }
 
 const ok = ergebnisse.filter(Boolean).length;
