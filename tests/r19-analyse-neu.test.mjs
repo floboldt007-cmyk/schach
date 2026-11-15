@@ -68,6 +68,9 @@ async function oeffne(seite, query = 'screen=keiner') {
   // die Testseite setzt kein data-modus (js/thema.js laeuft dort nicht); "system" laesst colorScheme des Kontexts
   // entscheiden wie in der App, sonst bliebe "dunkel" hell (css/themes/modern.css:213)
   await seite.evaluate(() => { document.documentElement.dataset.modus = 'system'; });
+  // der Wechsel faerbt Knoepfe mit Uebergang um (.knopf: transition ... var(--d-s) = 200 ms, --d-m 320 ms); in der App steht
+  // der Modus vor dem ersten Bild, hier erst danach: warten, sonst misst ein Kontrast mitten im Uebergang (1.48:1 gemessen)
+  await seite.waitForTimeout(600);
 }
 async function oeffneAnalyse(seite, d, extra = '') {
   await oeffne(seite, `screen=analyse&partieId=${d.oper}${extra}`);
