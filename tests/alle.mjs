@@ -4,13 +4,17 @@
 //   node tests/alle.mjs --schnell    kurze Fassung: ohne Viewport-Runden, Bilder und Browser-Teil von review
 //   node tests/alle.mjs --nur=sw,e2e nur diese Suiten (Namen siehe Liste unten)
 //   node tests/alle.mjs --parallel=3  bis zu drei geeignete Suiten gleichzeitig
-//   node tests/alle.mjs --teil=2/3    fester, nach gemessener Dauer verteilter Teil
+//   node tests/alle.mjs --teil=2/3    fester, nach gemessener Dauer verteilter Teil (tests/suite-dauern.json)
+//   node tests/alle.mjs --teil=2/7 --plan   nur zeigen, wie die Teile geplant sind, nichts starten
+//   node tests/alle.mjs --frist=880   Frist des ganzen Laufs in Sekunden: was dann laeuft, wird beendet, der Rest heisst
+//                                    "nicht gestartet", die Zusammenfassung kommt trotzdem (fuer ein aeusseres timeout 900)
 //   node tests/alle.mjs --laut       Ausgabe jeder Suite vollstaendig zeigen
 //
 // Jede Suite startet ihren eigenen Server auf ihrem eigenen Port und beendet ihn wieder.
 // Exitcode 0 nur, wenn alle Suiten bestehen.
+// ALLE_SUITEN=<datei.json> ersetzt die Liste unten (nur fuer tests/r19-suite-absturz.test.mjs und seine Probe-Suiten).
 import { prozess } from './zeitwaechter.mjs';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -23,10 +27,13 @@ const parallelArg = process.argv.find((a) => a.startsWith('--parallel='));
 const PARALLEL = parallelArg ? Number(parallelArg.slice(11)) : 1;
 const teilArg = process.argv.find((a) => a.startsWith('--teil='));
 const TEIL = teilArg?.slice(7).match(/^(\d+)\/(\d+)$/)?.slice(1).map(Number) || null;
+const PLAN = process.argv.includes('--plan');
+const fristArg = process.argv.find((a) => a.startsWith('--frist='));
+const FRIST = fristArg ? Number(fristArg.slice(8)) : null;
 
 if (!Number.isInteger(PARALLEL) || PARALLEL < 1 || (teilArg && !TEIL)
-    || (TEIL && (TEIL[0] < 1 || TEIL[1] < 1 || TEIL[0] > TEIL[1]))) {
-  console.error('Ungueltige Option. Erwartet: --parallel=N (N >= 1), --teil=k/n (1 <= k <= n).');
+    || (TEIL && (TEIL[0] < 1 || TEIL[1] < 1 || TEIL[0] > TEIL[1])) || (fristArg && !(FRIST > 0))) {
+  console.error('Ungueltige Option. Erwartet: --parallel=N (N >= 1), --teil=k/n (1 <= k <= n), --frist=S (S > 0).');
   process.exit(2);
 }
 
@@ -152,24 +159,19 @@ const SUITEN = [
   { name: 'r17-kopf', datei: 'r17-kopf.test.mjs', args: [], was: 'Feinschliff R17: Kopf-Knoepfe (Premium, rund) in Ruhe, Zeiger, Fokus, gedrueckt lesbar, Zeiger nur bei hover:hover, Handy ohne haengenden Zustand (Browser)' },
   { name: 'r18-hover-rest', datei: 'r18-hover-rest.test.mjs', args: [], was: 'Feinschliff R18: Einstellungen-Navigation und Kopf-Chips am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover (Browser)' },
   { name: 'r18-rd-hover', datei: 'r18-rd-hover.test.mjs', args: [], was: 'Feinschliff R18: Knoepfe des Raetsel-Duells (Start, Ende) am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover, Kontrast in vier Zustaenden mind. 4,5:1 (Browser)' },
+  { name: 'r19-suite-absturz', datei: 'r19-suite-absturz.test.mjs', args: [], was: 'Suitenlauf: Browser-Absturz als FEHLER mit Grund, --frist beendet haengende Suite mit Zusammenfassung, Teile nach gemessenen Dauern (--plan)' },
 ];
 
-// Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
-// bekommen den Median, damit sie ohne Aenderung an dieser Tabelle aufgenommen werden koennen.
-const DAUERN = new Map([
-  ['zeitwaechter', 4], ['konto', 0], ['online', 2], ['online-ui', 13], ['zuzweit', 15],
-  ['daten', 12], ['server-abo', 0], ['abo', 33], ['server-coach', 29], ['coach-ki', 30],
-  ['server-schule', 0], ['schule', 59], ['storage', 3], ['liga', 53], ['sicherung', 0],
-  ['review', 2], ['ereignisse', 1], ['fairness', 1], ['spiel', 15], ['engine-bots', 104],
-  ['board', 68], ['vorzuege', 17], ['sw', 0], ['sw-update', 40], ['brett-tastatur', 30], ['sw-cache', 0], ['thema', 55], ['klang', 12],
-  ['navigation', 39], ['ansicht', 150], ['arena', 154], ['funken', 124], ['punkte', 167], ['serie', 140],
-  ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
-  ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
-  ['e2e', 111], ['native', 0], ['gegnersuche', 2],
-]);
+// Gemessene Sekunden je Suite (tests/suite-dauern.json). Bis 15.11.2026 stand hier eine Tabelle vom 29.10. mit 47 Suiten,
+// alle neueren bekamen 12 s: die Teile waren so ungleich, dass jeder Teil am aeusseren timeout endete (rc=124, Befund R19).
+// Unbekannte/neue Suiten bekommen den Median der Liste, damit sie ohne Aenderung an der Datei aufgenommen werden.
+const DAUERN = new Map(Object.entries(JSON.parse(readFileSync(path.join(WURZEL, 'tests/suite-dauern.json'), 'utf8')).sekunden));
+const MEDIAN = [...DAUERN.values()].sort((x, y) => x - y)[Math.floor(DAUERN.size / 2)] || 12;
+// Probe-Liste statt der echten (tests/r19-suite-absturz.test.mjs)
+const LISTE = process.env.ALLE_SUITEN ? JSON.parse(readFileSync(process.env.ALLE_SUITEN, 'utf8')) : SUITEN;
 
 function teile(suiten, anzahl) {
-  const median = 12;
+  const median = MEDIAN;
   const gruppen = Array.from({ length: anzahl }, () => ({ dauer: 0, suiten: [] }));
   for (const suite of [...suiten].sort((a, b) => (DAUERN.get(b.name) ?? median) - (DAUERN.get(a.name) ?? median))) {
     const gruppe = gruppen.reduce((a, b) => a.dauer <= b.dauer ? a : b);
@@ -179,10 +181,20 @@ function teile(suiten, anzahl) {
   return gruppen;
 }
 
+// Frist des Laufs: 5 s bleiben fuer das Beenden der Suite (zeitwaechter.mjs braucht bis zu 4 s) und die Zusammenfassung
+const ENDE = FRIST ? Date.now() + FRIST * 1000 - 5000 : Infinity;
+const ABSTURZ = /Target crashed|Target page, context or browser has been closed/;
+
 async function lauf(suite) {
   if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
     return { ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, fehler: [`FEHLER Suite-Datei fehlt: tests/${suite.datei}`], ende: [] };
   }
+  const rest = ENDE - Date.now();
+  if (rest < 1000) {
+    return { ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, nichtGestartet: true,
+      fehler: [`FEHLER Suite ${suite.name} nicht gestartet: Frist des Laufs (${FRIST} s) erreicht`], ende: [] };
+  }
+  const limitMs = Math.min(20 * 60 * 1000, rest);
   let letzte = 'Start';
   const puls = setInterval(() => console.log(`… ${suite.name}: laeuft, zuletzt ${letzte}`), 30000);
   try {
@@ -194,8 +206,8 @@ async function lauf(suite) {
         // abgeleitete Ports (9200 + Platz) stiessen zusammen, sobald zwei Worktrees gleichzeitig alle.mjs liefen.
         ...(process.env.BILDER ? { BILDER: path.join(process.env.BILDER, suite.name) } : {}),
       },
-      // 20 Minuten je Suite, nicht fuer die gesamte Sammlung (der volle Lauf braucht laenger).
-      zeitlimitMs: 20 * 60 * 1000,
+      // 20 Minuten je Suite, nicht fuer die gesamte Sammlung (der volle Lauf braucht laenger); mit --frist hoechstens bis dahin
+      zeitlimitMs: limitMs,
       ausgabe(s) {
         const zeilen = s.trim().split(/\r?\n/).filter(Boolean);
         if (zeilen.length) letzte = zeilen.at(-1).slice(0, 180);
@@ -204,19 +216,32 @@ async function lauf(suite) {
     const zeilen = e.text.split(/\r?\n/);
     const zahl = zeilen.map(z => z.match(/(\d+)\s*\/\s*(\d+)\s+bestanden/)).filter(Boolean).pop();
     const fehler = zeilen.filter(z => /^FEHLER/.test(z.trim()));
-    if (e.zeitlimit) fehler.push(`FEHLER Suite ${suite.name} ueberschritt ihr Zeitlimit (20 Minuten)`);
+    if (e.zeitlimit) {
+      fehler.push(limitMs < 20 * 60 * 1000 ? `FEHLER Suite ${suite.name} am Ende der Frist des Laufs (${FRIST} s) beendet`
+        : `FEHLER Suite ${suite.name} ueberschritt ihr Zeitlimit (20 Minuten)`);
+    }
+    // Absturz des Browsers (Befund R19 15.11.): zuerst nennen, damit er nicht wie ein Fehler der App aussieht
+    if (e.code !== 0 && ABSTURZ.test(e.text)) fehler.unshift(`FEHLER Browser abgestuerzt in ${suite.name} (Target crashed): Suite einzeln wiederholen`);
     return { ...suite, code: e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
       gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text };
   } finally { clearInterval(puls); }
 }
 
-let auswahl = NUR ? SUITEN.filter((s) => NUR.includes(s.name)) : SUITEN;
+let auswahl = NUR ? LISTE.filter((s) => NUR.includes(s.name)) : LISTE;
+if (PLAN) {
+  const gruppen = teile(auswahl, TEIL ? TEIL[1] : 1);
+  gruppen.forEach((g, i) => console.log(`Teil ${i + 1}/${gruppen.length}: ${g.suiten.length} Suiten, geplant ${Math.round(g.dauer)} s\n  ${g.suiten.map((x) => x.name).join(' ')}`));
+  process.exit(0);
+}
 if (TEIL) auswahl = teile(auswahl, TEIL[1])[TEIL[0] - 1].suiten;
 if (!auswahl.length) {
-  console.log('Keine passende Suite. Namen: ' + SUITEN.map((s) => s.name).join(', '));
+  console.log('Keine passende Suite. Namen: ' + LISTE.map((s) => s.name).join(', '));
   process.exit(2);
 }
-console.log(`Crownmate: ${auswahl.length} Testsuiten${SCHNELL ? ' (schnell)' : ''}, parallel ${PARALLEL}${TEIL ? `, Teil ${TEIL.join('/')}` : ''}\n`);
+const geplant = Math.round(auswahl.reduce((a, s) => a + (DAUERN.get(s.name) ?? MEDIAN), 0));
+console.log(`Crownmate: ${auswahl.length} Testsuiten${SCHNELL ? ' (schnell)' : ''}, parallel ${PARALLEL}${TEIL ? `, Teil ${TEIL.join('/')}` : ''}`
+  + `, geplant ${geplant} s${FRIST ? `, Frist ${FRIST} s` : ''}\n`);
+if (FRIST && PARALLEL === 1 && geplant > FRIST) console.log(`Hinweis: geplant ${geplant} s ist mehr als die Frist ${FRIST} s, mehr Teile nehmen (--plan zeigt sie)\n`);
 const t0 = Date.now();
 const ergebnisse = [];
 async function starte(s) {
@@ -231,7 +256,7 @@ async function starte(s) {
   }
   const status = e.code === 0 ? 'ok    ' : 'FEHLER';
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
-  console.log(`${status} ${s.name.padEnd(12)} ${zahl.padStart(9)}  ${e.sekunden.toFixed(1).padStart(6)} s`);
+  console.log(`${status} ${s.name.padEnd(12)} ${zahl.padStart(9)}  ${e.sekunden.toFixed(1).padStart(6)} s${e.nichtGestartet ? '  nicht gestartet' : ''}`);
   if (e.code !== 0 && !LAUT) {
     const zeigen = e.fehler.length ? e.fehler.slice(0, 20) : e.ende;
     for (const z of zeigen) console.log('       ' + z);
@@ -254,7 +279,8 @@ for (const s of auswahl) {
 }
 await Promise.all(laufend);
 
-ergebnisse.sort((a, b) => SUITEN.indexOf(a) - SUITEN.indexOf(b));
+const platz = (e) => LISTE.findIndex((x) => x.name === e.name);
+ergebnisse.sort((a, b) => platz(a) - platz(b));
 const schlecht = ergebnisse.filter((e) => e.code !== 0);
 const summeOk = ergebnisse.reduce((a, e) => a + (e.ok || 0), 0);
 const summe = ergebnisse.reduce((a, e) => a + (e.gesamt || 0), 0);
@@ -262,7 +288,7 @@ console.log('\nZusammenfassung');
 console.log('Suite         Prüfungen    Zeit   Ergebnis');
 for (const e of ergebnisse) {
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
-  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${e.code === 0 ? 'bestanden' : 'FEHLGESCHLAGEN'}`);
+  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${e.code === 0 ? 'bestanden' : e.nichtGestartet ? 'nicht gestartet' : 'FEHLGESCHLAGEN'}`);
 }
 console.log(`\n${ergebnisse.length - schlecht.length}/${ergebnisse.length} Suiten bestanden, ${summeOk}/${summe} Prüfungen, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 process.exit(schlecht.length ? 1 : 0);
