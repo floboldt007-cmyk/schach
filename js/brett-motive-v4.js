@@ -478,18 +478,24 @@ export function rahmenBild(m) {
 }
 const rahmenUrl = (innen) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 1000' preserveAspectRatio='none'>${innen}</svg>`).replace(/'/g, '%27')}")`;
 
-export function motivCss(m, sel = `.motiv-brett[data-motiv="${m.id}"]`, glanzSel = sel) {
-  const b = texturBild(m), feld = feldFarben(m), k = koordFarben(m), r = m.rahmen;
-  const grund = `${rahmenUrl(rahmenBild(m))} 0 0 / 100% 100% no-repeat`;
-  // padding in % bezieht sich auf die Breite: das Band ist damit immer rahmen.breite / 1000 der Brettbreite; --sockel-abstand
-  // gleich, damit die Effekte der App (.brett-effekte) ueber den Feldern bleiben
-  let css = `${sel} { --sockel-abstand: ${r.breite / 10}%; padding: ${r.breite / 10}%; border-radius: ${r.radius}px; background: ${grund}; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); `
-    + `--feld-hell: ${feld.h}; --feld-dunkel: ${feld.d}; --feld-muster-hell: ${svgUrl(b.h)}; --feld-muster-dunkel: ${svgUrl(b.d)}; --feld-muster-groesse: ${GROESSE}; }\n`
-    // kleine Brett-Ecke: mit dem App-Rund (12 px) blieb zwischen Feld und Rahmen ein heller Zwickel
-    + `${sel} .brett { --brett-radius: 3px; border-radius: 3px; box-shadow: 0 0 0 2px ${r.linie}; }\n`
+// Felder und Koordinaten des Motivs unter sel, ohne Rahmen (auch fuer das Analysebrett der App)
+function feldCss(m, sel) {
+  const b = texturBild(m), feld = feldFarben(m), k = koordFarben(m);
+  return `${sel} { --feld-hell: ${feld.h}; --feld-dunkel: ${feld.d}; --feld-muster-hell: ${svgUrl(b.h)}; --feld-muster-dunkel: ${svgUrl(b.d)}; --feld-muster-groesse: ${GROESSE}; }\n`
     + `${sel} .brett .koord { font-family: ${m.koord.schrift}; font-weight: ${m.koord.gewicht}; }\n`
     + `${sel} .brett .feld.h .koord { color: ${k.h}; text-shadow: none; }\n`
     + `${sel} .brett .feld.d .koord { color: ${k.d}; text-shadow: none; }\n`;
+}
+
+export function motivCss(m, sel = `.motiv-brett[data-motiv="${m.id}"]`, glanzSel = sel) {
+  const r = m.rahmen;
+  const grund = `${rahmenUrl(rahmenBild(m))} 0 0 / 100% 100% no-repeat`;
+  // padding in % bezieht sich auf die Breite: das Band ist damit immer rahmen.breite / 1000 der Brettbreite; --sockel-abstand
+  // gleich, damit die Effekte der App (.brett-effekte) ueber den Feldern bleiben
+  let css = `${sel} { --sockel-abstand: ${r.breite / 10}%; padding: ${r.breite / 10}%; border-radius: ${r.radius}px; background: ${grund}; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); }\n`
+    + feldCss(m, sel)
+    // kleine Brett-Ecke: mit dem App-Rund (12 px) blieb zwischen Feld und Rahmen ein heller Zwickel
+    + `${sel} .brett { --brett-radius: 3px; border-radius: 3px; box-shadow: 0 0 0 2px ${r.linie}; }\n`;
   // leiser Glanz NUR auf dem Rahmen (.motiv-brett, die Felder liegen darueber) und nur ohne "weniger Bewegung"
   if (m.bewegung) {
     css += `@media (prefers-reduced-motion: no-preference) {\n`
@@ -503,14 +509,26 @@ export function motivCss(m, sel = `.motiv-brett[data-motiv="${m.id}"]`, glanzSel
 // In der App (js/labor.js brettFlaeche): am Sockel jeder Brett-Ansicht (.brett-rahmen), der Glanz nie bei
 // html[data-bewegung="aus"] (js/bewegung.js). Handy hochkant in der Partie bleibt das Brett von Rand zu Rand ohne Rahmen
 // (Flo 31.10.2026, css/partie.css), die Felder tragen das Motiv weiter.
+// Koordinaten-Lage "rand" (css/app.css .brett-rahmen:has(> .brett.koord-rand), links und unten 12 px): mit Motiv bleibt das
+// Band ringsum gleich breit (mindestens die 12 px) und die Koordinaten stehen hell mit dunklem Saum auf dem Rahmen; Handy
+// hochkant ohne Rahmen wie bei den anderen Brettern (links und unten 12 px, Farbe aus css/board.css).
+// Das Analysebrett (.an-brett-rahmen, css/analyse.css) behaelt seinen Sockel und traegt Felder und Koordinaten des Motivs.
 export function motivAppCss(id) {
   const m = MOTIVE.find((x) => x.id === id);
   if (!m) return '';
-  const html = `html[data-brett="${id}"]`, sel = `${html} .brett-rahmen`;
+  const html = `html[data-brett="${id}"]`, sel = `${html} .brett-rahmen`, randTeil = '.brett-rahmen:has(> .brett.koord-rand)', rand = `${html} ${randTeil}`;
+  const band = `${m.rahmen.breite / 10}%`, k = koordFarben(m);
   return motivCss(m, sel, `${html}:not([data-bewegung="aus"]) .brett-rahmen`)
+    + `${rand} { --sockel-abstand: max(12px, ${band}); padding: var(--sockel-abstand); }\n`
+    + `${rand} > .brett-effekte { inset: var(--sockel-abstand); }\n`
+    + `${sel} .brett-koord-rand .koord { color: ${k.d}; text-shadow: 0 0 2px rgba(0, 0, 0, .9), 0 0 4px rgba(0, 0, 0, .6); }\n`
+    + feldCss(m, `${html} .an-brett-rahmen`)
     + `@media (orientation: portrait) and (max-width: 600px) {\n`
     + `  ${html} .partie .brett-rahmen { --sockel-abstand: 0px; padding: 0; border-radius: 0; background: none; box-shadow: none; animation: none; }\n`
-    + `  ${html} .partie .brett-rahmen .brett { --brett-radius: 0px; border-radius: 0; box-shadow: none; }\n}\n`;
+    + `  ${html} .partie .brett-rahmen .brett { --brett-radius: 0px; border-radius: 0; box-shadow: none; }\n`
+    + `  ${html} .partie ${randTeil} { --sockel-abstand: 0px; padding: 0 0 12px 12px; }\n`
+    + `  ${html} .partie ${randTeil} > .brett-effekte { inset: 0 0 12px 12px; }\n`
+    + `  ${html} .partie .brett-rahmen .brett-koord-rand .koord { color: var(--text-2, #6A665F); text-shadow: none; }\n}\n`;
 }
 // Sammelbild (js/sammlung-kunst.js brettKunst): die Feldtextur als Oberflaeche (viewBox 800, Ecke oben links)
 export const motivMuster = (id) => { const m = MOTIVE.find((x) => x.id === id); return m ? { ...texturBild(m), ganz: true } : null; };

@@ -5,7 +5,10 @@
 //                (feldFarben, rahmen.linie), Seltenheit und Weg kommen aus dem Katalog; Einstellung, Labor und Namen de/en
 //   Ansichten    Bot-Partie, Online-Partie, Zu zweit, Raetsel-Duell: Rahmen am Sockel (.brett-rahmen), Feldtextur, Feld- und
 //                Koordinatenfarbe wie die Gestaltung; ein Wechsel bei offener Ansicht wirkt sofort (Nacht, dann zurueck)
-//   Handy        die Bot-Partie bleibt von Rand zu Rand (Flo 31.10.2026), ohne Rahmen, die Felder tragen das Motiv
+//   Rand         Koordinaten-Lage "rand": Rahmenband ringsum gleich, Rand-Koordinaten in der Motivfarbe (Kaltreview 15.11.)
+//   Analyse      das Analysebrett traegt Felder, Textur und Koordinaten des Motivs (Kaltreview 15.11.)
+//   Handy        die Bot-Partie bleibt von Rand zu Rand (Flo 31.10.2026), ohne Rahmen, die Felder tragen das Motiv;
+//                mit Koordinaten am Rand links und unten 12 px wie die anderen Bretter
 //   Sammlung     das Erfinder-Konto sieht die 20 Bretter mit Zeichnung im Sammelbild
 //   Gegenprobe   ohne Erfinder-Konto faellt ein gespeichertes v4-Brett auf Nacht, kein Rahmen, kein Eintrag in der Sammlung
 // Netzwerk ausschliesslich simuliert (wie tests/funktion-shop-skin.test.mjs).
@@ -111,7 +114,7 @@ const bediene = (stuecke) => async (route) => {
 const MOTIV = 'kirchenfenster';
 const m = MOTIVE.find((x) => x.id === MOTIV);
 const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return `rgb(${n >> 16}, ${(n >> 8) & 255}, ${n & 255})`; };
-const SOLL = m ? { feld: rgb(feldFarben(m).h), koord: rgb(koordFarben(m).h) } : {};
+const SOLL = m ? { feld: rgb(feldFarben(m).h), koord: rgb(koordFarben(m).h), koordRand: rgb(koordFarben(m).d) } : {};
 // Messung am Brett einer Ansicht: Sockel (.brett-rahmen) mit Rahmenbild und Polster, erstes helles Feld mit Textur und Farbe,
 // Koordinate auf einem hellen Feld
 const miss = (s, sel) => s.evaluate((sel) => {
@@ -176,6 +179,67 @@ async function sammlungBretter(s) {
   await s.waitForFunction((id) => document.querySelector(`.sa-blatt .sa-teil[data-teil="brett-${id}"] .sk-muster`), MOTIV, { timeout: 8000 }).catch(() => {});
   return s.evaluate((ids) => ids.map((id) => { const t = document.querySelector(`.sa-blatt .sa-teil[data-teil="brett-${id}"]`); return { id, da: !!t, muster: !!t?.querySelector('.sk-muster') }; }), ids);
 }
+// Kaltreview 15.11. (Befund 1): Koordinaten-Lage "rand" (css/app.css .brett-rahmen:has(> .brett.koord-rand)) darf den
+// Rahmen nicht zerreissen: Band ringsum gleich breit, Effekte ringsum gleich (kein 12-px-Sprung links und unten),
+// Rand-Koordinaten in der Motivfarbe. Einen gleichmaessigen Versatz der Effekte von wenigen px hat auch die Lage "ecke"
+// (inset in % des Sockels, Polster in % der Brettzone, die bei 1180 px schmaler ist als der Sockel); er ist nicht Teil
+// dieses Befunds und wird nur mit ausgegeben.
+const effekteVersatz = (s) => s.evaluate((sel) => {
+  const b = document.querySelector(sel), eb = b?.closest('.brett-rahmen')?.querySelector(':scope > .brett-effekte')?.getBoundingClientRect();
+  if (!eb) return null;
+  const bb = b.getBoundingClientRect();
+  return [eb.top - bb.top, bb.right - eb.right, bb.bottom - eb.bottom, eb.left - bb.left].map((x) => Math.round(x));
+}, BOT);
+async function koordRand(s) {
+  const ecke = await effekteVersatz(s);
+  await s.evaluate(() => window.__app.setzeEinstellungen({ koordLage: 'rand' }));
+  await s.waitForFunction((sel) => document.querySelector(sel)?.classList.contains('koord-rand')
+    && document.querySelector(sel + ' .brett-koord-rand .koord'), BOT, { timeout: 8000 }).catch(() => {});
+  await s.waitForTimeout(800);   // die Partie misst das Brett nach dem Wechsel neu (js/ui/partie.js --brett)
+  const r = await s.evaluate((sel) => {
+    const b = document.querySelector(sel), rahmen = b?.closest('.brett-rahmen'); if (!rahmen) return null;
+    const cs = getComputedStyle(rahmen), k = b.querySelector('.brett-koord-rand .koord');
+    return { rand: b.classList.contains('koord-rand'), polster: ['Top', 'Right', 'Bottom', 'Left'].map((x) => parseFloat(cs['padding' + x])),
+      koord: k ? getComputedStyle(k).color : null, rahmenBild: cs.backgroundImage.includes('data:image/svg') };
+  }, BOT);
+  const p = r?.polster || [], rand = await effekteVersatz(s);
+  pruefe('Koordinaten am Rand: Rahmenband ringsum gleich breit (mindestens 12 px)',
+    !!r && r.rand && r.rahmenBild && p.length === 4 && p.every((x) => Math.abs(x - p[0]) < 0.5) && p[0] >= 12, r);
+  pruefe('Koordinaten am Rand: Effekte ringsum gleich weit von den Feldern (kein Sprung links und unten)',
+    !!rand && rand.every((x) => Math.abs(x - rand[0]) <= 1), { ecke, rand });
+  console.log(`   Effekte-Versatz ecke ${JSON.stringify(ecke)} rand ${JSON.stringify(rand)}`);
+  pruefe('Koordinaten am Rand: Farbe des Motivs auf dem Rahmen', !!r && r.koord === SOLL.koordRand, { ist: r?.koord, soll: SOLL.koordRand });
+  await s.evaluate(() => window.__app.setzeEinstellungen({ koordLage: 'ecke' }));
+}
+// Kaltreview 15.11. (Befund 2): nach der Partie zeigt die Analyse dieselben Felder (Farbe, Textur, Koordinaten)
+async function analyseBrett(s) {
+  await s.evaluate(async () => {
+    const { Chess } = await import('./vendor/chess/chess.js');
+    const { analysierePartie } = await import('./js/review.js');
+    const { botNachId } = await import('./js/bots.js');
+    const c = new Chess(), zuege = [], san = [];
+    for (const z of ['e4', 'e5', 'Nf3', 'Nc6']) { const m = c.move(z); zuege.push(m.lan); san.push(m.san); }
+    const bot = botNachId('benno');
+    const review = await analysierePartie(await window.__app.engine('bewertung'), zuege, { tiefe: 6, multipv: 1, spielerFarbe: 'w', elo: { b: bot.elo } });
+    const partie = { id: 'pmotivanalyse1', datum: new Date(Date.now() - 3600e3).toISOString(), botId: 'benno', botStufe: bot.stufe,
+      spielerFarbe: 'w', startFen: new Chess().fen(), zuege, san, ergebnis: 'remis', grund: 'einigung', hinweise: 0, zuruecknahmen: 0,
+      liveKlassen: review.zuege.map((z) => (z.farbe === 'w' ? z.klasse : null)), genauigkeit: review.genauigkeit.w,
+      genauigkeitBot: review.genauigkeit.b, spielstaerke: review.spielstaerke.w, eroeffnung: review.eroeffnung };
+    (await import('./js/storage.js')).speicherePartie(partie, review);
+    window.__app.gehe('analyse', { partieId: partie.id });
+  });
+  await s.waitForFunction(() => document.querySelectorAll('.an-brett-rahmen .brett .feld').length === 64, null, { timeout: 30000 }).catch(() => {});
+  await s.waitForFunction(() => getComputedStyle(document.querySelector('.an-brett-rahmen .brett .feld.h')).backgroundImage.includes('data:image/svg'),
+    null, { timeout: 8000 }).catch(() => {});
+  const r = await s.evaluate(() => {
+    const b = document.querySelector('.an-brett-rahmen .brett'); if (!b) return null;
+    const hc = getComputedStyle(b.querySelector('.feld.h')), k = b.querySelector('.feld.h .koord');
+    return { brett: document.documentElement.dataset.brett, feldBild: hc.backgroundImage.includes('data:image/svg'), feld: hc.backgroundColor,
+      koord: k ? getComputedStyle(k).color : null };
+  });
+  pruefe(`Analyse: Feldtextur, Feld- und Koordinatenfarbe von "${MOTIV}"`,
+    !!r && r.brett === MOTIV && r.feldBild && r.feld === SOLL.feld && r.koord === SOLL.koord, { ist: r, soll: SOLL });
+}
 const BOT = '.screen.partie:not(.online-screen) .brett-rahmen > .brett';
 const AUFBAU_MS = 45000;
 
@@ -188,6 +252,7 @@ try {
     await s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
     await s.waitForFunction((sel) => document.querySelectorAll(sel + ' .feld').length === 64, BOT, { timeout: AUFBAU_MS }).catch(() => {});
     await ansicht(s, 'bot-partie', BOT);
+    await koordRand(s);
 
     await s.evaluate(id => window.__app.gehe('online', { partieId: id }), ONLINE.id);
     await s.waitForFunction(() => window.__online?.brett() && document.querySelectorAll('.screen').length === 1
@@ -207,6 +272,8 @@ try {
     await s.waitForFunction(() => document.querySelectorAll('.screen.raetsel-duell .rd-brett .feld').length === 64, null, { timeout: 15000 }).catch(() => {});
     await ansicht(s, 'raetsel-duell', '.screen.raetsel-duell .rd-brett');
 
+    await analyseBrett(s);
+
     const samm = await sammlungBretter(s);
     pruefe('Sammlung (Erfinder): alle 20 Motiv-Bretter mit Zeichnung im Sammelbild', samm.length === 20 && samm.every((x) => x.da && x.muster), samm.filter((x) => !x.da || !x.muster));
     pruefe('Erfinder: keine Seitenfehler', fehler.length === 0, fehler);
@@ -221,6 +288,13 @@ try {
     const r = await miss(s, BOT);
     pruefe('Handy: Bot-Partie ohne Rahmen von Rand zu Rand, Felder mit Textur und Farbe des Motivs',
       !!r && r.brett === MOTIV && !r.rahmenBild && r.polster === 0 && r.feldBild && r.feld === SOLL.feld, { ist: r, soll: SOLL });
+    // Koordinaten am Rand: wie bei den anderen Brettern links und unten 12 px, ohne Rahmenbild
+    await s.evaluate(() => window.__app.setzeEinstellungen({ koordLage: 'rand' }));
+    await s.waitForFunction((sel) => document.querySelector(sel)?.classList.contains('koord-rand'), BOT, { timeout: 8000 }).catch(() => {});
+    await s.waitForTimeout(800);
+    const hr = await s.evaluate((sel) => { const cs = getComputedStyle(document.querySelector(sel).closest('.brett-rahmen'));
+      return { polster: ['Top', 'Right', 'Bottom', 'Left'].map((x) => parseFloat(cs['padding' + x])), rahmenBild: cs.backgroundImage.includes('data:image/svg') }; }, BOT);
+    pruefe('Handy, Koordinaten am Rand: links und unten 12 px, kein Rahmen', !!hr && !hr.rahmenBild && hr.polster.join() === '0,0,12,12', hr);
     pruefe('Handy: keine Seitenfehler', fehler.length === 0, fehler);
     await k.close();
   }
