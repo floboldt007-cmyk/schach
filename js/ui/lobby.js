@@ -25,6 +25,7 @@ import { suche as kronenSuche, angemeldet as kronenAngemeldet, RANKED_ZEIT } fro
 import { karteDerPartie } from '../karte.js';
 import { visitenkarte, eigeneKarte, fremdeKarte, botKarte, karteVomServer } from './visitenkarte.js';
 import { hoere } from '../ereignisse.js';
+import { starteKiErsatz } from './ki-ersatz.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 import '../sprachen/online.js';
@@ -264,7 +265,7 @@ export function zeige(root, params, app) {
             gefundenUndWeiter(el, botKarte(bot), () => {
               // erst wenn die Partie steht: der Seitenwechsel leert die Meldungen (js/app.js zeigeScreen)
               if (verlassen) { const ab = hoere('app:screen', (d) => { if (d.name !== 'partie') return; ab(); app.meldung(L('suche.kiVerlassen'), { dauer: 4500 }); }); }
-              app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl, ki: true, ...(kiRef ? { kiRef } : {}) });
+              starteKiErsatz(app, { bot, tempo: tempoWahl, kiRef });
             });
           },
           beiFehler: () => {

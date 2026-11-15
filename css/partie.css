@@ -49,7 +49,9 @@
   box-shadow: var(--s1), var(--kante); }
 .partie .spieler.gegner { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto auto; row-gap: 0;
   grid-template-areas: "leiste leiste leiste" "av info uhr" "blase blase blase"; }
-.partie .spieler.ich { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 0;
+/* R19 online-weg (Flo 15.11.2026, "unten rechts verbuggt"): die Leiste am Namen (Level-Chip) behaelt ihre Breite, ein
+   langer Name bricht um, statt die Leiste auf 0 px zu druecken (gemessen mit 15 und 20 Zeichen auf vier Geraeten) */
+.partie .spieler.ich { grid-template-columns: auto minmax(0, max-content) minmax(max-content, 1fr) auto; grid-template-rows: auto auto; row-gap: 0;
   grid-template-areas: "av name leiste uhr" "av unter unter uhr"; }
 .partie .spieler > .av { grid-area: av; width: var(--av); height: var(--av); margin-right: 12px; border-radius: 15px; overflow: hidden;
   display: grid; place-items: center; background: var(--flaeche-2); }

@@ -322,7 +322,7 @@ export function zeige(root, params, app) {
         // Mit altem SQL stimmt der Satz nicht, dort kein Hinweis.
         // erst wenn die Partie steht: der Seitenwechsel leert die Meldungen (js/app.js zeigeScreen)
         if (kiRef && lage().vomServer) { const ab = hoere('app:screen', (d) => { if (d.name !== 'partie') return; ab(); app.meldung(O('suche.kiVerlassen'), { dauer: 4500 }); }); }
-        app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl(lage), ki: true, ...(kiRef ? { kiRef } : {}) });
+        import('./ki-ersatz.js').then((m) => m.starteKiErsatz(app, { bot, tempo: tempoWahl(lage), kiRef, weg: () => weg })).catch((e) => { console.error(e); sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); });
       },
       beiFehler: (e) => { suche = null; sucheZustand('bereit', O('suche.erklaert')); melde(e?.message || O('fehler')); },
     });

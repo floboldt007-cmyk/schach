@@ -157,7 +157,11 @@ async function browserTeil() {
       });
       pruefe('Erfinder: Umschalter Welten | Online ueber der Karte, Welten aktiv, Online mit Labor-Schild, Knoepfe mindestens 38 px im 44-px-Band',
         leiste.aktiv === 'welten' && leiste.hoehe >= 44 && leiste.ueberKarte && leiste.labor && leiste.knoepfe.every((h) => h >= 38), leiste);
+      // R19 online-weg (15.11.2026): der Umschalter fuehrt zur echten Online-Seite; die Vorschau-Lobby nur noch ueber #lobby
       await p.s.locator('.lb-modus [data-modus="online"]').click();
+      await p.s.waitForSelector('.screen.online-screen', { timeout: 10000 });
+      pruefe('Erfinder: Umschalter Online fuehrt zur echten Online-Seite (#online)', await p.s.evaluate(() => location.hash) === '#online');
+      await p.s.evaluate(() => window.__app.gehe('lobby'));
       await p.s.waitForSelector('.screen.lobby .lb-spielen', { timeout: 10000 });
       await warte(700);
       const lobby = await p.s.evaluate(() => ({
