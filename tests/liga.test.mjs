@@ -559,7 +559,7 @@ async function browserTeil(browser, start) {
 }
 
 // Wochen-Gruppen (07.11.2026): Reiter "Gruppe" der Bestenliste mit abgefangenem Server (liga_meine_gruppe).
-// Gruppe Laeufer II (Stufe 7), du auf Platz 3, 27 Menschen und 3 Bots ("KI"), dazu eine gemerkte Belohnung.
+// Gruppe Warden II (Stufe 7), du auf Platz 3, 27 Menschen und 3 Bots ("KI"), dazu eine gemerkte Belohnung.
 function probeGruppe({ platz = 3, stufe = 7, botKi = { genutzt: 120, max: 300 } } = {}) {
   const mitglieder = [];
   for (let p = 1; p <= 30; p++) {
@@ -625,11 +625,11 @@ async function gruppeTeil(browser, start) {
         assert.ok(await page.locator('.bl-steuer-fenster').isHidden());
         assert.ok(rpc.includes('liga_meine_gruppe'));
       });
-      await browserPruefe('Gruppe: Buehne mit Wappen, "Läufer II", "Platz 3 von 30", Aufstiegskurs, naechste Stufe Läufer I', async () => {
-        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Läufer II');
+      await browserPruefe('Gruppe: Buehne mit Wappen, "Warden II", "Platz 3 von 30", Aufstiegskurs, naechste Stufe Warden I', async () => {
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Warden II');
         assert.equal(await page.locator('.lg-gr-titel p').innerText(), 'Platz 3 von 30');
         assert.match(await page.locator('.lg-gr-zone').innerText(), /Auf Aufstiegskurs/);
-        assert.match(await page.locator('.lg-gr-naechste').innerText(), /Läufer I$/);
+        assert.match(await page.locator('.lg-gr-naechste').innerText(), /Warden I$/);
         assert.match(await page.locator('.lg-gr-wappen').getAttribute('src'), /assets\/liga\/laeufer\.svg$/);
         assert.ok(await page.locator('.lg-gr-wappen').evaluate((i) => i.complete && i.naturalWidth > 0), 'Wappen geladen');
         assert.equal(await page.locator('.lg-gr-ende').innerText(), 'Ende am Sonntag, 08.11.');
@@ -680,7 +680,7 @@ async function gruppeTeil(browser, start) {
         const werte = await page.locator('.lg-mini-blatt .lg-mini-werte').innerText();
         assert.match(werte, /Platz[\s\S]*2/);
         assert.match(werte, /376/);
-        assert.match(werte, /Läufer II/);
+        assert.match(werte, /Warden II/);
         assert.match(await page.locator('.lg-mini-satz').innerText(), /Titel und Erfolge sieht nur/);
         assert.equal(await page.locator('.lg-mini-blatt .lg-mini-av.bild').count(), 1);
         await page.locator('.lg-mini-blatt .sheet-knoepfe button').click();
@@ -727,9 +727,9 @@ async function gruppeTeil(browser, start) {
     const leer = { woche: '2026-11-02', ende: '2026-11-08', stufe: 3, gruppe: null, platz: null, n: 30, mitglieder: [], belohnung: [], offen: [] };
     const { kontext, page } = await gruppeSeite(browser, start, { antwort: leer });
     try {
-      await browserPruefe('Gruppe ohne Partie diese Woche: Buehne Springer III mit Einladung, keine Liste', async () => {
+      await browserPruefe('Gruppe ohne Partie diese Woche: Buehne Knight III mit Einladung, keine Liste', async () => {
         assert.equal(await page.locator('.lg-gr').getAttribute('data-zustand'), 'leer');
-        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Springer III');
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Knight III');
         assert.match(await page.locator('.lg-gr-titel p').innerText(), /Spiel eine Partie/);
         assert.equal(await page.locator('.lg-gr-liste').count(), 0);
       });
@@ -748,13 +748,13 @@ async function gruppeTeil(browser, start) {
     const { kontext, page } = await gruppeSeite(browser, start, { antwort: probeGruppe({ platz: 28, stufe: 17, botKi: { genutzt: 300, max: 300 } }),
       sprache: 'en', modus: 'dunkel' });
     try {
-      await browserPruefe('Gruppe englisch, dunkel, Koenig I auf Platz 28: "King I", "Place 28 of 30", ruhiges Abzeichen', async () => {
-        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'King I');
+      await browserPruefe('Gruppe englisch, dunkel, Crownmate I auf Platz 28: "Crownmate I", "Place 28 of 30", ruhiges Abzeichen', async () => {
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Crownmate I');
         assert.equal(await page.locator('.lg-gr-titel p').innerText(), 'Place 28 of 30');
         assert.equal(await page.locator('.lg-gr-zone').getAttribute('data-zone'), 'ab');
         assert.match(await page.locator('.lg-gr-zone').innerText(), /Everything is open until Sunday/);
-        assert.equal(await page.locator('.lg-gr-naechste').count(), 0, 'ueber Koenig I gibt es nichts');
-        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="auf"]').count(), 0, 'in Koenig I steigt niemand auf');
+        assert.equal(await page.locator('.lg-gr-naechste').count(), 0, 'ueber Crownmate I gibt es nichts');
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="auf"]').count(), 0, 'in Crownmate I steigt niemand auf');
       });
       await browserPruefe('Gruppe: Bot-Kronen-Deckel voll (300 von 300): ruhiger Hinweis in Grau wie "Ends on Sunday", nie rot', async () => {
         assert.equal(await page.locator('.lg-gr-botvoll').innerText(), 'Bot crowns are full for this week. Online games still count.');
@@ -776,20 +776,20 @@ async function gruppeTeil(browser, start) {
         assert.equal(await page.locator('.lg-liga[data-liga="online"]').getAttribute('data-zone'), 'auf');
         assert.equal(await page.locator('[role="tablist"].lg-ligen [role="tab"]').count(), 2);
         assert.equal(await page.locator('.lg-gr').getAttribute('data-liga'), 'online');
-        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Läufer II');
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Warden II');
         assert.ok(rpc.includes('liga_gruppe') && !rpc.includes('liga_meine_gruppe'), JSON.stringify(rpc));
         assert.match(await page.locator('.lg-gr-regeln').evaluate((d) => d.textContent), /zwei Ligen/);
       });
-      await browserPruefe('Zwei Ligen: Tipp auf Rätsel zeigt die Rätsel-Gruppe (Springer II, Platz 9), Pfeiltaste zurück auf Online', async () => {
+      await browserPruefe('Zwei Ligen: Tipp auf Rätsel zeigt die Rätsel-Gruppe (Knight II, Platz 9), Pfeiltaste zurück auf Online', async () => {
         await page.locator('.lg-liga[data-liga="raetsel"]').click();
         assert.equal(await page.locator('.lg-gr').getAttribute('data-liga'), 'raetsel');
-        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Springer II');
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Knight II');
         assert.equal(await page.locator('.lg-gr-titel p').innerText(), 'Platz 9 von 30');
         assert.equal(await page.locator('.lg-liga[data-liga="raetsel"]').getAttribute('aria-selected'), 'true');
         assert.equal(await page.locator('.lg-ligen-feld').getAttribute('aria-labelledby'), 'lg-liga-raetsel');
         await page.locator('.lg-liga[data-liga="raetsel"]').focus();
         await page.keyboard.press('ArrowLeft');
-        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Läufer II');
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Warden II');
         assert.equal(await page.evaluate(() => document.activeElement?.dataset.liga), 'online', 'Fokus folgt dem Reiter');
       });
       await browserPruefe('Zwei Ligen: keine JavaScript- oder Konsolenfehler', async () => assert.deepEqual(fehler, []));
@@ -803,7 +803,7 @@ async function gruppeTeil(browser, start) {
         assert.ok(rpc.includes('liga_gruppe') && rpc.includes('liga_meine_gruppe'), JSON.stringify(rpc));
         assert.equal(await page.locator('.lg-ligen').count(), 0);
         assert.equal(await page.locator('.lg-gr').getAttribute('data-liga'), null);
-        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Läufer II');
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Warden II');
         assert.doesNotMatch(await page.locator('.lg-gr-regeln').evaluate((d) => d.textContent), /zwei Ligen/);
       });
       await browserPruefe('Zwei Ligen ohne SQL: keine JavaScript- oder Konsolenfehler', async () => assert.deepEqual(fehler, []));
@@ -816,7 +816,7 @@ async function gruppeTeil(browser, start) {
     try {
       await browserPruefe('Zwei Ligen: Rätsel-Liga gibt einen Fehler -> nur Online, keine Leiste, kein liga_meine_gruppe', async () => {
         assert.equal(await page.locator('.lg-ligen').count(), 0);
-        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Läufer II');
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Warden II');
         assert.ok(!rpc.includes('liga_meine_gruppe'), JSON.stringify(rpc));
       });
     } finally { await kontext.close(); }

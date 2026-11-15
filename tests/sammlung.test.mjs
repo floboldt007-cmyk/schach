@@ -82,15 +82,19 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
   const { brettKunst } = await import('../js/sammlung-kunst.js');
   const css = readFileSync(path.join(WURZEL, 'css/tokens.css'), 'utf8');
   const innen = (url) => decodeURIComponent(url).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+  // seit den 65 Brettern (14.11.2026) je Welt drei; die Zeichnung muss bei jedem Brett mit muster gleich sein
   const welten = LABOR_BRETTER.filter((b) => b.welt);
-  const abweichend = welten.filter((b) => {
+  const abweichend = LABOR_BRETTER.filter((b) => b.muster).filter((b) => {
     const block = new RegExp(`html\\[data-brett="${b.id}"\\] \\{([^}]*)\\}`).exec(css);
     const url = (n) => (block && new RegExp(`--feld-muster-${n}: url\\("data:image/svg\\+xml,([^"]+)"\\)`).exec(block[1]) || [])[1] || '';
     return !block || innen(url('hell')) !== b.muster.h || innen(url('dunkel')) !== b.muster.d;
   }).map((b) => b.id);
-  pruefe('Welten-Bretter: fünf (Welt 1 bis 5), Zeichnung im Spiel und im Sammelbild gleich', welten.map((b) => b.welt).join() === '1,2,3,4,5'
-    && abweichend.length === 0, abweichend);
-  pruefe('Welten-Bretter: das Sammelbild trägt die Zeichnung je Feld, die Themen-Bretter ohne', (brettKunst('#fff', '#000', '#111', '', welten[0].muster).match(/class="sk-muster"/g) || []).length === 9
+  pruefe('Welten-Bretter: je Welt drei (Welt 1 bis 5), jede Zeichnung im Spiel und im Sammelbild gleich',
+    welten.map((b) => b.welt).sort().join() === '1,1,1,2,2,2,3,3,3,4,4,4,5,5,5' && abweichend.length === 0, abweichend);
+  // seit den Oberflaechen (14.11.2026) zeichnen nur noch die gewoehnlichen je Feld (Heuboden ist ein Welten-Brett); die
+  // seltenen tragen eine Oberflaeche aus js/brett-flaechen.js, Spiel und Sammelbild nehmen sie aus brettMuster
+  const jeFeld = welten.find((b) => b.muster);
+  pruefe('Welten-Bretter: das Sammelbild trägt die Zeichnung je Feld, die Themen-Bretter ohne', !!jeFeld && (brettKunst('#fff', '#000', '#111', '', jeFeld.muster).match(/class="sk-muster"/g) || []).length === 9
     && !/sk-muster/.test(brettKunst('#fff', '#000', '#111', '')));
 }
 
@@ -467,6 +471,11 @@ async function erfinderTeil(browser) {
   pruefe('Erfinder: „Der Erfinder“ und „Nr. 0 · 1 von 1“, Knopf für die Blaupause', !!info && info.chips === 'Der Erfinder|Nr. 0 · 1 von 1'
     && info.knopf === 'Blaupause-Figuren benutzen', info);
   pruefe('Erfinder: Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // Befund ed (14.11.2026): Erfinder auf neuem Geraet, der Status kommt erst nach dem Laden; die Oberflaechen der seltenen
+  // Bretter muessen trotzdem im Sammelbild erscheinen (vorher entschied eine Modul-Konstante beim Laden fuer immer)
+  const flaechen = await p.s.waitForFunction(() => document.querySelectorAll('.sa-bereich[data-bereich="bretter"] clipPath[id^="skf"]').length,
+    null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => 0);
+  pruefe('Erfinder auf neuem Gerät: Sammelbild der Bretter zeigt die Oberflächen, sobald der Server den Erfinder meldet', flaechen > 0, flaechen);
   // G-002 (Sammlung B): Plaetze statt Reiter; auf dem Handy alle im Bild, gross genug, ohne Ueberlappung
   pruefe('Handy: alle Plätze der Sammlung sichtbar (mindestens 44 px hoch, keiner überlappt, nichts ragt rechts heraus)', await p.s.evaluate((seg) => {
     const ueber = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
@@ -571,7 +580,10 @@ async function laborTeil(browser) {
   const bretter = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="bretter"] .sa-teil')]
     .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
   const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
-  pruefe('Labor: zehn Bretter mit Schild (fünf Themen, fünf Welten), nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker,brett-moos,brett-pflaster,brett-brandung,brett-tiefsee', bretter);
+  // seit den 65 Brettern (14.11.2026): alle 62 Labor-Bretter in der Reihenfolge von js/labor.js
+  const laborIds = (await import('../js/labor.js')).LABOR_BRETTER.map((b) => 'brett-' + b.id).join();
+  pruefe('Labor: alle 62 Labor-Bretter mit Schild, nur diese markiert', lab === laborIds && lab.split(',').length === 62
+    && lab.startsWith('brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker'), bretter.length);
   await ruesteAus(p.s, 'brett-kuerbis');
   pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
     && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));

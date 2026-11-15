@@ -51,8 +51,10 @@ function nodeTeil() {
   const app = lies('js/app.js');
   const paketScreens = (app.match(/const PAKET_SCREENS = new Set\(\[([^\]]*)\]\)/) || [])[1] || '';
   pruefe('training ist Kern-Screen (nicht mehr in PAKET_SCREENS), start bleibt Paket-Screen', !/'training'/.test(paketScreens) && /'start'/.test(paketScreens), paketScreens);
+  // R19 Lobby-Farbe (14.11.2026): die Reiter tragen gefuellte Spiel-Symbole (js/ui/icons.js spielSymbol)
   pruefe('Reiter nach Konzept 2026-11-06: Start, Bots, Liga, Ich (Training und Verlauf sind keine Reiter mehr)',
-    /const REITER_ALLE = \[\['heim', 'Start', 'haus'\], \['arena', 'Bots', 'pokal'\], \['bestenliste', 'Liga', 'liga'\], \['ich', 'Ich', 'person'\]\]/.test(app));
+    /const REITER_ALLE = \[\['heim', 'Start', 'heim'\], \['arena', 'Bots', 'bots'\], \['bestenliste', 'Liga', 'liga'\], \['ich', 'Ich', 'ich'\]\]/.test(app)
+    && /\$\{spielSymbol\(ic\)\}<span>\$\{t\('rahmen\.reiter\.'/.test(app));
   pruefe('Seitenleiste im Querformat ab 1021 px', /min-width: 1021px\) and \(orientation: landscape\)/.test(app) && /'seite'/.test(app));
   pruefe('Icon liga (Kronen-Umriss) fuer den Liga-Reiter', iconNamen().includes('liga') && !/fill="currentColor"/.test(icon('liga')));
   pruefe('erweiterungen.js: REITER bestenliste und ich', /export const REITER = Object\.freeze\(\['bestenliste', 'ich'\]\)/.test(lies('js/erweiterungen.js')));
