@@ -189,6 +189,9 @@ const ENDE = FRIST ? Date.now() + FRIST * 1000 - 5000 : Infinity;
 // nach einem gewoehnlichen Fehler (Fix-Review f1, gemessen mit hart beendeten Browser-Prozessen). Ein solcher Absturz erscheint
 // darum als gewoehnlicher FEHLER, ohne Absturz-Zeile und ohne Wiederholung, also nie als falsches Gruen.
 const ABSTURZ = /Target crashed/;
+// Kopf einer Ausnahme in der Ausgabe einer Suite (Error, TypeError, AssertionError [ERR_ASSERTION], TargetClosedError ...) und
+// der Hinweis, den Node bei einer geworfenen Nicht-Error-Ausnahme druckt. Die Stack-Zeilen darunter gehoeren zum Kopf.
+const AUSNAHME = /^\s*(Uncaught\s+)?[A-Za-z]*Error\b|--trace-uncaught/;
 
 // Eine Suite mit Seitenabsturz laeuft EINMAL neu (Analyse f1, R19-Kritik/absturz-ursache.md: 15 Abstuerze in 13 Suiten,
 // ohne Muster). Besteht die Wiederholung, war es ein Umgebungsfehler; stuerzt sie wieder ab, bleibt sie FEHLER. Ein Lauf ohne
@@ -199,7 +202,7 @@ async function lauf(suite) {
   const erst = await einzelLauf(suite);
   if (!erst.absturz || erst.zeitlimit) return erst;
   if (!erst.nurAbsturz) {
-    console.log(`Keine Wiederholung nach Absturz: ${suite.name} hat daneben einen FEHLER ohne Absturz`);
+    console.log(`Keine Wiederholung nach Absturz: ${suite.name} hat ${erst.ohneWiederholung}`);
     return erst;
   }
   console.log(`WIEDERHOLT nach Absturz: ${suite.name} (erster Lauf ${erst.sekunden.toFixed(1)} s, ${erst.fehler[0]})`);
@@ -248,10 +251,17 @@ async function einzelLauf(suite) {
     // Absturz des Browsers (Befund R19 15.11.): zuerst nennen, damit er nicht wie ein Fehler der App aussieht. Er macht den
     // Lauf immer zum FEHLER, auch wenn die Suite mit 0 endet (etwa nach einer stillen Wiederholung in der Suite selbst).
     const absturz = ABSTURZ.test(e.text);
-    const nurAbsturz = fehler.every(z => ABSTURZ.test(z));
+    // Nur Absturz: mindestens eine FEHLER-Zeile, jede nennt den Absturz, und keine Ausnahme ohne ihn (Fix-Review 64, KRITISCH:
+    // eine unbehandelte Ausnahme schreibt keine FEHLER-Zeile und verschwand sonst nach einer gruenen Wiederholung)
+    const fremdeAusnahme = zeilen.find(z => AUSNAHME.test(z) && !ABSTURZ.test(z));
+    const nurAbsturz = fehler.length > 0 && !fremdeAusnahme && fehler.every(z => ABSTURZ.test(z));
+    // warum nicht wiederholt wird, mit der Ausnahme im Wortlaut: sie steht sonst in keiner FEHLER-Zeile
+    const ersteAusnahme = (zeilen.find(z => AUSNAHME.test(z)) || '').trim();
+    const ohneWiederholung = nurAbsturz ? null : fremdeAusnahme ? `eine Ausnahme ohne Absturz (${fremdeAusnahme.trim()})`
+      : fehler.length ? 'daneben einen FEHLER ohne Absturz' : `keine FEHLER-Zeile${ersteAusnahme ? ` (${ersteAusnahme})` : ''}`;
     if (absturz) fehler.unshift(`FEHLER Browser abgestuerzt in ${suite.name} (${e.text.match(ABSTURZ)[0]})`);
     return { ...suite, code: absturz && e.code === 0 ? 1 : e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
-      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text, absturz, nurAbsturz, zeitlimit: e.zeitlimit };
+      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text, absturz, nurAbsturz, ohneWiederholung, zeitlimit: e.zeitlimit };
   } finally { clearInterval(puls); }
 }
 

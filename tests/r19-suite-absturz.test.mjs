@@ -86,6 +86,17 @@ if (kenntListe) {
   pruefe('Wiederholung: inhaltlicher FEHLER mit Absturz wird nicht wiederholt, bleibt FEHLER mit seiner Zeile',
     g.code === 1 && gn === 1 && !/WIEDERHOLT/.test(g.text) && /Brett 352 statt 360 px/.test(g.text)
     && /Browser abgestuerzt/.test(g.text) && /Keine Wiederholung nach Absturz: gemischt/.test(g.text), { gn, code: g.code, text: g.text.slice(-600) });
+  // Fix-Review 64 (KRITISCH): Absturz plus unbehandelte Ausnahme, die keine FEHLER-Zeile schreibt. Auch sie darf nach einer
+  // gruenen Wiederholung nicht verschwinden; ebenso keine Wiederholung, wenn der Lauf gar keine FEHLER-Zeile hat.
+  for (const [probe, text] of [['ausnahme', /Probe-Ausnahme: Brett 352 statt 360 px/], ['leer', /page\.evaluate: Target crashed/]]) {
+    const pMarke = path.join(ORDNER, probe + '.marke');
+    const pLaeufe = path.join(ORDNER, probe + '.laeufe');
+    const p = await alle([], liste(probe, [[probe, probe]]), 60000, { ABSTURZ_MARKE: pMarke, LAEUFE_DATEI: pLaeufe });
+    const pn = existsSync(pLaeufe) ? readFileSync(pLaeufe, 'utf8').trim().split('\n').length : 0;
+    pruefe(`Wiederholung: ${probe === 'ausnahme' ? 'Absturz mit unbehandelter Ausnahme' : 'Absturz ohne FEHLER-Zeile'} wird nicht wiederholt, bleibt FEHLER mit der Ausnahme`,
+      p.code === 1 && pn === 1 && !/WIEDERHOLT/.test(p.text) && text.test(p.text)
+      && new RegExp(`Keine Wiederholung nach Absturz: ${probe}`).test(p.text), { pn, code: p.code, text: p.text.slice(-600) });
+  }
 }
 // 1d. Seitenabsturz im Protokoll (tests/browser.mjs): Ansicht und Viewport je Seite, aus newContext und aus newPage
 {
