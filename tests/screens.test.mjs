@@ -274,6 +274,9 @@ async function testeAnalyse(browser, d) {
   pruefe('Wischen nach rechts: ein Zug zurück', (await aktuellerPly(seite)) === -1);
 
   // --- Kurve antippen
+  // seit R19 "Analyse neu" stehen die Schluesselmomente ueber dem Verlauf (Flos Wunsch): erst hinscrollen, wie unten beim Finger
+  await seite.locator('.an-kurve-wrap').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await seite.waitForTimeout(300);
   const kb = await seite.locator('.an-kurve-wrap').boundingBox();
   await seite.mouse.click(kb.x + kb.width * (20 / 33), kb.y + kb.height / 2);
   pruefe('Kurve antippen: springt zu Ply 19', (await aktuellerPly(seite)) === 19, String(await aktuellerPly(seite)));
