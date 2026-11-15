@@ -233,12 +233,20 @@ try {
       document.body.append(fremd, eigen);
       const abz = fremd.querySelector('.vk-season-abz');
       const img = abz?.querySelector('img');
-      return { fremdOrden: !!fremd.querySelector('.vk-orden'), eigenLeer: !!eigen.querySelector('.vk-orden li.leer'),
+      const mitTitel = V.visitenkarte(V.karteVomServer({ name: 'Mia', kronen_stufe: 13, elo: 1412, saison: { abzeichen: { saison: 1, stufe: 17 }, titel: 'crownmaster-s1' },
+        vitrine: [] }));
+      mitTitel.style.width = '360px';
+      document.body.append(mitTitel);
+      const bannerUnten = mitTitel.querySelector('.vk-banner').getBoundingClientRect().bottom;
+      const chipsUnten = Math.max(...[...mitTitel.querySelectorAll('.vk-season > *')].map((c) => c.getBoundingClientRect().bottom));
+      return { bannerDeckt: bannerUnten + 0.5 >= chipsUnten, bannerUnten, chipsUnten,
+        fremdOrden: !!fremd.querySelector('.vk-orden'), eigenLeer: !!eigen.querySelector('.vk-orden li.leer'),
         abzPx: abz ? parseFloat(getComputedStyle(abz).fontSize) : 0, abzImg: img ? Math.round(img.getBoundingClientRect().width) : 0,
         abzText: abz?.textContent.trim() || '' };
     });
     pruefe('Gegnerkarte: leere Vitrine auf fremder Karte ausgeblendet', vk.fremdOrden === false, vk);
     pruefe('Eigene Karte: leere Vitrine bleibt', vk.eigenLeer === true, vk);
+    pruefe('Gegnerkarte: Banner deckt Abzeichen und Titel ganz ab', vk.bannerDeckt === true, vk);
     pruefe('Gegnerkarte: Abzeichen mit Wappen ab 18 px und Schrift ab 13 px', vk.abzImg >= 18 && vk.abzPx >= 13 && vk.abzText === 'S1 · Crownmate I', vk);
     await kontext.close();
   }

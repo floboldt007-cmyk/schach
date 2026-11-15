@@ -13,7 +13,10 @@
 .vk { position: relative; display: grid; min-width: 0; overflow: hidden; border-radius: var(--r-l, 18px); background: var(--flaeche);
   border: 1px solid var(--linie); color: var(--text); box-shadow: var(--s1, none); }
 .vk-banner { display: block; background-color: #14161C; background-size: cover; background-position: 30% center; background-repeat: no-repeat; }
-.vk > .vk-banner { position: absolute; inset: 0 0 auto 0; height: 100px; }
+/* Banner und Kopf teilen sich die erste Zeile: das Banner waechst mit dem Kopf (mindestens 100 px), auch wenn Season-Abzeichen
+   und Titel ihn hoeher machen (R19, vorher feste 100 px, der Titel-Chip lag dann halb unter der Bannerkante) */
+.vk > .vk-banner { position: relative; grid-area: 1 / 1; }
+.vk > .vk-kopf { grid-area: 1 / 1; }
 /* G-001: gemeinsame Regel fuer alle Banner-Flaechen mit Text links (Profilkopf "Ich", Visitenkarte, Spielerzeile online).
    Alle Banner tragen ihr Motiv bei gut einem Viertel der Breite (x 300 bis 330 von 1200); mit "cover" lag es je nach Breite unter
    Name und Titel-Schild. Darum feste Hoehe --banner-h (4:1, Vorgabe 120 px, also 480 px breit), so verschoben, dass das Motiv
