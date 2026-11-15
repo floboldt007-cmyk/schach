@@ -9,8 +9,11 @@ const stuerze = async (seite, ansicht) => {
   await seite.goto('data:text/html,<p>Probe</p>');
   // pushState wie die App (js/app.js); location.hash navigiert in einer data:-Seite nicht (gemessen 15.11.)
   await seite.evaluate((h) => history.pushState({}, '', h), ansicht);
+  // auf das Ereignis warten statt einer festen Pause: mit 1,5 s fehlte unter Last einmal die zweite Zeile (Kernprobe 15.11.).
+  // tests/browser.mjs hat seinen Zuhoerer zuerst angehaengt, seine Zeile steht also vor dem Ende dieses Wartens.
+  const abgestuerzt = seite.waitForEvent('crash', { timeout: 15000 }).catch(() => {});
   seite.goto('chrome://crash').catch(() => {});
-  await new Promise((r) => setTimeout(r, 1500));
+  await abgestuerzt;
 };
 let browser;
 try {
