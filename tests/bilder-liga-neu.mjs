@@ -168,6 +168,9 @@ try {
         await s.waitForFunction(() => !!window.__punkte, null, { timeout: 15000 });
         await befuelle(s);
         await s.goto(`http://127.0.0.1:${PORT}/index.html?test#bestenliste`);
+        // erst neu laden, wenn der Verlaufseintrag umgestellt ist: beim Laden gilt history.state vor dem Hash (js/app.js
+        // ausVerlauf), ein zu fruehes reload() landete wieder auf #start (seltener Haenger bis 15.11.2026)
+        await s.waitForFunction(() => history.state && history.state.name === 'bestenliste', null, { timeout: 15000 });
         await s.reload();
         await s.waitForSelector('.bl-steuer-reiter', { timeout: 30000 });
         await s.waitForFunction(() => !!window.__punkte, null, { timeout: 15000 });

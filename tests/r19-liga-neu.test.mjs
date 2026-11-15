@@ -107,6 +107,8 @@ async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', ichEr
     window.__punkte.speichere({ ...window.__punkte.stand(), tafeln, umzug: true });
   });
   await s.goto(`http://127.0.0.1:${PORT}/index.html?test#bestenliste`);
+  // erst neu laden, wenn der Verlaufseintrag umgestellt ist (history.state gilt beim Laden vor dem Hash, js/app.js ausVerlauf)
+  await s.waitForFunction(() => history.state && history.state.name === 'bestenliste', null, { timeout: 15000 });
   await s.reload();
   await s.waitForSelector('.bl-steuer-reiter', { timeout: 30000 });
   return { k, s };
