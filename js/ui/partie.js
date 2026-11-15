@@ -2736,6 +2736,9 @@ export function zeige(root, params, app) {
     // Ein verkleinerter, aber gueltiger Wert bleibt unerkannt; das Geraet ist keine Vertrauensgrenze, die Dauer der
     // Partie gegen den Start der kiRef prueft der Server (eigener Auftrag)
     const lauf = laufend && laufend.uhr && typeof laufend.uhr === 'object' ? laufend.uhr : null;
+    // uhr.seit gilt nur zwischen Start und jetzt: in der Zukunft kostete der laufende Zug nichts (Zeitgewinn) bzw.
+    // buchte Flo die Spanne bis dorthin (Fix-Review 64, Proben E/F); sonst wie ohne uhr die Wanduhr ab Start
+    const seitGilt = !!lauf && Number.isFinite(lauf.seit) && lauf.seit <= Date.now() && !(lauf.seit < Date.parse(z.gestartet));
     let wandSeit = null;
     if (!z.zeiten || z.zeiten.length !== z.zuege.length) {
       const je = laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : [];
@@ -2743,7 +2746,7 @@ export function zeige(root, params, app) {
       z.zeiten = z.zuege.map((_, i) => (bekannt(i) ? je[i] : 0));
       const start = Date.parse(z.gestartet);
       if (uhrGewertet) {
-        const ende = lauf && Number.isFinite(lauf.seit) ? lauf.seit : Date.now();
+        const ende = seitGilt ? lauf.seit : Date.now();
         let offen = Number.isFinite(start) ? Math.max(0, Math.round((ende - start) / 100) - z.zeiten.reduce((a, x) => a + x, 0)) : 0;
         const vonFlo = (i) => (i % 2 === 0) === (startFarbe === farbe);
         const floOffen = z.zuege.map((_, i) => i).filter((i) => !bekannt(i) && vonFlo(i));
@@ -2758,7 +2761,7 @@ export function zeige(root, params, app) {
           });
           // bis jetzt laufen nur, wenn ein Eintrag von Flo die Wanduhr aufgenommen hat oder uhr.seit gilt; sonst wie mit
           // gueltigen zeiten ab Start plus nur den gueltig gebuchten Eintraegen (ohne den ersetzten Bot-Zuschlag, Kaltreview 64)
-          wandSeit = floOffen.length || (lauf && Number.isFinite(lauf.seit))
+          wandSeit = floOffen.length || seitGilt
             ? ende : start + z.zuege.reduce((a, _, i) => a + (bekannt(i) ? je[i] * 100 : 0), 0);
         }
       }
@@ -2766,7 +2769,7 @@ export function zeige(root, params, app) {
     let laufOpt = {};
     if (laufend && uhrGewertet) {
       // ohne gueltige uhr nicht "laeuft seit jetzt": Wanduhr seit dem Start der Partie minus die gebuchten Zeiten
-      const seit = lauf && Number.isFinite(lauf.seit) ? lauf.seit
+      const seit = seitGilt ? lauf.seit
         : wandSeit != null ? wandSeit : Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
       if (Number.isFinite(seit)) laufOpt = { laufSeit: seit, jetzt: Date.now() };
     } else if (lauf) laufOpt = { laufVerbraucht: lauf.verbraucht };

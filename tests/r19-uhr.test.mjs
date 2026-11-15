@@ -376,6 +376,11 @@ if (!pw) {
       // Kaltreview 64 Befund 1: zeiten verworfen, aber kein unbekannter Eintrag von Flo, der den Rest aufnimmt
       ['Fortsetzen gewertet, ein zeiten-Eintrag zu viel und uhr fehlt: kein Zeitgewinn', (l) => { l.zeiten.push(0); delete l.uhr; }],
       ['Fortsetzen gewertet, Bot-Eintrag ungueltig und uhr fehlt: kein Zeitgewinn', (l) => { l.zeiten[1] = -1; delete l.uhr; }],
+      // Fix-Review 64 (e99973a): uhr.seit in der Zukunft liess den laufenden Zug nichts kosten (Probe E) bzw. buchte Flo mit
+      // einem unbekannten Eintrag die ganze Spanne bis dorthin (Probe F)
+      ['Fortsetzen gewertet, uhr.seit in der Zukunft: kein Zeitgewinn', (l) => { l.uhr.seit = Date.now() + 3600e3; }],
+      ['Fortsetzen gewertet, uhr.seit in der Zukunft und ein zeiten-Wert ungueltig: kein Zeitgewinn',
+        (l) => { l.uhr.seit = Date.now() + 3600e3; l.zeiten[0] = -1; }],
     ]) {
       await pruefe(name, async () => {
         const { k, s } = await neueSeite(browser);
@@ -402,6 +407,8 @@ if (!pw) {
           const b = await leseUhr(s, 'flo');
           const zuMs = Date.now() - zu;
           assert.ok(a.ms - b.ms >= zuMs - 1500, `kein Gewinn: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
+          // und nicht weit mehr als die geschlossene Zeit (Fix-Review 64, Probe F: 172 s weg)
+          assert.ok(a.ms - b.ms <= zuMs + 5000, `kein Verlust weit ueber die Pause: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
         } finally { await k.close(); }
       });
     }
