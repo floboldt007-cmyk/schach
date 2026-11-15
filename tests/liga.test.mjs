@@ -533,17 +533,22 @@ async function browserTeil(browser, start) {
         }));
       });
       await page.evaluate(() => window.__app.gehe('verlauf'));
-      await page.waitForSelector('.liga-verlauf');
-      await browserPruefe(name + ': Verlaufskarte mit Wertung als Zahl (ohne Klassennamen), Mini-Kurve und Saison-Abzeichen', async () => {
-        assert.equal(await page.locator('.liga-kurve svg polyline').count(), 1);
-        const wert = await page.locator('.liga-verlauf .liga-wertung').innerText();
-        assert.match(wert, /1211/); assert.ok(!/klasse/i.test(wert), wert);
-        assert.match(await page.locator('.liga-archiv').innerText(), /Saison 1: Holz/);
+      await page.waitForSelector('.screen.vl-screen .vl-statistik');
+      // R19 (15.11.2026): die Karte "Deine Liga-Wertung" im Verlauf entfaellt (Flo: eine Staerke-Zahl, die Spielstaerke);
+      // Wertung, Kurve und Abzeichen bleiben im Modul-Speicher
+      const gespeichert = () => page.evaluate(() => {
+        const st = window.__ligaProbe.speicher.ladeModul('liga');
+        return { wert: st && st.wertung && st.wertung.wert, kurve: st && Array.isArray(st.kurve) ? st.kurve.length : 0,
+          archiv: st && Array.isArray(st.archiv) ? st.archiv.length : 0, karte: document.querySelectorAll('.liga-verlauf').length };
       });
-      await page.reload(); await page.waitForSelector('.liga-verlauf');
+      await browserPruefe(name + ': Verlauf ohne Liga-Karte, Wertung, Kurve und Saison-Abzeichen bleiben gespeichert', async () => {
+        const g = await gespeichert();
+        assert.equal(g.karte, 0); assert.match(String(g.wert), /^1211/); assert.ok(g.kurve >= 2, JSON.stringify(g)); assert.equal(g.archiv, 1);
+      });
+      await page.reload(); await page.waitForSelector('.screen.vl-screen .vl-statistik');
       await browserPruefe(name + ': Neuladen bewahrt Wertung, Kurve und Abzeichen', async () => {
-        assert.match(await page.locator('.liga-verlauf .liga-wertung').innerText(), /1211/);
-        assert.equal(await page.locator('.liga-archiv li').count(), 1);
+        const g = await gespeichert();
+        assert.equal(g.karte, 0); assert.match(String(g.wert), /^1211/); assert.equal(g.archiv, 1);
       });
       await page.evaluate(() => {
         window.__ligaZeit = new Date(2027, 0, 11, 4, 0, 1).getTime();
