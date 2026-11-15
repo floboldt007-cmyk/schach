@@ -58,8 +58,9 @@ if (kenntListe) {
   pruefe('Geschlossene Seite: FEHLER, aber nicht als Browser-Absturz gemeldet', /^FEHLER zu/m.test(e.text) && !/Browser abgestuerzt/.test(e.text), e.text.slice(-900));
   const c = await alle([], liste('crash0', [['crash0', 'crash0']]), 60000);
   pruefe('Absturz mit Exit 0: Suite FEHLER, Lauf Exitcode 1', c.code === 1 && /^FEHLER crash0/m.test(c.text) && /Browser abgestuerzt/.test(c.text), c.text.slice(-900));
-  // Nachfix Fix-Review f1: die Alternativen fuer den ganzen Browser griffen mit Playwright 1.64.1 nie
-  pruefe('Absturz-Regex ist nur /Target crashed/', /^const ABSTURZ = \/Target crashed\/;$/m.test(readFileSync(path.join(WURZEL, 'tests/alle.mjs'), 'utf8')));
+  // Nachfix Fix-Review f1: die Alternativen fuer den ganzen Browser griffen mit Playwright 1.64.1 nie. Der Name der Pruefung
+  // nennt den Suchtext bewusst nicht: alle.mjs saehe ihn in der Ausgabe dieser Suite und hielte sie fuer abgestuerzt.
+  pruefe('Absturz-Regex: nur der Seitenabsturz, ohne die Alternativen fuer den ganzen Browser',/^const ABSTURZ = \/Target crashed\/;$/m.test(readFileSync(path.join(WURZEL, 'tests/alle.mjs'), 'utf8')));
 }
 // 1c. Wiederholung nach Absturz (Analyse f1, R19-Kritik/absturz-ursache.md): einmal, sichtbar; ein zweiter Absturz bleibt
 // FEHLER, ein inhaltlicher FEHLER wird nie wiederholt
