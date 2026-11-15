@@ -365,8 +365,10 @@ if (!pw) {
     });
 
     // Kaltreview F1/F2: veraenderter oder alter Speicherstand der gewerteten Partie bringt keine Zeit zurueck
-    // Flo laesst sich 4 s Zeit fuer den ersten Zug, damit ein verlorener Wert als Gewinn messbar waere; die Wanduhr
+    // Flo laesst sich 7 s Zeit fuer den ersten Zug, bei 3+2 also 5 s mehr als der Zuschlag: ein verlorener Wert, der als
+    // Zuschlag zaehlt, braechte genau diese 5 s zurueck (Fix-Review f1, mit 3+10 und 4 s war das unsichtbar). Die Wanduhr
     // laeuft in der gewerteten Partie weiter, also muss die Zeit mindestens um die geschlossene Zeit sinken
+    const T32 = { grund: 180, zuschlag: 2 };
     for (const [name, aendere] of [
       ['Fortsetzen gewertet, ein zeiten-Wert ungueltig: kein Zeitgewinn', (l) => { l.zeiten[0] = -1; }],
       ['Fortsetzen gewertet, zeiten fehlen: kein Zeitgewinn', (l) => { delete l.zeiten; }],
@@ -375,8 +377,8 @@ if (!pw) {
       await pruefe(name, async () => {
         const { k, s } = await neueSeite(browser);
         try {
-          await starte(s, { botId: 'benno', farbe: 'w', tempo: T3, ki: true, kiRef: KI_REF });
-          await warte(4000);
+          await starte(s, { botId: 'benno', farbe: 'w', tempo: T32, ki: true, kiRef: KI_REF });
+          await warte(7000);
           await zug(s, 'e2e4');
           await s.waitForFunction(() => window.__partie.phase() === 'flo' && window.__partie.chess().history().length === 2, null, { timeout: 15000 });
           await warte(1500);

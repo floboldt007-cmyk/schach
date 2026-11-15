@@ -2730,18 +2730,40 @@ export function zeige(root, params, app) {
   if (z.tempo) {
     uhr.zeige(true);
     // R19 Uhr: Rest aus den gespeicherten zeiten und dem laufenden Zug. Ein unbekannter Eintrag (alter Stand ohne zeiten
-    // oder ungueltiger Wert, laufend.zeitenJe aus js/storage.js) zaehlt 0, in der gewerteten Partie den Zuschlag: so
-    // bringt er dort keine Zeit zurueck
+    // oder ungueltiger Wert, laufend.zeitenJe aus js/storage.js) zaehlt 0. In der gewerteten Partie bekommen Flos
+    // unbekannte Eintraege zusammen die Wanduhr seit dem Start bis zum laufenden Zug (ohne gueltige uhr bis jetzt) minus
+    // alles gueltig Gebuchte, die des Bots den Zuschlag (netto 0): lieber zu wenig Zeit als zu viel (Fix-Review f1).
+    // Ein verkleinerter, aber gueltiger Wert bleibt unerkannt; das Geraet ist keine Vertrauensgrenze, die Dauer der
+    // Partie gegen den Start der kiRef prueft der Server (eigener Auftrag)
+    const lauf = laufend && laufend.uhr && typeof laufend.uhr === 'object' ? laufend.uhr : null;
+    let wandSeit = null;
     if (!z.zeiten || z.zeiten.length !== z.zuege.length) {
       const je = laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : [];
-      const unbekannt = uhrGewertet ? z.tempo.zuschlag * 10 : 0;
-      z.zeiten = z.zuege.map((_, i) => (Number.isInteger(je[i]) ? je[i] : unbekannt));
+      const bekannt = (i) => Number.isInteger(je[i]);
+      z.zeiten = z.zuege.map((_, i) => (bekannt(i) ? je[i] : 0));
+      const start = Date.parse(z.gestartet);
+      if (uhrGewertet) {
+        const ende = lauf && Number.isFinite(lauf.seit) ? lauf.seit : Date.now();
+        let offen = Number.isFinite(start) ? Math.max(0, Math.round((ende - start) / 100) - z.zeiten.reduce((a, x) => a + x, 0)) : 0;
+        const vonFlo = (i) => (i % 2 === 0) === (startFarbe === farbe);
+        const floOffen = z.zuege.map((_, i) => i).filter((i) => !bekannt(i) && vonFlo(i));
+        for (const i of z.zuege.keys()) if (!bekannt(i) && !vonFlo(i)) z.zeiten[i] = z.tempo.zuschlag * 10;
+        // ohne gueltigen Start: wie bisher den Zuschlag, dann bringt der Eintrag wenigstens nichts zurueck
+        if (!Number.isFinite(start)) for (const i of floOffen) z.zeiten[i] = z.tempo.zuschlag * 10;
+        else {
+          floOffen.forEach((i, n) => {
+            const teil = Math.floor(offen / (floOffen.length - n));
+            z.zeiten[i] = teil; offen -= teil;
+          });
+          wandSeit = ende;
+        }
+      }
     }
-    const lauf = laufend && laufend.uhr && typeof laufend.uhr === 'object' ? laufend.uhr : null;
     let laufOpt = {};
     if (laufend && uhrGewertet) {
       // ohne gueltige uhr nicht "laeuft seit jetzt": Wanduhr seit dem Start der Partie minus die gebuchten Zeiten
-      const seit = lauf && Number.isFinite(lauf.seit) ? lauf.seit : Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
+      const seit = lauf && Number.isFinite(lauf.seit) ? lauf.seit
+        : wandSeit != null ? wandSeit : Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
       if (Number.isFinite(seit)) laufOpt = { laufSeit: seit, jetzt: Date.now() };
     } else if (lauf) laufOpt = { laufVerbraucht: lauf.verbraucht };
     const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe, ...laufOpt });
