@@ -33,10 +33,12 @@ export const angemeldet = () => !!sitzung()?.access_token;
 
 const istStand = (d) => d && typeof d === 'object' && !Array.isArray(d) && Number.isInteger(d.taler) && d.stufen && typeof d.stufen === 'object';
 
-// Vitrine: neue Eintraege sind 'stufe-<familie>', aeltere gespeicherte Erfolgs-Ids werden auf ihre Familie abgebildet
+// Vitrine: neue Eintraege sind 'stufe-<familie>', aeltere gespeicherte Erfolgs-Ids werden auf ihre Familie abgebildet.
+// Nur Familien des Servers: die lokalen (R19, js/pakete/sammlung/taten.js) stehen nur in der eigenen Vitrine, der Server
+// lehnte sie ab (karte_waehle: Familie ohne Stufe)
 function vitrineId(x) {
   if (typeof x !== 'string') return null;
-  if (/^stufe-[a-z]+$/.test(x)) return x;
+  if (/^stufe-[a-z]+$/.test(x)) return FAMILIEN.some((f) => 'stufe-' + f.id === x) ? x : null;
   const f = familieVonAlt(x);
   return f ? 'stufe-' + f : null;
 }
