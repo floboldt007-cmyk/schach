@@ -252,7 +252,7 @@
 .ss-haken { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; visibility: hidden; }
 .ss-haken svg { width: 14px; height: 14px; }
 .ss-titel[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
-.ss-titel[aria-pressed="true"] .ss-haken { visibility: visible; background: var(--gold); color: #2A1A00; }
+.ss-titel[aria-pressed="true"] .ss-haken { visibility: visible; }
 .ss-titel:focus-visible { outline: 3px solid var(--fokus); outline-offset: 2px; }
 .ss-vorschau-titel { margin-top: var(--a3) !important; font-size: 13px; font-weight: 700; color: var(--text-2); }
 .ss-vorschau { margin-bottom: var(--a3); }
@@ -274,26 +274,21 @@
 .ss-ligen-stufen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0 52px; padding: 0; list-style: none; }
 .ss-ligen-stufe { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border-radius: 999px;
   background: var(--flaeche); box-shadow: inset 0 0 0 1px var(--linie); font-size: 13px; font-weight: 700; color: var(--text); }
-.ss-ligen-stufe[aria-current="true"] { background: #FFD47A; color: #2A1A00; box-shadow: none; }
 .ss-ligen-du { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .sheet-karte .ss-ligen-regel { margin: 6px 0 0; padding: 12px; border-radius: var(--r-m); background: var(--flaeche-2); font-size: 14px; font-weight: 500;
   line-height: 1.45; color: var(--text); }
-/* Fenster am Season-Ende: Abzeichen als Held mit kurzem Auftritt (bei reduzierter Bewegung ein Standbild) */
+/* Fenster am Season-Ende: Abzeichen als Held (Auftritt und Gold-Chips in css/visitenkarte.css, Abschnitt Season-Gold:
+   diese Datei bleibt bei Theme-Tokens ohne eigene Bewegung, tests/liga.test.mjs) */
 .ss-ende { display: grid; justify-items: center; gap: 10px; margin: 8px 0 4px; }
 .ss-ende p { margin: 0; line-height: 1.45; }
 .ss-ende-held { display: grid; place-items: center; width: 148px; height: 148px; border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--gold) 34%, transparent), transparent);
-  animation: ss-auftritt .9s cubic-bezier(.2, .8, .2, 1) both, ss-schweben 4s ease-in-out .9s infinite alternate; }
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--gold) 34%, transparent), transparent); }
 .ss-ende-held .ss-symbol { width: 104px; }
 .sheet-karte .ss-ende-abz { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--text); }
 .sheet-karte .ss-ende-chips-titel { margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--text-2); }
 .ss-ende-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.ss-chip { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 999px; background: #FFD47A; color: #2A1A00;
-  font-size: 15px; font-weight: 800; }
+.ss-chip { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 999px; font-size: 15px; font-weight: 800; }
 .sheet-karte .ss-ende-neu { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-2); }
-@keyframes ss-auftritt { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
-@keyframes ss-schweben { from { transform: translateY(0); } to { transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) { .ss-ende-held { animation: none; } }
 /* Liga: das eigene Wappen auf der Buehne oeffnet "Alle Ligen" */
 .lg-gr-wappen-knopf { display: grid; padding: 0; border: 0; background: none; border-radius: var(--r-m); cursor: pointer; }
 
