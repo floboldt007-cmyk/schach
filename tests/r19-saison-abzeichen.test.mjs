@@ -153,6 +153,9 @@ try {
       gefunden = await seite.evaluate(() => !!document.activeElement?.matches('.ss-bisher .ss-ligen-knopf'));
     }
     pruefe('Tastatur: Tab erreicht das Wappen der Saison-Karte', gefunden);
+    // --fokus ist eine ganze outline-Angabe; "3px solid var(--fokus)" loeschte den Ring (design-beweis 15.11.)
+    const ring = await seite.evaluate(() => { const s = getComputedStyle(document.activeElement); return { stil: s.outlineStyle, breite: parseFloat(s.outlineWidth) }; });
+    pruefe('Tastatur: Fokusring am Wappen sichtbar', ring.stil !== 'none' && ring.breite >= 2, ring);
     await seite.keyboard.press('Enter');
     await seite.waitForSelector('.sheet-karte.ss-ligen-blatt', { timeout: 4000 }).catch(() => {});
     let b = await blattLigen(seite);

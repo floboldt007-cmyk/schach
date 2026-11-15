@@ -245,7 +245,8 @@
 .ss-abz-kachel { width: 100%; gap: 6px; min-height: 100px; padding: 10px 6px; border-radius: var(--r-m); background: var(--flaeche-2);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, var(--linie)); font-size: 13px; font-weight: 700; text-align: center; }
 .ss-abz-kachel .ss-symbol { width: 44px; }
-.ss-ligen-knopf:focus-visible, .ss-alle-ligen:focus-visible, .lg-alle-ligen:focus-visible { outline: 3px solid var(--fokus); outline-offset: 2px; }
+/* --fokus ist eine ganze outline-Angabe (modern.css: 2.5px solid ...); "3px solid var(--fokus)" waere ungueltig und loescht den Ring */
+.ss-ligen-knopf:focus-visible, .ss-alle-ligen:focus-visible, .lg-alle-ligen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 /* Titelwahl als echte Auswahl: Haken am gewaehlten Titel, darunter die Vorschau der eigenen Karte */
 .ss-wahl { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--a2); }
 .ss-titel { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
@@ -253,7 +254,7 @@
 .ss-haken svg { width: 14px; height: 14px; }
 .ss-titel[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
 .ss-titel[aria-pressed="true"] .ss-haken { visibility: visible; }
-.ss-titel:focus-visible { outline: 3px solid var(--fokus); outline-offset: 2px; }
+.ss-titel:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .ss-vorschau-titel { margin-top: var(--a3) !important; font-size: 13px; font-weight: 700; color: var(--text-2); }
 .ss-vorschau { margin-bottom: var(--a3); }
 .ss-vorschau .vk { max-width: 420px; }
