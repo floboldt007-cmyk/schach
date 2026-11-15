@@ -386,7 +386,8 @@ export function zeige(root, params, app) {
     z.liveKlassen.push(null);
     z.liveTrivial.push(false);
     z.live.push(null);
-    // R19 Uhr: beim Nachspielen einer fortgesetzten Partie gibt es die Uhr noch nicht (zeiten kommen aus dem Speicher)
+    // R19 Uhr: beim Nachspielen einer fortgesetzten Partie gibt es die Uhr noch nicht (zeiten kommen aus dem Speicher);
+    // 864000 Zehntel (24 h) ist die Obergrenze, die pruefeZeiten (js/storage.js) noch annimmt
     if (schachuhr) z.zeiten.push(Math.min(864000, Math.round(schachuhr.zug(Date.now()) / 100)));
   }
   const farbeVon = (i) => (i % 2 === 0 ? startFarbe : (startFarbe === 'w' ? 'b' : 'w'));
