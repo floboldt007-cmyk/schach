@@ -1,12 +1,9 @@
-// Online ruhiger (Feinschliff R19, 14.11.2026, Flo: "zu viele Zahlen, zu unuebersichtlich"): drei ENTWUERFE hinter der
-// Kennung ?onlineStil=a|b|c (js/ui/online.js, css/online.css), nichts davon ist ohne Kennung zu sehen.
-//   a "Nur das Wichtige": Lobby genau EINE Zahl (deine Elo), Stufe, Platz und Kronen hinter "Mehr"; Spielerleisten nur Name;
-//     Ergebnis hoechstens eine Zahl.
-//   b "Karten": Stand, Liga und Saison als drei Karten mit Symbol und je einem Wert; Partie mit Chips statt Textzeile;
-//     Ergebnis als zwei Karten.
-//   c "Spielerleiste": Lobby zeigt dich als Spielerleiste (Name, Banner, Liga-Abzeichen) ohne Zahl; Partie-Leisten mit
-//     Abzeichen statt Zahlen; Ergebnis mit beiden Leisten.
-// Ohne Kennung (und mit unbekannter Kennung) bleibt alles wie heute. iPhone 13 und PC, hell. Netz nur simuliert.
+// Online ruhiger (Feinschliff R19, Flo 14.11.2026: "zu viele Zahlen, zu unuebersichtlich"; Wahl 23:00: Entwurf A). A ist die
+// einzige Fassung (js/ui/online.js, css/online.css), die Kennung ?onlineStil gibt es nicht mehr:
+//   Lobby genau EINE Zahl (deine Online-Elo vom Server, kronen_mein_stand.elo), Stufe, Platz und Kronen hinter "Mehr";
+//   ohne Elo vom Server (Feld fehlt, null, kaputt) KEINE Zahl, gross steht die Liga als Wort ("Deine Liga"), auch wenn das
+//   Geraet eine Bot-Liga-Wertung hat (andere Groesse, kein Rueckfall darauf); Spielerleisten nur der Name;
+//   Ergebnis hoechstens eine Zahl (die Kronen-Aenderung). iPhone 13 und PC, hell. Netz nur simuliert.
 //
 //   node tests/r19-online-ruhig.test.mjs
 //   PORT=8976 node tests/r19-online-ruhig.test.mjs   eigener Port (Standard: frei)
@@ -44,14 +41,14 @@ function pruefe(name, gut, detail = '') {
   console.log(`${gut ? 'ok  ' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`);
 }
 
-// ---- Server-Attrappe wie tests/bilder-online.mjs; kronen_mein_stand nennt die Elo (Feld elo), wenn mitElo ----
+// ---- Server-Attrappe wie tests/bilder-online.mjs; kronen_mein_stand nennt die Elo (Feld elo), wenn z.elo gesetzt ist ----
 const UID = 'u1';
 const token = (uid) => 'a.' + Buffer.from(JSON.stringify({ sub: uid })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'test-r', expires_at: 9999999999, user: { id: UID, email: 'u1@example.invalid' } };
 const NAMEN = { u1: 'Spieler_1', u2: 'Spieler_2' };
 const PARTIE = 'ruhig-1';
 const ELO = 1240;
-const GEGNER_ELO = { u1: 1240, u2: 1310 }; // Visitenkarte mit Elo (heute zeigt die Leiste "Elo 1310 · Läufer II")
+const GEGNER_ELO = { u1: 1240, u2: 1310 }; // Visitenkarte mit Elo (vor A zeigte die Leiste "Elo 1310 · Läufer II")
 const iso = (ms) => new Date(ms).toISOString();
 
 function bediener(z) {
@@ -97,16 +94,17 @@ function bediener(z) {
       const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, elo: GEGNER_ELO[u], du: u === UID });
       return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
     }
-    if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...(z.mitElo ? { elo: ELO } : {}) });
+    if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...('elo' in z ? { elo: z.elo } : {}) });
     return antwort(rpc === 'karte_melde_stufen' ? {} : []);
   };
 }
-function initSkript({ sitzung }) {
+function initSkript({ sitzung, liga }) {
   try {
     if (!sessionStorage.getItem('ruhig-start')) {
       sessionStorage.setItem('ruhig-start', '1');
       localStorage.clear();
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+      if (liga) localStorage.setItem('schach-arena:v1:modul:liga', JSON.stringify(liga));
       localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ haltenAufgeben: false, duellIntro: 'aus' }));
     }
   } catch (e) { /* egal */ }
@@ -140,55 +138,50 @@ async function tippe(s, uci) {
 
 const GERAETE = [['iPhone 13', 390, 844], ['PC', 1280, 720]];
 const seitenfehler = [];
-const heuteLobby = {}; // Zahlen der Lobby ohne Kennung je Geraet (Vergleich fuer die Varianten)
 
-async function lauf(browser, [geraet, w, h], stil, { mitElo = true } = {}) {
-  const gruppe = `${geraet} ${stil || 'heute'}${mitElo ? '' : ' ohne Server-Elo'}`;
+async function neueSeite(browser, [w, h], z, { liga = null, gruppe }) {
   const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
     colorScheme: 'light', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
-  const z = { partien: new Map(), treffer: false, sucheSeit: null, mitElo };
   await k.route('**/*.supabase.co/**', bediener(z));
-  await k.addInitScript(initSkript, { sitzung: SITZUNG });
+  await k.addInitScript(initSkript, { sitzung: SITZUNG, liga });
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
-  const kennung = stil ? `&onlineStil=${stil}` : '';
-  try {
-    await s.goto(`http://127.0.0.1:${PORT}/index.html?test${kennung}#online`);
-    pruefe(`${gruppe}: Lobby mit Suchknopf`, await sichtbar(s, '[data-online="suchen"]:not([disabled])', 30000));
-    await s.waitForFunction(() => !document.querySelector('.on-liga[data-laedt]'), null, { timeout: 10000 }).catch(() => {});
-    await warte(300);
-    const attr = await s.evaluate(() => document.querySelector('.online-screen')?.dataset.onlineStil ?? null);
-    const lobby = await zahlenIn(s, '.online-screen .on-inhalt', '.on-bild img');
-    const gesetzt = ['a', 'b', 'c'].includes(stil) ? stil : null;
-    pruefe(`${gruppe}: Kennung am Bildschirm ${gesetzt}`, attr === gesetzt, attr);
+  return { k, s };
+}
+async function lobbyBereit(s, gruppe, kennung = '') {
+  await s.goto(`http://127.0.0.1:${PORT}/index.html?test${kennung}#online`);
+  pruefe(`${gruppe}: Lobby mit Suchknopf`, await sichtbar(s, '[data-online="suchen"]:not([disabled])', 30000));
+  await s.waitForFunction(() => !document.querySelector('.on-liga[data-laedt]'), null, { timeout: 10000 }).catch(() => {});
+  await warte(300);
+}
 
-    if (!gesetzt && stil !== 'x') heuteLobby[geraet] = lobby.length;
-    if (!gesetzt) {
-      // heute: Liga-Streifen mit Stufe, Platz und Kronen in einer Zeile
-      const liga = await s.evaluate(() => document.querySelector('.on-liga')?.textContent.replace(/\s+/g, ' ').trim());
-      pruefe(`${gruppe}: Liga-Streifen wie heute`, /Platz 3 von 30/.test(liga || '') && /140/.test(liga || ''), liga);
-    } else if (stil === 'a') {
-      pruefe(`${gruppe}: Lobby zeigt genau eine Zahl, die Elo`, lobby.length === 1 && lobby[0] === String(ELO), lobby);
-      const mehr = await s.evaluate(() => { const d = document.querySelector('.online-screen details.on-mehr');
-        return d ? { offen: d.open, text: d.textContent.replace(/\s+/g, ' ') } : null; });
-      pruefe(`${gruppe}: Stufe, Platz und Kronen hinter "Mehr" (zu)`, !!mehr && !mehr.offen && /Platz 3 von 30/.test(mehr.text) && /140/.test(mehr.text), mehr);
-    } else if (stil === 'b') {
-      const karten = await s.evaluate(() => [...document.querySelectorAll('.online-screen .on-rk-reihe > .on-rk')].map((k) => ({
-        symbol: !!k.querySelector('svg'), werte: k.querySelectorAll('.on-rk-wert').length, sichtbar: k.checkVisibility() })));
-      pruefe(`${gruppe}: drei Karten Stand, Liga, Saison mit Symbol und je einem Wert`,
-        karten.length === 3 && karten.every((k) => k.symbol && k.werte === 1 && k.sichtbar), karten);
-      const zeile = await s.evaluate(() => !!document.querySelector('.online-screen .on-liga:not([hidden])'));
-      pruefe(`${gruppe}: kein Zahlenstreifen mehr`, !zeile);
-    } else if (stil === 'c') {
-      await s.waitForFunction((n) => document.querySelector('.on-il-name')?.textContent.trim() === n, NAMEN.u1, { timeout: 5000 }).catch(() => {});
-      const leiste = await s.evaluate(() => { const l = document.querySelector('.online-screen .on-ich-leiste');
-        return l && l.checkVisibility() ? { name: l.querySelector('.on-il-name')?.textContent.trim(), banner: !!l.querySelector('.on-banner'),
-          abzeichen: !!l.querySelector('.on-abzeichen svg') } : null; });
-      pruefe(`${gruppe}: Lobby zeigt dich als Spielerleiste (Name, Banner, Abzeichen)`, !!leiste && leiste.name === NAMEN.u1 && leiste.banner && leiste.abzeichen, leiste);
-      const inLeiste = await zahlenIn(s, '.online-screen .on-ich-leiste', '.on-il-name'); // der Name zaehlt nicht (Spieler_1)
-      pruefe(`${gruppe}: keine Zahl in der Spielerleiste`, inLeiste.length === 0, inLeiste);
-    }
-    if (gesetzt) pruefe(`${gruppe}: Lobby hat weniger Zahlen als heute (${heuteLobby[geraet]})`, lobby.length < heuteLobby[geraet], lobby);
+// A mit Elo vom Server: Lobby, Partie, Ergebnis. `kennung` prueft, dass eine alte Kennung nichts mehr umschaltet.
+async function lauf(browser, [geraet, w, h], kennung = '') {
+  const gruppe = `${geraet}${kennung ? ' mit alter Kennung ' + kennung : ''}`;
+  const z = { partien: new Map(), treffer: false, sucheSeit: null, elo: ELO };
+  const { k, s } = await neueSeite(browser, [w, h], z, { gruppe });
+  try {
+    await lobbyBereit(s, gruppe, kennung);
+    const attr = await s.evaluate(() => document.querySelector('.online-screen')?.dataset.onlineStil ?? null);
+    pruefe(`${gruppe}: keine Stil-Kennung am Bildschirm`, attr === null, attr);
+    const lobby = await zahlenIn(s, '.online-screen .on-inhalt', '.on-bild img');
+    pruefe(`${gruppe}: Lobby zeigt genau eine Zahl, die Elo`, lobby.length === 1 && lobby[0] === String(ELO), lobby);
+    const gross = await s.evaluate(() => {
+      const l = document.querySelector('.online-screen .on-liga');
+      return l ? { wert: l.querySelector('.on-gross-wert')?.textContent.trim(), text: l.querySelector('.on-gross-text')?.textContent.trim(),
+        label: l.getAttribute('aria-label'), sichtbar: l.checkVisibility() } : null;
+    });
+    pruefe(`${gruppe}: gross die Elo mit "Deine Elo", vorgelesen wie zu sehen`, !!gross && gross.sichtbar && gross.wert === String(ELO)
+      && gross.text === 'Deine Elo' && gross.label === `Deine Elo: ${ELO}`, gross);
+    const mehr = await s.evaluate(() => {
+      const d = document.querySelector('.online-screen details.on-mehr');
+      return d ? { offen: d.open, text: d.textContent.replace(/\s+/g, ' ') } : null;
+    });
+    pruefe(`${gruppe}: Stufe, Platz und Kronen hinter "Mehr" (zu)`, !!mehr && !mehr.offen && /Platz 3 von 30/.test(mehr.text) && /140/.test(mehr.text), mehr);
+    const alt = await s.evaluate(() => document.querySelectorAll('.online-screen :is(.on-rk, .on-ich-leiste, .on-abzeichen, .on-chip)').length);
+    pruefe(`${gruppe}: keine Bausteine der Entwuerfe B und C`, alt === 0, alt);
+    const duell = await s.evaluate(() => document.querySelector('#on-duell-t')?.textContent.trim() ?? null);
+    pruefe(`${gruppe}: Duell-Tuer heisst "Rätsel gegen einen Menschen"`, duell === 'Rätsel gegen einen Menschen', duell);
 
     // Partie
     await s.locator('[data-online="suchen"]').filter({ visible: true }).first().click();
@@ -204,14 +197,12 @@ async function lauf(browser, [geraet, w, h], stil, { mitElo = true } = {}) {
     // Zahlen in den Spielerleisten ohne die Uhren (die braucht man zum Spielen) und ohne die Namen (Spieler_2 ist ein Name)
     const leisten = await zahlenIn(s, '.online-screen .on-spieler', '.uhr, .name');
     const meta = await s.evaluate(() => [...document.querySelectorAll('.online-screen .on-spieler')].map((e) => ({
+      name: e.querySelector('.name b')?.textContent.trim() || '',
       zeile: e.querySelector('.p-meta')?.checkVisibility() ? e.querySelector('.p-meta').textContent.trim() : null,
-      chips: [...e.querySelectorAll('.on-chip')].filter((c) => c.checkVisibility()).length,
-      abzeichen: [...e.querySelectorAll('.on-abzeichen')].filter((c) => c.checkVisibility() && c.querySelector('svg')).length })));
-    if (!gesetzt) pruefe(`${gruppe}: Spielerleisten wie heute (Zeile mit Elo und Liga)`, meta.length === 2 && meta.every((m) => /^Elo \d+ · Läufer II$/.test(m.zeile || '')), meta);
-    else if (stil === 'a') pruefe(`${gruppe}: Spielerleisten nur mit Namen (keine Zeile, keine Chips)`, meta.every((m) => m.zeile === null && !m.chips), meta);
-    else if (stil === 'b') pruefe(`${gruppe}: Spielerleisten mit Chips statt Zeile`, meta.every((m) => m.zeile === null && m.chips >= 1), meta);
-    else pruefe(`${gruppe}: Spielerleisten mit Liga-Abzeichen statt Zeile`, meta.every((m) => m.zeile === null && m.abzeichen === 1), meta);
-    if (gesetzt) pruefe(`${gruppe}: keine Zahl in den Spielerleisten ausser der Uhr`, leisten.length === 0, leisten);
+      chips: e.querySelectorAll('.on-chip, .on-abzeichen').length })));
+    pruefe(`${gruppe}: Spielerleisten nur mit Namen (keine Elo-Zeile, keine Chips)`, meta.length === 2
+      && meta.every((m) => m.name && m.zeile === null && !m.chips), meta);
+    pruefe(`${gruppe}: keine Zahl in den Spielerleisten ausser der Uhr`, leisten.length === 0, leisten);
 
     // Ergebnis
     await s.locator('[data-online="aufgeben"]').filter({ visible: true }).first().click();
@@ -221,44 +212,54 @@ async function lauf(browser, [geraet, w, h], stil, { mitElo = true } = {}) {
     await s.waitForFunction(() => { const k = document.querySelector('.on-erg-kronen'); return k && !k.hidden; }, null, { timeout: 8000 }).catch(() => {});
     await warte(300);
     const blatt = await zahlenIn(s, '.on-erg .ergebnis-karte');
-    const aufbau = await s.evaluate(() => ({
-      kronen: document.querySelector('.on-erg-kronen')?.checkVisibility() ? document.querySelector('.on-erg-kronen').textContent.replace(/\s+/g, ' ').trim() : null,
-      karten: [...document.querySelectorAll('.on-erg .on-rk')].filter((k) => k.checkVisibility() && k.querySelector('svg')).length,
-      spieler: [...document.querySelectorAll('.on-erg .on-erg-spieler')].filter((k) => k.checkVisibility()).length }));
-    if (!gesetzt) pruefe(`${gruppe}: Ergebnis wie heute (Kronen-Zeile mit Wochenstand)`, /140 Kronen/.test(aufbau.kronen || ''), aufbau);
-    else if (stil === 'a') pruefe(`${gruppe}: Ergebnis hoechstens eine Zahl`, blatt.length <= 1, blatt);
-    else if (stil === 'b') pruefe(`${gruppe}: Ergebnis als zwei Karten mit Symbol`, aufbau.karten === 2, aufbau);
-    else pruefe(`${gruppe}: Ergebnis mit beiden Spielerleisten`, aufbau.spieler === 2, aufbau);
+    const kronen = await s.evaluate(() => document.querySelector('.on-erg-kronen')?.checkVisibility()
+      ? document.querySelector('.on-erg-kronen').textContent.replace(/\s+/g, ' ').trim() : null);
+    pruefe(`${gruppe}: Ergebnis hoechstens eine Zahl, ohne Wochenstand`, blatt.length <= 1 && !/140/.test(kronen || ''), { blatt, kronen });
+    const altErg = await s.evaluate(() => document.querySelectorAll('.on-erg :is(.on-erg-spieler, .on-rk)').length);
+    pruefe(`${gruppe}: Ergebnis ohne Leisten und Karten der Entwuerfe`, altErg === 0, altErg);
   } catch (e) {
     pruefe(`${gruppe}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
   }
   await k.close().catch(() => {});
 }
 
-// Ohne Server-Elo: A zeigt die Wertung des Geraets nur, wenn es eine gibt; sonst keine Zahl (kein erfundener Startwert)
-async function ohneElo(browser) {
-  const k = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block', colorScheme: 'light', locale: 'de-DE' });
-  const z = { partien: new Map(), treffer: false, sucheSeit: null, mitElo: false };
-  await k.route('**/*.supabase.co/**', bediener(z));
-  await k.addInitScript(initSkript, { sitzung: SITZUNG });
-  const s = await k.newPage();
-  s.on('pageerror', (e) => seitenfehler.push(`ohne Elo: ${e.message}`));
-  await s.goto(`http://127.0.0.1:${PORT}/index.html?test&onlineStil=a#online`);
-  await sichtbar(s, '[data-online="suchen"]:not([disabled])', 30000);
-  await s.waitForFunction(() => !document.querySelector('.on-liga[data-laedt]'), null, { timeout: 10000 }).catch(() => {});
-  await warte(300);
-  const lobby = await zahlenIn(s, '.online-screen .on-inhalt', '.on-bild img');
-  const gross = await s.evaluate(() => document.querySelector('.online-screen .on-gross-wert')?.textContent.trim() ?? null);
-  pruefe('ohne Server-Elo und ohne Wertung: keine erfundene Zahl, gross steht die Liga', lobby.length === 0 && gross === 'Läufer II', { lobby, gross });
+// Ohne Elo vom Server: keine Zahl, gross die Liga als Wort. Auch eine Bot-Liga-Wertung des Geraets (andere Groesse) erscheint
+// nicht (Gegenprobe zum frueheren Rueckfall auf ladeModul('liga').wertung).
+const OHNE = [
+  ['Feld elo fehlt', {}],
+  ['elo null', { elo: null }],
+  ['elo kaputt "x"', { elo: 'x' }],
+  ['elo ausserhalb 99999', { elo: 99999 }],
+  ['Feld fehlt, Geraet mit Bot-Liga-Wertung 1555', {}, { wertung: { n: 12, wert: 1555, blitz: { n: 0, wert: 800 } } }],
+];
+async function ohneElo(browser, [name, felder, liga]) {
+  const gruppe = `ohne Server-Elo (${name})`;
+  const z = { partien: new Map(), treffer: false, sucheSeit: null, ...felder };
+  const { k, s } = await neueSeite(browser, [390, 844], z, { liga, gruppe });
+  try {
+    await lobbyBereit(s, gruppe);
+    const lobby = await zahlenIn(s, '.online-screen .on-inhalt', '.on-bild img');
+    const l = await s.evaluate(() => {
+      const e = document.querySelector('.online-screen .on-liga');
+      return e ? { wert: e.querySelector('.on-gross-wert')?.textContent.trim(), text: e.querySelector('.on-gross-text')?.textContent.trim(),
+        label: e.getAttribute('aria-label') } : null;
+    });
+    pruefe(`${gruppe}: keine Zahl, gross "Läufer II" mit "Deine Liga"`, lobby.length === 0 && !!l && l.wert === 'Läufer II'
+      && l.text === 'Deine Liga' && l.label === 'Deine Liga: Läufer II', { lobby, l });
+    const text = await s.evaluate(() => document.querySelector('.online-screen .on-inhalt')?.textContent || '');
+    pruefe(`${gruppe}: kein undefined, null oder NaN im Text`, !/undefined|null|NaN/.test(text), text.match(/undefined|null|NaN/g));
+  } catch (e) {
+    pruefe(`${gruppe}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
+  }
   await k.close().catch(() => {});
 }
 
 let browser;
 try {
   browser = await browserTyp(pw).launch({ headless: true });
-  for (const g of GERAETE) for (const stil of [null, 'a', 'b', 'c']) await lauf(browser, g, stil);
-  await lauf(browser, GERAETE[0], 'x'); // unbekannte Kennung: wie heute
-  await ohneElo(browser);
+  for (const g of GERAETE) await lauf(browser, g);
+  await lauf(browser, GERAETE[0], '&onlineStil=b'); // alte Kennung: schaltet nichts mehr um
+  for (const fall of OHNE) await ohneElo(browser, fall);
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();

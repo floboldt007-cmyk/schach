@@ -5,8 +5,8 @@
 //
 //   node tests/bilder-online.mjs --bilder=<ordner>     16 Bilder: online-<geraet>-<hell|dunkel>-<lobby|suche|partie|ergebnis>.png
 //   PORT=8991 node tests/bilder-online.mjs ...         eigener Port (Standard 8991)
-//   --stil=a|b|c       Entwurf "online ruhig" (R19, ?onlineStil=, js/ui/online.js); Dateien online-<stil>-<geraet>-...;
-//                      die Attrappe nennt dann die Elo (Feld elo in kronen_mein_stand, das der Server heute noch nicht schickt)
+//   --ohne-elo         die Attrappe schickt keine Elo (Feld elo in kronen_mein_stand fehlt, wie vor online-elo-schema.sql);
+//                      Dateien online-ohne-elo-<geraet>-...; sonst nennt sie Elo 1240 (R19 online ruhig: eine Zahl in der Lobby)
 //   --nur-hell         nur das helle Schema (8 Bilder)
 //   --zahlen=<datei>   schreibt je Ansicht alle sichtbaren Zahlen als Markdown-Liste (Brett-Koordinaten zusammengefasst)
 // Exit 0, wenn alle 16 Bilder entstanden sind und jede Ansicht im erwarteten Modus stand; sonst 1.
@@ -28,7 +28,7 @@ if (!pw) throw new Error('Playwright fehlt (PLAYWRIGHT_PFAD setzen)');
 const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : null; };
 const BILDER = arg('bilder') || path.join(os.tmpdir(), 'bilder-online');
 mkdirSync(BILDER, { recursive: true });
-const STIL = ['a', 'b', 'c'].includes(arg('stil')) ? arg('stil') : null;
+const OHNE_ELO = process.argv.includes('--ohne-elo');
 const ZAHLEN = arg('zahlen');
 const zahlenListe = [];
 
@@ -43,7 +43,7 @@ const server = http.createServer((req, res) => {
 });
 const PORT = Number(process.env.PORT || 8991);
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test${STIL ? '&onlineStil=' + STIL : ''}`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let ok = 0, gesamt = 0;
@@ -112,7 +112,7 @@ function bediener(z) {
         const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du: u === UID });
         return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
       }
-      if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...(STIL ? { elo: 1240 } : {}) });
+      if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...(OHNE_ELO ? {} : { elo: 1240 }) });
       z.unerwartet.push(rpc);
       return antwort([]);
     }
@@ -180,7 +180,7 @@ async function lauf(browser, [geraet, w, h], [wort, schema, modus]) {
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
   const bild = async (teil) => {
     if (ZAHLEN) zahlenListe.push({ ansicht: `${geraet} ${wort} ${teil}`, zahlen: await sichtbareZahlen(s) });
-    const datei = path.join(BILDER, `online-${STIL ? STIL + '-' : ''}${geraet}-${wort}-${teil}.png`);
+    const datei = path.join(BILDER, `online-${OHNE_ELO ? 'ohne-elo-' : ''}${geraet}-${wort}-${teil}.png`);
     const da = await s.screenshot({ path: datei }).then(() => true).catch(() => false);
     pruefe(`${gruppe}: Bild ${teil}`, da, datei);
   };
@@ -233,7 +233,7 @@ try {
   server.close();
 }
 if (ZAHLEN) {
-  const zeilen = [`# Sichtbare Zahlen je Ansicht${STIL ? ' (Entwurf ' + STIL + ')' : ' (heute)'}`, '',
+  const zeilen = [`# Sichtbare Zahlen je Ansicht${OHNE_ELO ? ' (ohne Elo vom Server)' : ''}`, '',
     'Gemessen mit tests/bilder-online.mjs --zahlen: jeder sichtbare Text mit Ziffern (oder ½) im Bild; Namen wie Spieler_2 zaehlen mit.', ''];
   for (const { ansicht, zahlen } of zahlenListe) {
     const anzahl = zahlen.raus.reduce((a, x) => a + x.zahlen.length, 0);
