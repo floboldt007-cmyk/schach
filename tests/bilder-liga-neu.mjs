@@ -157,6 +157,11 @@ try {
       }, { sitzung: SITZUNG, modus });
       const s = await k.newPage(); s.setDefaultTimeout(15000);
       s.on('pageerror', (e) => seitenfehler.push(`${gruppeName}: ${e.message}`));
+      // Diagnose fuer den seltenen Lade-Haenger (15.11.2026, auch im Ausgangsstand): Konsole und offene Anfragen merken
+      const konsole = [], offen = new Set();
+      s.on('console', (m) => { konsole.push(`${m.type()}: ${m.text()}`.slice(0, 200)); if (konsole.length > 8) konsole.shift(); });
+      s.on('request', (r) => offen.add(r.url()));
+      for (const ende of ['requestfinished', 'requestfailed']) s.on(ende, (r) => offen.delete(r.url()));
       try {
         await s.goto(`http://127.0.0.1:${PORT}/index.html?test#start`);
         await s.waitForSelector('.screen', { timeout: 30000 });
@@ -199,7 +204,9 @@ try {
           pruefe(`${gruppeName}: Belohnung`, false, e.message.split('\n')[0]);
         }
       } catch (e) {
-        pruefe(`${gruppeName}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
+        const lage = await s.evaluate(() => ({ url: location.href, bereit: document.readyState, screen: !!document.querySelector('.screen'),
+          reiter: !!document.querySelector('.bl-steuer-reiter'), punkte: !!window.__punkte })).catch((f) => ({ fehler: f.message.split('\n')[0] }));
+        pruefe(`${gruppeName}: Ablauf ohne Abbruch`, false, { fehler: e.message.split('\n')[0], lage, konsole, offen: [...offen].slice(0, 8) });
       }
       await k.close().catch(() => {});
     }
