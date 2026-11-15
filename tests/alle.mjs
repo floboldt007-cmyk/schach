@@ -184,11 +184,27 @@ function teile(suiten, anzahl) {
 
 // Frist des Laufs: 5 s bleiben fuer das Beenden der Suite (zeitwaechter.mjs braucht bis zu 4 s) und die Zusammenfassung
 const ENDE = FRIST ? Date.now() + FRIST * 1000 - 5000 : Infinity;
-// Nur echte Abstuerze: "Target crashed" (Seite) und der verlorene Browser. Nicht "Target page, context or browser has been
-// closed": so meldet Playwright jeden Zugriff auf eine geschlossene Seite, auch nach einem gewoehnlichen Fehler (Kaltreview f1).
-const ABSTURZ = /Target crashed|Browser has been closed|[Bb]rowser has disconnected/;
+// Nur der Absturz einer Seite: "Target crashed". Einen Absturz des ganzen Browsers unterscheidet Playwright 1.64.1 nicht vom
+// eigenen close: beide melden "Target page, context or browser has been closed", wie jeder Zugriff auf eine geschlossene Seite
+// nach einem gewoehnlichen Fehler (Fix-Review f1, gemessen mit hart beendeten Browser-Prozessen). Ein solcher Absturz erscheint
+// darum als gewoehnlicher FEHLER, ohne Absturz-Zeile und ohne Wiederholung, also nie als falsches Gruen.
+const ABSTURZ = /Target crashed/;
 
+// Eine Suite mit Seitenabsturz laeuft EINMAL neu (Analyse f1, R19-Kritik/absturz-ursache.md: 15 Abstuerze in 13 Suiten,
+// ohne Muster). Besteht die Wiederholung, war es ein Umgebungsfehler; stuerzt sie wieder ab, bleibt sie FEHLER. Ein Lauf ohne
+// "Target crashed" wird nie wiederholt, auch kein am Zeitlimit oder an der Frist beendeter. Beide Laeufe stehen im Protokoll.
 async function lauf(suite) {
+  const erst = await einzelLauf(suite);
+  if (!erst.absturz || erst.zeitlimit) return erst;
+  console.log(`WIEDERHOLT nach Absturz: ${suite.name} (erster Lauf ${erst.sekunden.toFixed(1)} s, ${erst.fehler[0]})`);
+  const zweit = await einzelLauf(suite);
+  if (zweit.nichtGestartet) return { ...erst, wiederholt: true, fehler: [...erst.fehler, ...zweit.fehler] };
+  if (zweit.absturz) zweit.fehler[0] = `FEHLER Browser abgestuerzt in ${suite.name}, auch in der Wiederholung (${erst.fehler[0].replace(/^FEHLER /, 'erster Lauf: ')})`;
+  return { ...zweit, wiederholt: true, sekunden: erst.sekunden + zweit.sekunden,
+    ausgabe: `${erst.ausgabe}\n--- ${suite.name}: Wiederholung nach Absturz ---\n${zweit.ausgabe}` };
+}
+
+async function einzelLauf(suite) {
   if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
     return { ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, fehler: [`FEHLER Suite-Datei fehlt: tests/${suite.datei}`], ende: [] };
   }
@@ -223,12 +239,12 @@ async function lauf(suite) {
       fehler.push(limitMs < 20 * 60 * 1000 ? `FEHLER Suite ${suite.name} am Ende der Frist des Laufs (${FRIST} s) beendet`
         : `FEHLER Suite ${suite.name} ueberschritt ihr Zeitlimit (20 Minuten)`);
     }
-    // Absturz des Browsers (Befund R19 15.11.): zuerst nennen, damit er nicht wie ein Fehler der App aussieht. Er macht die
-    // Suite immer zum FEHLER, auch wenn sie mit 0 endet (etwa nach einer stillen Wiederholung).
+    // Absturz des Browsers (Befund R19 15.11.): zuerst nennen, damit er nicht wie ein Fehler der App aussieht. Er macht den
+    // Lauf immer zum FEHLER, auch wenn die Suite mit 0 endet (etwa nach einer stillen Wiederholung in der Suite selbst).
     const absturz = ABSTURZ.test(e.text);
-    if (absturz) fehler.unshift(`FEHLER Browser abgestuerzt in ${suite.name} (${e.text.match(ABSTURZ)[0]}): Suite einzeln wiederholen`);
+    if (absturz) fehler.unshift(`FEHLER Browser abgestuerzt in ${suite.name} (${e.text.match(ABSTURZ)[0]})`);
     return { ...suite, code: absturz && e.code === 0 ? 1 : e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
-      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text };
+      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text, absturz, zeitlimit: e.zeitlimit };
   } finally { clearInterval(puls); }
 }
 
@@ -264,7 +280,7 @@ async function starte(s) {
   }
   const status = e.code === 0 ? 'ok    ' : 'FEHLER';
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
-  console.log(`${status} ${s.name.padEnd(12)} ${zahl.padStart(9)}  ${e.sekunden.toFixed(1).padStart(6)} s${e.nichtGestartet ? '  nicht gestartet' : ''}`);
+  console.log(`${status} ${s.name.padEnd(12)} ${zahl.padStart(9)}  ${e.sekunden.toFixed(1).padStart(6)} s${e.nichtGestartet ? '  nicht gestartet' : ''}${e.wiederholt ? '  (wiederholt)' : ''}`);
   if (e.code !== 0 && !LAUT) {
     const zeigen = e.fehler.length ? e.fehler.slice(0, 20) : e.ende;
     for (const z of zeigen) console.log('       ' + z);
@@ -296,7 +312,7 @@ console.log('\nZusammenfassung');
 console.log('Suite         Prüfungen    Zeit   Ergebnis');
 for (const e of ergebnisse) {
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
-  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${e.code === 0 ? 'bestanden' : e.nichtGestartet ? 'nicht gestartet' : 'FEHLGESCHLAGEN'}`);
+  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${e.code === 0 ? 'bestanden' : e.nichtGestartet ? 'nicht gestartet' : 'FEHLGESCHLAGEN'}${e.wiederholt ? ' (wiederholt)' : ''}`);
 }
 console.log(`\n${ergebnisse.length - schlecht.length}/${ergebnisse.length} Suiten bestanden, ${summeOk}/${summe} Prüfungen, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 process.exit(schlecht.length ? 1 : 0);

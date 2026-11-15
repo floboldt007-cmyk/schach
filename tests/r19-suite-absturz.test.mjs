@@ -58,6 +58,31 @@ if (kenntListe) {
   pruefe('Geschlossene Seite: FEHLER, aber nicht als Browser-Absturz gemeldet', /^FEHLER zu/m.test(e.text) && !/Browser abgestuerzt/.test(e.text), e.text.slice(-900));
   const c = await alle([], liste('crash0', [['crash0', 'crash0']]), 60000);
   pruefe('Absturz mit Exit 0: Suite FEHLER, Lauf Exitcode 1', c.code === 1 && /^FEHLER crash0/m.test(c.text) && /Browser abgestuerzt/.test(c.text), c.text.slice(-900));
+  // Nachfix Fix-Review f1: die Alternativen fuer den ganzen Browser griffen mit Playwright 1.64.1 nie
+  pruefe('Absturz-Regex ist nur /Target crashed/', /^const ABSTURZ = \/Target crashed\/;$/m.test(readFileSync(path.join(WURZEL, 'tests/alle.mjs'), 'utf8')));
+}
+// 1c. Wiederholung nach Absturz (Analyse f1, R19-Kritik/absturz-ursache.md): einmal, sichtbar; ein zweiter Absturz bleibt
+// FEHLER, ein inhaltlicher FEHLER wird nie wiederholt
+{
+  const marke = path.join(ORDNER, 'einmal.marke');
+  const e = await alle([], liste('einmal', [['einmal', 'einmal']]), 60000, { ABSTURZ_MARKE: marke });
+  pruefe('Wiederholung: Absturz im ersten Lauf, zweiter besteht, Lauf Exitcode 0', e.code === 0 && /^ok +einmal /m.test(e.text) && /1\/1 Suiten bestanden/.test(e.text), e.text.slice(-900));
+  pruefe('Wiederholung: sichtbar als "WIEDERHOLT nach Absturz"', /einmal.*WIEDERHOLT nach Absturz|WIEDERHOLT nach Absturz.*einmal/.test(e.text), e.text.slice(-900));
+  const a = await alle([], liste('absturz2', [['absturz', 'absturz']]), 120000);
+  pruefe('Wiederholung: zweiter Absturz bleibt FEHLER (genau eine Wiederholung)', a.code === 1 && /^FEHLER absturz/m.test(a.text)
+    && (a.text.match(/WIEDERHOLT nach Absturz/g) || []).length === 1 && /Browser abgestuerzt/.test(a.text), a.text.slice(-900));
+  const laeufe = path.join(ORDNER, 'inhalt.laeufe');
+  const i = await alle([], liste('inhalt', [['inhalt', 'inhalt']]), 60000, { LAEUFE_DATEI: laeufe });
+  const n = existsSync(laeufe) ? readFileSync(laeufe, 'utf8').trim().split('\n').length : 0;
+  pruefe('Wiederholung: inhaltlicher FEHLER genau einmal gelaufen, nicht wiederholt', i.code === 1 && n === 1 && !/WIEDERHOLT/.test(i.text), { n, text: i.text.slice(-600) });
+  const z = await alle([], liste('zu2', [['zu', 'zu']]), 120000);
+  pruefe('Wiederholung: geschlossene Seite wird nicht wiederholt', z.code === 1 && !/WIEDERHOLT/.test(z.text), z.text.slice(-600));
+}
+// 1d. Seitenabsturz im Protokoll (tests/browser.mjs): Ansicht und Viewport je Seite, aus newContext und aus newPage
+{
+  const e = await prozess(process.execPath, [path.join(WURZEL, 'tests/r19-suite-absturz/seite-crash.mjs')], { cwd: WURZEL, zeitlimitMs: 60000 });
+  pruefe('Protokoll: Seite aus newContext meldet Absturz mit Ansicht und Viewport', /Target crashed.*Ansicht #\/probe-kontext.*Viewport 390x844/.test(e.text), e.text.slice(-900));
+  pruefe('Protokoll: Seite aus newPage meldet Absturz mit Ansicht und Viewport', /Target crashed.*Ansicht #\/probe-seite.*Viewport 1280x800/.test(e.text), e.text.slice(-900));
 }
 // 2. Frist
 {

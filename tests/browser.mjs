@@ -1,11 +1,59 @@
+import path from 'node:path';
+
 // Waehlt die Browser-Engine fuer alle Playwright-Suiten. Ohne BROWSER bleibt
 // Chromium der Standard; WebKit kann lokal und in CI explizit aktiviert werden.
+// Absturz-Protokoll (R19, Analyse f1 R19-Kritik/absturz-ursache.md): launch() haengt an jede Seite page.on('crash'), damit die
+// Absturzzeile Suite, Ansicht (Hash der letzten Adresse) und Viewport nennt. Die Zeile enthaelt "Target crashed", so erkennt
+// tests/alle.mjs den Absturz auch dann, wenn die Suite den Fehler selbst faengt.
 export function browserTyp(playwright) {
   const name = process.env.BROWSER || 'chromium';
   if (!['chromium', 'webkit'].includes(name)) {
     throw new Error(`Unbekannter BROWSER \"${name}\" (erlaubt: chromium, webkit)`);
   }
-  return playwright[name];
+  const typ = playwright[name];
+  return new Proxy(typ, {
+    get(ziel, schluessel) {
+      if (schluessel === 'launch') return async (...args) => mitAbsturzMeldung(await ziel.launch(...args));
+      const wert = Reflect.get(ziel, schluessel);
+      return typeof wert === 'function' ? wert.bind(ziel) : wert;
+    },
+  });
+}
+
+const SUITE = path.basename(process.argv[1] || 'unbekannt');
+const gemeldet = new WeakSet();
+
+function meldeAbsturz(seite) {
+  if (gemeldet.has(seite)) return;
+  gemeldet.add(seite);
+  // chrome://crash und aehnliche Adressen sind der Absturz selbst, nicht die Ansicht davor
+  let adresse = seite.url();
+  seite.on('framenavigated', (rahmen) => {
+    if (rahmen === seite.mainFrame() && !/^chrome:/.test(rahmen.url())) adresse = rahmen.url();
+  });
+  seite.on('crash', () => {
+    let ansicht;
+    try { ansicht = new URL(adresse).hash || '#/'; } catch (e) { ansicht = adresse || '-'; }
+    const v = seite.viewportSize();
+    console.log(`FEHLER Seite abgestuerzt (Target crashed) in ${SUITE}: Ansicht ${ansicht}, Viewport ${v ? `${v.width}x${v.height}` : 'ohne'}`);
+  });
+}
+
+// browser.newPage laeuft in Playwright 1.64.1 ueber browser.newContext; die WeakSet verhindert die doppelte Meldung
+function mitAbsturzMeldung(browser) {
+  const neuerKontext = browser.newContext.bind(browser);
+  const neueSeite = browser.newPage.bind(browser);
+  browser.newContext = async (...args) => {
+    const kontext = await neuerKontext(...args);
+    kontext.on('page', meldeAbsturz);
+    return kontext;
+  };
+  browser.newPage = async (...args) => {
+    const seite = await neueSeite(...args);
+    meldeAbsturz(seite);
+    return seite;
+  };
+  return browser;
 }
 
 // Finger-Treiber ohne CDP (Premium-Umbau U6): synthetische Zeiger-Ereignisse mit pointerType 'touch' per
