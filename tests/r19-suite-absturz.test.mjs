@@ -88,7 +88,11 @@ if (kenntListe) {
     && /Browser abgestuerzt/.test(g.text) && /Keine Wiederholung nach Absturz: gemischt/.test(g.text), { gn, code: g.code, text: g.text.slice(-600) });
   // Fix-Review 64 (KRITISCH): Absturz plus unbehandelte Ausnahme, die keine FEHLER-Zeile schreibt. Auch sie darf nach einer
   // gruenen Wiederholung nicht verschwinden; ebenso keine Wiederholung, wenn der Lauf gar keine FEHLER-Zeile hat.
-  for (const [probe, text] of [['ausnahme', /Probe-Ausnahme: Brett 352 statt 360 px/], ['leer', /page\.evaluate: Target crashed/]]) {
+  // Kaltreview b4 (KRITISCH): auch Ablehnung, eigener Error-Name, geworfenes Objekt, nur stderr und eine Ablehnung nach der
+  // Zusammenfassung; erkannt am fehlenden Ende "x/y bestanden", nicht an einem Textmuster
+  for (const [probe, text] of [['ausnahme', /Probe-Ausnahme: Brett 352 statt 360 px/], ['leer', /page\.evaluate: Target crashed/],
+    ['rejekt', /Probe-Ablehnung: Zug e2e4 fehlt/], ['name', /Pruefung: Brett 352 statt 360 px/], ['objekt', /Objekt statt Error/],
+    ['stumm', /Probe-stderr: Brett fehlt/], ['nachende', /Probe-Ablehnung nach dem Ende/]]) {
     const pMarke = path.join(ORDNER, probe + '.marke');
     const pLaeufe = path.join(ORDNER, probe + '.laeufe');
     const p = await alle([], liste(probe, [[probe, probe]]), 60000, { ABSTURZ_MARKE: pMarke, LAEUFE_DATEI: pLaeufe });
@@ -114,6 +118,19 @@ if (kenntListe) {
     pruefe(`Unbekannte Suite ${was}: Zeile "FEHLER unbekannte Suite: gibt-es-nicht" und Exit 4`, e.code === 4 && /^FEHLER unbekannte Suite: gibt-es-nicht$/m.test(e.text), { code: e.code, text: e.text.slice(-400) });
     pruefe(`Unbekannte Suite ${was}: keine Suite gelaufen`, !existsSync(laeufe) && !/Suiten bestanden/.test(e.text), e.text.slice(-400));
   }
+  // "--nur=" (leer) und "--nur inhalt" (Leerzeichen): FEHLER und Exit 2, keine Suite laeuft (Kaltreview b4)
+  for (const [was, args] of [['leer', ['--nur=']], ['mit Leerzeichen', ['--nur', 'inhalt']]]) {
+    const laeufe = path.join(ORDNER, `nur-${args.length}.laeufe`);
+    const e = await alle(args, liste('nur' + args.length, [['inhalt', 'inhalt']]), 60000, { LAEUFE_DATEI: laeufe });
+    pruefe(`--nur ${was}: FEHLER-Zeile, Exit 2, keine Suite gelaufen`, e.code === 2 && /^FEHLER --nur braucht Namen/m.test(e.text)
+      && !existsSync(laeufe) && !/Suiten bestanden/.test(e.text), { code: e.code, text: e.text.slice(-400) });
+  }
+}
+// 1f. Absturz und danach am Zeitlimit beendet: keine Wiederholung, mit Grund im Protokoll (Kaltreview b4)
+{
+  const e = await alle(['--frist=12'], liste('haengtabsturz', [['haengtabsturz', 'haengt-absturz']]), 60000, { ABSTURZ_MARKE: path.join(ORDNER, 'haengt.marke') });
+  pruefe('Absturz am Zeitlimit: keine Wiederholung, Grund im Protokoll', e.code === 1 && !/WIEDERHOLT/.test(e.text)
+    && /Keine Wiederholung nach Absturz: haengtabsturz wurde am Zeitlimit oder an der Frist beendet/.test(e.text), e.text.slice(-600));
 }
 // 2. Frist
 {

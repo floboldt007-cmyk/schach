@@ -24,6 +24,11 @@ const SCHNELL = process.argv.includes('--schnell');
 const LAUT = process.argv.includes('--laut');
 const nurArg = process.argv.find((a) => a.startsWith('--nur='));
 const NUR = nurArg ? nurArg.slice(6).split(',').map((s) => s.trim()).filter(Boolean) : null;
+// "--nur sw" (Leerzeichen) und "--nur=" (leer) liefen sonst still ALLE bzw. keine Suite (Kaltreview b4)
+if (process.argv.includes('--nur') || (NUR && !NUR.length)) {
+  console.log('FEHLER --nur braucht Namen mit "=": --nur=name1,name2');
+  process.exit(2);
+}
 const parallelArg = process.argv.find((a) => a.startsWith('--parallel='));
 const PARALLEL = parallelArg ? Number(parallelArg.slice(11)) : 1;
 const teilArg = process.argv.find((a) => a.startsWith('--teil='));
@@ -200,7 +205,12 @@ const AUSNAHME = /^\s*(Uncaught\s+)?[A-Za-z]*Error\b|--trace-uncaught/;
 // inhaltlicher FEHLER, bliebe er nach einer gruenen Wiederholung unsichtbar. Dann bleibt die Suite FEHLER, mit beiden Zeilen.
 async function lauf(suite) {
   const erst = await einzelLauf(suite);
-  if (!erst.absturz || erst.zeitlimit) return erst;
+  if (!erst.absturz) return erst;
+  if (erst.zeitlimit) {
+    // jeder Verzicht steht mit Grund im Protokoll (Kaltreview b4)
+    console.log(`Keine Wiederholung nach Absturz: ${suite.name} wurde am Zeitlimit oder an der Frist beendet`);
+    return erst;
+  }
   if (!erst.nurAbsturz) {
     console.log(`Keine Wiederholung nach Absturz: ${suite.name} hat ${erst.ohneWiederholung}`);
     return erst;
@@ -253,12 +263,21 @@ async function einzelLauf(suite) {
     const absturz = ABSTURZ.test(e.text);
     // Nur Absturz: mindestens eine FEHLER-Zeile, jede nennt den Absturz, und keine Ausnahme ohne ihn (Fix-Review 64, KRITISCH:
     // eine unbehandelte Ausnahme schreibt keine FEHLER-Zeile und verschwand sonst nach einer gruenen Wiederholung)
+    // Am Zustand, nicht an Textmustern (Kaltreview b4, KRITISCH: Promise-Ablehnung, eigener Error-Name, geworfenes Objekt,
+    // nur stderr entgingen dem Muster): die Suite hat ihr Ende erreicht, also ist die letzte Zeile ihre Zusammenfassung
+    // "x/y bestanden". Jede Ausnahme oder Ablehnung, auch eine nach der Zusammenfassung, endet anders.
+    const letzteZeile = zeilen.filter(z => z.trim()).at(-1) || '';
+    // Formen der Suiten: "N/N bestanden", "... in N s", "N/N Pruefungen bestanden", "N FEHLER | N/N bestanden"
+    const amEnde = /\d+\s*\/\s*\d+\s+(\S+\s+)?bestanden/.test(letzteZeile);
     const fremdeAusnahme = zeilen.find(z => AUSNAHME.test(z) && !ABSTURZ.test(z));
-    const nurAbsturz = fehler.length > 0 && !fremdeAusnahme && fehler.every(z => ABSTURZ.test(z));
-    // warum nicht wiederholt wird, mit der Ausnahme im Wortlaut: sie steht sonst in keiner FEHLER-Zeile
-    const ersteAusnahme = (zeilen.find(z => AUSNAHME.test(z)) || '').trim();
+    const nurAbsturz = amEnde && !fremdeAusnahme && fehler.length > 0 && fehler.every(z => ABSTURZ.test(z));
+    // warum nicht wiederholt wird, mit der Ausnahme bzw. der letzten Zeile im Wortlaut: sie steht sonst in keiner FEHLER-Zeile
+    // (von hinten die erste Zeile, die nicht Node-Fuss oder Stack ist: dort steht die Meldung der Ausnahme)
+    const meldung = zeilen.filter(z => z.trim() && !/^\s+at |^Node\.js v/.test(z)).at(-1) || '';
+    const ersteAusnahme = (zeilen.find(z => AUSNAHME.test(z)) || meldung).trim();
     const ohneWiederholung = nurAbsturz ? null : fremdeAusnahme ? `eine Ausnahme ohne Absturz (${fremdeAusnahme.trim()})`
-      : fehler.length ? 'daneben einen FEHLER ohne Absturz' : `keine FEHLER-Zeile${ersteAusnahme ? ` (${ersteAusnahme})` : ''}`;
+      : !amEnde ? `kein Ende mit "x/y bestanden" (${ersteAusnahme})`
+      : fehler.length ? 'daneben einen FEHLER ohne Absturz' : 'keine FEHLER-Zeile';
     if (absturz) fehler.unshift(`FEHLER Browser abgestuerzt in ${suite.name} (${e.text.match(ABSTURZ)[0]})`);
     return { ...suite, code: absturz && e.code === 0 ? 1 : e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
       gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text, absturz, nurAbsturz, ohneWiederholung, zeitlimit: e.zeitlimit };
