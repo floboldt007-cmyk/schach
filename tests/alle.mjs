@@ -193,9 +193,15 @@ const ABSTURZ = /Target crashed/;
 // Eine Suite mit Seitenabsturz laeuft EINMAL neu (Analyse f1, R19-Kritik/absturz-ursache.md: 15 Abstuerze in 13 Suiten,
 // ohne Muster). Besteht die Wiederholung, war es ein Umgebungsfehler; stuerzt sie wieder ab, bleibt sie FEHLER. Ein Lauf ohne
 // "Target crashed" wird nie wiederholt, auch kein am Zeitlimit oder an der Frist beendeter. Beide Laeufe stehen im Protokoll.
+// Wiederholt wird nur, wenn JEDE FEHLER-Zeile der Suite den Absturz nennt (Kaltreview f1, KRITISCH): steht daneben ein
+// inhaltlicher FEHLER, bliebe er nach einer gruenen Wiederholung unsichtbar. Dann bleibt die Suite FEHLER, mit beiden Zeilen.
 async function lauf(suite) {
   const erst = await einzelLauf(suite);
   if (!erst.absturz || erst.zeitlimit) return erst;
+  if (!erst.nurAbsturz) {
+    console.log(`Keine Wiederholung nach Absturz: ${suite.name} hat daneben einen FEHLER ohne Absturz`);
+    return erst;
+  }
   console.log(`WIEDERHOLT nach Absturz: ${suite.name} (erster Lauf ${erst.sekunden.toFixed(1)} s, ${erst.fehler[0]})`);
   const zweit = await einzelLauf(suite);
   if (zweit.nichtGestartet) return { ...erst, wiederholt: true, fehler: [...erst.fehler, ...zweit.fehler] };
@@ -242,9 +248,10 @@ async function einzelLauf(suite) {
     // Absturz des Browsers (Befund R19 15.11.): zuerst nennen, damit er nicht wie ein Fehler der App aussieht. Er macht den
     // Lauf immer zum FEHLER, auch wenn die Suite mit 0 endet (etwa nach einer stillen Wiederholung in der Suite selbst).
     const absturz = ABSTURZ.test(e.text);
+    const nurAbsturz = fehler.every(z => ABSTURZ.test(z));
     if (absturz) fehler.unshift(`FEHLER Browser abgestuerzt in ${suite.name} (${e.text.match(ABSTURZ)[0]})`);
     return { ...suite, code: absturz && e.code === 0 ? 1 : e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
-      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text, absturz, zeitlimit: e.zeitlimit };
+      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text, absturz, nurAbsturz, zeitlimit: e.zeitlimit };
   } finally { clearInterval(puls); }
 }
 

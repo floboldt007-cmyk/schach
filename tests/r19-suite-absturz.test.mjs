@@ -78,6 +78,14 @@ if (kenntListe) {
   pruefe('Wiederholung: inhaltlicher FEHLER genau einmal gelaufen, nicht wiederholt', i.code === 1 && n === 1 && !/WIEDERHOLT/.test(i.text), { n, text: i.text.slice(-600) });
   const z = await alle([], liste('zu2', [['zu', 'zu']]), 120000);
   pruefe('Wiederholung: geschlossene Seite wird nicht wiederholt', z.code === 1 && !/WIEDERHOLT/.test(z.text), z.text.slice(-600));
+  // Kaltreview f1 (KRITISCH): inhaltlicher FEHLER plus Absturz im ersten Lauf. Eine Wiederholung liesse den FEHLER verschwinden.
+  const gMarke = path.join(ORDNER, 'gemischt.marke');
+  const gLaeufe = path.join(ORDNER, 'gemischt.laeufe');
+  const g = await alle([], liste('gemischt', [['gemischt', 'gemischt']]), 60000, { ABSTURZ_MARKE: gMarke, LAEUFE_DATEI: gLaeufe });
+  const gn = existsSync(gLaeufe) ? readFileSync(gLaeufe, 'utf8').trim().split('\n').length : 0;
+  pruefe('Wiederholung: inhaltlicher FEHLER mit Absturz wird nicht wiederholt, bleibt FEHLER mit seiner Zeile',
+    g.code === 1 && gn === 1 && !/WIEDERHOLT/.test(g.text) && /Brett 352 statt 360 px/.test(g.text)
+    && /Browser abgestuerzt/.test(g.text) && /Keine Wiederholung nach Absturz: gemischt/.test(g.text), { gn, code: g.code, text: g.text.slice(-600) });
 }
 // 1d. Seitenabsturz im Protokoll (tests/browser.mjs): Ansicht und Viewport je Seite, aus newContext und aus newPage
 {
