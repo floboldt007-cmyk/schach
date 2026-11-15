@@ -52,6 +52,13 @@ if (kenntListe) {
   pruefe('Absturz: Suite FEHLER mit Grund "Browser abgestuerzt"', /^FEHLER absturz/m.test(e.text) && /Browser abgestuerzt/.test(e.text), e.text.slice(-900));
   pruefe('Absturz: die naechste Suite laeuft weiter und besteht', /^ok +gut /m.test(e.text) && /1\/2 Suiten bestanden/.test(e.text), e.text.slice(-600));
 }
+// 1b. Kaltreview f1: eine geschlossene Seite ist kein Absturz; ein gemeldeter Absturz zaehlt auch bei Exit 0 als FEHLER
+{
+  const e = await alle([], liste('zu', [['zu', 'zu']]), 120000);
+  pruefe('Geschlossene Seite: FEHLER, aber nicht als Browser-Absturz gemeldet', /^FEHLER zu/m.test(e.text) && !/Browser abgestuerzt/.test(e.text), e.text.slice(-900));
+  const c = await alle([], liste('crash0', [['crash0', 'crash0']]), 60000);
+  pruefe('Absturz mit Exit 0: Suite FEHLER, Lauf Exitcode 1', c.code === 1 && /^FEHLER crash0/m.test(c.text) && /Browser abgestuerzt/.test(c.text), c.text.slice(-900));
+}
 // 2. Frist
 {
   const t0 = Date.now();
@@ -81,7 +88,12 @@ if (kenntListe) {
   const e = kenntPlan ? await prozess(process.execPath, [path.join(WURZEL, 'tests/alle.mjs'), '--plan', '--teil=1/7'], { cwd: WURZEL, zeitlimitMs: 30000 })
     : { code: 1, text: 'alle.mjs kennt --plan nicht', dauerMs: 0 };
   const teile = [...e.text.matchAll(/^Teil (\d+)\/7: (\d+) Suiten, geplant (\d+) s/gm)].map((m) => ({ teil: +m[1], suiten: +m[2], s: +m[3] }));
-  pruefe('Plan: --plan zeigt alle 7 Teile ohne zu laufen', e.code === 0 && teile.length === 7 && e.dauerMs < 20000, e.text.slice(0, 600));
+  // Exit 3 statt 0: ein gesiegeltes --plan-Protokoll darf nie wie ein gruener Lauf aussehen (Kaltreview f1)
+  pruefe('Plan: --plan zeigt alle 7 Teile ohne zu laufen, Exit 3 und "nichts gelaufen" in der letzten Zeile',
+    e.code === 3 && teile.length === 7 && e.dauerMs < 20000 && /nichts gelaufen/.test(e.text.trim().split(/\r?\n/).pop()), { code: e.code, text: e.text.slice(-300) });
+  const f = kenntPlan ? await prozess(process.execPath, [path.join(WURZEL, 'tests/alle.mjs'), '--plan', '--teil=1/6', '--frist=100'], { cwd: WURZEL, zeitlimitMs: 30000 })
+    : { text: '' };
+  pruefe('Plan: --plan mit --frist warnt bei jedem Teil ueber der Frist', (f.text.match(/^Hinweis: Teil \d+\/6 /gm) || []).length === 6, f.text.slice(-600));
   pruefe('Plan: kein Teil ueber 850 s geplant', teile.length === 7 && teile.every((t) => t.s <= 850), teile);
   pruefe('Plan: zusammen jede Suite genau einmal', teile.reduce((a, t) => a + t.suiten, 0) === namen.length, { summe: teile.reduce((a, t) => a + t.suiten, 0), namen: namen.length });
 }

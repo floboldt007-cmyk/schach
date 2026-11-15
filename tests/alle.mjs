@@ -5,7 +5,8 @@
 //   node tests/alle.mjs --nur=sw,e2e nur diese Suiten (Namen siehe Liste unten)
 //   node tests/alle.mjs --parallel=3  bis zu drei geeignete Suiten gleichzeitig
 //   node tests/alle.mjs --teil=2/3    fester, nach gemessener Dauer verteilter Teil (tests/suite-dauern.json)
-//   node tests/alle.mjs --teil=2/7 --plan   nur zeigen, wie die Teile geplant sind, nichts starten
+//   node tests/alle.mjs --teil=2/7 --plan   nur zeigen, wie die Teile geplant sind, nichts starten (Exit 3; mit --frist
+//                                    ein Hinweis je Teil, der laenger geplant ist)
 //   node tests/alle.mjs --frist=880   Frist des ganzen Laufs in Sekunden: was dann laeuft, wird beendet, der Rest heisst
 //                                    "nicht gestartet", die Zusammenfassung kommt trotzdem (fuer ein aeusseres timeout 900)
 //   node tests/alle.mjs --laut       Ausgabe jeder Suite vollstaendig zeigen
@@ -183,7 +184,9 @@ function teile(suiten, anzahl) {
 
 // Frist des Laufs: 5 s bleiben fuer das Beenden der Suite (zeitwaechter.mjs braucht bis zu 4 s) und die Zusammenfassung
 const ENDE = FRIST ? Date.now() + FRIST * 1000 - 5000 : Infinity;
-const ABSTURZ = /Target crashed|Target page, context or browser has been closed/;
+// Nur echte Abstuerze: "Target crashed" (Seite) und der verlorene Browser. Nicht "Target page, context or browser has been
+// closed": so meldet Playwright jeden Zugriff auf eine geschlossene Seite, auch nach einem gewoehnlichen Fehler (Kaltreview f1).
+const ABSTURZ = /Target crashed|Browser has been closed|[Bb]rowser has disconnected/;
 
 async function lauf(suite) {
   if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
@@ -220,9 +223,11 @@ async function lauf(suite) {
       fehler.push(limitMs < 20 * 60 * 1000 ? `FEHLER Suite ${suite.name} am Ende der Frist des Laufs (${FRIST} s) beendet`
         : `FEHLER Suite ${suite.name} ueberschritt ihr Zeitlimit (20 Minuten)`);
     }
-    // Absturz des Browsers (Befund R19 15.11.): zuerst nennen, damit er nicht wie ein Fehler der App aussieht
-    if (e.code !== 0 && ABSTURZ.test(e.text)) fehler.unshift(`FEHLER Browser abgestuerzt in ${suite.name} (Target crashed): Suite einzeln wiederholen`);
-    return { ...suite, code: e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
+    // Absturz des Browsers (Befund R19 15.11.): zuerst nennen, damit er nicht wie ein Fehler der App aussieht. Er macht die
+    // Suite immer zum FEHLER, auch wenn sie mit 0 endet (etwa nach einer stillen Wiederholung).
+    const absturz = ABSTURZ.test(e.text);
+    if (absturz) fehler.unshift(`FEHLER Browser abgestuerzt in ${suite.name} (${e.text.match(ABSTURZ)[0]}): Suite einzeln wiederholen`);
+    return { ...suite, code: absturz && e.code === 0 ? 1 : e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
       gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text };
   } finally { clearInterval(puls); }
 }
@@ -231,7 +236,10 @@ let auswahl = NUR ? LISTE.filter((s) => NUR.includes(s.name)) : LISTE;
 if (PLAN) {
   const gruppen = teile(auswahl, TEIL ? TEIL[1] : 1);
   gruppen.forEach((g, i) => console.log(`Teil ${i + 1}/${gruppen.length}: ${g.suiten.length} Suiten, geplant ${Math.round(g.dauer)} s\n  ${g.suiten.map((x) => x.name).join(' ')}`));
-  process.exit(0);
+  if (FRIST) gruppen.forEach((g, i) => { if (g.dauer > FRIST) console.log(`Hinweis: Teil ${i + 1}/${gruppen.length} ist mit ${Math.round(g.dauer)} s mehr als die Frist ${FRIST} s, mehr Teile nehmen`); });
+  // Exit 3, nicht 0: ein gesiegeltes Protokoll von --plan darf nie wie ein gruener Lauf aussehen (Kaltreview f1)
+  console.log('PLAN: nichts gelaufen (Exit 3)');
+  process.exit(3);
 }
 if (TEIL) auswahl = teile(auswahl, TEIL[1])[TEIL[0] - 1].suiten;
 if (!auswahl.length) {
