@@ -645,7 +645,8 @@ export function zeige(root, params, app) {
     const rand = r + 8;   // wie stelleFlo: so weit bleibt die Figur vom Rand der Karte
     const hoehe = weltEl.offsetHeight || masse.h;
     const hindernisse = flaechenDerStationen();
-    const kandidaten = (d > 0 ? [] : [[cx, cy]]).concat(...[d || r * 2 + FLO_ABSTAND, (d || r * 2 + FLO_ABSTAND) + r]
+    const a0 = d || r * 2 + FLO_ABSTAND;
+    const kandidaten = (d > 0 ? [] : [[cx, cy]]).concat(...[a0, a0 + r, a0 + 2 * r, a0 + 4 * r]
       .map((a) => FLO_RICHTUNGEN.map((g) => [cx + a * Math.cos(g * Math.PI / 180), cy + a * Math.sin(g * Math.PI / 180)])));
     const passt = ([x, y]) => x >= rand && x <= masse.w - rand && y >= rand && y <= hoehe - rand
       && hindernisse.every((h) => (h.kreis ? Math.hypot(x - h.x, y - h.y) >= r + h.r + 2
@@ -661,7 +662,9 @@ export function zeige(root, params, app) {
       liste.push({ kreis: true, x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2, r: el.offsetWidth / 2 });
       for (const t of el.querySelectorAll('.k-schild, .k-nr, .boss-krone, .fahne, .k-sterne')) {
         if (!t.offsetWidth) continue;
-        const dx = parseFloat(t.style.getPropertyValue('--krone-dx')) || 0;
+        // Schild, Sterne und Fahne sind per translateX(-50%) zentriert (Fahne dazu --krone-dx): offsetLeft kennt das nicht
+        const tf = getComputedStyle(t).transform;
+        const dx = tf && tf !== 'none' ? new DOMMatrixReadOnly(tf).m41 : 0;
         liste.push({ x: el.offsetLeft + t.offsetLeft + dx, y: el.offsetTop + t.offsetTop, w: t.offsetWidth, h: t.offsetHeight });
       }
     }
@@ -674,7 +677,7 @@ export function zeige(root, params, app) {
     // am Start schob das Einklemmen die Figur auf schmalen Karten halb hinter die erste Station, deren Rand sie
     // abschnitt (iPhone SE, 08.11.2026): so dicht an ihr bleibt sie unsichtbar
     const [sx, sy] = LAGEN[lageModus || modus].stationen[0];
-    const rk = 76 * masse.s * (LBOTS[0].id === aktuellId ? 1.22 : 1) / 2;
+    const rk = (knoten[0] && knoten[0].offsetWidth) ? knoten[0].offsetWidth / 2 : 76 * masse.s * (LBOTS[0].id === aktuellId ? 1.22 : 1) / 2;
     floFigur.classList.toggle('verdeckt', Math.hypot(x - sx * masse.w, y - yVon(sy)) < rk + r - 8);
     floFigur.style.left = x.toFixed(1) + 'px';
     floFigur.style.top = y.toFixed(1) + 'px';
