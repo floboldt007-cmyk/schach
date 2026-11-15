@@ -43,7 +43,12 @@ const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID }))
   expires_at: 9999999999, user: { id: UID, email: 'probe@example.invalid' } };
 // Weltrangliste: du ("flo", Banner saison-silber) auf Platz 7 mit 1.988, Platz 6 hat 2.025 und Platz 8 1.933
 const NAMEN = ['bert', 'mira_k', 'jonas', 'SchachLena', 'tim.r', 'koenigin_ida', 'flo', 'paul88', 'zoe', 'Matt_in_3'];
-function weltAntwort(ichErster = false) {
+function weltAntwort(ichErster = false, ausserhalb = false) {
+  // ausserhalb (Kaltreview df 15.11.): du auf Platz 150, die Liste traegt nur die besten 100; Name und Banner nur in ich
+  if (ausserhalb) {
+    const liste = Array.from({ length: 100 }, (_, i) => ({ rang: i + 1, name: 'Spieler ' + (i + 1), banner: 'start', elo: 2400 - i * 5, ich: false }));
+    return { ab: 15, ab_start: 30, teilnahme: true, liste, ich: { status: 'dabei', rang: 150, elo: 1900, name: 'flo', banner: 'saison-silber' } };
+  }
   const liste = NAMEN.map((name, i) => ({ rang: i + 1, name, banner: name === 'flo' ? 'saison-silber' : 'start', elo: 2210 - i * 37 - (i > 6 ? 18 : 0),
     ich: name === 'flo' }));
   if (ichErster) { liste[6].elo = 2300; liste.sort((a, b) => b.elo - a.elo).forEach((z, i) => { z.rang = i + 1; }); }
@@ -60,7 +65,7 @@ const FREUNDE = [['f1', 'mira_k', 18400, 4], [UID, 'flo', 15200, 6], ['f2', 'jon
   .map(([id, name, punkte, partien]) => ({ id, name, punkte, partien, ich: id === UID }));
 
 const seitenfehler = [];
-async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', ichErster = false } = {}) {
+async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', ichErster = false, ausserhalb = false } = {}) {
   const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1, hasTouch: breite < 700, isMobile: breite < 700,
     serviceWorkers: 'block', colorScheme: 'dark', reducedMotion: 'reduce', locale: sprache === 'de' ? 'de-DE' : 'en-GB', timezoneId: 'Europe/Berlin' });
   await k.route('**/*.supabase.co/**', (r) => {
@@ -70,7 +75,7 @@ async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', ichEr
     if (url.includes('/auth/v1/')) return antwort({ id: UID, email: 'probe@example.invalid' });
     if (url.includes('/rest/v1/profile')) return antwort([{ id: UID, benutzername: 'flo' }]);
     if (name === 'liga_meine_gruppe') return antwort(gruppe());
-    if (name === 'weltrang_liste') return antwort(weltAntwort(ichErster));
+    if (name === 'weltrang_liste') return antwort(weltAntwort(ichErster, ausserhalb));
     if (name === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 381, platz: 3, n: 30, ziel: 355 });
     if (name === 'freunde_rangliste') return antwort(FREUNDE);
     return antwort([]);
@@ -234,6 +239,18 @@ try {
     await reiter(s, 'Welt', '.lg-welt[data-zustand="dabei"]');
     const t = await s.locator('.lg-welt-platz').innerText().catch(() => '');
     pruefe('Welt Platz 1: "#1" und ein Satz ohne Abstand', /#1/.test(t) && /führst/.test(t) && !/Noch \d+ Elo/.test(t), t);
+    await k.close();
+  }
+  {
+    const { k, s } = await seite(browser, { ausserhalb: true });
+    await reiter(s, 'Welt', '.lg-welt[data-zustand="dabei"]');
+    const w = await s.evaluate(() => {
+      const k = document.querySelector('.lg-welt-platz');
+      return k && { text: k.innerText, banner: k.querySelector('.lg-welt-platz-banner')?.style.backgroundImage || '',
+        balken: !!k.querySelector('.lg-welt-platz-balken') };
+    });
+    pruefe('Welt ausserhalb der Liste: Name und eigenes Banner aus "ich"', !!w && /flo/.test(w.text) && /banner\/saison-silber\.svg/.test(w.banner), w);
+    pruefe('Welt ausserhalb der Liste: kein Balken ohne den Platz direkt ueber dir', !!w && !w.balken && /#150/.test(w.text), w);
     await k.close();
   }
   {
