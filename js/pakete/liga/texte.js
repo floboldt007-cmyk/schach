@@ -1,19 +1,13 @@
 // Woerterbuch des Pakets liga (Englische Version, Teil 2). Schluessel t('p-liga.x'); de = die bisherigen deutschen Texte
 // woertlich. Rein, ohne DOM.
-// Eine Liga (Flo 08.11.2026): angezeigt wird nur noch die Kronen-Liga. Von der alten Saison-Liga bleiben die Stufen-Namen
-// fuer die verdienten Abzeichen im Verlauf ('stufe.<i>', de aus wertung.js STUFEN[i].name). Die Spielklasse traegt keinen
-// Figurennamen mehr ("Springer" gehoert der Kronen-Liga), sie steht nur als Wertungszahl da.
+// Eine Liga (Flo 08.11.2026): angezeigt wird nur noch die Kronen-Liga. Die Spielklasse traegt keinen Figurennamen mehr
+// ("Springer" gehoert der Kronen-Liga), sie steht nur als Wertungszahl da. Die Texte der Verlaufs-Karte (Wertung, Kurve,
+// alte Saison-Abzeichen) sind seit R19 (15.11.2026) mit der Karte entfallen.
 // Englisch: Wertung = rating, Liga-Stufe = tier, Saison = season.
 import { registriereTexte, t } from '../../sprache.js';
-import { STUFEN } from './wertung.js';
 import { stufeInfo } from './kronen.js';
 
-const stufenDe = Object.fromEntries(STUFEN.map((s, i) => ['stufe.' + i, s.name]));
-
 export const DE = {
-  // Wertung
-  wert: '≈ {wert} ± {u}',
-  wertVorlaeufig: '≈ {wert} ± {u} · vorläufig',
   // Bilanz im Panel
   'bilanz.text': 'Du gegen {name}: {siege} · {remis} · {niederlagen}',
   'bilanz.siege.eins': '{n} Sieg',
@@ -25,16 +19,6 @@ export const DE = {
   // Abrechnung im Ergebnis (nur die Wertung, Liga-Punkte gibt es seit 08.11.2026 nicht mehr)
   'abr.blitz': 'Blitz-Wertung {diff}',
   'abr.arena': 'Liga-Wertung {diff}',
-  // Verlauf
-  'kurve.leer': 'Deine Wertungskurve wächst mit den nächsten normalen Partien.',
-  'kurve.label': 'Verlauf der normalen Liga-Wertung',
-  'kurve.titel': 'Liga-Wertung: {a} bis {b}',
-  'kurve.text': '{a} → {b} · letzte {n} normale Partien',
-  'verlauf.titel': 'Deine Liga-Wertung',
-  'verlauf.abzeichen': 'Deine Abzeichen der alten Saison-Liga',
-  'verlauf.saison': 'Saison {nr}: {stufe}',
-  'verlauf.punkte': '{punkte} Punkte · Rechenstand {stand}',
-  'verlauf.fuss': 'Liga-Wertung mit Verlustschutz · Rechenstand {stand}. Die Bot-Skala ist vorläufig.',
   // Kronen-Liga mit Wochen-Gruppen (kronen.js LIGEN, Umbau 07.11.2026). Ruhige Fakten, kein Druck (fairness Regel 9/10):
   // der untere Abschnitt heisst "Eine Stufe tiefer", die Woche "Ende am Sonntag"
   // Liga-Namen Satz A (Flo 14.11.2026), auch deutsch englisch; die IDs bleiben die Figuren aus kronen.js LIGEN
@@ -93,7 +77,7 @@ export const DE = {
   'gruppe.regeln.kronen': 'Online und im Rätsel-Duell gegen Menschen: Sieg +{os}, Remis +{or}, Niederlage −{on}. Gegen den KI-Gegner: Sieg +{ks}, Remis +{kr}, Niederlage −{kn}. Bot-Leiter: Sieg +{bs}, Remis +{br}, eine Niederlage kostet nichts.',
   'gruppe.regeln.woche': 'Jede Woche spielst du in einer Gruppe mit {gruppe} Plätzen. Am Sonntag steigen die besten {auf} eine Stufe auf, die letzten {ab} gehen eine Stufe tiefer. Belohnung gibt es bis Platz {lohn}. Gewertet werden je Tag {botTag} Bot-Partien und {kiTag} Partien gegen den KI-Gegner, zusammen höchstens {woche} Kronen je Woche.',
   // R19 Season (supabase/saison-schema.sql): "Season" bleibt auch deutsch (Flo: "Crownmaster Season N"), damit sie sich
-  // klar von den alten Saison-Abzeichen im Verlauf (verlauf.saison) unterscheidet
+  // klar von den alten Saison-Abzeichen der frueheren Saison-Liga unterscheidet
   'season.titel': 'Season {n}',
   'season.vorsaison': 'Season 1 beginnt am {datum}. Bis dahin läuft die Wochen-Liga wie gewohnt.',
   'season.lauf': 'Woche {woche} von {wochen} · endet am {datum}',
@@ -151,12 +135,9 @@ export const DE = {
   // R19 (Flo 14.11.2026): wer die Start-Elo selbst angegeben hat, zaehlt erst ab {abStart} Partien (weltrang-schema.sql ab_start)
   'welt.erklaerungStart': 'Hast du deine Start-Elo selbst angegeben, zählst du erst ab {abStart} Partien mit.',
   'welt.fussnote': 'Elo aus Online-Partien, Startwert selbst angegeben.',
-  ...stufenDe,
 };
 
 export const EN = {
-  wert: '≈ {wert} ± {u}',
-  wertVorlaeufig: '≈ {wert} ± {u} · provisional',
   'bilanz.text': 'You vs. {name}: {siege} · {remis} · {niederlagen}',
   'bilanz.siege.eins': '{n} win',
   'bilanz.siege.mehr': '{n} wins',
@@ -166,24 +147,6 @@ export const EN = {
   'bilanz.niederlagen.mehr': '{n} losses',
   'abr.blitz': 'Blitz rating {diff}',
   'abr.arena': 'League rating {diff}',
-  'kurve.leer': 'Your rating curve grows with your next standard games.',
-  'kurve.label': 'History of your standard league rating',
-  'kurve.titel': 'League rating: {a} to {b}',
-  'kurve.text': '{a} → {b} · last {n} standard games',
-  'verlauf.titel': 'Your league rating',
-  'verlauf.abzeichen': 'Your badges from the old season league',
-  'verlauf.saison': 'Season {nr}: {stufe}',
-  'verlauf.punkte': '{punkte} points · scoring version {stand}',
-  'verlauf.fuss': 'League rating with loss protection · scoring version {stand}. The bot scale is provisional.',
-  // Stufen der alten Saison-Liga (wertung.js STUFEN), nur noch fuer die Abzeichen im Verlauf: Holz bis Gold wie im
-  // Deutschen, oben die Krone statt "Meister"
-  'stufe.0': 'Wood',
-  'stufe.1': 'Bronze',
-  'stufe.2': 'Silver',
-  'stufe.3': 'Gold',
-  'stufe.4': 'Platinum',
-  'stufe.5': 'Diamond',
-  'stufe.6': 'Crown',
   'kliga.bauer': 'Squire', 'kliga.springer': 'Knight', 'kliga.laeufer': 'Warden', 'kliga.turm': 'Baron', 'kliga.dame': 'Sovereign',
   'kliga.koenig': 'Crownmate',
   'gruppe.reiter': 'Group',

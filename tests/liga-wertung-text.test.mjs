@@ -12,7 +12,7 @@ function pruefe(name, gut, detail = '') {
 for (const [sprache, w, wort] of [['de', DE, /Liga-Wertung/], ['en', EN, /league rating/i]]) {
   const arena = Object.entries(w).filter(([, v]) => typeof v === 'string' && /arena/i.test(v));
   pruefe(`${sprache}: kein Text im Paket liga nennt "Arena"`, arena.length === 0, arena);
-  for (const k of ['abr.arena', 'kurve.label', 'kurve.titel', 'verlauf.titel', 'verlauf.fuss']) {
+  for (const k of ['abr.arena']) {
     pruefe(`${sprache}: ${k} nennt die Liga-Wertung`, wort.test(String(w[k])), w[k]);
   }
 }

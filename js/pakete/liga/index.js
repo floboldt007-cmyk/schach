@@ -4,7 +4,6 @@ import { hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { BOTS, botNachId } from '../../bots.js';
 import { ladeModul, speichereModul, ladePartie, wertet, MODUL_BUDGET, eigeneZuege, BESTWERT_MIN_ZUEGE } from '../../storage.js';
-import { registriereIcon } from '../../ui/icons.js';
 import './texte.js';
 import {
   normalisiereStand, beendeSaisonLiga, buchePartie, bucheGenauigkeit, belegFuer, imBudget, STUFEN,
@@ -129,7 +128,6 @@ if (typeof document !== 'undefined') {
     css.href = new URL('../../../css/pakete/liga.css', import.meta.url).href;
     css.dataset.paket = MODUL;
     document.head.append(css);
-    registriereIcon('liga-wappen', '<path d="M5 4h14v8c0 4-4 7-7 9-3-2-7-5-7-9z"/><path d="m8 9 4 3 4-3M8 14l4 3 4-3"/>');
   })();
   // Die Saison-Liga-Karte der Bots-Seite (Ort arena:panel-oben) entfaellt mit der einen Liga (Flo 08.11.2026)
   anbieten('arena:panel-bot', sicher((k) => botBilanz(k)), { reihenfolge: 15, paket: MODUL });

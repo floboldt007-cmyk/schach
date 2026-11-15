@@ -35,8 +35,7 @@
 .liga-stufe[data-zustand="hier"] .liga-stufe-stand { color: var(--text); font-weight: 800; }
 .liga-kurz { display: grid; gap: var(--a1); min-width: 0; }
 .liga-titel { font-family: var(--display); font-size: var(--fs-text); }
-.liga-unter, .liga-hilfe, .liga-bilanz { color: var(--text-2); font-size: var(--fs-klein); line-height: 1.55; }
-.liga-hilfe { margin: var(--a2) 0; }
+.liga-unter, .liga-bilanz { color: var(--text-2); font-size: var(--fs-klein); line-height: 1.55; }
 .liga-mehr { margin-left: auto; color: var(--text-2); }
 .liga-mehr .ico { width: 18px; height: 18px; }
 .liga-aufklappen[open] .liga-mehr { transform: rotate(90deg); }
@@ -60,12 +59,6 @@
 .liga-knopf { min-height: var(--tipp); padding: var(--a2) var(--a3); font: inherit; color: var(--text); border: 1px solid var(--linie-2); border-radius: var(--r-s); background: var(--flaeche); cursor: pointer; }
 .liga-bilanz { margin: var(--a2) 0; }
 .liga-abrechnung { font-size: var(--fs-klein); color: var(--text); line-height: 1.55; padding-block: var(--a1); }
-.liga-kurve svg { display: block; width: 100%; max-height: 110px; color: var(--akzent-text); }
-.liga-kurve polyline { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-.liga-archiv { list-style: none; padding: 0; margin: 0; }
-.liga-abzeichen { display: flex; flex-wrap: wrap; align-items: center; gap: var(--a2); padding-block: var(--a2); border-bottom: 1px solid var(--linie); }
-.liga-abzeichen .ico { width: 20px; height: 20px; color: var(--akzent-text); }
-.liga-abzeichen small { color: var(--text-2); font-size: var(--fs-klein); }
 
 /* Liga im Ergebnis als Karte (Flo 30.10. abends: "Liga anzeigen", "farbiger und mehr durchdacht"): Wappen der Stufe,
    Stand mit Balken bis zur naechsten Stufe, Aenderung in Gruen oder Rot und warum. Die Farbe der Stufe (--liga-f) setzt
