@@ -416,7 +416,8 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-g-stand { flex: none; display: grid; justify-items: end; gap: 3px; }
 .bl-g-platz { min-width: 34px; padding: 1px 8px; border-radius: var(--r-pille); background: var(--flaeche-3); color: var(--text);
   font-family: var(--display); font-size: 14px; font-weight: var(--gw-titel); text-align: center; font-variant-numeric: tabular-nums; }
-.bl-g-platz[data-medaille="gold"], .bl-fr-platz[data-medaille="gold"] { background: var(--gold); color: var(--auf-akzent); }
+/* auf Gold dunkle Schrift: --auf-akzent ist hell und hatte auf Gold nur 2,24:1 (design-beweis 15.11.), Schwarz hat 9:1 und mehr */
+.bl-g-platz[data-medaille="gold"], .bl-fr-platz[data-medaille="gold"] { background: var(--gold); color: black; }
 .bl-g-platz[data-medaille="silber"], .bl-fr-platz[data-medaille="silber"] { background: var(--flaeche-3); color: var(--text); box-shadow: inset 0 0 0 2px var(--text-3); }
 .bl-g-platz[data-medaille="bronze"], .bl-fr-platz[data-medaille="bronze"] { background: var(--warn-weich); color: var(--text); box-shadow: inset 0 0 0 2px var(--warn); }
 .bl-g-wert { display: inline-flex; align-items: center; gap: 4px; font-family: var(--display); font-size: 15px; font-weight: var(--gw-titel);
