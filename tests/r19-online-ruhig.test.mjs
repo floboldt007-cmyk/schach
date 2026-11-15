@@ -255,8 +255,8 @@ async function ohneElo(browser, [name, felder, liga]) {
       return e ? { wert: e.querySelector('.on-gross-wert')?.textContent.trim(), text: e.querySelector('.on-gross-text')?.textContent.trim(),
         label: e.getAttribute('aria-label') } : null;
     });
-    pruefe(`${gruppe}: keine Zahl, gross "Läufer II" mit "Deine Liga"`, lobby.length === 0 && !!l && l.wert === 'Läufer II'
-      && l.text === 'Deine Liga' && l.label === 'Deine Liga: Läufer II', { lobby, l });
+    pruefe(`${gruppe}: keine Zahl, gross "Warden II" mit "Deine Liga"`, lobby.length === 0 && !!l && l.wert === 'Warden II'
+      && l.text === 'Deine Liga' && l.label === 'Deine Liga: Warden II', { lobby, l });
     const text = await s.evaluate(() => document.querySelector('.online-screen .on-inhalt')?.textContent || '');
     pruefe(`${gruppe}: kein undefined, null oder NaN im Text`, !/undefined|null|NaN/.test(text), text.match(/undefined|null|NaN/g));
   } catch (e) {

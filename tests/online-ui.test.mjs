@@ -517,7 +517,7 @@ try {
         klein: [...document.querySelectorAll('.online-screen .on-inhalt button, .online-screen .on-freunde-zeile')].filter((b) => b.getClientRects().length && b.getBoundingClientRect().height < 44).map((b) => b.className) };
     });
     pruefe(`iPhone 13 ${modus}: Online passt ohne Scrollen (Liga-Zeile mit "Mehr", zwei Tueren, Freunde-Zeile), Suchen-Knoepfe "gewertet", keine Beispiel-Liga`,
-      handy.scroll <= 1 && handy.quer && handy.freundeSichtbar && handy.gewertet && handy.freundeZu && /Läufer II/.test(handy.liga)
+      handy.scroll <= 1 && handy.quer && handy.freundeSichtbar && handy.gewertet && handy.freundeZu && /Warden II/.test(handy.liga)
       && /Platz 3 von 30/.test(handy.mehr) && /140/.test(handy.mehr)
       && !handy.beispiel && handy.klein.length === 0, handy);
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-390-${modus}.png`) });
