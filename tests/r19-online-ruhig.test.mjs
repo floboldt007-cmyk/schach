@@ -4,7 +4,8 @@
 //   ohne Elo vom Server (Feld fehlt, null, kaputt) KEINE Zahl, gross steht die Liga als Wort ("Deine Liga"), auch wenn das
 //   Geraet eine Bot-Liga-Wertung hat (andere Groesse, kein Rueckfall darauf); Spielerleisten: eigene nur der Name, der Gegner
 //   mit "Elo N" (Server-Elo der Visitenkarte, Flo 15.11.), ohne sie mit der Liga als Wort;
-//   Ergebnis hoechstens eine Zahl (die Kronen-Aenderung). iPhone 13, SE und PC, hell. Netz nur simuliert.
+//   Ergebnis hoechstens eine Zahl (die Kronen-Aenderung). Lobby und Suche matt, Partie und Ergebnisblatt mit dem Schein der
+//   Bot-Partie (scheinWieBot, Kaltreview 64 vom 15.11.). iPhone 13, SE und PC, hell und dunkel. Netz nur simuliert.
 //
 //   node tests/r19-online-ruhig.test.mjs
 //   PORT=8976 node tests/r19-online-ruhig.test.mjs   eigener Port (Standard: frei)
@@ -181,6 +182,32 @@ const glanzIn = (s, wurzel) => s.evaluate((wurzel) => {
   }
   return [...new Set(raus)];
 }, wurzel);
+// box-shadow eines Hauptknopfs im Online-Bildschirm gegen denselben Knopf ausserhalb (so wie die Bot-Partie ihn zeigt).
+// echte: Selektor der echten Knoepfe; ohne ihn wird ein Probeknopf mit den Klassen von "Zur Partie" eingesetzt.
+// huelle: 'a|b' baut die Huelle des Bezugsknopfs (z. B. ergebnis-overlay > ergebnis-karte) ausserhalb von .online-screen
+const scheinWieBot = (s, wurzel, echte, huelle) => s.evaluate(({ wurzel, echte, huelle }) => {
+  const KLASSEN = 'knopf primaer za-live dr';
+  let aussen = document.body;
+  const weg = [];
+  for (const k of huelle ? huelle.split('|') : []) { const d = document.createElement('div'); d.className = k; aussen.append(d); if (aussen === document.body) weg.push(d); aussen = d; }
+  const ref = document.createElement('button');
+  ref.className = echte ? 'knopf primaer' : KLASSEN;
+  ref.textContent = 'x';
+  aussen.append(ref);
+  if (!weg.length) weg.push(ref);
+  const soll = getComputedStyle(ref).boxShadow;
+  weg.forEach((e) => e.remove());
+  const ort = document.querySelector(wurzel);
+  if (!ort) return { soll, ist: [], fehlt: wurzel };
+  if (echte) return { soll, ist: [...document.querySelectorAll(echte)].map((b) => getComputedStyle(b).boxShadow) };
+  const probe = document.createElement('button');
+  probe.className = KLASSEN;
+  probe.textContent = 'x';
+  ort.append(probe);
+  const ist = [getComputedStyle(probe).boxShadow];
+  probe.remove();
+  return { soll, ist };
+}, { wurzel, echte, huelle });
 async function partieOffen(s, z, gruppe, beiSuche = null) {
   await s.locator('[data-online="suchen"]').filter({ visible: true }).first().click();
   await sichtbar(s, '.on-suche');
@@ -270,6 +297,10 @@ async function lauf(browser, [geraet, w, h], kennung = '', farbe = 'light') {
     pruefe(`${gruppe}: in den Spielerleisten ausser der Uhr nur die Gegner-Elo als Zahl`, leisten.length === 1 && leisten[0] === String(GEGNER_ELO.u2), leisten);
     pruefe(`${gruppe}: Gegnerleiste nicht hoeher als die eigene, kein Ueberlauf`, !!oben && !!unten && oben.hoehe <= Math.max(unten.hoehe, 58)
       && !oben.ueberlauf.length, meta);
+    // "Zur Partie" (online.js za-live), Remis annehmen und Strittig stehen in .on-inhalt der Partie: Schein wie in der Bot-Partie
+    const partieSchein = await scheinWieBot(s, '.online-screen.online-partie .on-inhalt', null, '');
+    pruefe(`${gruppe}: Partie: Hauptknopf (za-live) mit Schein wie in der Bot-Partie`, partieSchein.ist.length === 1 && partieSchein.ist[0] === partieSchein.soll
+      && partieSchein.soll !== 'none', partieSchein);
 
     // Ergebnis
     await s.locator('[data-online="aufgeben"]').filter({ visible: true }).first().click();
@@ -282,8 +313,10 @@ async function lauf(browser, [geraet, w, h], kennung = '', farbe = 'light') {
     const kronen = await s.evaluate(() => document.querySelector('.on-erg-kronen')?.checkVisibility()
       ? document.querySelector('.on-erg-kronen').textContent.replace(/\s+/g, ' ').trim() : null);
     pruefe(`${gruppe}: Ergebnis hoechstens eine Zahl, ohne Wochenstand`, blatt.length <= 1 && !/140/.test(kronen || ''), { blatt, kronen });
-    const glanzErg = await glanzIn(s, '.on-erg');
-    pruefe(`${gruppe}: Ergebnis matt`, glanzErg.length === 0, glanzErg);
+    // Kaltreview 64 (15.11.): die Partie samt Ergebnisblatt bleibt gleich der Bot-Partie, matt ist nur die Seite davor
+    const ergSchein = await scheinWieBot(s, '.on-erg', '.on-erg .knopf.primaer', 'ergebnis-overlay|ergebnis-karte');
+    pruefe(`${gruppe}: Ergebnisblatt: Hauptknopf mit Schein wie in der Bot-Partie`, ergSchein.ist.length > 0 && ergSchein.ist.every((x) => x === ergSchein.soll)
+      && ergSchein.soll !== 'none', ergSchein);
     const altErg = await s.evaluate(() => document.querySelectorAll('.on-erg :is(.on-erg-spieler, .on-rk)').length);
     pruefe(`${gruppe}: Ergebnis ohne Leisten und Karten der Entwuerfe`, altErg === 0, altErg);
   } catch (e) {
