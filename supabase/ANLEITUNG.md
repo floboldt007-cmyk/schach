@@ -551,6 +551,26 @@ Kein Konto kann sich selbst eintragen oder die Liste lesen. Ohne Anmeldung gibt 
 **Rückweg:** `supabase/verwaltung-zurueck.sql` (vorher die Sicherungszeilen oben in der Datei lesen). Freigeschaltetes
 Premium und geänderte Namen bleiben dabei, die Banner aus der Verwaltung und das Protokoll sind danach weg.
 
+## Benutzername: einmal in 30 Tagen ändern (Stand 15.11.2026, vorbereitet, noch nicht eingespielt)
+
+Den ersten Benutzernamen wählt jeder frei. Danach geht höchstens eine eigene Änderung je 30 Tage. Die App zeigt unter
+Einstellungen → Konto „Nächste Änderung ab <Datum>“. Wer es trotzdem versucht (etwa von einem zweiten Gerät aus), bekommt
+eine klare Meldung mit dem Datum. Die Sperre sitzt im Server, also hilft auch kein Aufruf an der App vorbei. Die
+Verwaltung und der SQL Editor bleiben frei. Ohne diese Datei läuft die App wie bisher, nur ohne Sperre und ohne Hinweis.
+
+1. Vorher muss `schema.sql` eingespielt sein.
+2. Im **SQL Editor** den ganzen Inhalt von `supabase/benutzername-sperre-schema.sql` ausführen. Die Datei darf mehrfach
+   laufen.
+3. `notify pgrst, 'reload schema';` ausführen.
+4. Prüfen: den Inhalt von `supabase/benutzername-sperre-rls-test.sql` ausführen. Am Ende steht
+   „benutzername-sperre-rls-test: alles gruen“, und nichts bleibt zurück.
+
+**Sperre für ein Konto aufheben** (nur SQL Editor):
+`update public.profile set name_geaendert_am = null where user_id = '<id>';`
+
+**Rückweg:** `supabase/benutzername-sperre-zurueck.sql`. Die Namen bleiben, nur der Zeitpunkt der letzten Änderung ist
+danach weg, und der Name ist wieder beliebig oft änderbar.
+
 ## Google-Anmeldung einrichten
 
 Die App hat in der Konto-Gruppe den Knopf „Mit Google anmelden“. Er leitet zu Supabase
