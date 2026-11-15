@@ -490,8 +490,10 @@ function feldCss(m, sel) {
 export function motivCss(m, sel = `.motiv-brett[data-motiv="${m.id}"]`, glanzSel = sel) {
   const r = m.rahmen;
   const grund = `${rahmenUrl(rahmenBild(m))} 0 0 / 100% 100% no-repeat`;
-  // padding in % bezieht sich auf die Breite: das Band ist damit immer rahmen.breite / 1000 der Brettbreite; --sockel-abstand
-  // gleich, damit die Effekte der App (.brett-effekte) ueber den Feldern bleiben
+  // Band als padding in %: das bezieht sich auf die Breite des UMGEBENDEN Blocks (in der App die .brettzone), nicht auf
+  // die Brettbreite. --sockel-abstand traegt denselben Wert, aber als inset der .brett-effekte bezieht er sich auf Breite und
+  // Hoehe des Sockels; beides deckt sich nur, wenn Block und Sockel gleich gross sind. Die Partie setzt deshalb ein festes
+  // Band (motivAppCss, --rahmen), fuer die uebrigen Ansichten bleibt es beim Anteil.
   let css = `${sel} { --sockel-abstand: ${r.breite / 10}%; padding: ${r.breite / 10}%; border-radius: ${r.radius}px; background: ${grund}; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); }\n`
     + feldCss(m, sel)
     // kleine Brett-Ecke: mit dem App-Rund (12 px) blieb zwischen Feld und Rahmen ein heller Zwickel
@@ -513,6 +515,12 @@ export function motivCss(m, sel = `.motiv-brett[data-motiv="${m.id}"]`, glanzSel
 // Band ringsum gleich breit (mindestens die 12 px) und die Koordinaten stehen hell mit dunklem Saum auf dem Rahmen; Handy
 // hochkant ohne Rahmen wie bei den anderen Brettern (links und unten 12 px, Farbe aus css/board.css).
 // Das Analysebrett (.an-brett-rahmen, css/analyse.css) behaelt seinen Sockel und traegt Felder und Koordinaten des Motivs.
+// Partie (Bot und Online, ausser Handy hochkant): das Band ist --rahmen, also das Mass, das css/partie.css fuer den Sockel
+// einplant (--brett, Breite der Brettzone) und das js/ui/partie.js layout() am Polster misst. Polster und inset der
+// .brett-effekte sind damit dieselbe Laenge, die Ebene deckt das Brett, und der Sockel ragt nicht ueber die Brettzone
+// (R19: mit dem Anteil lag die Ebene bis 5 px daneben, bei 1180x820 war der Sockel breiter als die Zone, iPad hoch ragte
+// das Brett aus dem Sockel). Laenge: rahmen.breite / 1000 der kleineren Seite des Partie-Inhalts (container partie), damit
+// das Band so breit bleibt wie vorher.
 export function motivAppCss(id) {
   const m = MOTIVE.find((x) => x.id === id);
   if (!m) return '';
@@ -521,6 +529,10 @@ export function motivAppCss(id) {
   return motivCss(m, sel, `${html}:not([data-bewegung="aus"]) .brett-rahmen`)
     + `${rand} { --sockel-abstand: max(12px, ${band}); padding: var(--sockel-abstand); }\n`
     + `${rand} > .brett-effekte { inset: var(--sockel-abstand); }\n`
+    + `@media not all and (orientation: portrait) and (max-width: 600px) {\n`
+    + `  ${html} .partie { --rahmen: calc(${m.rahmen.breite / 1000} * 100cqmin); }\n`
+    + `  ${html} .partie .brett-rahmen { --sockel-abstand: var(--rahmen); padding: var(--sockel-abstand); }\n`
+    + `  ${html} .partie ${randTeil} { --sockel-abstand: max(12px, var(--rahmen)); }\n}\n`
     + `${sel} .brett-koord-rand .koord { color: ${k.d}; text-shadow: 0 0 2px rgba(0, 0, 0, .9), 0 0 4px rgba(0, 0, 0, .6); }\n`
     + feldCss(m, `${html} .an-brett-rahmen`)
     + `@media (orientation: portrait) and (max-width: 600px) {\n`
