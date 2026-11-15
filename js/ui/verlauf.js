@@ -15,6 +15,9 @@
 // nicht wertenden Partien je Art ("3 Partien, davon 1 Übung und 1 Boss-Partie"); vorher hiess jede davon "Übung".
 // Englische Version (Teil 1): Texte aus js/sprachen/analyse.js (vl.*, ergebnis.*), Datum und Uhrzeit mit der Sprache,
 // Eroeffnung ueber openings.eroeffnungsAnzeige (gespeichert bleibt der deutsche Name).
+// R19 (Flo 15.11.2026: "muss ueberarbeitet werden"): Partien ohne Zug als EINE aufklappbare Zeile, Ergebnis als Zeichen
+// am Bild (Grund klein), Zu zweit und Online mit eigenem Bild, Muelleimer leise (Stil css/verlauf.css), Statistik-Kopf
+// mit Bilanz-Balken und EINER Staerke-Zahl samt Erklaerung (tests/r19-verlauf-neu.test.mjs).
 import { BOTS, botNachId } from '../bots.js';
 import { SYMBOLE } from '../symbole.js';
 import { eroeffnung, eroeffnungsAnzeige } from '../openings.js';
@@ -53,8 +56,28 @@ const ICON = {
   pfeil: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   kiste: '<path d="M3.5 10.5h17v9a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5zM3.5 10.5 5.5 5h13l2 5.5M10 10.5v3h4v-3"/>',
   vor: '<path d="M9 5l7 7-7 7"/>',
+  // R19: Sammelzeile "Partien ohne Zug" (leeres Brett)
+  leer: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 12h16M12 4v16" opacity=".45"/>',
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+
+// R19 (Flo 15.11.2026 zum Verlauf: "muss ueberarbeitet werden"): Ergebnis als farbiges Zeichen am Bild statt grauer
+// Plakette, je Ergebnis eine eigene Form (nicht nur Farbe): Sieg +, Remis =, Niederlage -, ohne Ergebnis ?; Zu zweit
+// eine Krone in der Farbe des Siegers. Der Grund (Aufgabe, Matt ...) steht klein in der Nebenzeile.
+const ZEICHEN = {
+  sieg: '<path d="M12 7v10M7 12h10"/>',
+  remis: '<path d="M7 9.5h10M7 14.5h10"/>',
+  niederlage: '<path d="M7 12h10"/>',
+  offen: '<path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.3M12 16.8v.1"/>',
+  krone: '<path d="M6 16.5h12M6.5 16.5 5.5 8.5l3.8 3 2.7-4.5 2.7 4.5 3.8-3-1 8"/>',
+};
+const zeichenSvg = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ZEICHEN[n]}</svg>`;
+// Eigene Bilder statt leerem Kasten: Zu zweit zwei Bauern (Weiss und Schwarz), Online ein Globus
+const BAUER = (x, fuell, rand) => `<g transform="translate(${x} 0)" fill="${fuell}" stroke="${rand}" stroke-width="1.6" stroke-linejoin="round">
+  <circle cx="0" cy="17" r="5.2"/><path d="M-4.2 21.5h8.4l3.4 12.5h-15.2z"/><rect x="-9.5" y="33" width="19" height="4.6" rx="2.3"/></g>`;
+const BILD_ZUZWEIT = `<svg class="vl-bild-svg" viewBox="0 0 48 48" aria-hidden="true">${BAUER(15, '#FFFFFF', '#1C1B19')}${BAUER(33, '#1C1B19', '#FFFFFF')}</svg>`;
+const BILD_ONLINE = `<svg class="vl-bild-svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+  <circle cx="24" cy="24" r="13"/><path d="M11 24h26M24 11c-4 4-5.5 8.5-5.5 13s1.5 9 5.5 13M24 11c4 4 5.5 8.5 5.5 13s-1.5 9-5.5 13"/></svg>`;
 
 // Spielende: Grund (analyse.ergebnis.*) und Ergebnis (allgemein.sieg/niederlage/remis)
 const GRUND = new Set(['matt', 'aufgabe', 'patt', 'wiederholung', '50-zuege', 'material', 'abgebrochen', 'strittig', 'unklar']);
@@ -118,6 +141,7 @@ export function zeige(root, params = {}, app) {
   let offen = null;      // Zeile mit aufgewischter Loeschtaste
   let dialog = null;
   let ortSeite = null;   // Fuellung des Orts verlauf:seite
+  let ohneOffen = false; // Sammelzeile "Partien ohne Zug" aufgeklappt (bleibt ueber baue() nach dem Loeschen)
 
   const sec = document.createElement('section');
   sec.className = 'screen scrollt vl-screen';
@@ -136,7 +160,7 @@ export function zeige(root, params = {}, app) {
           ${schatzHtml()}
         </aside>
         <div class="vl-haupt">
-          ${n ? `<h3 class="vl-titel">${esc(t('analyse.vl.titel'))}</h3><div class="vl-liste" role="list">${partien.map(zeileHtml).join('')}</div>` : leerHtml()}
+          ${n ? `<h3 class="vl-titel">${esc(t('analyse.vl.titel'))}</h3><div class="vl-liste" role="list">${listeHtml(partien)}</div>` : leerHtml()}
         </div>
       </div>`;
     for (const z of sec.querySelectorAll('.vl-zeile')) verbindeWischen(z);
@@ -162,22 +186,56 @@ export function zeige(root, params = {}, app) {
     return u ? t('analyse.vl.davon', { alle, liste }) : alle;
   }
 
+  // R19 Statistik-Kopf: Partien gross, daneben die Bilanz als Balken (Sieg, Remis, Niederlage), darunter Genauigkeit,
+  // Bestwert und Sterne, unten EINE Staerke-Zahl mit kurzer Erklaerung (Flo 15.11.: statt Spielstaerke, Liga-Wertung
+  // und Elo nebeneinander; die alte Liga-Wertung verlaesst den Verlauf mit so/R19-liga-neu)
   function statistikHtml() {
     const s = statistik();
     if (!s.partien) return '';
     const sterne = gesamtSterne();
-    const kachel = (wert, label, extra = '') => `<div class="vl-kachel${extra}"><b class="zahl">${wert}</b><span>${label}</span></div>`;
+    const kachel = (wert, label) => `<div class="vl-kachel"><b class="zahl">${wert}</b><span>${label}</span></div>`;
+    // Wort zur Zahl in Einzahl oder Mehrzahl ("1 Sieg", "3 Siege"), die Zahl selbst steht fett davor
+    const wort = (art, n) => t(`analyse.vl.bilanz.${art}`, { n }).replace(/^\s*\d+\s*/, '');
+    const teile = [['sieg', s.siege], ['remis', s.remis], ['niederlage', s.niederlagen]];
+    const bilanz = t('analyse.vl.bilanz.aria', { sieg: t('analyse.vl.bilanz.sieg', { n: s.siege }),
+      remis: t('analyse.vl.bilanz.remis', { n: s.remis }), niederlage: t('analyse.vl.bilanz.niederlage', { n: s.niederlagen }) });
     return `
       <section class="vl-statistik flaeche" aria-label="${esc(t('analyse.vl.statistik'))}">
-        ${kachel(s.partien, esc(t('analyse.vl.stat.partien')))}
-        ${kachel(s.siege, esc(t('analyse.vl.stat.siege')), ' sieg')}
-        ${kachel(s.remis, esc(t('analyse.vl.stat.remis')), ' remis')}
-        ${kachel(s.niederlagen, esc(t('analyse.vl.stat.niederlagen')), ' niederlage')}
-        ${kachel(s.schnittGenauigkeit != null ? prozent(s.schnittGenauigkeit) : '?', esc(t('analyse.vl.stat.schnitt')))}
-        ${kachel(s.besteGenauigkeit != null ? prozent(s.besteGenauigkeit) : '?', esc(t('analyse.vl.stat.bestwert')))}
-        ${kachel(s.spielstaerke != null ? '≈ ' + s.spielstaerke : '?', esc(t('analyse.vl.stat.staerke')))}
-        ${kachel(`<span class="stern">★</span> ${sterne}`, esc(t('analyse.vl.stat.sterne', { n: BOTS.length * 3 })))}
+        <div class="vl-stat-oben">
+          <div class="vl-stat-partien"><b class="zahl">${s.partien}</b><span>${esc(t('analyse.vl.stat.partien'))}</span></div>
+          <div class="vl-bilanz" role="img" aria-label="${esc(bilanz)}">
+            <div class="vl-bilanz-balken" aria-hidden="true">${teile.map(([art, n]) => `<span class="${art}" style="flex-grow:${n}"></span>`).join('')}</div>
+            <div class="vl-bilanz-zahlen" aria-hidden="true">${teile.map(([art, n]) =>
+    `<span class="${art}"><b class="zahl">${n}</b> ${esc(wort(art, n))}</span>`).join('')}</div>
+          </div>
+        </div>
+        <div class="vl-stat-reihe">
+          ${kachel(s.schnittGenauigkeit != null ? prozent(s.schnittGenauigkeit) : '?', esc(t('analyse.vl.stat.schnitt')))}
+          ${kachel(s.besteGenauigkeit != null ? prozent(s.besteGenauigkeit) : '?', esc(t('analyse.vl.stat.bestwert')))}
+          ${kachel(`<span class="stern">★</span> ${sterne}`, esc(t('analyse.vl.stat.sterne', { n: BOTS.length * 3 })))}
+        </div>
+        <div class="vl-staerke">
+          <div class="vl-staerke-zahl"><b class="zahl">${s.spielstaerke != null ? '≈ ' + s.spielstaerke : '?'}</b><span>${esc(t('analyse.vl.stat.staerke'))}</span></div>
+          <p class="vl-staerke-text">${esc(t(s.spielstaerke != null ? 'analyse.vl.staerke.text' : 'analyse.vl.staerke.leer'))}</p>
+        </div>
       </section>`;
+  }
+
+  // Partien ohne Zug (sofort aufgegeben oder abgebrochen) als EINE aufklappbare Zeile am Ende der Liste; sie bleiben
+  // oeffen- und loeschbar. Gibt es nur solche, stehen sie wie bisher einzeln da.
+  function listeHtml(partien) {
+    const ohne = partien.filter((p) => !(p.zuege || []).length);
+    const mit = partien.filter((p) => (p.zuege || []).length);
+    if (!ohne.length || !mit.length) return partien.map(zeileHtml).join('');
+    return `${mit.map(zeileHtml).join('')}
+      <div class="vl-ohne-gruppe" role="listitem">
+        <button class="vl-ohne" type="button" data-aktion="ohne" aria-expanded="${ohneOffen}" aria-controls="vl-ohne-liste">
+          <span class="vl-ohne-bild">${icon('leer')}</span>
+          <span class="vl-ohne-text"><b>${esc(t('analyse.vl.ohne.titel', { n: ohne.length }))}</b><span>${esc(t('analyse.vl.ohne.unter'))}</span></span>
+          <span class="vl-ohne-pfeil">${icon('vor')}</span>
+        </button>
+        <div class="vl-liste vl-ohne-liste" id="vl-ohne-liste" role="list"${ohneOffen ? '' : ' hidden'}>${ohne.map(zeileHtml).join('')}</div>
+      </div>`;
   }
 
   function schatzHtml() {
@@ -213,7 +271,14 @@ export function zeige(root, params = {}, app) {
     const art = ERGEBNIS.has(p.ergebnis) ? p.ergebnis : 'remis';
     const erg = ohneErgebnis ? t('analyse.ergebnis.ohneErgebnis')
       : zuZweit && p.ergebnis !== 'remis' ? t('analyse.ergebnis.gewinnt', { name: p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz }) : t(`allgemein.${art}`);
+    // Zeichen am Bild: aus eigener Sicht; Zu zweit die Farbe des Siegers (Krone), Remis wie sonst
+    const zeichenArt = ohneErgebnis ? 'offen' : zuZweit && art !== 'remis' ? (art === 'sieg' ? 'weiss' : 'schwarz') : art;
+    const zeichen = `<span class="vl-ergebnis" data-ergebnis="${zeichenArt}">${zeichenSvg(zuZweit && art !== 'remis' ? 'krone' : zeichenArt)}<span class="vl-sr">${esc(erg)}</span></span>`;
+    const bild = zuZweit ? `<span class="an-avatar vl-av-zuzweit" aria-hidden="true">${BILD_ZUZWEIT}</span>`
+      : online ? `<span class="an-avatar vl-av-online" aria-hidden="true">${BILD_ONLINE}</span>` : avatarHtml(bot);
     const grund = grundText(p.grund);
+    // Nebenzeile: Grund klein vorn, bei Zu zweit dazu der Sieger in Worten (das Zeichen allein sagt nur die Farbe)
+    const grundZeile = [zuZweit ? erg : '', grund].filter(Boolean).join(' · ');
     const zuege = Math.ceil((p.zuege || []).length / 2);
     const sterne = Array.isArray(p.sterne) ? p.sterne : [false, false, false];
     const sterneHtml = sterne.map((s) => `<span class="${s ? 'an' : 'aus'}">★</span>`).join('');
@@ -226,11 +291,11 @@ export function zeige(root, params = {}, app) {
         <button class="vl-hinten" type="button" data-aktion="loeschen" tabindex="-1" aria-hidden="true">${icon('muell')}<span>${esc(t('allgemein.loeschen'))}</span></button>
         <div class="vl-vorne">
           <button class="vl-oeffnen" type="button" data-aktion="oeffnen" aria-label="${esc(label)}">
-            ${avatarHtml(bot)}
+            <span class="vl-bild">${bild}${zeichen}</span>
             <span class="vl-info">
-              <span class="vl-z1"><b class="vl-name">${esc(name)}</b><span class="vl-ergebnis ${ohneErgebnis ? 'offen' : art}">${esc(erg)}${grund ? ` · ${esc(grund)}` : ''}</span></span>
+              <span class="vl-z1"><b class="vl-name">${esc(name)}</b></span>
               <span class="vl-z2">${ohneZuege ? esc(t('analyse.vl.zeile.ohneZug')) : `${esc(t('analyse.vl.zeile.zuege', { n: zuege }))} · ${esc(eroeffnungsName(p))}`}</span>
-              <span class="vl-z3">${esc(datum)}${zuZweit ? '' : ' · ' + esc(t('analyse.vl.zeile.mitFarbe', { farbe: t(p.spielerFarbe === 'b' ? 'allgemein.schwarz' : 'allgemein.weiss') }))}</span>
+              <span class="vl-z3">${grundZeile ? `<span class="vl-grund">${esc(grundZeile)}</span> · ` : ''}${esc(datum)}${zuZweit ? '' : ' · ' + esc(t('analyse.vl.zeile.mitFarbe', { farbe: t(p.spielerFarbe === 'b' ? 'allgemein.schwarz' : 'allgemein.weiss') }))}</span>
             </span>
             <span class="vl-werte">
               <b class="vl-genau zahl${Number.isFinite(p.genauigkeit) ? '' : ' offen'}">${genau}</b>
@@ -269,6 +334,13 @@ export function zeige(root, params = {}, app) {
         app.gehe('analyse', { partieId: zeile.dataset.id });
         break;
       case 'juwel': app.gehe('analyse', { partieId: k.dataset.id, ply: Number(k.dataset.ply) }); break;
+      case 'ohne': {
+        ohneOffen = k.getAttribute('aria-expanded') !== 'true';
+        k.setAttribute('aria-expanded', String(ohneOffen));
+        const liste = sec.querySelector('.vl-ohne-liste');
+        if (liste) liste.hidden = !ohneOffen;
+        break;
+      }
       case 'loeschen': frageLoeschen(zeile); break;
       case 'dialog-ab': schliesseDialog(); break;
       case 'dialog-ok': if (dialog) loesche(dialog.zeile); break;
