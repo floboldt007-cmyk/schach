@@ -49,7 +49,9 @@
   box-shadow: var(--s1), var(--kante); }
 .partie .spieler.gegner { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto auto; row-gap: 0;
   grid-template-areas: "leiste leiste leiste" "av info uhr" "blase blase blase"; }
-.partie .spieler.ich { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 0;
+/* R19 online-weg (Flo 15.11.2026, "unten rechts verbuggt"): die Leiste am Namen (Level-Chip) behaelt ihre Breite, ein
+   langer Name bricht um, statt die Leiste auf 0 px zu druecken (gemessen mit 15 und 20 Zeichen auf vier Geraeten) */
+.partie .spieler.ich { grid-template-columns: auto minmax(0, max-content) minmax(max-content, 1fr) auto; grid-template-rows: auto auto; row-gap: 0;
   grid-template-areas: "av name leiste uhr" "av unter unter uhr"; }
 .partie .spieler > .av { grid-area: av; width: var(--av); height: var(--av); margin-right: 12px; border-radius: 15px; overflow: hidden;
   display: grid; place-items: center; background: var(--flaeche-2); }
@@ -72,7 +74,9 @@
 .partie .spieler.ich > .name { grid-area: name; }
 .partie .spieler .unter { display: flex; align-items: center; gap: 6px; height: 18px; margin-top: 1px; min-width: 0; overflow: hidden;
   white-space: nowrap; font-size: 13px; font-weight: 650; color: var(--text-2); }
-.partie .spieler.ich > .unter { grid-area: unter; }
+/* contain: die Unterzeile schneidet ohnehin ab und darf die Spalte der Leiste nicht breit ziehen (sonst bricht der Name
+   in der Online-Partie ohne Leiste um, tests/gleichheit-ansichten.test.mjs PC "Leiste ich") */
+.partie .spieler.ich > .unter { grid-area: unter; contain: inline-size; }
 .partie .spieler .p-meta { flex: none; }
 /* Etappe B Task 4: Bot als Ersatz aus der Gegnersuche, ehrlich gekennzeichnet (Text in Schriftfarbe, nur ein Rahmen) */
 .partie .spieler .ki-abzeichen { flex: none; display: inline-block; margin-inline-end: .4em; padding: 0 .45em; border: 1px solid currentColor;
