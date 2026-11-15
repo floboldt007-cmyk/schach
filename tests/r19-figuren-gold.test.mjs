@@ -51,6 +51,8 @@ pruefe('kein Skript, kein Fremd-Inhalt in den SVG', da.every((c) => !/<script|<f
 pruefe('js/figurensatz.js kennt den Pfad', lies('js/figurensatz.js').includes(`${SATZ}: '${ORDNER}'`));
 pruefe('js/labor.js: im Labor (nur Erfinder), vorn in der Liste',
   /LABOR_FIGUREN = Object\.freeze\(\['goldelfenbein',/.test(lies('js/labor.js')));
+// Funktionsprobe 15.11. (sonst still cburnett): die Einstellung figuren nimmt nur Werte aus js/storage.js
+pruefe('js/storage.js: Einstellung figuren erlaubt den Satz', /figuren: Object\.freeze\(\[[^\]]*'goldelfenbein'/.test(lies('js/storage.js')));
 const texte = lies('js/pakete/sammlung/texte.js');
 pruefe('Name deutsch und englisch', texte.includes(`'figuren.${SATZ}': 'Gold und Elfenbein'`) && texte.includes(`'figuren.${SATZ}': 'Gold and ivory'`));
 const herkunft = (lies('README.md').match(/- \*\*Figuren\*\* „Gold und Elfenbein“[\s\S]*?(?=\n- \*\*)/) || [''])[0].replace(/\s+/g, ' ');
