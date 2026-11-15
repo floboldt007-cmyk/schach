@@ -39,6 +39,7 @@ import { fuelle } from '../orte.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { t, zahl, registriereTexte } from '../sprache.js';
 import { stufenName } from '../pakete/liga/texte.js';
+import { KATALOG, brettSvg, produktName } from '../pakete/sammlung/shop.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 // Art der Online-Partie ("Blitz", online.zeit.*): der Weg Online nennt sie wie die Online-Seite (Feinschliff R6, B26)
@@ -83,6 +84,9 @@ registriereTexte('heim', {
     spielen: 'Spielen',
     elo: 'Elo {elo}',
     naechstes: 'Als Nächstes',
+    'shop.titel': 'Neu im Shop',
+    'shop.zum': 'Zum Shop',
+    'shop.karte': '{name} im Shop ansehen',
     'liga.platz': 'Platz {platz} von {n}',
     'liga.ohneGruppe': 'Spiel eine Partie für deine Gruppe',
     'liga.label': '{stufe}, {zeile}, {kronen} Kronen diese Woche',
@@ -138,6 +142,9 @@ registriereTexte('heim', {
     spielen: 'Play',
     elo: 'Elo {elo}',
     naechstes: 'Up next',
+    'shop.titel': 'New in the shop',
+    'shop.zum': 'Go to shop',
+    'shop.karte': 'View {name} in the shop',
     'liga.platz': 'Place {platz} of {n}',
     'liga.ohneGruppe': 'Play a game to join your group',
     'liga.label': '{stufe}, {zeile}, {kronen} crowns this week',
@@ -403,6 +410,22 @@ function zeichneLiga(s, lg) {
   zeigeNaechstes(s);
 }
 
+// R19 Shopleiste A (Flo 14.11.: "Shop auf die Startseite"): die Stuecke des Katalogs mit grossem Brettbild und Namen,
+// wie der Gast sie im Shop sieht. Kein Preis, kein Stand, kein Kaufknopf; jede Karte und "Zum Shop" fuehren in den Shop.
+function shopLeiste() {
+  const karten = Object.entries(KATALOG).map(([id, a]) => {
+    const name = produktName(id);
+    return `<button class="heim-shop-karte dr" type="button" data-aktion="heim-shop" data-produkt="${esc(id)}"
+      aria-label="${esc(t('heim.shop.karte', { name }))}">${brettSvg(a, 'heim-shop-bild')}
+      <span class="heim-shop-text"><small><span class="heim-shop-neu">${esc(t('heim.shop.titel'))} · </span>${esc(t('p-sammlung.shop.gastUeber'))}</small><b>${esc(name)}</b></span></button>`;
+  }).join('');
+  return `<section class="heim-shop" data-variante="shopleiste-a" aria-labelledby="heim-shop-titel">
+    <div class="heim-shop-kopf"><h3 id="heim-shop-titel">${esc(t('heim.shop.titel'))}</h3>
+      <button class="heim-shop-zum" type="button" data-aktion="heim-shop">${esc(t('heim.shop.zum'))}${icon('pfeil')}</button></div>
+    <div class="heim-shop-karten" data-anzahl="${Object.keys(KATALOG).length}">${karten}</div>
+  </section>`;
+}
+
 export function zeigeHeim(app, { jetzt = new Date() } = {}) {
   const laufend = ladeLaufendePartie();
   const st = laufend ? stellung(laufend) : null;
@@ -436,6 +459,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
           <div class="heim-liste"></div>
         </section>
       </div>
+      ${shopLeiste()}
     </div>`;
   s._orte = fuelle('heim:naechstes', s.querySelector('.heim-liste'), { app, tag: tagSchluessel(jetzt), zeile: paketZeile });
   zeichneLiga(s, ersteLage());
@@ -464,6 +488,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
     else if (a === 'heim-online') app.gehe('online');
     else if (a === 'heim-raetsel') app.gehe('training');
     else if (a === 'heim-zuzweit') app.gehe('partie', { modus: 'zuzweit' });
+    else if (a === 'heim-shop') app.gehe('ich', { bereich: 'shop' });
   });
   if (partie) {
     // dasselbe Brett wie in der Partie (Figurensatz, Brettfarben, Koordinaten aus den Einstellungen), nur zum Ansehen:

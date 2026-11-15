@@ -11,12 +11,13 @@
 //
 //   ERFOLGS_TITEL                 [{ erfolg, id, zeichen, farbe, seltenheit }]
 //   KOENNEN_TITEL, koennenFrei(partien, eloVon) -> ['koennen-<id>']   Titel aus den eigenen Partien (Blitzschlag ...)
-//   titelListe({ level, erfolge, erfinder, pionier, koennen }) -> [{ id, art, name, frei, weg, zeichen, farbe, seltenheit, ab? }]
-//                                 art: erfinder | pionier | level | erfolg | koennen
+//   titelListe({ level, erfolge, erfinder, pionier, koennen, taten }) -> [{ id, art, name, frei, weg, zeichen, farbe, seltenheit, ab? }]
+//                                 art: erfinder | pionier | level | erfolg | koennen | tat (R19, ./taten.js, nie an den Server)
 //   aktuellerTitel({ ..., wahl }) -> Titel | null   der gewaehlte, wenn frei; sonst Erfinder, Pionier oder hoechster Level-Titel
 //   titelBild(t, klasse) -> SVG
 import { TITEL as LEVEL_TITEL } from '../funken/level.js';
 import { titelWappen } from '../../titel-kunst.js';
+import { TAT_TITEL, TAT_ZIEL } from './taten.js';
 import { t } from '../../sprache.js';
 import './texte.js';
 
@@ -112,7 +113,7 @@ export function koennenFrei(partien = [], eloVon = () => 0, daten = {}) {
 
 // labor: die Meisterschule steht im Labor (./index.js schulStand); ihr Titel erscheint nur dann oder wenn er erspielt ist.
 // alle: jeder Titel der festen Liste, auch ausgeblendete (Titel eines anderen Spielers, profil.js titelVonId)
-export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier = null, koennen = [], labor = false, alle = false } = {}) {
+export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier = null, koennen = [], labor = false, alle = false, taten = [] } = {}) {
   const nachId = new Map(erfolge.map((e) => [e.id, e]));
   const lv = LEVEL_TITEL.map(([ab]) => {
     const [zeichen, farbe] = LEVEL_KUNST[ab] || ['funke', LEVEL_KUNST[1][1]];
@@ -126,14 +127,17 @@ export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier 
   });
   const kn = KOENNEN_TITEL.filter((x) => alle || !x.labor || labor || koennen.includes('koennen-' + x.id)).map((x) => ({ id: 'koennen-' + x.id, art: 'koennen', name: S('titel.' + x.id), frei: koennen.includes('koennen-' + x.id),
     weg: S('titel.weg.' + x.id, { n: KOENNEN_ZIEL[x.id] }), zeichen: x.zeichen, farbe: x.farbe, seltenheit: x.seltenheit }));
+  // Taten-Titel (R19): geheime erst, wenn erspielt
+  const tt = TAT_TITEL.filter((x) => alle || !x.geheim || taten.includes('tat-' + x.id)).map((x) => ({ id: 'tat-' + x.id, art: 'tat', name: S('titel.' + x.id),
+    frei: taten.includes('tat-' + x.id), weg: S('titel.weg.' + x.id, { n: TAT_ZIEL[x.id] }), zeichen: x.zeichen, n: x.n || 0, farbe: x.farbe, seltenheit: x.seltenheit }));
   const er = erfinder ? [{ ...ERFINDER_TITEL, art: 'erfinder', name: S('erfinder.titel'), frei: true, weg: '' }] : [];
   const pi = Number.isInteger(pionier) && pionier >= 1 && pionier <= 100
     ? [{ ...PIONIER_TITEL, art: 'pionier', name: S('titel.pionier', { n: pionier }), frei: true, weg: '' }] : [];
-  return [...er, ...pi, ...lv, ...ef, ...kn];
+  return [...er, ...pi, ...lv, ...ef, ...kn, ...tt];
 }
 
-export function aktuellerTitel({ level = 1, erfolge = [], erfinder = false, wahl = null, pionier = null, koennen = [], labor = false } = {}) {
-  const liste = titelListe({ level, erfolge, erfinder, pionier, koennen, labor });
+export function aktuellerTitel({ level = 1, erfolge = [], erfinder = false, wahl = null, pionier = null, koennen = [], labor = false, taten = [] } = {}) {
+  const liste = titelListe({ level, erfolge, erfinder, pionier, koennen, labor, taten });
   const gewaehlt = wahl ? liste.find((x) => x.id === wahl && x.frei) : null;
   if (gewaehlt) return { ...gewaehlt, gewaehlt: true };
   // ohne Wahl: Erfinder, sonst Pionier, sonst der hoechste Level-Titel
