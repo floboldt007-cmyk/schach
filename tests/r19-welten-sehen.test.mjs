@@ -1,0 +1,239 @@
+// Funktionsprobe "Welten sehen" (R19, Flo 15.11.2026: die Bot-Welt sieht aus wie live; neu ist nur, dass man ALLE
+// anderen Welten schon anschauen kann, spielbar wird eine Welt erst nach dem Sieg ueber den letzten Bot der Welt davor,
+// kein Schloss-Symbol), im Browser wie ein Mensch.
+// Je Geraet (iPhone 13, iPhone SE, iPad quer, PC 1280) und Modus (hell mit Bewegung, dunkel mit prefers-reduced-motion):
+//   frisch (nichts besiegt), Welt 2 bis 5 nacheinander ueber den Pfeil:
+//     (a) die Welt ist sichtbar: Landschaft in Farbe, sechs Stationen mit Bild und Name, kein Schloss (weder Element
+//         noch Schloss-Bild) und keine Sperrkarte;
+//     (d) jede Station sagt dem Bildschirmleser, wen man zuerst besiegen muss (den Endgegner der Welt davor);
+//     (b) Tipp auf einen Bot der Welt oeffnet seine Karte, statt "Spielen" steht dort der Hinweis; keine Partie startet.
+//   Welt 1 besiegt (Saat): (c) der erste Bot von Welt 2 ist spielbar und "Spielen" startet die Partie;
+//     Welt 3 bleibt Vorschau und nennt den Endgegner von Welt 2.
+//   Keine Seiten- und Konsolenfehler. Bilder vorher (Stand 7ecabd1) und nachher je Geraet, Modus und Welt.
+//
+//   node tests/r19-welten-sehen.test.mjs
+//   BILDER=<ordner> node tests/r19-welten-sehen.test.mjs   Bilder dorthin (Standard: <tmp>/r19-welten-sehen)
+import http from 'node:http';
+import { createRequire } from 'node:module';
+import { readFile, mkdir } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import os from 'node:os';
+import path from 'node:path';
+import { browserTyp } from './browser.mjs';
+import { BOTS, botsDerWelt } from '../js/bots.js';
+
+const require = createRequire(import.meta.url);
+let pw;
+for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
+  try { pw = require(p); break; } catch (e) { /* naechster */ }
+}
+if (!pw) throw new Error('Playwright fehlt');
+const BILDER = process.env.BILDER || path.join(os.tmpdir(), 'r19-welten-sehen');
+const WURZEL = fileURLToPath(new URL('../', import.meta.url));
+const TYPEN = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
+  '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2',
+  '.webmanifest': 'application/manifest+json' };
+const server = http.createServer(async (q, r) => {
+  const p = path.resolve(WURZEL, '.' + decodeURIComponent(new URL(q.url, 'http://test').pathname).replace(/\/$/, '/index.html'));
+  if (!p.startsWith(WURZEL)) { r.writeHead(403); r.end(); return; }
+  try { const d = await readFile(p); r.writeHead(200, { 'Content-Type': TYPEN[path.extname(p)] || 'application/octet-stream' }); r.end(d); }
+  catch (e) { r.writeHead(404); r.end(); }
+});
+await new Promise(r => server.listen(Number(process.env.PORT || 0), '127.0.0.1', r));
+await mkdir(BILDER, { recursive: true });
+
+// Vorher-Bilder mit den Arena-Dateien des Live-Stands; ohne git (flacher Klon in CI) entfallen nur die Vorher-Bilder
+const BASIS_REF = '7ecabd1';
+const BASIS_DATEIEN = ['css/arena.css', 'js/ui/arena.js', 'js/sprachen/arena.js'];
+let basis = null;
+try {
+  basis = Object.fromEntries(BASIS_DATEIEN.map((d) => [d, execFileSync('git', ['show', `${BASIS_REF}:${d}`], { cwd: WURZEL, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })]));
+} catch (e) { basis = null; }
+
+const { defaultBrowserType: _a, ...IPHONE13 } = pw.devices['iPhone 13'];
+const GERAETE = [
+  { name: 'iphone13', optionen: IPHONE13 },
+  { name: 'iphonese', optionen: { ...IPHONE13, viewport: { width: 375, height: 667 }, screen: { width: 375, height: 667 } } },
+  { name: 'ipad-quer', optionen: { viewport: { width: 1180, height: 820 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+  { name: 'pc1280', optionen: { viewport: { width: 1280, height: 800 } } },
+];
+const MODI = [{ name: 'hell', modus: 'hell', schema: 'light', ruhe: false }, { name: 'dunkel', modus: 'dunkel', schema: 'dark', ruhe: true }];
+const WELTEN = [...new Set(BOTS.map((b) => b.welt))].sort((a, b) => a - b);
+const endgegner = (nr) => BOTS.find((b) => b.welt === nr && b.endgegner);
+const vorname = (b) => b.name.split(' ')[0];
+const SIEG = { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 80 };
+const SAAT_WELT1 = { bots: Object.fromEntries(BOTS.filter((b) => b.welt === 1).map((b) => [b.id, SIEG])), brillanteZuege: [] };
+// der Pfad des Schloss-Bilds aus js/ui/icons.js: taucht er in der Karte auf, ist dort ein Schloss
+const SCHLOSS_PFAD = 'M8 11V8a4 4 0 0 1 8 0v3';
+const PARTIE = '.screen.partie:not(.online-screen)';
+
+let ok = 0, gesamt = 0;
+function pruefe(name, gut, detail = '') {
+  gesamt++; if (gut) ok++;
+  console.log(`${gut ? 'OK' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail).slice(0, 700)}`);
+  return gut;
+}
+const warte = ms => new Promise(r => setTimeout(r, ms));
+const klappt = p => p.then(() => true).catch(() => false);
+
+async function oeffne(browser, g, m, { alt = false, saat = null } = {}) {
+  const k = await browser.newContext({ ...g.optionen, locale: 'de-DE', colorScheme: m.schema, reducedMotion: m.ruhe ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
+  await k.route('**/*.supabase.co/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  if (alt) for (const d of BASIS_DATEIEN) {
+    await k.route(u => new URL(u).pathname.endsWith('/' + d), r => r.fulfill({ status: 200, contentType: TYPEN[path.extname(d)], body: basis[d] }));
+  }
+  await k.addInitScript(([modus, saat]) => {
+    try {
+      if (sessionStorage.getItem('probe-start')) return;
+      sessionStorage.setItem('probe-start', '1');
+      localStorage.clear();
+      const d = new Date(); if (d.getHours() < 4) d.setDate(d.getDate() - 1);
+      const z = n => String(n).padStart(2, '0');
+      localStorage.setItem('schach-arena:v1:modul:start', JSON.stringify({ v: 1, gesehen: `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}` }));
+      localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ sprache: 'de', spracheGewaehlt: true, klang: false, modus }));
+      localStorage.setItem('schach-arena:v1:hinweis-installieren', '1');
+      if (saat) localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(saat));
+    } catch (e) { /* egal */ }
+  }, [m.modus, saat]);
+  const s = await k.newPage(); s.setDefaultTimeout(15000);
+  const fehler = [];
+  s.on('pageerror', e => fehler.push(e.message));
+  s.on('console', x => { if (x.type() === 'error') fehler.push(x.text()); });
+  await s.goto(`http://127.0.0.1:${server.address().port}/index.html?test#arena`);
+  await s.waitForSelector('.screen.arena .knoten[data-bot]', { state: 'visible', timeout: 20000 });
+  await s.evaluate(() => document.fonts.ready);
+  await warte(900);
+  return { k, s, fehler };
+}
+
+// einen Pfeil weiter, bis die Karte die erste Station von Welt nr zeigt
+async function zuWelt(s, nr) {
+  const ziel = botsDerWelt(nr)[0].id;
+  for (let i = 0; i < WELTEN.length; i++) {
+    if (await s.locator(`.screen.arena .knoten[data-bot="${ziel}"]`).count()) break;
+    await s.locator('.screen.arena .ww-pfeil[data-richtung="1"]').click();
+    await warte(450);
+  }
+  await s.waitForSelector(`.screen.arena .knoten[data-bot="${ziel}"]`);
+  await warte(500);
+}
+
+const vorschau = (s, pfad) => s.evaluate(([pfad]) => {
+  const sc = document.querySelector('.screen.arena');
+  const welt = sc.querySelector('.welt');
+  const svg = welt.querySelector('.welt-svg');
+  const st = getComputedStyle(svg);
+  const stationen = [...welt.querySelectorAll('.knoten[data-bot]')].map((k) => {
+    const img = k.querySelector('.avatar img');
+    const name = k.querySelector('.k-name');
+    const r = img.getBoundingClientRect();
+    return { id: k.dataset.bot, bild: img.complete && img.naturalWidth > 0 && r.width > 8 && Number(getComputedStyle(img).opacity) >= 0.5,
+      name: (name?.textContent || '').trim(), label: k.getAttribute('aria-label') || '' };
+  });
+  const sperre = sc.querySelector('.welt-sperre, .ws-karte');
+  return { filter: st.filter, deckkraft: st.opacity, stationen, unter: sc.querySelector('.ww-unter')?.textContent || '',
+    sperrkarte: !!sperre && getComputedStyle(sperre).display !== 'none' && !sperre.hidden,
+    schlossElemente: sc.querySelectorAll('.welt .schloss').length, schlossBild: welt.innerHTML.includes(pfad) };
+}, [pfad]);
+
+const karteVon = (s) => s.evaluate(() => {
+  const d = document.querySelector('.screen.arena .detail');
+  const h = d.querySelector('.sp-gesperrt');
+  const r = h?.getBoundingClientRect();
+  return { h2: d.querySelector('h2')?.textContent.trim(), spielen: d.querySelectorAll('[data-aktion="spielen"]').length,
+    hinweis: h ? h.textContent.trim() : null, hinweisSichtbar: !!r && r.width > 0 && r.height > 0, schloss: d.querySelectorAll('.schloss').length };
+});
+
+let browser;
+try {
+  browser = await browserTyp(pw).launch({ headless: true });
+  for (const g of GERAETE) for (const m of MODI) {
+    const name = `${g.name} ${m.name}${m.ruhe ? ' (weniger Bewegung)' : ''}`;
+    // ---- vorher: Live-Stand, Welt 2 und 3 ----
+    if (basis) {
+      const a = await oeffne(browser, g, m, { alt: true });
+      try {
+        for (const nr of [2, 3]) { await zuWelt(a.s, nr); await a.s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-welt${nr}-vorher.png`) }); }
+      } catch (e) { /* nur Bilder */ }
+      await a.k.close();
+    }
+    // ---- nachher, frisch: Welt 2 bis 5 sind zu sehen, keine spielbar ----
+    {
+      const { k, s, fehler } = await oeffne(browser, g, m);
+      try {
+        for (const nr of WELTEN.filter((n) => n > 1)) {
+          await zuWelt(s, nr);
+          await s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-welt${nr}-nachher.png`) }).catch(() => {});
+          const tor = endgegner(nr - 1);
+          const v = await vorschau(s, SCHLOSS_PFAD);
+          pruefe(`${name}: Welt ${nr} (a) sichtbar, Landschaft in Farbe, keine Sperrkarte`, v.filter === 'none' && Number(v.deckkraft) === 1 && !v.sperrkarte, v);
+          pruefe(`${name}: Welt ${nr} (a) sechs Stationen mit Bild und Name`, v.stationen.length === 6 && v.stationen.every((x) => x.bild && x.name), v.stationen);
+          pruefe(`${name}: Welt ${nr} (a) kein Schloss in der Karte (Element oder Bild)`, v.schlossElemente === 0 && !v.schlossBild, v);
+          pruefe(`${name}: Welt ${nr} (d) Bildschirmleser nennt den Endgegner davor ("Besiege zuerst ${vorname(tor)}")`,
+            v.stationen.every((x) => x.label.includes('Besiege zuerst ' + tor.name)), v.stationen.map((x) => x.label));
+          const bot = botsDerWelt(nr)[1].id;
+          await s.locator(`.screen.arena .knoten[data-bot="${bot}"]`).click();
+          await warte(800);
+          const karte = await karteVon(s);
+          pruefe(`${name}: Welt ${nr} (b) Tipp oeffnet die Karte von ${BOTS.find((b) => b.id === bot).name}, statt "Spielen" "Besiege zuerst ${vorname(tor)}", kein Schloss`,
+            karte.h2 === BOTS.find((b) => b.id === bot).name && karte.spielen === 0 && (karte.hinweis || '').startsWith('Besiege zuerst ' + tor.name)
+            && karte.hinweisSichtbar && karte.schloss === 0, karte);
+          if (nr === 3) await s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-welt3-karte.png`) }).catch(() => {});
+          // den Hinweis antippen: keine Partie
+          await s.locator('.screen.arena .detail .sp-gesperrt').click().catch(() => {});
+          await warte(700);
+          const lage = await s.evaluate(() => ({ laufend: localStorage.getItem('schach-arena:v1:laufend'),
+            arena: !!document.querySelector('.screen.arena') }));
+          pruefe(`${name}: Welt ${nr} (b) vor dem Sieg startet keine Partie`, !lage.laufend && lage.arena, lage);
+          // Karte wieder schliessen, falls sie (Handy) ueber der Welt liegt
+          await s.evaluate(() => { for (const x of document.querySelectorAll('.toast')) x.remove(); });
+          await s.keyboard.press('Escape').catch(() => {});
+          await warte(300);
+        }
+      } catch (e) {
+        await s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-abbruch.png`) }).catch(() => {});
+        pruefe(`${name}: Vorschau ohne Abbruch`, false, e.message);
+      }
+      pruefe(`${name}: Vorschau ohne Seiten- und Konsolenfehler`, fehler.length === 0, fehler);
+      await k.close().catch(() => {});
+    }
+    // ---- nachher, Welt 1 besiegt: Welt 2 spielbar, Welt 3 Vorschau ----
+    {
+      const { k, s, fehler } = await oeffne(browser, g, m, { saat: SAAT_WELT1 });
+      try {
+        await zuWelt(s, 3);
+        const v3 = await vorschau(s, SCHLOSS_PFAD);
+        const tor2 = endgegner(2);
+        pruefe(`${name}: Welt 1 besiegt: Welt 3 bleibt Vorschau ohne Schloss, nennt ${vorname(tor2)}`,
+          v3.schlossElemente === 0 && !v3.schlossBild && v3.stationen.every((x) => x.label.includes('Besiege zuerst ' + tor2.name)), v3);
+        await s.locator('.screen.arena .ww-pfeil[data-richtung="-1"]').click();
+        await zuWelt(s, 2);
+        const erster = botsDerWelt(2)[0].id;
+        await s.locator(`.screen.arena .knoten[data-bot="${erster}"]`).click();
+        await warte(900);
+        const z = await s.evaluate((id) => ({ gesperrt: document.querySelector(`.screen.arena .knoten[data-bot="${id}"]`).classList.contains('gesperrt'),
+          spielen: document.querySelectorAll('.screen.arena .detail [data-aktion="spielen"]').length, hinweis: document.querySelectorAll('.screen.arena .detail .sp-gesperrt').length }), erster);
+        pruefe(`${name}: (c) nach dem Sieg ueber ${vorname(endgegner(1))}: ${erster} frei, Spielen-Knopf statt Hinweis`, !z.gesperrt && z.spielen === 1 && z.hinweis === 0, z);
+        await s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-welt2-frei.png`) }).catch(() => {});
+        const weiss = s.locator('.screen.arena .detail .seg[data-wert="w"]');
+        if (await weiss.count()) await weiss.first().click();
+        await s.locator('.screen.arena .detail [data-aktion="spielen"]').click();
+        const gestartet = await klappt(s.waitForFunction(sel => window.__partie && window.__partie.bereit === true
+          && document.querySelectorAll(sel + ' .brett img.figur').length === 32, PARTIE, { timeout: 30000 }));
+        pruefe(`${name}: (c) "Spielen" startet die Partie gegen ${erster}`, gestartet
+          && await s.evaluate((id) => JSON.parse(localStorage.getItem('schach-arena:v1:laufend') || 'null')?.botId === id, erster).catch(() => false),
+          await s.evaluate(() => ({ screen: document.documentElement.dataset.screen, laufend: localStorage.getItem('schach-arena:v1:laufend') })).catch((e) => e.message));
+      } catch (e) {
+        await s.screenshot({ path: path.join(BILDER, `${g.name}-${m.name}-frei-abbruch.png`) }).catch(() => {});
+        pruefe(`${name}: freie Welt ohne Abbruch`, false, e.message);
+      }
+      pruefe(`${name}: freie Welt ohne Seiten- und Konsolenfehler`, fehler.length === 0, fehler);
+      await k.close().catch(() => {});
+    }
+  }
+  if (!basis) console.log(`Hinweis: ${BASIS_REF} nicht lesbar, Vorher-Bilder entfallen`);
+} catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
+finally { await browser?.close(); await new Promise(r => server.close(r)); }
+console.log(`\nBilder: ${BILDER}`);
+console.log(`\n${ok}/${gesamt} bestanden`); process.exitCode = ok === gesamt ? 0 : 1;
