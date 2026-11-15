@@ -247,3 +247,15 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
 .online-screen .on-tueren[data-mehr] :is(.on-tuer-text p, .on-zeit-fest, .on-bild-uhr) { display: none; }
 .online-screen .on-tuer-kopf { align-items: center; }
+/* ---------- R19 matt (Flo 15.11.2026 ca. 12:15: "ein bisschen zu hell, die Symbole leuchten zu viel. Cleaner und matt
+   machen", tests/r19-online-ruhig.test.mjs glanzIn): Lobby, Suche und Ergebnis ohne farbigen Schein und Glanzlicht am
+   Hauptknopf (app.css .knopf.primaer), Karten flach nur mit Kante und etwas in den Seitengrund gemischt (hell weniger reines
+   Weiss, dunkel eine Spur ruhiger), Symbole in ruhigen Tokenfarben, das Mini-Brett entsaettigt. Die Partie (.online-partie)
+   bleibt gleich der Bot-Partie (tests/gleichheit-ansichten.test.mjs). Rueckholbar: diesen Block entfernen. */
+.online-screen { --on-karte: color-mix(in srgb, var(--flaeche) 55%, var(--grund)); }
+.online-screen :is(.on-inhalt, .on-erg) .knopf.primaer { box-shadow: none; }
+.online-screen :is(.on-tuer, .on-liga, .on-freunde-zeile) { background: var(--on-karte); box-shadow: var(--kante); }
+.online-screen .on-mehr > ul { background: var(--on-karte); }
+.online-screen .on-tueren[data-zustand="ohne"] .on-tuer { background: transparent; box-shadow: none; }
+.online-screen .on-freunde-symbol { color: var(--text-2); }
+.online-screen .on-bild { filter: saturate(.65); }

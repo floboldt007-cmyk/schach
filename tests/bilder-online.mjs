@@ -1,15 +1,15 @@
 // Bilder der Online-Ansichten (Feinschliff R8, 13.11.2026): Lobby, Gegnersuche, laufende Partie und Ergebnis auf
-// iPhone 13 und PC, je hell und dunkel. Die Funktionsproben (tests/online-ui.test.mjs, tests/gegnersuche.test.mjs)
+// iPhone 13, iPhone SE und PC, je hell und dunkel. Die Funktionsproben (tests/online-ui.test.mjs, tests/gegnersuche.test.mjs)
 // machen keine Bilder; dieses Skript schliesst die Luecke fuer die Sichtkritik. Kein Teil von tests/alle.mjs.
 // Netzwerk ausschliesslich simuliert: jede Anfrage an *.supabase.co beantwortet die Attrappe unten, nie das echte Projekt.
 //
-//   node tests/bilder-online.mjs --bilder=<ordner>     16 Bilder: online-<geraet>-<hell|dunkel>-<lobby|suche|partie|ergebnis>.png
+//   node tests/bilder-online.mjs --bilder=<ordner>     24 Bilder: online-<geraet>-<hell|dunkel>-<lobby|suche|partie|ergebnis>.png
 //   PORT=8991 node tests/bilder-online.mjs ...         eigener Port (Standard 8991)
 //   --ohne-elo         die Attrappe schickt keine Elo (Feld elo in kronen_mein_stand fehlt, wie vor online-elo-schema.sql);
 //                      Dateien online-ohne-elo-<geraet>-...; sonst nennt sie Elo 1240 (R19 online ruhig: eine Zahl in der Lobby)
 //   --nur-hell         nur das helle Schema (8 Bilder)
 //   --zahlen=<datei>   schreibt je Ansicht alle sichtbaren Zahlen als Markdown-Liste (Brett-Koordinaten zusammengefasst)
-// Exit 0, wenn alle 16 Bilder entstanden sind und jede Ansicht im erwarteten Modus stand; sonst 1.
+// Exit 0, wenn alle 24 Bilder entstanden sind und jede Ansicht im erwarteten Modus stand; sonst 1.
 import http from 'node:http';
 import os from 'node:os';
 import { createRequire } from 'node:module';
@@ -109,7 +109,8 @@ function bediener(z) {
       if (rpc === 'online_pruefe_zeit' && p) return antwort(p);
       if (rpc === 'online_gib_auf' && p) { Object.assign(p, { status: 'beendet', grund: 'aufgabe', ergebnis: '0-1', aktualisiert_am: iso(Date.now()) }); return antwort(p); }
       if (rpc === 'karte_der_partie') {
-        const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du: u === UID });
+        const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7,
+          ...(OHNE_ELO ? {} : { elo: u === UID ? 1240 : 1310 }), du: u === UID }); // Visitenkarte mit Elo (supabase/karte-elo-schema.sql)
         return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
       }
       if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...(OHNE_ELO ? {} : { elo: 1240 }) });
@@ -165,7 +166,7 @@ const sichtbareZahlen = (s) => s.evaluate(() => {
   }
   return { raus, koord };
 });
-const GERAETE = [['iphone-13', 390, 844], ['pc', 1280, 720]];
+const GERAETE = [['iphone-13', 390, 844], ['iphone-se', 375, 667], ['pc', 1280, 720]];
 const SCHEMATA = [['hell', 'light', 'hell'], ['dunkel', 'dark', 'dunkel']].slice(0, process.argv.includes('--nur-hell') ? 1 : 2);
 const seitenfehler = [];
 

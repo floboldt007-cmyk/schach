@@ -894,16 +894,18 @@ export function zeige(root, params, app) {
     }
     const eigen = online.meineFarbe(p);
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
-      const { k, name } = spielerDaten(f);
+      const { k, name, elo, liga } = spielerDaten(f);
       const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
       const avatar = k?.avatar || floAvatar(f);
-      // R19 online ruhig (Flos Wahl A): die Leiste zeigt nur den Namen, ohne Elo, Liga und Titel; unter dem Namen stehen nur
-      // die geschlagenen Figuren. Rueckholbar: die Zeile "Elo N · Liga" stand hier als <span class="p-meta"> (vor 17d2249).
-      const unter = `<div class="unter bot-meta"><span class="geschlagen-ort" data-wer="${f}"></span></div>`;
+      // R19 online ruhig (Flos Wahl A): die Leiste zeigt den Namen, ohne Titel; unter dem Namen die geschlagenen Figuren.
+      // Flo 15.11. 12:50 ("die elo soll man schon sehen koennen"): beim GEGNER davor seine Elo, nur die vom Server
+      // (spielerDaten, 100 bis 4000), ohne sie die Liga als Wort, ohne beides nichts. Die eigene Elo steht in der Lobby.
+      const meta = ort === 'oben' ? (elo != null ? `Elo ${elo}` : liga) : '';
+      const unter = `<div class="unter bot-meta">${meta ? `<span class="p-meta">${esc(meta)}</span>` : ''}<span class="geschlagen-ort" data-wer="${f}"></span></div>`;
       const uhr = `<div class="uhr zahl" data-farbe="${f}"${p.bedenkzeit_s == null ? ' hidden' : ''}>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
       const el = inhalt.querySelector('.on-' + ort);
       el.classList.toggle('mit-banner', !!banner);
-      el.setAttribute('aria-label', name);
+      el.setAttribute('aria-label', meta ? `${name}, ${meta}` : name);
       // Gegner: Bild, Feld info (Name, Unterzeile), Uhr; eigene Leiste: Bild, Name, Unterzeile, Uhr (Gitter aus css/partie.css)
       el.innerHTML = ort === 'oben'
         ? `${banner}<span class="av">${avatar}</span><div class="info"><div class="name"><b>${esc(name)}</b></div>${unter}</div>${uhr}`
