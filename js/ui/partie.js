@@ -2738,7 +2738,12 @@ export function zeige(root, params, app) {
     const lauf = laufend && laufend.uhr && typeof laufend.uhr === 'object' ? laufend.uhr : null;
     // uhr.seit gilt nur zwischen Start und jetzt: in der Zukunft kostete der laufende Zug nichts (Zeitgewinn) bzw.
     // buchte Flo die Spanne bis dorthin (Fix-Review 64, Proben E/F); sonst wie ohne uhr die Wanduhr ab Start
-    const seitGilt = !!lauf && Number.isFinite(lauf.seit) && lauf.seit <= Date.now() && !(lauf.seit < Date.parse(z.gestartet));
+    // Untergrenze ist der Beginn des laufenden Zugs (Start plus alle gueltig gebuchten Zeiten), nicht der Start der Partie:
+    // ein uhr.seit dazwischen buchte die schon gebuchten Zuege ein zweites Mal (Fix-Review 64 c76e18e, Probe H)
+    const gebucht = z.zeiten && z.zeiten.length === z.zuege.length ? z.zeiten
+      : (laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : []);
+    const zugBeginn = Date.parse(z.gestartet) + gebucht.reduce((a, x) => a + (Number.isInteger(x) && x >= 0 ? x * 100 : 0), 0);
+    const seitGilt = !!lauf && Number.isFinite(lauf.seit) && lauf.seit <= Date.now() && !(lauf.seit < zugBeginn);
     let wandSeit = null;
     if (!z.zeiten || z.zeiten.length !== z.zuege.length) {
       const je = laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : [];
@@ -2772,7 +2777,14 @@ export function zeige(root, params, app) {
       const seit = seitGilt ? lauf.seit
         : wandSeit != null ? wandSeit : Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
       if (Number.isFinite(seit)) laufOpt = { laufSeit: seit, jetzt: Date.now() };
-    } else if (lauf) laufOpt = { laufVerbraucht: lauf.verbraucht };
+    } else if (lauf && Number.isFinite(lauf.verbraucht) && lauf.verbraucht >= 0) laufOpt = { laufVerbraucht: lauf.verbraucht };
+    else if (laufend) {
+      // ungewertet ohne gueltiges verbraucht (Altstand ohne uhr oder kaputter Wert): weiterspielen mit einem Ersatz ohne
+      // Zeitgewinn, die Wanduhr seit dem Beginn des laufenden Zugs. Lieber zu wenig Zeit; ein sehr alter Stand kann damit
+      // auf Zeit verlieren (e7 15.11.2026, Variante A, rueckholbar; Fix-Review 64 c76e18e, Proben I/J)
+      const seit = seitGilt ? lauf.seit : Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
+      if (Number.isFinite(seit)) laufOpt = { laufSeit: seit, jetzt: Date.now() };
+    }
     const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe, ...laufOpt });
     schachuhr = neueUhr({ ...z.tempo, amZug: r.amZug, w: r.w, b: r.b });
     zeigeUhr(Date.now());

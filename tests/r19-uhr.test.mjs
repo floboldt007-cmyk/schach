@@ -369,7 +369,7 @@ if (!pw) {
     // Zuschlag zaehlt, braechte genau diese 5 s zurueck (Fix-Review f1, mit 3+10 und 4 s war das unsichtbar). Die Wanduhr
     // laeuft in der gewerteten Partie weiter, also muss die Zeit mindestens um die geschlossene Zeit sinken
     const T32 = { grund: 180, zuschlag: 2 };
-    for (const [name, aendere] of [
+    for (const [name, aendere, ungewertet] of [
       ['Fortsetzen gewertet, ein zeiten-Wert ungueltig: kein Zeitgewinn', (l) => { l.zeiten[0] = -1; }],
       ['Fortsetzen gewertet, zeiten fehlen: kein Zeitgewinn', (l) => { delete l.zeiten; }],
       ['Fortsetzen gewertet, uhr fehlt: der laufende Zug zaehlt trotzdem (Wanduhr)', (l) => { delete l.uhr; }],
@@ -381,11 +381,17 @@ if (!pw) {
       ['Fortsetzen gewertet, uhr.seit in der Zukunft: kein Zeitgewinn', (l) => { l.uhr.seit = Date.now() + 3600e3; }],
       ['Fortsetzen gewertet, uhr.seit in der Zukunft und ein zeiten-Wert ungueltig: kein Zeitgewinn',
         (l) => { l.uhr.seit = Date.now() + 3600e3; l.zeiten[0] = -1; }],
+      // Fix-Review 64 (c76e18e): uhr.seit zwischen Start und Zugbeginn buchte die gebuchten Zuege noch einmal (Probe H, 11 s
+      // Abzug bei 3,7 s Pause); die Obergrenze unten faengt das
+      ['Fortsetzen gewertet, uhr.seit = Start der Partie: kein Abzug ueber die Pause', (l) => { l.uhr.seit = Date.parse(l.gestartet); }],
+      // Fix-Review 64 (c76e18e), Proben I/J: ungewertet ohne gueltiges uhr.verbraucht zaehlte der laufende Zug 0 (Zeitgewinn)
+      ['Fortsetzen ungewertet, uhr fehlt: kein Zeitgewinn', (l) => { delete l.uhr; }, true],
+      ['Fortsetzen ungewertet, uhr.verbraucht negativ: kein Zeitgewinn', (l) => { l.uhr.verbraucht = -999999; }, true],
     ]) {
       await pruefe(name, async () => {
         const { k, s } = await neueSeite(browser);
         try {
-          await starte(s, { botId: 'benno', farbe: 'w', tempo: T32, ki: true, kiRef: KI_REF });
+          await starte(s, ungewertet ? { botId: 'benno', farbe: 'w', tempo: T32 } : { botId: 'benno', farbe: 'w', tempo: T32, ki: true, kiRef: KI_REF });
           await warte(7000);
           await zug(s, 'e2e4');
           await s.waitForFunction(() => window.__partie.phase() === 'flo' && window.__partie.chess().history().length === 2, null, { timeout: 15000 });
@@ -406,8 +412,10 @@ if (!pw) {
           await warte(300);
           const b = await leseUhr(s, 'flo');
           const zuMs = Date.now() - zu;
-          assert.ok(a.ms - b.ms >= zuMs - 1500, `kein Gewinn: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
-          // und nicht weit mehr als die geschlossene Zeit (Fix-Review 64, Probe F: 172 s weg)
+          // ungewertet steht die Uhr, solange die App zu ist: kein Gewinn heisst hier nur, die Zeit steigt nicht
+          if (ungewertet) assert.ok(a.ms - b.ms >= -300, `ungewertet kein Gewinn: ${a.text} -> ${b.text}`);
+          else assert.ok(a.ms - b.ms >= zuMs - 1500, `kein Gewinn: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
+          // und nicht weit mehr als die geschlossene Zeit (Fix-Review 64, Probe F: 172 s weg; Probe H: 11 s bei 3,7 s)
           assert.ok(a.ms - b.ms <= zuMs + 5000, `kein Verlust weit ueber die Pause: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
         } finally { await k.close(); }
       });
