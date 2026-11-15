@@ -1,14 +1,14 @@
-// Shop "wie Fortnite" (Feinschliff R19, 14.11.2026): drei ENTWUERFE hinter der Kennung ?shopStil=a|b|c
-// (js/pakete/sammlung/shop-entwurf.js, css/pakete/sammlung.css). Ohne Kennung (und mit unbekannter) bleibt der Shop wie
-// heute: eine Edition, Kaufknopf "Bald verfuegbar" abgeschaltet.
-//   a "Schaufenster": ein grosses Highlight "Neu diese Woche" oben, darunter Reihen je Kategorie mit Karten.
-//   b "Raster": gleich grosse Karten, nach Seltenheit gefaerbt und sortiert, das Neue zuerst.
-//   c "Regal": waagerecht wischbare Reihen je Kategorie, die erste Reihe "Neu diese Woche".
-// Feste Grenzen (design/runde4/SPIELKONZEPT.md, Regeln der Werkstatt): kein Countdown, keine Rotation, kein "nur heute",
-// keine Restzahl; ein Preis nur, wenn der Server ihn schickt (betrag_cent), sonst "Preis folgt"; der Kaufen-Knopf zeigt im
-// Entwurf nur eine Vorschau-Meldung und ruft nichts beim Server auf (keine Kasse, kein Stripe).
-// Antippen einer Karte zeigt die Vorschau auf dem ECHTEN Brett (js/board.js) mit den Farben bzw. Figuren des Stuecks.
-// iPhone 13 und PC, hell. Netz nur simuliert.
+// Shop A "Schaufenster" (Feinschliff R19, Flos Wahl 15.11.2026): fuenf feste Plaetze hinter der Kennung ?shopStil=a
+// (js/pakete/sammlung/shop-entwurf.js, Belegung aus assets/shop/auslage.json). Ohne Kennung (und mit jeder anderen) bleibt
+// der Shop wie heute: eine Edition, Kaufknopf "Bald verfuegbar" abgeschaltet.
+//   Je Art genau ein Platz, immer in dieser Reihenfolge: Brett, Figur, Klang, Emote, Finisher. Ein fehlender oder
+//   unbekannter Eintrag laesst seinen Platz mit "Folgt" stehen, es bleiben fuenf.
+// Feste Grenzen (design/runde4/SPIELKONZEPT.md, Regeln der Werkstatt): kein Countdown, keine Rotation, nichts verschwindet,
+// keine Restzahl; ein Preis nur, wenn der Server ihn schickt (betrag_cent), sonst "Preis folgt"; "Kaufen" zeigt nur eine
+// Vorschau-Meldung und ruft nichts beim Server auf (keine Kasse, kein Stripe).
+// Vorschau je Art: Brett und Figur auf dem ECHTEN Brett (js/board.js), Klang mit Anhoeren-Knopf, Emote gross (bewegt nur
+// ohne "weniger Bewegung"), Finisher als Standbild.
+// iPhone 13, iPhone SE, iPad und PC, hell und dunkel. Netz nur simuliert.
 //
 //   node tests/r19-shop-fortnite.test.mjs
 //   PORT=8977 node tests/r19-shop-fortnite.test.mjs   eigener Port (Standard: frei)
@@ -51,7 +51,11 @@ const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID }))
 // Edition wie tests/funktion-shop-skin.test.mjs; der Preis kommt NUR hier vom Server (Testwert, kein Katalogpreis)
 const EDITION = { produkt_id: 'brett-mitternacht', name: 'Mitternacht & Gold', auflage: 10, status: 'erhaeltlich', restzahl: 9,
   verkauf_ab: '2026-11-28T10:00:00Z', betrag_cent: 499, waehrung: 'eur' };
-const VORRAT = JSON.parse(readFileSync(new URL('../assets/shop/vorrat.json', import.meta.url), 'utf8'));
+const AUSLAGE = JSON.parse(readFileSync(new URL('../assets/shop/auslage.json', import.meta.url), 'utf8'));
+const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
+// Probe "die Datenliste ist die Quelle": andere Figur, ein unbekanntes Emote, kein Klang-Eintrag, Reihenfolge verdreht
+const UMGEBAUT = { plaetze: [{ art: 'emote', id: 'gibt-es-nicht' }, { art: 'finisher', id: 'krone' }, { art: 'figur', id: 'lampion' },
+  { art: 'brett', id: 'aurora' }] };
 
 function bediener(z) {
   return async (route) => {
@@ -73,17 +77,17 @@ function initSkript({ sitzung }) {
     if (!sessionStorage.getItem('shop-start')) {
       sessionStorage.setItem('shop-start', '1');
       localStorage.clear();
-      localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus', figuren: 'cburnett' }));
+      localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'normal', figuren: 'cburnett' }));
       localStorage.setItem('schach-arena:konto:sichtbar', '1');
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
     }
   } catch (e) { /* egal */ }
 }
 
-const GERAETE = [['iPhone 13', 390, 844], ['PC', 1280, 720]];
+const IPHONE = ['iPhone 13', 390, 844], SE = ['iPhone SE', 375, 667], IPAD = ['iPad', 820, 1180], PC = ['PC', 1280, 720];
 const seitenfehler = [];
-// Woerter, die nach Druck aussehen (Regeln der Werkstatt): Countdown, Restzeit, Restzahl, nur heute
-const DRUCK = /\b\d{1,2}:\d{2}\b|nur heute|nur noch|läuft ab|endet in|verschwindet|\d+ von \d+ verfügbar|noch \d+ (std|stunden|tage|min)/i;
+// Woerter, die nach Druck aussehen (Regeln der Werkstatt): Countdown, Restzeit, Restzahl, nur heute, Wochen-Wechsel
+const DRUCK = /\b\d{1,2}:\d{2}\b|nur heute|nur noch|läuft ab|endet in|verschwindet|diese woche|\d+ von \d+ verfügbar|noch \d+ (std|stunden|tage|min)/i;
 
 async function oeffneShop(s, kennung) {
   await s.goto(`http://127.0.0.1:${PORT}/index.html?test${kennung}#heim`);
@@ -96,81 +100,100 @@ async function oeffneShop(s, kennung) {
   await s.waitForSelector('.sa-blatt .sa-bereich[data-bereich="shop"]:not([hidden])', { timeout: 10000 });
 }
 
-async function lauf(browser, [geraet, w, h], stil) {
-  const gruppe = `${geraet} ${stil || 'heute'}`;
+// Vorschau einer Karte oeffnen; gibt zurueck, was im Blatt steht
+async function oeffneVorschau(s, art) {
+  const k = s.locator(`.sa-blatt .shf-karte[data-art="${art}"]`).first();
+  await k.scrollIntoViewIfNeeded();
+  await k.click();
+  await s.waitForSelector('.sheet-karte .shf-vorschau', { timeout: 10000 });
+  await warte(500);
+}
+async function schliesse(s) {
+  const zu = s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Schließen' });
+  if (await zu.count()) await zu.first().click();
+  await s.waitForSelector('.sheet-karte', { state: 'detached', timeout: 5000 }).catch(() => {});
+  await warte(300);
+}
+
+async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = null, ruhig = false } = {}) {
+  const gruppe = `${geraet} ${stil || 'heute'}${farbe === 'dunkel' ? ' dunkel' : ''}${auslage ? ' umgebaut' : ''}${ruhig ? ' ruhig' : ''}`;
   const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
-    colorScheme: 'light', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    colorScheme: farbe === 'dunkel' ? 'dark' : 'light', reducedMotion: ruhig ? 'reduce' : 'no-preference', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
   const z = { aufrufe: [] };
   await k.route('**/*.supabase.co/**', bediener(z));
+  if (auslage) await k.route('**/assets/shop/auslage.json', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(auslage) }));
   await k.addInitScript(initSkript, { sitzung: SITZUNG });
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
-  const gesetzt = ['a', 'b', 'c'].includes(stil) ? stil : null;
   try {
     await oeffneShop(s, stil ? `&shopStil=${stil}` : '');
-    if (!gesetzt) {
+    if (stil !== 'a') {
       await s.waitForSelector('.sa-blatt .sh-karte', { timeout: 15000 }).catch(() => {});
       const heute = await s.evaluate(() => ({ karten: document.querySelectorAll('.sa-blatt .sh-karte').length,
         kaufAus: !!document.querySelector('.sa-blatt .sh-kaufen')?.disabled, entwurf: !!document.querySelector('.shf') }));
-      pruefe(`${gruppe}: Shop wie heute (eine Edition, Kaufknopf aus, kein Entwurf)`, heute.karten === 1 && heute.kaufAus && !heute.entwurf, heute);
+      pruefe(`${gruppe}: Shop wie heute (eine Edition, Kaufknopf aus, kein Schaufenster)`, heute.karten === 1 && heute.kaufAus && !heute.entwurf, heute);
       await k.close(); return;
     }
     await s.waitForSelector('.sa-blatt .shf .shf-karte', { timeout: 15000 }).catch(() => {});
-    await warte(300);
+    await warte(400);
     const bild = await s.evaluate(() => {
       const shf = document.querySelector('.sa-blatt .shf');
       const karten = [...document.querySelectorAll('.sa-blatt .shf-karte')];
-      const sichtbarerText = shf ? shf.innerText : '';
+      const breite = document.documentElement.clientWidth;
       return {
         stil: shf?.dataset.shopStil ?? null,
-        karten: karten.length,
-        ids: [...new Set(karten.map((x) => x.dataset.id))],
-        pakete: karten.filter((x) => x.dataset.art === 'paket').length,
-        neu: [...document.querySelectorAll('.sa-blatt .shf-neu')].map((x) => x.closest('.shf-karte, .shf-reihe')?.querySelector('.shf-name')?.textContent || x.textContent),
+        arten: karten.map((x) => x.dataset.art),
+        ids: karten.map((x) => x.dataset.id || null),
+        folgt: karten.map((x) => x.hasAttribute('data-folgt')),
+        mitBild: karten.map((x) => !!x.querySelector('.shf-bild svg, .shf-bild img')),
         // Intl setzt ein geschuetztes Leerzeichen vor das Euro-Zeichen
         preise: karten.map((x) => x.querySelector('.shf-preis')?.textContent.replace(/\s+/g, ' ').trim() ?? null),
-        euroAusserPreis: (sichtbarerText.match(/€/g) || []).length,
-        text: sichtbarerText,
-        gross: !!document.querySelector('.sa-blatt .shf-held .shf-karte'),
-        reihen: [...document.querySelectorAll('.sa-blatt .shf-reihe')].map((r) => ({ titel: r.querySelector('.shf-reihe-titel')?.textContent.trim(),
-          wisch: getComputedStyle(r.querySelector('.shf-band') || r).overflowX })),
+        euro: ((shf ? shf.innerText : '').match(/€/g) || []).length,
+        text: shf ? shf.innerText : '',
+        reihen: document.querySelectorAll('.sa-blatt .shf-reihe, .sa-blatt .shf-held, .sa-blatt .shf-band').length,
+        ueberlauf: document.scrollingElement.scrollWidth > breite + 1
+          || karten.some((x) => { const r = x.getBoundingClientRect(); return r.left < -1 || r.right > breite + 1; }),
+        klein: karten.filter((x) => { const r = x.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).length,
         hoehen: [...new Set(karten.map((x) => Math.round(x.getBoundingClientRect().height)))],
-        seltenheiten: karten.map((x) => x.dataset.seltenheit),
-        farben: [...new Set(karten.map((x) => getComputedStyle(x).getPropertyValue('--shf-farbe').trim()))],
+        gleichBreit: new Set(karten.map((x) => Math.round(x.getBoundingClientRect().width))).size === 1,
       };
     });
-    pruefe(`${gruppe}: Kennung ${stil} gesetzt`, bild.stil === stil, bild.stil);
-    // eine Edition + 24 Stuecke aus assets/shop/vorrat.json + 3 Pakete
-    const soll = 1 + VORRAT.stuecke.length + 3;
-    pruefe(`${gruppe}: alle Stuecke als Karten (${soll}, je Stueck einmal)`, bild.ids.length === soll, bild.ids.length);
-    pruefe(`${gruppe}: drei Pakete (Brett + Figuren)`, bild.pakete === 3, bild.pakete);
-    pruefe(`${gruppe}: "Neu diese Woche" hebt Mitternacht & Gold hervor`, bild.neu.some((x) => /Mitternacht/.test(x)), bild.neu);
-    const mitPreis = bild.preise.filter((x) => x && x !== 'Preis folgt');
-    pruefe(`${gruppe}: Preis nur vom Server (Edition 4,99 €), sonst "Preis folgt"`,
-      mitPreis.length >= 1 && mitPreis.every((x) => x === '4,99 €') && bild.preise.every((x) => x === '4,99 €' || x === 'Preis folgt'), bild.preise);
-    pruefe(`${gruppe}: kein Euro ausser dem Server-Preis`, bild.euroAusserPreis === mitPreis.length, { euro: bild.euroAusserPreis, mitPreis: mitPreis.length });
-    pruefe(`${gruppe}: kein Countdown, keine Restzahl, kein "nur heute"`, !DRUCK.test(bild.text), (bild.text.match(DRUCK) || [])[0]);
-    if (stil === 'a') {
-      pruefe(`${gruppe}: Schaufenster mit grossem Highlight oben und Reihen`, bild.gross && bild.reihen.length >= 4, bild.reihen);
-    } else if (stil === 'b') {
-      pruefe(`${gruppe}: Raster mit gleich hohen Karten`, bild.hoehen.length === 1 && !bild.gross, bild.hoehen);
-      pruefe(`${gruppe}: Karten nach Seltenheit gefaerbt (4 Farben)`, bild.farben.filter(Boolean).length >= 4, bild.farben);
-      const rang = { exklusiv: 4, episch: 3, selten: 2, haeufig: 1 };
-      const folge = bild.seltenheiten.slice(1).map((x) => rang[x] || 0);
-      pruefe(`${gruppe}: nach dem Neuen sortiert nach Seltenheit (Exklusiv zuerst)`, folge.every((x, i) => i === 0 || folge[i - 1] >= x), bild.seltenheiten);
-    } else {
-      pruefe(`${gruppe}: Regal mit wischbaren Reihen, die erste "Neu diese Woche"`,
-        bild.reihen.length >= 4 && bild.reihen.every((r) => r.wisch === 'auto' || r.wisch === 'scroll') && /Neu diese Woche/.test(bild.reihen[0].titel || ''), bild.reihen);
-    }
+    pruefe(`${gruppe}: Kennung a gesetzt`, bild.stil === 'a', bild.stil);
+    pruefe(`${gruppe}: genau fuenf Plaetze, je Art einer, in fester Reihenfolge`, JSON.stringify(bild.arten) === JSON.stringify(ARTEN), bild.arten);
+    pruefe(`${gruppe}: keine Reihen, kein Highlight (nur die fuenf Plaetze)`, bild.reihen === 0, bild.reihen);
+    pruefe(`${gruppe}: jeder Platz hat ein Bild`, bild.mitBild.every(Boolean), bild.mitBild);
+    pruefe(`${gruppe}: gleich grosse Karten`, bild.gleichBreit && bild.hoehen.length <= 2, { hoehen: bild.hoehen, gleichBreit: bild.gleichBreit });
+    pruefe(`${gruppe}: kein Countdown, keine Restzahl, kein "nur heute", kein "diese Woche"`, !DRUCK.test(bild.text), (bild.text.match(DRUCK) || [])[0]);
+    pruefe(`${gruppe}: kein Ueberlauf zur Seite`, !bild.ueberlauf);
+    pruefe(`${gruppe}: Karten mindestens 44 px`, bild.klein === 0, bild.klein);
+    const mitPreis = bild.preise.filter((x) => x && x !== 'Preis folgt' && x !== 'Folgt');
+    pruefe(`${gruppe}: Preis nur vom Server, sonst "Preis folgt"`, mitPreis.every((x) => x === '4,99 €') && bild.euro === mitPreis.length, { preise: bild.preise, euro: bild.euro });
 
-    // Vorschau auf dem echten Brett: Figurensatz "Sternwarte"
+    if (auslage) {
+      pruefe(`${gruppe}: Belegung kommt aus auslage.json (Brett Aurora, Figur Lampion, Finisher Krone)`,
+        bild.ids[0] === 'aurora' && bild.ids[1] === 'lampion' && bild.ids[4] === 'krone', bild.ids);
+      pruefe(`${gruppe}: fehlender Klang und unbekanntes Emote stehen als "Folgt"`, bild.folgt[2] && bild.folgt[3] && !bild.folgt[0] && !bild.folgt[1] && !bild.folgt[4], bild.folgt);
+      pruefe(`${gruppe}: ein "Folgt"-Platz hat keinen Preis und keinen Kaufen-Weg`, bild.preise[2] === 'Folgt' && bild.preise[3] === 'Folgt', bild.preise);
+      await k.close(); return;
+    }
+    const soll = ARTEN.map((art) => AUSLAGE.plaetze.find((p) => p.art === art)?.id ?? null);
+    pruefe(`${gruppe}: Belegung wie assets/shop/auslage.json`, JSON.stringify(bild.ids) === JSON.stringify(soll) && bild.folgt.every((x) => !x), { ids: bild.ids, soll });
+    pruefe(`${gruppe}: Brett-Platz traegt den Server-Preis der Edition (4,99 €)`, bild.preise[0] === '4,99 €', bild.preise[0]);
+
+    // Brett: Farben des Bretts im echten Brett (Mitternacht & Gold dunkel #3b4a7a)
+    await oeffneVorschau(s, 'brett');
+    const farbe = await s.evaluate(() => { const f = document.querySelector('.sheet-karte .shf-vorschau .brett .feld.d'); return f ? getComputedStyle(f).backgroundColor : null; });
+    pruefe(`${gruppe}: Brett-Vorschau auf dem echten Brett in den Farben des Bretts`, farbe === 'rgb(59, 74, 122)', farbe);
+    pruefe(`${gruppe}: Kaufen zeigt den Server-Preis`, await s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Kaufen · 4,99' }).count() === 1);
+    await schliesse(s);
+
+    // Figur: der Satz auf dem echten Brett, Kaufen nur als Vorschau-Meldung ohne Serveraufruf
+    await oeffneVorschau(s, 'figur');
+    const figurId = soll[1];
+    const satz = await s.evaluate((id) => [...document.querySelectorAll('.sheet-karte .shf-vorschau .brett img.figur')]
+      .filter((i) => i.getAttribute('src').includes(`assets/shop/figuren/${id}/`)).length, figurId);
+    pruefe(`${gruppe}: Figur-Vorschau zeigt den Satz auf dem echten Brett`, satz === 32, satz);
     const vorher = z.aufrufe.length;
-    await s.locator('.sa-blatt .shf-karte[data-id="sternwarte"]').first().scrollIntoViewIfNeeded();
-    await s.locator('.sa-blatt .shf-karte[data-id="sternwarte"]').first().click();
-    const vorschau = await s.waitForFunction(() => document.querySelectorAll('.sheet-karte .shf-vorschau .brett img.figur').length === 32, null, { timeout: 10000 })
-      .then(() => true).catch(() => false);
-    const satz = await s.evaluate(() => [...document.querySelectorAll('.sheet-karte .shf-vorschau .brett img.figur')].filter((i) => i.getAttribute('src').includes('assets/shop/figuren/sternwarte/')).length);
-    pruefe(`${gruppe}: Antippen zeigt das echte Brett mit dem Figurensatz`, vorschau && satz === 32, { vorschau, satz });
     const kaufen = s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Kaufen' });
     pruefe(`${gruppe}: Vorschau hat "Kaufen"`, await kaufen.count() === 1);
     await kaufen.first().click();
@@ -180,16 +203,39 @@ async function lauf(browser, [geraet, w, h], stil) {
     await warte(400);
     const neu = z.aufrufe.slice(vorher).filter((x) => x !== 'edition_staende');
     pruefe(`${gruppe}: Kaufen ruft nichts beim Server auf (keine Kasse)`, neu.length === 0, neu);
+    await s.waitForSelector('.sheet-karte', { state: 'detached', timeout: 5000 }).catch(() => {});
+    await warte(300);
 
-    // Brett-Vorschau: Farben des Stuecks im echten Brett
-    await s.waitForSelector('.sa-blatt .shf-karte[data-id="aurora"]', { timeout: 8000 }).catch(() => {});
-    if (await s.locator('.sa-blatt .shf-karte[data-id="aurora"]').count()) {
-      await s.locator('.sa-blatt .shf-karte[data-id="aurora"]').first().scrollIntoViewIfNeeded();
-      await s.locator('.sa-blatt .shf-karte[data-id="aurora"]').first().click();
-      const farbe = await s.waitForFunction(() => { const f = document.querySelector('.sheet-karte .shf-vorschau .brett .feld.d');
-        return f ? getComputedStyle(f).backgroundColor : null; }, null, { timeout: 10000 }).then((h) => h.jsonValue()).catch(() => null);
-      pruefe(`${gruppe}: Brett-Vorschau in den Farben des Bretts (Aurora dunkel #1E3050)`, farbe === 'rgb(30, 48, 80)', farbe);
-    } else pruefe(`${gruppe}: Shop nach der Vorschau wieder offen`, false);
+    // Klang: Anhoeren-Knopf (mindestens 44 px), Antippen ohne Fehler
+    await oeffneVorschau(s, 'klang');
+    const knopf = await s.evaluate(() => { const b = document.querySelector('.sheet-karte .shf-vorschau .shf-anhoeren'); const r = b?.getBoundingClientRect();
+      return b ? { h: Math.round(r.height), text: b.textContent.trim(), bild: !!document.querySelector('.sheet-karte .shf-vorschau svg') } : null; });
+    pruefe(`${gruppe}: Klang-Vorschau hat Bild und einen Anhoeren-Knopf ab 44 px`, !!knopf && knopf.h >= 44 && /Anhören/.test(knopf.text) && knopf.bild, knopf);
+    // Karte und Vorschau zeigen dieselbe Kunst: doppelte Verlaufs-Ids liessen die Schneeflocke "Kristall" verschwinden
+    const doppelt = await s.evaluate(() => [...document.querySelectorAll('.sa-blatt .shf svg [id], .sheet-karte svg [id]')]
+      .filter((e) => document.querySelectorAll(`[id="${CSS.escape(e.id)}"]`).length > 1)
+      .map((e) => e.id + ' auch in ' + [...document.querySelectorAll(`[id="${CSS.escape(e.id)}"]`)].filter((x) => x !== e).map((x) => x.closest('[class]')?.closest('section, .sheet-karte, .sa-bereich, .shf-karte')?.className).join('|')));
+    pruefe(`${gruppe}: keine doppelten Ids in den Bildern`, doppelt.length === 0, doppelt.slice(0, 5));
+    const fehlerVorher = seitenfehler.length;
+    if (knopf) await s.locator('.sheet-karte .shf-anhoeren').click();
+    await warte(400);
+    pruefe(`${gruppe}: Anhoeren laeuft ohne Fehler`, seitenfehler.length === fehlerVorher, seitenfehler.slice(fehlerVorher));
+    await schliesse(s);
+
+    // Emote: gross, bewegt nur ohne "weniger Bewegung"
+    await oeffneVorschau(s, 'emote');
+    const emote = await s.evaluate(() => { const e = document.querySelector('.sheet-karte .shf-vorschau svg.emote-sticker');
+      return e ? { breite: Math.round(e.getBoundingClientRect().width), laeuft: e.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length } : null; });
+    pruefe(`${gruppe}: Emote-Vorschau gross (ab 120 px)`, !!emote && emote.breite >= 120, emote);
+    pruefe(`${gruppe}: Emote ${ruhig ? 'steht still (weniger Bewegung)' : 'bewegt sich'}`, !!emote && (ruhig ? emote.laeuft === 0 : emote.laeuft > 0), emote);
+    await schliesse(s);
+
+    // Finisher: als Standbild
+    await oeffneVorschau(s, 'finisher');
+    const fin = await s.evaluate(() => { const e = document.querySelector('.sheet-karte .shf-vorschau svg.sk-finisher');
+      return e ? { breite: Math.round(e.getBoundingClientRect().width), laeuft: e.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length } : null; });
+    pruefe(`${gruppe}: Finisher-Vorschau als grosses Standbild`, !!fin && fin.breite >= 120 && fin.laeuft === 0, fin);
+    await schliesse(s);
   } catch (e) {
     pruefe(`${gruppe}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
   }
@@ -199,8 +245,12 @@ async function lauf(browser, [geraet, w, h], stil) {
 let browser;
 try {
   browser = await browserTyp(pw).launch({ headless: true });
-  for (const g of GERAETE) for (const stil of [null, 'a', 'b', 'c']) await lauf(browser, g, stil);
-  await lauf(browser, GERAETE[0], 'x'); // unbekannte Kennung: wie heute
+  for (const g of [IPHONE, PC]) await lauf(browser, g, null);
+  for (const g of [IPHONE, SE, IPAD, PC]) await lauf(browser, g, 'a');
+  for (const g of [IPHONE, PC]) await lauf(browser, g, 'a', { farbe: 'dunkel' });
+  await lauf(browser, IPHONE, 'a', { ruhig: true });
+  await lauf(browser, IPHONE, 'a', { auslage: UMGEBAUT });
+  await lauf(browser, IPHONE, 'b'); // die Entwuerfe b und c gibt es nicht mehr: wie heute
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();

@@ -1,11 +1,12 @@
-// Bilder des Shops (Feinschliff R19, 14.11.2026) fuer Flos Wahl "Shop wie Fortnite": heute und die Entwuerfe
-// ?shopStil=a|b|c (js/pakete/sammlung/shop-entwurf.js) auf iPhone 13 und PC, hell. Je Ansicht der Shop-Start, der Shop
-// weiter unten und die Vorschau eines Bretts (heute: Anprobieren der Edition, Entwurf: Brett Aurora auf dem echten Brett).
+// Bilder des Shops (Feinschliff R19): heute (ist) und Shop A mit fuenf festen Plaetzen (?shopStil=a,
+// js/pakete/sammlung/shop-entwurf.js, Belegung aus assets/shop/auslage.json) auf iPhone 13, iPhone SE, iPad und PC, hell,
+// iPhone 13 und PC auch dunkel. Je Ansicht der Shop-Start und bei a die Vorschau jedes Platzes (Brett, Figur, Klang, Emote,
+// Finisher); heute das Anprobieren der Edition.
 // Kein Teil von tests/alle.mjs. Netzwerk ausschliesslich simuliert (Attrappe wie tests/r19-shop-fortnite.test.mjs); die
 // Edition hat dort KEINEN Preis, denn heute steht keiner im Katalog: die Karten zeigen "Preis folgt".
 //
-//   node tests/bilder-shop.mjs --bilder=<ordner>      Unterordner ist/, a/, b/, c/ mit shop-<geraet>-<start|unten|vorschau>.png
-//   node tests/bilder-shop.mjs --nur=a,b ...          nur diese Stile (heute heisst ist)
+//   node tests/bilder-shop.mjs --bilder=<ordner>      Unterordner ist/, a/ mit shop-<geraet>[-dunkel]-<start|vorschau-art>.png
+//   node tests/bilder-shop.mjs --nur=a ...            nur diese Stile (heute heisst ist)
 //   PORT=8992 node tests/bilder-shop.mjs ...          eigener Port (Standard 8992)
 // Exit 0, wenn alle Bilder entstanden sind und jede Ansicht im erwarteten Stil stand; sonst 1.
 import http from 'node:http';
@@ -24,7 +25,7 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 if (!pw) throw new Error('Playwright fehlt (PLAYWRIGHT_PFAD setzen)');
 const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : null; };
 const BILDER = arg('bilder') || path.join(os.tmpdir(), 'bilder-shop');
-const NUR = arg('nur') ? arg('nur').split(',') : ['ist', 'a', 'b', 'c'];
+const NUR = arg('nur') ? arg('nur').split(',') : ['ist', 'a'];
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
@@ -77,7 +78,9 @@ function initSkript({ sitzung }) {
 const bilderFertig = (s, wurzel) => s.waitForFunction((w) => [...document.querySelectorAll(`${w} img`)].every((i) => i.complete), wurzel, { timeout: 15000 })
   .catch(() => {}).then(() => warte(400));
 
-const GERAETE = [['iphone13', 390, 844], ['pc', 1280, 720]];
+const GERAETE = [['iphone13', 390, 844, 'hell'], ['iphonese', 375, 667, 'hell'], ['ipad', 820, 1180, 'hell'], ['pc', 1280, 720, 'hell'],
+  ['iphone13', 390, 844, 'dunkel'], ['pc', 1280, 720, 'dunkel']];
+const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
 const seitenfehler = [];
 let browser;
 try {
@@ -85,16 +88,17 @@ try {
   for (const stil of NUR) {
     const ordner = path.join(BILDER, stil);
     mkdirSync(ordner, { recursive: true });
-    for (const [geraet, w, h] of GERAETE) {
-      const gruppe = `${stil} ${geraet}`;
+    for (const [geraet, w, h, farbe] of GERAETE) {
+      const name = geraet + (farbe === 'dunkel' ? '-dunkel' : '');
+      const gruppe = `${stil} ${name}`;
       const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, hasTouch: true, serviceWorkers: 'block',
-        colorScheme: 'light', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+        colorScheme: farbe === 'dunkel' ? 'dark' : 'light', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
       await k.route('**/*.supabase.co/**', bediener);
       await k.addInitScript(initSkript, { sitzung: SITZUNG });
       const s = await k.newPage(); s.setDefaultTimeout(15000);
       s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
       const bild = async (teil) => {
-        const da = await s.screenshot({ path: path.join(ordner, `shop-${geraet}-${teil}.png`) }).then(() => true).catch(() => false);
+        const da = await s.screenshot({ path: path.join(ordner, `shop-${name}-${teil}.png`) }).then(() => true).catch(() => false);
         pruefe(`${gruppe}: Bild ${teil}`, da);
       };
       try {
@@ -110,20 +114,26 @@ try {
         pruefe(`${gruppe}: Ansicht im Stil ${stil}`, steht === stil, steht);
         await bilderFertig(s, '.sa-blatt');
         await bild('start');
-        await s.evaluate(() => { const b = document.querySelector('.sa-blatt'); b.scrollTop = b.scrollHeight * 0.45; });
-        await bilderFertig(s, '.sa-blatt');
-        await bild('unten');
-        await s.evaluate(() => { document.querySelector('.sa-blatt').scrollTop = 0; });
-        if (stil === 'ist') await s.locator('.sa-blatt .sh-anprobieren').first().click();
-        else {
-          const k2 = s.locator('.sa-blatt .shf-karte[data-id="aurora"]').first();
-          await k2.scrollIntoViewIfNeeded();
-          await k2.click();
+        if (stil === 'ist') {
+          await s.locator('.sa-blatt .sh-anprobieren').first().click();
+          await s.waitForSelector('.sheet-karte .sh-anprobe', { timeout: 10000 });
+          await bilderFertig(s, '.sheet-karte');
+          await warte(500);
+          await bild('vorschau');
+        } else {
+          for (const art of ARTEN) {
+            const karte = s.locator(`.sa-blatt .shf-karte[data-art="${art}"]`).first();
+            await karte.scrollIntoViewIfNeeded();
+            await karte.click();
+            await s.waitForSelector('.sheet-karte .shf-vorschau', { timeout: 10000 });
+            await bilderFertig(s, '.sheet-karte');
+            await warte(700);
+            await bild('vorschau-' + art);
+            await s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Schließen' }).first().click();
+            await s.waitForSelector('.sheet-karte', { state: 'detached', timeout: 5000 }).catch(() => {});
+            await warte(300);
+          }
         }
-        await s.waitForSelector(stil === 'ist' ? '.sheet-karte .sh-anprobe' : '.sheet-karte .shf-vorschau .brett img.figur', { timeout: 10000 });
-        await bilderFertig(s, '.sheet-karte');
-        await warte(500);
-        await bild('vorschau');
       } catch (e) {
         pruefe(`${gruppe}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
       }

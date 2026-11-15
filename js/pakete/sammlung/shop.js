@@ -166,7 +166,7 @@ export function shopBereich({ app } = {}) {
       satz(S('shop.vorbereitung'));
       return;
     }
-    // R19-Entwurf "Shop wie Fortnite" (nur mit ?shopStil=a|b|c, js/pakete/sammlung/shop-entwurf.js)
+    // R19 Shop A mit fuenf festen Plaetzen (nur mit ?shopStil=a, js/pakete/sammlung/shop-entwurf.js)
     const stil = shopStil();
     if (stil) {
       try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen: liste, katalog: KATALOG, produktName, bereich: s, app })); return; }
