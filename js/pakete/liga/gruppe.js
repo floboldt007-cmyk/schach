@@ -76,8 +76,24 @@ function lohnBild(b) {
   }
   return `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">${s}</svg>`;
 }
-const lohnText = (b) => (b.art === 'banner' ? T('bannerText') : T('talerText', { n: zahl(b.menge) }));
 const lohnKurz = (b) => (b.art === 'banner' ? T('banner') : T('taler', { n: zahl(b.menge) }));
+// Liga-Banner je Liga (Stufe / 3, Holz bis Krone), gleiche Liste wie karte_konstanten 'liga_banner' in
+// supabase/karte-schema.sql: dieses Banner schreibt der Server beim Wochenabschluss fuer Platz 1 gut
+const LIGA_BANNER = ['saison-holz', 'saison-bronze', 'saison-silber', 'saison-gold', 'saison-diamant', 'saison-krone'];
+
+// Belohnungs-Karte (R19 Liga neu, Flo 15.11.: Belohnung zeigen statt beschreiben): das echte Banner der Liga bzw. die Taler
+// gross im Gold-Rahmen, dazu ein wahrer Satz. Wahr heisst: das Banner kommt beim Wochenabschluss in die Sammlung
+// (karte_liga_banner_nachtragen), Taler stehen in liga_belohnungen und werden spaeter ausgezahlt, also "aufgehoben".
+function preisKarte(m, b, stufe) {
+  const bild = b.art === 'banner'
+    ? `<img src="${esc(B.bannerUrl(LIGA_BANNER[Math.min(LIGA_BANNER.length - 1, Math.floor(stufe / 3))] || 'start'))}" alt="" width="160" height="80">`
+    : lohnBild(b);
+  return `<div class="lg-gr-info lg-gr-preis" data-art="${esc(b.art)}" hidden>
+    <span class="lg-gr-preis-bild" aria-hidden="true">${bild}</span>
+    <span class="lg-gr-preis-text"><b>${esc(T('belohnung', { platz: zahl(m.platz) }))}: ${esc(lohnKurz(b))}</b>
+      <span>${esc(b.art === 'banner' ? T('preis.banner') : T('preis.taler'))}</span></span>
+  </div>`;
+}
 
 // Bild und Banner einer Zeile: eigene Zeile aus der eigenen Karte, Menschen vom Server (geprueft in gruppeLage),
 // KI-Mitspieler ein festes Bot-Banner und Initialen, sonst Initialen ohne Banner
@@ -91,7 +107,7 @@ function bildVon(m, name) {
   return { avatar: esc(initialen(name)), banner: m.ki ? B.botBanner({ id: m.name }) : null, initialen: true };
 }
 
-function zeile(m) {
+function zeile(m, stufe) {
   const name = m.ich ? T('du') : (m.name || T('spieler'));
   const bild = bildVon(m, m.ich ? (m.name || name) : name);
   const b = belohnungFuer(m.platz);
@@ -99,7 +115,7 @@ function zeile(m) {
     ? `<button class="lg-gr-lohn" type="button" data-art="${esc(b.art)}" aria-expanded="false"
         aria-label="${esc(T('belohnung', { platz: zahl(m.platz) }) + ': ' + lohnKurz(b))}">${lohnBild(b)}</button>`
     : '<span class="lg-gr-lohn-leer" aria-hidden="true"></span>';
-  const info = b ? `<p class="lg-gr-info" hidden>${esc(T('belohnung', { platz: zahl(m.platz) }))}: ${esc(lohnText(b))}. ${esc(T('gemerkt'))}</p>` : '';
+  const info = b ? preisKarte(m, b, stufe) : '';
   return `<li class="lg-gr-zeile${m.ich ? ' ich' : ''}" data-platz="${esc(m.platz)}"${m.ki ? ' data-ki="1"' : ''}${bild.banner ? ` data-banner="${esc(bild.banner)}"` : ''}>
     ${bild.banner ? `<span class="lg-gr-streifen" aria-hidden="true" style="background-image:url('${B.bannerUrl(bild.banner)}')"></span>` : ''}
     <span class="lg-gr-platz">${esc(zahl(m.platz))}</span>
@@ -191,7 +207,7 @@ function liste(lg) {
     const titel = z === 'bleib' ? `${T('bleib')} · ${name}` : T(z);
     return `<section class="lg-gr-abschnitt" data-zone="${z}">
       <h3>${z === 'auf' ? HOCH : ''}${esc(titel)}</h3>
-      <ol>${ms.map((m) => zeile(m).replace('<li ', sichtbar.includes(m) ? '<li ' : '<li hidden data-eingeklappt="1" ')).join('')}</ol>
+      <ol>${ms.map((m) => zeile(m, lg.stufe).replace('<li ', sichtbar.includes(m) ? '<li ' : '<li hidden data-eingeklappt="1" ')).join('')}</ol>
       ${versteckt ? `<button class="lg-gr-mehr" type="button" aria-expanded="false" data-n="${versteckt}">${esc(T('mehr', { n: zahl(versteckt) }))}</button>` : ''}
     </section>`;
   }).join('');

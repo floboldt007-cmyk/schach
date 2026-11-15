@@ -324,3 +324,38 @@
 .lg-welt-elo { display: inline-flex; align-items: baseline; gap: 4px; font-family: var(--display); font-weight: var(--gw-titel); font-size: 16px;
   color: var(--text); font-variant-numeric: tabular-nums; }
 .lg-welt-elo small { font-family: inherit; font-size: 12px; font-weight: 700; color: var(--text-2); }
+
+/* ---------- R19 Liga neu (15.11.2026, Flo: "billig, viel Text, wenig Farbe"): Preis und Platz als Bild ---------- */
+/* Belohnung einer Zeile: der echte Preis gross in einem Goldrahmen, daneben ein warmer Satz statt einer Erklaerung */
+.lg-gr-info.lg-gr-preis { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; margin: 2px 0 8px;
+  padding: 12px 14px; border-radius: var(--r-l); color: var(--text);
+  background: radial-gradient(closest-side at 18% 50%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 72%), var(--flaeche-2);
+  box-shadow: inset 0 0 0 2px var(--gold), var(--s1); }
+.lg-gr-info.lg-gr-preis[hidden] { display: none; }
+.lg-gr-preis-bild { display: grid; place-items: center; min-width: 64px; }
+/* das Banner ist 4:1 mit dem Wappen links; der 2:1-Ausschnitt beginnt links, damit das Wappen ganz zu sehen ist */
+.lg-gr-preis-bild img { display: block; width: 128px; height: 64px; object-fit: cover; object-position: left center; border-radius: var(--r-m);
+  box-shadow: 0 0 0 2px var(--gold), var(--s2); }
+.lg-gr-preis-bild svg { width: 64px; height: 64px; }
+.lg-gr-preis-text { display: grid; gap: 4px; min-width: 0; }
+.lg-gr-preis-text b { font-family: var(--display); font-size: 16px; font-weight: var(--gw-titel); color: var(--text); }
+.lg-gr-preis-text span { font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--text-2); }
+
+/* Weltrangliste, eigene Platz-Karte (Variante A): Banner oben, Platz gross in Gold, darunter der Weg zum naechsten Platz */
+.lg-welt-platz { position: relative; display: grid; gap: 10px; width: 100%; min-width: 0; padding: 0 0 14px; overflow: hidden;
+  border-radius: var(--r-l); background: var(--flaeche-2); box-shadow: inset 0 0 0 2.5px var(--gold), var(--s2); }
+.lg-welt-platz-banner { display: block; height: 72px; background: center / cover no-repeat;
+  -webkit-mask-image: linear-gradient(180deg, black 55%, transparent); mask-image: linear-gradient(180deg, black 55%, transparent); }
+.lg-welt-platz-kopf { display: flex; align-items: center; gap: 14px; min-width: 0; margin-top: -30px; padding: 0 16px; }
+/* Gold auf hellem Grund hat nur gut 2:1, darum eine dunkle Plakette in beiden Themen (Gold darauf deutlich ueber 3:1) */
+.lg-welt-platz-rang { flex: none; padding: 2px 14px; border-radius: 999px; background: color-mix(in srgb, var(--gold) 14%, black); color: var(--gold);
+  box-shadow: inset 0 0 0 2px var(--gold), var(--s1); font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel);
+  line-height: 1.1; font-variant-numeric: tabular-nums; }
+.lg-welt-platz-wer { display: grid; min-width: 0; padding-top: 22px; }
+.lg-welt-platz-wer b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; color: var(--text); }
+.lg-welt-platz-wer span { font-size: 14px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.lg-welt-teilnahme .lg-welt-platz-ziel { display: flex; align-items: center; gap: 6px; margin: 0 16px; font-size: 14.5px; font-weight: 700; color: var(--text); }
+.lg-welt-platz-ziel .ico { width: 18px; height: 18px; color: var(--gold); }
+.lg-welt-platz-balken { display: block; height: 8px; margin: 0 16px; overflow: hidden; border-radius: 999px; background: var(--flaeche-3); }
+.lg-welt-platz-balken i { display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 60%, var(--flaeche)), var(--gold)); }

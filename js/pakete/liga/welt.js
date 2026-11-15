@@ -70,6 +70,32 @@ function standText(lage) {
   return '';
 }
 
+// Platz-Karte (R19 Liga neu, Flos Variante A): dein Banner, der Platz gross in Gold, Name und Elo, darunter der Abstand zum
+// naechsten Platz mit Balken. Der Balken misst den Weg vom Platz unter dir (dessen Elo) bis zum Platz ueber dir; ohne
+// jemanden unter dir zaehlt derselbe Abstand nach unten. Der Satz "Du bist auf Platz …" bleibt fuer den Vorleser (.sr).
+function platzKarte(lage, stand) {
+  const i = lage.ich;
+  const mein = lage.liste.find((z) => z.ich);
+  const ueber = lage.liste.filter((z) => z.rang < i.rang && z.elo > i.elo).at(-1);
+  const unter = lage.liste.find((z) => z.rang > i.rang && z.elo < i.elo);
+  let ziel = `<p class="lg-welt-platz-ziel">${icon('krone')}${esc(T('platz.erster'))}</p>`;
+  if (ueber) {
+    const n = ueber.elo - i.elo;
+    const basis = unter ? unter.elo : i.elo - n;
+    const anteil = Math.round(Math.min(0.95, Math.max(0.05, (i.elo - basis) / (ueber.elo - basis))) * 100);
+    ziel = `<p class="lg-welt-platz-ziel">${esc(T('platz.abstand', { n: zahl(n), platz: zahl(ueber.rang) }))}</p>
+      <span class="lg-welt-platz-balken" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${anteil}"
+        aria-valuetext="${esc(T('platz.balken', { n: zahl(n), platz: zahl(ueber.rang) }))}"><i style="width:${anteil}%"></i></span>`;
+  }
+  return `<article class="lg-welt-platz" data-rang="${esc(i.rang)}">
+    <span class="lg-welt-platz-banner" aria-hidden="true" style="background-image:url('${B.bannerUrl(mein ? mein.banner : 'start')}')"></span>
+    <p class="lg-welt-stand sr" data-status="dabei">${esc(stand)}</p>
+    <div class="lg-welt-platz-kopf" aria-hidden="true"><span class="lg-welt-platz-rang">#${esc(zahl(i.rang))}</span>
+      <span class="lg-welt-platz-wer">${mein ? `<b>${esc(mein.name)}</b>` : ''}<span>${esc(T('elo'))} ${esc(zahl(i.elo))}</span></span></div>
+    ${ziel}
+  </article>`;
+}
+
 export function reiterWelt() {
   const s = huelleWelt();
   s.hidden = false;
@@ -91,7 +117,8 @@ export function reiterWelt() {
       ? `<button class="knopf lg-welt-austreten" type="button">${esc(T('austreten'))}</button>`
       : `<button class="knopf primaer lg-welt-mitmachen" type="button">${esc(T('mitmachen'))}</button>`;
     const oben = lage.teilnahme
-      ? `${stand ? `<p class="lg-welt-stand" data-status="${lage.ich.status}">${esc(stand)}</p>` : ''}`
+      ? (lage.ich.status === 'dabei' ? platzKarte(lage, stand)
+        : `${stand ? `<p class="lg-welt-stand" data-status="${lage.ich.status}">${esc(stand)}</p>` : ''}`)
       : `<p class="lg-welt-erklaerung">${esc(T('erklaerung', { ab: zahl(lage.ab) }))}${lage.abStart
         ? ` ${esc(T('erklaerungStart', { abStart: zahl(lage.abStart) }))}` : ''}</p>`;
     const liste = lage.liste.length

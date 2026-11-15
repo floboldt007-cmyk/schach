@@ -156,3 +156,12 @@ html[data-bewegung="aus"] .ss-ende-held { animation: none; }
 .st-moment.ruhig { animation: st-ein 200ms ease-out both; }
 @keyframes st-ein { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .st-moment.ruhig { animation: none; } }
+
+/* R19 Liga neu (15.11.2026): Freunde in der Liga mit festem Farbton aus dem Namen (freunde.js setzt --fr-ton); die Schrift
+   bleibt weiss, die Helligkeit ist fuer jeden Farbton gleich (oklch), damit der Buchstabe immer lesbar bleibt */
+.bl-fr-av[style*="--fr-ton"] { background: oklch(46% .13 var(--fr-ton)); color: #fff; }
+/* das Lebendige: der aufgeklappte Preis in der Liga schwebt sanft, einmal hin und zurueck je vier Sekunden */
+.lg-gr-preis:not([hidden]) .lg-gr-preis-bild > * { animation: lg-preis-schweben 4s ease-in-out infinite alternate; }
+@keyframes lg-preis-schweben { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .lg-gr-preis:not([hidden]) .lg-gr-preis-bild > * { animation: none; } }
+html[data-bewegung="aus"] .lg-gr-preis:not([hidden]) .lg-gr-preis-bild > * { animation: none; }
