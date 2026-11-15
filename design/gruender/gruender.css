@@ -1,0 +1,146 @@
+/* Gruender-Paket, Vorschau (design/gruender/gruender.js). Stil der Premium-Seite (css/premium.css, Leitlinie R19): dunkel und
+   edel, Gold als Akzent, ruhige Karten mit feiner Kante, die empfohlene Karte mit Gold-Rahmen und Plakette. Bewegung nur
+   transform und opacity; "Bewegung aus" (html[data-bewegung="aus"], css/tokens.css) und prefers-reduced-motion zeigen ein
+   Standbild. */
+body { overflow-y: auto; }
+.gr-seite { max-width: 1120px; margin: 0 auto; padding: 18px var(--rand) 48px; display: grid; gap: 18px; }
+.gr-seite .pm-held { padding: 22px 18px 20px; }
+.gr-held-bild { width: 150px; height: 150px; }
+.gr-held-bild svg { width: 100%; height: 100%; display: block; }
+.gr-hinweis { margin: 4px 0 0; display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: var(--r-pille);
+  background: var(--gold-weich); box-shadow: inset 0 0 0 1.5px var(--gold); color: var(--text); font-weight: 700; font-size: 13px; }
+
+.gr-teil { display: grid; gap: 12px; }
+.gr-varianten { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding-top: 10px; }
+.gr-karte { position: relative; display: grid; align-content: start; justify-items: center; gap: 10px; padding: 20px 12px 16px;
+  border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--s1), var(--kante); text-align: center; min-width: 0; }
+.gr-karte.ist-empfohlen { background: color-mix(in srgb, var(--gold) 9%, var(--flaeche)); box-shadow: inset 0 0 0 2.5px var(--gold), var(--s2); }
+.gr-karte-name { margin: 2px 0 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 19px; letter-spacing: -.02em; color: var(--text); }
+.gr-karte-satz { margin: -4px 0 0; max-width: 30ch; color: var(--text-2); font-weight: 600; font-size: 13.5px; line-height: 1.4; text-wrap: balance; }
+.gr-profil { width: min(170px, 70%); aspect-ratio: 1; }
+.gr-profil svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+/* ---------- Spielerleiste wie in der Partie (css/partie.css .spieler) ---------- */
+.gr-leiste { width: 100%; max-width: 330px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto;
+  column-gap: 12px; align-items: center; padding: 8px 10px; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); text-align: left; }
+.gr-av { grid-row: 1 / 3; width: 46px; height: 46px; border-radius: 15px; overflow: hidden; background: var(--flo-grund); }
+.gr-av svg { display: block; width: 100%; height: 100%; }
+.gr-name-zeile { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.gr-name { font-weight: 800; font-size: 16px; line-height: 1.25; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gr-elo { grid-column: 2; font-size: 12.5px; font-weight: 650; color: var(--text-2); }
+.gr-uhr { grid-column: 3; grid-row: 1 / 3; padding: 6px 10px; border-radius: 10px; background: var(--flaeche); box-shadow: var(--kante);
+  font-variant-numeric: tabular-nums; font-weight: 800; font-size: 17px; color: var(--text); }
+
+/* ---------- Steigerung: erspielt, Premium, Gruender ---------- */
+.gr-stufen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.gr-stufe { display: grid; gap: 8px; justify-items: center; padding: 14px 12px; border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
+.gr-stufe.ist-gruender { background: color-mix(in srgb, var(--gold) 9%, var(--flaeche)); box-shadow: inset 0 0 0 2.5px var(--gold), var(--s2); }
+.gr-stufe-was { font-size: 12.5px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+.gr-stufe.ist-gruender .gr-stufe-was { color: color-mix(in srgb, var(--gold) 72%, var(--text)); }
+
+/* ---------- Zeichen am Namen ---------- */
+.gz { display: inline-flex; align-items: center; flex: none; }
+.gz-krone { width: 17px; height: 17px; }
+.gz-premium { color: var(--gold); }
+.gz-siegel { width: 22px; height: 22px; }
+.gz-siegel-bild { width: 100%; height: 100%; overflow: visible; }
+.gz-siegel-strahlen { transform-origin: 20px 20px; animation: gz-dreh 12s linear infinite; }
+.gz-siegel-strahlen path { stroke: var(--gold); stroke-width: 2.2; stroke-linecap: round; }
+.gz-siegel-funke { transform-box: fill-box; transform-origin: center; animation: gz-funke 3.2s ease-in-out infinite; }
+.gz-goldkrone { color: var(--gold); }
+.gz-goldname { background: linear-gradient(100deg, #B9780E 0%, #E9B23A 30%, #FFF3C4 45%, #E9B23A 60%, #B9780E 100%) 0 0 / 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: gz-glanz 3.6s ease-in-out infinite; }
+:root[data-modus="hell"] .gz-goldname { background-image: linear-gradient(100deg, #8A5806 0%, #B9780E 30%, #E9B23A 45%, #B9780E 60%, #8A5806 100%); }
+.gz-plakette { position: relative; overflow: hidden; gap: 3px; padding: 2px 7px 2px 5px; border-radius: var(--r-pille);
+  background: linear-gradient(180deg, #FFE08A, #E0A22B); color: #2A1A00; font-size: 10.5px; font-weight: 850; letter-spacing: .06em; box-shadow: inset 0 0 0 1px #7A4E06; }
+.gz-plakette .gz-krone { width: 12px; height: 12px; }
+.gz-plakette::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .75) 50%, transparent 70%);
+  transform: translateX(-120%); animation: gz-streif 3.6s ease-in-out infinite; }
+.gr-profilname { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 64px; }
+.gr-gross { font-family: var(--display); font-weight: var(--gw-titel); font-size: 32px; letter-spacing: -.03em; color: var(--text); }
+.gr-profilname .gz-siegel { width: 34px; height: 34px; }
+.gr-profilname .gz-krone { width: 26px; height: 26px; }
+.gr-profilname .gz-plakette { font-size: 13px; padding: 3px 10px 3px 7px; }
+.gr-profilname .gz-plakette .gz-krone { width: 15px; height: 15px; }
+@keyframes gz-dreh { to { transform: rotate(360deg); } }
+@keyframes gz-funke { 0%, 70%, 100% { transform: scale(.2); opacity: 0; } 82% { transform: scale(1.2); opacity: 1; } }
+@keyframes gz-glanz { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0 0; } }
+@keyframes gz-streif { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+
+/* ---------- Gruender-Rahmen: Lichtlauf ---------- */
+.gr-lauf { animation: rk-drehen 3.2s linear infinite; }
+
+/* ---------- Finisher auf dem Mini-Brett (Schleife 5 s) ---------- */
+.gf { width: min(260px, 92%); }
+.gf-brett { --zyklus: 5s; position: relative; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); border-radius: 12px; overflow: hidden;
+  box-shadow: var(--s2); container-type: inline-size; }
+.gf-feld { background: #EEE3CF; }
+.gf-feld.d { background: #A8876A; }
+.gf-zuletzt { position: absolute; width: 12.5%; height: 12.5%; background: rgba(255, 196, 70, .45); }
+.gf-figur { position: absolute; width: 12.5%; height: 12.5%; pointer-events: none; }
+.gf-effekt { position: absolute; inset: 0; pointer-events: none; }
+.gf-effekt > * { position: absolute; }
+.gf-dunkel { inset: 0; background: radial-gradient(circle at var(--fx) var(--fy), transparent 0 12%, rgba(10, 8, 4, .55) 60%); opacity: 0;
+  animation: gf-dunkel var(--zyklus) ease-in-out infinite; }
+.gf-welle { left: var(--fx); top: var(--fy); width: 20%; aspect-ratio: 1; margin: -10% 0 0 -10%; border-radius: 50%; box-shadow: 0 0 0 3px #FFE08A, 0 0 18px 4px rgba(255, 210, 100, .6);
+  opacity: 0; animation: gf-welle var(--zyklus) ease-out infinite; }
+.gf-welle-mitte { left: 50%; top: 50%; }
+.gf-kranz { left: var(--fx); top: var(--fy); width: 62%; height: 62%; margin: -31% 0 0 -31%; opacity: 0; animation: gf-kranz var(--zyklus) ease-out infinite; }
+.gf-kranz path { stroke: #FFD86A; stroke-width: 4; stroke-linecap: round; }
+.gf-krone { left: var(--fx); top: var(--fy); width: 16%; margin: -14% 0 0 -8%; overflow: visible; filter: drop-shadow(0 3px 4px rgba(40, 24, 0, .5)); }
+.gf-faellt { animation: gf-faellt var(--zyklus) cubic-bezier(.3, 0, .4, 1) infinite; }
+.gf-springt { animation: gf-springt var(--zyklus) ease-out infinite; }
+.gf-regen { inset: 0; }
+.gf-funke { position: absolute; width: calc(5% * var(--s)); opacity: 0; animation: gf-funke var(--zyklus) ease-in-out infinite; animation-delay: var(--v); }
+.gf-schild { left: 50%; bottom: 7%; transform: translateX(-50%); padding: 4px 14px; border-radius: 999px; background: linear-gradient(180deg, #FFE08A, #E0A22B);
+  color: #2A1A00; font-weight: 850; font-size: max(11px, 5.4cqi); letter-spacing: .14em; box-shadow: 0 4px 14px rgba(40, 24, 0, .45), inset 0 0 0 1.5px #7A4E06;
+  opacity: 0; animation: gf-schild var(--zyklus) ease-out infinite; }
+.gf-gold { width: 12.5%; height: 12.5%; background: linear-gradient(135deg, #FFF3C4, #E9B23A 45%, #B9780E); opacity: 0; mix-blend-mode: multiply;
+  animation: gf-gold var(--zyklus) ease-in-out infinite; animation-delay: var(--v); }
+.gf-siegel { left: 50%; top: 50%; width: 48%; aspect-ratio: 1; margin: -24% 0 0 -24%; opacity: 0; filter: drop-shadow(0 6px 10px rgba(30, 18, 0, .55));
+  animation: gf-siegel var(--zyklus) cubic-bezier(.2, .8, .3, 1.2) infinite; }
+.gf-siegel svg { width: 100%; height: 100%; }
+.gf-siegel .gz-siegel-strahlen path { stroke: #FFD86A; }
+
+@keyframes gf-dunkel { 0%, 10% { opacity: 0; } 22%, 80% { opacity: 1; } 95%, 100% { opacity: 0; } }
+@keyframes gf-faellt { 0% { transform: translateY(-420%) scale(1.3); opacity: 0; } 6% { opacity: 1; } 20% { transform: translateY(0) scale(1); }
+  24% { transform: translateY(-12%) scale(1.04); } 28%, 82% { transform: translateY(0) scale(1); opacity: 1; } 95%, 100% { opacity: 0; transform: translateY(0) scale(1); } }
+@keyframes gf-springt { 0%, 52% { transform: scale(0); opacity: 0; } 62% { transform: scale(1.25); opacity: 1; } 68%, 84% { transform: scale(1); opacity: 1; } 96%, 100% { transform: scale(1); opacity: 0; } }
+@keyframes gf-welle { 0%, 19% { transform: scale(.2); opacity: 0; } 21% { opacity: 1; } 45%, 100% { transform: scale(7); opacity: 0; } }
+@keyframes gf-kranz { 0%, 19% { transform: scale(.3) rotate(0); opacity: 0; } 28% { transform: scale(1.05) rotate(20deg); opacity: .95; }
+  80% { transform: scale(1) rotate(80deg); opacity: .85; } 95%, 100% { transform: scale(1) rotate(95deg); opacity: 0; } }
+@keyframes gf-funke { 0%, 22% { transform: translateY(-30%) scale(.3); opacity: 0; } 34% { opacity: 1; transform: translateY(0) scale(1); }
+  70% { opacity: .9; } 88%, 100% { transform: translateY(160%) scale(.5); opacity: 0; } }
+@keyframes gf-schild { 0%, 30% { transform: translate(-50%, 40%); opacity: 0; } 40%, 82% { transform: translate(-50%, 0); opacity: 1; } 95%, 100% { transform: translate(-50%, 0); opacity: 0; } }
+@keyframes gf-gold { 0%, 4% { opacity: 0; } 12% { opacity: .95; } 46% { opacity: .9; } 52% { opacity: 1; } 84% { opacity: .9; } 96%, 100% { opacity: 0; } }
+@keyframes gf-siegel { 0%, 6% { transform: scale(2.6) rotate(-18deg); opacity: 0; } 20% { transform: scale(.94) rotate(0); opacity: 1; } 26%, 82% { transform: scale(1) rotate(0); opacity: 1; }
+  95%, 100% { transform: scale(1); opacity: 0; } }
+
+/* ---------- Standbild: "Bewegung aus" und weniger Bewegung ----------
+   tokens.css kuerzt die Animationen auf einen Durchlauf; fuer das Standbild setzen wir den Endzustand der Schleife ausdruecklich */
+html[data-bewegung="aus"] .rk, html[data-bewegung="aus"] .gz-siegel-strahlen, html[data-bewegung="aus"] .gz-siegel-funke,
+html[data-bewegung="aus"] .gz-goldname, html[data-bewegung="aus"] .gz-plakette::after { animation: none !important; }
+html[data-bewegung="aus"] .gf-effekt > *, html[data-bewegung="aus"] .gf-funke, html[data-bewegung="aus"] .gf-gold { animation: none !important; opacity: 1; }
+html[data-bewegung="aus"] .gf-welle, html[data-bewegung="aus"] .gf-regen, html[data-bewegung="aus"] .gz-siegel-funke { opacity: 0; }
+html[data-bewegung="aus"] .gf-gold { opacity: .9; }
+@media (prefers-reduced-motion: reduce) {
+  .gr-lauf, .gz-siegel-strahlen, .gz-siegel-funke, .gz-goldname, .gz-plakette::after { animation: none; }
+  .gf-effekt > *, .gf-funke, .gf-gold { animation: none; opacity: 1; }
+  .gf-welle, .gf-regen, .gz-siegel-funke { opacity: 0; }
+}
+
+/* ---------- Ausschnitte fuer die Bilder (?nur=...) ---------- */
+.gr-inhalt { display: grid; gap: 22px; }
+:root[data-nur="steigerung"] .gr-teil:not([data-teil="steigerung"]), :root[data-nur="rahmen"] .gr-teil:not([data-teil="rahmen"]),
+:root[data-nur="finisher"] .gr-teil:not([data-teil="finisher"]), :root[data-nur="zeichen"] .gr-teil:not([data-teil="zeichen"]) { display: none; }
+:root[data-nur]:not([data-nur="alles"]) .pm-held { display: none; }
+
+/* ---------- Handy ---------- */
+@media (max-width: 760px) {
+  .gr-varianten, .gr-stufen { grid-template-columns: minmax(0, 1fr); }
+  .gr-seite { gap: 14px; padding-top: 12px; }
+  .gr-held-bild { width: 120px; height: 120px; }
+  .gr-karte { padding-top: 18px; }
+  .gr-profil { width: 150px; }
+  .gf { width: min(300px, 86%); }
+}
