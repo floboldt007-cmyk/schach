@@ -8,6 +8,9 @@
 //   Analyse: Felder ganz im Sockel, keine waagrechte Rolle (die Analyse zeigt die Koordinaten immer in der Ecke)
 //   Brettwechsel waehrend der Partie (nacht, gruen, holz, nacht): Felder danach weiter ganz im Sockel, Effekt-Ebene
 //   deckungsgleich (iPhone SE mit "rand": --brett und Sockel lagen nach dem Wechsel 8 px auseinander, js/ui/partie.js layout)
+// Grenze (Kaltreview df 15.11.): mit Sockel-Rand 7 px (Handy quer, quer unter 1000 px Breite) passte "rand" auf 7ecabd1
+// schon, dort bleibt das Brett gleich gross wie mit "ecke". Gerollt hat es nur mit Sockel-Rand 4 px (quer ab 1000 px, auch
+// bei 440 px Hoehe; hoch ab 601 px). Darum auch Handy quer, 999 x 700 und 1000 x 440.
 // Vorlage: der ungecommittete Rot-Lauf von Fenster 4e (schach-R19-rand-handy), uebernommen von 8a.
 //
 //   node tests/r19-rand-handy.mjs
@@ -33,8 +36,10 @@ const BILDER = process.env.BILDER || '';
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// [name, breite, hoehe, touch, gleich]: gleich = Brett mit "rand" so gross wie mit "ecke" (so war es auf 7ecabd1)
 const GERAETE = [['iphone13', 390, 844, true], ['se', 375, 667, true], ['ipad-hoch', 820, 1180, true], ['ipad-quer', 1180, 820, true],
-  ['pc1280', 1280, 720, false], ['pc1440', 1440, 900, false]];
+  ['pc1280', 1280, 720, false], ['pc1440', 1440, 900, false], ['iphone13-quer', 844, 390, true, true], ['se-quer', 667, 375, true, true],
+  ['quer-999x700', 999, 700, true, true], ['quer-1000x440', 1000, 440, false]];
 
 let ok = 0, gesamt = 0;
 function pruefe(name, gut, detail = '') {
@@ -76,11 +81,11 @@ let browser;
 try {
   for (let i = 0; i < 60 && !(await antwortetOk(BASIS)); i++) await warte(150);
   browser = await browserTyp(pw).launch({ headless: true });
-  for (const [name, w, h, touch] of GERAETE) {
+  for (const [name, w, h, touch, gleich] of GERAETE) {
     const werte = {};
     for (const lage of ['ecke', 'rand']) {
       const fehler = [];
-      const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: touch, isMobile: touch && w < 700,
+      const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: touch, isMobile: touch && Math.min(w, h) < 700,
         serviceWorkers: 'block', locale: 'de-DE' });
       await k.route('**/*.supabase.co/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
       await k.addInitScript((lage) => {
@@ -140,6 +145,7 @@ try {
     }
     const e = werte.ecke, r = werte.rand;
     pruefe(`${name}: Brett mit "rand" hoechstens 16 px kleiner als mit "ecke" (${r1(r.breite)} gegen ${r1(e.breite)})`, r.breite >= e.breite - 16 && r.breite <= e.breite + 0.5);
+    if (gleich) pruefe(`${name}: Brett mit "rand" gleich gross wie mit "ecke" wie auf 7ecabd1 (${r1(r.breite)} gegen ${r1(e.breite)})`, Math.abs(r.breite - e.breite) <= 0.5);
     pruefe(`${name}: Spalte rollt mit "rand" nicht mehr als mit "ecke" (${r.rolleY} gegen ${e.rolleY})`, r.rolleY <= e.rolleY + 0.5);
     pruefe(`${name}: Analyse-Brett gleich in beiden Lagen`, versatz(werte.eckeAnalyse.felder, werte.randAnalyse.felder) <= 0.5);
   }

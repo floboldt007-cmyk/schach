@@ -176,8 +176,12 @@
 
 /* Koordinaten am Rand: der Sockel ist links und unten 12 px statt --rahmen (css/app.css .brett-rahmen:has(> .brett.koord-rand)).
    Die Brett-Formeln ziehen das Mehr einmal je Richtung ab, sonst ragt das Brett ueber den Sockel und die Spalte rollt.
-   Nie negativ: ein breiterer Sockel (Motiv-Band) hat die 12 px schon. */
-.partie:has(.brett.koord-rand) { --koord-extra: max(0px, 12px - var(--rahmen)); }
+   Nie negativ: ein breiterer Sockel (Motiv-Band) hat die 12 px schon.
+   Nur wo --rahmen 4px ist (die zwei Bloecke unten): mit 7 px (Handy quer, quer unter 1000 px) passte "rand" schon und das
+   Brett bleibt so gross wie mit "ecke" (gemessen 15.11., tests/r19-rand-handy.mjs); Handy hoch rechnet layout() in partie.js. */
+@media (orientation: landscape) and (min-width: 1000px), (orientation: portrait) and (min-width: 601px) {
+  .partie:has(.brett.koord-rand) { --koord-extra: max(0px, 12px - var(--rahmen)); }
+}
 
 /* ============================================================
    QUER (iPad quer, Desktop): Brett links, eine Spalte rechts
