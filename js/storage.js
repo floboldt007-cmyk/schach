@@ -925,7 +925,12 @@ export function ladeLaufendePartie() {
     const x = Array.isArray(s.zeiten) ? s.zeiten[i] : undefined;
     return Number.isInteger(x) && x >= 0 && x <= 864000 ? x : null;
   });
-  return normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra, zeitenJe });
+  const n = normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra, zeitenJe });
+  // R19 Uhr: mit Bedenkzeit rechnet die Uhr beim Fortsetzen ab gestartet (js/ui/partie.js); fehlt es, ist es kaputt oder
+  // liegt es in der Zukunft, braechte der Stand Zeit zurueck -> wie ein kaputter Zug keine laufende Partie
+  const start = Date.parse(n.gestartet);
+  if (n.tempo && !(Number.isFinite(start) && start <= Date.now())) return null;
+  return n;
 }
 
 export function loescheLaufendePartie() {

@@ -2748,14 +2748,18 @@ export function zeige(root, params, app) {
         const vonFlo = (i) => (i % 2 === 0) === (startFarbe === farbe);
         const floOffen = z.zuege.map((_, i) => i).filter((i) => !bekannt(i) && vonFlo(i));
         for (const i of z.zuege.keys()) if (!bekannt(i) && !vonFlo(i)) z.zeiten[i] = z.tempo.zuschlag * 10;
-        // ohne gueltigen Start: wie bisher den Zuschlag, dann bringt der Eintrag wenigstens nichts zurueck
+        // ohne gueltigen Start: wie bisher den Zuschlag. Ein geladener Stand kommt so nicht an (js/storage.js verwirft mit
+        // tempo einen ungueltigen gestartet), der Zweig faengt nur einen Aufrufer ohne storage ab
         if (!Number.isFinite(start)) for (const i of floOffen) z.zeiten[i] = z.tempo.zuschlag * 10;
         else {
           floOffen.forEach((i, n) => {
             const teil = Math.floor(offen / (floOffen.length - n));
             z.zeiten[i] = teil; offen -= teil;
           });
-          wandSeit = ende;
+          // bis jetzt laufen nur, wenn ein Eintrag von Flo die Wanduhr aufgenommen hat oder uhr.seit gilt; sonst wie mit
+          // gueltigen zeiten ab Start plus nur den gueltig gebuchten Eintraegen (ohne den ersetzten Bot-Zuschlag, Kaltreview 64)
+          wandSeit = floOffen.length || (lauf && Number.isFinite(lauf.seit))
+            ? ende : start + z.zuege.reduce((a, _, i) => a + (bekannt(i) ? je[i] * 100 : 0), 0);
         }
       }
     }

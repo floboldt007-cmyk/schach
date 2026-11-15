@@ -373,6 +373,9 @@ if (!pw) {
       ['Fortsetzen gewertet, ein zeiten-Wert ungueltig: kein Zeitgewinn', (l) => { l.zeiten[0] = -1; }],
       ['Fortsetzen gewertet, zeiten fehlen: kein Zeitgewinn', (l) => { delete l.zeiten; }],
       ['Fortsetzen gewertet, uhr fehlt: der laufende Zug zaehlt trotzdem (Wanduhr)', (l) => { delete l.uhr; }],
+      // Kaltreview 64 Befund 1: zeiten verworfen, aber kein unbekannter Eintrag von Flo, der den Rest aufnimmt
+      ['Fortsetzen gewertet, ein zeiten-Eintrag zu viel und uhr fehlt: kein Zeitgewinn', (l) => { l.zeiten.push(0); delete l.uhr; }],
+      ['Fortsetzen gewertet, Bot-Eintrag ungueltig und uhr fehlt: kein Zeitgewinn', (l) => { l.zeiten[1] = -1; delete l.uhr; }],
     ]) {
       await pruefe(name, async () => {
         const { k, s } = await neueSeite(browser);
