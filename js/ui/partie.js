@@ -1471,10 +1471,18 @@ export function zeige(root, params, app) {
     if (weg) return false;
     if (z.phase === 'bot' && app.einstellungen().vorzuege !== false) return merkeVorzug(von, nach, umwandlung);
     if (z.phase !== 'flo') return false;
+    if (zeitAus()) return false;
     let m = null;
     try { m = z.chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { m = null; }
     if (!m) return false;
     spieleEigenenZug(m, info && Number.isFinite(info.landung) ? info.landung : brett.gleitDauer());
+    return true;
+  }
+  // R19 Uhr: nur der 100-ms-Takt beendet die Partie bei Zeitende; haengt er (belegter Hauptfaden, gedrosselter
+  // Hintergrund), wird ein spaeter Zug nicht gebucht, sondern die Partie endet hier mit 'zeit'
+  function zeitAus() {
+    if (!schachuhr || z.phase === 'ende' || !schachuhr.abgelaufen(Date.now())) return false;
+    uhrTick();
     return true;
   }
 
@@ -1488,7 +1496,7 @@ export function zeige(root, params, app) {
   }
 
   function fuehreVorzugAus() {
-    if (!z.vorzuege.length || weg || z.phase === 'ende') return false;
+    if (!z.vorzuege.length || weg || z.phase === 'ende' || zeitAus()) return false;
     const v = z.vorzuege.shift();
     let m = null;
     try { m = z.chess.move({ from: v.von, to: v.nach, promotion: v.umwandlung || 'q' }); } catch (e) { m = null; }
@@ -1631,6 +1639,7 @@ export function zeige(root, params, app) {
   }
 
   function fuehreBotZugAus(uci) {
+    if (zeitAus()) return;
     let m = null;
     try { m = z.chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || undefined }); } catch (e) { m = null; }
     if (!m) { const n = notZug(); if (n && n.uci !== uci) fuehreBotZugAus(n.uci); return; }
@@ -2720,13 +2729,22 @@ export function zeige(root, params, app) {
   if (handyMq && handyMq.addEventListener) handyMq.addEventListener('change', layout);
   if (z.tempo) {
     uhr.zeige(true);
-    // R19 Uhr: Rest aus den gespeicherten zeiten (aeltere Partien ohne zeiten: 0 je Halbzug) und dem laufenden Zug
-    if (!z.zeiten || z.zeiten.length !== z.zuege.length) z.zeiten = z.zuege.map((_, i) => (z.zeiten && z.zeiten[i]) || 0);
+    // R19 Uhr: Rest aus den gespeicherten zeiten und dem laufenden Zug. Ein unbekannter Eintrag (alter Stand ohne zeiten
+    // oder ungueltiger Wert, laufend.zeitenJe aus js/storage.js) zaehlt 0, in der gewerteten Partie den Zuschlag: so
+    // bringt er dort keine Zeit zurueck
+    if (!z.zeiten || z.zeiten.length !== z.zuege.length) {
+      const je = laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : [];
+      const unbekannt = uhrGewertet ? z.tempo.zuschlag * 10 : 0;
+      z.zeiten = z.zuege.map((_, i) => (Number.isInteger(je[i]) ? je[i] : unbekannt));
+    }
     const lauf = laufend && laufend.uhr && typeof laufend.uhr === 'object' ? laufend.uhr : null;
-    const r = restAusZeiten(z.tempo, z.zeiten, {
-      startFarbe,
-      ...(lauf ? (uhrGewertet ? { laufSeit: lauf.seit, jetzt: Date.now() } : { laufVerbraucht: lauf.verbraucht }) : {}),
-    });
+    let laufOpt = {};
+    if (laufend && uhrGewertet) {
+      // ohne gueltige uhr nicht "laeuft seit jetzt": Wanduhr seit dem Start der Partie minus die gebuchten Zeiten
+      const seit = lauf && Number.isFinite(lauf.seit) ? lauf.seit : Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
+      if (Number.isFinite(seit)) laufOpt = { laufSeit: seit, jetzt: Date.now() };
+    } else if (lauf) laufOpt = { laufVerbraucht: lauf.verbraucht };
+    const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe, ...laufOpt });
     schachuhr = neueUhr({ ...z.tempo, amZug: r.amZug, w: r.w, b: r.b });
     zeigeUhr(Date.now());
     duellBereit.then(() => {

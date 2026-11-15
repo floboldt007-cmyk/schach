@@ -919,7 +919,13 @@ export function ladeLaufendePartie() {
   const modus = MODI.includes(s.modus) ? s.modus : 'normal';
   const ziel = modus === 'uebung' ? pruefeZiel(s.ziel) : null;
   const extra = pruefeExtra(s.extra) || {};
-  return normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra });
+  // R19 Uhr: zeitenJe prueft jeden Eintrag einzeln (ungueltig oder fehlend: null), damit die Uhr beim Fortsetzen nicht
+  // alle Zeiten verliert, wenn einer kaputt ist; zeiten selbst verwirft pruefeZeiten weiter im Ganzen
+  const zeitenJe = zuege.map((_, i) => {
+    const x = Array.isArray(s.zeiten) ? s.zeiten[i] : undefined;
+    return Number.isInteger(x) && x >= 0 && x <= 864000 ? x : null;
+  });
+  return normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra, zeitenJe });
 }
 
 export function loescheLaufendePartie() {

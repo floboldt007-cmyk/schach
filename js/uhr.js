@@ -4,7 +4,8 @@
 //     -> { starte(jetzt), zug(jetzt) -> verbraucht ms, halte(jetzt), weiter(jetzt), rest(farbe, jetzt),
 //          abgelaufen(jetzt) -> 'w' | 'b' | null, amZug, laeuft, imZug(jetzt) }
 //     zug: zieht dem Ziehenden die Zeit seit dem Start seines Zugs ab (Pausen zaehlen nicht), gibt ihm den Zuschlag
-//     und laesst die Uhr des Gegners laufen. imZug: im laufenden Zug schon verbraucht (zum Speichern).
+//     und laesst die Uhr des Gegners laufen; nach Ablauf weder Zuschlag noch Wechsel. imZug: im laufenden Zug schon
+//     verbraucht (zum Speichern).
 //   restAusZeiten(tempo, zeiten, { startFarbe, laufVerbraucht?, laufSeit?, jetzt? }) -> { w, b, amZug }
 //     zeiten = verbrauchte Zehntelsekunden je Halbzug (Speicherfeld, js/storage.js). laufVerbraucht: im laufenden Zug
 //     schon verbraucht (Bot-Partie, die Uhr hielt beim Schliessen an); laufSeit + jetzt: Wanduhr seit Beginn des
@@ -40,6 +41,11 @@ export function neueUhr({ grund, zuschlag, amZug, w, b }) {
     },
     zug(jetzt) {
       const verbraucht = imZug(jetzt);
+      // nach Ablauf (der Takt der App kann haengen) kein Zuschlag und kein Wechsel: die Zeit bleibt bei 0, die Uhr steht
+      if (rest[dran] - verbraucht <= 0) {
+        rest[dran] = 0; vorher = 0; seit = null;
+        return verbraucht;
+      }
       const lief = seit != null;
       rest[dran] = Math.max(0, rest[dran] - verbraucht) + plus;
       dran = gegner(dran);
