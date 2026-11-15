@@ -77,6 +77,17 @@ if (U) {
     assert.equal(u.rest('w', 5000), 0);
   });
 
+  // Kaltreview F3: der Takt kann haengen, ein spaeter Zug darf die Zeit nicht mit dem Zuschlag wiederbeleben
+  await pruefe('Zug nach Ablauf: kein Zuschlag, kein Wechsel, bleibt abgelaufen', () => {
+    const u = U.neueUhr({ grund: 1, zuschlag: 5, amZug: 'w' });
+    u.starte(0);
+    u.zug(1500);
+    assert.equal(u.amZug, 'w', 'kein Wechsel');
+    assert.equal(u.rest('w', 2000), 0, 'kein Zuschlag');
+    assert.equal(u.abgelaufen(2000), 'w');
+    assert.equal(u.rest('b', 2000), 1000, 'Gegneruhr unberuehrt');
+  });
+
   await pruefe('Fortsetzen aus zeiten: Abzug je Seite, Zuschlag je eigenem Zug, Seite am Zug', () => {
     const zeiten = [20, 35, 100];
     const r = U.restAusZeiten(T, zeiten, { startFarbe: 'w' });
@@ -329,6 +340,63 @@ if (!pw) {
           else assert.ok(weg <= 2500, `angehalten: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
           const bot = await leseUhr(s, 'bot');
           assert.ok(bot.ms >= 180000, 'Bot-Uhr mit Zuschlag nach seinem Zug: ' + bot.text);
+        } finally { await k.close(); }
+      });
+    }
+
+    // Kaltreview F3: Hauptfaden bis nach dem Ablauf belegt (kein Takt), dann der Zug im selben Abschnitt
+    await pruefe('Zug nach Ablauf ohne Takt: nicht gebucht, Niederlage mit Grund zeit', async () => {
+      const { k, s } = await neueSeite(browser);
+      try {
+        await starte(s, { botId: 'benno', farbe: 'w', tempo: { grund: 2, zuschlag: 10 } });
+        await s.waitForFunction(() => window.__partie.phase() === 'flo', null, { timeout: 15000 });
+        await s.waitForFunction(() => document.querySelector('.screen.partie .uhr[data-wer="flo"]')?.classList.contains('laeuft'), null, { timeout: 10000 });
+        const angenommen = await s.evaluate(() => {
+          const bis = Date.now() + 2600;
+          while (Date.now() < bis) { /* Hauptfaden belegt */ }
+          return window.__partie.brett.beiZug('e2', 'e4');
+        });
+        assert.equal(angenommen, false, 'Zug nach Ablauf angenommen');
+        await warteEnde(s, 5000);
+        assert.equal(await s.evaluate(() => window.__partie?.chess().history().length ?? 0), 0, 'kein Zug gebucht');
+        const p = await letztePartie(s);
+        assert.equal(p.ergebnis, 'niederlage'); assert.equal(p.grund, 'zeit');
+      } finally { await k.close(); }
+    });
+
+    // Kaltreview F1/F2: veraenderter oder alter Speicherstand der gewerteten Partie bringt keine Zeit zurueck
+    // Flo laesst sich 4 s Zeit fuer den ersten Zug, damit ein verlorener Wert als Gewinn messbar waere; die Wanduhr
+    // laeuft in der gewerteten Partie weiter, also muss die Zeit mindestens um die geschlossene Zeit sinken
+    for (const [name, aendere] of [
+      ['Fortsetzen gewertet, ein zeiten-Wert ungueltig: kein Zeitgewinn', (l) => { l.zeiten[0] = -1; }],
+      ['Fortsetzen gewertet, zeiten fehlen: kein Zeitgewinn', (l) => { delete l.zeiten; }],
+      ['Fortsetzen gewertet, uhr fehlt: der laufende Zug zaehlt trotzdem (Wanduhr)', (l) => { delete l.uhr; }],
+    ]) {
+      await pruefe(name, async () => {
+        const { k, s } = await neueSeite(browser);
+        try {
+          await starte(s, { botId: 'benno', farbe: 'w', tempo: T3, ki: true, kiRef: KI_REF });
+          await warte(4000);
+          await zug(s, 'e2e4');
+          await s.waitForFunction(() => window.__partie.phase() === 'flo' && window.__partie.chess().history().length === 2, null, { timeout: 15000 });
+          await warte(1500);
+          const a = await leseUhr(s, 'flo');
+          const zu = Date.now();
+          await s.goto('about:blank');
+          await s.goto(`${BASIS}#arena`);
+          await s.waitForSelector('.screen.arena', { timeout: 20000 });
+          await s.evaluate((quelle) => {
+            const l = JSON.parse(localStorage.getItem('schach-arena:v1:laufend'));
+            (0, eval)(quelle)(l);
+            localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l));
+          }, String(aendere));
+          await warte(3000);
+          await s.evaluate(() => { window.__test = { maxWarten: 0, botPause: 30 }; window.__app.gehe('partie', { fortsetzen: true }); });
+          await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.chess().history().length === 2, null, { timeout: 30000 });
+          await warte(300);
+          const b = await leseUhr(s, 'flo');
+          const zuMs = Date.now() - zu;
+          assert.ok(a.ms - b.ms >= zuMs - 1500, `kein Gewinn: ${a.text} -> ${b.text}, zu ${zuMs} ms`);
         } finally { await k.close(); }
       });
     }
