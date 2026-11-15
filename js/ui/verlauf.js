@@ -273,7 +273,8 @@ export function zeige(root, params = {}, app) {
       : zuZweit && p.ergebnis !== 'remis' ? t('analyse.ergebnis.gewinnt', { name: p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz }) : t(`allgemein.${art}`);
     // Zeichen am Bild: aus eigener Sicht; Zu zweit die Farbe des Siegers (Krone), Remis wie sonst
     const zeichenArt = ohneErgebnis ? 'offen' : zuZweit && art !== 'remis' ? (art === 'sieg' ? 'weiss' : 'schwarz') : art;
-    const zeichen = `<span class="vl-ergebnis" data-ergebnis="${zeichenArt}">${zeichenSvg(zuZweit && art !== 'remis' ? 'krone' : zeichenArt)}<span class="vl-sr">${esc(erg)}</span></span>`;
+    // nur Bild: das Ergebnis in Worten traegt das aria-label des Knopfs (label unten), ein Vorlese-Text im Zeichen waere doppelt
+    const zeichen = `<span class="vl-ergebnis" data-ergebnis="${zeichenArt}" aria-hidden="true">${zeichenSvg(zuZweit && art !== 'remis' ? 'krone' : zeichenArt)}</span>`;
     const bild = zuZweit ? `<span class="an-avatar vl-av-zuzweit" aria-hidden="true">${BILD_ZUZWEIT}</span>`
       : online ? `<span class="an-avatar vl-av-online" aria-hidden="true">${BILD_ONLINE}</span>` : avatarHtml(bot);
     const grund = grundText(p.grund);

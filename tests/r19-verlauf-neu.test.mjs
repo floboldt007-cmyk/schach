@@ -209,7 +209,10 @@ async function testeZeilen(browser, d) {
         const cs = getComputedStyle(e);
         const svg = e.querySelector('svg');
         const r = e.getBoundingClientRect();
-        return { art: e.dataset.ergebnis, text: e.textContent.trim(), hg: cs.backgroundColor, form: svg ? svg.innerHTML : '',
+        // Vorleser hoeren das aria-label des Knopfs (das Zeichen selbst ist aria-hidden, sonst doppelt)
+        const knopf = zeile(id).querySelector('.vl-oeffnen');
+        return { art: e.dataset.ergebnis, text: knopf ? knopf.getAttribute('aria-label') || '' : '', versteckt: e.getAttribute('aria-hidden') === 'true',
+          hg: cs.backgroundColor, form: svg ? svg.innerHTML : '',
           kante: __k(cs.backgroundColor, __grund(e.parentElement)), glyph: svg ? __k(getComputedStyle(svg).color, cs.backgroundColor) : 0,
           gross: Math.round(r.width), rund: cs.borderRadius };
       };
@@ -228,11 +231,11 @@ async function testeZeilen(browser, d) {
     pruefe('Zu zweit mit eigenem Bild', z.bilder.zuzweit && z.bilder.zuzweit.kinder >= 1, z.bilder);
     pruefe('Online mit eigenem Bild', z.bilder.online && z.bilder.online.kinder >= 1, z.bilder);
     const drei = [z.zeichen.sieg, z.zeichen.remis, z.zeichen.niederlage];
-    pruefe('Ergebniszeichen je Zeile mit Text für Vorleser', drei.every((x) => x && /Sieg|Remis|Niederlage/.test(x.text)), drei.map((x) => x && x.text));
+    pruefe('Ergebnis je Zeile für Vorleser im Knopf-Label, Zeichen selbst nur Bild', drei.every((x) => x && /Sieg|Remis|Niederlage/.test(x.text) && x.versteckt), drei.map((x) => x && [x.text, x.versteckt]));
     pruefe('Drei Formen und drei Farben', new Set(drei.map((x) => x && x.form)).size === 3 && new Set(drei.map((x) => x && x.hg)).size === 3, drei);
     pruefe('Zeichen hebt sich ab (>= 3:1) und Glyphe lesbar (>= 4,5:1)', drei.every((x) => x.kante >= 3 && x.glyph >= 4.5), drei.map((x) => [x.kante, x.glyph]));
     pruefe('Zeichen mindestens 24 px', drei.every((x) => x.gross >= 24), drei.map((x) => x.gross));
-    pruefe('Zu zweit: Zeichen nennt Weiß als Sieger', z.zeichen.zuzweit && z.zeichen.zuzweit.art === 'weiss' && /Anna/.test(z.zeichen.zuzweit.text), z.zeichen.zuzweit);
+    pruefe('Zu zweit: Zeichen in Weiß, das Label nennt den Sieger', z.zeichen.zuzweit && z.zeichen.zuzweit.art === 'weiss' && /Anna/.test(z.zeichen.zuzweit.text), z.zeichen.zuzweit);
     pruefe('Online: Zeichen Niederlage', z.zeichen.online && z.zeichen.online.art === 'niederlage', z.zeichen.online);
     pruefe('Keine Plakette mehr neben dem Namen', z.plakette === 0, String(z.plakette));
     pruefe('Grund klein in der Nebenzeile (<= 13 px), nicht im Zeichen', z.grund && /Aufgabe/.test(z.grund.text) && z.grund.px <= 13 && !z.grund.imZeichen, z.grund);
