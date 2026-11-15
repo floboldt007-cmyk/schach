@@ -4,8 +4,11 @@
 // von links oben), Glanz und Spiegelstreif, Schatten unten am Koerper, Umriss mit Verlauf, weicher Bodenschatten, beim
 // Marmor Adern. Schwarz nimmt die schwarze cburnett-Datei: dunkler Umriss aussen, die hellen Innenlinien (#ececec)
 // werden zur Glanzkante im Material (licht). So bleibt jede schwarze Figur auch mit vielen Innenlinien dunkel.
-// Nur Entwurf: Ziel ist design/figuren-material/<probe>/, nicht assets/pieces/ (kein Eintrag in js/figurensatz.js).
-//   node werkzeuge/figuren-material.mjs    schreibt alle Proben aus PROBEN
+// Proben: Ziel ist design/figuren-material/<probe>/. Flos Wahl (14.11.2026 23:00) Gold/Elfenbein ist zusaetzlich ein
+// Labor-Satz der App: mit --app schreibt das Werkzeug ihn inhaltsgleich nach assets/pieces/<satz>/ (APP, js/figurensatz.js,
+// js/labor.js; Herkunft im README). Glas und Marmor bleiben Proben.
+//   node werkzeuge/figuren-material.mjs          schreibt alle Proben aus PROBEN
+//   node werkzeuge/figuren-material.mjs --app    dazu die Saetze aus APP nach assets/pieces/
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -13,6 +16,9 @@ import path from 'node:path';
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ZIEL = path.join(WURZEL, 'design/figuren-material');
 const FIGUREN = ['K', 'Q', 'R', 'B', 'N', 'P'];
+// Probe -> Satz-Id in der App (assets/pieces/<id>/)
+const APP = { 'gold-elfenbein': 'goldelfenbein' };
+const MIT_APP = process.argv.includes('--app');
 
 // Material je Farbe: koerper = Verlaufsstufen [Ort, Farbe, Deckkraft], kante = Umriss oben links -> unten rechts,
 // auge = Springer-Auge (nur Weiss), licht = helle Innenlinien (nur Schwarz), glanz = Deckkraft des Lichts,
@@ -22,7 +28,7 @@ const PROBEN = {
     name: 'Gold und Elfenbein',
     w: { koerper: [[0, '#fffefa'], [0.4, '#faf4e6'], [0.8, '#efe5cd'], [1, '#d8c49e']], kante: ['#5e4526', '#2b1d0b'], auge: '#2b1d0b',
       glanz: 0.6, streif: 0.35 },
-    b: { koerper: [[0, '#e8c055'], [0.28, '#b07714'], [0.62, '#704306'], [1, '#3c2402']], kante: ['#3d2904', '#140c01'], licht: '#cf9f3e',
+    b: { koerper: [[0, '#f2cf68'], [0.28, '#bb8018'], [0.62, '#583203'], [1, '#140b00']], kante: ['#120b01', '#000000'], licht: '#cf9f3e',
       glanz: 0.55, streif: 0.7 },
   },
   glas: {
@@ -81,13 +87,14 @@ function figur(form, farbe, m, id) {
 }
 
 for (const [probe, material] of Object.entries(PROBEN)) {
-  const ordner = path.join(ZIEL, probe);
-  mkdirSync(ordner, { recursive: true });
+  const ordner = [path.join(ZIEL, probe), ...(MIT_APP && APP[probe] ? [path.join(WURZEL, 'assets/pieces', APP[probe])] : [])];
+  for (const o of ordner) mkdirSync(o, { recursive: true });
   for (const farbe of ['w', 'b']) {
     for (const f of FIGUREN) {
       const form = readFileSync(path.join(WURZEL, 'assets/pieces', `${farbe}${f}.svg`), 'utf8');
-      writeFileSync(path.join(ordner, `${farbe}${f}.svg`), figur(form, farbe, material[farbe], `${farbe}${f}`));
+      const svg = figur(form, farbe, material[farbe], `${farbe}${f}`);
+      for (const o of ordner) writeFileSync(path.join(o, `${farbe}${f}.svg`), svg);
     }
   }
-  console.log(`${probe}: 12 Figuren (${material.name})`);
+  console.log(`${probe}: 12 Figuren (${material.name})${ordner.length > 1 ? ', auch in assets/pieces/' + APP[probe] : ''}`);
 }

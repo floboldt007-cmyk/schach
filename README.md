@@ -182,6 +182,9 @@ eigene Klänge (siehe unten und `assets/LIZENZ-KUNST.md`).
 - **Figuren** „cburnett“ von Colin M.L. Burnett: GPLv2 oder neuer (derselbe Satz wie bei Lichess).
 - **Figuren** „Blaupause“ (`assets/pieces/blaupause/`): abgeleitet aus „cburnett“ mit `werkzeuge/blaupause.mjs` (nur
   Farben getauscht, Hilfslinien ergänzt), darum ebenfalls GPLv2 oder neuer.
+- **Figuren** „Gold und Elfenbein“ (`assets/pieces/goldelfenbein/`, Labor): bearbeitet aus „cburnett“ von Colin M.L. Burnett
+  mit `werkzeuge/figuren-material.mjs` (Form unverändert, Material Gold/Elfenbein: Verlauf, Glanz, Schatten), darum
+  ebenfalls GPLv2 oder neuer.
 - **Figuren** „Kürbis“, „Frost“ und „Gold“ (`assets/pieces/kuerbis/`, `frost/`, `gold/`): eigene gedrechselte Formen aus
   `werkzeuge/figuren-3d.mjs` (seit 31.10.2026), GPL-3.0 wie der Code.
 - **Schriften** (Look „Modern und klar“): **Manrope** (The Manrope Project Authors) und **Bricolage Grotesque**

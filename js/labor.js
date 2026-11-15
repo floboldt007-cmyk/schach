@@ -118,7 +118,8 @@ export const LABOR_BRETTER = Object.freeze([
 // Kronen (werkzeuge/figuren-themen.mjs), vorn in der Sammlung; dazu Weltraum, Roboter und Naschwerk ("denk dir was aus"),
 // ganz vorn Drachen, Zombies, Geister und Lava-Golem ("Musst kreativ werden: Zombies, Golems, Geister, Drachen"),
 // danach Piraten, Aegypten, Wikinger und Dinos ("Denk dir mehr aus")
-export const LABOR_FIGUREN = Object.freeze(['drachen', 'zombies', 'geister', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos', 'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'moosgeister', 'tiefsee', 'elfenbein',
+// ganz vorn Gold und Elfenbein (Flos Wahl R19 14.11.2026): cburnett-Form mit Material, werkzeuge/figuren-material.mjs --app
+export const LABOR_FIGUREN = Object.freeze(['goldelfenbein', 'drachen', 'zombies', 'geister', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos', 'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'moosgeister', 'tiefsee', 'elfenbein',
   'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'pixel', 'geo']);
 export const LABOR_KLAENGE = Object.freeze(['juwel', 'grusel', 'kristall']);
 

@@ -1,7 +1,8 @@
 // Pflichtangaben in "Info und Lizenzen" (Rechte-Liste Crownmate 14.11.2026, G-007 AC-06): jede fremde Lizenz, die die App
 // mitliefert oder nutzt, steht auf der Info-Seite, in Deutsch und Englisch, dazu der Link zum eigenen Quellcode (GPL-3.0).
 // Teil 1 in Node: README und werkzeuge/labor-figuren.mjs fuehren Frost, Kuerbis und Gold so, wie sie heute entstehen
-//   (werkzeuge/figuren-3d.mjs, GPL-3.0), nicht mehr als Ableitung aus "cburnett".
+//   (werkzeuge/figuren-3d.mjs, GPL-3.0), nicht mehr als Ableitung aus "cburnett"; "Gold und Elfenbein" (R19) dagegen als
+//   bearbeitetes cburnett (werkzeuge/figuren-material.mjs, GPLv2 oder neuer), auch auf der Info-Seite.
 // Teil 2 im Browser (Playwright, echte App, eigener Server): Einstellungen > Info und Lizenzen je Sprache.
 //
 //   node tests/info-lizenzen.test.mjs
@@ -38,6 +39,9 @@ function pruefe(name, gut, detail = '') {
   const kopf = lies('werkzeuge/labor-figuren.mjs').split('\n').filter((z) => z.startsWith('//')).join(' ');
   pruefe('labor-figuren.mjs: Kopf behauptet nicht, dass es Kürbis, Frost und Gold aus cburnett schreibt, und nennt figuren-3d.mjs',
     !/Kuerbis \(Halloween\), Frost und Gold\. Abgeleitet/.test(kopf) && /figuren-3d\.mjs/.test(kopf), kopf.slice(0, 300));
+  const ge = flach((readme.match(/- \*\*Figuren\*\* „Gold und Elfenbein“[\s\S]*?(?=\n- \*\*)/) || [''])[0]);
+  pruefe('README: Gold und Elfenbein bearbeitet aus cburnett (Colin M.L. Burnett), GPLv2 oder neuer',
+    /cburnett/.test(ge) && /Burnett/.test(ge) && /bearbeitet/.test(ge) && /GPLv2 oder neuer/.test(ge), ge || 'Zeile fehlt');
 }
 
 // ---------- Teil 2: Info-Seite je Sprache ----------
@@ -134,6 +138,11 @@ try {
     pruefe(`${sp}: chess.js mit vollem Lizenztext wie vendor/chess/LICENSE`, flach(info.bsd) === BSD, (info.bsd || 'fehlt').slice(0, 200));
     const cb = posten(/cburnett/);
     pruefe(`${sp}: Figuren cburnett mit Urheber und GPLv2+`, /Colin M\. ?L\. Burnett/.test(cb) && /GPLv2\+/.test(cb), cb);
+    // R19: der Labor-Satz Gold und Elfenbein ist eine Bearbeitung von cburnett: Quelle, Lizenz und "bearbeitet" stehen da
+    const ge = posten(sp === 'de' ? /Gold und Elfenbein/ : /Gold and ivory/);
+    pruefe(`${sp}: Figuren Gold und Elfenbein mit Quelle cburnett, Urheber, GPLv2+ und bearbeitet`,
+      /cburnett/.test(ge) && /Colin M\. ?L\. Burnett/.test(ge) && /GPLv2\+/.test(ge)
+      && (sp === 'de' ? /bearbeitet \(Material Gold\/Elfenbein\)/ : /modified \(gold\/ivory material\)/).test(ge), ge || 'Eintrag fehlt');
     const sch = posten(/Manrope/);
     pruefe(`${sp}: Schriften unter SIL OFL 1.1, beide Lizenztexte verlinkt`,
       /Bricolage Grotesque/.test(sch) && /Open Font License 1\.1/.test(sch)
