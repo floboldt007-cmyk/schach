@@ -91,8 +91,12 @@
 //   der Rufname da (rufnameVon), der volle Name im aria-label der Karte. .av der Karten sind die Ziele des Portraetflugs
 //   im Duell-Intro (U5). lage() meldet weiter 'hoch' | 'quer'.
 //   Uhr: .uhr in beiden Karten, versteckt ohne Bedenkzeit (z.tempo). fmtUhr(ms) (exportiert) formatiert, uhr.setze(wer,
-//   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). Die Logik (Laufen,
-//   Zuschlag, Zeitueberschreitung) bringt W0+b; bis dahin steht die Grundzeit still da.
+//   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). R19 Uhr: der Kern
+//   js/uhr.js laeuft ab dem Ende des Intros (duellBereit) fuer die Seite am Zug, auch waehrend der Bot denkt; jeder
+//   Zug traegt seine Zehntel in z.zeiten ein und bekommt den Zuschlag; Zeitende -> ende(..., 'zeit') mit zeitErgebnis
+//   (Remis ohne Mattmaterial des Gegners). Gewertete KI-Partie (z.kiRef) laeuft im Hintergrund weiter wie online und
+//   rechnet beim Fortsetzen die Wanduhr (laufend.uhr.seit); jede andere Partie haelt im Hintergrund an und setzt mit
+//   laufend.uhr.verbraucht fort. Der Bot-Zug kennt die Uhr nicht.
 //   Sprechblase: .blase-ort ist das letzte Kind der Gegner-Karte (quer eine Zeile in der Karte unter dem Namen, hoch
 //   legt sie sich neben dem Portraet ueber Name und Unterzeile, nie ueber die Figuren) und blendet nach BLASE_MS
 //   (3,5 s) aus; nur quer bleibt die Begruessung BEGRUESSUNG_MS stehen. Einstellung
@@ -147,6 +151,7 @@ import { t, sprache } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/partie.js';
 import { meinName } from '../konto.js';
+import { neueUhr, restAusZeiten, zeitErgebnis } from '../uhr.js';
 
 
 const SERIE = new Set(['bester', 'stark', 'brillant']);
@@ -157,6 +162,7 @@ const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
 // Grund des Spielendes -> Schluessel im Woerterbuch partie (Text erst beim Zeichnen)
 const GRUND_SCHLUESSEL = {
   matt: 'matt', aufgabe: 'aufgabe', patt: 'patt', wiederholung: 'wiederholung', '50-zuege': 'fuenfzig', material: 'material',
+  zeit: 'zeit',
 };
 function grundText(grund) {
   return Object.hasOwn(GRUND_SCHLUESSEL, grund) ? t('partie.grund.' + GRUND_SCHLUESSEL[grund]) : null;
@@ -354,6 +360,11 @@ export function zeige(root, params, app) {
   const startNummer = Number(z.chess.fen().split(' ')[5]) || 1;
   // Zuege ansehen (zeigeAnsicht): vor dem Nachspielen einer fortgesetzten Partie anlegen, merkeZug liest es
   const ansehen = { ply: null, el: null, brett: null };
+  // R19 Uhr: Kern aus js/uhr.js (nur mit z.tempo, angelegt bei den Uhren unten), uhrTakt zeichnet und prueft das Zeitende
+  let schachuhr = null;
+  let uhrTakt = null;
+  let uhrGestartet = false;
+  const uhrGewertet = z.ki && !!z.kiRef;
   if (laufend) {
     for (const u of laufend.zuege) {
       let m = null;
@@ -375,6 +386,8 @@ export function zeige(root, params, app) {
     z.liveKlassen.push(null);
     z.liveTrivial.push(false);
     z.live.push(null);
+    // R19 Uhr: beim Nachspielen einer fortgesetzten Partie gibt es die Uhr noch nicht (zeiten kommen aus dem Speicher)
+    if (schachuhr) z.zeiten.push(Math.min(864000, Math.round(schachuhr.zug(Date.now()) / 100)));
   }
   const farbeVon = (i) => (i % 2 === 0 ? startFarbe : (startFarbe === 'w' ? 'b' : 'w'));
   const istFlo = (i) => farbeVon(i) === farbe;
@@ -1707,6 +1720,7 @@ export function zeige(root, params, app) {
       if (e && e.erledigt) e.erledigt();   // wartende Bot-Pause loesen; Marke ist damit veraltet
     }
     z.zuruecknahmen++;
+    if (schachuhr) setzeUhrNeu(Date.now());
     merkeSerie();
     sende('zug:zurueckgenommen', { laufId, bisPly: fp, plies: anzahl });
     if (z.zuruecknahmen === 1) app.meldung(t('partie.meldung.zurueckgenommen'));
@@ -1785,6 +1799,7 @@ export function zeige(root, params, app) {
       modus: z.modus, ziel: z.ziel, extra: z.extra, maxSerie: z.maxSerie,
       liveTrivial: z.zuege.map((_, i) => z.liveTrivial[i] === true),
       ...spielFelder(),
+      ...(schachuhr ? { uhr: uhrStand(Date.now()) } : {}),
     };
   }
   // W0+a: seed, boss, liga, tempo, zeiten (nur gesetzte; storage prueft sie)
@@ -1855,6 +1870,7 @@ export function zeige(root, params, app) {
     loescheVorzuege();
     pfeilTippWeg();
     z.phase = 'ende';
+    halteUhr();
     if (app.schliesseDialog) app.schliesseDialog();   // z. B. "Wirklich aufgeben?", wenn der Bot mattsetzt
     abbrechenBot();
     brett.erlaubeZuege(null);
@@ -2066,6 +2082,7 @@ export function zeige(root, params, app) {
     let unter;
     if (grund === 'matt') unter = t(ergebnis === 'sieg' ? 'partie.erg.mattSieg' : 'partie.erg.mattNiederlage', { nr, name: bot.name });
     else if (grund === 'aufgabe') unter = t('partie.erg.aufgabe', { name: bot.name });
+    else if (grund === 'zeit') unter = t({ sieg: 'partie.erg.zeitSieg', niederlage: 'partie.erg.zeitNiederlage', remis: 'partie.erg.zeitRemis' }[ergebnis], { name: bot.name });
     else unter = t('partie.erg.grund', { grund: grundText(grund) || t('partie.grund.remis'), name: bot.name });
     // Nicht wertende Partie (Uebung, eigene Stellung): Chip "ÜBUNG" neben dem Kopfwort, keine Sterne. Kein Konfetti mehr.
     const wertend = z.gespeichert ? z.gespeichert.wertet !== false : wertetJetzt();
@@ -2702,8 +2719,78 @@ export function zeige(root, params, app) {
   if (handyMq && handyMq.addEventListener) handyMq.addEventListener('change', layout);
   if (z.tempo) {
     uhr.zeige(true);
-    uhr.setze('bot', z.tempo.grund * 1000);
-    uhr.setze('flo', z.tempo.grund * 1000);
+    // R19 Uhr: Rest aus den gespeicherten zeiten (aeltere Partien ohne zeiten: 0 je Halbzug) und dem laufenden Zug
+    if (!z.zeiten || z.zeiten.length !== z.zuege.length) z.zeiten = z.zuege.map((_, i) => (z.zeiten && z.zeiten[i]) || 0);
+    const lauf = laufend && laufend.uhr && typeof laufend.uhr === 'object' ? laufend.uhr : null;
+    const r = restAusZeiten(z.tempo, z.zeiten, {
+      startFarbe,
+      ...(lauf ? (uhrGewertet ? { laufSeit: lauf.seit, jetzt: Date.now() } : { laufVerbraucht: lauf.verbraucht }) : {}),
+    });
+    schachuhr = neueUhr({ ...z.tempo, amZug: r.amZug, w: r.w, b: r.b });
+    zeigeUhr(Date.now());
+    duellBereit.then(() => {
+      if (weg || z.phase === 'ende') return;
+      uhrGestartet = true;
+      // eine ungewertete Partie im Hintergrund startet erst beim Zurueckkommen (beiSichtbarkeit)
+      if (document.hidden && !uhrGewertet) return;
+      schachuhr.starte(Date.now());
+      uhrTick();
+    });
+    document.addEventListener('visibilitychange', beiSichtbarkeit);
+    window.addEventListener('pagehide', speichereLaufend);
+  }
+  function zeigeUhr(n) {
+    const lauf = schachuhr.laeuft && z.phase !== 'ende';
+    uhr.setze('flo', schachuhr.rest(farbe, n), { laeuft: lauf && schachuhr.amZug === farbe });
+    uhr.setze('bot', schachuhr.rest(botFarbe, n), { laeuft: lauf && schachuhr.amZug === botFarbe });
+  }
+  function uhrTick() {
+    clearTimeout(uhrTakt);
+    uhrTakt = null;
+    if (!schachuhr || weg || z.phase === 'ende') return;
+    const n = Date.now();
+    zeigeUhr(n);
+    const aus = schachuhr.abgelaufen(n);
+    if (aus) {
+      const r = zeitErgebnis(z.chess.fen(), aus);
+      ende(r === 'remis' ? 'remis' : r === farbe ? 'sieg' : 'niederlage', 'zeit');
+      return;
+    }
+    if (schachuhr.laeuft) uhrTakt = setTimeout(uhrTick, 100);
+  }
+  function halteUhr() {
+    if (!schachuhr) return;
+    clearTimeout(uhrTakt);
+    uhrTakt = null;
+    const n = Date.now();
+    schachuhr.halte(n);
+    zeigeUhr(n);
+  }
+  // gewertet: laeuft weiter (Wanduhr), der Takt holt beim Zurueckkommen auf; sonst haelt die Uhr an
+  function beiSichtbarkeit() {
+    if (!schachuhr || weg || z.phase === 'ende') return;
+    const n = Date.now();
+    if (document.hidden) {
+      if (!uhrGewertet) schachuhr.halte(n);
+      speichereLaufend();
+    } else {
+      if (uhrGestartet && !uhrGewertet) schachuhr.weiter(n);
+      uhrTick();
+    }
+  }
+  // nach dem Zuruecknehmen (nur Test-Haken): Rest neu aus den verbliebenen zeiten
+  function setzeUhrNeu(n) {
+    z.zeiten.length = z.zuege.length;
+    const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe });
+    const lief = schachuhr.laeuft;
+    schachuhr = neueUhr({ ...z.tempo, amZug: r.amZug, w: r.w, b: r.b });
+    if (lief) schachuhr.starte(n);
+    uhrTick();
+  }
+  // Speicherstand des laufenden Zugs: seit (Wanduhr, gewertete Partie) und verbraucht (angehaltene Partie)
+  function uhrStand(n) {
+    const v = Math.round(schachuhr.imZug(n));
+    return { seit: n - v, verbraucht: v };
   }
   const gegnerOrt = fuelle('partie:gegner-leiste', gegnerLeiste, {
     app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss, lage,
@@ -2912,6 +2999,9 @@ export function zeige(root, params, app) {
       if (engBewertung && laufendeAnalysen.size) { try { engBewertung.stop({ warteschlange: true }); } catch (e) { /* egal */ } }
       for (const u of uhren) clearTimeout(u);
       uhren.clear();
+      clearTimeout(uhrTakt);
+      document.removeEventListener('visibilitychange', beiSichtbarkeit);
+      window.removeEventListener('pagehide', speichereLaufend);
       clearTimeout(z.blaseUhr);
       clearTimeout(z.kompaktUhr);
       if (overlay) overlay.verlasse();
