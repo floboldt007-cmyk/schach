@@ -519,8 +519,9 @@ export function motivCss(m, sel = `.motiv-brett[data-motiv="${m.id}"]`, glanzSel
 // einplant (--brett, Breite der Brettzone) und das js/ui/partie.js layout() am Polster misst. Polster und inset der
 // .brett-effekte sind damit dieselbe Laenge, die Ebene deckt das Brett, und der Sockel ragt nicht ueber die Brettzone
 // (R19: mit dem Anteil lag die Ebene bis 5 px daneben, bei 1180x820 war der Sockel breiter als die Zone, iPad hoch ragte
-// das Brett aus dem Sockel). Laenge: rahmen.breite / 1000 der kleineren Seite des Partie-Inhalts (container partie), damit
-// das Band so breit bleibt wie vorher.
+// das Brett aus dem Sockel). Laenge: rahmen.breite / 1000 der kleineren Fensterseite (vmin), damit das Band etwa so breit
+// bleibt wie vorher (1180x820: 54 statt 51 px). Nicht cqmin: der Inhalt der Online-Partie hat beim Aufbau noch keine Hoehe,
+// cqmin war dort 0 und das Band fehlte (tests/bretter-v4-app.test.mjs online-partie).
 export function motivAppCss(id) {
   const m = MOTIVE.find((x) => x.id === id);
   if (!m) return '';
@@ -530,7 +531,7 @@ export function motivAppCss(id) {
     + `${rand} { --sockel-abstand: max(12px, ${band}); padding: var(--sockel-abstand); }\n`
     + `${rand} > .brett-effekte { inset: var(--sockel-abstand); }\n`
     + `@media not all and (orientation: portrait) and (max-width: 600px) {\n`
-    + `  ${html} .partie { --rahmen: calc(${m.rahmen.breite / 1000} * 100cqmin); }\n`
+    + `  ${html} .partie { --rahmen: calc(${m.rahmen.breite / 1000} * 100vmin); }\n`
     + `  ${html} .partie .brett-rahmen { --sockel-abstand: var(--rahmen); padding: var(--sockel-abstand); }\n`
     + `  ${html} .partie ${randTeil} { --sockel-abstand: max(12px, var(--rahmen)); }\n}\n`
     + `${sel} .brett-koord-rand .koord { color: ${k.d}; text-shadow: 0 0 2px rgba(0, 0, 0, .9), 0 0 4px rgba(0, 0, 0, .6); }\n`
