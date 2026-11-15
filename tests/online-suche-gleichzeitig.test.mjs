@@ -233,9 +233,11 @@ async function paar(ua, ub, { elo }) {
     const l = await leisteOben(ich.seite);
     const erwartTitel = du === 'u1' ? 'Der Erfinder' : du === 'u2' ? 'Pionier Nr. 7' : 'Feuertaufe';
     pruefe(`${ich.seite.uid} sieht in der Leiste Name, Banner und Profilbild von ${du}`, l.name === g.name && l.banner.includes(g.banner + '.svg') && l.avatar, l);
-    // R19 online ruhig (Flos Wahl A): die Leiste zeigt nur den Namen, ohne Titel, Elo und Liga; Titel und Elo nennt das
-    // Duell-Intro (Pruefungen unten)
-    pruefe(`${ich.seite.uid} sieht in der Leiste von ${du} nur den Namen (kein Titel, keine Elo-/Liga-Zeile)`, l.titel === '' && l.meta === '', l);
+    // R19 online ruhig (Flos Wahl A): die Leiste zeigt keinen Titel, den nennt das Duell-Intro (Pruefungen unten).
+    // R19 elo-leiste (Flo 15.11. 12:50, "die elo soll man schon sehen koennen"): beim Gegner wieder "Elo N" (Server-Elo),
+    // ohne sie die Liga als Wort
+    pruefe(`${ich.seite.uid} sieht in der Leiste von ${du} keinen Titel und ${elo ? `"Elo ${g.elo}"` : 'die Liga als Wort'}`,
+      l.titel === '' && (elo ? l.meta === `Elo ${g.elo}` : !!l.meta && !/Elo/.test(l.meta)), l);
 
     await ich.seite.waitForFunction(() => window.__intros.length > 0, null, { timeout: 9000 }).catch(() => {});
     const intro = (await ich.seite.evaluate(() => window.__intros))[0] || null;
