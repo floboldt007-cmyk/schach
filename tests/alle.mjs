@@ -67,6 +67,7 @@ const SUITEN = [
   { name: 'server-saison', datei: 'server-saison.test.mjs', args: [], was: 'R19 Season: Abrechnung, Abzeichen, Titel, Reset, Karte der Partie, Rechte, Rueckweg (Server, PGlite)' },
   { name: 'r19-saison', datei: 'r19-saison.test.mjs', args: [], was: 'R19 Season: Leiste im Profil, Titelwahl, Blatt am Season-Ende einmal, Karte, Datenschutz' },
   { name: 'r19-saison-abzeichen', datei: 'r19-saison-abzeichen.test.mjs', args: [], was: 'R19 Season-Abzeichen: grosse Wappen, Alle Ligen (18 Stufen, Tastatur), Balken, Titel-Vorschau, Ende-Fenster, Vitrine nur eigen' },
+  { name: 'r19-ligen-satz', datei: 'r19-ligen-satz.test.mjs', args: [], was: 'R19 Alle Ligen: Satz je Liga nennt Auf- und Abstieg wie zoneVon (Abstieg ueberall ausser Squire III), DE/EN' },
   { name: 'server-weltrang', datei: 'server-weltrang.test.mjs', args: [], was: 'Weltrangliste: Zustimmung, ab 15 bzw. 30 Partien (Start-Elo selbst gesetzt), Rechte, Auskunft, Rueckweg (Server, PGlite)' },
   { name: 'r19-weltrang', datei: 'r19-weltrang.test.mjs', args: [], was: 'R19 Weltrangliste: Texte DE/EN, Satz unter der Liste, ab_start nie erfunden, Datenschutz DE/EN' },
   { name: 'karte', datei: 'karte.test.mjs', args: [], was: 'Etappe 4b: js/karte.js gegen einen nachgebildeten Server (Stufen melden, Karte waehlen, Karte der Partie)' },
