@@ -49,7 +49,9 @@
   box-shadow: var(--s1), var(--kante); }
 .partie .spieler.gegner { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto auto; row-gap: 0;
   grid-template-areas: "leiste leiste leiste" "av info uhr" "blase blase blase"; }
-.partie .spieler.ich { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 0;
+/* R19 online-weg (Flo 15.11.2026, "unten rechts verbuggt"): die Leiste am Namen (Level-Chip) behaelt ihre Breite, ein
+   langer Name bricht um, statt die Leiste auf 0 px zu druecken (gemessen mit 15 und 20 Zeichen auf vier Geraeten) */
+.partie .spieler.ich { grid-template-columns: auto minmax(0, max-content) minmax(max-content, 1fr) auto; grid-template-rows: auto auto; row-gap: 0;
   grid-template-areas: "av name leiste uhr" "av unter unter uhr"; }
 .partie .spieler > .av { grid-area: av; width: var(--av); height: var(--av); margin-right: 12px; border-radius: 15px; overflow: hidden;
   display: grid; place-items: center; background: var(--flaeche-2); }
@@ -72,7 +74,9 @@
 .partie .spieler.ich > .name { grid-area: name; }
 .partie .spieler .unter { display: flex; align-items: center; gap: 6px; height: 18px; margin-top: 1px; min-width: 0; overflow: hidden;
   white-space: nowrap; font-size: 13px; font-weight: 650; color: var(--text-2); }
-.partie .spieler.ich > .unter { grid-area: unter; }
+/* contain: die Unterzeile schneidet ohnehin ab und darf die Spalte der Leiste nicht breit ziehen (sonst bricht der Name
+   in der Online-Partie ohne Leiste um, tests/gleichheit-ansichten.test.mjs PC "Leiste ich") */
+.partie .spieler.ich > .unter { grid-area: unter; contain: inline-size; }
 .partie .spieler .p-meta { flex: none; }
 /* Etappe B Task 4: Bot als Ersatz aus der Gegnersuche, ehrlich gekennzeichnet (Text in Schriftfarbe, nur ein Rahmen) */
 .partie .spieler .ki-abzeichen { flex: none; display: inline-block; margin-inline-end: .4em; padding: 0 .45em; border: 1px solid currentColor;
@@ -174,6 +178,15 @@
 @keyframes feld-puls { 0% { opacity: 0; transform: scale(.7); } 25% { opacity: .5; transform: none; } 100% { opacity: 0; transform: none; } }
 @keyframes streif { from { transform: translateX(-135%) skewX(-16deg); } to { transform: translateX(330%) skewX(-16deg); } }
 
+/* Koordinaten am Rand: der Sockel ist links und unten 12 px statt --rahmen (css/app.css .brett-rahmen:has(> .brett.koord-rand)).
+   Die Brett-Formeln ziehen das Mehr einmal je Richtung ab, sonst ragt das Brett ueber den Sockel und die Spalte rollt.
+   Nie negativ: ein breiterer Sockel (Motiv-Band) hat die 12 px schon.
+   Nur wo --rahmen 4px ist (die zwei Bloecke unten): mit 7 px (Handy quer, quer unter 1000 px) passte "rand" schon und das
+   Brett bleibt so gross wie mit "ecke" (gemessen 15.11., tests/r19-rand-handy.mjs); Handy hoch rechnet layout() in partie.js. */
+@media (orientation: landscape) and (min-width: 1000px), (orientation: portrait) and (min-width: 601px) {
+  .partie:has(.brett.koord-rand) { --koord-extra: max(0px, 12px - var(--rahmen)); }
+}
+
 /* ============================================================
    QUER (iPad quer, Desktop): Brett links, eine Spalte rechts
    ============================================================ */
@@ -181,7 +194,7 @@
   .partie .inhalt { display: grid; grid-template-columns: auto var(--seite); justify-content: center; align-items: start; gap: var(--quer-luecke);
     padding: 16px var(--quer-rand) 22px; container: partie / size; }
   .partie .inhalt > .brettzone {
-    --brett: min(calc(100cqh - 2 * var(--rahmen)), calc(100cqw - var(--balken) - var(--spalt) - var(--quer-luecke) - var(--seite) - 2 * var(--rahmen))); }
+    --brett: min(calc(100cqh - 2 * var(--rahmen) - var(--koord-extra, 0px)), calc(100cqw - var(--balken) - var(--spalt) - var(--quer-luecke) - var(--seite) - 2 * var(--rahmen) - var(--koord-extra, 0px))); }
   .partie .seite { display: flex; flex-direction: column; gap: var(--luecke); height: 100cqh; container: seite / inline-size; }
   .partie .seite > * { flex: none; }
   .partie .zugleiste { display: none; }
@@ -300,9 +313,9 @@
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
   .partie .seite { display: contents; }
   .partie .inhalt > *, .partie .seite > * {
-    --reserve: calc(50px + 50px + 62px + 60px + 44px + 5 * 6px + var(--balken) + var(--spalt) + 2 * var(--rahmen));
-    --brett: min(calc(100cqw - 2 * var(--rahmen)), calc(100cqh - var(--reserve)));
-    width: calc(var(--brett) + 2 * var(--rahmen)); max-width: 100%; flex: none; }
+    --reserve: calc(50px + 50px + 62px + 60px + 44px + 5 * 6px + var(--balken) + var(--spalt) + 2 * var(--rahmen) + var(--koord-extra, 0px));
+    --brett: min(calc(100cqw - 2 * var(--rahmen) - var(--koord-extra, 0px)), calc(100cqh - var(--reserve)));
+    width: calc(var(--brett) + 2 * var(--rahmen) + var(--koord-extra, 0px)); max-width: 100%; flex: none; }
   .partie .inhalt > .brettzone { flex-direction: column; }
   .partie .zugbox { display: none; }
   .partie .spieler.gegner { order: 0; } .partie .brettzone { order: 1; } .partie .spieler.ich { order: 2; }

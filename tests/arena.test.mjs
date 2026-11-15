@@ -153,8 +153,8 @@ function nodeTeil() {
   const arenaJs = lies('js/ui/arena.js');
   pruefe('arena.js: Stationen als button.stufe.knoten[data-bot], Scroll-Behaelter .karte, Orte auf der Karte', /stufe knoten/.test(arenaJs) && /class="karte"/.test(arenaJs)
     && /fuelle\('arena:karte-boss'/.test(arenaJs) && /fuelle\('arena:karte-event'/.test(arenaJs) && /fuelle\('arena:start'/.test(arenaJs));
-  pruefe('arena.js: Welten: Weltwahl mit Pfeilen (.weltwahl .ww-pfeil[data-richtung]), gesperrte Welt (.welt-sperre), Schild .k-neu, Endgegner (b.endgegner) statt fester Stufe',
-    /class="ww-pfeil dr" type="button" data-richtung="-1"/.test(arenaJs) && /data-richtung="1"/.test(arenaJs) && /class="welt-sperre"/.test(arenaJs) && /class="k-neu"/.test(arenaJs)
+  pruefe('arena.js: Welten: Weltwahl mit Pfeilen (.weltwahl .ww-pfeil[data-richtung]), Vorschau-Welt ohne Sperrkarte (kein .welt-sperre), Schild .k-neu, Endgegner (b.endgegner) statt fester Stufe',
+    /class="ww-pfeil dr" type="button" data-richtung="-1"/.test(arenaJs) && /data-richtung="1"/.test(arenaJs) && !/welt-sperre/.test(arenaJs) && /class="k-neu"/.test(arenaJs)
     && /b\.endgegner \? ' boss'/.test(arenaJs) && !/stufe === 10/.test(arenaJs));
   pruefe('arena.js: Portraets ueber avatarVon, Flos Figur ueber floAvatar, Farbe als Segment, Duell ueber spieleDuell', /avatarVon\(/.test(arenaJs) && /floAvatar\(/.test(arenaJs) && /segment\(\{/.test(arenaJs) && /spieleDuell\(/.test(arenaJs));
   pruefe('arena.js: nach bereit app.gehe(\'partie\', ...)', /await duell\.bereit;[\s\S]{0,80}app\.gehe\('partie'/.test(arenaJs));
@@ -885,15 +885,14 @@ async function testeKnopftext(browser) {
 }
 
 // Welten (Flo 23.10.): die Karte zeigt die sechs Stationen einer Welt; Weltwahl mit Pfeilen, gesperrte Welten
-// (.welt-sperre), Schild NEU (.k-neu), Endgegner direkt herausforderbar, alle 30 Bots Welt fuer Welt
+// (seit 15.11.2026 als Vorschau ohne Sperrkarte), Schild NEU (.k-neu), Endgegner direkt herausforderbar, alle 30 Bots Welt fuer Welt
 const weltwahl = (seite) => seite.evaluate(() => {
   const ww = document.querySelector('.weltwahl');
-  const sperre = document.querySelector('.welt-sperre');
   const w = document.querySelector('.welt');
   return { name: ww.querySelector('.ww-name').textContent, unter: ww.querySelector('.ww-unter').textContent,
     zurueckAus: ww.querySelector('[data-richtung="-1"]').disabled, vorAus: ww.querySelector('[data-richtung="1"]').disabled,
     siegel: ww.classList.contains('mit-siegel'), wwGesperrt: ww.classList.contains('gesperrt'), welt: w.dataset.welt, weltGesperrt: w.classList.contains('gesperrt'),
-    sperre: !sperre.hidden, sperreText: sperre.textContent.replace(/\s+/g, ' ').trim(), flo: getComputedStyle(document.querySelector('.flo-figur')).display,
+    sperre: !!document.querySelector('.welt-sperre, .ws-karte'), svgFilter: getComputedStyle(w.querySelector('.welt-svg')).filter, flo: getComputedStyle(document.querySelector('.flo-figur')).display,
     ids: [...document.querySelectorAll('.welt button.stufe.knoten[data-bot]')].map((k) => k.dataset.bot),
     zustaende: [...document.querySelectorAll('.welt button.stufe.knoten[data-bot]')].map((k) => ['besiegt', 'aktuell', 'offen', 'gesperrt'].find((z) => k.classList.contains(z))).join(),
     nr: [...document.querySelectorAll('.welt .knoten .k-nr')].map((e) => e.textContent).join(), elo: [...document.querySelectorAll('.welt .knoten .k-meta')].map((e) => e.textContent).join() };
@@ -930,18 +929,19 @@ async function testeWelten(browser) {
     await tippe(seite, '.ww-pfeil[data-richtung="1"]');
     await warte(500);
     w = await weltwahl(seite);
-    pruefe('Pfeil vor: Welt 2 „Der Springerforst“, gesperrt (Weltwahl und Karte grau, .welt-sperre nennt den Schluessel: Sieg gegen Janine), Flos Figur weg',
-      w.name === 'Der Springerforst' && w.unter === 'Welt 2 von 5 · gesperrt' && w.wwGesperrt && w.weltGesperrt && w.welt === 'springerforst' && w.sperre && !w.zurueckAus && !w.vorAus && w.flo === 'none'
-      && /Dichter Mischwald mit Lichtungen und Bach\. Ein Sieg gegen Janine vom Scheunenclub öffnet sie\.$/.test(w.sperreText) && w.sperreText.startsWith('Der Springerforst'), JSON.stringify(w));
-    pruefe('gesperrte Welt: alle sechs Stationen gesperrt mit Schloss, der Endgegner (Ritter Thorsten) als Silhouette mit „?“, die anderen in Graustufen',
-      w.ids.join() === WELT_IDS[1].join() && w.zustaende === 'gesperrt,gesperrt,gesperrt,gesperrt,gesperrt,gesperrt' && await seite.evaluate(() => document.querySelectorAll('.welt .knoten.gesperrt .schloss').length === 6
+    // Vorschau (Flo 15.11.2026): die naechste Welt ist zu sehen, in Farbe und ohne Schloss, aber noch nicht spielbar
+    pruefe('Pfeil vor: Welt 2 „Der Springerforst“ als Vorschau (Weltwahl „Vorschau“, Landschaft in Farbe, keine Sperrkarte), Flos Figur weg',
+      w.name === 'Der Springerforst' && w.unter === 'Welt 2 von 5 · Vorschau' && w.wwGesperrt && w.weltGesperrt && w.welt === 'springerforst' && !w.sperre && w.svgFilter === 'none' && !w.zurueckAus && !w.vorAus && w.flo === 'none', JSON.stringify(w));
+    pruefe('Vorschau-Welt: alle sechs Stationen gesperrt OHNE Schloss, der Endgegner (Ritter Thorsten) als Silhouette mit „?“, die anderen leicht gedimmt',
+      w.ids.join() === WELT_IDS[1].join() && w.zustaende === 'gesperrt,gesperrt,gesperrt,gesperrt,gesperrt,gesperrt' && await seite.evaluate(() => document.querySelectorAll('.welt .knoten .schloss').length === 0
         && /brightness\(0\)/.test(getComputedStyle(document.querySelector('.knoten.boss[data-bot="rudi"] .avatar img')).filter) && /grayscale/.test(getComputedStyle(document.querySelector('.knoten[data-bot="kalle"] .avatar img')).filter)
         && document.querySelectorAll('.knoten .fahne').length === 0 && /ENDGEGNER/.test(document.querySelector('.knoten.boss .boss-krone').textContent)), JSON.stringify(w));
     await tippe(seite, '.knoten[data-bot="kalle"]');
-    await seite.waitForSelector('.toast');
-    const sp = await seite.evaluate(() => ({ toast: document.querySelector('.toast').textContent, h2: document.querySelector('.detail h2').textContent }));
-    pruefe('Tipp auf eine Station der gesperrten Welt: „Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub.“, das Panel bleibt bei Janine',
-      sp.toast === 'Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub.' && sp.h2 === 'Janine vom Scheunenclub', JSON.stringify(sp));
+    await warte(700);
+    const sp = await seite.evaluate(() => ({ toast: document.querySelectorAll('.toast').length, h2: document.querySelector('.detail h2').textContent,
+      spielen: document.querySelectorAll('.detail [data-aktion="spielen"]').length, hinweis: (document.querySelector('.detail .sp-gesperrt') || {}).textContent }));
+    pruefe('Tipp auf eine Station der Vorschau-Welt: ihre Karte geht auf, statt „Spielen“ „Besiege zuerst Janine vom Scheunenclub. Dann öffnet sich diese Welt.“, keine Meldung',
+      sp.toast === 0 && sp.h2 === 'Maxi vom Stammtisch' && sp.spielen === 0 && sp.hinweis === 'Besiege zuerst Janine vom Scheunenclub. Dann öffnet sich diese Welt.', JSON.stringify(sp));
     await seite.evaluate(() => { for (const x of document.querySelectorAll('.toast')) x.remove(); });
     // alle fuenf Welten der Reihe nach: sechs Stationen, Stufe 1 bis 30 mit Elo 100 bis 3000, nichts ueberdeckt oder abgeschnitten
     await geheZuWelt(seite, 1);
@@ -972,7 +972,7 @@ async function testeWelten(browser) {
     await arenaNeu(seite, { welt: 3 });
     w = await weltwahl(seite);
     const h3 = await seite.evaluate(() => document.querySelector('.detail h2').textContent);
-    pruefe('gehe(arena, { welt: 3 }): zeigt Die Turmstadt (gesperrt), das Panel bleibt beim naechsten Gegner', w.name === 'Die Turmstadt' && w.unter === 'Welt 3 von 5 · gesperrt' && w.weltGesperrt && h3 === 'Postbotin Paula', JSON.stringify([w.name, w.unter, h3]));
+    pruefe('gehe(arena, { welt: 3 }): zeigt Die Turmstadt (Vorschau), das Panel bleibt beim naechsten Gegner', w.name === 'Die Turmstadt' && w.unter === 'Welt 3 von 5 · Vorschau' && w.weltGesperrt && h3 === 'Postbotin Paula', JSON.stringify([w.name, w.unter, h3]));
     await arenaNeu(seite, { waehle: 'janine' });
     w = await weltwahl(seite);
     const hj = await seite.evaluate(() => ({ h2: document.querySelector('.detail h2').textContent, gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot }));

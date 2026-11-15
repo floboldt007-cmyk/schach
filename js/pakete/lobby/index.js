@@ -86,7 +86,9 @@ export function modusLeiste(app, aktiv = 'welten') {
     if (!k || k.dataset.modus === el.dataset.aktiv) return;
     el.dataset.aktiv = k.dataset.modus;
     for (const b of el.querySelectorAll('[data-modus]')) b.setAttribute('aria-pressed', String(b === k));
-    try { app.gehe(k.dataset.modus === 'online' ? 'lobby' : 'arena', {}, { ersetzen: true }); } catch (f) { console.error(f); }
+    // R19 online-weg (15.11.2026): "Online" fuehrt zur echten Online-Seite, die alle sehen (der Server steht); die
+    // Vorschau-Lobby bleibt nur ueber #lobby erreichbar
+    try { app.gehe(k.dataset.modus === 'online' ? 'online' : 'arena', {}, { ersetzen: true }); } catch (f) { console.error(f); }
   });
   return el;
 }

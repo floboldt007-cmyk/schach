@@ -28,6 +28,7 @@ import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
 import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen, ladePartien } from '../storage.js';
 import { BOTS, botNachId, rufname } from '../bots.js';
+import { avatarVon } from '../thema.js';
 import { eigenerName, sitzung } from '../konto.js';
 import { holeStand, angemeldet, RANKED_ZEIT } from '../kronen.js';
 import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js';
@@ -307,7 +308,7 @@ function buehnePartie(laufend, st) {
 }
 
 function buehneGegner(bot) {
-  return `<div class="heim-portraet" style="--bot-farbe: var(--bot-${esc(bot.id)}, var(--gold))"><img src="${esc(bot.avatar)}" alt="" draggable="false"></div>
+  return `<div class="heim-portraet" style="--bot-farbe: var(--bot-${esc(bot.id)}, var(--gold))"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></div>
     <div class="heim-buehne-text">
       <small class="heim-ueber">${esc(t('heim.naechsterGegner'))}</small>
       <div class="heim-name"><h2 class="heim-gegner">${esc(bot.name)}</h2>
@@ -325,7 +326,7 @@ function leiterZeile(bot) {
       <h3 id="heim-leiter-titel">${esc(t('heim.leiter'))}</h3>
       <button class="heim-leiter-liste dr" type="button" data-aktion="heim-leiter">
         ${danach.map((b) => `<span class="heim-leiter-bot" style="--bot-farbe: var(--bot-${esc(b.id)}, var(--gold))">
-          <img src="${esc(b.avatar)}" alt="" draggable="false"><span><b>${esc(b.name)}</b><small class="zahl">${esc(zahl(b.elo))}</small></span>
+          <img src="${esc(avatarVon(b))}" alt="" draggable="false"><span><b>${esc(b.name)}</b><small class="zahl">${esc(zahl(b.elo))}</small></span>
         </span>`).join('')}
       </button>
     </section>`;
