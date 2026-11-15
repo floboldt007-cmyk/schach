@@ -305,13 +305,13 @@ async function testeKronenLage(browser) {
       kaputt: kronenLage({ kronen: 'x', stufe: 'y', platz: 'z' }), liste: kronenLage([]), minus: kronenLage({ kronen: -40, stufe: -3 }) };
   });
   const l = r.leer;
-  pruefe('kronenLage(null): 0, Bauer III, ohne Konto, Anteil 0', l.kronen === 0 && l.stufe === 0 && l.liga === 'bauer' && l.rang === 3 && l.ohneKonto === true && l.anteil === 0, JSON.stringify(l));
-  pruefe('kronenLage Platz 2: voll (Aufstiegsplatz), Koenig I', r.oben.anteil === 1 && r.oben.stufe === 17 && r.oben.liga === 'koenig' && r.oben.platz === 2, JSON.stringify(r.oben));
+  pruefe('kronenLage(null): 0, Squire III, ohne Konto, Anteil 0', l.kronen === 0 && l.stufe === 0 && l.liga === 'bauer' && l.rang === 3 && l.ohneKonto === true && l.anteil === 0, JSON.stringify(l));
+  pruefe('kronenLage Platz 2: voll (Aufstiegsplatz), Crownmate I', r.oben.anteil === 1 && r.oben.stufe === 17 && r.oben.liga === 'koenig' && r.oben.platz === 2, JSON.stringify(r.oben));
   const s = r.mitte;
-  pruefe('kronenLage Platz 9 mit 64 von 160 bis Platz 5: Laeufer II, Anteil 0,4', s.kronen === 64 && s.stufe === 7 && s.liga === 'laeufer' && s.rang === 2 && s.platz === 9
+  pruefe('kronenLage Platz 9 mit 64 von 160 bis Platz 5: Warden II, Anteil 0,4', s.kronen === 64 && s.stufe === 7 && s.liga === 'laeufer' && s.rang === 2 && s.platz === 9
     && Math.abs(s.anteil - 0.4) < 1e-9 && s.ohneKonto === false, JSON.stringify(s));
   pruefe('kronenLage ohne Gruppe: platz null, Anteil 0', r.ohneGruppe.platz === null && r.ohneGruppe.anteil === 0, JSON.stringify(r.ohneGruppe));
-  pruefe('kronenLage mit Unsinn (Text, Liste, negativ): 0, Bauer III, ohne Gruppe, aber mit Konto',
+  pruefe('kronenLage mit Unsinn (Text, Liste, negativ): 0, Squire III, ohne Gruppe, aber mit Konto',
     [r.kaputt, r.liste, r.minus].every((x) => x.kronen === 0 && x.stufe === 0 && x.platz === null && x.ohneKonto === false),
     JSON.stringify([r.kaputt, r.liste, r.minus]));
   await kontext.close();
@@ -335,9 +335,9 @@ async function testeNaechstes(browser, heute) {
     await istScreen(seite, 'heim');
     const da = await warteZeile(seite, 'Platz 9 von 30');
     const r = await zeile(seite);
-    pruefe('Server-Stand: eine Zeile "Läufer II" / "Platz 9 von 30"', da && r.zeilen === 1 && r.stufe === 'Läufer II' && r.text === 'Platz 9 von 30', JSON.stringify(r));
+    pruefe('Server-Stand: eine Zeile "Warden II" / "Platz 9 von 30"', da && r.zeilen === 1 && r.stufe === 'Warden II' && r.text === 'Platz 9 von 30', JSON.stringify(r));
     pruefe('Balken zu 40 % (64 von 160 Kronen auf Platz 5)', r.balken === 40, String(r.balken));
-    pruefe('Beschriftung nennt Stufe, Platz und Kronen', r.aria === 'Läufer II, Platz 9 von 30, 64 Kronen diese Woche', r.aria);
+    pruefe('Beschriftung nennt Stufe, Platz und Kronen', r.aria === 'Warden II, Platz 9 von 30, 64 Kronen diese Woche', r.aria);
     pruefe('kein NaN, undefined oder null', ohneUnsinn(r), JSON.stringify(r));
     pruefe('Ruhe: kein Countdown, kein roter Punkt', await seite.evaluate(() => !document.querySelector('.heim-naechstes .punkt-neu, .heim-naechstes .badge, .heim-naechstes [data-countdown]')));
     const gemerkt = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:kronen') || 'null'));
@@ -354,7 +354,7 @@ async function testeNaechstes(browser, heute) {
     await istScreen(seite, 'heim');
     const da = await warteZeile(seite, 'Platz 1 von 30');
     const r = await zeile(seite);
-    pruefe('hoechste Stufe auf Platz 1: "König I", Balken voll', da && r.stufe === 'König I' && r.balken === 100, JSON.stringify(r));
+    pruefe('hoechste Stufe auf Platz 1: "Crownmate I", Balken voll', da && r.stufe === 'Crownmate I' && r.balken === 100, JSON.stringify(r));
     await kontext.close();
   }
   {
@@ -362,8 +362,8 @@ async function testeNaechstes(browser, heute) {
     await istScreen(seite, 'heim');
     const da = await warteZeile(seite, 'Spiel eine Partie für deine Gruppe');
     const r = await zeile(seite);
-    pruefe('ohne Gruppe diese Woche: "Springer III" / "Spiel eine Partie für deine Gruppe", Balken leer',
-      da && r.stufe === 'Springer III' && r.balken === 0 && ohneUnsinn(r), JSON.stringify(r));
+    pruefe('ohne Gruppe diese Woche: "Knight III" / "Spiel eine Partie für deine Gruppe", Balken leer',
+      da && r.stufe === 'Knight III' && r.balken === 0 && ohneUnsinn(r), JSON.stringify(r));
     await kontext.close();
   }
   gruppe = 'offline';
@@ -373,7 +373,7 @@ async function testeNaechstes(browser, heute) {
     await istScreen(seite, 'heim');
     await warte(1200);
     const r = await zeile(seite);
-    pruefe('offline: letzter gemerkter Stand, "Dame III" / "Platz 4 von 30"', r.stufe === 'Dame III' && r.text === 'Platz 4 von 30', JSON.stringify(r));
+    pruefe('offline: letzter gemerkter Stand, "Sovereign III" / "Platz 4 von 30"', r.stufe === 'Sovereign III' && r.text === 'Platz 4 von 30', JSON.stringify(r));
     pruefe('offline: keine Fehler der App', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -415,7 +415,7 @@ async function testeNaechstes(browser, heute) {
     const r = await zeile(seite);
     const sonst = await seite.evaluate(() => ({ wege: [...document.querySelectorAll('.heim-modus b')].map((b) => b.textContent.trim()),
       titel: document.querySelector('.heim-gruss h1')?.textContent.trim() }));
-    pruefe('Englisch: "Bishop II" / "Place 9 of 30", Titel und Wege englisch', da && r.stufe === 'Bishop II' && sonst.titel === 'Ready for the next game?'
+    pruefe('Englisch: "Warden II" / "Place 9 of 30", Titel und Wege englisch', da && r.stufe === 'Warden II' && sonst.titel === 'Ready for the next game?'
       && sonst.wege.join() === 'Online,Learn,Two players', JSON.stringify({ r, sonst }));
     await kontext.close();
   }
