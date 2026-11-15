@@ -174,6 +174,15 @@
 @keyframes feld-puls { 0% { opacity: 0; transform: scale(.7); } 25% { opacity: .5; transform: none; } 100% { opacity: 0; transform: none; } }
 @keyframes streif { from { transform: translateX(-135%) skewX(-16deg); } to { transform: translateX(330%) skewX(-16deg); } }
 
+/* Koordinaten am Rand: der Sockel ist links und unten 12 px statt --rahmen (css/app.css .brett-rahmen:has(> .brett.koord-rand)).
+   Die Brett-Formeln ziehen das Mehr einmal je Richtung ab, sonst ragt das Brett ueber den Sockel und die Spalte rollt.
+   Nie negativ: ein breiterer Sockel (Motiv-Band) hat die 12 px schon.
+   Nur wo --rahmen 4px ist (die zwei Bloecke unten): mit 7 px (Handy quer, quer unter 1000 px) passte "rand" schon und das
+   Brett bleibt so gross wie mit "ecke" (gemessen 15.11., tests/r19-rand-handy.mjs); Handy hoch rechnet layout() in partie.js. */
+@media (orientation: landscape) and (min-width: 1000px), (orientation: portrait) and (min-width: 601px) {
+  .partie:has(.brett.koord-rand) { --koord-extra: max(0px, 12px - var(--rahmen)); }
+}
+
 /* ============================================================
    QUER (iPad quer, Desktop): Brett links, eine Spalte rechts
    ============================================================ */
@@ -181,7 +190,7 @@
   .partie .inhalt { display: grid; grid-template-columns: auto var(--seite); justify-content: center; align-items: start; gap: var(--quer-luecke);
     padding: 16px var(--quer-rand) 22px; container: partie / size; }
   .partie .inhalt > .brettzone {
-    --brett: min(calc(100cqh - 2 * var(--rahmen)), calc(100cqw - var(--balken) - var(--spalt) - var(--quer-luecke) - var(--seite) - 2 * var(--rahmen))); }
+    --brett: min(calc(100cqh - 2 * var(--rahmen) - var(--koord-extra, 0px)), calc(100cqw - var(--balken) - var(--spalt) - var(--quer-luecke) - var(--seite) - 2 * var(--rahmen) - var(--koord-extra, 0px))); }
   .partie .seite { display: flex; flex-direction: column; gap: var(--luecke); height: 100cqh; container: seite / inline-size; }
   .partie .seite > * { flex: none; }
   .partie .zugleiste { display: none; }
@@ -300,9 +309,9 @@
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
   .partie .seite { display: contents; }
   .partie .inhalt > *, .partie .seite > * {
-    --reserve: calc(50px + 50px + 62px + 60px + 44px + 5 * 6px + var(--balken) + var(--spalt) + 2 * var(--rahmen));
-    --brett: min(calc(100cqw - 2 * var(--rahmen)), calc(100cqh - var(--reserve)));
-    width: calc(var(--brett) + 2 * var(--rahmen)); max-width: 100%; flex: none; }
+    --reserve: calc(50px + 50px + 62px + 60px + 44px + 5 * 6px + var(--balken) + var(--spalt) + 2 * var(--rahmen) + var(--koord-extra, 0px));
+    --brett: min(calc(100cqw - 2 * var(--rahmen) - var(--koord-extra, 0px)), calc(100cqh - var(--reserve)));
+    width: calc(var(--brett) + 2 * var(--rahmen) + var(--koord-extra, 0px)); max-width: 100%; flex: none; }
   .partie .inhalt > .brettzone { flex-direction: column; }
   .partie .zugbox { display: none; }
   .partie .spieler.gegner { order: 0; } .partie .brettzone { order: 1; } .partie .spieler.ich { order: 2; }
