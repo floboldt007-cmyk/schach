@@ -2320,7 +2320,7 @@ export function zeige(root, params, app) {
         const neu = wertet ? erg.neuFreigeschaltet : null;
         if (neu && !nachtrag) {
           o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${themaBotFarbe(neu)}">
-            <span class="avatar"><img src="${esc(neu.avatar)}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
+            <span class="avatar"><img src="${esc(avatarVon(neu))}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
             <div><div class="ef-titel">${esc(t('partie.erg.freigeschaltet', { stufe: neu.stufe }))}</div><div class="ef-name">${esc(neu.name)} <span class="ef-elo zahl">${neu.elo}</span></div></div></div>`;
         }
         if (!nachtrag) {
