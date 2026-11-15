@@ -184,9 +184,11 @@ function teile(suiten, anzahl) {
 
 // Frist des Laufs: 5 s bleiben fuer das Beenden der Suite (zeitwaechter.mjs braucht bis zu 4 s) und die Zusammenfassung
 const ENDE = FRIST ? Date.now() + FRIST * 1000 - 5000 : Infinity;
-// Nur echte Abstuerze: "Target crashed" (Seite) und der verlorene Browser. Nicht "Target page, context or browser has been
-// closed": so meldet Playwright jeden Zugriff auf eine geschlossene Seite, auch nach einem gewoehnlichen Fehler (Kaltreview f1).
-const ABSTURZ = /Target crashed|Browser has been closed|[Bb]rowser has disconnected/;
+// Nur "Target crashed" (Absturz einer Seite). Nicht "Target page, context or browser has been closed": so meldet Playwright
+// jeden Zugriff auf eine geschlossene Seite, auch nach einem gewoehnlichen Fehler (Kaltreview f1). Ein Absturz des ganzen
+// Browsers meldet mit Playwright 1.64.1 genau dasselbe, ist also vom eigenen close nicht unterscheidbar; er erscheint als
+// gewoehnlicher FEHLER, nie als falsches Gruen (Fix-Review f1: "Browser has been closed"/"disconnected" kommen nie vor).
+const ABSTURZ = /Target crashed/;
 
 async function lauf(suite) {
   if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {

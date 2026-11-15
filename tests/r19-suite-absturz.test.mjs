@@ -58,6 +58,10 @@ if (kenntListe) {
   pruefe('Geschlossene Seite: FEHLER, aber nicht als Browser-Absturz gemeldet', /^FEHLER zu/m.test(e.text) && !/Browser abgestuerzt/.test(e.text), e.text.slice(-900));
   const c = await alle([], liste('crash0', [['crash0', 'crash0']]), 60000);
   pruefe('Absturz mit Exit 0: Suite FEHLER, Lauf Exitcode 1', c.code === 1 && /^FEHLER crash0/m.test(c.text) && /Browser abgestuerzt/.test(c.text), c.text.slice(-900));
+  // Fix-Review f1: Playwright 1.64.1 meldet "Browser has been closed" / "browser has disconnected" nie (R19-Protokolle: 0-mal,
+  // "Target crashed" 26-mal); die Erkennung traegt keine toten Alternativen
+  const regel = readFileSync(path.join(WURZEL, 'tests/alle.mjs'), 'utf8').match(/^const ABSTURZ = (.+);$/m)?.[1];
+  pruefe('Absturz-Erkennung ist genau /Target crashed/', regel === '/Target crashed/', regel);
 }
 // 2. Frist
 {
