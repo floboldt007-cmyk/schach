@@ -170,6 +170,10 @@ const ARENA_NACHHOLEN_MS = 2500;
 const ZIELE = ['sieg', 'genau', 'hilfe'];
 // Mindesthoehe der hohen Welt auf schmalen Karten (px): Stationen mit Sternen, Fahne und Schild ueberdecken sich nicht
 const WELT_MIN_H = 820;
+// Flos Figur neben ihrer Station: Abstand zum Rand der Station (px) und Richtungen in Grad (0 = rechts, negativ = oben),
+// zuerst schraeg rechts oben wie bisher, dann rechts, rechts unten, links
+const FLO_ABSTAND = 6;
+const FLO_RICHTUNGEN = [-35, 0, 35, -70, -145, 180, 145, -110, 70, 110];
 // Dauer der Freischalt-Choreografie (tests/app.test.mjs misst 2,7 s zwischen Beginn und Ende von .wird-frei)
 const FREI_DAUER_MS = 2700;
 
@@ -619,7 +623,10 @@ export function zeige(root, params, app) {
     return teile.every((n) => n.top >= k.top - 1 && n.bottom <= k.bottom + 1);
   }
 
-  // Flo steht neben der zuletzt bezwungenen Station (sonst am Start des Wegs); beim Freischalten noch beim alten Platz
+  // Flo steht neben der zuletzt bezwungenen Station (sonst am Start des Wegs); beim Freischalten noch beim alten Platz.
+  // Frei daneben (Flo 15.11.2026, live Welt 1 fertig: die Figur hing halb hinter dem Endgegner): der feste Versatz kannte
+  // weder den groesseren Endgegner noch die 44-px-Mindestgroesse der Stationen. Jetzt echter Radius der Station plus Figur
+  // plus Abstand, und von den Richtungen die erste, die keine Station, kein Schild und keinen Rand beruehrt.
   function floPosition(vorStation = null) {
     const lage = LAGEN[lageModus || modus];
     // zuletzt bezwungen: die Station vor dem naechsten Gegner (alle besiegt: der Endgegner); waehrend des Freischaltens
@@ -627,10 +634,38 @@ export function zeige(root, params, app) {
     const letzte = weltFertig ? LBOTS.length - 1 : aktuellIdx - 1;
     const i = vorStation != null ? vorStation : (neuId && !wegGezeichnet ? idx(neuId) - 2 : letzte);
     const kn = 76 * masse.s;
-    if (i < 0) return [lage.start[0] * masse.w + kn * 0.1, yVon(lage.start[1]) - kn * 0.45];
+    const r = (floFigur.offsetWidth || 36) / 2;
+    if (i < 0) return freierPlatz(lage.start[0] * masse.w + kn * 0.1, yVon(lage.start[1]) - kn * 0.45, 0, r);
     const [fx, fy] = lage.stationen[i];
-    const gross = LBOTS[i].id === aktuellId ? 1.22 : 1;
-    return [fx * masse.w + kn * gross * 0.52, yVon(fy) - kn * gross * 0.28];
+    const R = ((knoten[i] && knoten[i].offsetWidth) || kn) / 2;
+    return freierPlatz(fx * masse.w, yVon(fy), R + r + FLO_ABSTAND, r);
+  }
+  // um (cx, cy) im Abstand d (d = 0: zuerst der Punkt selbst) der erste Platz ohne Beruehrung; sonst die erste Richtung
+  function freierPlatz(cx, cy, d, r) {
+    const rand = r + 8;   // wie stelleFlo: so weit bleibt die Figur vom Rand der Karte
+    const hoehe = weltEl.offsetHeight || masse.h;
+    const hindernisse = flaechenDerStationen();
+    const kandidaten = (d > 0 ? [] : [[cx, cy]]).concat(...[d || r * 2 + FLO_ABSTAND, (d || r * 2 + FLO_ABSTAND) + r]
+      .map((a) => FLO_RICHTUNGEN.map((g) => [cx + a * Math.cos(g * Math.PI / 180), cy + a * Math.sin(g * Math.PI / 180)])));
+    const passt = ([x, y]) => x >= rand && x <= masse.w - rand && y >= rand && y <= hoehe - rand
+      && hindernisse.every((h) => (h.kreis ? Math.hypot(x - h.x, y - h.y) >= r + h.r + 2
+        : Math.hypot(x - Math.max(h.x, Math.min(x, h.x + h.w)), y - Math.max(h.y, Math.min(y, h.y + h.h))) >= r + 2));
+    return kandidaten.find(passt) || kandidaten[d > 0 ? 0 : 1];
+  }
+  // Kreise der Stationen und Rechtecke ihrer Schilder in Welt-Pixeln, aus dem Layout (offset*), nicht aus dem Bild:
+  // Stationen koennen gerade einschweben (transform), ihre Plaetze stehen trotzdem fest
+  function flaechenDerStationen() {
+    const liste = [];
+    for (const el of knoten) {
+      if (!el || !el.offsetWidth) continue;
+      liste.push({ kreis: true, x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2, r: el.offsetWidth / 2 });
+      for (const t of el.querySelectorAll('.k-schild, .k-nr, .boss-krone, .fahne, .k-sterne')) {
+        if (!t.offsetWidth) continue;
+        const dx = parseFloat(t.style.getPropertyValue('--krone-dx')) || 0;
+        liste.push({ x: el.offsetLeft + t.offsetLeft + dx, y: el.offsetTop + t.offsetTop, w: t.offsetWidth, h: t.offsetHeight });
+      }
+    }
+    return liste;
   }
   function stelleFlo([x, y]) {
     // ganz in der Karte (Handy kompakt: am Start ragte die Figur links ueber den Rand)
