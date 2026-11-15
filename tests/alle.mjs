@@ -248,6 +248,15 @@ async function einzelLauf(suite) {
   } finally { clearInterval(puls); }
 }
 
+// Ein unbekannter Name in --nur ist ein FEHLER, bevor etwas laeuft (auch mit --teil und --plan). Bis 15.11.2026 fiel er still
+// weg, und ein Lauf mit Tippfehler oder einer Suite aus einem anderen Zweig sah gruen aus (r19-rand-handy, bretter-v4-app).
+// Exit 4: 2 ist "keine passende Suite", 3 ist --plan.
+const unbekannt = NUR ? NUR.filter((n) => !LISTE.some((s) => s.name === n)) : [];
+if (unbekannt.length) {
+  for (const n of unbekannt) console.log(`FEHLER unbekannte Suite: ${n}`);
+  console.log('Namen: ' + LISTE.map((s) => s.name).join(', '));
+  process.exit(4);
+}
 let auswahl = NUR ? LISTE.filter((s) => NUR.includes(s.name)) : LISTE;
 if (PLAN) {
   const gruppen = teile(auswahl, TEIL ? TEIL[1] : 1);

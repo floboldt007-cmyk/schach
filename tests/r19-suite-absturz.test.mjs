@@ -85,6 +85,17 @@ if (kenntListe) {
   pruefe('Protokoll: Seite aus newContext meldet Absturz mit Ansicht und Viewport', /Target crashed.*Ansicht #\/probe-kontext.*Viewport 390x844/.test(e.text), e.text.slice(-900));
   pruefe('Protokoll: Seite aus newPage meldet Absturz mit Ansicht und Viewport', /Target crashed.*Ansicht #\/probe-seite.*Viewport 1280x800/.test(e.text), e.text.slice(-900));
 }
+// 1e. Unbekannter Name in --nur (Nachtrag 15.11.: r19-rand-handy und bretter-v4-app fielen still weg): FEHLER mit eigenem
+// Exit-Code, bevor eine Suite laeuft; mit --teil genauso
+{
+  for (const extra of [[], ['--teil=1/2']]) {
+    const laeufe = path.join(ORDNER, `unbekannt${extra.length}.laeufe`);
+    const e = await alle(['--nur=inhalt,gibt-es-nicht', ...extra], liste('unbekannt', [['inhalt', 'inhalt']]), 60000, { LAEUFE_DATEI: laeufe });
+    const was = extra.length ? 'mit --teil' : 'ohne --teil';
+    pruefe(`Unbekannte Suite ${was}: Zeile "FEHLER unbekannte Suite: gibt-es-nicht" und Exit 4`, e.code === 4 && /^FEHLER unbekannte Suite: gibt-es-nicht$/m.test(e.text), { code: e.code, text: e.text.slice(-400) });
+    pruefe(`Unbekannte Suite ${was}: keine Suite gelaufen`, !existsSync(laeufe) && !/Suiten bestanden/.test(e.text), e.text.slice(-400));
+  }
+}
 // 2. Frist
 {
   const t0 = Date.now();
