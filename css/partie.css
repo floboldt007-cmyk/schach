@@ -74,7 +74,9 @@
 .partie .spieler.ich > .name { grid-area: name; }
 .partie .spieler .unter { display: flex; align-items: center; gap: 6px; height: 18px; margin-top: 1px; min-width: 0; overflow: hidden;
   white-space: nowrap; font-size: 13px; font-weight: 650; color: var(--text-2); }
-.partie .spieler.ich > .unter { grid-area: unter; }
+/* contain: die Unterzeile schneidet ohnehin ab und darf die Spalte der Leiste nicht breit ziehen (sonst bricht der Name
+   in der Online-Partie ohne Leiste um, tests/gleichheit-ansichten.test.mjs PC "Leiste ich") */
+.partie .spieler.ich > .unter { grid-area: unter; contain: inline-size; }
 .partie .spieler .p-meta { flex: none; }
 /* Etappe B Task 4: Bot als Ersatz aus der Gegnersuche, ehrlich gekennzeichnet (Text in Schriftfarbe, nur ein Rahmen) */
 .partie .spieler .ki-abzeichen { flex: none; display: inline-block; margin-inline-end: .4em; padding: 0 .45em; border: 1px solid currentColor;
