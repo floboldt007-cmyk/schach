@@ -149,6 +149,7 @@ const SUITEN = [
   { name: 'geschmack-r8', datei: 'geschmack-r8.test.mjs', args: [], was: 'Feinschliff R8: Serien-Chip neben dem Gruss auf kurzen Handys, Erfolgs-Fenster nie ueber einem offenen Blatt (Browser)' },
   { name: 'r16-p1', datei: 'r16-p1.test.mjs', args: [], was: 'Feinschliff R16 Paket 1: Konto-Fehlertext, Lobby-Gegnerkarte (VS, Sondertitel-Wappen, Elo), Vitrine, Lektion auf dem iPhone SE (Browser)' },
   { name: 'r19-online', datei: 'r19-online.test.mjs', args: [], was: 'Feinschliff R19: Online abgemeldet Konto-Hinweis unter den Tueren und ungestreckt, angemeldet Liga, Tueren, Freunde, Tueren-Ueberzeile mind. 12 px (Browser)' },
+  { name: 'r19-uhr', datei: 'r19-uhr.test.mjs', args: [], was: 'Feinschliff R19: Schachuhr in Bot- und KI-Partie (Kern: Abzug, Zuschlag, Pause, Zeitende, Fortsetzen aus zeiten, Wanduhr gewertet, Remis ohne Mattmaterial)' },
   { name: 'r17-kopf', datei: 'r17-kopf.test.mjs', args: [], was: 'Feinschliff R17: Kopf-Knoepfe (Premium, rund) in Ruhe, Zeiger, Fokus, gedrueckt lesbar, Zeiger nur bei hover:hover, Handy ohne haengenden Zustand (Browser)' },
   { name: 'r18-hover-rest', datei: 'r18-hover-rest.test.mjs', args: [], was: 'Feinschliff R18: Einstellungen-Navigation und Kopf-Chips am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover (Browser)' },
   { name: 'r18-rd-hover', datei: 'r18-rd-hover.test.mjs', args: [], was: 'Feinschliff R18: Knoepfe des Raetsel-Duells (Start, Ende) am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover, Kontrast in vier Zustaenden mind. 4,5:1 (Browser)' },
