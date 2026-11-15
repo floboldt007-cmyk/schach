@@ -52,7 +52,8 @@ const NAME = { u1: 'flo', u2: 'opa' };
 const partien = new Map();
 let stamp = Date.now(), nummer = 0;
 const unerwartet = [], reklamiert = [];
-const aktualisieren = (p) => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
+// wie der Trigger setze_aktualisiert_am (now()): echte Zeit, streng steigend (Serveruhr fuer js/serverzeit.js)
+const aktualisieren = (p) => { stamp = Math.max(Date.now(), stamp + 1); p.aktualisiert_am = new Date(stamp).toISOString(); return p; };
 function neuePartie({ gewertet, alterMs = 0 }) {
   const jetzt = new Date(Date.now() - alterMs).toISOString();
   const p = aktualisieren({ id: 'partie-' + ++nummer, code: 'OPA' + nummer + 'X2', weiss: 'u1', schwarz: 'u2', erstellt_von: gewertet ? null : 'u1',
@@ -166,7 +167,7 @@ const uhrLaeuft = async (sp) => {
 // A (Empfehlung): Koenig der Farbe am Zug, Zahl, schmaler Gold-Balken · B: nur Koenig und Zahl · C: voller neutraler Balken
 const BILDER = (process.argv.find((a) => a.startsWith('--bilder=')) || '').slice(9);
 const VARIANTEN = { A: '', B: '.on-frist-balken{display:none!important}',
-  C: '.on-frist-figur{display:none!important}.on-frist-balken{max-width:none!important;height:4px!important}.on-frist-balken i{background:var(--text-2)!important}' };
+  C: '.on-frist-figur{display:none!important}.on-frist-balken{width:100%!important;height:3px!important}.on-frist-balken i{background:var(--text-2)!important}' };
 const GERAETE = { iphone13: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true },
   pc: { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 } };
 async function machBilder(browser) {

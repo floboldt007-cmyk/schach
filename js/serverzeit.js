@@ -14,12 +14,14 @@
 export const FRISCH_MS = 6000;
 // Proben veralten: eine spaeter gestellte Geraeteuhr soll nicht fuer immer mit dem alten Versatz rechnen
 export const PROBE_GILT_MS = 10 * 60 * 1000;
+// mehr als einen Tag daneben ist keine Uhr, sondern ein falscher Zeitstempel: zaehlt nicht
+export const PLAUSIBEL_MS = 24 * 60 * 60 * 1000;
 
 let proben = [];
 
 export function probe(serverIso, empfangMs = Date.now(), frisch = false) {
   const s = Date.parse(serverIso || '');
-  if (!Number.isFinite(s) || !Number.isFinite(empfangMs)) return;
+  if (!Number.isFinite(s) || !Number.isFinite(empfangMs) || Math.abs(s - empfangMs) > PLAUSIBEL_MS) return;
   proben.push({ wert: s - empfangMs, frisch: !!frisch, am: empfangMs });
   if (proben.length > 40) proben = proben.slice(-40);
 }

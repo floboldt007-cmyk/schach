@@ -1,6 +1,6 @@
 // Serveruhr minus Geraeteuhr (js/serverzeit.js, R19 15.11.2026: Flo gegen Opa, Uhr stand, Intro nur auf einer Seite).
 // Node, ohne Browser.   node tests/serverzeit.test.mjs
-import { probe, versatz, sicher, jetzt, vergiss, FRISCH_MS, PROBE_GILT_MS } from '../js/serverzeit.js';
+import { probe, versatz, sicher, jetzt, vergiss, FRISCH_MS, PROBE_GILT_MS, PLAUSIBEL_MS } from '../js/serverzeit.js';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, bedingung, info) {
@@ -38,6 +38,9 @@ pruefe('Probe gilt PROBE_GILT_MS', versatz(T + 40300 + PROBE_GILT_MS) === -40300
 vergiss(); probe('', T, true); probe('kaputt', T, true); probe(undefined, T, true); probe(iso(T), NaN, true);
 pruefe('leere oder kaputte Zeitstempel zaehlen nicht', versatz(T) === 0 && !sicher(T));
 
+// ein Zaehler statt einer Uhrzeit (etwa 1970) oder ein Tag daneben: keine Uhr, zaehlt nicht
+vergiss(); probe(iso(5), T, true); probe(iso(T - PLAUSIBEL_MS - 1), T, true);
+pruefe('unplausible Stempel (mehr als ein Tag daneben) zaehlen nicht', versatz(T) === 0 && !sicher(T), versatz(T));
 pruefe('FRISCH_MS ist eine kurze Spanne (hoechstens 10 s)', FRISCH_MS > 0 && FRISCH_MS <= 10000, FRISCH_MS);
 
 console.log(`\n${ok}/${gesamt} bestanden`);

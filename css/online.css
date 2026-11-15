@@ -128,13 +128,15 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-zug, .on-uhr-hinweis, .on-live { margin: 0; text-align: center; color: var(--text-2); font-size: var(--fs-klein); }
 .on-zug { font-weight: 700; color: var(--text); }
 .on-uhr-hinweis:empty { display: none; }
-/* R19 (15.11.2026): Erstzug-Frist vor dem 2. Halbzug: Koenig der Farbe am Zug, Zahl und ein schmaler Gold-Balken, der
-   schrumpft (das eine lebendige Element, matt, ohne Schein). In den letzten 10 s in der Warnfarbe; ohne Bewegung
-   springt der Balken nur je Sekunde */
-.on-frist { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin: 0; font-size: var(--fs-klein); font-weight: 700; color: var(--text-2); }
+/* R19 (15.11.2026): Erstzug-Frist vor dem 2. Halbzug in der Zug-Zeile: Koenig der Farbe am Zug, Zahl und darunter ein
+   schmaler Gold-Balken, der schrumpft (das eine lebendige Element, matt, ohne Schein). Der Balken liegt absolut unter
+   der Zeile und kostet keine Hoehe (Brettgroesse wie in der Bot-Partie). Letzte 10 s in der Warnfarbe; ohne Bewegung
+   springt er nur je Sekunde */
+.on-zug { position: relative; }
+.on-frist { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; font-weight: 700; color: var(--text-2); }
 .on-frist[hidden] { display: none; }
-.on-frist-figur { width: 18px; height: 18px; flex: none; }
-.on-frist-balken { flex: 0 0 100%; display: block; max-width: 160px; height: 3px; border-radius: 2px; background: var(--linie); overflow: hidden; }
+.on-frist-figur { width: 1.25em; height: 1.25em; margin: -0.2em 0; flex: none; }
+.on-frist-balken { position: absolute; left: 50%; bottom: -5px; width: min(140px, 50%); height: 2px; transform: translateX(-50%); border-radius: 1px; background: var(--linie); overflow: hidden; }
 .on-frist-balken i { display: block; height: 100%; background: var(--gold); transform-origin: left center; transition: transform .1s linear; }
 .on-frist.knapp { color: var(--warn); }
 .on-frist.knapp .on-frist-balken i { background: var(--warn); }

@@ -416,7 +416,7 @@ export function zeige(root, params, app) {
           <div class="seite">
             <div class="spieler gegner on-spieler on-oben" role="group"></div>
             <div class="on-hinweise"><p class="on-angebot" role="alert" hidden></p><p class="on-neuer" hidden></p>
-              <p class="on-zug" role="status"></p><p class="on-frist" aria-hidden="true" hidden><img class="on-frist-figur" alt="" decoding="sync"><span class="on-frist-zeit zahl"></span><span class="on-frist-balken"><i></i></span></p><p class="on-uhr-hinweis"></p><p class="on-live" hidden></p></div>
+              <p class="on-zug" role="status"><span class="on-zug-text"></span><span class="on-frist" aria-hidden="true" hidden><img class="on-frist-figur" alt="" decoding="sync"><span class="on-frist-zeit zahl"></span><span class="on-frist-balken"><i></i></span></span></p><p class="on-uhr-hinweis"></p><p class="on-live" hidden></p></div>
             <div class="zugbox"><div class="zb-kopf">${pfeil('zug-zurueck', 'icon-knopf zl-zurueck dr')}<span class="zb-titel">${esc(O('zuege'))}</span>${pfeil('zug-vor', 'icon-knopf zl-vor dr')}</div>
               <div class="zugliste" role="region" tabindex="0" aria-label="${esc(O('zuege'))}"></div></div>
             <div class="zugleiste" role="region" tabindex="0" aria-label="${esc(O('zuege'))}"></div>
@@ -872,7 +872,8 @@ export function zeige(root, params, app) {
       const id = p.id;
       karteDerPartie(id, { frist: 8000 }).then((d) => {
         if (!d || weg || !p || p.id !== id) return;
-        kartenDaten = d; karten(); intro();
+        // Name des Gegners auch in der Zeile "<Name> beginnt" (R19)
+        kartenDaten = d; karten(); zeichneZugZeile(); intro();
         // die Namen kamen erst nach dem Ende: in der Ablage fuer die Analyse nachtragen
         if (p.status === 'beendet') { try { sichereFuerAnalyse(); } catch (e) { /* bleibt bei den alten Namen */ } }
       });
@@ -976,19 +977,23 @@ export function zeige(root, params, app) {
       aktion(() => online.pruefeZeit(p.id));
     }
   }
+  // Zeile ueber den Hinweisen; R19: vor dem ersten Zug sagt sie auf beiden Seiten, wer beginnt, dahinter die Frist
+  function zeichneZugZeile() {
+    if (!brett || weg || !p || blockiert) return;
+    const gegnerZug = p.gewertet ? O('gegnerAmZug') : O('gegner');
+    const beginn = p.status === 'laeuft' && online.zuegeListe(p).length === 0;
+    const amZugText = beginn ? (online.binAmZug(p) ? O('beginnstDu') : O('beginnt', { name: spielerDaten('w').name }))
+      : online.binAmZug(p) ? O('du') : gegnerZug;
+    inhalt.querySelector('.on-zug-text').textContent = p.status === 'beendet' ? O('fertig') : widerspruch ? O('stellung') : busy ? O('bestaetigt') : amZugText;
+    zeichneFrist();
+  }
   function zeichne() {
     if (!brett || weg || blockiert) return;
     const m = chess.history({ verbose: true }).at(-1);
     brett.setzeStellung(chess.fen(), { letzterZug: m ? [m.from, m.to] : null, schach: chess.inCheck() ? true : null });
     karten();
     zeichneGeschlagen();
-    const gegnerZug = p.gewertet ? O('gegnerAmZug') : O('gegner');
-    // R19: vor dem ersten Zug sagt die Zeile auf beiden Seiten, wer beginnt
-    const beginn = p.status === 'laeuft' && online.zuegeListe(p).length === 0;
-    const amZugText = beginn ? (online.binAmZug(p) ? O('beginnstDu') : O('beginnt', { name: spielerDaten('w').name }))
-      : online.binAmZug(p) ? O('du') : gegnerZug;
-    inhalt.querySelector('.on-zug').textContent = p.status === 'beendet' ? O('fertig') : widerspruch ? O('stellung') : busy ? O('bestaetigt') : amZugText;
-    zeichneFrist();
+    zeichneZugZeile();
     inhalt.querySelector('.on-uhr-hinweis').textContent = p.bedenkzeit_s != null && online.zuegeListe(p).length < 2 ? O('uhr') : '';
     // ein neuer Zug fuehrt aus der Ansicht einer frueheren Stellung zur Partie zurueck
     if (ansehen.el && chess.history().length !== ansehen.n) schliesseAnsicht();
