@@ -49,6 +49,7 @@ const SUITEN = [
   { name: 'konto-loeschen', datei: 'konto-loeschen.test.mjs', args: [], was: 'Löschseite ohne App (Google Play): Anmeldung, zweistufig löschen, Mail-Weg (Browser)' },
   { name: 'r19-bots-se', datei: 'r19-bots-se.test.mjs', args: [], was: 'Bots: klebender Spielen-Knopf verdeckt kein Fokusziel (7 Größen, in Ruhe bildgleich); Löschseite: Sprunglink zu "Selbst löschen" (Browser)' },
   { name: 'r19-botwelt-probe', datei: 'r19-botwelt-probe.test.mjs', args: [], was: 'Bot-Welt (Handy B + Welthintergrund A): Layout ohne Scrollen, Hintergrund lebt, reduced-motion steht still, Partie bis Sieg (4 Geraete, hell/dunkel)' },
+  { name: 'r19-welt-vorschau', datei: 'r19-welt-vorschau.test.mjs', args: [], was: 'Welt-Vorschau: naechste Welt sichtbar ohne Schloss, Karte mit Hinweis statt Spielen, spielbar nach dem Sieg (5 Geraete, hell/dunkel)' },
   { name: 'server-abo', datei: 'server-abo.test.mjs', args: [], was: 'Abo: Stripe-Webhook und Schema-Vertrag (Server)' },
   { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Trainer“: Stand, Kauf, Blatt' },
   // server-verwaltung steht wie alle PGlite-Suiten (server-karte*, server-daten*) nicht hier: PGlite gibt es nur im CI-Job
