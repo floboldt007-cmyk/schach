@@ -191,7 +191,12 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
 // Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
 export const EINSTELLUNG_WERTE = Object.freeze({
   // dahinter die Bretter des Labors (js/labor.js, nur das Erfinder-Konto; app.js faellt fuer andere auf 'nacht')
-  brett: Object.freeze(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron', 'acker', 'moos', 'pflaster', 'brandung', 'tiefsee']),
+  brett: Object.freeze(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron', 'acker', 'moos', 'pflaster', 'brandung', 'tiefsee',
+    // 65 Bretter (Flo 14.11.2026), Katalog in js/labor.js
+    'ahorn', 'schiefer', 'turnier', 'elfenbein', 'ebenholz', 'kirsche', 'wiese', 'duene', 'birke', 'herbst', 'kirschbluete', 'lavendel', 'bambus',
+    'sonnenblume', 'gletscher', 'vulkan', 'topas', 'amethyst', 'perlmutt', 'jade', 'bernstein', 'smaragd', 'saphir', 'rubin', 'opal', 'onyx',
+    'scheune', 'heuboden', 'lichtung', 'koehlerglut', 'rathausuhr', 'bibliothek', 'leuchtturm', 'watt', 'leuchtqualle', 'schatzkammer', 'sternennacht', 'mondschein', 'daemmerung',
+    'nachtmarkt', 'geisterstunde', 'gewitter', 'neon', 'synthwave', 'cyber', 'nordlicht', 'sonnenkrone', 'drachenglut', 'sternenstaub', 'kronjuwel', 'phoenix', 'tiefenleuchten']),
   klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall', 'juwel']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
