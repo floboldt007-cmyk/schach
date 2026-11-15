@@ -162,7 +162,7 @@ function buehne(lg) {
   const zone = lg.platz ? zoneVon(lg.platz, { n: lg.n, stufe: lg.stufe }) : null;
   const zoneText = zone === 'auf' ? T('zone.auf') : zone === 'ab' ? T('zone.ab') : zone ? T('zone.bleib', { stufe: name }) : '';
   return `<div class="lg-gr-buehne" data-liga="${esc(stufeInfo(lg.stufe).liga)}">
-    <img class="lg-gr-wappen" src="${esc(wappenUrl(lg.stufe))}" alt="" width="64" height="77">
+    <button type="button" class="lg-alle-ligen lg-gr-wappen-knopf" aria-label="${esc(t('p-liga.season.ligen.oeffnen'))}"><img class="lg-gr-wappen" src="${esc(wappenUrl(lg.stufe))}" alt="" width="64" height="77"></button>
     <div class="lg-gr-titel"><h2>${esc(name)}</h2><p>${lg.platz ? esc(T('platz', { platz: zahl(lg.platz), n: zahl(lg.n) })) : esc(T('leer'))}</p></div>
     ${zone || naechste != null ? `<div class="lg-gr-fuss">
       ${zone ? `<span class="lg-gr-zone" data-zone="${zone}">${zone === 'auf' ? HOCH : ''}${esc(zoneText)}</span>` : '<span></span>'}
@@ -238,7 +238,8 @@ export function reiterGruppe({ app } = {}) {
   // Wie Kronen zaehlen, eingeklappt unter der Liste; alle Zahlen kommen aus kronen.js
   const regeln = () => {
     const w = kronenRegelWerte();
-    return `<details class="lg-gr-regeln"><summary>${esc(T('regeln.titel'))}</summary>
+    return `<button type="button" class="lg-alle-ligen lg-gr-alle-link">${esc(t('p-liga.season.ligen.titel'))}</button>
+      <details class="lg-gr-regeln"><summary>${esc(T('regeln.titel'))}</summary>
       ${ligen?.raetsel ? `<p>${esc(T('regeln.zwei'))}</p>` : ''}<p>${esc(T('regeln.kronen', w))}</p><p>${esc(T('regeln.woche', w))}</p><p>${esc(T('keine'))}</p></details>`;
   };
   function zeichne(lg) {
@@ -275,6 +276,11 @@ export function reiterGruppe({ app } = {}) {
   s.addEventListener('click', (e) => {
     const liga = e.target.closest('.lg-liga');
     if (liga) { waehle(liga.dataset.liga, false); return; }
+    // "Alle Ligen" (saison.js) erst beim Tipp nachladen, die eigene Stufe markiert
+    if (e.target.closest('.lg-alle-ligen')) {
+      import('./saison.js').then((m) => m.zeigeLigen(lage ? lage.stufe : null)).catch(() => {});
+      return;
+    }
     const wer = e.target.closest('.lg-gr-wer');
     if (wer && lage) {
       const platz = Number(wer.closest('.lg-gr-zeile').dataset.platz);

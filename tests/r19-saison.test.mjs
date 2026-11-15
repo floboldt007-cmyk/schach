@@ -183,8 +183,9 @@ try {
     pruefe('Titelwahl: "Keinen zeigen" gedrueckt, dazu Crownmaster und Top 100 Season 1', JSON.stringify(l.knoepfe) === JSON.stringify([
       ['Keinen zeigen', 'true'], ['Crownmaster Season 1', 'false'], ['Top 100 Season 1', 'false']]), l.knoepfe);
     pruefe('Season-Ende: Blatt "Season 1 ist vorbei" mit Abzeichen, neuem Titel und Startstufe', l.blatt === 1 && l.blattText.includes('Season 1 ist vorbei')
-      && l.blattText.includes('Dein Abzeichen: Crownmate I') && l.blattText.includes('Neuer Titel: Crownmaster Season 1')
-      && l.blattText.includes('Neuer Titel: Top 100 Season 1') && l.blattText.includes('Season 2 startet für dich bei Sovereign I'), l.blattText);
+      // seit R19-saison-abzeichen: "Neue Titel" als Ueberschrift, die Titel als Chips (tests/r19-saison-abzeichen.test.mjs)
+      && l.blattText.includes('Dein Abzeichen: Crownmate I') && l.blattText.includes('Neue Titel') && l.blattText.includes('Crownmaster Season 1')
+      && l.blattText.includes('Top 100 Season 1') && l.blattText.includes('Season 2 startet für dich bei Sovereign I'), l.blattText);
     pruefe('keine Platzhalter oder NaN', ohneUnsinn(l.text) && ohneUnsinn(l.blattText), l.text + ' | ' + l.blattText);
     await seite.click('.ss-blatt .sheet-knoepfe button');
     await seite.waitForFunction(() => !document.querySelector('.ss-blatt'), null, { timeout: 4000 }).catch(() => {});

@@ -224,24 +224,78 @@
 .lg-gr-regeln p { margin: 0 0 8px; line-height: 1.45; }
 /* R19 Season: Leiste im Profil (ich:kopf) und Blatt am Season-Ende; nur Theme-Tokens */
 .ss-leiste[hidden] { display: none !important; }
-.ss-leiste .ss-kopf { margin-top: 0; }
 .ss-leiste p { margin: 0 0 var(--a2); line-height: 1.45; }
-.ss-lauf, .ss-hilfe { font-size: 13px; color: var(--text-2); }
-.ss-bisher, .ss-ende-abz { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.ss-symbol { flex: none; width: 18px; height: auto; }
-.ss-abzeichen { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--a2); padding: 0; list-style: none; }
-.ss-abzeichen li { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 10px; border-radius: 999px;
-  background: var(--flaeche-3); font-size: 13px; font-weight: 600; }
+/* Kopf mit Link "Alle Ligen", darunter der schmale Wochen-Balken (Flo 15.11.: Woche 3 von 8 als Balken mit Text) */
+.ss-kopfzeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: var(--a2); }
+.ss-kopfzeile .ss-kopf { margin: 0; }
+.ss-alle-ligen, .lg-gr-alle-link { min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--text); font: inherit;
+  font-size: 14px; font-weight: 700; text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px;
+  text-underline-offset: 4px; cursor: pointer; }
+.lg-gr-alle-link { justify-self: start; }
+.ss-fortschritt { height: 8px; margin: 0 0 6px; border-radius: var(--r-pille, 999px); background: var(--flaeche-3); box-shadow: inset 0 0 0 1px var(--linie); overflow: hidden; }
+.ss-fortschritt > span { display: block; height: 100%; border-radius: inherit; background: var(--gold); }
+.ss-lauf { font-size: 13px; font-weight: 600; color: var(--text-2); }
+/* Wappen mit Gewicht: die beste Stufe gross, die Abzeichen als Kacheln (vorhandene Liga-Symbole, keine neuen Bilder) */
+.ss-symbol { flex: none; height: auto; }
+.ss-bisher { display: flex; align-items: center; gap: 14px; margin: var(--a3) 0; font-weight: 700; font-size: 15px; }
+.ss-ligen-knopf { display: inline-grid; place-items: center; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.ss-bisher .ss-ligen-knopf { flex: none; width: 72px; height: 80px; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); }
+.ss-bisher .ss-symbol { width: 56px; }
+.ss-abzeichen { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin: 0 0 var(--a3); padding: 0; list-style: none; }
+.ss-abz-kachel { width: 100%; gap: 6px; min-height: 100px; padding: 10px 6px; border-radius: var(--r-m); background: var(--flaeche-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, var(--linie)); font-size: 13px; font-weight: 700; text-align: center; }
+.ss-abz-kachel .ss-symbol { width: 44px; }
+.ss-ligen-knopf:focus-visible, .ss-alle-ligen:focus-visible, .lg-alle-ligen:focus-visible { outline: 3px solid var(--fokus); outline-offset: 2px; }
+/* Titelwahl als echte Auswahl: Haken am gewaehlten Titel, darunter die Vorschau der eigenen Karte */
 .ss-wahl { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--a2); }
-.ss-titel { min-height: 44px; }
+.ss-titel { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.ss-haken { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; visibility: hidden; }
+.ss-haken svg { width: 14px; height: 14px; }
 .ss-titel[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.ss-titel[aria-pressed="true"] .ss-haken { visibility: visible; background: var(--gold); color: #2A1A00; }
 .ss-titel:focus-visible { outline: 3px solid var(--fokus); outline-offset: 2px; }
+.ss-vorschau-titel { margin-top: var(--a3) !important; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.ss-vorschau { margin-bottom: var(--a3); }
+.ss-vorschau .vk { max-width: 420px; }
+.ss-hilfe { font-size: 15px; color: var(--text-2); }
 .ss-fehler:empty { display: none; }
 .ss-fehler { color: var(--warn); font-weight: 600; }
-.ss-ende { display: grid; gap: 10px; margin: 8px 0 4px; }
+/* "Alle Ligen" (saison.js zeigeLigen): die Ligen als Stapel von oben nach unten, die eigene Liga golden umrandet */
+.sheet-karte.ss-ligen-blatt { width: min(560px, calc(100% - 24px)); overflow-y: auto; text-align: left;
+  max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+.ss-ligen { display: grid; gap: 8px; margin-top: 14px; }
+.ss-ligen-liga { padding: 10px 12px; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); }
+.ss-ligen-liga[data-hier] { box-shadow: inset 0 0 0 2px var(--gold); }
+.ss-ligen-kopf { display: flex; align-items: center; gap: 12px; }
+.ss-ligen-kopf .ss-symbol { width: 40px; }
+.ss-ligen-kopf h4 { margin: 0; font-family: var(--display); font-size: 17px; color: var(--text); }
+.sheet-karte .ss-ligen-satz { margin: 2px 0 0; font-size: 14px; font-weight: 500; line-height: 1.4; color: var(--text-2); }
+.ss-ligen-stufen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0 52px; padding: 0; list-style: none; }
+.ss-ligen-stufe { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border-radius: 999px;
+  background: var(--flaeche); box-shadow: inset 0 0 0 1px var(--linie); font-size: 13px; font-weight: 700; color: var(--text); }
+.ss-ligen-stufe[aria-current="true"] { background: #FFD47A; color: #2A1A00; box-shadow: none; }
+.ss-ligen-du { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.sheet-karte .ss-ligen-regel { margin: 6px 0 0; padding: 12px; border-radius: var(--r-m); background: var(--flaeche-2); font-size: 14px; font-weight: 500;
+  line-height: 1.45; color: var(--text); }
+/* Fenster am Season-Ende: Abzeichen als Held mit kurzem Auftritt (bei reduzierter Bewegung ein Standbild) */
+.ss-ende { display: grid; justify-items: center; gap: 10px; margin: 8px 0 4px; }
 .ss-ende p { margin: 0; line-height: 1.45; }
-.ss-ende-titel { font-weight: 700; }
-.ss-ende-abz { justify-content: center; }
+.ss-ende-held { display: grid; place-items: center; width: 148px; height: 148px; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--gold) 34%, transparent), transparent);
+  animation: ss-auftritt .9s cubic-bezier(.2, .8, .2, 1) both, ss-schweben 4s ease-in-out .9s infinite alternate; }
+.ss-ende-held .ss-symbol { width: 104px; }
+.sheet-karte .ss-ende-abz { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--text); }
+.sheet-karte .ss-ende-chips-titel { margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.ss-ende-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.ss-chip { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 999px; background: #FFD47A; color: #2A1A00;
+  font-size: 15px; font-weight: 800; }
+.sheet-karte .ss-ende-neu { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+@keyframes ss-auftritt { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes ss-schweben { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .ss-ende-held { animation: none; } }
+/* Liga: das eigene Wappen auf der Buehne oeffnet "Alle Ligen" */
+.lg-gr-wappen-knopf { display: grid; padding: 0; border: 0; background: none; border-radius: var(--r-m); cursor: pointer; }
 
 /* Weltrangliste nach Online-Elo (welt.js, G-006 AC-11, 14.11.2026): Kopf, Teilnahme mit Knopf, dann die Liste wie die
    Gruppe (Banner-Streifen links, Name auf der Flaeche, rechts die Elo) */

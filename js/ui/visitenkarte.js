@@ -117,11 +117,12 @@ export function fremdeKarte(daten) {
 export function eigeneKarte() {
   let k = null;
   try { k = waehle('karte:eigene?', {}); } catch (e) { k = null; }
-  if (k) return k;
+  // eigen: nur die eigene Karte zeigt die leere Vitrine als Einladung, fremde Karten lassen sie weg (Flo 15.11.2026)
+  if (k) return { ...k, eigen: true };
   // ohne Paket sammlung: Profilbild und Banner aus der eigenen Wahl, sonst nichts
   const w = profilWahl();
   return { name: K('karte.du'), titel: null, banner: MENSCHEN_BANNER.includes(w.banner) ? w.banner : 'start', ki: false, kronenStufe: null,
-    orden: [], avatar: floAvatar('w') };
+    orden: [], avatar: floAvatar('w'), eigen: true };
 }
 
 export function visitenkarte(karte = {}, { groesse = 'mittel' } = {}) {
@@ -148,7 +149,7 @@ export function visitenkarte(karte = {}, { groesse = 'mittel' } = {}) {
   const symbol = krone ? `<img class="vk-liga-symbol" src="${esc(ligaSymbolUrl(k.kronenStufe))}" alt="" width="14" height="16">` : '';
   const sz = saisonText(k.saison);
   const stt = saisonTitelText(k.saisonTitel);
-  const saison = sz || stt ? `<span class="vk-season">${sz ? `<span class="vk-season-abz" aria-label="${esc(K('saison.abzeichenLang', { n: k.saison.saison, stufe: kronenText(k.saison.stufe) }))}">${esc(sz)}</span>` : ''}${stt ? `<span class="vk-season-titel">${esc(stt)}</span>` : ''}</span>` : '';
+  const saison = sz || stt ? `<span class="vk-season">${sz ? `<span class="vk-season-abz" aria-label="${esc(K('saison.abzeichenLang', { n: k.saison.saison, stufe: kronenText(k.saison.stufe) }))}"><img class="vk-season-symbol" src="${esc(ligaSymbolUrl(k.saison.stufe))}" alt="" width="18" height="22">${esc(sz)}</span>` : ''}${stt ? `<span class="vk-season-titel">${esc(stt)}</span>` : ''}</span>` : '';
   const orden = (k.orden || []).slice(0, 3);
   el.innerHTML = `${bild}
     <div class="vk-kopf">
@@ -160,7 +161,7 @@ export function visitenkarte(karte = {}, { groesse = 'mittel' } = {}) {
         ${saison}
       </div>
     </div>
-    ${k.ki ? '' : `<ul class="vk-orden" aria-label="${esc(K('karte.orden'))}">${orden.length ? orden.map((o) => {
+    ${k.ki || (!orden.length && !k.eigen) ? '' : `<ul class="vk-orden" aria-label="${esc(K('karte.orden'))}">${orden.length ? orden.map((o) => {
     const st = [1, 2, 3].includes(o.stufe) ? o.stufe : 0;
     return `<li${st ? ` data-stufe="${st}"` : ''}><span class="vk-orden-bild" aria-hidden="true">${o.bild || ''}</span>
       <span class="vk-orden-name">${esc(o.name)}</span>${st ? `<small class="vk-orden-stufe">${esc(K('stufe.' + st))}</small>` : ''}</li>`;
