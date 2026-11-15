@@ -38,6 +38,8 @@ const SUITEN = [
   { name: 'apple-knopf', datei: 'apple-knopf.test.mjs', args: [], was: 'Anmeldeblatt: abgeschalteter Apple-Weg berechnet unsichtbar, Google und Code-Anmeldung sichtbar (Browser)' },
   { name: 'online', datei: 'online.test.mjs', args: [], was: 'Online gegen Freunde: Einladung, Zuege, Abfrage' },
   { name: 'online-haengt-vertrag', datei: 'online-haengt-vertrag.test.mjs', args: [], was: 'Haengende Online-Partie: Client wartet gewertet ranked_haengt_s + 1 s, sonst 10 Min (Vertrag mit zwei-ligen-schema.sql)' },
+  { name: 'serverzeit', datei: 'serverzeit.test.mjs', args: [], was: 'Serveruhr minus Geraeteuhr fuer Online-Uhr, Erstzug-Frist und Intro (R19)' },
+  { name: 'online-start', datei: 'online-start.test.mjs', args: [], was: 'Online-Start mit zwei Spielern: Intro sperrt nie, Erstzug-Frist auf beiden Seiten, Uhr trotz falscher Geraeteuhr (R19)' },
   { name: 'online-live-eigene', datei: 'online-live-eigene.test.mjs', args: [], was: 'Online-Live-Bewertung: nur eigene Zuege, kein bester Zug, Ranked nur mit Server-Kontingent' },
   { name: 'freunde', datei: 'freunde.test.mjs', args: [], was: 'Freunde: Anfrage, Antwort, Einladungslink (Server abgefangen)' },
   { name: 'online-ui', datei: 'online-ui.test.mjs', args: [], was: 'Online-Oberflaeche mit abgefangenen Server-Anfragen' },

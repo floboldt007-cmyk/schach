@@ -28,6 +28,7 @@ import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { hoere } from '../ereignisse.js';
 import { spieleDuell } from './duell.js';
+import { jetzt as serverJetzt } from '../serverzeit.js';
 import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie } from '../storage.js';
 
 const WURZEL = new URL('../../', import.meta.url);
@@ -44,6 +45,10 @@ const HAENGT_ABFRAGE_MS = 60 * 1000;
 const HAENGT_RANKED_MS = (30 + 1) * 1000;
 const HAENGT_RANKED_ABFRAGE_MS = 5 * 1000;
 const haengtNachMs = p => p.gewertet ? HAENGT_RANKED_MS : HAENGT_MS;
+// Erstzug-Frist des Servers (online_haengt: gewertet ranked_haengt_s = 30 s, sonst 10 Minuten), so angezeigt
+const erstzugFristMs = p => p.gewertet ? HAENGT_RANKED_MS - 1000 : HAENGT_MS;
+// R19: so lange darf ein neuer Stand alt sein, wenn diese Ansicht ihn zum ersten Mal sieht (Abfrage alle 2 s)
+const SICHT_SPIEL_MS = 2000;
 // Partie-Ansicht wie die Bot-Partie (Flo 11.11.2026: "soll aussehen wie die Bot-Partie"): dasselbe Gerippe wie
 // js/ui/partie.js (.partie > .inhalt > .brettzone + .seite, Spielerleisten, .spielknoepfe), damit css/partie.css Brett,
 // Leisten, Uhren und Knoepfe gleich setzt. Auf dem Handy rechnet layout() unten die Brettgroesse wie dort.
@@ -56,9 +61,8 @@ const UHR_SYMBOL = '<svg class="ico uhr-ic" viewBox="0 0 24 24" fill="none" stro
   + 'stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>';
 const REMIS_SYMBOL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><text x="12" y="18" text-anchor="middle" '
   + 'font-size="17" font-weight="800" fill="currentColor">½</text></svg>';
-// Duell-Intro vor gewerteten Partien (js/ui/duell.js) nur einmal je Partie und nur in der ersten Minute
+// Duell-Intro vor gewerteten Partien (js/ui/duell.js) nur einmal je Partie und nur vor dem 2. Halbzug (R19)
 const INTRO_SCHLUESSEL = 'schach-arena:online:intro';
-const INTRO_FRIST_MS = 60 * 1000;
 // neueste laufende Partie zuerst (Befund 2 vom 11.11.: zwei gewertete Partien zugleich, jedes Geraet sass in einer anderen)
 const zeitVon = (row) => Date.parse(row?.erstellt_am || row?.aktualisiert_am || '') || 0;
 const neuesteLaufende = (liste) => (Array.isArray(liste) ? liste : []).filter((row) => row && row.status === 'laeuft')
@@ -105,6 +109,8 @@ export function zeige(root, params, app) {
   let kartenDaten = null, kartenPartie = null;
   // introGelaufen: Duell-Intro dieser Ansicht schon entschieden; neuerGeprueft: Partie, fuer die nach einer neueren gefragt wurde
   let introGelaufen = false, introUhr = null, neuerGeprueft = null, layoutRo = null, layoutBild = 0;
+  // R19: wann diese Ansicht den jetzigen letzter_zug_am zuerst sah (Schranke fuer die Erstzug-Frist)
+  let ersteSicht = { stand: null, am: 0 };
   let live = null, liveFuer = null;
   // R7 Ergebnisblatt: blattFuer = Partie, fuer die das Blatt gebaut ist; kronenVor/kronenNach = kronen_mein_stand waehrend
   // der laufenden Partie und nach dem gesehenen Ende (nur gewertet; daraus die Aenderung, sonst keine Kronen-Zeile)
@@ -410,7 +416,7 @@ export function zeige(root, params, app) {
           <div class="seite">
             <div class="spieler gegner on-spieler on-oben" role="group"></div>
             <div class="on-hinweise"><p class="on-angebot" role="alert" hidden></p><p class="on-neuer" hidden></p>
-              <p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p><p class="on-live" hidden></p></div>
+              <p class="on-zug" role="status"></p><p class="on-frist" aria-hidden="true" hidden><img class="on-frist-figur" alt="" decoding="sync"><span class="on-frist-zeit zahl"></span><span class="on-frist-balken"><i></i></span></p><p class="on-uhr-hinweis"></p><p class="on-live" hidden></p></div>
             <div class="zugbox"><div class="zb-kopf">${pfeil('zug-zurueck', 'icon-knopf zl-zurueck dr')}<span class="zb-titel">${esc(O('zuege'))}</span>${pfeil('zug-vor', 'icon-knopf zl-vor dr')}</div>
               <div class="zugliste" role="region" tabindex="0" aria-label="${esc(O('zuege'))}"></div></div>
             <div class="zugleiste" role="region" tabindex="0" aria-label="${esc(O('zuege'))}"></div>
@@ -677,13 +683,14 @@ export function zeige(root, params, app) {
     return { k, name, elo, liga };
   }
   // Duell-Intro vor gewerteten Partien (Flo 11.11.: "Intro wie bei den Bots", Gegnername, Elo, Liga): einmal je Partie,
-  // nur in der ersten Minute nach dem Anlegen, sobald die Visitenkarten da sind (oder nach 1,5 s ohne sie)
+  // nur vor dem 2. Halbzug, sobald die Visitenkarten da sind (oder nach 1,5 s ohne sie). R19 (15.11., Flo gegen Opa:
+  // "bei ihm kam das Intro nicht"): ohne Vergleich mit der Geraeteuhr, eine falsch gehende Uhr nahm es einer Seite weg.
+  // Das Intro ist Schmuck: es sperrt nichts (sperre() fragt es nicht)
   function intro() {
     clearTimeout(introUhr); introUhr = null;
     if (introGelaufen || weg || !brett || !p || p.gewertet !== true || p.status !== 'laeuft' || blockiert) return;
     introGelaufen = true;
-    const alter = Date.now() - zeitVon(p);
-    if (!(alter > -5000 && alter < INTRO_FRIST_MS)) return;
+    if (online.zuegeListe(p).length >= 2) return;
     let gesehen = [];
     try { gesehen = JSON.parse(sessionStorage.getItem(INTRO_SCHLUESSEL) || '[]'); } catch (e) { gesehen = []; }
     if (!Array.isArray(gesehen)) gesehen = [];
@@ -913,7 +920,33 @@ export function zeige(root, params, app) {
   function rest(f) {
     const wert = Number(f === 'w' ? p.uhr_weiss_ms : p.uhr_schwarz_ms) || 0;
     const laeuft = p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2 && p.letzter_zug_am;
-    return Math.max(0, wert - (laeuft ? Math.max(0, Date.now() - Date.parse(p.letzter_zug_am)) : 0));
+    return Math.max(0, wert - (laeuft ? Math.max(0, serverJetzt() - Date.parse(p.letzter_zug_am)) : 0));
+  }
+  // R19: Zeit seit dem letzten Zug vor dem 2. Halbzug (Erstzug-Frist) nach der Serveruhr (js/serverzeit.js), aber nie
+  // mehr als seit diese Ansicht den Stand zuerst sah plus SICHT_SPIEL_MS: eine vorgehende Geraeteuhr ohne frische Probe
+  // beendet die Frist so nicht vorzeitig (jede Reklamation setzt busy und schluckt Tipps, Flo gegen Opa 15.11.)
+  function vorlaufMs() {
+    const s = Date.parse(p.letzter_zug_am || '');
+    if (!Number.isFinite(s)) return 0;
+    if (ersteSicht.stand !== p.letzter_zug_am) ersteSicht = { stand: p.letzter_zug_am, am: Date.now() };
+    return Math.max(0, Math.min(serverJetzt() - s, Date.now() - ersteSicht.am + SICHT_SPIEL_MS));
+  }
+  // R19 (Flo 15.11., e7: "Opa beginnt, er hat noch 0:25"): vor dem 2. Halbzug steht die Uhr, es laeuft aber die
+  // Erstzug-Frist des Servers. Beide Seiten sehen sie als Zahl und als schmalen Gold-Balken, der schrumpft (matt, ohne Schein)
+  function zeichneFrist() {
+    const el = inhalt.querySelector('.on-frist');
+    if (!el) return;
+    const an = p.status === 'laeuft' && p.bedenkzeit_s != null && online.zuegeListe(p).length < 2 && !widerspruch && !!p.letzter_zug_am;
+    if (el.hidden === an) el.hidden = !an;
+    if (!an) return;
+    const frist = erstzugFristMs(p), r = Math.max(0, frist - vorlaufMs()), zeit = uhrText(r);
+    const z = el.querySelector('.on-frist-zeit');
+    if (z.textContent !== zeit) z.textContent = zeit;
+    // Bildstueck (Leitlinie R19): der Koenig der Farbe, die jetzt ziehen muss
+    const bild = new URL(`assets/pieces/${p.am_zug === 'b' ? 'b' : 'w'}K.svg`, WURZEL).href, img = el.querySelector('.on-frist-figur');
+    if (img.getAttribute('src') !== bild) img.setAttribute('src', bild);
+    el.querySelector('.on-frist-balken i').style.transform = `scaleX(${(r / frist).toFixed(3)})`;
+    el.classList.toggle('knapp', r <= 10000);
   }
   function tick() {
     if (weg || !brett || !p || p.bedenkzeit_s == null) return;
@@ -926,6 +959,7 @@ export function zeige(root, params, app) {
       el.classList.toggle('am-zug', p.status === 'laeuft' && p.am_zug === f);
       el.classList.toggle('warn', p.status === 'laeuft' && r < 20000);
     }
+    zeichneFrist();
     // Uhr-Warnung einmal je Partie, sobald die eigene laufende Uhr unter 20 s faellt (wie in der Partie)
     if (!uhrGewarnt && p.status === 'laeuft' && online.binAmZug(p) && online.zuegeListe(p).length >= 2 && rest(online.meineFarbe(p)) < 20000) {
       uhrGewarnt = true; ton('uhr-warnung');
@@ -935,7 +969,7 @@ export function zeige(root, params, app) {
     if (halbzuege >= 2 && rest(p.am_zug) === 0) {
       zeitPruefung = Date.now() + 5000;
       aktion(() => online.pruefeZeit(p.id));
-    } else if (halbzuege < 2 && p.letzter_zug_am && Date.now() - Date.parse(p.letzter_zug_am) >= haengtNachMs(p)) {
+    } else if (halbzuege < 2 && p.letzter_zug_am && vorlaufMs() >= haengtNachMs(p)) {
       // vor dem 2. Halbzug laeuft keine Uhr: der Server beendet die Partie ohne Zug als abgebrochen (gewertet 30 s,
       // sonst 10 Minuten)
       zeitPruefung = Date.now() + (p.gewertet ? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS);
@@ -949,7 +983,12 @@ export function zeige(root, params, app) {
     karten();
     zeichneGeschlagen();
     const gegnerZug = p.gewertet ? O('gegnerAmZug') : O('gegner');
-    inhalt.querySelector('.on-zug').textContent = p.status === 'beendet' ? O('fertig') : widerspruch ? O('stellung') : busy ? O('bestaetigt') : online.binAmZug(p) ? O('du') : gegnerZug;
+    // R19: vor dem ersten Zug sagt die Zeile auf beiden Seiten, wer beginnt
+    const beginn = p.status === 'laeuft' && online.zuegeListe(p).length === 0;
+    const amZugText = beginn ? (online.binAmZug(p) ? O('beginnstDu') : O('beginnt', { name: spielerDaten('w').name }))
+      : online.binAmZug(p) ? O('du') : gegnerZug;
+    inhalt.querySelector('.on-zug').textContent = p.status === 'beendet' ? O('fertig') : widerspruch ? O('stellung') : busy ? O('bestaetigt') : amZugText;
+    zeichneFrist();
     inhalt.querySelector('.on-uhr-hinweis').textContent = p.bedenkzeit_s != null && online.zuegeListe(p).length < 2 ? O('uhr') : '';
     // ein neuer Zug fuehrt aus der Ansicht einer frueheren Stellung zur Partie zurueck
     if (ansehen.el && chess.history().length !== ansehen.n) schliesseAnsicht();

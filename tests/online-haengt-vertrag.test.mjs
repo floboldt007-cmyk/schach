@@ -46,8 +46,14 @@ pruefe('Client: Freundespartie bleibt beim Server-Wert (10 Minuten)', freundMs =
 pruefe('Client: Wartezeit haengt an p.gewertet',
   /const haengtNachMs = \(?p\)? => p\.gewertet \? HAENGT_RANKED_MS : HAENGT_MS;/.test(js));
 pruefe('Client: tick vergleicht mit haengtNachMs(p), nicht mit der festen Zahl',
-  /halbzuege < 2 && p\.letzter_zug_am && Date\.now\(\) - Date\.parse\(p\.letzter_zug_am\) >= haengtNachMs\(p\)/.test(js)
+  /halbzuege < 2 && p\.letzter_zug_am && vorlaufMs\(\) >= haengtNachMs\(p\)/.test(js)
     && !/>= HAENGT_MS\b/.test(js));
+// R19 (15.11.2026): die Frist vor dem 2. Halbzug rechnet nach der Serveruhr (js/serverzeit.js), nie allein nach dem
+// Geraet, und die angezeigte Frist ist genau die des Servers
+pruefe('Client: Erstzug-Frist nach Serveruhr, begrenzt durch die erste Sicht',
+  /Math\.min\(serverJetzt\(\) - s, Date\.now\(\) - ersteSicht\.am \+ SICHT_SPIEL_MS\)/.test(js));
+pruefe('Client: angezeigte Erstzug-Frist ist ranked_haengt_s bzw. 10 Minuten',
+  /const erstzugFristMs = p => p\.gewertet \? HAENGT_RANKED_MS - 1000 : HAENGT_MS;/.test(js) && rankedMs - 1000 === rankedS * 1000);
 // Steht der Server beim ersten Nachfragen noch nicht auf "haengt" (Uhren weichen ab), darf die gewertete Partie nicht
 // eine volle Minute festsitzen: die Wiederholung kommt nach hoechstens 5 s.
 const rankedAbfrage = konstante('HAENGT_RANKED_ABFRAGE_MS');

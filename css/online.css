@@ -128,6 +128,17 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-zug, .on-uhr-hinweis, .on-live { margin: 0; text-align: center; color: var(--text-2); font-size: var(--fs-klein); }
 .on-zug { font-weight: 700; color: var(--text); }
 .on-uhr-hinweis:empty { display: none; }
+/* R19 (15.11.2026): Erstzug-Frist vor dem 2. Halbzug: Koenig der Farbe am Zug, Zahl und ein schmaler Gold-Balken, der
+   schrumpft (das eine lebendige Element, matt, ohne Schein). In den letzten 10 s in der Warnfarbe; ohne Bewegung
+   springt der Balken nur je Sekunde */
+.on-frist { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin: 0; font-size: var(--fs-klein); font-weight: 700; color: var(--text-2); }
+.on-frist[hidden] { display: none; }
+.on-frist-figur { width: 18px; height: 18px; flex: none; }
+.on-frist-balken { flex: 0 0 100%; display: block; max-width: 160px; height: 3px; border-radius: 2px; background: var(--linie); overflow: hidden; }
+.on-frist-balken i { display: block; height: 100%; background: var(--gold); transform-origin: left center; transition: transform .1s linear; }
+.on-frist.knapp { color: var(--warn); }
+.on-frist.knapp .on-frist-balken i { background: var(--warn); }
+@media (prefers-reduced-motion: reduce) { .on-frist-balken i { transition: none; } }
 .on-ergebnis { text-align: center; margin-bottom: 0; }
 .on-ergebnis .on-aktionen { display: flex; flex-wrap: wrap; gap: var(--a3); justify-content: center; }
 .on-ergebnis[hidden], .on-angebot[hidden], .on-neuer[hidden] { display: none; }

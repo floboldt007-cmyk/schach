@@ -536,8 +536,10 @@ anmelden();
     && /const einladung = uebernimmEinladungsLink\(\);[\s\S]*?const ziel = einladung/.test(quelle('js/app.js'))
     && /const SCREENS = \[[^\]]*'online'/.test(quelle('js/app.js')) && /online: 'Online'/.test(quelle('js/app.js')));
   const eigene = quelle('js/online.js');
-  pruefe('online.js importiert nur Konfiguration, Konto und Sprache, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js,./sprache.js'
-    && [...eigene.matchAll(/import '([^']+)'/g)].map((x) => x[1]).join(',') === './sprachen/online.js');
+  // R19 (15.11.2026): dazu die Serveruhr (js/serverzeit.js), ein Blatt ohne eigene Importe
+  pruefe('online.js importiert nur Konfiguration, Konto, Sprache und Serveruhr, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js,./serverzeit.js,./sprache.js'
+    && [...eigene.matchAll(/import '([^']+)'/g)].map((x) => x[1]).join(',') === './sprachen/online.js'
+    && !/^\s*import\b/m.test(quelle('js/serverzeit.js')));
   pruefe('online.js: kein setInterval, keine Supabase-Bibliothek, kein geheimer Schluessel', !/setInterval|@supabase|service_role|eyJ[A-Za-z0-9_-]{20,}/.test(eigene));
   pruefe('online.js: Zuege nur ueber die Edge Function, rpc/online_zug kommt nicht mehr vor', !/['"`]online_zug['"`]/.test(eigene) && !/rpc\('online_zug'/.test(eigene)
     && /export const ZUG_PFAD = '\/functions\/v1\/online-zug';/.test(eigene));
