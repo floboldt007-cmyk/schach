@@ -119,7 +119,7 @@ function botInfo(r) {
 function gastMarke(r, name) {
   if (r.art === 'bot') {
     const b = botNachId(r.bot);
-    if (b && b.avatar) return `<span class="bl-gast bl-gast-bot" aria-hidden="true"><img src="${esc(b.avatar)}" alt="" draggable="false"></span>`;
+    if (b && b.avatar) return `<span class="bl-gast bl-gast-bot" aria-hidden="true"><img src="${esc(avatarVon(b))}" alt="" draggable="false"></span>`;
     return `<span class="bl-gast" aria-hidden="true">${icon('podest')}</span>`;
   }
   return `<span class="bl-gast" title="${esc(pruefText(r.pruef))}">${r.art === 'freund' ? esc((name[0] || '?').toUpperCase()) : icon('podest')}</span>`;

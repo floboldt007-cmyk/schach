@@ -27,7 +27,7 @@ import { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, 
 import { suche as kronenSuche, angemeldet as kronenAngemeldet, RANKED_ZEIT } from '../kronen.js';
 import { karteDerPartie } from '../karte.js';
 import { visitenkarte, eigeneKarte, fremdeKarte, botKarte, karteVomServer } from './visitenkarte.js';
-import { hoere } from '../ereignisse.js';
+import { starteKiErsatz } from './ki-ersatz.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 import '../sprachen/online.js';
@@ -291,11 +291,8 @@ export function zeige(root, params, app) {
             if (!suche || suche.el !== el) return;
             // wie Online: nur mit Beleg und neuem SQL (#213) der Hinweis, dass Verlassen als Niederlage zaehlt
             const verlassen = !!kiRef && suche.server.lage().vomServer;
-            gefundenUndWeiter(el, botKarte(bot), () => {
-              // erst wenn die Partie steht: der Seitenwechsel leert die Meldungen (js/app.js zeigeScreen)
-              if (verlassen) { const ab = hoere('app:screen', (d) => { if (d.name !== 'partie') return; ab(); app.meldung(L('suche.kiVerlassen'), { dauer: 4500 }); }); }
-              app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl, ki: true, ...(kiRef ? { kiRef } : {}) });
-            });
+            // kein weg: nach "Gegner gefunden" fuehrt auch Wegnavigieren in die Partie (verlasse, der Beleg steht)
+            gefundenUndWeiter(el, botKarte(bot), () => starteKiErsatz(app, { bot, tempo: tempoWahl, kiRef, hinweis: verlassen ? L('suche.kiVerlassen') : null }));
           },
           beiFehler: () => {
             if (!suche || suche.el !== el) return;

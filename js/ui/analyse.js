@@ -34,7 +34,7 @@ import {
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle } from '../orte.js';
-import { botFarbe, floAvatar } from '../thema.js';
+import { botFarbe, floAvatar, avatarVon } from '../thema.js';
 
 // Pfade relativ zum Projekt (klappt aus index.html und aus tests/)
 const WURZEL = new URL('../../', import.meta.url);
@@ -453,7 +453,7 @@ export function zeige(root, params = {}, app) {
 
   function avatarHtml(bot, extra = '') {
     if (!bot) return `<div class="an-avatar ${extra}" aria-hidden="true"></div>`;
-    return `<div class="an-avatar ${extra}" style="--bf:${esc(botFarbe(bot))}"><img src="${esc(pfad(bot.avatar))}" alt="${esc(bot.name)}"></div>`;
+    return `<div class="an-avatar ${extra}" style="--bf:${esc(botFarbe(bot))}"><img src="${esc(pfad(avatarVon(bot)))}" alt="${esc(bot.name)}"></div>`;
   }
 
   // ---------- Aufbau der Analyse ----------
