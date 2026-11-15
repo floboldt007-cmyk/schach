@@ -135,6 +135,18 @@ export function shopBereich({ app } = {}) {
     return b;
   };
   async function lade() {
+    // R19 Shop A mit fuenf festen Plaetzen (nur mit ?shopStil=a, js/pakete/sammlung/shop-entwurf.js): auch als Gast und bei
+    // einem Serverfehler, dann ohne Editionen ("Preis folgt"); den Preis liest derselbe Aufruf wie unten
+    const stil = shopStil();
+    if (stil) {
+      satz(S('shop.laedt'));
+      let editionen = [];
+      if (sitzung()) {
+        try { const r = await rufe('edition_staende', (await aktiveSitzung()).access_token); editionen = Array.isArray(r) ? r : []; } catch (e) { /* ohne Preis */ }
+      }
+      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen, katalog: KATALOG, produktName, bereich: s, app })); return; }
+      catch (e) { console.error(e); }
+    }
     if (!sitzung()) {
       // wie js/ui/online.js: die Konto-Gruppe ist je Geraet verborgen, bis jemand sie aufruft
       satz(S('shop.anmelden'), knopf(S('shop.zumKonto'), () => { kontoFreigeschaltet('#konto'); try { app?.gehe?.('einstellungen', { seite: 'konto' }); } catch (e) { /* egal */ } }));
@@ -165,12 +177,6 @@ export function shopBereich({ app } = {}) {
     } catch (e) {
       satz(S('shop.vorbereitung'));
       return;
-    }
-    // R19 Shop A mit fuenf festen Plaetzen (nur mit ?shopStil=a, js/pakete/sammlung/shop-entwurf.js)
-    const stil = shopStil();
-    if (stil) {
-      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen: liste, katalog: KATALOG, produktName, bereich: s, app })); return; }
-      catch (e) { console.error(e); }
     }
     const karten = liste.map(karte).filter(Boolean);
     if (!karten.length) { satz(S('shop.vorbereitung')); return; }

@@ -57,7 +57,7 @@ const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
 const UMGEBAUT = { plaetze: [{ art: 'emote', id: 'gibt-es-nicht' }, { art: 'finisher', id: 'krone' }, { art: 'figur', id: 'lampion' },
   { art: 'brett', id: 'aurora' }] };
 
-function bediener(z) {
+function bediener(z, { fehler = false } = {}) {
   return async (route) => {
     const url = new URL(route.request().url());
     const antwort = (d) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
@@ -67,7 +67,7 @@ function bediener(z) {
     if (url.pathname === '/rest/v1/sonderstuecke') return antwort([]);
     const rpc = url.pathname.split('/').at(-1);
     z.aufrufe.push(url.pathname.startsWith('/rest/v1/rpc/') ? rpc : url.pathname);
-    if (rpc === 'edition_staende') return antwort([EDITION]);
+    if (rpc === 'edition_staende') return fehler ? route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }) : antwort([EDITION]);
     if (rpc === 'karte_melde_stufen' || rpc === 'karte_waehle') return antwort({ taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } });
     return antwort([]);
   };
@@ -79,8 +79,16 @@ function initSkript({ sitzung }) {
       localStorage.clear();
       localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'normal', figuren: 'cburnett' }));
       localStorage.setItem('schach-arena:konto:sichtbar', '1');
-      localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+      if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
     }
+  } catch (e) { /* egal */ }
+  // resize-Hoerer am Fenster mitzaehlen (ohne CDP, damit es auch in WebKit laeuft): ein Vorschau-Brett, das nie
+  // zerstoert wird, laesst seinen Hoerer stehen (js/board.js)
+  try {
+    window.__resize = 0;
+    const an = window.addEventListener.bind(window), ab = window.removeEventListener.bind(window);
+    window.addEventListener = (typ, ...r) => { if (typ === 'resize') window.__resize++; return an(typ, ...r); };
+    window.removeEventListener = (typ, ...r) => { if (typ === 'resize') window.__resize--; return ab(typ, ...r); };
   } catch (e) { /* egal */ }
 }
 
@@ -115,18 +123,28 @@ async function schliesse(s) {
   await warte(300);
 }
 
-async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = null, ruhig = false } = {}) {
-  const gruppe = `${geraet} ${stil || 'heute'}${farbe === 'dunkel' ? ' dunkel' : ''}${auslage ? ' umgebaut' : ''}${ruhig ? ' ruhig' : ''}`;
+async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = null, ruhig = false, gast = false, fehler = false } = {}) {
+  const gruppe = `${geraet} ${stil || 'heute'}${farbe === 'dunkel' ? ' dunkel' : ''}${auslage ? ' umgebaut' : ''}${ruhig ? ' ruhig' : ''}`
+    + `${gast ? ' gast' : ''}${fehler ? ' serverfehler' : ''}`;
   const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
     colorScheme: farbe === 'dunkel' ? 'dark' : 'light', reducedMotion: ruhig ? 'reduce' : 'no-preference', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
   const z = { aufrufe: [] };
-  await k.route('**/*.supabase.co/**', bediener(z));
+  await k.route('**/*.supabase.co/**', bediener(z, { fehler }));
   if (auslage) await k.route('**/assets/shop/auslage.json', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(auslage) }));
-  await k.addInitScript(initSkript, { sitzung: SITZUNG });
+  await k.addInitScript(initSkript, { sitzung: gast ? null : SITZUNG });
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
   try {
     await oeffneShop(s, stil ? `&shopStil=${stil}` : '');
+    if (stil !== 'a' && (gast || fehler)) {
+      // der Standard-Shop bleibt, wie er ist: Gast-Satz mit Gast-Karte bzw. "in Vorbereitung"
+      await s.waitForFunction(() => /Konto|Vorbereitung/.test(document.querySelector('.sa-blatt .sh-satz')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+      const heute = await s.evaluate(() => ({ satz: document.querySelector('.sa-blatt .sh-satz')?.textContent || '',
+        gast: !!document.querySelector('.sa-blatt .sh-gast'), entwurf: !!document.querySelector('.shf') }));
+      pruefe(`${gruppe}: Shop wie heute (${gast ? 'Gast-Satz mit Gast-Karte' : '"in Vorbereitung"'}, kein Schaufenster)`,
+        !heute.entwurf && (gast ? /mit Konto/.test(heute.satz) && heute.gast : /in Vorbereitung/.test(heute.satz)), heute);
+      await k.close(); return;
+    }
     if (stil !== 'a') {
       await s.waitForSelector('.sa-blatt .sh-karte', { timeout: 15000 }).catch(() => {});
       const heute = await s.evaluate(() => ({ karten: document.querySelectorAll('.sa-blatt .sh-karte').length,
@@ -169,6 +187,11 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
     const mitPreis = bild.preise.filter((x) => x && x !== 'Preis folgt' && x !== 'Folgt');
     pruefe(`${gruppe}: Preis nur vom Server, sonst "Preis folgt"`, mitPreis.every((x) => x === '4,99 €') && bild.euro === mitPreis.length, { preise: bild.preise, euro: bild.euro });
 
+    if (gast || fehler) {
+      pruefe(`${gruppe}: fuenf Plaetze, alle mit Stueck und "Preis folgt" (ohne Server kein Preis)`,
+        bild.folgt.every((x) => !x) && bild.preise.every((x) => x === 'Preis folgt'), bild.preise);
+      await k.close(); return;
+    }
     if (auslage) {
       pruefe(`${gruppe}: Belegung kommt aus auslage.json (Brett Aurora, Figur Lampion, Finisher Krone)`,
         bild.ids[0] === 'aurora' && bild.ids[1] === 'lampion' && bild.ids[4] === 'krone', bild.ids);
@@ -185,7 +208,14 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
     const farbe = await s.evaluate(() => { const f = document.querySelector('.sheet-karte .shf-vorschau .brett .feld.d'); return f ? getComputedStyle(f).backgroundColor : null; });
     pruefe(`${gruppe}: Brett-Vorschau auf dem echten Brett in den Farben des Bretts`, farbe === 'rgb(59, 74, 122)', farbe);
     pruefe(`${gruppe}: Kaufen zeigt den Server-Preis`, await s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Kaufen · 4,99' }).count() === 1);
+    const hoererOffen = await s.evaluate(() => window.__resize);
     await schliesse(s);
+    // dreimal oeffnen und schliessen: das Vorschau-Brett raeumt seine Hoerer wieder ab
+    const hoererZu = await s.evaluate(() => window.__resize);
+    for (let i = 0; i < 2; i++) { await oeffneVorschau(s, 'brett'); await schliesse(s); }
+    const hoererDanach = await s.evaluate(() => window.__resize);
+    pruefe(`${gruppe}: Vorschau-Brett raeumt auf (resize-Hoerer offen ${hoererOffen}, zu ${hoererZu}, nach drei Mal ${hoererDanach})`,
+      hoererZu === hoererOffen - 1 && hoererDanach === hoererZu, { hoererOffen, hoererZu, hoererDanach });
 
     // Figur: der Satz auf dem echten Brett, Kaufen nur als Vorschau-Meldung ohne Serveraufruf
     await oeffneVorschau(s, 'figur');
@@ -251,6 +281,8 @@ try {
   await lauf(browser, IPHONE, 'a', { ruhig: true });
   await lauf(browser, IPHONE, 'a', { auslage: UMGEBAUT });
   await lauf(browser, IPHONE, 'b'); // die Entwuerfe b und c gibt es nicht mehr: wie heute
+  // abgemeldet und bei einem Serverfehler: Shop A zeigt trotzdem die fuenf Plaetze, der Standard-Shop bleibt wie heute
+  for (const art of [{ gast: true }, { fehler: true }]) { await lauf(browser, IPHONE, 'a', art); await lauf(browser, IPHONE, null, art); }
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();

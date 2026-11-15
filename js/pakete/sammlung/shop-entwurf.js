@@ -126,12 +126,13 @@ function karte(art, s, beiWahl) {
 async function vorschau(s, { bereich, app }) {
   const ort = document.createElement('div');
   ort.className = 'shf-vorschau';
+  let brett = null;
   if (s.art === 'brett' || s.art === 'figur') {
     if (s.brett) { ort.style.setProperty('--feld-hell', s.brett.hell); ort.style.setProperty('--feld-dunkel', s.brett.dunkel); }
     const brettEl = document.createElement('div');
     brettEl.className = 'shf-vorschau-brett';
     ort.append(brettEl);
-    const brett = new Brett(brettEl, { figurenPfad: s.figuren ? s.figuren + '/' : figurenPfad(), koordinaten: false });
+    brett = new Brett(brettEl, { figurenPfad: s.figuren ? s.figuren + '/' : figurenPfad(), koordinaten: false });
     brett.setzeStellung('start', { animieren: false });
   } else {
     const gross = document.createElement('div');
@@ -150,6 +151,8 @@ async function vorschau(s, { bereich, app }) {
   const kaufen = S('entwurf.kaufen') + (s.preis === S('entwurf.preisFolgt') ? '' : ' · ' + s.preis);
   const wert = await sheet({ titel: s.name, text: S('entwurf.vorschau.' + s.art), inhalt: ort, klasse: 'shf-sheet',
     knoepfe: [{ text: kaufen, wert: 'kaufen', art: 'primaer' }, { text: t('allgemein.schliessen'), wert: false }], abbrechen: false }).catch(() => false);
+  // das Blatt ist zu: Brett abbauen (Hoerer am Fenster, Eintrag in der Brett-Liste), wie js/ui/lektion.js
+  try { brett?.zerstoere(); } catch (e) { /* egal */ }
   if (wert === 'kaufen') { try { app?.meldung?.(S('entwurf.kaufenMeldung')); } catch (e) { /* egal */ } }
   if (bereich && bereich.isConnected) bereich.dispatchEvent(new CustomEvent('sa:oeffne', { bubbles: true }));
 }
