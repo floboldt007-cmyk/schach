@@ -59,6 +59,12 @@ pruefe('Client: Ausloesung mit Schranke nur am eigenen Zug, sonst nach der Serve
   /const geschuetzt = vorlaufMs\(\);\s*return p\.am_zug === online\.meineFarbe\(p\) \? geschuetzt : serverSeitMs\(\);/.test(js));
 pruefe('Client: tick loest Uhr und Erstzug-Frist ueber ausloeserMs aus',
   /halbzuege >= 2 && rest\(p\.am_zug, ausloeserMs\(\)\) === 0/.test(js) && /halbzuege < 2 && p\.letzter_zug_am && ausloeserMs\(\) >= haengtNachMs\(p\)/.test(js));
+// Pflicht-Probe e7 (16.11.): die wartende Seite reklamiert still (ohne aktion, also ohne busy) und hoechstens alle 30 s
+pruefe('Client: wartende Seite reklamiert still und gedrosselt (WARTEND_ABFRAGE_MS 30 s, pruefeLeise ohne aktion)',
+  /const WARTEND_ABFRAGE_MS = 30 \* 1000;/.test(js)
+    && /if \(eigen\) \{ zeitPruefung = Date\.now\(\) \+ pause; aktion\(\(\) => online\.pruefeZeit\(p\.id\)\); return; \}/.test(js)
+    && /fremdPruefung = Date\.now\(\) \+ Math\.max\(pause, WARTEND_ABFRAGE_MS\);\s*pruefeLeise\(\);/.test(js)
+    && !/function pruefeLeise\(\) \{[^}]*aktion\(/.test(js));
 pruefe('Client: angezeigte Erstzug-Frist nach der Serveruhr, ohne Schranke (wie beim Gegner)',
   /r = Math\.max\(0, frist - serverSeitMs\(\)\)/.test(js));
 pruefe('Client: angezeigte Erstzug-Frist ist ranked_haengt_s bzw. 10 Minuten',
@@ -68,7 +74,7 @@ pruefe('Client: angezeigte Erstzug-Frist ist ranked_haengt_s bzw. 10 Minuten',
 const rankedAbfrage = konstante('HAENGT_RANKED_ABFRAGE_MS');
 pruefe('Client: gewertete Partie fragt bei Bedarf nach hoechstens 5 s erneut', rankedAbfrage > 0 && rankedAbfrage <= 5000, rankedAbfrage);
 pruefe('Client: Wiederholung haengt an p.gewertet',
-  /zeitPruefung = Date\.now\(\) \+ \(p\.gewertet \? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS\);/.test(js));
+  /ausloeserMs\(\) >= haengtNachMs\(p\)\) pause = p\.gewertet \? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS;/.test(js));
 
 console.log(`\n${ok}/${gesamt} bestanden`);
 if (ok !== gesamt) process.exit(1);

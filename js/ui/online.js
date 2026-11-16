@@ -48,6 +48,8 @@ const haengtNachMs = p => p.gewertet ? HAENGT_RANKED_MS : HAENGT_MS;
 const erstzugFristMs = p => p.gewertet ? HAENGT_RANKED_MS - 1000 : HAENGT_MS;
 // R19: so lange darf ein neuer Stand alt sein, wenn diese Ansicht ihn zum ersten Mal sieht (Abfrage alle 2 s)
 const SICHT_SPIEL_MS = 2000;
+// R19 (16.11.): so oft reklamiert hoechstens die Seite, die NICHT am Zug ist (still, ohne busy; s. tick)
+const WARTEND_ABFRAGE_MS = 30 * 1000;
 // Partie-Ansicht wie die Bot-Partie (Flo 11.11.2026: "soll aussehen wie die Bot-Partie"): dasselbe Gerippe wie
 // js/ui/partie.js (.partie > .inhalt > .brettzone + .seite, Spielerleisten, .spielknoepfe), damit css/partie.css Brett,
 // Leisten, Uhren und Knoepfe gleich setzt. Auf dem Handy rechnet layout() unten die Brettgroesse wie dort.
@@ -109,7 +111,7 @@ export function zeige(root, params, app) {
   // strittigFaellig: der Widerspruch ist neu, die Partie wird gleich einmal von selbst als strittig gemeldet.
   let weg = false, busy = false, blockiert = false, widerspruch = false, beobachter = null, brett = null, p = null, chess = null, wartend = null;
   let strittigFaellig = false;
-  let profil = null, uhrTimer = null, zeitPruefung = 0;
+  let profil = null, uhrTimer = null, zeitPruefung = 0, fremdPruefung = 0;
   let kartenDaten = null, kartenPartie = null;
   // introGelaufen: Duell-Intro dieser Ansicht schon entschieden; neuerGeprueft: Partie, fuer die nach einer neueren gefragt wurde
   let introGelaufen = false, introUhr = null, neuerGeprueft = null, layoutRo = null, layoutBild = 0;
@@ -1002,17 +1004,28 @@ export function zeige(root, params, app) {
     if (!uhrGewarnt && p.status === 'laeuft' && online.binAmZug(p) && online.zuegeListe(p).length >= 2 && rest(online.meineFarbe(p)) < 20000) {
       uhrGewarnt = true; ton('uhr-warnung');
     }
-    if (blockiert || busy || widerspruch || p.status !== 'laeuft' || Date.now() < zeitPruefung) return;
-    const halbzuege = online.zuegeListe(p).length;
-    if (halbzuege >= 2 && rest(p.am_zug, ausloeserMs()) === 0) {
-      zeitPruefung = Date.now() + 5000;
-      aktion(() => online.pruefeZeit(p.id));
-    } else if (halbzuege < 2 && p.letzter_zug_am && ausloeserMs() >= haengtNachMs(p)) {
-      // vor dem 2. Halbzug laeuft keine Uhr: der Server beendet die Partie ohne Zug als abgebrochen (gewertet 30 s,
-      // sonst 10 Minuten)
-      zeitPruefung = Date.now() + (p.gewertet ? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS);
-      aktion(() => online.pruefeZeit(p.id));
-    }
+    if (blockiert || busy || widerspruch || p.status !== 'laeuft') return;
+    const halbzuege = online.zuegeListe(p).length, eigen = p.am_zug === online.meineFarbe(p);
+    if (Date.now() < (eigen ? zeitPruefung : fremdPruefung)) return;
+    let pause;
+    if (halbzuege >= 2 && rest(p.am_zug, ausloeserMs()) === 0) pause = 5000;
+    // vor dem 2. Halbzug laeuft keine Uhr: der Server beendet die Partie ohne Zug als abgebrochen (gewertet 30 s,
+    // sonst 10 Minuten)
+    else if (halbzuege < 2 && p.letzter_zug_am && ausloeserMs() >= haengtNachMs(p)) pause = p.gewertet ? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS;
+    else return;
+    if (eigen) { zeitPruefung = Date.now() + pause; aktion(() => online.pruefeZeit(p.id)); return; }
+    // die wartende Seite rechnet nach der Serveruhr; geht ihr Geraet vor, ist die Reklamation zu frueh und aendert nichts.
+    // Darum still (ohne busy: kein Zug des Gegners und kein eigener Tipp danach geht verloren, Flo gegen Opa 15.11.) und
+    // hoechstens eine je WARTEND_ABFRAGE_MS
+    fremdPruefung = Date.now() + Math.max(pause, WARTEND_ABFRAGE_MS);
+    pruefeLeise();
+  }
+  function pruefeLeise() {
+    online.pruefeZeit(p.id).then((neu) => {
+      if (weg || !neu || neu.id !== p?.id) return;
+      if (!busy) uebernehme(neu);
+      else if (!wartend || neu.aktualisiert_am > wartend.aktualisiert_am) wartend = neu;
+    }, () => { /* naechste Abfrage, der Beobachter bringt den Stand ohnehin */ });
   }
   // Zeile ueber den Hinweisen; R19: vor dem ersten Zug sagt sie auf beiden Seiten, wer beginnt, dahinter die Frist
   function zeichneZugZeile() {

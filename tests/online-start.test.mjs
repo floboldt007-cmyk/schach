@@ -109,7 +109,11 @@ async function bediene(route, uid) {
     Object.assign(p, { status: 'beendet', grund: 'zeit', ergebnis: p.am_zug === 'w' ? '0-1' : '1-0' }); return antwort(aktualisieren(p));
   }
   // fruehe Reklamation: der Server aendert nichts; Antwort mit Mobilfunk-Laufzeit, falls die Partie sie verlangt
-  if (rpc === 'online_pruefe_zeit' && p) { (p.fruehReklamiert ||= []).push(uid); if (p.laufzeitMs) await warte(p.laufzeitMs); return antwort(p); }
+  if (rpc === 'online_pruefe_zeit' && p) {
+    (p.fruehReklamiert ||= []).push(uid); (p.fruehZeiten ||= []).push({ uid, t: Date.now() });
+    if (p.laufzeitMs) await warte(p.laufzeitMs);
+    return antwort(p);
+  }
   if (rpc === 'online_strittig' || rpc === 'online_gib_auf') { unerwartet.push(uid + ':' + rpc); return antwort(p || {}); }
   if (/freigabe/.test(url.pathname)) return antwort([]);
   return antwort([]);
@@ -375,6 +379,43 @@ try {
       pruefe(`${name}: keine Seitenfehler`, !flo.fehler.length, flo.fehler);
     } catch (e) { pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]); }
     await flo.k.close().catch(() => {});
+  }
+  // Pflicht-Probe (e7 16.11.): die WARTENDE Seite mit vorgehender Geraeteuhr (Flos Ursprungsfehler: Dauer-Reklamation,
+  // busy, verworfene Zuege). (a) keine Dauerschleife: hoechstens eine Reklamation je 30 s, (b) nie busy, solange sie
+  // nicht am Zug ist, kein Gegnerzug und kein eigener Zug geht verloren, (c) die Partie laeuft normal weiter (3 Zuege je Seite)
+  for (const [vor, text] of [[40000, '+40 s'], [300000, '+5 min']]) {
+    const name = `Wartende Seite, Geraeteuhr ${text} (Ranked)`;
+    const p = neuePartie({ gewertet: true });
+    const flo = await spieler(browser, 'u1'), opa = await spieler(browser, 'u2', { versatz: vor });
+    try {
+      await Promise.all([oeffne(flo, p), oeffne(opa, p)]);
+      await opa.s.evaluate(() => {
+        window.__busy = [];
+        setInterval(() => { const o = window.__online; window.__busy.push({ busy: !!o?.busy(), amZug: o?.partie()?.am_zug }); }, 100);
+      });
+      // Flo wartet 12 s mit dem ersten Zug (Opas Geraet haelt die Frist dann laengst fuer abgelaufen)
+      await warte(12000);
+      const zuege = [['flo', 'e2e4'], ['opa', 'e7e5'], ['flo', 'g1f3'], ['opa', 'b8c6'], ['flo', 'f1c4'], ['opa', 'g8f6'], ['flo', 'd2d3'], ['opa', 'f8c5']];
+      const dauer = [];
+      for (const [wer, uci] of zuege) {
+        const sp = wer === 'flo' ? flo : opa;
+        // der Ziehende sieht den letzten Zug des anderen, bevor er tippt
+        const n = partien.get(p.id).zuege.split(' ').filter(Boolean).length;
+        await sp.s.waitForFunction((k) => (window.__online?.partie()?.zuege || '').split(' ').filter(Boolean).length >= k, n, { timeout: 8000 }).catch(() => {});
+        dauer.push(await ziehe(sp, p, uci, 6000));
+        await warte(400);
+      }
+      const zeiten = (p.fruehZeiten || []).filter((x) => x.uid === 'u2').map((x) => x.t);
+      const abstaende = zeiten.slice(1).map((t, i) => t - zeiten[i]);
+      const busyWartend = (await opa.s.evaluate(() => window.__busy)).filter((x) => x.amZug === 'w' && x.busy).length;
+      console.log(`   ${name}: Reklamationen Opa ${zeiten.length}, Abstaende ${JSON.stringify(abstaende)} · busy beim Warten ${busyWartend} · Zuege ${JSON.stringify(dauer)}`);
+      pruefe(`${name}: (a) keine Dauerschleife, hoechstens eine Reklamation je 30 s`, abstaende.every((d) => d >= 29000), { zeiten: zeiten.length, abstaende });
+      pruefe(`${name}: (b) nie busy, solange die wartende Seite nicht am Zug ist`, busyWartend === 0, { busyWartend });
+      pruefe(`${name}: (b/c) jeder Zug geht beim ersten Versuch durch und die Partie laeuft weiter (3 Zuege je Seite)`,
+        dauer.every((d) => d != null && d < 1500) && partien.get(p.id).status === 'laeuft' && partien.get(p.id).zuege.split(' ').length === 8, { dauer, status: partien.get(p.id).status });
+      pruefe(`${name}: keine Seitenfehler`, !flo.fehler.length && !opa.fehler.length, [...flo.fehler, ...opa.fehler]);
+    } catch (e) { pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]); }
+    await flo.k.close().catch(() => {}); await opa.k.close().catch(() => {});
   }
   }
 } finally {
