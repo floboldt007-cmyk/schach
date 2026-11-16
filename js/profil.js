@@ -36,11 +36,11 @@ export const GRUENDE = Object.freeze(['standard', 'welt-1', 'welt-2', 'welt-3', 
 // gegen ihn (erster Stern). Gezeichnet wird es nur fuer die Bots mit Portraet (js/thema.js profilAvatar); die Karte fuer
 // andere bekommt es nicht (js/karte.js KARTE_MOTIVE), dort steht der Bauer
 export const BOT_MOTIV = /^bot-([a-z0-9-]{2,30})$/;
-export function botMotivFrei(x, f = null) {
+export function botMotivFrei(x) {
   const m = BOT_MOTIV.exec(typeof x === 'string' ? x : '');
   if (!m) return false;
   try {
-    const b = (f || ladeFortschritt()).bots[m[1]];
+    const b = ladeFortschritt().bots[m[1]];
     return !!(b && Array.isArray(b.sterne) && b.sterne[0]);
   } catch (e) { return false; }
 }
