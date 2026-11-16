@@ -299,6 +299,8 @@
   .an-momente-zeile { order: 1; display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
     scrollbar-width: none; margin-inline: -10px; padding: 3px 10px; }
   .an-momente-zeile::-webkit-scrollbar { display: none; }
+  /* Fix-Review 16.11.: setzt passeBrett() brett-zuerst (Brett und Navigation auf order 0), bleibt die Zeile davor */
+  .an-screen.brett-zuerst .an-momente-zeile { order: -1; }
   .an-mz.knopf { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; height: 44px; padding: 0 12px 0 8px;
     border-radius: 12px; scroll-snap-align: start; white-space: nowrap; color: var(--text); background: var(--flaeche-2);
     border: 1.5px solid var(--kt); box-shadow: none; }

@@ -22,6 +22,9 @@ const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`))
 const BILDER = arg('bilder');
 const NAME = arg('name') || 'nachher';
 if (BILDER) mkdirSync(BILDER, { recursive: true });
+// Fix-Review 16.11.: Bilder der kurzen Hochformate (Momente-Zeile) aus testeMomente
+const BILDER_FIX = arg('fixbilder');
+if (BILDER_FIX) mkdirSync(BILDER_FIX, { recursive: true });
 const TEMPO_MERKER = 'schach-arena:v1:analyse-tempo';
 
 function ladePlaywright() {
@@ -142,7 +145,11 @@ async function testeMomente(browser, d) {
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
-  for (const [name, breite, hoehe] of [['iPhone 13', 390, 844], ['iPhone SE', 375, 667]]) {
+  // Fix-Review 16.11.: kurze Hochformate in Safari mit Leisten (SE 548, Android 640, iPhone 13 664, Entscheid Hauptfenster:
+  // dort gewollt mit Zeile) auch dann, wenn passeBrett() brett-zuerst setzt (Brett und Navigation springen auf order 0)
+  for (const [name, breite, hoehe] of [['iPhone 13', 390, 844], ['iPhone SE', 375, 667], ['SE Safari', 375, 548], ['Android', 360, 640],
+    ['iPhone 13 Safari', 390, 664]]) {
+    const kurz = hoehe <= 700;
     gruppe = `Momente ${name}`;
     const { kontext, seite, fehler } = await neueSeite(browser, { breite, hoehe, touch: true });
     await oeffneAnalyse(seite, d);
@@ -163,14 +170,24 @@ async function testeMomente(browser, d) {
       const eintraege = sichtbar ? [...zeile.querySelectorAll('.an-mz')].map((e) => Math.round(e.getBoundingClientRect().height)) : [];
       const momente = sichtbar ? r(zeile) : r(document.querySelector('.an-moment'));
       const brett = r(document.querySelector('.an-brett-rahmen'));
-      return { zeile: sichtbar, momente, brett, eintraege, momenteGanz: ganz(momente), brettGanz: ganz(brett),
+      // Bedienwege: die Zeile ist fuer Vorleser verborgen und nicht in der Tab-Reihenfolge, die Karten bleiben der Weg
+      const tabbar = (e) => e.tabIndex >= 0 && !e.closest('[aria-hidden="true"]');
+      const wege = { zeileVerborgen: !!zeile && zeile.getAttribute('aria-hidden') === 'true',
+        zeileTabs: zeile ? [...zeile.querySelectorAll('[data-aktion="moment"]')].filter(tabbar).length : 0,
+        karten: document.querySelectorAll('.an-moment').length,
+        kartenTabs: [...document.querySelectorAll('.an-momente [data-aktion="moment"]')].filter(tabbar).length };
+      return { zeile: sichtbar, momente, brett, eintraege, momenteGanz: ganz(momente), brettGanz: ganz(brett), wege,
+        brettZuerst: document.querySelector('.an-screen').classList.contains('brett-zuerst'),
         scroll: document.querySelector('.an-screen').scrollTop + scrollY, hoehe: innerHeight };
     });
     pruefe('Ohne Scrollen: Momente ganz im Bild', o.scroll === 0 && o.momenteGanz, JSON.stringify(o));
     pruefe('Ohne Scrollen: Brett ganz im Bild', o.scroll === 0 && o.brettGanz, JSON.stringify(o));
-    pruefe(name === 'iPhone SE' ? 'SE: kompakte Zeile ueber dem Brett, Eintraege mindestens 44 px' : 'iPhone 13: grosse Karten, keine Zeile',
-      name === 'iPhone SE' ? o.zeile && o.eintraege.length >= 2 && o.eintraege.every((x) => x >= 44) && o.momente.bottom <= o.brett.top : !o.zeile,
+    pruefe(kurz ? `${name}: kompakte Zeile ueber dem Brett, Eintraege mindestens 44 px` : `${name}: grosse Karten, keine Zeile`,
+      kurz ? o.zeile && o.eintraege.length >= 2 && o.eintraege.every((x) => x >= 44) && o.momente.bottom <= o.brett.top : !o.zeile,
       JSON.stringify(o));
+    pruefe('Momente nur einmal fuer Vorleser und Tastatur (Zeile verborgen, Karten tabbar)',
+      o.wege.zeileVerborgen && o.wege.zeileTabs === 0 && o.wege.karten >= 2 && o.wege.kartenTabs === o.wege.karten, JSON.stringify(o.wege));
+    if (BILDER_FIX && kurz) await seite.screenshot({ path: path.join(BILDER_FIX, `fix-${name.replace(/\s+/g, '-').toLowerCase()}-${breite}x${hoehe}.png`) });
     if (o.zeile) {
       const ziel = await seite.locator('.an-momente-zeile .an-mz').nth(1);
       const ply = Number(await ziel.getAttribute('data-ply'));

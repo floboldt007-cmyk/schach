@@ -735,14 +735,15 @@ export function zeige(root, params = {}, app) {
     // Kaltreview b4 16.11., Entscheidung A (e7): auf kurzen Hochformaten (iPhone SE) passen Brett und erste Karte nicht
     // zugleich ins Bild; dort steht ueber dem Brett eine kompakte Zeile (Symbol und Zug), die Karten bleiben darunter.
     // Sonst ist die Zeile display:none (css/analyse.css), also weder sichtbar noch fokussierbar.
+    // Fix-Review 16.11.: die Zeile ist eine Abkuerzung fuer den Finger; Vorleser und Tastatur bekommen die Momente nur einmal,
+    // ueber die Karten (aria-hidden, tabindex -1), sonst stuenden dieselben Knoepfe zweimal hintereinander
     const zeile = plies.map((p) => {
       const z = st.zuege[p];
-      const wer = zuzweit() ? personenName(z.farbe) : z.farbe === st.sf ? t('analyse.an.genau.du') : gegnerKurz();
-      return `<button class="knopf an-mz${z.farbe === st.sf ? ' du' : ''}" type="button" data-aktion="moment" data-ply="${p}" data-klasse="${esc(z.klasse)}"
-        aria-label="${esc(zugText(z))}, ${esc(KLASSEN_NAME[z.klasse])}, ${esc(wer)}">${symbolDeckend(z.klasse)}<span class="an-mz-zug">${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
+      return `<button class="knopf an-mz${z.farbe === st.sf ? ' du' : ''}" type="button" tabindex="-1" data-aktion="moment" data-ply="${p}" data-klasse="${esc(z.klasse)}">`
+        + `${symbolDeckend(z.klasse)}<span class="an-mz-zug">${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
     }).join('');
     return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}">${karten}</div></div>`
-      + `<div class="an-momente-zeile" role="group" aria-label="${titel}">${zeile}</div>`;
+      + `<div class="an-momente-zeile" aria-hidden="true">${zeile}</div>`;
   }
 
   function klassenHtml() {
