@@ -123,7 +123,8 @@ const LAGEN = {
   kompakt: {
     himmel: 0.10,
     baender: [0.10, 0.34, 0.60, 0.80],
-    stationen: [[0.18, 0.92], [0.50, 0.92], [0.84, 0.86], [0.80, 0.42], [0.46, 0.40], [0.17, 0.20]],
+    // R19 B: die aeusseren Stationen etwas eingerueckt, die groesseren Schilder ragten sonst ueber den Kartenrand
+    stationen: [[0.20, 0.92], [0.50, 0.92], [0.81, 0.86], [0.78, 0.42], [0.46, 0.40], [0.21, 0.20]],
     start: [0.02, 1.02],
     boss: [0.94, 0.26],
     event: [0.62, 0.66],
@@ -174,6 +175,29 @@ const WELT_MIN_H = 820;
 // zuerst schraeg rechts oben wie bisher, dann rechts, rechts unten, links
 const FLO_ABSTAND = 6;
 const FLO_RICHTUNGEN = [-35, 0, 35, -70, -145, 180, 145, -110, 70, 110];
+// Handy hoch, Leiste (R19 B): Hoehe der zugeklappten Gegner-Leiste unten (Griff, Kopf und runder Spielen-Knopf in einer
+// Zeile; css/arena.css .karte-leiste)
+const WEG_KARTE_ZU = 96;
+// Wappen der Welten auf der Weltwahl-Plakette (R19, Flo 15.11.2026: Weltname als Plakette statt grauem Text): selbst
+// gezeichnet, ein Schild mit Gold-Kante in der Farbe der Welt und ein Zeichen (Brett, Tanne, Turm, Welle, Fisch). Inline,
+// damit keine neue Datei in den Cache des Service Workers muss; Verlaufs-Ids je Welt, weil der Bildschirm nur eines zeigt,
+// eine alte Plakette beim Wechsel aber kurz neben der neuen stehen kann
+const WAPPEN = {
+  'karofelder': ['#3E7A4A', '#1F4A2C', '<g transform="translate(17 20)" fill="#F4E7C3"><rect x="0" y="0" width="10" height="10" rx="1.5"/><rect x="20" y="0" width="10" height="10" rx="1.5"/><rect x="10" y="10" width="10" height="10" rx="1.5"/><rect x="0" y="20" width="10" height="10" rx="1.5"/><rect x="20" y="20" width="10" height="10" rx="1.5"/></g><rect x="17" y="20" width="30" height="30" rx="2" fill="none" stroke="url(#wk-${id})" stroke-width="1.5"/>'],
+  'springerforst': ['#2F6B4F', '#173A2B', '<path d="M32 16 L44 32 H38 L47 44 H38 L46 54 H18 L26 44 H17 L26 32 H20 Z" fill="#9FD18A"/><rect x="29.5" y="54" width="5" height="7" rx="1" fill="#C9962E"/>'],
+  'turmstadt': ['#3D5A86', '#1E2F4E', '<path d="M20 20 H25 V24 H29.5 V20 H34.5 V24 H39 V20 H44 V30 L40 33 V48 L44 52 V57 H20 V52 L24 48 V33 L20 30 Z" fill="#F4E7C3"/><rect x="29" y="38" width="6" height="8" rx="3" fill="#1E2F4E"/>'],
+  'gezeitenkueste': ['#2D7EA0', '#134A66', '<circle cx="32" cy="27" r="7" fill="#F4D78A"/><path d="M13 42 C18 37 22 37 26 42 S34 47 38 42 S46 37 51 42" fill="none" stroke="#E8F6FB" stroke-width="3.5" stroke-linecap="round"/><path d="M15 51 C20 46 24 46 28 51 S36 56 40 51 S46 47 49 50" fill="none" stroke="#9ED3E8" stroke-width="3" stroke-linecap="round"/>'],
+  'stockfisch-tiefe': ['#22456E', '#0B1D36', '<path d="M16 40 C22 30 36 29 44 38 L52 32 V48 L44 42 C36 51 22 50 16 40 Z" fill="#8FC3E6"/><circle cx="24" cy="38" r="2" fill="#0B1D36"/><circle cx="40" cy="22" r="3" fill="none" stroke="#CFE8F7" stroke-width="1.6"/><circle cx="46" cy="16" r="2" fill="none" stroke="#CFE8F7" stroke-width="1.4"/>'],
+};
+function wappenSvg(id) {
+  const [oben, unten, zeichen] = WAPPEN[id] || WAPPEN.karofelder;
+  return `<svg viewBox="0 0 64 72" data-wappen="${id}" focusable="false"><defs>`
+    + `<linearGradient id="wg-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${oben}"/><stop offset="1" stop-color="${unten}"/></linearGradient>`
+    + `<linearGradient id="wk-${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4D78A"/><stop offset=".5" stop-color="#C9962E"/><stop offset="1" stop-color="#8A6418"/></linearGradient></defs>`
+    + `<path d="M32 2 L60 10 V34 C60 52 47 64 32 70 C17 64 4 52 4 34 V10 Z" fill="url(#wg-${id})" stroke="url(#wk-${id})" stroke-width="3.5" stroke-linejoin="round"/>`
+    + zeichen.replaceAll('${id}', id)
+    + '<path d="M12 14 L32 8 L52 14" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="2" stroke-linecap="round"/></svg>';
+}
 // Dauer der Freischalt-Choreografie (tests/app.test.mjs misst 2,7 s zwischen Beginn und Ende von .wird-frei)
 const FREI_DAUER_MS = 2700;
 
@@ -368,11 +392,12 @@ export function zeige(root, params, app) {
         <div class="karte-zieh-hinweis" aria-hidden="true" hidden>${esc(t('arena.karte.ziehen'))}</div>
         <div class="weltwahl" role="group" aria-label="${esc(t('arena.aria.weltwahl'))}">
           <button class="ww-pfeil dr" type="button" data-richtung="-1" aria-label="${esc(t('arena.aria.vorige'))}">${icon('zurueck')}</button>
-          <div class="ww-mitte" aria-live="polite"><b class="ww-name"></b><span class="ww-unter"></span></div>
+          <div class="ww-mitte" aria-live="polite"><span class="ww-wappen" aria-hidden="true"></span><b class="ww-name"></b><span class="ww-unter"></span></div>
           <button class="ww-pfeil dr" type="button" data-richtung="1" aria-label="${esc(t('arena.aria.naechste'))}">${icon('vor')}</button>
         </div>
         <div class="welt">
           <div class="welt-bild" aria-hidden="true"></div>
+          <div class="welt-leben" aria-hidden="true"></div>
           <div class="ort-karte-boss" hidden></div>
           <div class="ort-karte-event" hidden></div>
           <div class="flo-figur" aria-hidden="true">${floAvatar(letzteFarbe === 'b' ? 'b' : 'w')}</div>
@@ -499,8 +524,9 @@ export function zeige(root, params, app) {
       return;
     }
     if (gewaehlt === b.id) {
-      // schon gewaehlt: auf dem Handy zum Panel, dazu ein kurzer Wink des Spielen-Knopfs
-      if (modus === 'hoch') detail.scrollIntoView({ behavior: reduziert() ? 'auto' : 'smooth', block: 'nearest' });
+      // schon gewaehlt: auf dem Handy zum Panel (Weg: die Karte geht auf), dazu ein kurzer Wink des Spielen-Knopfs
+      if (s.classList.contains('karte-weg')) setzeKarteOffen(true);
+      else if (modus === 'hoch') detail.scrollIntoView({ behavior: reduziert() ? 'auto' : 'smooth', block: 'nearest' });
       const sp = detail.querySelector('[data-aktion="spielen"]');
       if (sp) anim(sp, [{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }, { transform: 'none' }], { d: 420, k: 'feder' });
       return;
@@ -511,7 +537,20 @@ export function zeige(root, params, app) {
     // Station federt (Portraet hebt sich kurz), das Namensschild federt auf (entwurf-a/SYSTEM.md "Bot waehlen")
     anim(el.querySelector('.avatar'), [{ transform: 'scale(.86)' }, { transform: 'translateY(-5px) scale(1.04)', offset: 0.55 }, { transform: 'none' }], { d: 560, k: 'hupf' });
     anim(el.querySelector('.k-schild'), [{ transform: 'translateX(-50%) scale(.84)' }, { transform: 'translateX(-50%)' }], { d: 460, k: 'feder' });
+    if (s.classList.contains('karte-weg')) karteOffen = true;
     zeigeDetail(true, true);
+  }
+
+  // Weg (R19 A): die Gegner-Karte unten ist zu (Kopf und Spielen-Knopf) oder offen (dazu Spruch, Ziele, Farbe)
+  let karteOffen = false;
+  function setzeKarteOffen(an) {
+    karteOffen = an;
+    detail.classList.toggle('offen', an);
+    const griff = detail.querySelector('.karte-griff');
+    if (griff) {
+      griff.setAttribute('aria-expanded', an ? 'true' : 'false');
+      griff.setAttribute('aria-label', t(an ? 'arena.karte.zu' : 'arena.karte.auf'));
+    }
   }
 
   function markiereGewaehlt() {
@@ -542,39 +581,51 @@ export function zeige(root, params, app) {
     const quer = !window.matchMedia('(orientation: portrait), (max-width: 760px)').matches && kh >= 420;
     const vorher = modus;
     modus = quer ? 'quer' : 'hoch';
-    // Handy hoch (schmale Karte, Hochformat): ganze Welt auf einen Blick, kein Scrollen in der Karte
-    const kompakt = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
-    lageModus = quer ? 'quer' : kompakt ? 'kompakt' : 'hoch';
+    // Handy hoch, Variante R19 B (Flo 14.11.: "sieht gequetscht aus"): die ganze Welt bleibt auf einen Blick (Flo 31.10.:
+    // "alles auf einmal sehen"), bekommt aber die volle Hoehe; der Gegner schwebt als schmale Leiste unten ueber der Welt
+    // und geht als Karte auf (.karte-weg.karte-leiste, css/arena.css). Kein Scrollen in der Karte.
+    const kompakt = false;
+    const wegModus = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
+    s.classList.toggle('karte-leiste', wegModus);
+    lageModus = quer ? 'quer' : wegModus ? 'kompakt' : 'hoch';
     s.classList.toggle('karte-quer', quer);
     s.classList.toggle('karte-hoch', !quer);
     s.classList.toggle('karte-kompakt', kompakt);
+    s.classList.toggle('karte-weg', wegModus);
+    // die Klassen aendern die Groesse der Karte (Weg: volle Hoehe statt Platz fuer das Panel); danach neu messen, sonst rechnet
+    // die Welt mit der alten Hoehe und der ResizeObserver sieht keine Aenderung mehr
+    const khNeu = karte.clientHeight || kh;
     const lage = LAGEN[lageModus];
     const w = kw;
     weltEl.dataset.welt = welt.id;
     weltEl.classList.toggle('gesperrt', !weltFrei);
     // Hochformat: Handy gestreckter (Platz fuer Schilder, Sterne und Fahne zwischen den Stationen), iPad hoch wie C;
     // schmale Karten (Handy quer: Karte neben dem Panel) mindestens WELT_MIN_H hoch, sonst rueckten die Stationen so eng
-    // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen
-    const h = quer || kompakt ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
-    // kompakt: kleinere Stationen, damit die ganze Welt in die Karte passt
+    // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen. Der Weg (R19 A) ist hoeher, damit
+    // jede Station ihren eigenen Platz hat
+    const h = quer || kompakt || wegModus ? khNeu : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
+    // kompakt: kleinere Stationen, damit die ganze Welt in die Karte passt; mit der Leiste (R19 B) nach der freien Hoehe
     const sk = kompakt ? Math.max(0.56, Math.min(0.78, Math.min(w, h * 1.25) / 560))
-      : Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
+      : wegModus ? Math.max(0.66, Math.min(0.9, Math.min(w, (h - WEG_KARTE_ZU) * 1.1) / 430))
+        : Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
     // senkrechte Abbildung: quer 1:1 (die Lage ist dafuer gezeichnet); hoch mit Rand oben (Krone und Fahne ueber dem
     // Endgegner) und unten (Schild unter Station 1), damit keine Beschriftung aus der Karte ragt
     let y0 = 0;
     let hy = h;
-    if (lageModus === 'hoch' || kompakt) {
+    if (lageModus === 'hoch' || lageModus === 'kompakt') {
       const kn = 76 * sk;
       const ys = lage.stationen.map((p) => p[1]);
       const fMin = Math.min(...ys);
       const fMax = Math.max(...ys);
       // Krone und Fahne des Endgegners unter der Weltwahl; kompakt ist die Weltwahl kleiner und die Karte flach
-      const oben = kn * 0.65 + (kompakt ? 70 : 118);
+      // Leiste (R19 B): etwas mehr Rand oben, das Schild "Endgegner" lag am iPhone SE unter der Weltwahl
+      const oben = kn * 0.65 + (kompakt ? 70 : wegModus ? 92 : 118);
       // kompakt: ist die unterste Station die aktuelle (vergroessert), braucht ihr Schild mehr Rand, sonst schneidet die
       // runde Ecke der Karte es ab (Handy-Runde 08.11.2026: "Willi 100"); sonst bleibt der Rand knapp, weil jeder Pixel
       // hier die Stationen enger zusammenrueckt (SE: Sterne auf dem Schild der Station darueber)
       const untenAktuell = LBOTS[ys.indexOf(fMax)]?.id === aktuellId;
-      const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : 36);
+      // Leiste (R19 B): unten schwebt die zugeklappte Gegner-Leiste ueber der Welt, die Stationen bleiben darueber
+      const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : wegModus ? WEG_KARTE_ZU + (untenAktuell ? 40 : 24) : 36);
       hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
       y0 = oben - fMin * hy;
     }
@@ -611,6 +662,8 @@ export function zeige(root, params, app) {
     // aus dem sichtbaren Teil geraten ist
     if (!quer && !kompakt && vorher && vorher !== modus) scrolleZu(gewaehlt, false);
     else if (!quer && !kompakt && vorher && kh !== letzteKh && !ganzImBild(gewaehlt)) scrolleZu(gewaehlt, false);
+    // Weg (R19 A): war die Karte beim Start noch nicht vermessen, holt das erste echte Layout den Gegner ins Bild
+    else if (wegModus && !vorher) scrolleZu(gewaehlt, false);
     letzteKh = kh;
   }
 
@@ -619,8 +672,10 @@ export function zeige(root, params, app) {
     const el = knoten[idx(id)];
     if (!el) return true;
     const k = karte.getBoundingClientRect();
-    const teile = [el, el.querySelector('.k-schild'), el.querySelector('.fahne')].filter(Boolean).map((t) => t.getBoundingClientRect());
-    return teile.every((n) => n.top >= k.top - 1 && n.bottom <= k.bottom + 1);
+    // Weg (R19 A): was unter der zugeklappten Gegner-Karte liegt, ist nicht im Bild
+    const unten = k.bottom - (s.classList.contains('karte-weg') ? WEG_KARTE_ZU + 18 : 0);
+    const teile = [el, el.querySelector('.k-schild'), el.querySelector('.fahne')].filter(Boolean).map((t) => t.getBoundingClientRect()).filter((r) => r.width || r.height);
+    return teile.every((n) => n.top >= k.top - 1 && n.bottom <= unten + 1);
   }
 
   // Flo steht neben der zuletzt bezwungenen Station (sonst am Start des Wegs); beim Freischalten noch beim alten Platz.
@@ -689,7 +744,9 @@ export function zeige(root, params, app) {
     if (i < 0) return;
     const y = yVon(LAGEN.hoch.stationen[i][1]);
     // Hoehe aus der Rechnung (masse.h), nicht offsetHeight: das gilt erst nach einer Transition (Bewegung aus: 0,01 ms)
-    const ziel = Math.max(0, Math.min((masse.h || weltEl.offsetHeight) - karte.clientHeight, y - karte.clientHeight * 0.55));
+    // Weg (R19 A): unten deckt die zugeklappte Gegner-Karte, die Station steht in der Mitte des freien Teils darueber
+    const frei = s.classList.contains('karte-weg') ? karte.clientHeight - WEG_KARTE_ZU - 18 : karte.clientHeight;
+    const ziel = Math.max(0, Math.min((masse.h || weltEl.offsetHeight) - karte.clientHeight, y - frei * 0.55));
     if (sanft && !reduziert() && karte.scrollTo) {
       try { karte.scrollTo({ top: ziel, behavior: 'smooth' }); } catch (e) { karte.scrollTop = ziel; }
     } else karte.scrollTop = ziel;
@@ -719,6 +776,7 @@ export function zeige(root, params, app) {
       // Startseite), Bot-Zeilen (arena:panel-bot), Merkmale und Bilanz entfallen; oben bleibt nur die Nachlese.
       detail.innerHTML = `
       <div class="ort-panel-oben" hidden></div>
+      <button class="karte-griff" type="button" aria-expanded="false" aria-label="${esc(t('arena.karte.auf'))}"><span aria-hidden="true"></span></button>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${botFarbe(laufBot)}">
         <span class="avatar"><img src="${esc(avatarVon(laufBot))}" alt=""></span>
@@ -764,6 +822,8 @@ export function zeige(root, params, app) {
       for (const k of seg.el.querySelectorAll('.seg')) k.dataset.farbe = k.dataset.wert;
       detail.querySelector('.farbwahl-ort').replaceWith(seg.el);
 
+      detail.querySelector('.karte-griff').addEventListener('click', () => setzeKarteOffen(!karteOffen));
+      setzeKarteOffen(karteOffen);
       detail.querySelector('[data-aktion="spielen"]')?.addEventListener('click', () => spielen(b));
       detail.querySelector('[data-aktion="steckbrief"]').addEventListener('click', () => zeigeSteckbrief(b));
       const fort = detail.querySelector('[data-aktion="fortsetzen"]');
@@ -1023,6 +1083,8 @@ export function zeige(root, params, app) {
   function zeichneWeltwahl() {
     const ww = s.querySelector('.weltwahl');
     ww.querySelector('.ww-name').textContent = welt.name;
+    // Plakette: Farbe und Wappen der Welt (css/arena.css .weltwahl[data-welt])
+    if (ww.dataset.welt !== welt.id) { ww.dataset.welt = welt.id; ww.querySelector('.ww-wappen').innerHTML = wappenSvg(welt.id); }
     const sterne = LBOTS.reduce((n, b) => n + fortschritt.bots[b.id].sterne.filter(Boolean).length, 0);
     const ww0 = { nr: weltNr, anzahl: WELTEN.length, sterne, max: LBOTS.length * 3 };
     ww.querySelector('.ww-unter').textContent = !weltFrei ? t('arena.weltwahl.vorschau', ww0)
@@ -1037,6 +1099,9 @@ export function zeige(root, params, app) {
   function wechsleWelt(nr) {
     if (!WELTEN.some((w) => w.nr === nr) || nr === weltNr) return;
     weltNr = nr;
+    // Gegner-Karte unten (R19): in der neuen Welt zugeklappt, sie zeigt einen anderen Gegner
+    karteOffen = false;
+    detail.classList.remove('offen');
     welt = WELTEN.find((w) => w.nr === nr);
     LBOTS = botsDerWelt(nr);
     weltFrei = istWeltFrei(nr, fortschritt);

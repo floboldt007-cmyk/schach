@@ -709,13 +709,22 @@ async function testeHochformate(browser) {
       const radius = parseFloat(getComputedStyle(karte).borderBottomLeftRadius) || 0;
       const schild = document.querySelector('.knoten.aktuell .k-schild')?.getBoundingClientRect();
       const flo = document.querySelector('.flo-figur').getBoundingClientRect();
-      return { kompakt: document.querySelector('.arena').classList.contains('karte-kompakt'), knoten: document.querySelectorAll('.knoten').length,
+      // Handy B (R19, Flo 14.11.2026, vorher .karte-kompakt): Gegner als Leiste unten ueber der Welt; keine Station und kein
+      // Schild liegt unter der zugeklappten Leiste, ihr Spruch erscheint erst nach dem Griff
+      const cl = document.querySelector('.arena').classList;
+      const leisteOben = document.querySelector('.arena .detail').getBoundingClientRect().top;
+      const unterLeiste = [...document.querySelectorAll('.knoten')].flatMap((kn) => [kn, kn.querySelector('.k-schild')].filter(Boolean))
+        .filter((t) => t.getBoundingClientRect().bottom > leisteOben + 1).length;
+      const blase = document.querySelector('.arena .detail .sprechblase');
+      return { leiste: cl.contains('karte-weg') && cl.contains('karte-leiste') && !document.querySelector('.arena .detail').classList.contains('offen'),
+        unterLeiste, spruchZu: !blase || getComputedStyle(blase).display === 'none', knoten: document.querySelectorAll('.knoten').length,
         scrollt: karte.scrollHeight > karte.clientHeight + 2, drin, hinweis: document.querySelectorAll('.karte-zieh-hinweis:not([hidden])').length,
         farbeVorKnopf: fw.bottom <= sp.top + 1, knopfDrin: sp.bottom <= inh.bottom + 1,
         schildAbstand: schild ? Math.round(kb.bottom - schild.bottom) : null, radius, floLinks: Math.round(flo.left - kb.left), floRechts: Math.round(kb.right - flo.right) };
     });
     pruefe('ganze Welt auf einen Blick: sechs Stationen samt Schild in der Karte, Karte scrollt nicht, kein Zieh-Hinweis',
-      k.kompakt && k.knoten === 6 && !k.scrollt && k.drin && k.hinweis === 0, JSON.stringify(k));
+      k.leiste && k.knoten === 6 && !k.scrollt && k.drin && k.hinweis === 0, JSON.stringify(k));
+    pruefe('Gegner-Leiste zu: keine Station und kein Schild darunter, Spruch erst nach dem Griff', k.leiste && k.unterLeiste === 0 && k.spruchZu, JSON.stringify(k));
     pruefe('Schild der aktuellen Station unten mindestens halben Eckenradius ueber dem Kartenrand (nicht abgeschnitten)',
       k.schildAbstand != null && k.schildAbstand >= k.radius / 2, JSON.stringify(k));
     pruefe('Flos Figur ganz in der Karte (links und rechts mindestens 4 px Rand)', k.floLinks >= 4 && k.floRechts >= 4, JSON.stringify(k));
@@ -736,14 +745,17 @@ async function testeHochformate(browser) {
         const k = document.querySelector('.karte');
         const kb = k.getBoundingClientRect();
         const a = document.querySelector('.knoten.aktuell .avatar').getBoundingClientRect();
+        const leisteOben = document.querySelector('.arena .detail').getBoundingClientRect().top;
         const sp = document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect();
         const nav = document.querySelector('.reiter-leiste');
         const nb = nav ? nav.getBoundingClientRect() : null;
         return { klasse: document.querySelector('.arena').className, scrollbar: k.scrollHeight > k.clientHeight + 20, scrollTop: k.scrollTop,
-          aktuellDrin: a.top >= kb.top && a.bottom <= kb.bottom, karteBreit: Math.abs(kb.width - (innerWidth - 32)) <= 1,
+          aktuellDrin: a.top >= kb.top && a.bottom <= Math.min(kb.bottom, leisteOben), karteBreit: Math.abs(kb.width - (innerWidth - 32)) <= 1,
           spielen: { t: sp.top, b: sp.bottom, l: sp.left, r: sp.right, h: sp.height }, leiste: nb ? { t: nb.top, b: nb.bottom } : null, reiter: document.documentElement.dataset.reiter || null, ih: innerHeight, iw: innerWidth };
       });
-      pruefe('Karte kompakt (ganze Welt, scrollt nicht), naechster Gegner sichtbar, volle Breite', /karte-hoch/.test(m.klasse) && /karte-kompakt/.test(m.klasse)
+      // Handy B (R19, vorher /karte-kompakt/): ganze Welt mit Gegner-Leiste; der naechste Gegner steht ueber der Leiste
+      pruefe('Karte mit Gegner-Leiste (ganze Welt, scrollt nicht), naechster Gegner ueber der Leiste sichtbar, volle Breite', /karte-hoch/.test(m.klasse)
+        && /karte-weg/.test(m.klasse) && /karte-leiste/.test(m.klasse)
         && !m.scrollbar && m.scrollTop === 0 && m.aktuellDrin && m.karteBreit, JSON.stringify(m));
       pruefe('Spielen-Knopf klebt sichtbar im Viewport, ueber der Reiter-Leiste, mindestens 56 px hoch', m.reiter === 'unten' && !!m.leiste && m.spielen.t >= 0 && m.spielen.b <= m.leiste.t && m.spielen.l >= 0 && m.spielen.r <= m.iw && m.spielen.h >= 56, JSON.stringify(m));
       // nach dem Scrollen des Panels bleibt der Knopf im Bild (sticky)

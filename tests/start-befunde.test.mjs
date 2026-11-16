@@ -113,7 +113,13 @@ try {
   // ---------- B20: Bot-Spruch in der kompakten Karte (iPhone 13, SE) ohne angeschnittene Zeile ----------
   for (const [name, w, h] of [['iPhone 13', 390, 844], ['iPhone 13 Safari', 390, 664], ['iPhone SE', 375, 667]]) {
     const { k, s, fehler } = await seite(browser, { w, h, touch: true, speicher: gesehen, hash: '#arena' });
-    await s.waitForFunction(() => !!document.querySelector('.arena.karte-kompakt .detail .sprechblase'));
+    // Handy B (R19, vorher .karte-kompakt): der Spruch steht in der Gegner-Karte, zu ist sie eine Leiste ohne Spruch; erst
+    // der Griff oeffnet sie, dann gelten die Pruefungen unten fuer die offene Karte
+    await s.waitForFunction(() => !!document.querySelector('.arena.karte-weg.karte-leiste .detail .sprechblase'));
+    const zu = await s.evaluate(() => getComputedStyle(document.querySelector('.arena .detail .sprechblase')).display);
+    pruefe(`B20 ${name}: Leiste zu zeigt keinen Spruch`, zu === 'none', zu);
+    await s.click('.arena .detail .karte-griff');
+    await s.waitForFunction(() => !!document.querySelector('.arena .detail.offen .sprechblase') && getComputedStyle(document.querySelector('.arena .detail .sprechblase')).display !== 'none');
     const SATZ = 'Ein neuer Name auf meiner Route! Schön, dich kennenzulernen. Ich hab’s immer ein bisschen eilig, also los, bevor die Post wartet.';
     await s.waitForTimeout(1200);
     // ein langer besonderer Satz (wie die Begruessung eines neuen Bots), danach die Karte neu legen lassen
