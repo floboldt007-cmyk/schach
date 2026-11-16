@@ -143,7 +143,7 @@ export function shopBereich({ app } = {}) {
       satz(S('shop.laedt'));
       let editionen = [];
       if (sitzung()) {
-        try { const r = await rufe('edition_staende', (await aktiveSitzung()).access_token); editionen = Array.isArray(r) ? r : []; } catch (e) { /* ohne Preis */ }
+        try { const r = await rufe('edition_staende', (await aktiveSitzung()).access_token); editionen = Array.isArray(r) ? r : []; } catch (e) { /* ohne Editionen */ }
       }
       try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen, katalog: KATALOG, produktName, bereich: s })); return; }
       catch (e) { console.error(e); }
