@@ -150,29 +150,36 @@ try {
     pruefe(`${L} Rang: Symbol ist Schmuck (alt leer, der Text nennt die Stufe)`, rang.alt === '', rang);
 
     // ---------- Figuren-Auswahl: die Figuren gross, keine Scheibe als "Logo" ----------
-    const fig = await s.evaluate(async () => {
+    // in drei Blattbreiten (SE-Blatt 320 bis iPhone 390, drei Spalten): auf dem SE schnitt die Kachel die aeusseren Figuren ab
+    const figs = await s.evaluate(async () => {
       const { bereich } = await import('/js/ui/ich.js');
       const { teileFiguren } = await import('/js/pakete/sammlung/index.js');
-      const sek = bereich({ id: 'figuren-probe', name: 'Probe', teile: teileFiguren() });
-      const huelle = document.createElement('div');
-      huelle.className = 'sheet-karte sa-blatt';
-      huelle.style.cssText = 'position:fixed;left:0;top:0;width:390px;z-index:99';
-      huelle.append(sek);
-      document.body.append(huelle);
-      await Promise.all([...huelle.querySelectorAll('img')].map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; }))));
-      const bild = huelle.querySelector('.sa-bild');
-      const imgs = [...huelle.querySelectorAll('.sk-figuren img')];
-      const rb = bild.getBoundingClientRect();
-      const hoehe = imgs.map((i) => Math.round(i.getBoundingClientRect().height));
-      const breite = imgs.reduce((s, i) => s + i.getBoundingClientRect().width, 0);
-      const scheibe = getComputedStyle(huelle.querySelector('.sk-figuren')).borderRadius;
-      huelle.remove();
-      return { n: imgs.length, hoehe, anteil: Math.round((breite / rb.width) * 100) / 100, bildB: Math.round(rb.width), scheibe };
+      const aus = [];
+      for (const blattB of [320, 343, 390]) {
+        const sek = bereich({ id: 'figuren-probe', name: 'Probe', teile: teileFiguren() });
+        const huelle = document.createElement('div');
+        huelle.className = 'sheet-karte sa-blatt';
+        huelle.style.cssText = `position:fixed;left:0;top:0;width:${blattB}px;z-index:99`;
+        huelle.append(sek);
+        document.body.append(huelle);
+        await Promise.all([...huelle.querySelectorAll('img')].map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; }))));
+        const bild = huelle.querySelector('.sa-bild');
+        const imgs = [...bild.querySelectorAll('.sk-figuren img')];
+        const rb = bild.getBoundingClientRect();
+        const ri = imgs.map((i) => i.getBoundingClientRect());
+        const breite = ri.reduce((s, r) => s + r.width, 0);
+        aus.push({ blattB, n: imgs.length, hoehe: ri.map((r) => Math.round(r.height)), anteil: Math.round((breite / rb.width) * 100) / 100,
+          bildB: Math.round(rb.width), drin: ri.every((r) => r.left >= rb.left - 1 && r.right <= rb.right + 1 && r.top >= rb.top - 1 && r.bottom <= rb.bottom + 1),
+          scheibe: getComputedStyle(bild.querySelector('.sk-figuren')).borderRadius });
+        huelle.remove();
+      }
+      return aus;
     });
-    pruefe(`${L} Figuren: drei Figuren des Satzes`, fig.n === 3, fig);
-    pruefe(`${L} Figuren: jede Figur mind. 40 px hoch`, fig.hoehe.length === 3 && fig.hoehe.every((h) => h >= 40), fig);
-    pruefe(`${L} Figuren: die Figuren fuellen das Bild (mind. 70 % der Breite)`, fig.anteil >= 0.7, fig);
-    pruefe(`${L} Figuren: keine runde Scheibe mehr`, !/50%/.test(fig.scheibe), fig);
+    pruefe(`${L} Figuren: drei Figuren des Satzes`, figs.every((f) => f.n === 3), figs);
+    pruefe(`${L} Figuren: keine Figur ragt aus der Kachel (Blatt 320, 343, 390 px)`, figs.every((f) => f.drin), figs);
+    pruefe(`${L} Figuren: die mittlere Figur mind. 30 px hoch, auch im schmalsten Blatt`, figs.every((f) => f.hoehe.length === 3 && f.hoehe[1] >= 30), figs);
+    pruefe(`${L} Figuren: die Figuren fuellen das Bild (mind. 70 % der Breite)`, figs.every((f) => f.anteil >= 0.7), figs);
+    pruefe(`${L} Figuren: keine runde Scheibe mehr`, figs.every((f) => !/50%/.test(f.scheibe)), figs);
     await k.close();
   }
 
