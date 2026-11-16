@@ -382,3 +382,40 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .shf-anhoeren { min-height: 44px; min-width: 44px; padding: 10px 22px; }
 .shf-still, .shf-still *, .shf-karte[data-art="finisher"] .shf-bild * { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { .shf-gross *, .shf-bild * { animation: none !important; } }
+
+/* ---------- R19 Profil Ich (Flo 15.11.2026, Leitlinie R19-Design-Leitlinie.md) ----------
+   Vitrine: "herzlos, kleine Symbole" -> grosse Orden auf einer dunklen Scheibe mit Ring in der Stufenfarbe und EIN sanfter
+   Glanz, der ab und zu darueber zieht (bei weniger Bewegung steht er still). Rang: das Liga-Symbol vor der Stufe.
+   Figuren: drei Figuren des Satzes gross nebeneinander statt zwei kleiner auf einer Scheibe ("das Logo ist zu gross"). */
+.pr-orden:not(.leer) { --orden-farbe: rgba(224, 162, 43, .55); }
+.pr-orden[data-stufe="1"] { --orden-farbe: var(--st-bronze); }
+.pr-orden[data-stufe="2"] { --orden-farbe: var(--st-silber); }
+.pr-orden[data-stufe="3"] { --orden-farbe: var(--st-gold); }
+.pr-orden:not(.leer) .pr-orden-bild { position: relative; overflow: hidden; width: 64px; height: 64px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #2E3340, #14161C 72%); box-shadow: inset 0 0 0 2px var(--orden-farbe), 0 4px 12px rgba(0, 0, 0, .28); }
+.pr-orden:not(.leer) .pr-orden-bild svg, .pr-orden:not(.leer) .pr-orden-bild svg.sk-erfolg { width: 56px; height: 56px; }
+.pr-orden:not(.leer) .pr-orden-bild::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 240, 200, .38) 50%, transparent 65%); transform: translateX(-120%);
+  animation: pr-orden-glanz 7s ease-in-out infinite; }
+.pr-orden:not(.leer):nth-child(2) .pr-orden-bild::after { animation-delay: 2.3s; }
+.pr-orden:not(.leer):nth-child(3) .pr-orden-bild::after { animation-delay: 4.6s; }
+@keyframes pr-orden-glanz { 0%, 70% { transform: translateX(-120%); } 90%, 100% { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) { .pr-orden:not(.leer) .pr-orden-bild::after { animation: none; } }
+html[data-bewegung="aus"] .pr-orden:not(.leer) .pr-orden-bild::after { animation: none; }
+.pr-vitrine:not([data-leer]) .pr-orden:not(.leer) { min-height: 0; padding: 10px 4px 8px; gap: 4px; }
+/* PC: die Vitrine steht rechts im Banner, dort etwas kleiner */
+@media (min-width: 900px) {
+  .pr-vitrine-ort .pr-orden:not(.leer) .pr-orden-bild { width: 56px; height: 56px; }
+  .pr-vitrine-ort .pr-orden:not(.leer) .pr-orden-bild svg { width: 48px; height: 48px; }
+}
+.pr-chip.pr-chip-krone:has(.pr-rang) { display: inline-flex; align-items: center; gap: 6px; padding: 2px 12px 2px 3px; }
+.pr-rang { width: 24px; height: 24px; flex: none; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45)); }
+.sk-figuren, .sa-raster > .sa-teil .sk-figuren { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 100%;
+  border: 0; border-radius: 0; background: none; padding-bottom: 6px; }
+.sk-figuren img, .sa-raster > .sa-teil .sk-figuren img { width: 54px; height: 54px; margin: 0 -8px; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .35)); }
+.sk-figuren img:nth-child(2), .sa-raster > .sa-teil .sk-figuren img:nth-child(2) { position: relative; z-index: 1; width: 62px; height: 62px; }
+@media (max-width: 520px) {
+  .sa-raster > .sa-teil .sk-figuren { padding-bottom: 4px; }
+  .sa-raster > .sa-teil .sk-figuren img { width: 40px; height: 40px; margin: 0 -6px; }
+  .sa-raster > .sa-teil .sk-figuren img:nth-child(2) { width: 48px; height: 48px; }
+}

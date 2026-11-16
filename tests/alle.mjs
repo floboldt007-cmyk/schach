@@ -71,6 +71,7 @@ const SUITEN = [
   { name: 'server-weltrang', datei: 'server-weltrang.test.mjs', args: [], was: 'Weltrangliste: Zustimmung, ab 15 bzw. 30 Partien (Start-Elo selbst gesetzt), Rechte, Auskunft, Rueckweg (Server, PGlite)' },
   { name: 'r19-weltrang', datei: 'r19-weltrang.test.mjs', args: [], was: 'R19 Weltrangliste: Texte DE/EN, Satz unter der Liste, ab_start nie erfunden, Datenschutz DE/EN' },
   { name: 'r19-titel-erfolge', datei: 'r19-titel-erfolge.test.mjs', args: [], was: 'R19: Taten-Titel und lokale Erfolgs-Familien (ohne Taler, ohne Server)' },
+  { name: 'r19-profil-ich', datei: 'r19-profil-ich.test.mjs', args: [], was: 'Profil Ich: Vitrine mit grossen Orden und sanftem Glanz, Liga-Symbol an der Stufe, Figuren gross, Banner Erster Zug neu, Banner bleiben in ihrer Kachel, DE/EN (Browser)' },
   { name: 'r19-lobby-farbe', datei: 'r19-lobby-farbe.test.mjs', args: [], was: 'Spiel-Symbole: gefuellt und farbig in Lobby, Startseite und Leiste, je Symbol mind. 3:1 an Pixeln hell und dunkel, Startseite scrollt nicht (Browser)' },
   { name: 'karte', datei: 'karte.test.mjs', args: [], was: 'Etappe 4b: js/karte.js gegen einen nachgebildeten Server (Stufen melden, Karte waehlen, Karte der Partie)' },
   { name: 'karte-vertrag', datei: 'karte-vertrag.test.mjs', args: [], was: 'Etappe 4b: Schema-Vertrag Visitenkarte (Zahlen, feste Listen, Rechte, Rueckweg, nie kaeuflich)' },

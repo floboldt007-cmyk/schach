@@ -24,7 +24,7 @@ import { meinName, sitzung, userId } from '../../konto.js';
 import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
 import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
-import { karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN } from '../../ui/visitenkarte.js';
+import { karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN, ligaSymbolUrl } from '../../ui/visitenkarte.js';
 import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
 import { teileErfolge, teileErfolgsStufen, teileLokaleStufen, familienOrden, karteAbgleichen, spielstand, titelDaten, schulStand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
@@ -337,7 +337,8 @@ export function profilKarte({ app } = {}) {
   // der getragene Titel mit seinem Wappen (auch der Level-Titel, wenn keiner gewaehlt ist)
   const tj = titelJetzt(erfolge);
   const titel = tj ? `<span class="pr-chip pr-chip-titel" data-art="${esc(tj.art)}" data-seltenheit="${esc(tj.seltenheit)}">${titelBild(tj, 'pr-titel-wappen')}<span>${esc(tj.name)}</span></span>` : '';
-  const krone = kronenText(eigeneKronenStufe());
+  const kronenStufe = eigeneKronenStufe();
+  const krone = kronenText(kronenStufe);
   // Kundenblick 09.11.2026 (Befund 12): "Ich" zeigt wenigstens eine Spielzahl
   const partienZahl = ladePartien().filter(wertet).length;
   // R4a (Kritik 09.11.): ganz leer zeigt die Vitrine einen schmalen Platz (waehlt Platz 1) statt drei grosser leerer Kaesten.
@@ -347,7 +348,7 @@ export function profilKarte({ app } = {}) {
   const plaetze = leer ? vitrine.slice(0, 1) : vitrine;
   k.innerHTML = `<div class="pr-kopf"><span class="pr-banner" aria-hidden="true" style="background-image:url('${bannerUrl(banner)}')"></span>
       <span class="pr-av">${floAvatar('w')}</span>
-      <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone">${esc(krone)}</span>` : ''}</div>
+      <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone"><img class="pr-rang" src="${ligaSymbolUrl(kronenStufe)}" alt="">${esc(krone)}</span>` : ''}</div>
         <small class="pr-seit">${esc(seitText())}${partienZahl ? ' · ' + esc(S(partienZahl === 1 ? 'profil.partieEine' : 'profil.partien', { zahl: partienZahl })) : ''}</small></div></div>
     <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button></div>
     <div class="pr-vitrine-ort"><h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>
