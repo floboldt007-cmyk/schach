@@ -6,13 +6,13 @@
 import { anbieten, waehle } from '../../orte.js';
 import { freischalten, bereich } from '../../ui/ich.js';
 import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl, ladeModul, ladePartien, wertet } from '../../storage.js';
-import { erspielteErfolge, merkeErspielteErfolge } from '../../profil.js';
+import { erspielteErfolge, merkeErspielteErfolge, erspielteLokalStufen, merkeLokalStufen } from '../../profil.js';
 import { BEREICHE as SCHUL_BEREICHE, ALLE as SCHUL_LEKTIONEN, summe as schulSumme } from '../lernen/mattbilder.js';
 import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
 import { klangKunst, brettKunst, erfolgKunst, erfolgSeltenheit } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
-import { LABOR_BRETTER, LABOR_FIGUREN, LABOR_KLAENGE, laborFrei, brettWahl, klangWahl } from '../../labor.js';
+import { LABOR_BRETTER, MOTIV_BRETTER, LABOR_FIGUREN, LABOR_KLAENGE, laborFrei, brettWahl, klangWahl } from '../../labor.js';
 import { figurenSatz, figurenPfad } from '../../figurensatz.js';
 import { hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { shopBereich } from './shop.js';
@@ -23,7 +23,9 @@ import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
 import { lade as ladePunkte, tafelStatistik } from '../punkte/stand.js';
 import { FAMILIEN, familienStand } from './stufen.js';
 import { zeigeStufen } from './moment.js';
-import { titelJetzt, talerJetzt } from './profil.js';
+import { titelJetzt, talerJetzt, titelFreiZahl } from './profil.js';
+import { lokalStand, lokaleStufen } from './taten.js';
+import { titelWappen } from '../../titel-kunst.js';
 import './texte.js';
 import './karte-texte.js';
 
@@ -44,10 +46,30 @@ const sternBild = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5
 // Ausruesten per Tipp (js/ui/ich.js): wahl() setzt die Einstellung ueber die App; ohne App (Node-Tests) keine Wahl
 const wahlVon = (app, teil) => (app && typeof app.setzeEinstellungen === 'function' ? () => app.setzeEinstellungen(teil) : undefined);
 
+// Oberflaechen der seltenen Labor-Bretter (14.11.2026): nur das Erfinder-Konto laedt sie, und zwar beim ersten Sammelbild mit
+// freiem Labor (Befund ed: auf einem neuen Geraet kommt der Erfinder-Status erst nach dem Laden). Ist die Datei da, wird der
+// offene Screen "Ich" ruhig neu gezeigt; fehlt sie (offline, nicht im Cache), bleiben die Farben ohne Oberflaeche und das
+// naechste Sammelbild fragt noch einmal
+// Dasselbe fuer die Feldtextur der Motiv-Bretter (js/brett-motive-v4.js), im selben Zug geladen
+let FLAECHEN = null, MOTIVKUNST = null;
+let flaechenLaden = null;
+function flaechenAnstossen(app) {
+  if (FLAECHEN || flaechenLaden || !laborFrei()) return;
+  flaechenLaden = Promise.all([import('../../brett-flaechen.js'), import('../../brett-motive-v4.js')]).then(([m, v4]) => {
+    FLAECHEN = m; MOTIVKUNST = v4;
+    const s = typeof document !== 'undefined' && document.querySelector('.sa-screen');
+    if (!s || !app || typeof app.gehe !== 'function') return;
+    const oben = s.querySelector('.sa-rumpf')?.scrollTop || 0;
+    app.gehe('ich', { ...(s.dataset.bereich ? { bereich: s.dataset.bereich } : {}), oben, ruhig: true }, { ersetzen: true });
+  }).catch(() => {}).finally(() => { flaechenLaden = null; });
+}
+
 export function teileBretter(e = ladeEinstellungen(), app = null) {
+  flaechenAnstossen(app);
   const an = brettWahl(e.brett);
   // Labor (Flo 31.10.2026): Kuerbis, Frost, Marmor, Nussbaum, Thron nur im Erfinder-Konto (js/labor.js)
-  const liste = [...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, b.muster]) : [])];
+  const liste = [...BRETTER, ...(laborFrei() ? [...LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, (b.flaeche && FLAECHEN && FLAECHEN.brettMuster(b)) || b.muster]),
+    ...MOTIV_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, MOTIVKUNST && MOTIVKUNST.motivMuster(b.id)])] : [])];
   // echte Figuren des ausgeruesteten Satzes (Flo 31.10.: "der Koenig sieht ganz anders aus")
   const figuren = new URL('../../../' + figurenPfad(e), import.meta.url).href;
   return liste.map(([id, h, d, r, labor, muster]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: an === id, zeile: an === id ? S('an') : S('frei'),
@@ -122,9 +144,15 @@ export function titelDaten(f = ladeFortschritt(), schule = schulStand()) {
     kartei: zahl(kartei && kartei.zaehler && kartei.zaehler.richtig),
     schulKapitel: schule ? schule.bereiche.filter((b) => b.alle > 0 && b.geschafft >= b.alle).length : 0,
     erzfeind: Object.keys(erzfeind).length,
+    // R19 (./taten.js): frei geschaltete Bretter
+    bretterFrei: bretterFrei(),
   };
 }
-export const LIGA_STUFEN = 6;                      // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
+// frei geschaltete Bretter: heute die drei Grundbretter. Die Labor-Bretter zeigt die Sammlung dem Erfinder nur als Vorschau
+// (ihr weg ist ein Vorschlag, nirgends erfuellt), sie zaehlen nicht, sonst gaebe es Brettsammler Gold beim ersten Oeffnen
+// (Kaltreview 14.11.). Schaltet spaeter ein Weg Bretter frei, gehoeren sie hierher.
+export const bretterFrei = () => BRETTER.length;
+export const LIGA_STUFEN = 6;                     // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
 export const SERIE_ZIELE = Object.freeze([7, 30, 100]);
 export const LEVEL_ZIELE = Object.freeze([10, 20, 30]);
 export const SIEGE_ZIELE = Object.freeze([10, 50, 100]);
@@ -287,6 +315,37 @@ export function teileErfolgsStufen(stand = stufenStand(), gemerkt = ladeBesitz()
   });
 }
 
+// R19 lokale Familien (./taten.js): Stand aus Partien-Archiv, Fortschritt, Raetsel-Folge, Kartei, Sammlung und Titeln
+export function lokalerStand(f = ladeFortschritt()) {
+  const sicher = (fn, ersatz) => { try { const x = fn(); return x == null ? ersatz : x; } catch (e) { return ersatz; } };
+  const d = titelDaten(f, null);
+  return lokalStand(sicher(() => ladePartien().filter(wertet), []), {
+    besiegt: BOTS.filter((b) => f.bots[b.id] && f.bots[b.id].sterne[0]).map((b) => b.id),
+    dreiSterne: sicher(() => BOTS.filter((b) => sterneZahl(b.id, f) === 3).length, 0),
+    raetselFolge: sicher(() => ladeBesitz().raetsel.beste, 0), kartei: d.kartei, bretterFrei: d.bretterFrei,
+    titelFrei: sicher(() => titelFreiZahl(), 0),
+  });
+}
+// Abzeichen der lokalen Familien: ihr Wappen in der Stufenfarbe (ohne Stufe grau)
+const STUFEN_FARBE = [['#C8CED8', '#6A7486', '#434B5A'], ['#E8B48A', '#9A5A2A', '#5E3414'], ['#E4E8F0', '#8C97AB', '#4E5868'], ['#FFE6A0', '#C8901E', '#7A5610']];
+// Teile wie teileErfolgsStufen, ohne Taler und ohne Server; geheime erst ab Bronze. Neu erreichte Stufen werden gemerkt.
+// Name: der Name der erreichten Stufe (Hofbesuch, Waldrunde ...), vorher der Name der Familie
+export function teileLokaleStufen(stand = lokalerStand(), gemerkt = erspielteLokalStufen()) {
+  const liste = lokaleStufen(stand, gemerkt);
+  const neu = liste.flatMap((x) => Array.from({ length: x.stufe }, (_, i) => `${x.familie}-${i + 1}`)).filter((id) => !gemerkt.includes(id));
+  if (neu.length) { try { merkeLokalStufen(neu); } catch (e) { /* ohne Speicher nur fuer jetzt */ } }
+  return liste.filter((x) => !x.geheim || x.stufe > 0).map((x) => {
+    const n = Math.min(x.wert, x.naechstes ?? x.wert);
+    const zeile = x.stufe === 3 ? K('zeile.gold') : x.stufe === 0 ? K('zeile.start', { n, ziel: x.naechstes, was: K('was.' + x.familie) })
+      : K('zeile.weiter', { stufe: K('stufe.' + x.stufe), n, ziel: x.naechstes, naechste: K('stufe.' + (x.stufe + 1)) });
+    const vorher = x.stufe > 0 ? x.ziele[x.stufe - 1] : 0;
+    return { id: 'stufe-' + x.familie, familie: x.familie, stufe: x.stufe, lokal: true, name: x.stufe ? K(`sn.${x.familie}.${x.stufe}`) : K('fam.' + x.familie),
+      frei: x.stufe > 0, zeile, bild: titelWappen(x.zeichen, { farbe: STUFEN_FARBE[x.stufe], seltenheit: SELTEN[x.stufe], klasse: 'sk-orden' }),
+      seltenheit: SELTEN[x.stufe], gruppe: S('gruppe.' + x.gruppe),
+      fortschritt: x.naechstes ? Math.max(0, Math.min(1, (x.wert - vorher) / Math.max(1, x.naechstes - vorher))) : undefined };
+  });
+}
+
 // Name und Abzeichen einer Familie fuer die Karte eines anderen Spielers (seine Stufe kommt vom Server)
 export function familienOrden(familie, stufe = 3) {
   if (!FAMILIEN.some((x) => x.id === familie)) return null;
@@ -334,6 +393,6 @@ anbieten('sammlung:bereich', ({ app }) => {
 }, { reihenfolge: 45, paket: PAKET });
 anbieten('sammlung:bereich', ({ app }) => bereich({ id: 'klaenge', name: S('klaenge'), teile: teileKlaenge(undefined, app) }), { reihenfolge: 50, paket: PAKET });
 // Etappe 4b: jede Stufe zahlt Taler; der Stand steht als Hinweis ueber den Erfolgen (mit Konto der des Servers)
-anbieten('sammlung:bereich', () => bereich({ id: 'erfolge', name: S('erfolge'), teile: teileErfolgsStufen(),
+anbieten('sammlung:bereich', () => bereich({ id: 'erfolge', name: S('erfolge'), teile: [...teileErfolgsStufen(), ...teileLokaleStufen()],
   hinweis: K('taler.stand', { n: talerJetzt() }) }), { reihenfolge: 90, paket: PAKET });
 anbieten('sammlung:bereich', ({ app }) => shopBereich({ app }), { reihenfolge: 95, paket: PAKET });

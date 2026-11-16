@@ -1,15 +1,19 @@
 // Bilder der Online-Ansichten (Feinschliff R8, 13.11.2026): Lobby, Gegnersuche, laufende Partie und Ergebnis auf
-// iPhone 13 und PC, je hell und dunkel. Die Funktionsproben (tests/online-ui.test.mjs, tests/gegnersuche.test.mjs)
+// iPhone 13, iPhone SE und PC, je hell und dunkel. Die Funktionsproben (tests/online-ui.test.mjs, tests/gegnersuche.test.mjs)
 // machen keine Bilder; dieses Skript schliesst die Luecke fuer die Sichtkritik. Kein Teil von tests/alle.mjs.
 // Netzwerk ausschliesslich simuliert: jede Anfrage an *.supabase.co beantwortet die Attrappe unten, nie das echte Projekt.
 //
-//   node tests/bilder-online.mjs --bilder=<ordner>     16 Bilder: online-<geraet>-<hell|dunkel>-<lobby|suche|partie|ergebnis>.png
+//   node tests/bilder-online.mjs --bilder=<ordner>     24 Bilder: online-<geraet>-<hell|dunkel>-<lobby|suche|partie|ergebnis>.png
 //   PORT=8991 node tests/bilder-online.mjs ...         eigener Port (Standard 8991)
-// Exit 0, wenn alle 16 Bilder entstanden sind und jede Ansicht im erwarteten Modus stand; sonst 1.
+//   --ohne-elo         die Attrappe schickt keine Elo (Feld elo in kronen_mein_stand fehlt, wie vor online-elo-schema.sql);
+//                      Dateien online-ohne-elo-<geraet>-...; sonst nennt sie Elo 1240 (R19 online ruhig: eine Zahl in der Lobby)
+//   --nur-hell         nur das helle Schema (8 Bilder)
+//   --zahlen=<datei>   schreibt je Ansicht alle sichtbaren Zahlen als Markdown-Liste (Brett-Koordinaten zusammengefasst)
+// Exit 0, wenn alle 24 Bilder entstanden sind und jede Ansicht im erwarteten Modus stand; sonst 1.
 import http from 'node:http';
 import os from 'node:os';
 import { createRequire } from 'node:module';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
@@ -24,6 +28,9 @@ if (!pw) throw new Error('Playwright fehlt (PLAYWRIGHT_PFAD setzen)');
 const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : null; };
 const BILDER = arg('bilder') || path.join(os.tmpdir(), 'bilder-online');
 mkdirSync(BILDER, { recursive: true });
+const OHNE_ELO = process.argv.includes('--ohne-elo');
+const ZAHLEN = arg('zahlen');
+const zahlenListe = [];
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
@@ -50,7 +57,8 @@ function pruefe(name, gut, detail = '') {
 const UID = 'u1';
 const token = (uid) => 'a.' + Buffer.from(JSON.stringify({ sub: uid })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'test-r', expires_at: 9999999999, user: { id: UID, email: 'u1@example.invalid' } };
-const NAMEN = { u1: 'Spieler_1', u2: 'Spieler_2' };
+// Namen ohne Ziffern, damit die Zahlenliste (--zahlen) nur echte Zahlen zaehlt
+const NAMEN = { u1: 'Mira', u2: 'Jonas' };
 const PARTIE = 'such-1';
 const iso = (ms) => new Date(ms).toISOString();
 
@@ -101,10 +109,11 @@ function bediener(z) {
       if (rpc === 'online_pruefe_zeit' && p) return antwort(p);
       if (rpc === 'online_gib_auf' && p) { Object.assign(p, { status: 'beendet', grund: 'aufgabe', ergebnis: '0-1', aktualisiert_am: iso(Date.now()) }); return antwort(p); }
       if (rpc === 'karte_der_partie') {
-        const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du: u === UID });
+        const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7,
+          ...(OHNE_ELO ? {} : { elo: u === UID ? 1240 : 1310 }), du: u === UID }); // Visitenkarte mit Elo (supabase/karte-elo-schema.sql)
         return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
       }
-      if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09' });
+      if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...(OHNE_ELO ? {} : { elo: 1240 }) });
       z.unerwartet.push(rpc);
       return antwort([]);
     }
@@ -138,8 +147,27 @@ async function bestaetige(s) {
 const sichtbar = (s, sel, ms = 15000) => s.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((e) => !e.hidden && e.getClientRects().length > 0), sel, { timeout: ms })
   .then(() => true).catch(() => false);
 
-const GERAETE = [['iphone-13', 390, 844], ['pc', 1280, 720]];
-const SCHEMATA = [['hell', 'light', 'hell'], ['dunkel', 'dark', 'dunkel']];
+// Alle Zahlen, die man in der Ansicht sieht: Textknoten mit Ziffern oder ½, sichtbar (checkVisibility) und im Bild
+// (Viewport), mit der Klasse des Elternelements als Ort. Brett-Koordinaten (1-8, a-h) stehen als eine Zeile.
+const sichtbareZahlen = (s) => s.evaluate(() => {
+  const raus = [];
+  let koord = 0;
+  const gang = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = gang.nextNode())) {
+    const el = n.parentElement;
+    const zahlen = n.textContent.match(/\d+(?:[:.,]\d+)*|½/g);
+    if (!el || !zahlen || !el.checkVisibility({ visibilityProperty: true, opacityProperty: true })) continue;
+    const r = el.getBoundingClientRect();
+    if (r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) continue;
+    if (el.closest('.koord, .koords, [class*="koord"]')) { koord++; continue; }
+    const ort = el.closest('[class]')?.getAttribute('class').split(/\s+/).slice(0, 2).join('.') || el.tagName.toLowerCase();
+    raus.push({ text: n.textContent.trim().replace(/\s+/g, ' ').slice(0, 80), zahlen, ort });
+  }
+  return { raus, koord };
+});
+const GERAETE = [['iphone-13', 390, 844], ['iphone-se', 375, 667], ['pc', 1280, 720]];
+const SCHEMATA = [['hell', 'light', 'hell'], ['dunkel', 'dark', 'dunkel']].slice(0, process.argv.includes('--nur-hell') ? 1 : 2);
 const seitenfehler = [];
 
 async function lauf(browser, [geraet, w, h], [wort, schema, modus]) {
@@ -152,7 +180,8 @@ async function lauf(browser, [geraet, w, h], [wort, schema, modus]) {
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
   const bild = async (teil) => {
-    const datei = path.join(BILDER, `online-${geraet}-${wort}-${teil}.png`);
+    if (ZAHLEN) zahlenListe.push({ ansicht: `${geraet} ${wort} ${teil}`, zahlen: await sichtbareZahlen(s) });
+    const datei = path.join(BILDER, `online-${OHNE_ELO ? 'ohne-elo-' : ''}${geraet}-${wort}-${teil}.png`);
     const da = await s.screenshot({ path: datei }).then(() => true).catch(() => false);
     pruefe(`${gruppe}: Bild ${teil}`, da, datei);
   };
@@ -203,6 +232,18 @@ try {
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();
+}
+if (ZAHLEN) {
+  const zeilen = [`# Sichtbare Zahlen je Ansicht${OHNE_ELO ? ' (ohne Elo vom Server)' : ''}`, '',
+    'Gemessen mit tests/bilder-online.mjs --zahlen: jeder sichtbare Text mit Ziffern (oder ½) im Bild; Namen wie Spieler_2 zaehlen mit.', ''];
+  for (const { ansicht, zahlen } of zahlenListe) {
+    const anzahl = zahlen.raus.reduce((a, x) => a + x.zahlen.length, 0);
+    zeilen.push(`## ${ansicht}: ${anzahl} Zahlen${zahlen.koord ? ` (dazu ${zahlen.koord} Brett-Koordinaten)` : ''}`, '');
+    for (const x of zahlen.raus) zeilen.push(`- ${x.zahlen.join(', ')}: "${x.text}" (${x.ort})`);
+    zeilen.push('');
+  }
+  writeFileSync(ZAHLEN, zeilen.join('\n'));
+  console.log(`Zahlenliste in ${ZAHLEN}`);
 }
 pruefe('keine Seitenfehler', seitenfehler.length === 0, seitenfehler);
 console.log(`\nBilder in ${BILDER}\n${ok}/${gesamt} Pruefungen bestanden`);
