@@ -157,6 +157,23 @@ try {
           if (!(await platz.count())) { pruefe(`${gruppeName}: Platz ${b} vorhanden`, false); continue; }
           await blatt(s, async () => { await platz.scrollIntoViewIfNeeded(); await platz.click(); }, path.join(BILDER, `${VOR}${geraet}-${modus}-${b}.png`), `${gruppeName}: ${b}`);
         }
+        // Gegner-Portraets (nur mit dem Portraet-Commit): Bereich im Blatt (frei und gesperrt), dann Fridolin waehlen, Profilkopf
+        if (await s.evaluate(async () => typeof (await import('/js/pakete/sammlung/profil.js')).portraetTeile === 'function')) {
+          await s.locator('.pr-aendern').first().click();
+          const bereichP = s.locator('.sheet-karte .pr-portraets').first();
+          await bereichP.waitFor({ timeout: 10000 });
+          await bereichP.scrollIntoViewIfNeeded();
+          await s.waitForFunction(() => [...document.querySelectorAll('.pr-portraets img')].every((i) => i.complete), null, { timeout: 10000 }).catch(() => {});
+          await warte(400);
+          pruefe(`${gruppeName}: portraets`, await bereichP.screenshot({ path: path.join(BILDER, `${VOR}${geraet}-${modus}-portraets.png`) }).then(() => true).catch(() => false));
+          await s.locator('.sheet-karte .pr-portraet[data-figur="bot-fridolin"]').click();
+          // "Fertig" (nicht Escape): erst danach zeichnet die Karte neu (waehleAussehen, sheet().then)
+          await s.locator('.sheet-karte button.primaer').first().click();
+          await s.waitForSelector('.sheet-karte', { state: 'detached', timeout: 5000 }).catch(() => {});
+          await warte(500);
+          pruefe(`${gruppeName}: Profilkopf mit Portraet`, (await s.locator('.pr-karte .pr-av svg[data-figur="bot-fridolin"]').count()) === 1);
+          pruefe(`${gruppeName}: karte-portraet`, await s.locator('.pr-karte').first().screenshot({ path: path.join(BILDER, `${VOR}${geraet}-${modus}-karte-portraet.png`) }).then(() => true).catch(() => false));
+        }
       } catch (e) {
         const lage = await s.evaluate(() => ({ url: location.href, bereit: document.readyState, karte: !!document.querySelector('.pr-karte') }))
           .catch((f) => ({ fehler: f.message.split('\n')[0] }));

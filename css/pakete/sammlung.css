@@ -419,3 +419,6 @@ html[data-bewegung="aus"] .pr-orden:not(.leer) .pr-orden-bild::after { animation
   .sa-raster > .sa-teil .sk-figuren img { width: 40px; height: 40px; margin: 0 -6px; }
   .sa-raster > .sa-teil .sk-figuren img:nth-child(2) { width: 48px; height: 48px; }
 }
+/* R19 Profil Ich: Gegner-Portraets als Profilbild (frei mit dem ersten Sieg gegen den Bot); gesperrt grau, die Zeile nennt den Bot */
+.pr-portraet-bild { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.pr-portraet:disabled .pr-portraet-bild { filter: grayscale(1) brightness(.6); }

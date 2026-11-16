@@ -13,9 +13,9 @@
 import { anbieten } from '../../orte.js';
 import { bereich } from '../../ui/ich.js';
 import { sheet } from '../../ui/bauteile.js';
-import { floAvatar } from '../../thema.js';
+import { floAvatar, BOT_PORTRAETS } from '../../thema.js';
 import { rahmenSvg, RAHMEN_KUNST } from '../../rahmen-kunst.js';
-import { profilWahl, setzeProfilWahl, dabeiSeit, erspielteTitel, merkeErspielteTitel, FIGUREN, RAHMEN, KREATUR_MOTIVE, GRUENDE, NUR_ERFINDER } from '../../profil.js';
+import { profilWahl, setzeProfilWahl, dabeiSeit, erspielteTitel, merkeErspielteTitel, FIGUREN, RAHMEN, KREATUR_MOTIVE, GRUENDE, NUR_ERFINDER, botMotivFrei } from '../../profil.js';
 import { istErfinder, hatSonderstueck, pionierNummer, ERFINDER } from '../../sonderstuecke.js';
 import { WELTEN, botNachId } from '../../bots.js';
 import { istWeltFrei, ladePartien, wertet, ladeModul } from '../../storage.js';
@@ -220,6 +220,16 @@ export function motivTeile(erfolge = teileErfolge(), erfinder = istErfinder()) {
   });
   return [...figuren, ...kreaturen];
 }
+// R19 Profil Ich (16.11.2026): Portraets der Gegner, frei mit dem ersten Sieg gegen den Bot; gesperrt sagt die Kachel, wen
+// man besiegen muss (kein Kauf, kein Preis)
+export function portraetTeile() {
+  return BOT_PORTRAETS.map((id) => {
+    const bot = botNachId(id);
+    const name = bot ? bot.name : id;
+    const frei = botMotivFrei('bot-' + id);
+    return { id: 'bot-' + id, bot: id, name, frei, weg: frei ? '' : S('portraet.weg', { name }) };
+  });
+}
 export function grundTeile(erfinder = istErfinder()) {
   return GRUENDE.map((g) => {
     const nr = Number((/^welt-(\d)$/.exec(g) || [])[1]);
@@ -231,6 +241,7 @@ export function grundTeile(erfinder = istErfinder()) {
 // kleines Vorschaubild eines Hintergrunds: wie das Profilbild ohne Motiv und Rahmen
 const grundBild = (g) => `<svg viewBox="0 0 120 120" class="pr-grund-bild" aria-hidden="true">${profilGrund(g)
   || '<rect width="120" height="120" fill="#2C3038"/><circle cx="60" cy="64" r="42" fill="#3A3F48"/><path d="M60 22a42 42 0 0 1 0 84Z" fill="#F7F3EC" opacity=".9"/>'}</svg>`;
+const portraetBild = (id) => `<img class="pr-portraet-bild" src="${new URL(`../../../assets/avatare/modern/${id}.svg`, import.meta.url).href}" alt="" loading="lazy">`;
 const kreaturBild = (k) => kreaturSvg(k, 'normal').replace(/ class="[^"]*"/g, '').replace('<svg ', '<svg class="pr-kreatur-bild" ');
 
 function waehleAussehen(app) {
@@ -244,6 +255,9 @@ function waehleAussehen(app) {
   const kreaturen = motive.filter((m) => m.art === 'kreatur').map((m) => `<button type="button" class="pr-rahmen pr-kreatur" data-figur="${m.id}"
     aria-pressed="${wahl.figur === m.id}" ${m.frei ? '' : 'disabled'}>${kreaturBild(m.id)}<b>${esc(m.name)}</b><small>${esc(m.frei
     ? (m.erfinder ? S('erfinder.name') : wahl.figur === m.id ? S('an') : S('frei')) : m.weg)}</small></button>`).join('');
+  const portraets = portraetTeile().map((m) => `<button type="button" class="pr-rahmen pr-portraet" data-figur="${m.id}"
+    aria-pressed="${wahl.figur === m.id}" ${m.frei ? '' : 'disabled'}>${portraetBild(m.bot)}<b>${esc(m.name)}</b><small>${esc(m.frei
+    ? (wahl.figur === m.id ? S('an') : S('frei')) : m.weg)}</small></button>`).join('');
   const gruende = grundTeile().map((g) => `<button type="button" class="pr-rahmen pr-grund" data-grund="${g.id}" aria-pressed="${wahl.grund === g.id}"
     ${g.frei ? '' : 'disabled'}>${grundBild(g.id)}<b>${esc(g.name)}</b><small>${esc(g.frei ? (wahl.grund === g.id ? S('an') : S('frei')) : g.weg)}</small></button>`).join('');
   const rahmen = rahmenTeile().map((r) => `<button type="button" class="pr-rahmen" data-rahmen="${r.id}" aria-pressed="${wahl.rahmen === r.id}"
@@ -251,6 +265,7 @@ function waehleAussehen(app) {
   inhalt.innerHTML = `<div class="pr-vorschau" aria-hidden="true">${floAvatar('w')}</div>
     <h4>${esc(S('profil.figur'))}</h4><div class="pr-figuren" style="--n:${motive.filter((m) => m.art === 'figur').length}">${figuren}</div>
     <h4>${esc(S('profil.kreatur'))}</h4><div class="pr-rahmen-raster pr-kreaturen">${kreaturen}</div>
+    <h4>${esc(S('profil.portraet'))}</h4><div class="pr-rahmen-raster pr-portraets">${portraets}</div>
     <h4>${esc(S('profil.grund'))}</h4><div class="pr-rahmen-raster pr-gruende">${gruende}</div>
     <h4>${esc(S('profil.rahmen'))}</h4><div class="pr-rahmen-raster">${rahmen}</div>`;
   const vorschau = () => { inhalt.querySelector('.pr-vorschau').innerHTML = floAvatar('w'); };

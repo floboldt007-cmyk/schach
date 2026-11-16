@@ -194,6 +194,37 @@ try {
       return { id: t.dataset.teil, ueber: r.left < b.left - 1 || r.right > b.right + 1, sichtbar };
     }).filter((x) => x && x.ueber && x.sichtbar === 'visible'));
     pruefe('Banner-Blatt: kein Banner ragt sichtbar aus seiner Kachel', raus.length === 0, raus);
+    await s.keyboard.press('Escape');
+
+    // ---------- Gegner-Portraets als Profilbild (eigener Commit, frei mit dem ersten Sieg gegen den Bot) ----------
+    const bp = await s.evaluate(async () => {
+      const profil = await import('/js/profil.js');
+      const thema = await import('/js/thema.js');
+      const { portraetTeile } = await import('/js/pakete/sammlung/profil.js');
+      const { KARTE_MOTIVE } = await import('/js/karte.js');
+      const teile = portraetTeile();
+      const fri = teile.find((x) => x.id === 'bot-fridolin'), lisa = teile.find((x) => x.id === 'bot-lisa');
+      profil.setzeProfilWahl({ figur: 'bot-lisa' });
+      const gesperrtWahl = profil.profilWahl().figur;
+      profil.setzeProfilWahl({ figur: 'bot-fridolin' });
+      const freiWahl = profil.profilWahl().figur;
+      profil.setzeProfilWahl({ vitrine: ['stufe-siege', 'stufe-liga', null] });
+      const bleibt = profil.profilWahl().figur;
+      const bild = thema.profilAvatar({ figur: 'bot-fridolin' }, 'w');
+      const fremd = ['bot-../x', 'bot-niemand', 'bot-FRIDOLIN', 'bot-'].map((f) => thema.profilAvatar({ figur: f }, 'w'));
+      const gegner = thema.avatarVon({ id: 'fridolin', avatar: 'x.svg' });
+      profil.setzeProfilWahl({ figur: 'P' });
+      return { n: teile.length, fri, lisa, gesperrtWahl, freiWahl, bleibt, bild: /assets\/avatare\/modern\/fridolin\.svg/.test(bild),
+        fremd: fremd.map((x) => (x.match(/data-figur="([^"]*)"/) || [])[1]), fremdOhneBild: fremd.every((x) => !/avatare/.test(x)),
+        gegner, karte: KARTE_MOTIVE.includes('bot-fridolin') };
+    });
+    pruefe('Portraets: dreissig Gegner zur Wahl', bp.n === 30, bp.n);
+    pruefe('Portraets: Fridolin (besiegt) frei, Lisa (nie gespielt) gesperrt mit Weg "Besiege"', !!(bp.fri && bp.fri.frei && bp.lisa && !bp.lisa.frei && /Besiege/.test(bp.lisa.weg)), { fri: bp.fri, lisa: bp.lisa });
+    pruefe('Portraets: gesperrtes Portraet laesst sich nicht setzen (Standard bleibt)', bp.gesperrtWahl === 'P', bp.gesperrtWahl);
+    pruefe('Portraets: freies Portraet wird Profilbild und bleibt beim Speichern der Vitrine', bp.freiWahl === 'bot-fridolin' && bp.bleibt === 'bot-fridolin', bp);
+    pruefe('Portraets: Profilbild zeichnet das Portraet aus dem festen Ordner', bp.bild);
+    pruefe('Portraets: fremde Werte fallen auf den Standard, kein Bild', bp.fremd.every((f) => f === 'P') && bp.fremdOhneBild, bp.fremd);
+    pruefe('Portraets: Gegner-Avatar unveraendert, Karte fuer andere ohne Portraet-Motiv', bp.gegner === 'assets/avatare/modern/fridolin.svg' && !bp.karte, bp);
     await k.close();
   }
 } finally {

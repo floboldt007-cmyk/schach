@@ -21,7 +21,7 @@
 //   erspielteLokalStufen() -> [id], merkeLokalStufen(ids)  Stufen der lokalen Familien (R19, ohne Server und ohne Taler)
 //   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
 //                                      Aufrufs; einmal gemerkt (bleibt beim Speichern der Wahl erhalten)
-import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien } from './storage.js';
+import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien, ladeFortschritt } from './storage.js';
 import { istErfinder } from './sonderstuecke.js';
 import { KREATUREN } from './kreaturen-kunst.js';
 
@@ -32,7 +32,19 @@ export const MOTIVE = Object.freeze([...FIGUREN, ...KREATUR_MOTIVE]);
 export const NUR_ERFINDER = Object.freeze(['K', 'kronli']);
 export const STANDARD_FIGUR = 'P';
 export const GRUENDE = Object.freeze(['standard', 'welt-1', 'welt-2', 'welt-3', 'welt-4', 'welt-5']);
-const motivErlaubt = (x) => MOTIVE.includes(x) && (!NUR_ERFINDER.includes(x) || istErfinder());
+// R19 Profil Ich (16.11.2026): das Portraet eines besiegten Bots als Profilbild, Id 'bot-<botId>', frei mit dem ersten Sieg
+// gegen ihn (erster Stern). Gezeichnet wird es nur fuer die Bots mit Portraet (js/thema.js profilAvatar); die Karte fuer
+// andere bekommt es nicht (js/karte.js KARTE_MOTIVE), dort steht der Bauer
+export const BOT_MOTIV = /^bot-([a-z0-9-]{2,30})$/;
+export function botMotivFrei(x, f = null) {
+  const m = BOT_MOTIV.exec(typeof x === 'string' ? x : '');
+  if (!m) return false;
+  try {
+    const b = (f || ladeFortschritt()).bots[m[1]];
+    return !!(b && Array.isArray(b.sterne) && b.sterne[0]);
+  } catch (e) { return false; }
+}
+const motivErlaubt = (x) => (MOTIVE.includes(x) && (!NUR_ERFINDER.includes(x) || istErfinder())) || botMotivFrei(x);
 // Ring als Farbe oder Verlauf (SVG-Farben); glanz: zweiter, feiner Innenring
 export const RAHMEN = Object.freeze({
   ohne: Object.freeze({ ring: null }),
