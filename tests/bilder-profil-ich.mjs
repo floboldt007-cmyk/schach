@@ -78,7 +78,7 @@ async function befuelle(s) {
   }, { uid: UID, kronen: KRONEN });
 }
 
-const GERAETE = [['iphone13', 390, 844], ['se', 375, 667], ['ipad-quer', 1180, 820], ['pc', 1920, 1080]];
+const GERAETE = [['iphone13', 390, 844], ['se', 375, 667], ['ipad-hoch', 820, 1180], ['ipad-quer', 1180, 820], ['pc', 1920, 1080]];
 const SCHEMATA = [['hell', 'light'], ['dunkel', 'dark']];
 const seitenfehler = [];
 
