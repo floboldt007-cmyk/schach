@@ -470,27 +470,40 @@ if (!pw) {
           await zug(s, 'e2e4');
           await s.waitForFunction(() => window.__partie.phase() === 'flo' && window.__partie.chess().history().length === 2, null, { timeout: 15000 });
           await warte(5000);
-          const a = await leseUhr(s, 'flo');
           await s.goto('about:blank');
           await s.goto(`${BASIS}#arena`);
           await s.waitForSelector('.screen.arena', { timeout: 20000 });
-          const vorher = await s.evaluate((quelle) => {
+          // Fix-Review c8 (16.11.): gerechnet aus dem GESPEICHERTEN Stand (zeiten in 100 ms, uhr.verbraucht in ms), nicht aus der
+          // Anzeige in Sekunden; dort ging eine Gutschrift von 1 s durch (Mutant M1)
+          const l0 = await s.evaluate((quelle) => {
             const l = JSON.parse(localStorage.getItem('schach-arena:v1:laufend'));
-            const v = { zeit0: l.zeiten[0], verbraucht: l.uhr.verbraucht };
+            const v = JSON.parse(JSON.stringify(l));
             (0, eval)(quelle)(l);
             localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l));
             return v;
           }, String(aendere));
           await s.evaluate(() => { window.__test = { maxWarten: 0, botPause: 30 }; window.__app.gehe('partie', { fortsetzen: true }); });
           await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.chess().history().length === 2, null, { timeout: 30000 });
+          const t0 = Date.now();
           await warte(300);
-          const b = await leseUhr(s, 'flo');
+          await s.goto('about:blank');
+          const lauf = Date.now() - t0;
+          await s.goto(`${BASIS}#arena`);
+          await s.waitForSelector('.screen.arena', { timeout: 20000 });
+          const l1 = await s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:laufend')));
+          // Rest von Flo ohne den laufenden Zug: Grund - Summe seiner zeiten + Zuschlag je Zug; der laufende Zug (verbraucht)
+          // getrennt, er darf nur um die Zeit seit dem Fortsetzen wachsen
+          const floRest = (l) => { const f = (l.zeiten || []).filter((_, i) => i % 2 === 0); return T32.grund * 1000 - f.reduce((a, x) => a + x * 100, 0) + T32.zuschlag * 1000 * f.length; };
           const verloren = /ungueltig|fehlen/.test(name);
           // erwartet: verlorener Eintrag netto 0 (also + echter Wert - Zuschlag), alles andere wie vor dem Schliessen
-          const erwartet = verloren ? vorher.zeit0 * 100 - T32.zuschlag * 1000 : 0;
-          assert.ok(vorher.verbraucht >= 4000, `Probe braucht einen laufenden Zug mit verbraucht: ${JSON.stringify(vorher)}`);
-          assert.ok(Math.abs((b.ms - a.ms) - erwartet) <= 1300,
-            `${a.text} -> ${b.text}: Differenz ${b.ms - a.ms} ms, erwartet ${erwartet} ms (gespeichert ${JSON.stringify(vorher)})`);
+          const erwartet = verloren ? l0.zeiten[0] * 100 - T32.zuschlag * 1000 : 0;
+          const anstieg = floRest(l1) - floRest(l0);
+          const dVerbraucht = l1.uhr.verbraucht - l0.uhr.verbraucht;
+          assert.ok(l0.uhr.verbraucht >= 4000, `Probe braucht einen laufenden Zug mit verbraucht: ${JSON.stringify(l0.uhr)}`);
+          assert.ok(Math.abs(anstieg - erwartet) <= 300,
+            `Rest aus zeiten: Anstieg ${anstieg} ms, erwartet ${erwartet} ms (vorher ${JSON.stringify(l0.zeiten)}, nachher ${JSON.stringify(l1.zeiten)})`);
+          assert.ok(dVerbraucht >= 0 && dVerbraucht <= lauf + 300,
+            `laufender Zug: verbraucht ${l0.uhr.verbraucht} -> ${l1.uhr.verbraucht} ms, seit dem Fortsetzen ${lauf} ms`);
         } finally { await k.close(); }
       });
     }
