@@ -451,12 +451,16 @@ if (!pw) {
     // Vertrag (Entscheid Hauptfenster 16.11.2026, rueckholbar): der verlorene Eintrag kostet genau den Zuschlag (netto 0,
     // seinen echten Wert kennt nach dem Rueckschritt niemand), verbraucht bleibt verbraucht, sonst kein Gewinn und keine
     // Strafe. Erwartet ist also: Flos Uhr steigt genau um den echten Wert des verlorenen Eintrags minus den Zuschlag.
-    const zurueck = (l) => { l.gestartet = new Date(Date.now() + 3600e3).toISOString(); l.uhr.seit = Date.now() + 3600e3; };
+    // die Aenderung laeuft als Quelltext in der Seite (String(aendere)), darum steht der Rueckschritt in jeder Zeile selbst
     for (const [name, aendere, ungewertet] of [
-      ['Uhr zurueck, ungewertet, alle Eintraege gueltig: Rest bleibt', (l) => { zurueck(l); }, true],
-      ['Uhr zurueck, ungewertet, zeiten[0] ungueltig: der laufende Zug behaelt verbraucht', (l) => { zurueck(l); l.zeiten[0] = -1; }, true],
-      ['Uhr zurueck, ungewertet, zeiten fehlen: der laufende Zug behaelt verbraucht', (l) => { zurueck(l); delete l.zeiten; }, true],
-      ['Uhr zurueck, gewertet, zeiten[0] ungueltig: der laufende Zug behaelt verbraucht', (l) => { zurueck(l); l.zeiten[0] = -1; }, false],
+      ['Uhr zurueck, ungewertet, alle Eintraege gueltig: Rest bleibt',
+        (l) => { l.gestartet = new Date(Date.now() + 3600e3).toISOString(); l.uhr.seit = Date.now() + 3600e3; }, true],
+      ['Uhr zurueck, ungewertet, zeiten[0] ungueltig: der laufende Zug behaelt verbraucht',
+        (l) => { l.gestartet = new Date(Date.now() + 3600e3).toISOString(); l.uhr.seit = Date.now() + 3600e3; l.zeiten[0] = -1; }, true],
+      ['Uhr zurueck, ungewertet, zeiten fehlen: der laufende Zug behaelt verbraucht',
+        (l) => { l.gestartet = new Date(Date.now() + 3600e3).toISOString(); l.uhr.seit = Date.now() + 3600e3; delete l.zeiten; }, true],
+      ['Uhr zurueck, gewertet, zeiten[0] ungueltig: der laufende Zug behaelt verbraucht',
+        (l) => { l.gestartet = new Date(Date.now() + 3600e3).toISOString(); l.uhr.seit = Date.now() + 3600e3; l.zeiten[0] = -1; }, false],
     ]) {
       await pruefe(name, async () => {
         const { k, s } = await neueSeite(browser);
