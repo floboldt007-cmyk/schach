@@ -153,6 +153,32 @@ async function testeMomente(browser, d) {
     });
     pruefe('Momente direkt unter der Navigation, vor Coach und Verlauf', m.momente > m.navi && m.momente < m.coach && m.momente < m.kurve, JSON.stringify(m));
     pruefe('Kein waagrechter Ueberlauf der Seite', m.ueber <= 0, JSON.stringify(m));
+    // Kaltreview b4 16.11. (Befund 1, Entscheidung A): ohne Scrollen sind die Momente (SE: kompakte Zeile ueber dem Brett,
+    // iPhone 13: die erste Karte) UND das ganze Brett im Bild
+    const o = await seite.evaluate(() => {
+      const r = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), left: Math.round(b.left), right: Math.round(b.right), h: Math.round(b.height) }; };
+      const zeile = document.querySelector('.an-momente-zeile');
+      const sichtbar = !!zeile && getComputedStyle(zeile).display !== 'none';
+      const ganz = (b) => !!b && b.h > 0 && b.top >= 0 && b.bottom <= innerHeight + 0.5 && b.left >= -0.5 && b.right <= innerWidth + 0.5;
+      const eintraege = sichtbar ? [...zeile.querySelectorAll('.an-mz')].map((e) => Math.round(e.getBoundingClientRect().height)) : [];
+      const momente = sichtbar ? r(zeile) : r(document.querySelector('.an-moment'));
+      const brett = r(document.querySelector('.an-brett-rahmen'));
+      return { zeile: sichtbar, momente, brett, eintraege, momenteGanz: ganz(momente), brettGanz: ganz(brett),
+        scroll: document.querySelector('.an-screen').scrollTop + scrollY, hoehe: innerHeight };
+    });
+    pruefe('Ohne Scrollen: Momente ganz im Bild', o.scroll === 0 && o.momenteGanz, JSON.stringify(o));
+    pruefe('Ohne Scrollen: Brett ganz im Bild', o.scroll === 0 && o.brettGanz, JSON.stringify(o));
+    pruefe(name === 'iPhone SE' ? 'SE: kompakte Zeile ueber dem Brett, Eintraege mindestens 44 px' : 'iPhone 13: grosse Karten, keine Zeile',
+      name === 'iPhone SE' ? o.zeile && o.eintraege.length >= 2 && o.eintraege.every((x) => x >= 44) && o.momente.bottom <= o.brett.top : !o.zeile,
+      JSON.stringify(o));
+    if (o.zeile) {
+      const ziel = await seite.locator('.an-momente-zeile .an-mz').nth(1);
+      const ply = Number(await ziel.getAttribute('data-ply'));
+      await ziel.click();
+      await warte(500);
+      const an = await seite.evaluate(() => [...document.querySelectorAll('.an-momente-zeile .an-mz.an')].map((e) => Number(e.dataset.ply)));
+      pruefe('SE: Antippen in der Zeile springt zum Moment', an.length === 1 && an[0] === ply, `${ply} ${JSON.stringify(an)}`);
+    }
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -260,6 +286,24 @@ async function testeAbspielen(browser, d) {
     const t2 = (await tempo.textContent()).trim();
     const gemerkt = await seite.evaluate((k) => localStorage.getItem(k), TEMPO_MERKER);
     pruefe('Tempo waehlbar (drei Stufen) und gemerkt', new Set([t0, t1, t2]).size === 3 && !!gemerkt, `${t0} | ${t1} | ${t2} | ${gemerkt}`);
+    // Kaltreview b4 16.11. (Warnung): Tempo waehrend der Variante umstellen gilt ab dem naechsten Schritt
+    // (Kommentar an wechsleTempo). Start auf Zuegig (1000 ms), nach zwei Zuegen auf Ruhig (2400 ms).
+    const lang = await seite.evaluate((id) => (testseite.speicher.ladeReview(id).zuege.find((x) => (x.besteLinie || []).length >= 6) || {}).ply, d.oper);
+    pruefe('Partie hat eine Variante mit mindestens 6 Zuegen', Number.isInteger(lang), String(lang));
+    if (Number.isInteger(lang)) {
+      await oeffneAnalyse(seite, d, `&ply=${lang}`);
+      const vorher = zeitenVon(seite, '.an-coach .an-c-eval', 3, 6000);
+      await seite.click('.an-coach [data-aktion="variante"]');
+      await vorher;
+      await seite.click('.an-navi [data-aktion="tempo"]');
+      await seite.click('.an-navi [data-aktion="tempo"]');
+      const stufe = (await tempo.textContent()).trim();
+      const danach = await zeitenVon(seite, '.an-coach .an-c-eval', 3, 9000);
+      // der schon geplante Schritt laeuft noch im alten Takt, danach gilt Ruhig
+      const abst = danach.slice(1).map((x, i) => Math.round(x - danach[i]));
+      pruefe('Tempo waehrend der Variante umgestellt: naechste Schritte im neuen Takt', /Ruhig/.test(stufe) && abst.length >= 1 && abst.every((a) => a >= 2000),
+        `${stufe} ${JSON.stringify(abst)}`);
+    }
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }

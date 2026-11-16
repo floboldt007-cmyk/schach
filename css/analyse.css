@@ -292,6 +292,22 @@
 .an-moment.an { box-shadow: 0 0 0 2px var(--kt), var(--s1); }
 @media (hover: hover) { .an-moment.knopf:hover { box-shadow: 0 0 0 1px var(--kt), var(--s1); } }
 .an-momente-leer { font-size: 14px; color: var(--text-2); padding: 4px 2px; }
+/* Kompakte Momente-Zeile ueber dem Brett, nur auf kurzen Hochformaten (Entscheidung A, e7 16.11.): je Moment Symbol und
+   Zug, Kante in der Klassen-Textfarbe wie die Karten, mindestens 44 px hoch; nur die Zeile wischt, nie die Seite */
+.an-momente-zeile { display: none; }
+@media (orientation: portrait) and (max-height: 700px) {
+  .an-momente-zeile { order: 1; display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+    scrollbar-width: none; margin-inline: -10px; padding: 3px 10px; }
+  .an-momente-zeile::-webkit-scrollbar { display: none; }
+  .an-mz.knopf { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; height: 44px; padding: 0 12px 0 8px;
+    border-radius: 12px; scroll-snap-align: start; white-space: nowrap; color: var(--text); background: var(--flaeche-2);
+    border: 1.5px solid var(--kt); box-shadow: none; }
+  .an-mz.knopf.du { background: var(--flaeche); box-shadow: var(--s1); }
+  .an-mz .an-sym { width: 28px; height: 28px; }
+  .an-mz .an-sym svg { display: block; width: 100%; height: 100%; }
+  .an-mz-zug { font-family: var(--display); font-size: 15px; font-weight: var(--gw-titel); letter-spacing: -.01em; }
+  .an-mz.an { box-shadow: 0 0 0 2px var(--kt); }
+}
 
 /* ---------- Klassen-Zaehler ---------- */
 .an-klassen { padding: 8px 16px 6px; }

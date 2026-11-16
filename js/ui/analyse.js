@@ -732,7 +732,17 @@ export function zeige(root, params = {}, app) {
       </button>`;
     }).join('');
     const titel = esc(t('analyse.an.momente.titel'));
-    return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}">${karten}</div></div>`;
+    // Kaltreview b4 16.11., Entscheidung A (e7): auf kurzen Hochformaten (iPhone SE) passen Brett und erste Karte nicht
+    // zugleich ins Bild; dort steht ueber dem Brett eine kompakte Zeile (Symbol und Zug), die Karten bleiben darunter.
+    // Sonst ist die Zeile display:none (css/analyse.css), also weder sichtbar noch fokussierbar.
+    const zeile = plies.map((p) => {
+      const z = st.zuege[p];
+      const wer = zuzweit() ? personenName(z.farbe) : z.farbe === st.sf ? t('analyse.an.genau.du') : gegnerKurz();
+      return `<button class="knopf an-mz${z.farbe === st.sf ? ' du' : ''}" type="button" data-aktion="moment" data-ply="${p}" data-klasse="${esc(z.klasse)}"
+        aria-label="${esc(zugText(z))}, ${esc(KLASSEN_NAME[z.klasse])}, ${esc(wer)}">${symbolDeckend(z.klasse)}<span class="an-mz-zug">${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
+    }).join('');
+    return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}">${karten}</div></div>`
+      + `<div class="an-momente-zeile" role="group" aria-label="${titel}">${zeile}</div>`;
   }
 
   function klassenHtml() {
@@ -885,19 +895,20 @@ export function zeige(root, params = {}, app) {
   }
 
   function zeigeMomente() {
-    const box = koerper.querySelector('.an-momente');
-    if (!box) return;
-    let aktiv = null;
-    for (const k of box.querySelectorAll('.an-moment')) {
-      const an = Number(k.dataset.ply) === st.ply;
-      k.classList.toggle('an', an);
-      k.setAttribute('aria-pressed', an ? 'true' : 'false');
-      if (an) aktiv = k;
-    }
-    if (aktiv && box.scrollWidth > box.clientWidth) {
-      const l = aktiv.offsetLeft - box.offsetLeft;
-      if (l < box.scrollLeft || l + aktiv.offsetWidth > box.scrollLeft + box.clientWidth) {
-        box.scrollTo({ left: Math.max(0, l - 24), behavior: reduziert() ? 'auto' : 'smooth' });
+    // Karten und (auf kurzen Hochformaten) die kompakte Zeile ueber dem Brett
+    for (const box of koerper.querySelectorAll('.an-momente, .an-momente-zeile')) {
+      let aktiv = null;
+      for (const k of box.querySelectorAll('[data-aktion="moment"]')) {
+        const an = Number(k.dataset.ply) === st.ply;
+        k.classList.toggle('an', an);
+        k.setAttribute('aria-pressed', an ? 'true' : 'false');
+        if (an) aktiv = k;
+      }
+      if (aktiv && box.scrollWidth > box.clientWidth) {
+        const l = aktiv.offsetLeft - box.offsetLeft;
+        if (l < box.scrollLeft || l + aktiv.offsetWidth > box.scrollLeft + box.clientWidth) {
+          box.scrollTo({ left: Math.max(0, l - 24), behavior: reduziert() ? 'auto' : 'smooth' });
+        }
       }
     }
   }
@@ -1022,7 +1033,8 @@ export function zeige(root, params = {}, app) {
     }
     koerper.querySelector('.an-brettzone').classList.add('variante');
     etikett(t('analyse.an.variante'));
-    const takt = TEMPO[st.tempo];
+    // Takt je Schritt neu lesen: ein Tempowechsel gilt ab dem naechsten Schritt (wechsleTempo, Kaltreview b4 16.11.)
+    const takt = () => TEMPO[st.tempo];
     const weiter = () => {
       if (st.variante !== v) return;
       const s = v.schritte[v.i];
@@ -1037,10 +1049,10 @@ export function zeige(root, params = {}, app) {
       for (const sp of coach.querySelectorAll('.an-c-zuege [data-i]')) sp.classList.toggle('an', Number(sp.dataset.i) === v.i - 1);
       etikett(t('analyse.an.variante.stand', { i: v.i, n: v.schritte.length }));
       if (s.farbe === z.farbe) spieleKlang({ san: s.san });
-      if (v.i < v.schritte.length) v.timer = nach(takt, weiter);
+      if (v.i < v.schritte.length) v.timer = nach(takt(), weiter);
       else etikett(t('analyse.an.variante.stand', { i: v.schritte.length, n: v.schritte.length }));
     };
-    v.timer = nach(Math.round(takt * 0.7), weiter);
+    v.timer = nach(Math.round(takt() * 0.7), weiter);
   }
 
   // Stand der Variante im Chip oben rechts in der Coach-Karte (statt der Bewertung)

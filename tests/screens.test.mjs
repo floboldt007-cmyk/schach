@@ -113,8 +113,9 @@ const ueberlauf = (seite) => seite.evaluate(() => {
   const raus = [...document.querySelectorAll('.screen *')].filter((el) => {
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) return false;
-    // Leisten zum Wischen ragen absichtlich hinaus (Momente der Analyse, Menue der Einstellungen auf dem Handy)
-    if (el.closest('.an-momente, .vl-dialog-hg, .es-nav')) return false;
+    // Leisten zum Wischen ragen absichtlich hinaus (Momente der Analyse samt kompakter Zeile auf kurzen Handys, Menue der
+    // Einstellungen auf dem Handy)
+    if (el.closest('.an-momente, .an-momente-zeile, .vl-dialog-hg, .es-nav')) return false;
     return r.right > innerWidth + 1 || r.left < -1;
   }).slice(0, 3).map((el) => el.className.baseVal ?? el.className);
   return { doc, scr, raus };
