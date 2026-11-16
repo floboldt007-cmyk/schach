@@ -445,6 +445,52 @@ if (!pw) {
       });
     }
 
+    // Fix-Review c8 (ce3d308): Geraeteuhr eine Stunde zurueck (gestartet und uhr.seit in der Zukunft) plus ein unbekannter
+    // Eintrag von Flo. js/storage.js setzt gestartet dann auf jetzt, die Wanduhr seit Start ist 0, und der laufende Zug
+    // verlor sein gueltiges uhr.verbraucht: die ganze Denkzeit kam zurueck (Probe c8: 2:45 -> 3:02, +17 s).
+    // Vertrag (Entscheid Hauptfenster 16.11.2026, rueckholbar): der verlorene Eintrag kostet genau den Zuschlag (netto 0,
+    // seinen echten Wert kennt nach dem Rueckschritt niemand), verbraucht bleibt verbraucht, sonst kein Gewinn und keine
+    // Strafe. Erwartet ist also: Flos Uhr steigt genau um den echten Wert des verlorenen Eintrags minus den Zuschlag.
+    const zurueck = (l) => { l.gestartet = new Date(Date.now() + 3600e3).toISOString(); l.uhr.seit = Date.now() + 3600e3; };
+    for (const [name, aendere, ungewertet] of [
+      ['Uhr zurueck, ungewertet, alle Eintraege gueltig: Rest bleibt', (l) => { zurueck(l); }, true],
+      ['Uhr zurueck, ungewertet, zeiten[0] ungueltig: der laufende Zug behaelt verbraucht', (l) => { zurueck(l); l.zeiten[0] = -1; }, true],
+      ['Uhr zurueck, ungewertet, zeiten fehlen: der laufende Zug behaelt verbraucht', (l) => { zurueck(l); delete l.zeiten; }, true],
+      ['Uhr zurueck, gewertet, zeiten[0] ungueltig: der laufende Zug behaelt verbraucht', (l) => { zurueck(l); l.zeiten[0] = -1; }, false],
+    ]) {
+      await pruefe(name, async () => {
+        const { k, s } = await neueSeite(browser);
+        try {
+          await starte(s, ungewertet ? { botId: 'benno', farbe: 'w', tempo: T32 } : { botId: 'benno', farbe: 'w', tempo: T32, ki: true, kiRef: KI_REF });
+          await warte(7000);
+          await zug(s, 'e2e4');
+          await s.waitForFunction(() => window.__partie.phase() === 'flo' && window.__partie.chess().history().length === 2, null, { timeout: 15000 });
+          await warte(5000);
+          const a = await leseUhr(s, 'flo');
+          await s.goto('about:blank');
+          await s.goto(`${BASIS}#arena`);
+          await s.waitForSelector('.screen.arena', { timeout: 20000 });
+          const vorher = await s.evaluate((quelle) => {
+            const l = JSON.parse(localStorage.getItem('schach-arena:v1:laufend'));
+            const v = { zeit0: l.zeiten[0], verbraucht: l.uhr.verbraucht };
+            (0, eval)(quelle)(l);
+            localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l));
+            return v;
+          }, String(aendere));
+          await s.evaluate(() => { window.__test = { maxWarten: 0, botPause: 30 }; window.__app.gehe('partie', { fortsetzen: true }); });
+          await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.chess().history().length === 2, null, { timeout: 30000 });
+          await warte(300);
+          const b = await leseUhr(s, 'flo');
+          const verloren = /ungueltig|fehlen/.test(name);
+          // erwartet: verlorener Eintrag netto 0 (also + echter Wert - Zuschlag), alles andere wie vor dem Schliessen
+          const erwartet = verloren ? vorher.zeit0 * 100 - T32.zuschlag * 1000 : 0;
+          assert.ok(vorher.verbraucht >= 4000, `Probe braucht einen laufenden Zug mit verbraucht: ${JSON.stringify(vorher)}`);
+          assert.ok(Math.abs((b.ms - a.ms) - erwartet) <= 1300,
+            `${a.text} -> ${b.text}: Differenz ${b.ms - a.ms} ms, erwartet ${erwartet} ms (gespeichert ${JSON.stringify(vorher)})`);
+        } finally { await k.close(); }
+      });
+    }
+
     // Fix-Review 07 (ab98f60): nach dem Fortsetzen fehlte der Teil des Zugs vor dem Schliessen im gespeicherten Stand; zweimal
     // zu und auf brachte ihn zurueck (Probe: 2:52 -> 2:56, zeiten[0] 1 s bei 12 s Denkzeit)
     const zuUndFort = async (s) => {
