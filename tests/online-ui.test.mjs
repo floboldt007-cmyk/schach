@@ -875,9 +875,10 @@ try {
       && woaGespeichert.grund === 'matt' && woaGespeichert.zuzweit?.weiss === 'Gegner_2' && woaGespeichert.zuege?.length === 7, woaGespeichert);
   await seite.evaluate(() => window.__app.gehe('verlauf'));
   await seite.waitForFunction(() => document.querySelector('.vl-screen .vl-zeile'), null, { timeout: 8000 }).catch(() => {});
+  // R19 Verlauf: das Ergebnis in Worten steht im Knopf-Label der Zeile, das Zeichen ist nur Bild
   const woaZeile = await seite.evaluate(id => {
     const z = document.querySelector(`.vl-screen .vl-zeile[data-id="on-${id}"]`);
-    return z ? { name: z.querySelector('.vl-name')?.textContent, chip: z.querySelector('.vl-uebung')?.textContent, erg: z.querySelector('.vl-ergebnis')?.textContent,
+    return z ? { name: z.querySelector('.vl-name')?.textContent, chip: z.querySelector('.vl-uebung')?.textContent, erg: z.querySelector('.vl-oeffnen')?.getAttribute('aria-label'),
       farbe: z.querySelector('.vl-z3')?.textContent } : null;
   }, woa.id);
   pruefe('W-online-analyse: Meine Partien zeigt sie mit Kennzeichen "Online", Gegnername, Niederlage und eigener Farbe',

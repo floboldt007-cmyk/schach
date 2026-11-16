@@ -609,7 +609,8 @@ async function testeVerlauf(browser, d) {
   await oeffne(seite, 'screen=verlauf');
   const anzahl = await seite.evaluate(() => testseite.speicher.ladePartien().length);
   pruefe('Liste zeigt alle Partien', (await seite.locator('.vl-zeile').count()) === anzahl && anzahl >= 2, String(anzahl));
-  const erste = await seite.locator('.vl-zeile').first().textContent();
+  // R19 Verlauf: das Ergebnis in Worten steht im Knopf-Label (das Zeichen ist nur Bild), darum Label plus sichtbarer Text
+  const erste = `${await seite.locator('.vl-zeile .vl-oeffnen').first().getAttribute('aria-label')} ${await seite.locator('.vl-zeile').first().textContent()}`;
   pruefe('Zeile: Name, Ergebnis, Genauigkeit, Datum, Eröffnung, Züge',
     /Sieg|Niederlage|Remis/.test(erste) && /%/.test(erste) && /Züge/.test(erste) && /(Heute|Gestern|\d{4}),/.test(erste), erste.replace(/\s+/g, ' '));
   pruefe('Sterne je Partie', (await seite.locator('.vl-zeile').first().locator('.vl-sterne span').count()) === 3);
