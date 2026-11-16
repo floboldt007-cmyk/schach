@@ -1,6 +1,6 @@
 // Bilder des Profils "Ich" (R19 Profil Ich, 15.11.2026): Seite Ich mit Karte und Vitrine, Blatt "Profil aendern" (Figuren,
 // Kreaturen, Profilbilder, Gruende, Rahmen), Blatt Banner und Blatt Figuren auf iPhone 13, iPhone SE, iPad quer und PC,
-// hell und dunkel, angemeldet, mit erfundenem Spielstand (vier Siege, Level 12, Knight II). Kein Teil von tests/alle.mjs.
+// hell und dunkel, angemeldet als Erfinder-Konto wie Flo, mit erfundenem Spielstand (vier Siege, Level 12, Knight II). Kein Teil von tests/alle.mjs.
 // Netzwerk ausschliesslich simuliert: jede Anfrage an *.supabase.co beantwortet die Attrappe unten.
 //
 //   node tests/bilder-profil-ich.mjs --bilder=<ordner> [--vor]   Bilder [vorher-]<geraet>-<hell|dunkel>-<ansicht>.png
@@ -50,6 +50,8 @@ const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
 const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID })).toString('base64url') + '.x', refresh_token: 'r1',
   expires_at: 9999999999, user: { id: UID, email: 'probe@example.invalid' } };
 const KRONEN = { stufe: 7, kronen: 381, platz: 3, n: 30, ziel: 355 };
+// Erfinder-Konto wie Flo (tests/funktion-shop-skin.test.mjs): erst mit mehr als einem Figurensatz gibt es den Platz Figuren
+const STUECKE = ['erfinder-titel', 'erfinder-figuren-blaupause'];
 
 // Spielstand im Geraet: sechs Partien (vier Siege), Level 12, Vitrine mit Siegen und Level, ein Platz leer
 async function befuelle(s) {
@@ -116,9 +118,10 @@ try {
         if (r.request().url().includes('/auth/v1/')) return antwort({ id: UID, email: 'probe@example.invalid' });
         if (r.request().url().includes('/rest/v1/profile')) return antwort([{ id: UID, benutzername: 'flo' }]);
         if (name === 'kronen_mein_stand') return antwort(KRONEN);
+        if (new URL(r.request().url()).pathname === '/rest/v1/sonderstuecke') return antwort(STUECKE.map((stueck_id) => ({ stueck_id })));
         return antwort([]);
       });
-      await k.addInitScript(({ sitzung, modus }) => {
+      await k.addInitScript(({ sitzung, modus, uid, stuecke }) => {
         if (sessionStorage.getItem('profil-bild')) return;
         sessionStorage.setItem('profil-bild', '1');
         localStorage.clear();
@@ -126,7 +129,8 @@ try {
         localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ modus, sprache: 'de', spracheGewaehlt: true, bewegung: 'aus',
           klang: false, duellIntro: 'aus' }));
         localStorage.setItem('schach-arena:v1:hinweis-installieren', '1');
-      }, { sitzung: SITZUNG, modus });
+        localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: stuecke }));
+      }, { sitzung: SITZUNG, modus, uid: UID, stuecke: STUECKE });
       const s = await k.newPage(); s.setDefaultTimeout(15000);
       s.on('pageerror', (e) => seitenfehler.push(`${gruppeName}: ${e.message}`));
       try {
@@ -139,6 +143,9 @@ try {
         await s.waitForFunction(() => history.state && history.state.name === 'ich', null, { timeout: 15000 });
         await s.reload();
         await s.waitForSelector('.pr-karte', { timeout: 30000 });
+        // der Liga-Stand schaltet Erfolge frei: deren Momente legen sich ueber die Seite (wie tests/funktion-shop-skin.test.mjs)
+        await s.waitForSelector('.st-moment', { timeout: 2500 }).catch(() => {});
+        for (let i = 0; i < 12 && await s.locator('.st-moment .st-weiter').count(); i++) { await s.locator('.st-moment .st-weiter').first().click(); await warte(250); }
         await s.waitForFunction(() => [...document.querySelectorAll('img')].every((i) => i.complete), null, { timeout: 10000 }).catch(() => {});
         await warte(800);
         pruefe(`${gruppeName}: Vitrine mit zwei Orden`, (await s.locator('.pr-orden:not(.leer)').count()) === 2, await s.locator('.pr-orden:not(.leer)').count());

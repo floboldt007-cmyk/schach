@@ -96,6 +96,9 @@ async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', beweg
   await s.waitForFunction(() => history.state && history.state.name === 'ich', null, { timeout: 15000 });
   await s.reload();
   await s.waitForSelector('.pr-karte', { timeout: 30000 });
+  // der Liga-Stand schaltet Erfolge frei: deren Momente legen sich ueber die Seite (wie tests/funktion-shop-skin.test.mjs)
+  await s.waitForSelector('.st-moment', { timeout: 2500 }).catch(() => {});
+  for (let i = 0; i < 12 && await s.locator('.st-moment .st-weiter').count(); i++) { await s.locator('.st-moment .st-weiter').first().click(); await warte(250); }
   // die Rang-Stufe kommt vom (nachgebauten) Server: warten, bis der Chip steht
   await s.waitForSelector('.pr-chip-krone', { timeout: 10000 }).catch(() => {});
   await s.waitForFunction(() => [...document.querySelectorAll('img')].every((i) => i.complete), null, { timeout: 10000 }).catch(() => {});
