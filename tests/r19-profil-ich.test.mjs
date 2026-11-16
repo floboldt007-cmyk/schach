@@ -219,7 +219,7 @@ try {
         gegner, karte: KARTE_MOTIVE.includes('bot-fridolin') };
     });
     pruefe('Portraets: dreissig Gegner zur Wahl', bp.n === 30, bp.n);
-    pruefe('Portraets: Fridolin (besiegt) frei, Lisa (nie gespielt) gesperrt mit Weg "Besiege"', !!(bp.fri && bp.fri.frei && bp.lisa && !bp.lisa.frei && /Besiege/.test(bp.lisa.weg)), { fri: bp.fri, lisa: bp.lisa });
+    pruefe('Portraets: Fridolin (besiegt) frei, Lisa (nie gespielt) gesperrt mit Weg "Erster Sieg: <Name>" (Namen tragen teils ihren Artikel, "Besiege Der Stockfisch")', !!(bp.fri && bp.fri.frei && bp.lisa && !bp.lisa.frei && /^Erster Sieg: Lisa/.test(bp.lisa.weg)), { fri: bp.fri, lisa: bp.lisa });
     pruefe('Portraets: gesperrtes Portraet laesst sich nicht setzen (Standard bleibt)', bp.gesperrtWahl === 'P', bp.gesperrtWahl);
     pruefe('Portraets: freies Portraet wird Profilbild und bleibt beim Speichern der Vitrine', bp.freiWahl === 'bot-fridolin' && bp.bleibt === 'bot-fridolin', bp);
     pruefe('Portraets: Profilbild zeichnet das Portraet aus dem festen Ordner', bp.bild);
