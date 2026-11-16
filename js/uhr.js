@@ -1,6 +1,7 @@
 // R19 Uhr (Flo 15.11.2026: "die Uhr lief auch in der Partie nicht"; W0+b). Schachuhr ohne DOM und ohne eigene Zeit:
 // jede Zeit kommt als Argument (ms, z. B. performance.now() oder Date.now()), so rechnet sie im Test wie in der App.
-//   neueUhr({ grund, zuschlag, amZug, w?, b? })   grund/zuschlag in Sekunden; w/b: Rest in ms (Fortsetzen)
+//   neueUhr({ grund, zuschlag, amZug, w?, b?, imZug? })   grund/zuschlag in Sekunden; w/b: Rest in ms (Fortsetzen) OHNE
+//     den laufenden Zug; imZug: davon schon verbraucht (Fortsetzen), zaehlt in rest, imZug und zug wie eine Pause davor
 //     -> { starte(jetzt), zug(jetzt) -> verbraucht ms, halte(jetzt), weiter(jetzt), rest(farbe, jetzt),
 //          abgelaufen(jetzt) -> 'w' | 'b' | null, amZug, laeuft, imZug(jetzt) }
 //     zug: zieht dem Ziehenden die Zeit seit dem Start seines Zugs ab (Pausen zaehlen nicht), gibt ihm den Zuschlag
@@ -10,17 +11,20 @@
 //     zeiten = verbrauchte Zehntelsekunden je Halbzug (Speicherfeld, js/storage.js). laufVerbraucht: im laufenden Zug
 //     schon verbraucht (Bot-Partie, die Uhr hielt beim Schliessen an); laufSeit + jetzt: Wanduhr seit Beginn des
 //     laufenden Zugs (gewertete KI-Partie, die Uhr laeuft weiter wie online).
+//   laufAnteil({ laufVerbraucht?, laufSeit?, jetzt? }) -> ms >= 0   der laufende Zug allein (dieselbe Regel wie oben)
 //   zeitErgebnis(fen, abgelaufen) -> 'w' | 'b' | 'remis'
 //     Der Gegner der Seite ohne Zeit gewinnt, ausser er hat nur den Koenig oder Koenig und eine Leichtfigur (dann
 //     Remis). ANNAHME: die vereinfachte Regel der grossen Schachseiten, keine Pruefung auf Hilfsmatt.
 const gegner = (f) => (f === 'w' ? 'b' : 'w');
 
-export function neueUhr({ grund, zuschlag, amZug, w, b }) {
+export function neueUhr({ grund, zuschlag, amZug, w, b, imZug: schon }) {
   const plus = zuschlag * 1000;
   const rest = { w: Number.isFinite(w) ? w : grund * 1000, b: Number.isFinite(b) ? b : grund * 1000 };
   let dran = amZug === 'b' ? 'b' : 'w';
   let seit = null;       // Start des laufenden Abschnitts, null = steht
-  let vorher = 0;        // in diesem Zug vor einer Pause verbraucht
+  // in diesem Zug vor einer Pause verbraucht; beim Fortsetzen der Teil vor dem Schliessen, sonst fehlte er im naechsten
+  // Speicherstand und zweimal zu und auf brachte ihn zurueck (Fix-Review 07)
+  let vorher = Number.isFinite(schon) && schon > 0 ? schon : 0;
   const imZug = (jetzt) => vorher + (seit == null ? 0 : jetzt - seit);
   return {
     get amZug() { return dran; },
@@ -63,12 +67,15 @@ export function restAusZeiten(tempo, zeiten, { startFarbe, laufVerbraucht, laufS
     rest[dran] = Math.max(0, rest[dran] - zehntel * 100) + tempo.zuschlag * 1000;
     dran = gegner(dran);
   }
-  let lauf = 0;
-  // gespeicherte Werte nie als Zeitgewinn lesen (negativ oder eine Startzeit in der Zukunft zaehlt 0)
-  if (Number.isFinite(laufVerbraucht)) lauf = Math.max(0, laufVerbraucht);
-  else if (Number.isFinite(laufSeit) && Number.isFinite(jetzt)) lauf = Math.max(0, jetzt - laufSeit);
-  rest[dran] = Math.max(0, rest[dran] - lauf);
+  rest[dran] = Math.max(0, rest[dran] - laufAnteil({ laufVerbraucht, laufSeit, jetzt }));
   return { w: rest.w, b: rest.b, amZug: dran };
+}
+
+export function laufAnteil({ laufVerbraucht, laufSeit, jetzt } = {}) {
+  // gespeicherte Werte nie als Zeitgewinn lesen (negativ oder eine Startzeit in der Zukunft zaehlt 0)
+  if (Number.isFinite(laufVerbraucht)) return Math.max(0, laufVerbraucht);
+  if (Number.isFinite(laufSeit) && Number.isFinite(jetzt)) return Math.max(0, jetzt - laufSeit);
+  return 0;
 }
 
 export function zeitErgebnis(fen, abgelaufen) {

@@ -112,6 +112,28 @@ if (U) {
     assert.equal(u.rest('b', 500), 239000); assert.equal(u.rest('w', 500), 294000);
   });
 
+  // Fix-Review 07 (ab98f60): nach dem Fortsetzen fehlte der Teil des laufenden Zugs vor dem Schliessen in imZug, zug und
+  // damit in uhr.verbraucht/seit und zeiten; zweimal zu und auf brachte ihn zurueck
+  await pruefe('neueUhr mit imZug: der schon verbrauchte Teil des Zugs zaehlt in rest, imZug und zug', () => {
+    const u = U.neueUhr({ ...T, amZug: 'w', imZug: 8000 });
+    assert.equal(u.rest('w', 0), 292000, 'vor dem Start schon abgezogen');
+    assert.equal(u.imZug(0), 8000);
+    u.starte(1000);
+    assert.equal(u.imZug(4000), 11000);
+    assert.equal(u.zug(4000), 11000, 'der Zug bucht den ganzen Zug');
+    assert.equal(u.rest('w', 5000), 292000, '300 - 11 + 3 Zuschlag');
+    for (const kaputt of [-5, NaN, Infinity, undefined]) assert.equal(U.neueUhr({ ...T, amZug: 'w', imZug: kaputt }).imZug(0), 0, String(kaputt));
+  });
+
+  await pruefe('laufAnteil: verbraucht vor Wanduhr, nie negativ, Zukunft zaehlt 0', () => {
+    assert.equal(typeof U.laufAnteil, 'function', 'laufAnteil fehlt');
+    assert.equal(U.laufAnteil({ laufVerbraucht: 4000 }), 4000);
+    assert.equal(U.laufAnteil({ laufVerbraucht: -4000 }), 0);
+    assert.equal(U.laufAnteil({ laufSeit: 1000, jetzt: 61000 }), 60000);
+    assert.equal(U.laufAnteil({ laufSeit: 9000, jetzt: 1000 }), 0);
+    assert.equal(U.laufAnteil({}), 0);
+  });
+
   const K_GEGEN = (schwarz) => `${schwarz}/8/8/8/8/8/8/4K3 w - - 0 1`;
   await pruefe('Zeitergebnis: Gegner mit Mattmaterial gewinnt', () => {
     assert.equal(U.zeitErgebnis(K_GEGEN('3qk3'), 'w'), 'b');
@@ -387,6 +409,8 @@ if (!pw) {
       // Fix-Review 64 (c76e18e), Proben I/J: ungewertet ohne gueltiges uhr.verbraucht zaehlte der laufende Zug 0 (Zeitgewinn)
       ['Fortsetzen ungewertet, uhr fehlt: kein Zeitgewinn', (l) => { delete l.uhr; }, true],
       ['Fortsetzen ungewertet, uhr.verbraucht negativ: kein Zeitgewinn', (l) => { l.uhr.verbraucht = -999999; }, true],
+      // Fix-Review 07 (ab98f60), Entscheid Hauptfenster 16.11.: auch ungewertet zaehlte ein kaputter Eintrag 0 (Zeitgewinn)
+      ['Fortsetzen ungewertet, ein zeiten-Wert ungueltig: kein Zeitgewinn', (l) => { l.zeiten[0] = -1; }, true],
     ]) {
       await pruefe(name, async () => {
         const { k, s } = await neueSeite(browser);
@@ -420,6 +444,104 @@ if (!pw) {
         } finally { await k.close(); }
       });
     }
+
+    // Fix-Review 07 (ab98f60): nach dem Fortsetzen fehlte der Teil des Zugs vor dem Schliessen im gespeicherten Stand; zweimal
+    // zu und auf brachte ihn zurueck (Probe: 2:52 -> 2:56, zeiten[0] 1 s bei 12 s Denkzeit)
+    const zuUndFort = async (s) => {
+      await s.goto('about:blank');
+      await s.goto(`${BASIS}#arena`);
+      await s.waitForSelector('.screen.arena', { timeout: 20000 }); await warte(300);
+      await s.evaluate(() => {
+        window.__test = { maxWarten: 0, botPause: 30, botZug: () => window.__partie.chess().moves({ verbose: true }).map((m) => m.lan).sort()[0] };
+        window.__app.gehe('partie', { fortsetzen: true });
+      });
+      await s.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+      await warte(400);
+    };
+    for (const [name, params] of [
+      ['Zweimal fortsetzen, Bot-Partie: keine Zeit zurueck, der Zug bucht die ganze Denkzeit', { botId: 'benno', farbe: 'w', tempo: { grund: 180, zuschlag: 0 } }],
+      ['Zweimal fortsetzen, gewertete KI-Partie: keine Zeit zurueck, der Zug bucht die ganze Denkzeit',
+        { botId: 'benno', farbe: 'w', tempo: { grund: 180, zuschlag: 0 }, ki: true, kiRef: KI_REF }],
+    ]) {
+      await pruefe(name, async () => {
+        const { k, s } = await neueSeite(browser);
+        try {
+          await starte(s, params);
+          const t0 = Date.now();
+          await warte(6000);
+          await zuUndFort(s);
+          const a1 = await leseUhr(s, 'flo');
+          await warte(3000);
+          await zuUndFort(s);
+          const a2 = await leseUhr(s, 'flo');
+          assert.ok(a2.ms <= a1.ms + 300, `ohne Zug kein Gewinn: ${a1.text} -> ${a2.text}`);
+          assert.ok(a2.ms <= 180000 - 8500, `mindestens die gedachten 9 s weg: ${a2.text}`);
+          await zug(s, 'e2e4');
+          const gedacht = Date.now() - t0;
+          await s.waitForFunction(() => window.__partie.phase() === 'flo' && window.__partie.chess().history().length === 2, null, { timeout: 15000 });
+          const zeiten = await s.evaluate(() => window.__partie.z.zeiten.slice());
+          assert.ok(zeiten[0] * 100 >= 8500, `zeiten[0] bucht die Denkzeit vor dem Fortsetzen: ${zeiten[0]} Zehntel`);
+          assert.ok(zeiten[0] * 100 <= gedacht + 1000, `zeiten[0] nicht mehr als die Zeit seit dem Start: ${zeiten[0]} Zehntel, ${gedacht} ms`);
+          await warte(500);
+          const a3 = await leseUhr(s, 'flo');
+          await zuUndFort(s);
+          const a4 = await leseUhr(s, 'flo');
+          assert.ok(a4.ms <= a3.ms + 300, `nach dem Zug kein Gewinn: ${a3.text} -> ${a4.text}`);
+        } finally { await k.close(); }
+      });
+    }
+
+    // Fix-Review 07 (ab98f60): gewertet lief die Wanduhr auch fuer den Bot, der bei geschlossener App nicht ziehen kann ->
+    // Schliessen waehrend der Bot denkt gewann die Partie auf Zeit
+    await pruefe('Gewertet, App zu waehrend der Bot denkt: kein Sieg auf Zeit, die Bot-Uhr stand', async () => {
+      const { k, s } = await neueSeite(browser);
+      try {
+        await starte(s, { botId: 'benno', farbe: 'w', tempo: { grund: 10, zuschlag: 0 }, ki: true, kiRef: KI_REF }, { test: { maxWarten: 0, botAnhalten: true } });
+        await zug(s, 'e2e4');
+        await warte(500);
+        const bot0 = await leseUhr(s, 'bot');
+        await s.goto('about:blank');
+        await warte(11000);
+        await s.goto(`${BASIS}#arena`);
+        await s.waitForSelector('.screen.arena', { timeout: 20000 }); await warte(300);
+        await s.evaluate(() => { window.__test = { maxWarten: 0, botAnhalten: true }; window.__app.gehe('partie', { fortsetzen: true }); });
+        await s.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+        await warte(800);
+        assert.notEqual(await s.evaluate(() => window.__partie.phase()), 'ende', 'Partie endete beim Fortsetzen');
+        const bot1 = await leseUhr(s, 'bot');
+        assert.ok(bot1.ms >= bot0.ms - 2500, `Bot-Uhr lief nicht, solange die App zu war: ${bot0.text} -> ${bot1.text}`);
+      } finally { await k.close(); }
+    });
+
+    await pruefe('Gewertet verdeckt: die Bot-Uhr steht, zieht der Bot verdeckt, laeuft Flos Uhr sofort weiter', async () => {
+      const { k, s } = await neueSeite(browser);
+      try {
+        await starte(s, { botId: 'benno', farbe: 'w', tempo: { grund: 180, zuschlag: 0 }, ki: true, kiRef: KI_REF }, { test: { maxWarten: 0, botAnhalten: true } });
+        await zug(s, 'e2e4');
+        await warte(500);
+        const bot0 = await leseUhr(s, 'bot');
+        await sichtbar(s, false);
+        await warte(3000);
+        await sichtbar(s, true);
+        await warte(300);
+        const bot1 = await leseUhr(s, 'bot');
+        assert.ok(bot0.ms - bot1.ms <= 1200, `Bot-Uhr stand verdeckt: ${bot0.text} -> ${bot1.text}`);
+        assert.equal(bot1.laeuft, true, 'Bot-Uhr laeuft nach der Rueckkehr');
+        // der Bot zieht verdeckt: Flos gewertete Uhr laeuft ab seinem Zug, auch verdeckt
+        await sichtbar(s, false);
+        // botAnhalten weg = der wartende Bot zieht (partie.js, Schleife vor dem Bot-Zug)
+        await s.evaluate(() => {
+          window.__test = { maxWarten: 0, botPause: 30, botZug: () => window.__partie.chess().moves({ verbose: true }).map((m) => m.lan).sort()[0] };
+        });
+        await s.waitForFunction(() => window.__partie.chess().history().length === 2, null, { timeout: 8000 });
+        const f0 = await leseUhr(s, 'flo');
+        await warte(3000);
+        await sichtbar(s, true);
+        await warte(300);
+        const f1 = await leseUhr(s, 'flo');
+        assert.ok(f0.ms - f1.ms >= 2500, `Flos Uhr lief verdeckt nach dem Bot-Zug: ${f0.text} -> ${f1.text}`);
+      } finally { await k.close(); }
+    });
 
     await pruefe('Bot-Zug haengt nicht an der Uhr (gleicher Seed, 3+2, 15+10, ohne Uhr)', async () => {
       const antworten = [];

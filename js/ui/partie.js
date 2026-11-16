@@ -151,7 +151,7 @@ import { t, sprache } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/partie.js';
 import { meinName } from '../konto.js';
-import { neueUhr, restAusZeiten, zeitErgebnis } from '../uhr.js';
+import { neueUhr, restAusZeiten, laufAnteil, zeitErgebnis } from '../uhr.js';
 
 
 const SERIE = new Set(['bester', 'stark', 'brillant']);
@@ -389,6 +389,12 @@ export function zeige(root, params, app) {
     // R19 Uhr: beim Nachspielen einer fortgesetzten Partie gibt es die Uhr noch nicht (zeiten kommen aus dem Speicher);
     // 864000 Zehntel (24 h) ist die Obergrenze, die pruefeZeiten (js/storage.js) noch annimmt
     if (schachuhr) z.zeiten.push(Math.min(864000, Math.round(schachuhr.zug(Date.now()) / 100)));
+    // zieht der Bot, waehrend die Seite verdeckt ist, stand seine gewertete Uhr (laeuftVerdeckt); Flos Uhr laeuft ab
+    // seinem Zug sofort, auch verdeckt, sonst schenkte das Warten im Hintergrund Flo Zeit
+    if (schachuhr && uhrGestartet && document.hidden && z.phase !== 'ende' && !schachuhr.laeuft && laeuftVerdeckt()) {
+      schachuhr.starte(Date.now());
+      uhrTick();
+    }
   }
   const farbeVon = (i) => (i % 2 === 0 ? startFarbe : (startFarbe === 'w' ? 'b' : 'w'));
   const istFlo = (i) => farbeVon(i) === farbe;
@@ -2730,9 +2736,11 @@ export function zeige(root, params, app) {
   if (z.tempo) {
     uhr.zeige(true);
     // R19 Uhr: Rest aus den gespeicherten zeiten und dem laufenden Zug. Ein unbekannter Eintrag (alter Stand ohne zeiten
-    // oder ungueltiger Wert, laufend.zeitenJe aus js/storage.js) zaehlt 0. In der gewerteten Partie bekommen Flos
-    // unbekannte Eintraege zusammen die Wanduhr seit dem Start bis zum laufenden Zug (ohne gueltige uhr bis jetzt) minus
-    // alles gueltig Gebuchte, die des Bots den Zuschlag (netto 0): lieber zu wenig Zeit als zu viel (Fix-Review f1).
+    // oder ungueltiger Wert, laufend.zeitenJe aus js/storage.js) bringt nie Zeit: Flos unbekannte Eintraege bekommen
+    // zusammen die Wanduhr seit dem Start bis zum laufenden Zug (ohne gueltige uhr bis jetzt) minus alles gueltig
+    // Gebuchte, die des Bots den Zuschlag (netto 0). Das gilt gewertet wie ungewertet (Vertrag, Entscheid Hauptfenster
+    // 16.11.2026, Fix-Review 07): lieber zu wenig Zeit als zu viel (Fix-Review f1); ungewertet kostet ein kaputter Eintrag
+    // damit auch die Pausen davor, ein alter Stand kann so auf Zeit verlieren.
     // Ein verkleinerter, aber gueltiger Wert bleibt unerkannt; das Geraet ist keine Vertrauensgrenze, die Dauer der
     // Partie gegen den Start der kiRef prueft der Server (eigener Auftrag)
     const lauf = laufend && laufend.uhr && typeof laufend.uhr === 'object' ? laufend.uhr : null;
@@ -2745,54 +2753,60 @@ export function zeige(root, params, app) {
     const zugBeginn = Date.parse(z.gestartet) + gebucht.reduce((a, x) => a + (Number.isInteger(x) && x >= 0 ? x * 100 : 0), 0);
     const seitGilt = !!lauf && Number.isFinite(lauf.seit) && lauf.seit <= Date.now() && !(lauf.seit < zugBeginn);
     let wandSeit = null;
+    let bisJetzt = false;   // die Wanduhr der unbekannten Eintraege reicht schon bis jetzt (laufender Zug inklusive)
     if (!z.zeiten || z.zeiten.length !== z.zuege.length) {
       const je = laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : [];
       const bekannt = (i) => Number.isInteger(je[i]);
       z.zeiten = z.zuege.map((_, i) => (bekannt(i) ? je[i] : 0));
       const start = Date.parse(z.gestartet);
-      if (uhrGewertet) {
-        const ende = seitGilt ? lauf.seit : Date.now();
-        let offen = Number.isFinite(start) ? Math.max(0, Math.round((ende - start) / 100) - z.zeiten.reduce((a, x) => a + x, 0)) : 0;
-        const vonFlo = (i) => (i % 2 === 0) === (startFarbe === farbe);
-        const floOffen = z.zuege.map((_, i) => i).filter((i) => !bekannt(i) && vonFlo(i));
-        for (const i of z.zuege.keys()) if (!bekannt(i) && !vonFlo(i)) z.zeiten[i] = z.tempo.zuschlag * 10;
-        // ohne gueltigen Start: wie bisher den Zuschlag. Ein geladener Stand kommt so nicht an (js/storage.js verwirft mit
-        // tempo einen ungueltigen gestartet), der Zweig faengt nur einen Aufrufer ohne storage ab
-        if (!Number.isFinite(start)) for (const i of floOffen) z.zeiten[i] = z.tempo.zuschlag * 10;
-        else {
-          floOffen.forEach((i, n) => {
-            const teil = Math.floor(offen / (floOffen.length - n));
-            z.zeiten[i] = teil; offen -= teil;
-          });
-          // bis jetzt laufen nur, wenn ein Eintrag von Flo die Wanduhr aufgenommen hat oder uhr.seit gilt; sonst wie mit
-          // gueltigen zeiten ab Start plus nur den gueltig gebuchten Eintraegen (ohne den ersetzten Bot-Zuschlag, Kaltreview 64)
-          wandSeit = floOffen.length || seitGilt
-            ? ende : start + z.zuege.reduce((a, _, i) => a + (bekannt(i) ? je[i] * 100 : 0), 0);
-        }
+      const ende = seitGilt ? lauf.seit : Date.now();
+      let offen = Number.isFinite(start) ? Math.max(0, Math.round((ende - start) / 100) - z.zeiten.reduce((a, x) => a + x, 0)) : 0;
+      const vonFlo = (i) => (i % 2 === 0) === (startFarbe === farbe);
+      const floOffen = z.zuege.map((_, i) => i).filter((i) => !bekannt(i) && vonFlo(i));
+      for (const i of z.zuege.keys()) if (!bekannt(i) && !vonFlo(i)) z.zeiten[i] = z.tempo.zuschlag * 10;
+      // ohne gueltigen Start: den Zuschlag. Ein geladener Stand kommt so nicht an (js/storage.js ersetzt mit tempo einen
+      // ungueltigen gestartet), der Zweig faengt nur einen Aufrufer ohne storage ab
+      if (!Number.isFinite(start)) for (const i of floOffen) z.zeiten[i] = z.tempo.zuschlag * 10;
+      else {
+        floOffen.forEach((i, n) => {
+          const teil = Math.floor(offen / (floOffen.length - n));
+          z.zeiten[i] = teil; offen -= teil;
+        });
+        // bis jetzt laufen nur, wenn ein Eintrag von Flo die Wanduhr aufgenommen hat oder uhr.seit gilt; sonst wie mit
+        // gueltigen zeiten ab Start plus nur den gueltig gebuchten Eintraegen (ohne den ersetzten Bot-Zuschlag, Kaltreview 64)
+        wandSeit = floOffen.length || seitGilt
+          ? ende : start + z.zuege.reduce((a, _, i) => a + (bekannt(i) ? je[i] * 100 : 0), 0);
+        bisJetzt = floOffen.length > 0 && !seitGilt;
       }
     }
-    let laufOpt = {};
-    if (laufend && uhrGewertet) {
-      // ohne gueltige uhr nicht "laeuft seit jetzt": Wanduhr seit dem Start der Partie minus die gebuchten Zeiten
-      const seit = seitGilt ? lauf.seit
-        : wandSeit != null ? wandSeit : Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
-      if (Number.isFinite(seit)) laufOpt = { laufSeit: seit, jetzt: Date.now() };
-    } else if (lauf && Number.isFinite(lauf.verbraucht) && lauf.verbraucht >= 0) laufOpt = { laufVerbraucht: lauf.verbraucht };
-    else if (laufend) {
+    // Rest ohne den laufenden Zug; der laufende Zug geht als imZug in die Uhr, damit ihn der naechste Speicherstand und
+    // sein zeiten-Eintrag ganz enthalten (Fix-Review 07: sonst brachte zweimal zu und auf diesen Teil zurueck)
+    const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe });
+    let imZug = 0;
+    if (laufend) {
+      const verbraucht = lauf && Number.isFinite(lauf.verbraucht) && lauf.verbraucht >= 0 ? lauf.verbraucht : null;
+      const wand = (seit) => laufAnteil({ laufSeit: seit, jetzt: Date.now() });
+      const abStart = () => Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
+      if (bisJetzt) imZug = 0;
+      // der Bot kann bei geschlossener App nicht ziehen: er zahlt nie die Zeit, in der sie zu war, auch gewertet nicht
+      // (Fix-Review 07: sonst gewann Schliessen waehrend der Bot denkt die Partie auf Zeit)
+      else if (r.amZug !== farbe) imZug = verbraucht ?? 0;
+      // gewertet laeuft Flos Uhr weiter wie online (Wanduhr); ohne gueltige uhr nicht "seit jetzt", sondern ab dem Start
+      // minus die gebuchten Zeiten, und nie weniger als das gespeicherte verbraucht (ungueltiges seit schenkt nichts)
+      else if (uhrGewertet) imZug = Math.max(wand(seitGilt ? lauf.seit : wandSeit != null ? wandSeit : abStart()), verbraucht ?? 0);
+      else if (verbraucht != null) imZug = verbraucht;
       // ungewertet ohne gueltiges verbraucht (Altstand ohne uhr oder kaputter Wert): weiterspielen mit einem Ersatz ohne
       // Zeitgewinn, die Wanduhr seit dem Beginn des laufenden Zugs. Lieber zu wenig Zeit; ein sehr alter Stand kann damit
       // auf Zeit verlieren (e7 15.11.2026, Variante A, rueckholbar; Fix-Review 64 c76e18e, Proben I/J)
-      const seit = seitGilt ? lauf.seit : Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
-      if (Number.isFinite(seit)) laufOpt = { laufSeit: seit, jetzt: Date.now() };
+      else imZug = wand(seitGilt ? lauf.seit : abStart());
     }
-    const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe, ...laufOpt });
-    schachuhr = neueUhr({ ...z.tempo, amZug: r.amZug, w: r.w, b: r.b });
+    schachuhr = neueUhr({ ...z.tempo, amZug: r.amZug, w: r.w, b: r.b, imZug });
     zeigeUhr(Date.now());
     duellBereit.then(() => {
       if (weg || z.phase === 'ende') return;
       uhrGestartet = true;
-      // eine ungewertete Partie im Hintergrund startet erst beim Zurueckkommen (beiSichtbarkeit)
-      if (document.hidden && !uhrGewertet) return;
+      // im Hintergrund startet nur Flos gewertete Uhr; sonst erst beim Zurueckkommen (beiSichtbarkeit)
+      if (document.hidden && !laeuftVerdeckt()) return;
       schachuhr.starte(Date.now());
       uhrTick();
     });
@@ -2826,15 +2840,20 @@ export function zeige(root, params, app) {
     schachuhr.halte(n);
     zeigeUhr(n);
   }
-  // gewertet: laeuft weiter (Wanduhr), der Takt holt beim Zurueckkommen auf; sonst haelt die Uhr an
+  // verdeckt laeuft nur Flos Uhr in der gewerteten Partie weiter (Wanduhr wie online); die Seite des Bots und jede
+  // ungewertete Partie halten an (Fix-Review 07: der Bot zahlte sonst fuer die Zeit, in der Flo weg war)
+  function laeuftVerdeckt() {
+    return uhrGewertet && !!schachuhr && schachuhr.amZug === farbe;
+  }
+  // der Takt holt beim Zurueckkommen auf; weiter ist ein No-op, wenn die Uhr laeuft
   function beiSichtbarkeit() {
     if (!schachuhr || weg || z.phase === 'ende') return;
     const n = Date.now();
     if (document.hidden) {
-      if (!uhrGewertet) schachuhr.halte(n);
+      if (!laeuftVerdeckt()) schachuhr.halte(n);
       speichereLaufend();
     } else {
-      if (uhrGestartet && !uhrGewertet) schachuhr.weiter(n);
+      if (uhrGestartet) schachuhr.weiter(n);
       uhrTick();
     }
   }
