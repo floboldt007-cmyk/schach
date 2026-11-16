@@ -350,15 +350,15 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .shf { display: grid; gap: 22px; min-width: 0; max-width: 1100px; }
 .sh-inhalt:has(> .shf) { max-width: none; }
 .shf-fuenf { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
-.shf-karte { --shf-farbe: #7a8494; }
-.shf-karte[data-seltenheit="haeufig"] { --shf-farbe: #4f9a64; }
-.shf-karte[data-seltenheit="selten"] { --shf-farbe: #3a78d4; }
-.shf-karte[data-seltenheit="episch"] { --shf-farbe: #8b4fd8; }
-.shf-karte[data-seltenheit="exklusiv"] { --shf-farbe: #c38f22; }
-.shf-karte { position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: 10px; border: 0; border-radius: 16px;
+.shf-karte, .shf-rk { --shf-farbe: #7a8494; }
+:is(.shf-karte, .shf-rk)[data-seltenheit="haeufig"] { --shf-farbe: #4f9a64; }
+:is(.shf-karte, .shf-rk)[data-seltenheit="selten"] { --shf-farbe: #3a78d4; }
+:is(.shf-karte, .shf-rk)[data-seltenheit="episch"] { --shf-farbe: #8b4fd8; }
+:is(.shf-karte, .shf-rk)[data-seltenheit="exklusiv"] { --shf-farbe: #c38f22; }
+.shf-karte, .shf-rk { position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: 10px; border: 0; border-radius: 16px;
   text-align: left; font: inherit; color: var(--text); cursor: pointer; min-width: 0; background: var(--flaeche);
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--shf-farbe) 60%, transparent), var(--s1); }
-.shf-karte:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+.shf-karte:focus-visible, .shf-rk:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
 .shf-karte[data-folgt] { cursor: default; box-shadow: inset 0 0 0 2px var(--rand, rgba(127, 127, 127, .35)); }
 .shf-bild { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
   background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--shf-farbe) 34%, #fff), color-mix(in srgb, var(--shf-farbe) 80%, #000)); }
@@ -374,7 +374,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .shf-preis { justify-self: start; padding: 4px 10px; border-radius: 99px; font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums;
   background: var(--flaeche-2); }
 /* ohne Kauf-Weg: Schloss und "Bald" (matt, ohne Glanz, Leitlinie R19 Punkt 3) */
-.shf-karte:not([data-folgt]) .shf-preis { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.shf-karte:not([data-folgt]) .shf-preis, .shf-rk .shf-preis { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
 .shf-schloss { width: 16px; height: 16px; flex: none; }
 /* Vorschau: Brett und Figur auf dem echten Brett (js/board.js, Farben als --feld-hell und --feld-dunkel), Klang, Emote und
    Finisher gross; der Finisher steht still, alles steht still bei "weniger Bewegung" */
@@ -383,7 +383,14 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .shf-gross { display: grid; place-items: center; width: min(240px, 62vw); aspect-ratio: 1; }
 .shf-gross > svg { width: 100%; height: auto; }
 .shf-anhoeren { min-height: 44px; min-width: 44px; padding: 10px 22px; }
-.shf-still, .shf-still *, .shf-karte[data-art="finisher"] .shf-bild * { animation: none !important; }
+.shf-still, .shf-still *, :is(.shf-karte, .shf-rk)[data-art="finisher"] .shf-bild * { animation: none !important; }
+/* Regale (R19): "Mehr Emotes", "Mehr Finisher", "Mehr Klaenge" als waagrechte Streifen unter den fuenf Plaetzen; was nicht
+   in die Breite passt, wischt man seitlich (die Seite selbst scrollt nie zur Seite) */
+.shf-regal { display: grid; gap: 10px; min-width: 0; }
+.shf-regal-titel { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 18px; }
+.shf-regal-reihe { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(132px, 150px); gap: 12px; min-width: 0;
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; padding: 2px 2px 8px; scrollbar-width: thin; }
+.shf-rk { scroll-snap-align: start; }
 @media (prefers-reduced-motion: reduce) { .shf-gross *, .shf-bild * { animation: none !important; } }
 
 /* ---------- R19 Profil Ich (Flo 15.11.2026, Leitlinie R19-Design-Leitlinie.md) ----------

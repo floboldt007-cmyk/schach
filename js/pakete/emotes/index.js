@@ -6,7 +6,7 @@ import { t } from '../../sprache.js';
 import { bereich } from '../../ui/ich.js';
 import { istErfinder } from '../../sonderstuecke.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
-import { emoteSvg } from '../../emote-kunst.js';
+import { emoteSvg, EMOTE_PREMIUM } from '../../emote-kunst.js';
 import { klang } from '../../sounds.js';
 import './texte.js';
 
@@ -321,9 +321,13 @@ function gruppe() {
 export function teileEmotes(erfinder = istErfinder()) {
   const sticker = EMOTES.map(([id]) => ({ id: 'emote-' + id, name: T('emote.' + id), frei: true, zeile: '', gruppe: T('gruppe.sticker'),
     bild: emoteSvg(id) || icon(id) }));
-  if (!erfinder) return sticker;
+  // Premium-Sticker (R19, Flo 15.11.2026): die acht oben bleiben gratis wie heute; die neuen sind gesperrt ("Bald im Shop"),
+  // nur das Labor des Erfinders hat sie frei (Freischalt-Regeln unveraendert). Das Rad zeigt weiter nur die acht.
+  const premium = EMOTE_PREMIUM.map((id) => ({ id: 'emote-' + id, name: T('emote.' + id), frei: erfinder, labor: erfinder,
+    zeile: erfinder ? '' : T('bald'), gruppe: T('gruppe.premium'), bild: emoteSvg(id) }));
+  if (!erfinder) return [...sticker, ...premium];
   const aktiv = kreaturAktiv(einstellungen(), true);
-  return [...sticker, ...KREATUREN.map((k) => ({
+  return [...sticker, ...premium, ...KREATUREN.map((k) => ({
     id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true, gruppe: T('kreaturen'),
     wahl: () => setze({ kreatur: k.id }), abwahl: () => setze({ kreatur: null }),
     zeile: k.welt ? t(`bots.welten.${k.welt}.kurz`) : T('maskottchen'), bild: kreaturSvg(k.id, 'normal'),

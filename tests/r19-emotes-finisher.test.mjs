@@ -58,7 +58,8 @@ pruefe('Emotes: Premium-Bewegung nur ueber transform und opacity (keine Ruckler 
 const ohne = emotes.teileEmotes ? emotes.teileEmotes(false) : [];
 const DE_E = emoteTexte.DE || {}, EN_E = emoteTexte.EN || {};
 pruefe('Sammlung Emotes ohne Erfinder: 8 Sticker frei wie heute, dahinter 6 Premium gesperrt mit "Bald im Shop"',
-  ohne.length === 14 && ohne.slice(0, 8).every((x, i) => x.frei && x.id === 'emote-' + GRATIS_STICKER[i])
+  // die acht in der Reihenfolge des Rads (EMOTES in emotes/index.js), darum als Menge verglichen
+  ohne.length === 14 && ohne.slice(0, 8).every((x) => x.frei) && ohne.slice(0, 8).map((x) => x.id).sort().join() === GRATIS_STICKER.map((id) => 'emote-' + id).sort().join()
   && ohne.slice(8).every((x, i) => !x.frei && x.id === 'emote-' + PREMIUM[i] && x.zeile === DE_E.bald && x.gruppe === DE_E['gruppe.premium'] && /emote-premium/.test(x.bild)),
   ohne.map((x) => `${x.id}:${x.frei}:${x.zeile}`));
 const mit = emotes.teileEmotes ? emotes.teileEmotes(true) : [];
@@ -285,7 +286,7 @@ async function lauf(browser, [geraet, w, h], { farbe = 'hell', ruhig = false, ga
   } finally { await k.close(); }
 }
 
-const browser = await pw[browserTyp()].launch();
+const browser = await browserTyp(pw).launch({ headless: true });
 try {
   for (const g of [IPHONE, SE, IPAD, IPAD_QUER, PC]) await lauf(browser, g);
   await lauf(browser, IPHONE, { farbe: 'dunkel' });
