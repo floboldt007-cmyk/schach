@@ -23,7 +23,7 @@ import '../sprachen/allgemein.js';
 import '../sprachen/analyse.js';
 import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet, pruefeZuzweit, istOnline } from '../storage.js';
 import { fuelle } from '../orte.js';
-import { botFarbe } from '../thema.js';
+import { botFarbe, avatarVon } from '../thema.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 
 // W0+a: Chip nicht wertender Partien je Art (w0plus-a-fix: dazu Gast), Einzahl und Mehrzahl fuer die Kopfzeile
@@ -106,7 +106,7 @@ function eroeffnungsName(p) {
 
 function avatarHtml(bot, klein = false) {
   if (!bot) return `<span class="an-avatar${klein ? ' vl-klein' : ''}" aria-hidden="true"></span>`;
-  return `<span class="an-avatar${klein ? ' vl-klein' : ''}" style="--bf:${esc(botFarbe(bot))}" aria-hidden="true"><img src="${esc(pfad(bot.avatar))}" alt=""></span>`;
+  return `<span class="an-avatar${klein ? ' vl-klein' : ''}" style="--bf:${esc(botFarbe(bot))}" aria-hidden="true"><img src="${esc(pfad(avatarVon(bot)))}" alt=""></span>`;
 }
 
 export function zeige(root, params = {}, app) {
@@ -247,7 +247,7 @@ export function zeige(root, params = {}, app) {
     const g = naechsterGegner();
     return `
       <div class="vl-leer flaeche">
-        ${g ? `<span class="an-avatar vl-leer-avatar" style="--bf:${esc(botFarbe(g))}"><img src="${esc(pfad(g.avatar))}" alt=""></span>` : ''}
+        ${g ? `<span class="an-avatar vl-leer-avatar" style="--bf:${esc(botFarbe(g))}"><img src="${esc(pfad(avatarVon(g)))}" alt=""></span>` : ''}
         <h3>${esc(t('analyse.vl.leer.titel'))}</h3>
         <p>${esc(t('analyse.vl.leer.text', { name: g ? g.name : (botNachId('benno')?.name || 'Bauer Lukas') }))}</p>
         <button class="knopf primaer" type="button" data-aktion="arena">${esc(t('analyse.vl.leer.arena'))} ${icon('pfeil')}</button>

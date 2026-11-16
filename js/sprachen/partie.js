@@ -22,6 +22,9 @@ registriereTexte('partie', {
     'kopf.uebungAb': 'Übung ab Zug {nr}',
     'kopf.eroeffnung': 'Eröffnung',
     'kopf.grundstellung': 'Grundstellung',
+    // Kopf der KI-Partie aus der Gegnersuche: "Online · gewertet · 5 + 3" (gewertet nur mit Beleg)
+    'kopf.online': 'Online',
+    'kopf.gewertet': 'gewertet',
     // Kurzformen langer Bot-Namen (Spielerkarte, Kopf auf dem Handy), wo sie vom Rufnamen abweichen
     'rufname.hilde': 'Hilde',
     'rufname.rudi': 'Thorsten',
@@ -184,6 +187,8 @@ registriereTexte('partie', {
     'kopf.uebungAb': 'Practice from move {nr}',
     'kopf.eroeffnung': 'Opening',
     'kopf.grundstellung': 'Starting position',
+    'kopf.online': 'Online',
+    'kopf.gewertet': 'rated',
     'rufname.hilde': 'Hilde',
     'rufname.rudi': 'Thorsten',
     'rufname.koenig': 'Tobias',

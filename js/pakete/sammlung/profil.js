@@ -24,7 +24,7 @@ import { meinName, sitzung, userId } from '../../konto.js';
 import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
 import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
-import { visitenkarte, botKarte, karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN } from '../../ui/visitenkarte.js';
+import { karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN } from '../../ui/visitenkarte.js';
 import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
 import { teileErfolge, teileErfolgsStufen, teileLokaleStufen, familienOrden, karteAbgleichen, spielstand, titelDaten, schulStand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
@@ -362,14 +362,11 @@ export function profilKarte({ app } = {}) {
 
 anbieten('ich:kopf', ({ app }) => profilKarte({ app }), { reihenfolge: 10, paket: PAKET });
 anbieten('duell:profil?', () => duellProfil(), { reihenfolge: 10, paket: PAKET });
-// Etappe 4b: die eigene Karte fuer Lobby und Partie; Spielerleisten nur gegen einen KI-Gegner der Liga (Bot-Leiter-Partien
-// zeigen den Bot wie bisher, Online-Partien zeichnet js/ui/online.js selbst)
+// Etappe 4b: die eigene Karte fuer Lobby und Partie. R19 online-weg (Flo 15.11.2026): keine Visitenkarten-Streifen mehr
+// in den Spielerleisten der KI-Partie (neben dem eigenen Namen doppelt, schnitt den Level-Chip ab; beim Gegner auf
+// "KI" gestaucht, das Abzeichen KI-Gegner reicht). Das Intro zeigt Titel und Banner weiter.
 anbieten('karte:eigene?', () => eigeneKartenDaten(), { reihenfolge: 10, paket: PAKET });
 anbieten('karte:fremde?', ({ daten }) => karteVomServer(daten, { orden: familienOrden, titel: titelVonId }), { reihenfolge: 10, paket: PAKET });
-anbieten('partie:spieler-leiste', ({ buehne }) => (buehne && buehne.ki ? visitenkarte(eigeneKartenDaten(), { groesse: 'streifen' }) : null),
-  { reihenfolge: 5, paket: PAKET });
-anbieten('partie:gegner-leiste', ({ buehne, bot }) => (buehne && buehne.ki ? visitenkarte(botKarte(bot), { groesse: 'streifen' }) : null),
-  { reihenfolge: 5, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'banner', name: KT('banner'), teile: bannerTeile(), hinweis: KT('banner.hinweis') }),
   { reihenfolge: 32, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'titel', name: S('titel'), teile: titelTeile(), hinweis: S('titel.hinweis') }),

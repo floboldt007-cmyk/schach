@@ -580,9 +580,10 @@ async function laborTeil(browser) {
   const bretter = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="bretter"] .sa-teil')]
     .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
   const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
-  // seit den 65 Brettern (14.11.2026): alle 62 Labor-Bretter in der Reihenfolge von js/labor.js
-  const laborIds = (await import('../js/labor.js')).LABOR_BRETTER.map((b) => 'brett-' + b.id).join();
-  pruefe('Labor: alle 62 Labor-Bretter mit Schild, nur diese markiert', lab === laborIds && lab.split(',').length === 62
+  // seit den 65 Brettern (14.11.2026): alle 62 Labor-Bretter in der Reihenfolge von js/labor.js, dahinter die 20 Motiv-Bretter
+  const { LABOR_BRETTER, MOTIV_BRETTER } = await import('../js/labor.js');
+  const laborIds = [...LABOR_BRETTER, ...MOTIV_BRETTER].map((b) => 'brett-' + b.id).join();
+  pruefe('Labor: alle 62 Labor-Bretter und 20 Motiv-Bretter mit Schild, nur diese markiert', lab === laborIds && lab.split(',').length === 82
     && lab.startsWith('brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker'), bretter.length);
   await ruesteAus(p.s, 'brett-kuerbis');
   pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
