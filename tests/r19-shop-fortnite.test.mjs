@@ -1,14 +1,15 @@
-// Shop A "Schaufenster" (Feinschliff R19, Flos Wahl 15.11.2026): fuenf feste Plaetze hinter der Kennung ?shopStil=a
-// (js/pakete/sammlung/shop-entwurf.js, Belegung aus assets/shop/auslage.json). Ohne Kennung (und mit jeder anderen) bleibt
-// der Shop wie heute: eine Edition, Kaufknopf "Bald verfuegbar" abgeschaltet.
+// Shop A "Schaufenster" (Feinschliff R19, Flos Wahl 15.11.2026, fuer alle seit Flos JA 16.11. 21:40): fuenf feste Plaetze
+// (js/pakete/sammlung/shop-entwurf.js, Belegung aus assets/shop/auslage.json). Nur mit ?shopStil=alt (fuer Tests) kommt
+// der alte Shop: eine Edition, Kaufknopf "Bald verfuegbar" abgeschaltet.
 //   Je Art genau ein Platz, immer in dieser Reihenfolge: Brett, Figur, Klang, Emote, Finisher. Ein fehlender oder
 //   unbekannter Eintrag laesst seinen Platz mit "Folgt" stehen, es bleiben fuenf.
 // Feste Grenzen (design/runde4/SPIELKONZEPT.md, Regeln der Werkstatt): kein Countdown, keine Rotation, nichts verschwindet,
-// keine Restzahl; ein Preis nur, wenn der Server ihn schickt (betrag_cent), sonst "Preis folgt"; "Kaufen" zeigt nur eine
-// Vorschau-Meldung und ruft nichts beim Server auf (keine Kasse, kein Stripe).
+// keine Restzahl. Ohne echten Kauf-Weg kein Versprechen (Entscheid 16.11. 21:40, rueckholbar): kein Kaufen-Knopf, kein Preis
+// und kein "Preis folgt", auch wenn der Server einen Preis schickt (betrag_cent), sondern Schloss und "Bald"; die Vorschau
+// ruft nichts beim Server auf (keine Kasse, kein Stripe).
 // Vorschau je Art: Brett und Figur auf dem ECHTEN Brett (js/board.js), Klang mit Anhoeren-Knopf, Emote gross (bewegt nur
 // ohne "weniger Bewegung"), Finisher als Standbild.
-// iPhone 13, iPhone SE, iPad und PC, hell und dunkel. Netz nur simuliert.
+// iPhone 13, iPhone SE, iPad hoch und quer und PC, hell und dunkel. Netz nur simuliert.
 //
 //   node tests/r19-shop-fortnite.test.mjs
 //   PORT=8977 node tests/r19-shop-fortnite.test.mjs   eigener Port (Standard: frei)
@@ -92,7 +93,7 @@ function initSkript({ sitzung }) {
   } catch (e) { /* egal */ }
 }
 
-const IPHONE = ['iPhone 13', 390, 844], SE = ['iPhone SE', 375, 667], IPAD = ['iPad', 820, 1180], PC = ['PC', 1280, 720];
+const IPHONE = ['iPhone 13', 390, 844], SE = ['iPhone SE', 375, 667], IPAD = ['iPad', 820, 1180], IPAD_QUER = ['iPad quer', 1180, 820], PC = ['PC', 1280, 720];
 const seitenfehler = [];
 // Woerter, die nach Druck aussehen (Regeln der Werkstatt): Countdown, Restzeit, Restzahl, nur heute, Wochen-Wechsel
 const DRUCK = /\b\d{1,2}:\d{2}\b|nur heute|nur noch|läuft ab|endet in|verschwindet|diese woche|\d+ von \d+ verfügbar|noch \d+ (std|stunden|tage|min)/i;
@@ -124,7 +125,7 @@ async function schliesse(s) {
 }
 
 async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = null, ruhig = false, gast = false, fehler = false } = {}) {
-  const gruppe = `${geraet} ${stil || 'heute'}${farbe === 'dunkel' ? ' dunkel' : ''}${auslage ? ' umgebaut' : ''}${ruhig ? ' ruhig' : ''}`
+  const gruppe = `${geraet} ${stil || 'standard'}${farbe === 'dunkel' ? ' dunkel' : ''}${auslage ? ' umgebaut' : ''}${ruhig ? ' ruhig' : ''}`
     + `${gast ? ' gast' : ''}${fehler ? ' serverfehler' : ''}`;
   const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
     colorScheme: farbe === 'dunkel' ? 'dark' : 'light', reducedMotion: ruhig ? 'reduce' : 'no-preference', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
@@ -136,20 +137,20 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
   try {
     await oeffneShop(s, stil ? `&shopStil=${stil}` : '');
-    if (stil !== 'a' && (gast || fehler)) {
-      // der Standard-Shop bleibt, wie er ist: Gast-Satz mit Gast-Karte bzw. "in Vorbereitung"
+    if (stil === 'alt' && (gast || fehler)) {
+      // der alte Shop bleibt hinter ?shopStil=alt, wie er war: Gast-Satz mit Gast-Karte bzw. "in Vorbereitung"
       await s.waitForFunction(() => /Konto|Vorbereitung/.test(document.querySelector('.sa-blatt .sh-satz')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
       const heute = await s.evaluate(() => ({ satz: document.querySelector('.sa-blatt .sh-satz')?.textContent || '',
         gast: !!document.querySelector('.sa-blatt .sh-gast'), entwurf: !!document.querySelector('.shf') }));
-      pruefe(`${gruppe}: Shop wie heute (${gast ? 'Gast-Satz mit Gast-Karte' : '"in Vorbereitung"'}, kein Schaufenster)`,
+      pruefe(`${gruppe}: alter Shop (${gast ? 'Gast-Satz mit Gast-Karte' : '"in Vorbereitung"'}, kein Schaufenster)`,
         !heute.entwurf && (gast ? /mit Konto/.test(heute.satz) && heute.gast : /in Vorbereitung/.test(heute.satz)), heute);
       await k.close(); return;
     }
-    if (stil !== 'a') {
+    if (stil === 'alt') {
       await s.waitForSelector('.sa-blatt .sh-karte', { timeout: 15000 }).catch(() => {});
       const heute = await s.evaluate(() => ({ karten: document.querySelectorAll('.sa-blatt .sh-karte').length,
         kaufAus: !!document.querySelector('.sa-blatt .sh-kaufen')?.disabled, entwurf: !!document.querySelector('.shf') }));
-      pruefe(`${gruppe}: Shop wie heute (eine Edition, Kaufknopf aus, kein Schaufenster)`, heute.karten === 1 && heute.kaufAus && !heute.entwurf, heute);
+      pruefe(`${gruppe}: alter Shop (eine Edition, Kaufknopf aus, kein Schaufenster)`, heute.karten === 1 && heute.kaufAus && !heute.entwurf, heute);
       await k.close(); return;
     }
     await s.waitForSelector('.sa-blatt .shf .shf-karte', { timeout: 15000 }).catch(() => {});
@@ -166,6 +167,7 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
         mitBild: karten.map((x) => !!x.querySelector('.shf-bild svg, .shf-bild img')),
         // Intl setzt ein geschuetztes Leerzeichen vor das Euro-Zeichen
         preise: karten.map((x) => x.querySelector('.shf-preis')?.textContent.replace(/\s+/g, ' ').trim() ?? null),
+        schloss: karten.map((x) => !!x.querySelector('.shf-preis svg.shf-schloss')),
         euro: ((shf ? shf.innerText : '').match(/€/g) || []).length,
         text: shf ? shf.innerText : '',
         reihen: document.querySelectorAll('.sa-blatt .shf-reihe, .sa-blatt .shf-held, .sa-blatt .shf-band').length,
@@ -184,12 +186,15 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
     pruefe(`${gruppe}: kein Countdown, keine Restzahl, kein "nur heute", kein "diese Woche"`, !DRUCK.test(bild.text), (bild.text.match(DRUCK) || [])[0]);
     pruefe(`${gruppe}: kein Ueberlauf zur Seite`, !bild.ueberlauf);
     pruefe(`${gruppe}: Karten mindestens 44 px`, bild.klein === 0, bild.klein);
-    const mitPreis = bild.preise.filter((x) => x && x !== 'Preis folgt' && x !== 'Folgt');
-    pruefe(`${gruppe}: Preis nur vom Server, sonst "Preis folgt"`, mitPreis.every((x) => x === '4,99 €') && bild.euro === mitPreis.length, { preise: bild.preise, euro: bild.euro });
+    // kein Versprechen ohne Kauf-Weg: jeder belegte Platz zeigt Schloss und "Bald", nie einen Preis oder "Preis folgt"
+    const belegt = bild.preise.filter((x, i) => !bild.folgt[i]);
+    pruefe(`${gruppe}: belegte Plaetze mit Schloss und "Bald", kein Preis, kein "Preis folgt"`,
+      belegt.every((x) => x === 'Bald') && bild.preise.every((x, i) => bild.folgt[i] || bild.schloss[i]) && bild.euro === 0 && !/Preis folgt/.test(bild.text),
+      { preise: bild.preise, schloss: bild.schloss, euro: bild.euro });
 
     if (gast || fehler) {
-      pruefe(`${gruppe}: fuenf Plaetze, alle mit Stueck und "Preis folgt" (ohne Server kein Preis)`,
-        bild.folgt.every((x) => !x) && bild.preise.every((x) => x === 'Preis folgt'), bild.preise);
+      pruefe(`${gruppe}: fuenf Plaetze, alle mit Stueck, Schloss und "Bald"`,
+        bild.folgt.every((x) => !x) && bild.preise.every((x) => x === 'Bald') && bild.schloss.every(Boolean), bild.preise);
       await k.close(); return;
     }
     if (auslage) {
@@ -201,13 +206,15 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
     }
     const soll = ARTEN.map((art) => AUSLAGE.plaetze.find((p) => p.art === art)?.id ?? null);
     pruefe(`${gruppe}: Belegung wie assets/shop/auslage.json`, JSON.stringify(bild.ids) === JSON.stringify(soll) && bild.folgt.every((x) => !x), { ids: bild.ids, soll });
-    pruefe(`${gruppe}: Brett-Platz traegt den Server-Preis der Edition (4,99 €)`, bild.preise[0] === '4,99 €', bild.preise[0]);
+    pruefe(`${gruppe}: Brett-Platz zeigt trotz Server-Preis (4,99 €) nur Schloss und "Bald"`, bild.preise[0] === 'Bald' && bild.schloss[0], bild.preise[0]);
 
     // Brett: Farben des Bretts im echten Brett (Mitternacht & Gold dunkel #3b4a7a)
     await oeffneVorschau(s, 'brett');
     const farbe = await s.evaluate(() => { const f = document.querySelector('.sheet-karte .shf-vorschau .brett .feld.d'); return f ? getComputedStyle(f).backgroundColor : null; });
     pruefe(`${gruppe}: Brett-Vorschau auf dem echten Brett in den Farben des Bretts`, farbe === 'rgb(59, 74, 122)', farbe);
-    pruefe(`${gruppe}: Kaufen zeigt den Server-Preis`, await s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Kaufen · 4,99' }).count() === 1);
+    const knoepfe = await s.locator('.sheet-karte .sheet-knoepfe button').allInnerTexts();
+    pruefe(`${gruppe}: Vorschau ohne Kaufen-Knopf und ohne Preis, nur "Schließen"`, knoepfe.length === 1 && knoepfe[0].trim() === 'Schließen'
+      && !/Kaufen|€|Preis folgt/.test(await s.locator('.sheet-karte').innerText()), knoepfe);
     const hoererOffen = await s.evaluate(() => window.__resize);
     await schliesse(s);
     // dreimal oeffnen und schliessen: das Vorschau-Brett raeumt seine Hoerer wieder ab
@@ -217,24 +224,17 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
     pruefe(`${gruppe}: Vorschau-Brett raeumt auf (resize-Hoerer offen ${hoererOffen}, zu ${hoererZu}, nach drei Mal ${hoererDanach})`,
       hoererZu === hoererOffen - 1 && hoererDanach === hoererZu, { hoererOffen, hoererZu, hoererDanach });
 
-    // Figur: der Satz auf dem echten Brett, Kaufen nur als Vorschau-Meldung ohne Serveraufruf
+    // Figur: der Satz auf dem echten Brett; Oeffnen und Schliessen der Vorschau ruft nichts beim Server auf
+    const vorher = z.aufrufe.length;
     await oeffneVorschau(s, 'figur');
     const figurId = soll[1];
     const satz = await s.evaluate((id) => [...document.querySelectorAll('.sheet-karte .shf-vorschau .brett img.figur')]
       .filter((i) => i.getAttribute('src').includes(`assets/shop/figuren/${id}/`)).length, figurId);
     pruefe(`${gruppe}: Figur-Vorschau zeigt den Satz auf dem echten Brett`, satz === 32, satz);
-    const vorher = z.aufrufe.length;
-    const kaufen = s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Kaufen' });
-    pruefe(`${gruppe}: Vorschau hat "Kaufen"`, await kaufen.count() === 1);
-    await kaufen.first().click();
-    const meldung = await s.waitForFunction(() => /Vorschau/.test(document.querySelector('.toast, .meldung, [role="status"]')?.textContent || ''), null, { timeout: 5000 })
-      .then(() => true).catch(() => false);
-    pruefe(`${gruppe}: Kaufen zeigt nur eine Vorschau-Meldung`, meldung);
-    await warte(400);
+    pruefe(`${gruppe}: Figur-Vorschau ohne Kaufen-Knopf`, await s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Kaufen' }).count() === 0);
+    await schliesse(s);
     const neu = z.aufrufe.slice(vorher).filter((x) => x !== 'edition_staende');
-    pruefe(`${gruppe}: Kaufen ruft nichts beim Server auf (keine Kasse)`, neu.length === 0, neu);
-    await s.waitForSelector('.sheet-karte', { state: 'detached', timeout: 5000 }).catch(() => {});
-    await warte(300);
+    pruefe(`${gruppe}: Vorschau ruft nichts beim Server auf (keine Kasse)`, neu.length === 0, neu);
 
     // Klang: Anhoeren-Knopf (mindestens 44 px), Antippen ohne Fehler
     await oeffneVorschau(s, 'klang');
@@ -275,14 +275,16 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
 let browser;
 try {
   browser = await browserTyp(pw).launch({ headless: true });
-  for (const g of [IPHONE, PC]) await lauf(browser, g, null);
-  for (const g of [IPHONE, SE, IPAD, PC]) await lauf(browser, g, 'a');
-  for (const g of [IPHONE, PC]) await lauf(browser, g, 'a', { farbe: 'dunkel' });
-  await lauf(browser, IPHONE, 'a', { ruhig: true });
-  await lauf(browser, IPHONE, 'a', { auslage: UMGEBAUT });
-  await lauf(browser, IPHONE, 'b'); // die Entwuerfe b und c gibt es nicht mehr: wie heute
-  // abgemeldet und bei einem Serverfehler: Shop A zeigt trotzdem die fuenf Plaetze, der Standard-Shop bleibt wie heute
-  for (const art of [{ gast: true }, { fehler: true }]) { await lauf(browser, IPHONE, 'a', art); await lauf(browser, IPHONE, null, art); }
+  // Shop A ist ohne Kennung der Standard; ?shopStil=a bleibt gueltig, der alte Shop nur noch mit ?shopStil=alt
+  for (const g of [IPHONE, SE, IPAD, IPAD_QUER, PC]) await lauf(browser, g, null);
+  for (const g of [IPHONE, PC]) await lauf(browser, g, null, { farbe: 'dunkel' });
+  await lauf(browser, IPHONE, 'a');
+  await lauf(browser, IPHONE, 'b'); // unbekannte Kennung: der Standard (Shop A)
+  for (const g of [IPHONE, PC]) await lauf(browser, g, 'alt');
+  await lauf(browser, IPHONE, null, { ruhig: true });
+  await lauf(browser, IPHONE, null, { auslage: UMGEBAUT });
+  // abgemeldet und bei einem Serverfehler: Shop A zeigt trotzdem die fuenf Plaetze, der alte Shop bleibt, wie er war
+  for (const art of [{ gast: true }, { fehler: true }]) { await lauf(browser, IPHONE, null, art); await lauf(browser, IPHONE, 'alt', art); }
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();
