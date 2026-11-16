@@ -249,7 +249,8 @@ try {
   const vorschau = await s.evaluate((sel) => { const t = document.querySelector(sel);
     return t ? { zustand: t.dataset.zustand, bilder: [...t.querySelectorAll('.sk-figuren img')].map(i => ({ src: i.getAttribute('src'), geladen: i.complete && i.naturalWidth > 0 })) } : null; }, teil);
   pruefe(`Figurensatz-Vorschau: "${SKIN}" steht in der Sammlung, noch nicht ausgeruestet, Bilder aus dem Satz geladen`, !!vorschau && vorschau.zustand === 'frei'
-    && vorschau.bilder.length === 2 && vorschau.bilder.every(b => b.src.includes('/pieces/' + SKIN + '/') && b.geladen), vorschau);
+    && vorschau.bilder.length === 3 && vorschau.bilder.every(b => b.src.includes('/pieces/' + SKIN + '/') && b.geladen)
+    && ['wN', 'bQ', 'wK'].every((f, i) => vorschau.bilder[i].src.endsWith('/' + f + '.svg')), vorschau);
   await bild(s, '2-figuren-vorschau');
   await s.locator(teil + ' .sa-wahl').click();
   await s.waitForFunction((sel) => document.querySelector(sel)?.dataset.zustand === 'an', teil, { timeout: 10000 }).catch(() => {});
