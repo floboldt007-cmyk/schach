@@ -2737,8 +2737,8 @@ export function zeige(root, params, app) {
     uhr.zeige(true);
     // R19 Uhr: Rest aus den gespeicherten zeiten und dem laufenden Zug. Ein unbekannter Eintrag (alter Stand ohne zeiten
     // oder ungueltiger Wert, laufend.zeitenJe aus js/storage.js) bringt nie Zeit: Flos unbekannte Eintraege bekommen
-    // zusammen die Wanduhr seit dem Start bis zum laufenden Zug (ohne gueltige uhr bis jetzt) minus alles gueltig
-    // Gebuchte, die des Bots den Zuschlag (netto 0). Das gilt gewertet wie ungewertet (Vertrag, Entscheid Hauptfenster
+    // zusammen die Wanduhr seit dem Start bis zum laufenden Zug (ohne gueltiges uhr.seit bis jetzt minus verbraucht) minus
+    // alles gueltig Gebuchte, jeder mindestens den Zuschlag; die des Bots den Zuschlag (netto 0). Das gilt gewertet wie ungewertet (Vertrag, Entscheid Hauptfenster
     // 16.11.2026, Fix-Review 07): lieber zu wenig Zeit als zu viel (Fix-Review f1); ungewertet kostet ein kaputter Eintrag
     // damit auch die Pausen davor, ein alter Stand kann so auf Zeit verlieren.
     // Ein verkleinerter, aber gueltiger Wert bleibt unerkannt; das Geraet ist keine Vertrauensgrenze, die Dauer der
@@ -2753,13 +2753,17 @@ export function zeige(root, params, app) {
     const zugBeginn = Date.parse(z.gestartet) + gebucht.reduce((a, x) => a + (Number.isInteger(x) && x >= 0 ? x * 100 : 0), 0);
     const seitGilt = !!lauf && Number.isFinite(lauf.seit) && lauf.seit <= Date.now() && !(lauf.seit < zugBeginn);
     let wandSeit = null;
-    let bisJetzt = false;   // die Wanduhr der unbekannten Eintraege reicht schon bis jetzt (laufender Zug inklusive)
+    const verbraucht = lauf && Number.isFinite(lauf.verbraucht) && lauf.verbraucht >= 0 ? lauf.verbraucht : null;
     if (!z.zeiten || z.zeiten.length !== z.zuege.length) {
       const je = laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : [];
       const bekannt = (i) => Number.isInteger(je[i]);
       z.zeiten = z.zuege.map((_, i) => (bekannt(i) ? je[i] : 0));
       const start = Date.parse(z.gestartet);
-      const ende = seitGilt ? lauf.seit : Date.now();
+      // ohne gueltiges uhr.seit reicht die Wanduhr der unbekannten Eintraege nur bis zum Beginn des laufenden Zugs (jetzt
+      // minus das gespeicherte verbraucht); der laufende Zug behaelt verbraucht. Frueher lief sie bis jetzt und der laufende
+      // Zug zaehlte 0: ging die Geraeteuhr zurueck, ersetzt js/storage.js gestartet durch jetzt, die Wanduhr gab 0 her und
+      // die ganze Denkzeit kam zurueck (Fix-Review c8, Probe 2:45 -> 3:02)
+      const ende = seitGilt ? lauf.seit : Date.now() - (verbraucht ?? 0);
       let offen = Number.isFinite(start) ? Math.max(0, Math.round((ende - start) / 100) - z.zeiten.reduce((a, x) => a + x, 0)) : 0;
       const vonFlo = (i) => (i % 2 === 0) === (startFarbe === farbe);
       const floOffen = z.zuege.map((_, i) => i).filter((i) => !bekannt(i) && vonFlo(i));
@@ -2768,15 +2772,17 @@ export function zeige(root, params, app) {
       // ungueltigen gestartet), der Zweig faengt nur einen Aufrufer ohne storage ab
       if (!Number.isFinite(start)) for (const i of floOffen) z.zeiten[i] = z.tempo.zuschlag * 10;
       else {
+        // jeder unbekannte Eintrag von Flo kostet mindestens den Zuschlag (netto 0): seinen echten Wert kennt nach einem
+        // Rueckschritt der Geraeteuhr niemand, also kein Zeitgewinn und keine Strafe (Entscheid Hauptfenster 16.11.2026,
+        // rueckholbar)
         floOffen.forEach((i, n) => {
           const teil = Math.floor(offen / (floOffen.length - n));
-          z.zeiten[i] = teil; offen -= teil;
+          z.zeiten[i] = Math.max(teil, z.tempo.zuschlag * 10); offen -= teil;
         });
         // bis jetzt laufen nur, wenn ein Eintrag von Flo die Wanduhr aufgenommen hat oder uhr.seit gilt; sonst wie mit
         // gueltigen zeiten ab Start plus nur den gueltig gebuchten Eintraegen (ohne den ersetzten Bot-Zuschlag, Kaltreview 64)
         wandSeit = floOffen.length || seitGilt
           ? ende : start + z.zuege.reduce((a, _, i) => a + (bekannt(i) ? je[i] * 100 : 0), 0);
-        bisJetzt = floOffen.length > 0 && !seitGilt;
       }
     }
     // Rest ohne den laufenden Zug; der laufende Zug geht als imZug in die Uhr, damit ihn der naechste Speicherstand und
@@ -2784,13 +2790,11 @@ export function zeige(root, params, app) {
     const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe });
     let imZug = 0;
     if (laufend) {
-      const verbraucht = lauf && Number.isFinite(lauf.verbraucht) && lauf.verbraucht >= 0 ? lauf.verbraucht : null;
       const wand = (seit) => laufAnteil({ laufSeit: seit, jetzt: Date.now() });
       const abStart = () => Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
-      if (bisJetzt) imZug = 0;
       // der Bot kann bei geschlossener App nicht ziehen: er zahlt nie die Zeit, in der sie zu war, auch gewertet nicht
       // (Fix-Review 07: sonst gewann Schliessen waehrend der Bot denkt die Partie auf Zeit)
-      else if (r.amZug !== farbe) imZug = verbraucht ?? 0;
+      if (r.amZug !== farbe) imZug = verbraucht ?? 0;
       // gewertet laeuft Flos Uhr weiter wie online (Wanduhr); ohne gueltige uhr nicht "seit jetzt", sondern ab dem Start
       // minus die gebuchten Zeiten, und nie weniger als das gespeicherte verbraucht (ungueltiges seit schenkt nichts)
       else if (uhrGewertet) imZug = Math.max(wand(seitGilt ? lauf.seit : wandSeit != null ? wandSeit : abStart()), verbraucht ?? 0);
