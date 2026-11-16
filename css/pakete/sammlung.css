@@ -373,6 +373,9 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .shf-unter { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .shf-preis { justify-self: start; padding: 4px 10px; border-radius: 99px; font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums;
   background: var(--flaeche-2); }
+/* ohne Kauf-Weg: Schloss und "Bald" (matt, ohne Glanz, Leitlinie R19 Punkt 3) */
+.shf-karte:not([data-folgt]) .shf-preis { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.shf-schloss { width: 16px; height: 16px; flex: none; }
 /* Vorschau: Brett und Figur auf dem echten Brett (js/board.js, Farben als --feld-hell und --feld-dunkel), Klang, Emote und
    Finisher gross; der Finisher steht still, alles steht still bei "weniger Bewegung" */
 .shf-vorschau { position: relative; display: grid; justify-items: center; gap: 12px; width: min(340px, 78vw); margin: 4px auto 12px; }

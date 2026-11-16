@@ -135,8 +135,9 @@ export function shopBereich({ app } = {}) {
     return b;
   };
   async function lade() {
-    // R19 Shop A mit fuenf festen Plaetzen (nur mit ?shopStil=a, js/pakete/sammlung/shop-entwurf.js): auch als Gast und bei
-    // einem Serverfehler, dann ohne Editionen ("Preis folgt"); den Preis liest derselbe Aufruf wie unten
+    // R19 Shop A mit fuenf festen Plaetzen (Standard seit 16.11., js/pakete/sammlung/shop-entwurf.js): auch als Gast und bei
+    // einem Serverfehler, dann ohne Editionen; derselbe Aufruf wie unten liefert den Namen der Edition. Der alte Weg darunter
+    // (Anmelden, Altersfrage, Anprobe) kommt nur noch mit ?shopStil=alt
     const stil = shopStil();
     if (stil) {
       satz(S('shop.laedt'));
@@ -144,7 +145,7 @@ export function shopBereich({ app } = {}) {
       if (sitzung()) {
         try { const r = await rufe('edition_staende', (await aktiveSitzung()).access_token); editionen = Array.isArray(r) ? r : []; } catch (e) { /* ohne Preis */ }
       }
-      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen, katalog: KATALOG, produktName, bereich: s, app })); return; }
+      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen, katalog: KATALOG, produktName, bereich: s })); return; }
       catch (e) { console.error(e); }
     }
     if (!sitzung()) {

@@ -1,5 +1,6 @@
 // Funktionsprobe Shop plus Skin (Feinschliff 12.11.2026, Auftrag F-shop): ein Konto oeffnet die Sammlung, schaut im Shop
-// eine Edition an (Anprobieren, nie kaufen), sieht die Vorschau des Figurensatzes, waehlt ihn aus und findet genau diesen
+// (Shop A, seit 16.11. fuer alle) die Edition in der Vorschau an (nie kaufen: es gibt keinen Kaufen-Knopf, nur Schloss und
+// "Bald"), sieht die Vorschau des Figurensatzes, waehlt ihn aus und findet genau diesen
 // Satz danach in JEDER Partie-Ansicht wieder: Bot-Partie, Online-Partie, Zu zweit, Raetsel-Duell, Meisterschule-Lektion.
 // Erkennbar am Bildpfad der Figuren im Brett (assets/pieces/<satz>/). Kein Kauf, kein Stripe: der Satz "blaupause" ist
 // waehlbar, weil das Konto das Sonderstueck besitzt (Attrappe von /rest/v1/sonderstuecke wie tests/online-ui.test.mjs,
@@ -226,22 +227,24 @@ try {
   const vorher = await satzAuf(s, BOT);
   pruefe(`Gegenprobe: vor der Wahl steht im Bot-Brett der Standardsatz, keine Figur aus "${SKIN}"`, vorher.n === 32 && vorher.imSatz === 0, vorher);
 
-  // 1) Shop: Sammlung auf "Ich", Shop-Bereich, Edition anprobieren (Vorschau), nichts kaufen
+  // 1) Shop A: Sammlung auf "Ich", Shop-Bereich, Edition in der Vorschau ansehen, nichts kaufen (kein Kaufen-Knopf)
   await s.evaluate(() => window.__app.gehe('ich'));
   await s.waitForSelector('.sa-screen', { timeout: 30000 });
   await s.waitForTimeout(400); await momenteWeg(s);
   await oeffneBereich(s, 'shop');
-  await s.waitForSelector('.sa-blatt .sh-karte', { timeout: 15000 }).catch(() => {});
-  const karte = await s.evaluate(() => { const k = document.querySelector('.sa-blatt .sh-karte'); const kauf = k?.querySelector('.sh-kaufen');
-    return k ? { produkt: k.dataset.produkt, kaufAus: !!kauf && kauf.disabled } : null; });
-  pruefe('Shop: die Edition steht im Shop, der Kaufknopf ist abgeschaltet (kein Kauf moeglich)', !!karte && karte.produkt === EDITION.produkt_id && karte.kaufAus, karte);
+  await s.waitForSelector('.sa-blatt .shf .shf-karte[data-art="brett"]', { timeout: 15000 }).catch(() => {});
+  const karte = await s.evaluate(() => { const k = document.querySelector('.sa-blatt .shf-karte[data-art="brett"]');
+    return k ? { produkt: k.dataset.id, preis: k.querySelector('.shf-preis')?.textContent.trim(), schloss: !!k.querySelector('.shf-preis svg.shf-schloss') } : null; });
+  pruefe('Shop: die Edition steht im Shop, mit Schloss und "Bald" statt Preis (kein Kauf moeglich)',
+    !!karte && karte.produkt === EDITION.produkt_id && karte.preis === 'Bald' && karte.schloss, karte);
   await bild(s, '0-shop');
-  await s.locator('.sa-blatt .sh-anprobieren').click();
-  const anprobe = await s.waitForSelector('.sheet-karte .sh-brett.gross', { timeout: 5000 }).then(() => true).catch(() => false);
-  pruefe('Shop: Anprobieren zeigt die Vorschau im Blatt', anprobe);
+  await s.locator('.sa-blatt .shf-karte[data-art="brett"]').click();
+  const anprobe = await s.waitForSelector('.sheet-karte .shf-vorschau .brett', { timeout: 5000 }).then(() => true).catch(() => false);
+  const knoepfe = await s.locator('.sheet-karte .sheet-knoepfe button').allInnerTexts().catch(() => []);
+  pruefe('Shop: die Vorschau zeigt das Brett im Blatt, nur mit "Schließen" (kein Kaufen-Knopf)', anprobe && knoepfe.length === 1 && !/Kaufen/.test(knoepfe.join()), knoepfe);
   await bild(s, '1-shop-vorschau');
   await s.locator('.sheet-karte .sheet-knoepfe button').first().click();
-  await s.waitForSelector('.sh-anprobe', { state: 'detached', timeout: 5000 }).catch(() => {});
+  await s.waitForSelector('.sheet-karte .shf-vorschau', { state: 'detached', timeout: 5000 }).catch(() => {});
 
   // 2) Figurensatz: Vorschau (Springer und Koenig des Satzes) ansehen, dann auswaehlen
   await oeffneBereich(s, 'figuren');

@@ -343,7 +343,7 @@ const EDITION = { produkt_id: 'brett-mitternacht', name: 'Mitternacht & Gold', a
   verkauf_ab: '2026-11-28T10:00:00Z' };
 
 // Shop mit gefaelschtem Server: edition_staende liefert [] ohne Altersangabe (wie supabase/werkstatt-schema.sql)
-async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop', vorher = {} } = {}) {
+async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop', vorher = {}, kennung = '' } = {}) {
   const k = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
   const s = await k.newPage();
   const srv = { ab18: false, editionen: [EDITION], sonder: [], ...server };
@@ -368,7 +368,7 @@ async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop
       for (const [k, v] of Object.entries(vorher)) localStorage.setItem(k, v);
     } catch (e) { /* egal */ }
   }, { sitzung, vorher });
-  await s.goto(BASIS + '#ich');
+  await s.goto(BASIS + kennung + '#ich');
   await s.waitForSelector('.sa-screen', { timeout: 30000 });
   // Etappe 4b: beim Start gebuchte Stufen zeigt "Ich" als Freischalt-Moment; wegtippen, wie ein Spieler es tut
   await warte(400);
@@ -379,9 +379,12 @@ async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop
   return { k, s, srv, anfragen, fehlerListe, moment };
 }
 
+// Der alte Shop (Anmelden, Altersfrage, Anprobe) kommt seit Shop A fuer alle (16.11.) nur noch mit ?shopStil=alt;
+// Shop A selbst prueft tests/r19-shop-fortnite.test.mjs
+const ALT = '&shopStil=alt';
 async function shopTeil(browser) {
   // abgemeldet: ein Satz und der Weg zum Konto, keine Anfrage an den Server
-  let p = await shopSeite(browser);
+  let p = await shopSeite(browser, { kennung: ALT });
   let text = await p.s.locator('.sh-bereich').innerText();
   pruefe('Shop abgemeldet: Hinweis ab 18 und Weg zum Konto, keine Editionen-Anfrage', /ab 18 Jahren/.test(text) && /Zum Konto/.test(text)
     && !p.anfragen.some((a) => a.url.includes('edition_staende')), text);
@@ -410,7 +413,7 @@ async function shopTeil(browser) {
   await p.k.close();
 
   // angemeldet ohne Altersangabe: einmal fragen, danach die Edition
-  p = await shopSeite(browser, { sitzung: SITZUNG });
+  p = await shopSeite(browser, { sitzung: SITZUNG, kennung: ALT });
   await p.s.waitForSelector('.sh-bereich .knopf', { timeout: 15000 });
   text = await p.s.locator('.sh-bereich').innerText();
   pruefe('Shop ohne Altersangabe: Frage und Knopf „Ich bin 18 oder älter“, noch keine Karte', /18 oder älter/.test(text)
@@ -444,7 +447,7 @@ async function shopTeil(browser) {
   await p.k.close();
 
   // angemeldet mit Altersangabe, aber nur unbekannte Produkte: ruhiger Satz statt leerer Karte
-  p = await shopSeite(browser, { sitzung: SITZUNG, server: { ab18: true, editionen: [{ ...EDITION, produkt_id: 'figuren-unbekannt' }] } });
+  p = await shopSeite(browser, { sitzung: SITZUNG, server: { ab18: true, editionen: [{ ...EDITION, produkt_id: 'figuren-unbekannt' }] }, kennung: ALT });
   await p.s.waitForFunction(() => /Vorbereitung/.test(document.querySelector('.sh-bereich')?.innerText || ''), null, { timeout: 15000 }).catch(() => {});
   text = await p.s.locator('.sh-bereich').innerText();
   pruefe('Shop: unbekanntes Produkt zeigt „in Vorbereitung“, keine Altersfrage', /in Vorbereitung/.test(text) && !/18 oder älter/.test(text), text);

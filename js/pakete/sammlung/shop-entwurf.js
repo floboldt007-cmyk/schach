@@ -1,21 +1,24 @@
-// Shop A "Schaufenster" (Feinschliff R19, Flos Wahl 15.11.2026): nur hinter der Kennung ?shopStil=a. Ohne Kennung zeigt
-// shop.js den Shop wie bisher (Bilder: tests/bilder-shop.mjs, Probe: tests/r19-shop-fortnite.test.mjs).
+// Shop A "Schaufenster" (Feinschliff R19, Flos Wahl 15.11.2026, fuer alle seit Flos JA 16.11. 21:40): der Standard. Nur mit
+// der Kennung ?shopStil=alt (fuer Tests) zeigt shop.js den alten Shop (Bilder: tests/bilder-shop.mjs, Probe:
+// tests/r19-shop-fortnite.test.mjs).
 //   Fuenf feste Plaetze, je Art genau einer, immer in der Reihenfolge Brett, Figur, Klang, Emote, Finisher. Welches Stueck
 //   auf einem Platz liegt, steht in assets/shop/auslage.json (Flo tauscht dort nur Zeilen). Ein fehlender oder unbekannter
 //   Eintrag laesst den Platz mit "Folgt" stehen: es bleiben immer fuenf.
 // Grenzen (design/runde4/SPIELKONZEPT.md, Regeln der Werkstatt): kein Countdown, keine Rotation, nichts verschwindet, keine
-// Restzahl. Ein Preis steht nur, wenn der Server ihn schickt (betrag_cent der Edition), sonst "Preis folgt".
-// "Kaufen" zeigt nur eine Vorschau-Meldung und ruft nichts beim Server auf.
+// Restzahl. Kein Versprechen ohne Kauf-Weg (Entscheid 16.11. 21:40, RUECKHOLBAR: so/R19-shop-a-standard, Laufzettel): es gibt
+// noch keinen echten Kauf, also kein Kaufen-Knopf, kein Preis und kein "Preis folgt", auch wenn der Server einen Preis
+// schickt, sondern Schloss und "Bald". Die Vorschau ruft nichts beim Server auf.
 //
 //   shopStil() -> 'a' | null
-//   shopEntwurf({ stil, editionen, katalog, produktName, bereich, app }) -> Promise<div.shf>
+//   shopEntwurf({ stil, editionen, katalog, produktName, bereich }) -> Promise<div.shf>
 import { Brett } from '../../board.js';
 import { figurenPfad } from '../../figurensatz.js';
 import { sheet } from '../../ui/bauteile.js';
-import { t, sprache } from '../../sprache.js';
+import { t } from '../../sprache.js';
 import { PAKETE_KLANG, PAKETE_LABOR, klang } from '../../sounds.js';
 import { klangKunst, finisherKunst } from '../../sammlung-kunst.js';
 import { emoteSvg } from '../../emote-kunst.js';
+import { icon } from '../../ui/icons.js';
 import '../emotes/texte.js';
 import '../finisher/texte.js';
 import './texte.js';
@@ -24,21 +27,13 @@ const S = (k, w) => t('p-sammlung.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function shopStil() {
-  try { return new URLSearchParams(location.search).get('shopStil') === 'a' ? 'a' : null; } catch (e) { return null; }
+  try { return new URLSearchParams(location.search).get('shopStil') === 'alt' ? null : 'a'; } catch (e) { return 'a'; }
 }
 
 const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
 // Seltenheit aus Vorrat bzw. Auslage ("Häufig" ...) als Schluessel; die Edition gilt als exklusiv (limitiert)
 const SELTENHEITEN = ['haeufig', 'selten', 'episch', 'exklusiv'];
 const schluessel = (x) => { const s = String(x || '').toLowerCase().replace('ä', 'ae'); return SELTENHEITEN.includes(s) ? s : null; };
-
-function preisText(e) {
-  if (!e || !Number.isInteger(e.betrag_cent) || !e.waehrung) return S('entwurf.preisFolgt');
-  try {
-    return new Intl.NumberFormat(sprache() === 'de' ? 'de-DE' : 'en-GB', { style: 'currency', currency: String(e.waehrung).toUpperCase() })
-      .format(e.betrag_cent / 100);
-  } catch (err) { return S('entwurf.preisFolgt'); }
-}
 
 const ladeJson = (pfad, leer) => fetch(pfad).then((r) => (r.ok ? r.json() : leer)).catch(() => leer);
 
@@ -47,33 +42,32 @@ function stueck(art, eintrag, { vorrat, katalog, editionen, produktName }) {
   const id = eintrag && typeof eintrag.id === 'string' ? eintrag.id : null;
   if (!id) return null;
   const ausVorrat = (vArt) => (vorrat.stuecke || []).find((v) => v.id === id && v.art === vArt);
-  const preis = S('entwurf.preisFolgt');
   const seltenheit = schluessel(eintrag.seltenheit);
   if (art === 'brett') {
     const k = Object.hasOwn(katalog, id) ? katalog[id] : null;
     if (k && k.art === 'brett') {
       const ed = editionen.find((e) => e.produkt_id === id);
-      return { id, art, name: produktName(id, ed?.name), seltenheit: 'exklusiv', preis: preisText(ed), unter: S('entwurf.art.edition'),
+      return { id, art, name: produktName(id, ed?.name), seltenheit: 'exklusiv', unter: S('entwurf.art.edition'),
         brett: { hell: k.hell, dunkel: k.dunkel } };
     }
     const v = ausVorrat('brett');
-    return v ? { id, art, name: v.name, seltenheit: schluessel(v.seltenheit), preis, unter: S('entwurf.art.brett'),
+    return v ? { id, art, name: v.name, seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.brett'),
       brett: { hell: v.hell, dunkel: v.dunkel }, bild: v.datei } : null;
   }
   if (art === 'figur') {
     const v = ausVorrat('figuren');
-    return v ? { id, art, name: v.name, seltenheit: schluessel(v.seltenheit), preis, unter: S('entwurf.art.figuren'), figuren: v.ordner } : null;
+    return v ? { id, art, name: v.name, seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.figuren'), figuren: v.ordner } : null;
   }
   if (art === 'klang') {
     if (!Object.hasOwn(PAKETE_KLANG, id) && !Object.hasOwn(PAKETE_LABOR, id)) return null;
-    return klangKunst(id) ? { id, art, name: S('klang.' + id), seltenheit, preis, unter: S('entwurf.art.klang') } : null;
+    return klangKunst(id) ? { id, art, name: S('klang.' + id), seltenheit, unter: S('entwurf.art.klang') } : null;
   }
   if (art === 'emote') {
-    return emoteSvg(id) ? { id, art, name: t('p-emotes.emote.' + id), seltenheit, preis, unter: S('entwurf.art.emote') } : null;
+    return emoteSvg(id) ? { id, art, name: t('p-emotes.emote.' + id), seltenheit, unter: S('entwurf.art.emote') } : null;
   }
   // "Signatur" ist Flos Erfinder-Stueck (Nr. 0, 1 von 1) und wird nie verkauft
   if (art === 'finisher' && id !== 'signatur' && finisherKunst(id)) {
-    return { id, art, name: t('p-finisher.' + id), seltenheit, preis, unter: S('entwurf.art.finisher') };
+    return { id, art, name: t('p-finisher.' + id), seltenheit, unter: S('entwurf.art.finisher') };
   }
   return null;
 }
@@ -116,14 +110,15 @@ function karte(art, s, beiWahl) {
     <span class="shf-preis"></span>`;
   k.querySelector('.shf-name').textContent = s.name;
   k.querySelector('.shf-unter').textContent = s.unter;
-  k.querySelector('.shf-preis').textContent = s.preis;
-  k.setAttribute('aria-label', [s.name, s.unter, selten, s.preis].filter(Boolean).join(', '));
+  // Schloss und "Bald" statt Preis: es gibt noch keinen Kauf-Weg (Kopf der Datei)
+  k.querySelector('.shf-preis').innerHTML = `${icon('schloss', 'shf-schloss')}<span>${esc(S('entwurf.bald'))}</span>`;
+  k.setAttribute('aria-label', [s.name, s.unter, selten, S('entwurf.bald')].filter(Boolean).join(', '));
   k.addEventListener('click', () => beiWahl(s));
   return k;
 }
 
 // Vorschau je Art: Brett und Figur auf dem echten Brett (js/board.js), Klang zum Anhoeren, Emote gross, Finisher still
-async function vorschau(s, { bereich, app }) {
+async function vorschau(s, { bereich }) {
   const ort = document.createElement('div');
   ort.className = 'shf-vorschau';
   let brett = null;
@@ -148,19 +143,18 @@ async function vorschau(s, { bereich, app }) {
       ort.append(knopf);
     }
   }
-  const kaufen = S('entwurf.kaufen') + (s.preis === S('entwurf.preisFolgt') ? '' : ' · ' + s.preis);
-  const wert = await sheet({ titel: s.name, text: S('entwurf.vorschau.' + s.art), inhalt: ort, klasse: 'shf-sheet',
-    knoepfe: [{ text: kaufen, wert: 'kaufen', art: 'primaer' }, { text: t('allgemein.schliessen'), wert: false }], abbrechen: false }).catch(() => false);
+  // ohne Kauf-Weg nur "Schliessen" (kein Kaufen-Knopf, Kopf der Datei)
+  await sheet({ titel: s.name, text: S('entwurf.vorschau.' + s.art), inhalt: ort, klasse: 'shf-sheet',
+    knoepfe: [{ text: t('allgemein.schliessen'), wert: false }], abbrechen: false }).catch(() => false);
   // das Blatt ist zu: Brett abbauen (Hoerer am Fenster, Eintrag in der Brett-Liste), wie js/ui/lektion.js
   try { brett?.zerstoere(); } catch (e) { /* egal */ }
-  if (wert === 'kaufen') { try { app?.meldung?.(S('entwurf.kaufenMeldung')); } catch (e) { /* egal */ } }
   if (bereich && bereich.isConnected) bereich.dispatchEvent(new CustomEvent('sa:oeffne', { bubbles: true }));
 }
 
-export async function shopEntwurf({ stil, editionen = [], katalog = {}, produktName = (id, n) => n || id, bereich = null, app = null }) {
+export async function shopEntwurf({ stil, editionen = [], katalog = {}, produktName = (id, n) => n || id, bereich = null }) {
   const [vorrat, auslage] = await Promise.all([ladeJson('assets/shop/vorrat.json', { stuecke: [] }), ladeJson('assets/shop/auslage.json', { plaetze: [] })]);
   const plaetze = Array.isArray(auslage?.plaetze) ? auslage.plaetze : [];
-  const wahl = (s) => vorschau(s, { bereich, app });
+  const wahl = (s) => vorschau(s, { bereich });
   const wurzel = document.createElement('div');
   wurzel.className = 'shf';
   wurzel.dataset.shopStil = stil;
