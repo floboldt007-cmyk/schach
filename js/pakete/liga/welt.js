@@ -45,7 +45,9 @@ export function weltLage(d) {
     .map((z) => ({ rang: z.rang, name: z.name.slice(0, 30), elo: z.elo, banner: banner(z.banner), ich: z.ich === true }))
     .sort((a, b) => a.rang - b.rang);
   const stand = ich.status === 'dabei'
-    ? (ganz(ich.rang) && ganz(ich.elo) ? { status: 'dabei', rang: ich.rang, elo: ich.elo } : null)
+    // Name und Banner auch aus ich: wer nicht unter den besten der Liste steht, fehlt dort (Kaltreview df 15.11.2026)
+    ? (ganz(ich.rang) && ganz(ich.elo) ? { status: 'dabei', rang: ich.rang, elo: ich.elo,
+      name: typeof ich.name === 'string' && ich.name ? ich.name.slice(0, 30) : '', banner: banner(ich.banner) } : null)
     : ich.status === 'zaehlt_noch' ? (ganz(ich.fehlen) ? { status: 'zaehlt_noch', fehlen: ich.fehlen } : null)
       : { status: ich.status };
   if (!stand) return null;
@@ -75,17 +77,19 @@ function standText(lage) {
 // jemanden unter dir zaehlt derselbe Abstand nach unten. Der Satz "Du bist auf Platz …" bleibt fuer den Vorleser (.sr).
 function platzKarte(lage, stand) {
   const i = lage.ich;
-  const mein = lage.liste.find((z) => z.ich);
+  const mein = lage.liste.find((z) => z.ich) || (i.name ? i : null);
   const ueber = lage.liste.filter((z) => z.rang < i.rang && z.elo > i.elo).at(-1);
   const unter = lage.liste.find((z) => z.rang > i.rang && z.elo < i.elo);
   let ziel = `<p class="lg-welt-platz-ziel">${icon('krone')}${esc(T('platz.erster'))}</p>`;
   if (ueber) {
     const n = ueber.elo - i.elo;
+    // der Balken misst nur den Weg zum Platz direkt ueber dir; ausserhalb der Liste bleibt es beim Satz
+    const balken = ueber.rang === i.rang - 1;
     const basis = unter ? unter.elo : i.elo - n;
     const anteil = Math.round(Math.min(0.95, Math.max(0.05, (i.elo - basis) / (ueber.elo - basis))) * 100);
-    ziel = `<p class="lg-welt-platz-ziel">${esc(T('platz.abstand', { n: zahl(n), platz: zahl(ueber.rang) }))}</p>
+    ziel = `<p class="lg-welt-platz-ziel">${esc(T('platz.abstand', { n: zahl(n), platz: zahl(ueber.rang) }))}</p>${balken ? `
       <span class="lg-welt-platz-balken" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${anteil}"
-        aria-valuetext="${esc(T('platz.balken', { n: zahl(n), platz: zahl(ueber.rang) }))}"><i style="width:${anteil}%"></i></span>`;
+        aria-valuetext="${esc(T('platz.balken', { n: zahl(n), platz: zahl(ueber.rang) }))}"><i style="width:${anteil}%"></i></span>` : ''}`;
   }
   return `<article class="lg-welt-platz" data-rang="${esc(i.rang)}">
     <span class="lg-welt-platz-banner" aria-hidden="true" style="background-image:url('${B.bannerUrl(mein ? mein.banner : 'start')}')"></span>

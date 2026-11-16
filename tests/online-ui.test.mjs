@@ -513,11 +513,14 @@ try {
       return { scroll: rumpf.scrollHeight - rumpf.clientHeight, quer: document.documentElement.scrollWidth <= innerWidth,
         freundeSichtbar: zeile.bottom <= unten + 1, knoepfe, gewertet: knoepfe.length === 2 && knoepfe.every((t) => /gewertet/.test(t)),
         freundeZu: !document.querySelector('.on-freunde').open, liga: document.querySelector('.on-liga').textContent.replace(/\s+/g, ' ').trim(),
+        // R19 online ruhig (A): Platz und Kronen stehen hinter "Mehr" (zu), gross die Elo oder ohne sie die Liga als Wort
+        mehr: document.querySelector('.online-screen details.on-mehr:not([open])')?.textContent.replace(/\s+/g, ' ').trim() || '',
         beispiel: /Beispiel|Turmfalke|Rochade77/.test(document.querySelector('.online-screen').textContent),
         klein: [...document.querySelectorAll('.online-screen .on-inhalt button, .online-screen .on-freunde-zeile')].filter((b) => b.getClientRects().length && b.getBoundingClientRect().height < 44).map((b) => b.className) };
     });
-    pruefe(`iPhone 13 ${modus}: Online passt ohne Scrollen (Liga-Streifen, zwei Tueren, Freunde-Zeile), Suchen-Knoepfe "gewertet", keine Beispiel-Liga`,
-      handy.scroll <= 1 && handy.quer && handy.freundeSichtbar && handy.gewertet && handy.freundeZu && /Platz 3 von 30/.test(handy.liga) && /140/.test(handy.liga)
+    pruefe(`iPhone 13 ${modus}: Online passt ohne Scrollen (Liga-Zeile mit "Mehr", zwei Tueren, Freunde-Zeile), Suchen-Knoepfe "gewertet", keine Beispiel-Liga`,
+      handy.scroll <= 1 && handy.quer && handy.freundeSichtbar && handy.gewertet && handy.freundeZu && /Warden II/.test(handy.liga)
+      && /Platz 3 von 30/.test(handy.mehr) && /140/.test(handy.mehr)
       && !handy.beispiel && handy.klein.length === 0, handy);
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-390-${modus}.png`) });
   }
@@ -813,8 +816,9 @@ try {
   pruefe('R7 B2: gewertetes Ende zeigt das Ergebnisblatt der Bot-Partie (Sieg!, Grund, Zur Analyse, Revanche, Meine Partien)',
     r7Da && /\bsieg\b/.test(r7B?.art) && r7B?.wort === 'Sieg!' && r7B?.unter === 'Aufgabe'
       && ['analyse', 'revanche', 'liste-zurueck'].every(k => r7B.knoepfe.includes(k)), r7B);
-  pruefe('R7 B2: Kronen-Aenderung aus kronen_mein_stand (vor dem Ende 140, danach 170): "+30" und der neue Wochenstand',
-    r7RufeVor >= 1 && /\+30/.test(r7B?.kronen || '') && /170/.test(r7B?.kronen || ''), { kronen: r7B?.kronen, r7RufeVor });
+  // R19 online ruhig (A): nur die Aenderung dieser Partie, der Wochenstand steht in der Lobby hinter "Mehr"
+  pruefe('R7 B2: Kronen-Aenderung aus kronen_mein_stand (vor dem Ende 140, danach 170): "+30 Kronen", ohne Wochenstand',
+    r7RufeVor >= 1 && /^\+30 ?Kronen$/.test(r7B?.kronen || '') && !/170/.test(r7B?.kronen || ''), { kronen: r7B?.kronen, r7RufeVor });
   // Auge: Brett ansehen; das Blatt kommt ueber "Ergebnis" in der Spalte zurueck
   await seite.locator('.online-screen .ergebnis-overlay .erg-zu').click().catch(() => {});
   const r7Zu = await seite.evaluate(() => ({ blatt: document.querySelector('.online-screen .ergebnis-overlay')?.hidden,

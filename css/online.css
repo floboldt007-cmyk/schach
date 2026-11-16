@@ -225,3 +225,38 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .on-tueren > .on-tuer:first-child { grid-row: 1; }
   .on-tueren > .on-tuer + .on-tuer { grid-row: 3; }
 }
+
+/* ---------- R19 online ruhig (Flo 14.11.2026: "zu viele Zahlen", Wahl 23:00: Entwurf A, js/ui/online.js zeigeLiga,
+   tests/r19-online-ruhig.test.mjs): eine grosse Zahl (Elo vom Server) oder die Liga als Wort, Erklaerungen und Bedenkzeit
+   hinter "Mehr". ---------- */
+@media (orientation: portrait) and (min-height: 740px) { .on-inhalt > .on-ruhig { grid-row: 3; } }
+.on-inhalt > .on-ruhig { margin-bottom: var(--a3); }
+.on-ruhig > .on-liga { margin-bottom: 0; }
+.online-screen .on-liga { min-height: 76px; }
+.on-gross { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.on-gross-wert { font-family: var(--display); font-weight: var(--gw-titel); font-size: 34px; line-height: 1.05; color: var(--text); }
+.on-gross-text { font-size: 13px; color: var(--text-2); }
+.on-mehr { margin-top: 6px; }
+.on-mehr > summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; font-size: 14px; font-weight: 650; color: var(--text-2);
+  cursor: pointer; list-style: none; }
+.on-mehr > summary::-webkit-details-marker { display: none; }
+.on-mehr > summary::after { content: ''; width: 7px; height: 7px; margin-left: 8px; border: solid currentColor; border-width: 0 2px 2px 0;
+  transform: translateY(-2px) rotate(45deg); }
+.on-mehr[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
+.on-mehr > ul { margin: 0 0 4px; padding: 10px 14px 10px 30px; border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--kante);
+  font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+.online-screen .on-tueren[data-mehr] :is(.on-tuer-text p, .on-zeit-fest, .on-bild-uhr) { display: none; }
+.online-screen .on-tuer-kopf { align-items: center; }
+/* ---------- R19 matt (Flo 15.11.2026 ca. 12:15: "ein bisschen zu hell, die Symbole leuchten zu viel. Cleaner und matt
+   machen", tests/r19-online-ruhig.test.mjs glanzIn): Lobby und Suche ohne farbigen Schein und Glanzlicht am Hauptknopf
+   (app.css .knopf.primaer), Karten flach nur mit Kante und etwas in den Seitengrund gemischt (hell weniger reines Weiss,
+   dunkel eine Spur ruhiger), Symbole in ruhigen Tokenfarben, das Mini-Brett entsaettigt. Die Partie samt Ergebnisblatt ist
+   derselbe Bildschirm (.online-screen.online-partie) und bleibt gleich der Bot-Partie (tests/gleichheit-ansichten.test.mjs,
+   Kaltreview 64 und Hauptfenster 15.11.), darum gilt jede Regel nur fuer :not(.online-partie). Rueckholbar: Block entfernen. */
+.online-screen:not(.online-partie) { --on-karte: color-mix(in srgb, var(--flaeche) 55%, var(--grund)); }
+.online-screen:not(.online-partie) .on-inhalt .knopf.primaer { box-shadow: none; }
+.online-screen:not(.online-partie) :is(.on-tuer, .on-liga, .on-freunde-zeile) { background: var(--on-karte); box-shadow: var(--kante); }
+.online-screen:not(.online-partie) .on-mehr > ul { background: var(--on-karte); }
+.online-screen:not(.online-partie) .on-tueren[data-zustand="ohne"] .on-tuer { background: transparent; box-shadow: none; }
+.online-screen:not(.online-partie) .on-freunde-symbol { color: var(--text-2); }
+.online-screen:not(.online-partie) .on-bild { filter: saturate(.65); }
