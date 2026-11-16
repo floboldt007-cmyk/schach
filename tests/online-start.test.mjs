@@ -102,6 +102,12 @@ async function bediene(route, uid) {
     reklamiert.push({ uid, nachMs: Date.now() - Date.parse(p.erstellt_am) });
     Object.assign(p, { status: 'beendet', grund: 'abgebrochen', ergebnis: null }); return antwort(aktualisieren(p));
   }
+  // laufende Uhr (ab dem 2. Halbzug) wie online_pruefe_zeit: abgelaufen nach der Serveruhr -> Partie endet 'zeit'
+  if (rpc === 'online_pruefe_zeit' && p && p.status === 'laeuft' && p.zuege.split(' ').filter(Boolean).length >= 2
+    && (p.am_zug === 'w' ? p.uhr_weiss_ms : p.uhr_schwarz_ms) - (Date.now() - Date.parse(p.letzter_zug_am)) <= 0) {
+    reklamiert.push({ uid, nachMs: Date.now() - Date.parse(p.erstellt_am), uhr: true });
+    Object.assign(p, { status: 'beendet', grund: 'zeit', ergebnis: p.am_zug === 'w' ? '0-1' : '1-0' }); return antwort(aktualisieren(p));
+  }
   // fruehe Reklamation: der Server aendert nichts; Antwort mit Mobilfunk-Laufzeit, falls die Partie sie verlangt
   if (rpc === 'online_pruefe_zeit' && p) { (p.fruehReklamiert ||= []).push(uid); if (p.laufzeitMs) await warte(p.laufzeitMs); return antwort(p); }
   if (rpc === 'online_strittig' || rpc === 'online_gib_auf') { unerwartet.push(uid + ':' + rpc); return antwort(p || {}); }
@@ -251,8 +257,11 @@ try {
         // leer ist erlaubt: zog Flo vor der ersten Probe, gibt es keine freie Probe vor dem Zug
         pruefe(`${name}: Zielkarte steht, sobald das Brett da ist (kein Riegel am Intro)`, frei.every((x) => x.karte), kurz);
         if (p.fruehReklamiert?.length) console.log(`   ${name}: fruehe Reklamation ohne Wirkung von ${JSON.stringify(p.fruehReklamiert)}`);
-        // eine falsch gehende Geraeteuhr loest keine Reklamation vor der Frist aus (jede setzt busy und schluckt Tipps)
-        if (lage === 'flo-uhr-vor' || lage === 'spaet') pruefe(`${name}: keine Reklamation vor der Frist trotz falscher Geraeteuhr`, !(p.fruehReklamiert || []).length, p.fruehReklamiert);
+        // eine falsch gehende Geraeteuhr loest bei der Seite AM ZUG (Weiss, Flo) keine Reklamation vor der Frist aus: jede
+        // setzt busy und schluckt Tipps. Die wartende Seite rechnet nach der Serveruhr (Fix-Review 84, 16.11.); ihre fruehe
+        // Reklamation aendert nichts (Server mit eigener Uhr, uebernehme verwirft aeltere Staende), Schwarz antwortet unten
+        if (lage === 'flo-uhr-vor' || lage === 'spaet') pruefe(`${name}: keine Reklamation der Seite am Zug vor der Frist trotz falscher Geraeteuhr`,
+          !(p.fruehReklamiert || []).includes('u1'), p.fruehReklamiert);
         // Schwarz (Opa, ohne Intro) sieht den Zug und antwortet
         const sieht = await opa.s.waitForFunction(() => (window.__online?.partie()?.zuege || '').startsWith('e2e4'), null, { timeout: 8000 }).then(() => true, () => false);
         pruefe(`${name}: Schwarz sieht den ersten Zug`, sieht);
@@ -301,6 +310,71 @@ try {
       pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]);
     }
     await flo.k.close().catch(() => {}); await opa.k.close().catch(() => {});
+  }
+  // ---------- Neu geoeffnet ohne frische Zeitprobe (Fix-Review 84, 16.11.): Anzeige und Zeitpruefung nach der Serveruhr ----------
+  // Flo ist weg, Opa oeffnet die Partie neu: nur ladePartie, keine eigene Schreibung, also keine frische Probe
+  const hinweisVon = async (sp) => (await sp.s.locator('.on-hinweise').innerText().catch(() => '')).replace(/\s+/g, ' ');
+  const sekunden = (s) => { const m = /(\d+):(\d\d)/.exec(s); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  {
+    const name = 'Neu geoeffnet, Erstzug-Frist laeuft seit 20 s (Ranked)';
+    const p = neuePartie({ gewertet: true, alterMs: 20000 });
+    const opa = await spieler(browser, 'u2');
+    try {
+      await oeffne(opa, p);
+      await warte(1200);
+      const h = await hinweisVon(opa), rest = sekunden(h), wahr = 30 - (Date.now() - Date.parse(p.erstellt_am)) / 1000;
+      console.log(`   ${name}: Hinweis "${h}" · wahr ${wahr.toFixed(1)} s`);
+      pruefe(`${name}: Frist zeigt die Restzeit des Servers (hoechstens 2,5 s daneben)`, rest != null && Math.abs(rest - wahr) <= 2.5, { h, wahr });
+      const t0 = Date.now();
+      while (Date.now() - t0 < 25000 && partien.get(p.id).status === 'laeuft') await warte(250);
+      const spaet = (Date.now() - Date.parse(p.erstellt_am)) / 1000 - 30;
+      pruefe(`${name}: Abbruch-Pruefung kommt kurz nach dem Fristende (hoechstens 8 s)`, partien.get(p.id).grund === 'abgebrochen' && spaet <= 8,
+        { grund: partien.get(p.id).grund, spaetS: spaet.toFixed(1) });
+      pruefe(`${name}: keine Seitenfehler`, !opa.fehler.length, opa.fehler);
+    } catch (e) { pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]); }
+    await opa.k.close().catch(() => {});
+  }
+  // laufende Uhr: Flo (Weiss) ist am Zug, hatte 60 s, sein letzter Zug ist 70 s her -> seine Zeit ist abgelaufen
+  const laufend = ({ uhrMs, seitMs, gewertet = true }) => {
+    const p = neuePartie({ gewertet, alterMs: seitMs + 5000 });
+    const c = new Chess(); c.move('e4'); c.move('e5');
+    return Object.assign(p, { zuege: 'e2e4 e7e5', fen: c.fen(), am_zug: 'w', uhr_weiss_ms: uhrMs, uhr_schwarz_ms: 290000,
+      letzter_zug_am: new Date(Date.now() - seitMs).toISOString() });
+  };
+  {
+    const name = 'Neu geoeffnet, Gegner am Zug, seine Uhr abgelaufen';
+    const p = laufend({ uhrMs: 60000, seitMs: 70000 });
+    const opa = await spieler(browser, 'u2');
+    try {
+      const t0 = await oeffne(opa, p);
+      const t1 = Date.now();
+      while (Date.now() - t1 < 15000 && partien.get(p.id).status === 'laeuft') await warte(250);
+      const nach = (Date.now() - t0) / 1000;
+      pruefe(`${name}: Zeitpruefung kommt sofort (hoechstens 8 s nach dem Oeffnen), Partie endet auf Zeit`,
+        partien.get(p.id).grund === 'zeit' && nach <= 8, { grund: partien.get(p.id).grund, nachS: nach.toFixed(1) });
+      pruefe(`${name}: keine Seitenfehler`, !opa.fehler.length, opa.fehler);
+    } catch (e) { pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]); }
+    await opa.k.close().catch(() => {});
+  }
+  // offene Frage des Pruefers: eigene Uhr, Geraet 40 s vor, ohne frische Probe (neu geoeffnet, vor dem ersten eigenen Zug)
+  {
+    const name = 'Neu geoeffnet, eigener Zug, Geraeteuhr 40 s vor';
+    const p = laufend({ uhrMs: 60000, seitMs: 10000 });
+    const flo = await spieler(browser, 'u1', { versatz: 40000 });
+    try {
+      await oeffne(flo, p);
+      await warte(1500);
+      const anzeige = await flo.s.locator('.on-spieler .uhr.am-zug .uhr-zeit').innerText().catch(() => '');
+      const wahr = (60000 - (Date.now() - Date.parse(p.letzter_zug_am))) / 1000;
+      console.log(`   ${name}: Anzeige ${anzeige} · wahr ${wahr.toFixed(1)} s (Geraet zaehlt 40 s zu viel, ohne Serverzeit unvermeidlich)`);
+      await warte(4000);
+      pruefe(`${name}: keine Reklamation vor dem echten Ablauf (sie wuerde Tipps schlucken)`, !(p.fruehReklamiert || []).length && partien.get(p.id).status === 'laeuft',
+        { frueh: p.fruehReklamiert, status: partien.get(p.id).status });
+      const dw = await ziehe(flo, p, 'g1f3', 6000);
+      pruefe(`${name}: eigener Zug geht durch`, dw != null, { dw });
+      pruefe(`${name}: keine Seitenfehler`, !flo.fehler.length, flo.fehler);
+    } catch (e) { pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]); }
+    await flo.k.close().catch(() => {});
   }
   }
 } finally {

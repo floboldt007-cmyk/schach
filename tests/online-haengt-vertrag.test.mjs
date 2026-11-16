@@ -46,15 +46,21 @@ pruefe('Client: Freundespartie bleibt beim Server-Wert (10 Minuten)', freundMs =
 pruefe('Client: Wartezeit haengt an p.gewertet',
   /const haengtNachMs = \(?p\)? => p\.gewertet \? HAENGT_RANKED_MS : HAENGT_MS;/.test(js));
 pruefe('Client: tick vergleicht mit haengtNachMs(p), nicht mit der festen Zahl',
-  /halbzuege < 2 && p\.letzter_zug_am && vorlaufMs\(\) >= haengtNachMs\(p\)/.test(js)
+  /halbzuege < 2 && p\.letzter_zug_am && ausloeserMs\(\) >= haengtNachMs\(p\)/.test(js)
     && !/>= HAENGT_MS\b/.test(js));
 // R19 (15.11.2026): die Frist vor dem 2. Halbzug rechnet nach der Serveruhr (js/serverzeit.js), nie allein nach dem
 // Geraet, und die angezeigte Frist ist genau die des Servers
 pruefe('Client: Erstzug-Frist nach Serveruhr, ohne frische Probe begrenzt durch die erste Sicht (serverzeit seit)',
   /return zeitSeit\(s, ersteSicht\.am, SICHT_SPIEL_MS\);/.test(js));
-// Kaltreview F3: die Uhr loest pruefeZeit mit derselben Schranke aus, nie allein nach einer vorgehenden Geraeteuhr
-pruefe('Client: tick loest die Zeitpruefung der laufenden Uhr mit der Ansichts-Schranke aus',
-  /halbzuege >= 2 && rest\(p\.am_zug, vorlaufMs\(\)\) === 0/.test(js));
+// Kaltreview F3 + Fix-Review 84 (16.11.): die Zeitpruefung (Uhr und Erstzug-Frist) loest am EIGENEN Zug mit der
+// Ansichts-Schranke aus (nie allein nach einer vorgehenden Geraeteuhr), ist der Gegner am Zug nach der Serveruhr (sonst
+// kommt sie nach Neuladen bis zu seiner ganzen Restzeit zu spaet)
+pruefe('Client: Ausloesung mit Schranke nur am eigenen Zug, sonst nach der Serveruhr',
+  /const geschuetzt = vorlaufMs\(\);\s*return p\.am_zug === online\.meineFarbe\(p\) \? geschuetzt : serverSeitMs\(\);/.test(js));
+pruefe('Client: tick loest Uhr und Erstzug-Frist ueber ausloeserMs aus',
+  /halbzuege >= 2 && rest\(p\.am_zug, ausloeserMs\(\)\) === 0/.test(js) && /halbzuege < 2 && p\.letzter_zug_am && ausloeserMs\(\) >= haengtNachMs\(p\)/.test(js));
+pruefe('Client: angezeigte Erstzug-Frist nach der Serveruhr, ohne Schranke (wie beim Gegner)',
+  /r = Math\.max\(0, frist - serverSeitMs\(\)\)/.test(js));
 pruefe('Client: angezeigte Erstzug-Frist ist ranked_haengt_s bzw. 10 Minuten',
   /const erstzugFristMs = p => p\.gewertet \? HAENGT_RANKED_MS - 1000 : HAENGT_MS;/.test(js) && rankedMs - 1000 === rankedS * 1000);
 // Steht der Server beim ersten Nachfragen noch nicht auf "haengt" (Uhren weichen ab), darf die gewertete Partie nicht

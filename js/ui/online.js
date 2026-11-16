@@ -946,7 +946,7 @@ export function zeige(root, params, app) {
     const wert = Number(f === 'w' ? p.uhr_weiss_ms : p.uhr_schwarz_ms) || 0;
     const laeuft = p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2 && p.letzter_zug_am;
     if (!laeuft) return Math.max(0, wert);
-    return Math.max(0, wert - (verbraucht ?? Math.max(0, serverJetzt() - Date.parse(p.letzter_zug_am))));
+    return Math.max(0, wert - (verbraucht ?? serverSeitMs()));
   }
   // R19: Zeit seit dem letzten Zug nach der Serveruhr (js/serverzeit.js seit), ohne frische Probe nie mehr als seit diese
   // Ansicht den Stand zuerst sah plus SICHT_SPIEL_MS: eine vorgehende Geraeteuhr beendet so weder Frist noch Uhr
@@ -957,6 +957,18 @@ export function zeige(root, params, app) {
     if (ersteSicht.stand !== p.letzter_zug_am) ersteSicht = { stand: p.letzter_zug_am, am: Date.now() };
     return zeitSeit(s, ersteSicht.am, SICHT_SPIEL_MS);
   }
+  // Zeit seit dem letzten Zug nach der Serveruhr, ohne Schranke: so zeigen Uhr und Frist dieselbe Zeit wie beim Gegner
+  function serverSeitMs() {
+    const s = Date.parse(p.letzter_zug_am || '');
+    return Number.isFinite(s) ? Math.max(0, serverJetzt() - s) : 0;
+  }
+  // Ausloesung der Zeitpruefung: die Schranke nur am eigenen Zug, denn nur dort schluckt eine Reklamation Tipps. Ist der
+  // Gegner am Zug, zaehlt die Serveruhr, sonst kaeme die faellige Pruefung nach Neuladen bis zu seiner ganzen Restzeit
+  // zu spaet (Fix-Review 84, 16.11.: 298 s bei 5 min). vorlaufMs laeuft immer mit, damit die erste Sicht stimmt
+  function ausloeserMs() {
+    const geschuetzt = vorlaufMs();
+    return p.am_zug === online.meineFarbe(p) ? geschuetzt : serverSeitMs();
+  }
   // R19 (Flo 15.11., e7: "Opa beginnt, er hat noch 0:25"): vor dem 2. Halbzug steht die Uhr, es laeuft aber die
   // Erstzug-Frist des Servers. Beide Seiten sehen sie als Zahl und als schmalen Gold-Balken, der schrumpft (matt, ohne Schein)
   function zeichneFrist() {
@@ -965,7 +977,7 @@ export function zeige(root, params, app) {
     const an = p.status === 'laeuft' && p.bedenkzeit_s != null && online.zuegeListe(p).length < 2 && !widerspruch && !!p.letzter_zug_am;
     if (el.hidden === an) el.hidden = !an;
     if (!an) return;
-    const frist = erstzugFristMs(p), r = Math.max(0, frist - vorlaufMs()), zeit = uhrText(r);
+    const frist = erstzugFristMs(p), r = Math.max(0, frist - serverSeitMs()), zeit = uhrText(r);
     const z = el.querySelector('.on-frist-zeit');
     if (z.textContent !== zeit) z.textContent = zeit;
     // Bildstueck (Leitlinie R19): der Koenig der Farbe, die jetzt ziehen muss
@@ -992,10 +1004,10 @@ export function zeige(root, params, app) {
     }
     if (blockiert || busy || widerspruch || p.status !== 'laeuft' || Date.now() < zeitPruefung) return;
     const halbzuege = online.zuegeListe(p).length;
-    if (halbzuege >= 2 && rest(p.am_zug, vorlaufMs()) === 0) {
+    if (halbzuege >= 2 && rest(p.am_zug, ausloeserMs()) === 0) {
       zeitPruefung = Date.now() + 5000;
       aktion(() => online.pruefeZeit(p.id));
-    } else if (halbzuege < 2 && p.letzter_zug_am && vorlaufMs() >= haengtNachMs(p)) {
+    } else if (halbzuege < 2 && p.letzter_zug_am && ausloeserMs() >= haengtNachMs(p)) {
       // vor dem 2. Halbzug laeuft keine Uhr: der Server beendet die Partie ohne Zug als abgebrochen (gewertet 30 s,
       // sonst 10 Minuten)
       zeitPruefung = Date.now() + (p.gewertet ? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS);
