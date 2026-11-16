@@ -600,13 +600,14 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
   animation: wl-schimmer 9s ease-in-out infinite alternate; }
 @keyframes wl-schimmer { from { opacity: .4; transform: scale(.9); } to { opacity: .9; transform: scale(1.06); } }
 .arena .welt[data-welt="springerforst"] .welt-leben::before { inset: 0; width: auto; aspect-ratio: auto; border-radius: 0; opacity: .8;
+  /* in den freien Flaechen zwischen den Stationen (Lage hoch und Handy); verdeckt eine Station eines, bleiben die anderen */
   background:
-    radial-gradient(circle at 18% 30%, rgba(255, 236, 140, .95) 0 2.5px, rgba(255, 236, 140, .3) 3px 7px, transparent 8px),
-    radial-gradient(circle at 72% 22%, rgba(255, 236, 140, .95) 0 2px, rgba(255, 236, 140, .3) 2.5px 6px, transparent 7px),
-    radial-gradient(circle at 40% 58%, rgba(255, 236, 140, .95) 0 2.5px, rgba(255, 236, 140, .3) 3px 7px, transparent 8px),
-    radial-gradient(circle at 84% 64%, rgba(255, 236, 140, .95) 0 2px, rgba(255, 236, 140, .3) 2.5px 6px, transparent 7px),
-    radial-gradient(circle at 12% 80%, rgba(255, 236, 140, .95) 0 2px, rgba(255, 236, 140, .3) 2.5px 6px, transparent 7px),
-    radial-gradient(circle at 58% 86%, rgba(255, 236, 140, .95) 0 2.5px, rgba(255, 236, 140, .3) 3px 7px, transparent 8px);
+    radial-gradient(circle at 60% 20%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
+    radial-gradient(circle at 90% 44%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
+    radial-gradient(circle at 6% 52%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
+    radial-gradient(circle at 34% 42%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
+    radial-gradient(circle at 70% 52%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
+    radial-gradient(circle at 48% 31%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px);
   animation: wl-gluehen 7s ease-in-out infinite alternate; }
 @keyframes wl-gluehen { from { opacity: .45; transform: translate(0, 0); } to { opacity: 1; transform: translate(10px, -16px); } }
 .arena .welt[data-welt="turmstadt"] .welt-leben::before { top: 9%; left: -34%; width: 30%; height: 7%; aspect-ratio: auto; border-radius: 50%; opacity: .85;
@@ -614,12 +615,13 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
   animation: wl-wolke 70s linear infinite; }
 @keyframes wl-wolke { from { transform: translateX(0); } to { transform: translateX(480%); } }
 .arena .welt[data-welt="gezeitenkueste"] .welt-leben::before { inset: 0; width: auto; aspect-ratio: auto; border-radius: 0; opacity: .7;
+  /* auf dem Wasserstreifen unter den Bergen (Lage hoch und Handy) */
   background:
-    radial-gradient(ellipse 14px 2.5px at 22% 18%, rgba(255, 255, 255, .95), transparent),
-    radial-gradient(ellipse 10px 2px at 64% 12%, rgba(255, 255, 255, .95), transparent),
-    radial-gradient(ellipse 16px 2.5px at 80% 26%, rgba(255, 255, 255, .9), transparent),
-    radial-gradient(ellipse 12px 2px at 38% 30%, rgba(255, 255, 255, .9), transparent),
-    radial-gradient(ellipse 10px 2px at 8% 34%, rgba(255, 255, 255, .85), transparent);
+    radial-gradient(ellipse 14px 2.5px at 15% 24%, rgba(255, 255, 255, .95), transparent),
+    radial-gradient(ellipse 10px 2px at 40% 26.5%, rgba(255, 255, 255, .95), transparent),
+    radial-gradient(ellipse 16px 2.5px at 62% 23%, rgba(255, 255, 255, .95), transparent),
+    radial-gradient(ellipse 12px 2px at 85% 27%, rgba(255, 255, 255, .95), transparent),
+    radial-gradient(ellipse 10px 2px at 28% 28%, rgba(255, 255, 255, .95), transparent);
   animation: wl-glanz 5s ease-in-out infinite alternate; }
 @keyframes wl-glanz { from { opacity: .25; transform: translateX(-6px); } to { opacity: .95; transform: translateX(6px); } }
 .arena .welt[data-welt="stockfisch-tiefe"] .welt-leben::before { top: 0; left: 0; width: 100%; height: 140%; aspect-ratio: auto; border-radius: 0; opacity: .7;

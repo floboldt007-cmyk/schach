@@ -45,12 +45,12 @@ const basis = Object.fromEntries(BASIS_DATEIEN.map((d) => [d, execFileSync('git'
 
 // Variante B: nur fuer diese Bilder, als Stil ueber den Arbeitsstand gelegt
 const STIL_B = `
-.arena .ww-mitte { grid-template-columns: none !important; justify-items: center; padding: 22px 18px 6px !important; margin-top: 14px;
+.arena .ww-mitte { grid-template-columns: none !important; justify-items: center; padding: 20px 18px 6px !important; margin-top: 18px;
   background: #FBF4E2 !important; border: 1.5px solid #C9962E !important; box-shadow: 0 0 0 3px #FBF4E2, 0 0 0 4.5px #C9962E, var(--s2) !important;
   border-radius: 14px !important; }
 .arena .ww-mitte .ww-name { color: #3A2A10 !important; }
 .arena .ww-mitte .ww-unter { color: #6B5320 !important; }
-.arena .ww-wappen { position: absolute; top: -20px; left: 50%; margin-left: -17px; }
+.arena .ww-wappen { position: absolute !important; top: -24px; left: 50%; margin-left: -15px; width: 30px !important; height: 34px !important; grid-row: auto !important; }
 .arena .ww-mitte { position: relative; }
 .arena .welt .welt-leben::before { content: '' !important; inset: -20% -60% !important; width: auto !important; height: auto !important;
   background: linear-gradient(105deg, transparent 42%, rgba(255, 246, 214, .42) 50%, transparent 58%) !important;
