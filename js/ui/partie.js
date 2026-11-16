@@ -441,7 +441,7 @@ export function zeige(root, params, app) {
   s.innerHTML = `
     <header class="kopf p-kopf">
       <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t(rueckZiel() === 'heim' ? 'partie.kopf.zurueckStart' : 'partie.kopf.zurueck'))}">${icon('zurueck')}</button>
-      <div class="titel"><h1>${esc(kopfTitel())}</h1><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
+      <div class="titel"><h1>${esc(kopfTitel())}</h1><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe && !z.ki
     ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">${esc(t('partie.kopf.stufe', { stufe: bot.stufe }))}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">${esc(t('partie.kopf.duSpielst'))}</span>${esc(farbeName(farbe))}</span></div></div>
       <div class="brettwahl" role="radiogroup" aria-label="${esc(t('partie.kopf.brettfarbe'))}">${brettwahl}</div>
       <button class="icon-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(t('partie.kopf.klang'))}">${icon('klang')}</button>
@@ -619,7 +619,11 @@ export function zeige(root, params, app) {
 
   function zeichneKopf() {
     let name = t('partie.kopf.eigeneStellung');
-    if (z.modus === 'boss') name = bot.regel ? t('partie.kopf.regel', { regel: bot.regel }) : t('partie.kopf.bossPartie');
+    // R19 online-weg: der KI-Ersatz der Gegnersuche ist eine Online-Partie (gewertet nur mit Beleg kiRef, js/pakete/liga)
+    if (z.ki) {
+      name = [t('partie.kopf.online'), z.kiRef && t('partie.kopf.gewertet'), z.tempo && `${Math.round(z.tempo.grund / 60)} + ${z.tempo.zuschlag}`]
+        .filter(Boolean).join(' · ');
+    } else if (z.modus === 'boss') name = bot.regel ? t('partie.kopf.regel', { regel: bot.regel }) : t('partie.kopf.bossPartie');
     else if (z.modus === 'uebung') name = t('partie.kopf.uebungAb', { nr: startNummer });
     else if (!startFen) {
       const er = eroeffnung(z.san);

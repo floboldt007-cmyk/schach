@@ -1,0 +1,11 @@
+{
+  "stand": "2026-11-15",
+  "hinweis": "Shop A (?shopStil=a): je Art genau ein Platz, Reihenfolge fest (brett, figur, klang, emote, finisher). Tauschen = nur die id einer Zeile aendern. Erlaubt: brett = Brett aus vorrat.json oder Edition aus KATALOG (js/pakete/sammlung/shop.js); figur = Figurensatz aus vorrat.json; klang = Klangset aus js/sounds.js (PAKETE_KLANG, PAKETE_LABOR); emote = Sticker aus js/emote-kunst.js; finisher = krone, welle, koenig, kronensturz. Unbekannt oder fehlend: der Platz zeigt Folgt. seltenheit nur fuer klang, emote, finisher (Brett und Figur bringen ihre eigene mit). Keine Preise: ein Preis kommt nur vom Server.",
+  "plaetze": [
+    { "art": "brett", "id": "brett-mitternacht" },
+    { "art": "figur", "id": "sternwarte" },
+    { "art": "klang", "id": "kristall", "seltenheit": "Selten" },
+    { "art": "emote", "id": "applaus", "seltenheit": "Häufig" },
+    { "art": "finisher", "id": "kronensturz", "seltenheit": "Episch" }
+  ]
+}

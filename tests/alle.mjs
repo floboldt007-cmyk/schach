@@ -98,6 +98,7 @@ const SUITEN = [
   { name: 'partie-hoehe', datei: 'partie-hoehe.test.mjs', args: [], was: 'Bot-Partie ohne Seitenueberlauf und Sieg-Blatt ohne Innen-Scrollen, Brett nicht kleiner (7 Geraete, R7 B8/B10)' },
   { name: 'layout-r8', datei: 'layout-r8.test.mjs', args: [], was: 'Kritik R8: Liga-Platzzahl deckend ueber dem Banner, Sieg-Blatt SE/PC ohne Innen-Scrollen, Fertig im Bereichs-Blatt volle Breite (Browser)' },
   { name: 'funktion-shop-skin', datei: 'funktion-shop-skin.test.mjs', args: [], was: 'Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht' },
+  { name: 'r19-shop-fortnite', datei: 'r19-shop-fortnite.test.mjs', args: [], was: 'R19 Shop A: ?shopStil=a, fuenf feste Plaetze aus assets/shop/auslage.json, Server-Preis oder Preis folgt, kein Druck, Vorschau je Art, Kaufen ohne Kasse' },
   { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
   { name: 'r15-ergebnis-teilen', datei: 'r15-ergebnis-teilen.test.mjs', args: [], was: 'Feinschliff R15: Duell-Nochmal in Suchfarbe, Niederlage mit Liga-Verweis, ein Knopf "Teilen ..." nach dem Sieg (Browser)' },
@@ -125,6 +126,9 @@ const SUITEN = [
   { name: 'sammlung', datei: 'sammlung.test.mjs', args: [], was: 'Paket Sammlung: Reiter Ich, Bereiche mit Schloss, Erfolge' },
   { name: 'bretter-65', datei: 'bretter-65.test.mjs', args: [], was: '65 Bretter: Katalog, Gleichlauf mit tokens.css, Kontrast und Figuren-Lesbarkeit, Glanz nur ohne weniger Bewegung' },
   { name: 'bretter-oberflaechen', datei: 'bretter-oberflaechen.test.mjs', args: [], was: 'Brett-Oberflaechen: Seltenheit gewoehnlich, Oberflaeche je seltenem Brett, Farbabstand, Kontrast mit Oberflaeche, Feldausschnitt im Browser' },
+  { name: 'bretter-v3', datei: 'bretter-v3.test.mjs', args: [], was: 'Motiv-Bretter Fassung 3 (Entwurf): 20 Motive, Helligkeitsbaender, Kontrast am echten Brett, Bewegung nur ohne weniger Bewegung' },
+  { name: 'bretter-v4', datei: 'bretter-v4.test.mjs', args: [], was: 'Motiv-Bretter Fassung 4: 20 Motive, Textur je Feld, Feld 3,0, Textur 1,15, Koordinaten 3,0, Bewegung nur am Rahmen' },
+  { name: 'bretter-v4-app', datei: 'bretter-v4-app.test.mjs', args: [], was: 'Motiv-Bretter in der App: Katalog nur Erfinder, Rahmen in Bot/Online/Zu zweit/Raetsel-Duell, Handy ohne Rahmen, Sammlung' },
   { name: 'lernen', datei: 'lernen.test.mjs', args: [], was: 'Paket lernen: Meisterschule, leicht gratis, Rest im Trainer, Lektionen mit Engine-Verteidigung' },
   { name: 'lobby', datei: 'lobby.test.mjs', args: [], was: 'Paket lobby: Online-Lobby als Vorschau im Labor (Umschalter, Bedenkzeiten, Suche, Partie mit Uhr)' },
   { name: 'finisher', datei: 'finisher.test.mjs', args: [], was: 'Paket Finisher: Freischaltung und sichere Standardwahl' },
@@ -149,12 +153,17 @@ const SUITEN = [
   { name: 'geschmack-r8', datei: 'geschmack-r8.test.mjs', args: [], was: 'Feinschliff R8: Serien-Chip neben dem Gruss auf kurzen Handys, Erfolgs-Fenster nie ueber einem offenen Blatt (Browser)' },
   { name: 'r16-p1', datei: 'r16-p1.test.mjs', args: [], was: 'Feinschliff R16 Paket 1: Konto-Fehlertext, Lobby-Gegnerkarte (VS, Sondertitel-Wappen, Elo), Vitrine, Lektion auf dem iPhone SE (Browser)' },
   { name: 'r19-online', datei: 'r19-online.test.mjs', args: [], was: 'Feinschliff R19: Online abgemeldet Konto-Hinweis unter den Tueren und ungestreckt, angemeldet Liga, Tueren, Freunde, Tueren-Ueberzeile mind. 12 px (Browser)' },
+  { name: 'r19-online-weg', datei: 'r19-online-weg.test.mjs', args: [], was: 'Feinschliff R19: KI-Ersatz mit Duell-Intro (Online-Seite und Labor-Lobby), Kopf Online gewertet 5 + 3, Spielerleisten ohne Streifen und ohne Abschneiden (4 Geraete), Umschalter Online fuehrt zur echten Seite (Browser)' },
+  { name: 'r19-online-ruhig', datei: 'r19-online-ruhig.test.mjs', args: [], was: 'Feinschliff R19: Online ruhiger (Entwurf A einzig), eine Zahl (Server-Elo) oder Liga als Wort, Tuertexte sichtbar oder in Mehr, Leisten nur Name (Browser)' },
+  { name: 'r19-welten-sehen', datei: 'r19-welten-sehen.test.mjs', args: [], was: 'Feinschliff R19: alle Bot-Welten zu sehen, noch nicht offene Welt ohne Schloss und nicht startbar, spielbar nach dem Endgegner davor (4 Geraete, hell/dunkel, Browser)' },
   { name: 'r19-avatar-modern', datei: 'r19-avatar-modern.test.mjs', args: [], was: 'Feinschliff R19: jeder Bot zeigt in jeder Ansicht das moderne Portraet (Zuordnung ueber avatarVon, Node)' },
   { name: 'r17-kopf', datei: 'r17-kopf.test.mjs', args: [], was: 'Feinschliff R17: Kopf-Knoepfe (Premium, rund) in Ruhe, Zeiger, Fokus, gedrueckt lesbar, Zeiger nur bei hover:hover, Handy ohne haengenden Zustand (Browser)' },
   { name: 'r18-hover-rest', datei: 'r18-hover-rest.test.mjs', args: [], was: 'Feinschliff R18: Einstellungen-Navigation und Kopf-Chips am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover (Browser)' },
   { name: 'r18-rd-hover', datei: 'r18-rd-hover.test.mjs', args: [], was: 'Feinschliff R18: Knoepfe des Raetsel-Duells (Start, Ende) am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover, Kontrast in vier Zustaenden mind. 4,5:1 (Browser)' },
   { name: 'r19-analyse-neu', datei: 'r19-analyse-neu.test.mjs', args: [], was: 'Feinschliff R19: Analyse neu (Schluesselmomente als Karten oben, Symbole gross, Verlauf ohne Kleintext, Ergebnis-Karte, Tempo, Auto-Abspielen) (Browser)' },
   { name: 'r19-verlauf-neu', datei: 'r19-verlauf-neu.test.mjs', args: [], was: 'Feinschliff R19: Verlauf neu (Partien ohne Zug als eine Zeile, Ergebniszeichen, Zu-zweit-Bild, leiser Muelleimer, eine Staerke-Zahl, Level-Karte im Rahmen)' },
+  { name: 'r19-rand-handy', datei: 'r19-rand-handy.mjs', args: [], was: 'Feinschliff R19: Brett mit Koordinaten am Rand ragt auf 6 Geraeten nicht ueber Sockel oder Seite, auch nach Brettwechsel in der Partie (<= 0,5 px) (Browser)' },
+  { name: 'r19-effekt-ebene', datei: 'r19-effekt-ebene.mjs', args: [], was: 'Feinschliff R19: mit jedem Motiv-Brett deckt sich die Effekt-Ebene auf 5 Geraeten (ecke/rand) auf 0,5 px mit dem Brett, nie breiter, kein Ueberlauf (Browser)' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
@@ -169,6 +178,7 @@ const DAUERN = new Map([
   ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
+  ['r19-lektionen-probe', 360],
 ]);
 
 function teile(suiten, anzahl) {
