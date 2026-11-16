@@ -77,7 +77,8 @@ function standText(lage) {
 // jemanden unter dir zaehlt derselbe Abstand nach unten. Der Satz "Du bist auf Platz …" bleibt fuer den Vorleser (.sr).
 function platzKarte(lage, stand) {
   const i = lage.ich;
-  const mein = lage.liste.find((z) => z.ich) || (i.name ? i : null);
+  // ausserhalb der Liste traegt ich selbst Name und Banner (weltLage); auch ohne Namen bleibt das eigene Banner (Fix-Review 9f 16.11.)
+  const mein = lage.liste.find((z) => z.ich) || i;
   const ueber = lage.liste.filter((z) => z.rang < i.rang && z.elo > i.elo).at(-1);
   const unter = lage.liste.find((z) => z.rang > i.rang && z.elo < i.elo);
   let ziel = `<p class="lg-welt-platz-ziel">${icon('krone')}${esc(T('platz.erster'))}</p>`;
@@ -92,10 +93,10 @@ function platzKarte(lage, stand) {
         aria-valuetext="${esc(T('platz.balken', { n: zahl(n), platz: zahl(ueber.rang) }))}"><i style="width:${anteil}%"></i></span>` : ''}`;
   }
   return `<article class="lg-welt-platz" data-rang="${esc(i.rang)}">
-    <span class="lg-welt-platz-banner" aria-hidden="true" style="background-image:url('${B.bannerUrl(mein ? mein.banner : 'start')}')"></span>
+    <span class="lg-welt-platz-banner" aria-hidden="true" style="background-image:url('${B.bannerUrl(mein.banner)}')"></span>
     <p class="lg-welt-stand sr" data-status="dabei">${esc(stand)}</p>
     <div class="lg-welt-platz-kopf" aria-hidden="true"><span class="lg-welt-platz-rang">#${esc(zahl(i.rang))}</span>
-      <span class="lg-welt-platz-wer">${mein ? `<b>${esc(mein.name)}</b>` : ''}<span>${esc(T('elo'))} ${esc(zahl(i.elo))}</span></span></div>
+      <span class="lg-welt-platz-wer">${mein.name ? `<b>${esc(mein.name)}</b>` : ''}<span>${esc(T('elo'))} ${esc(zahl(i.elo))}</span></span></div>
     ${ziel}
   </article>`;
 }

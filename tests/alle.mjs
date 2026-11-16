@@ -64,6 +64,7 @@ const SUITEN = [
   { name: 'kronen-vertrag', datei: 'kronen-vertrag.test.mjs', args: [], was: 'Liga mit Kronen: Schema-Vertrag mit js/pakete/liga/kronen.js, Rechte, Rueckweg (Server)' },
   { name: 'besitz', datei: 'besitz.test.mjs', args: [], was: 'Etappe 4b: Erfolge in Stufen, lokales Taler- und Banner-Buch (ohne Konto)' },
   { name: 'r19-liga-namen', datei: 'r19-liga-namen.test.mjs', args: [], was: 'Liga-Namen Satz A (Squire bis Crownmate, auch deutsch), Figuren und IDs unverändert, alte Spielklassen nie angezeigt' },
+  { name: 'r19-liga-neu', datei: 'r19-liga-neu.test.mjs', args: [], was: 'Liga neu: Reiter mit Bildstueck, Welt-Platzkarte mit Banner und Abstand (auch ausserhalb der Liste), Belohnungs-Karte ohne Technik-Satz, DE/EN' },
   { name: 'server-saison', datei: 'server-saison.test.mjs', args: [], was: 'R19 Season: Abrechnung, Abzeichen, Titel, Reset, Karte der Partie, Rechte, Rueckweg (Server, PGlite)' },
   { name: 'r19-saison', datei: 'r19-saison.test.mjs', args: [], was: 'R19 Season: Leiste im Profil, Titelwahl, Blatt am Season-Ende einmal, Karte, Datenschutz' },
   { name: 'r19-saison-abzeichen', datei: 'r19-saison-abzeichen.test.mjs', args: [], was: 'R19 Season-Abzeichen: grosse Wappen, Alle Ligen (18 Stufen, Tastatur), Balken, Titel-Vorschau, Ende-Fenster, Vitrine nur eigen' },
