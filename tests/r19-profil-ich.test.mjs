@@ -70,9 +70,11 @@ async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', beweg
   await s.goto(`http://127.0.0.1:${PORT}/index.html?test#start`);
   await s.waitForSelector('.screen', { timeout: 30000 });
   await s.waitForFunction(() => !!window.__punkte, null, { timeout: 15000 });
-  // Spielstand: vier Siege, Vitrine mit zwei Erfolgs-Familien (wie tests/bilder-profil-ich.mjs)
-  await s.evaluate(async () => {
+  // Spielstand: vier Siege, Vitrine mit zwei Erfolgs-Familien (Siege, Liga)
+  await s.evaluate(async (uid) => {
     const st = await import('/js/storage.js');
+    // Liga-Stand wie nach kronen_mein_stand (js/pakete/liga/kronen.js kronenSpeicher): Stufe 7 = Knight II
+    st.speichereModul('kronen', { konto: uid, stand: { stufe: 7, kronen: 381, platz: 3, n: 30, ziel: 355 } });
     const profil = await import('/js/profil.js');
     const jetzt = Date.now();
     const gegner = [['fridolin', 'sieg'], ['benno', 'sieg'], ['paula', 'remis'], ['gustav', 'sieg'], ['hilde', 'niederlage'], ['janine', 'sieg']];
@@ -87,8 +89,8 @@ async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', beweg
     localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(fortschritt));
     const pk = window.__punkte;
     if (pk) pk.speichere({ ...pk.stand(), level: 12, umzug: true });
-    profil.setzeProfilWahl({ vitrine: ['stufe-siege', 'stufe-level', null] });
-  });
+    profil.setzeProfilWahl({ vitrine: ['stufe-siege', 'stufe-liga', null] });
+  }, UID);
   await s.goto(`http://127.0.0.1:${PORT}/index.html?test#ich`);
   // erst neu laden, wenn der Verlaufseintrag umgestellt ist (js/app.js ausVerlauf, siehe tests/bilder-liga-neu.mjs)
   await s.waitForFunction(() => history.state && history.state.name === 'ich', null, { timeout: 15000 });

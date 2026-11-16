@@ -53,8 +53,10 @@ const KRONEN = { stufe: 7, kronen: 381, platz: 3, n: 30, ziel: 355 };
 
 // Spielstand im Geraet: sechs Partien (vier Siege), Level 12, Vitrine mit Siegen und Level, ein Platz leer
 async function befuelle(s) {
-  await s.evaluate(async () => {
+  await s.evaluate(async ({ uid, kronen }) => {
     const st = await import('/js/storage.js');
+    // Liga-Stand wie nach kronen_mein_stand (js/pakete/liga/kronen.js kronenSpeicher), damit Rang-Chip und Liga-Orden stehen
+    st.speichereModul('kronen', { konto: uid, stand: kronen });
     const profil = await import('/js/profil.js');
     const jetzt = Date.now();
     const gegner = [['fridolin', 'sieg'], ['benno', 'sieg'], ['paula', 'remis'], ['gustav', 'sieg'], ['hilde', 'niederlage'], ['janine', 'sieg']];
@@ -70,8 +72,8 @@ async function befuelle(s) {
     localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(fortschritt));
     const pk = window.__punkte;
     if (pk) pk.speichere({ ...pk.stand(), level: 12, umzug: true });
-    profil.setzeProfilWahl({ vitrine: ['stufe-siege', 'stufe-level', null] });
-  });
+    profil.setzeProfilWahl({ vitrine: ['stufe-siege', 'stufe-liga', null] });
+  }, { uid: UID, kronen: KRONEN });
 }
 
 const GERAETE = [['iphone13', 390, 844], ['se', 375, 667], ['ipad-quer', 1180, 820], ['pc', 1920, 1080]];
