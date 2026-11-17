@@ -68,6 +68,9 @@ async function seite(browser, { profil, status = 200, post = null, ziel = '#ich'
   }, { sitzung: SITZUNG, merker: MERKER, id: ID });
   await s.goto(BASIS + ziel);
   if (ziel !== '#ich') {
+    // 390 px ist Handy (HANDY in js/ui/einstellungen.js): die Konto-Gruppe ist dort eine eigene Seite
+    await s.waitForFunction(() => window.__app && window.__app.gehe, null, { timeout: 30000 });
+    await s.evaluate(() => window.__app.gehe('einstellungen', { seite: 'konto' }));
     await s.waitForSelector('.konto-name', { timeout: 30000 });
     await warte(1500);
     return { k, s, fehler, profilAnfragen, posts };
