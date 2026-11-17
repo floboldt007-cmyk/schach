@@ -241,6 +241,25 @@ async function testeZeilen(browser, d) {
     pruefe('Grund klein in der Nebenzeile (<= 13 px), nicht im Zeichen', z.grund && /Aufgabe/.test(z.grund.text) && z.grund.px <= 13 && !z.grund.imZeichen, z.grund);
     pruefe('Mülleimer leise: ohne Fläche und Schatten', /rgba\(0, 0, 0, 0\)|transparent/.test(z.muell.hg) && (z.muell.schatten === 'none' || !z.muell.schatten), z.muell);
     pruefe('Mülleimer erkennbar (>= 3:1) und tippbar (>= 24 px), mit Namen', z.muell.k >= 3 && z.muell.gross >= 24 && /löschen/i.test(z.muell.label || ''), z.muell);
+    // Kaltreview 9c (Entscheid a5 16.11.): der Vertrag nennt Zeiger und Fokus, also auch in diesen Zuständen messen
+    const muellSel = `.vl-zeile[data-id="${d.ids.niederlage}"] .vl-muell`;
+    const muellZustand = () => seite.evaluate((sel) => {
+      const m = document.querySelector(sel);
+      const cs = getComputedStyle(m);
+      return { hg: cs.backgroundColor, schatten: cs.boxShadow, k: __k(cs.color, __grund(m.parentElement)), sichtbar: m.getClientRects().length > 0 && cs.opacity !== '0' && cs.visibility !== 'hidden',
+        hover: m.matches(':hover'), fokus: m.matches(':focus-visible') };
+    }, muellSel);
+    await seite.hover(muellSel);
+    await warte(250);
+    const mh = await muellZustand();
+    pruefe('Mülleimer unter dem Zeiger: ohne Fläche, sichtbar, >= 3:1', mh.hover && /rgba\(0, 0, 0, 0\)|transparent/.test(mh.hg) && (mh.schatten === 'none' || !mh.schatten) && mh.sichtbar && mh.k >= 3, mh);
+    await seite.mouse.move(0, 0);
+    await seite.keyboard.press('Shift');
+    await seite.focus(muellSel);
+    await warte(250);
+    const mf = await muellZustand();
+    pruefe('Mülleimer mit Tastatur-Fokus: ohne Fläche, sichtbar, >= 3:1', mf.fokus && /rgba\(0, 0, 0, 0\)|transparent/.test(mf.hg) && mf.sichtbar && mf.k >= 3, mf);
+    await seite.evaluate(() => document.activeElement && document.activeElement.blur());
     if (schema === 'light') {
       // Knopf mit Bestaetigung, Abbrechen behaelt
       const vorher = await seite.locator('.vl-zeile').count();
@@ -309,6 +328,57 @@ async function testeKopf(browser) {
   }
 }
 
+// Kaltreview 9c: eigene Bestaende. (a) 11 gewertete Bot-Partien, nur die aelteste analysiert: statistik() nimmt die 10
+// neuesten, die Staerke bleibt leer, und der Satz muss genau das sagen. (c) Entscheid a5 16.11. (rueckholbar): nur Partien
+// ohne Zug stehen trotzdem als EINE Zeile.
+async function legeBestand(browser, art) {
+  const { kontext, seite, fehler } = await neueSeite(browser, { speicher: null });
+  await oeffne(seite);
+  await seite.evaluate((art) => {
+    testseite.leere();
+    const sp = testseite.speicher;
+    const stufe = testseite.BOTS.find((b) => b.id === 'benno')?.stufe;
+    const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    const jetzt = Date.now();
+    const lege = (minuten, o) => {
+      const t = new Date(jetzt - minuten * 60e3);
+      sp.speicherePartie({ id: sp.neueId(t), datum: t.toISOString(), startFen: fen, spielerFarbe: 'w', hinweise: 0, zuruecknahmen: 0,
+        botId: 'benno', botStufe: stufe, ergebnis: 'sieg', grund: 'matt', zuege: ['e2e4', 'e7e5'], san: ['e4', 'e5'], liveKlassen: [null, null], ...o });
+    };
+    if (art === 'alt-analysiert') {
+      for (let i = 0; i < 10; i++) lege(10 + i, {});
+      lege(100, { genauigkeit: 80, spielstaerke: 1500 });
+    } else {
+      lege(10, { ergebnis: 'niederlage', grund: 'aufgabe', zuege: [], san: [], liveKlassen: [] });
+      lege(20, { ergebnis: 'niederlage', grund: 'aufgabe', zuege: [], san: [], liveKlassen: [] });
+    }
+  }, art);
+  await zeigeVerlauf(seite);
+  return { kontext, seite, fehler };
+}
+async function testeBestaende(browser) {
+  gruppe = 'Stärke nur aus alter Analyse';
+  {
+    const { kontext, seite, fehler } = await legeBestand(browser, 'alt-analysiert');
+    const e = await seite.evaluate(() => (document.querySelector('.vl-staerke .vl-staerke-text')?.textContent || '').trim());
+    pruefe('Satz sagt, was die Rechnung braucht (letzte 10 Partien)', e === 'Erscheint, sobald eine deiner letzten 10 Partien gegen die Bots analysiert ist.', e);
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  gruppe = 'Nur Partien ohne Zug';
+  {
+    const { kontext, seite, fehler } = await legeBestand(browser, 'nur-ohne');
+    const r = await seite.evaluate(() => ({
+      knoepfe: document.querySelectorAll('.vl-ohne').length,
+      text: document.querySelector('.vl-ohne')?.textContent.replace(/\s+/g, ' ').trim() || null,
+      einzeln: [...document.querySelectorAll('.vl-zeile')].filter((z) => z.getClientRects().length > 0).length,
+    }));
+    pruefe('Nur Partien ohne Zug: EINE Sammelzeile mit Anzahl 2, keine einzeln sichtbar', r.knoepfe === 1 && /\b2\b/.test(r.text || '') && r.einzeln === 0, r);
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+}
+
 // Bilder fuer "Rueckholbar": iPhone 13, SE, iPad, PC, hell und dunkel
 async function machBilder(browser) {
   gruppe = 'Bilder';
@@ -346,6 +416,7 @@ try {
   await testeOhneZug(browser, d);
   await testeZeilen(browser, d);
   await testeKopf(browser);
+  await testeBestaende(browser);
   const fehlend = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - fehlend.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of fehlend) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + (typeof f.detail === 'string' ? f.detail : JSON.stringify(f.detail)) + ')' : ''));

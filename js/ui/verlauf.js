@@ -222,11 +222,11 @@ export function zeige(root, params = {}, app) {
   }
 
   // Partien ohne Zug (sofort aufgegeben oder abgebrochen) als EINE aufklappbare Zeile am Ende der Liste; sie bleiben
-  // oeffen- und loeschbar. Gibt es nur solche, stehen sie wie bisher einzeln da.
+  // oeffen- und loeschbar. Auch wenn es nur solche gibt, stehen sie in dieser einen Zeile (Entscheid 16.11., rueckholbar).
   function listeHtml(partien) {
     const ohne = partien.filter((p) => !(p.zuege || []).length);
     const mit = partien.filter((p) => (p.zuege || []).length);
-    if (!ohne.length || !mit.length) return partien.map(zeileHtml).join('');
+    if (!ohne.length) return partien.map(zeileHtml).join('');
     return `${mit.map(zeileHtml).join('')}
       <div class="vl-ohne-gruppe" role="listitem">
         <button class="vl-ohne" type="button" data-aktion="ohne" aria-expanded="${ohneOffen}" aria-controls="vl-ohne-liste">
