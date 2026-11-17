@@ -374,6 +374,9 @@ registriereTexte('einstellungen', {
     'konto.keineId': 'Die Sitzung enthält keine Benutzer-ID.',
     'konto.nameRegel': 'Der Benutzername braucht 3 bis 20 Zeichen: Buchstaben, Zahlen oder _.',
     'konto.nameVergeben': 'Dieser Benutzername ist schon vergeben.',
+    // Monats-Sperre (supabase/benutzername-sperre-schema.sql, R19): der Server entscheidet, die App nennt nur das Datum
+    'konto.nameAb': 'Nächste Änderung ab {datum}',
+    'konto.nameGesperrt': 'Den Benutzernamen kannst du einmal in 30 Tagen ändern. Nächste Änderung ab {datum}.',
     'konto.cloudFormat': 'Der Cloud-Spielstand hat ein unbekanntes Format.',
     'konto.rueckfallFehler': 'Die Rückfall-Sicherung konnte nicht gespeichert werden.',
     'konto.cloudLadenFehler': 'Cloud-Spielstand konnte nicht geladen werden. Der bisherige Stand bleibt erhalten.',
@@ -790,6 +793,8 @@ registriereTexte('einstellungen', {
     'konto.keineId': 'The session has no user ID.',
     'konto.nameRegel': 'The username needs 3 to 20 characters: letters, numbers or _.',
     'konto.nameVergeben': 'This username is already taken.',
+    'konto.nameAb': 'Next change from {datum}',
+    'konto.nameGesperrt': 'You can change your username once every 30 days. Next change from {datum}.',
     'konto.cloudFormat': 'The cloud progress has an unknown format.',
     'konto.rueckfallFehler': 'The fallback backup could not be saved.',
     'konto.cloudLadenFehler': 'The cloud progress could not be loaded. Your current progress stays as it is.',
