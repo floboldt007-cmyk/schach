@@ -26,6 +26,7 @@ const FAMILIE = {
 };
 export function wegText(w, weltName = (n) => 'Welt ' + n) {
   if (!w) return '';
+  if (w.art === 'geplant') return 'geplant: Shop oder harter Erfolg';
   if (w.art === 'start') return 'von Anfang an';
   if (w.art === 'level') return `Level ${w.n}`;
   if (w.art === 'welt') return `alle Bots von ${weltName(w.welt)} besiegt`;

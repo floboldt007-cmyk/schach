@@ -344,3 +344,41 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   .pr-vitrine-ort .pr-orden.leer { background: rgba(10, 12, 16, .62); border-color: rgba(255, 255, 255, .55); color: #FFFFFF; }
   .pr-vitrine-ort .pr-vitrine[data-leer] .pr-orden { min-height: 44px; }
 }
+
+/* R19 Shop A (shop-entwurf.js, nur mit ?shopStil=a): fuenf feste Plaetze (Brett, Figur, Klang, Emote, Finisher), gleich
+   grosse Karten mit Bild und Preis, Farbe je Seltenheit; kein Ablauf, keine Restzahl */
+.shf { display: grid; gap: 22px; min-width: 0; max-width: 1100px; }
+.sh-inhalt:has(> .shf) { max-width: none; }
+.shf-fuenf { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+.shf-karte { --shf-farbe: #7a8494; }
+.shf-karte[data-seltenheit="haeufig"] { --shf-farbe: #4f9a64; }
+.shf-karte[data-seltenheit="selten"] { --shf-farbe: #3a78d4; }
+.shf-karte[data-seltenheit="episch"] { --shf-farbe: #8b4fd8; }
+.shf-karte[data-seltenheit="exklusiv"] { --shf-farbe: #c38f22; }
+.shf-karte { position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: 10px; border: 0; border-radius: 16px;
+  text-align: left; font: inherit; color: var(--text); cursor: pointer; min-width: 0; background: var(--flaeche);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--shf-farbe) 60%, transparent), var(--s1); }
+.shf-karte:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+.shf-karte[data-folgt] { cursor: default; box-shadow: inset 0 0 0 2px var(--rand, rgba(127, 127, 127, .35)); }
+.shf-bild { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+  background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--shf-farbe) 34%, #fff), color-mix(in srgb, var(--shf-farbe) 80%, #000)); }
+.shf-karte[data-folgt] .shf-bild { background: var(--flaeche-2); color: var(--text-2); }
+.shf-bild > svg:not(.shf-brettbild) { width: 72%; height: auto; }
+.shf-brettbild { width: 72%; height: auto; border-radius: 6px; box-shadow: 0 6px 14px rgba(0, 0, 0, .3); }
+.shf-figuren { display: flex; align-items: flex-end; justify-content: center; width: 100%; }
+.shf-fig { width: 44%; height: auto; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .35)); }
+.shf-text { display: grid; gap: 2px; min-width: 0; align-content: start; }
+.shf-selten { font-size: 12px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; color: color-mix(in srgb, var(--shf-farbe) 78%, var(--text)); }
+.shf-name { font-family: var(--display); font-weight: var(--gw-titel); font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
+.shf-unter { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.shf-preis { justify-self: start; padding: 4px 10px; border-radius: 99px; font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums;
+  background: var(--flaeche-2); }
+/* Vorschau: Brett und Figur auf dem echten Brett (js/board.js, Farben als --feld-hell und --feld-dunkel), Klang, Emote und
+   Finisher gross; der Finisher steht still, alles steht still bei "weniger Bewegung" */
+.shf-vorschau { position: relative; display: grid; justify-items: center; gap: 12px; width: min(340px, 78vw); margin: 4px auto 12px; }
+.shf-vorschau-brett { width: 100%; aspect-ratio: 1; }
+.shf-gross { display: grid; place-items: center; width: min(240px, 62vw); aspect-ratio: 1; }
+.shf-gross > svg { width: 100%; height: auto; }
+.shf-anhoeren { min-height: 44px; min-width: 44px; padding: 10px 22px; }
+.shf-still, .shf-still *, .shf-karte[data-art="finisher"] .shf-bild * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .shf-gross *, .shf-bild * { animation: none !important; } }

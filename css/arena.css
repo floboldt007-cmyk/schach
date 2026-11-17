@@ -168,16 +168,13 @@
     --welt-weg: #A99F7E; --welt-weg-rand: #73694C;
   }
 }
-/* gesperrte Welt: ruhige Silhouette */
-.arena .welt.gesperrt .welt-svg { filter: grayscale(.85) brightness(1.04) contrast(.8); opacity: .6; }
-:root[data-modus="dunkel"] .arena .welt.gesperrt .welt-svg { filter: grayscale(.85) brightness(.8) contrast(.8); }
+/* Vorschau-Welt (noch nicht offen, Flo 15.11.2026): Landschaft in Farbe, ohne Schloss; die Bots etwas gedimmt, der
+   Endgegner bleibt Silhouette bis zum Freischalten; Flos Figur steht erst in einer offenen Welt */
 .arena .welt.gesperrt .flo-figur { display: none; }
-.arena .welt-sperre { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 24px; pointer-events: none; }
-.arena .welt-sperre[hidden] { display: none; }
-.arena .ws-karte { max-width: 320px; display: grid; justify-items: center; gap: 6px; padding: 18px 20px; border-radius: var(--r-l, 20px); text-align: center;
-  background: var(--flaeche); color: var(--text-2); box-shadow: var(--s3), var(--kante); font-size: 14px; line-height: 1.4; }
-.arena .ws-karte .ico { width: 22px; height: 22px; color: var(--text-2); }
-.arena .ws-karte b { font-family: var(--display); font-size: 20px; color: var(--text); }
+.arena .welt.gesperrt .knoten.gesperrt:not(.boss) .avatar img { filter: grayscale(.35) contrast(.95); opacity: .82; }
+/* statt "Spielen" der Hinweis, wer die Welt oeffnet (js/ui/arena.js zeigeDetail) */
+.arena .sp-gesperrt { margin: 0; min-height: var(--tipp); display: grid; place-items: center; padding: 10px 16px; border-radius: var(--r-pille);
+  background: var(--flaeche-3); color: var(--text); font-size: 15px; font-weight: 650; line-height: 1.3; text-align: center; }
 /* Weltwahl: Pfeile und Name der Welt ueber der Karte (klebt oben, auch wenn die Karte im Hochformat scrollt) */
 .arena .weltwahl { position: sticky; top: 10px; z-index: 30; height: 0; display: flex; justify-content: center; align-items: flex-start; gap: 6px;
   pointer-events: none; }
