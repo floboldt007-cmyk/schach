@@ -655,7 +655,17 @@ export function zeige(root, params, app) {
     const luft = ([x, y]) => (x < rand || x > masse.w - rand || y < rand || y > hoehe - rand ? -Infinity
       : Math.min(...hindernisse.map((h) => (h.kreis ? Math.hypot(x - h.x, y - h.y) - (r + h.r + 2)
         : Math.hypot(x - Math.max(h.x, Math.min(x, h.x + h.w)), y - Math.max(h.y, Math.min(y, h.y + h.h))) - (r + 2)))));
-    return kandidaten.find((p) => luft(p) >= 0) || kandidaten.reduce((a, b) => (luft(b) > luft(a) ? b : a));
+    const frei = kandidaten.find((p) => luft(p) >= 0);
+    if (frei) return frei;
+    // vor dem Rueckfall fein nahe suchen (iPhone SE, Welt 288x261, Start jeder Welt: kein Ring frei, der Rueckfall lag
+    // 2 px auf der Nummer von Station 1, frei war ein Platz 6 bis 9 px daneben): Ringe in 4-px-Schritten, alle 15 Grad
+    for (let a = d || 4; a <= a0 + 8 * r; a += 4) {
+      for (let g = 0; g < 360; g += 15) {
+        const p = [cx + a * Math.cos(g * Math.PI / 180), cy + a * Math.sin(g * Math.PI / 180)];
+        if (luft(p) >= 0) return p;
+      }
+    }
+    return kandidaten.reduce((a, b) => (luft(b) > luft(a) ? b : a));
   }
   // Bewegung aus (css/tokens.css): jeder Uebergang dauert .01ms, auch Breite und Rand der Stationen, wenn layout() ihre
   // Groesse setzt; solange er laeuft, melden offsetWidth und Lage noch den alten Wert, und die Figur stand auf der Fahne

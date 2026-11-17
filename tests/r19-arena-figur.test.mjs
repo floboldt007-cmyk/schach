@@ -1,7 +1,7 @@
 // Feinschliff R19 (Flo 15.11.2026 12:44, live #arena PC dunkel, Welt 1 komplett, Janine besiegt): Flos eigene Figur hing
 // halb hinter Janines Bild. Ziel: Die Figur steht bei jeder Stufe sichtbar und frei neben ihrer Station, auch bei fertiger
 // Welt, nie hinter oder auf einem Bot, seinem Namensschild, seiner Nummer oder seinem Schild darueber.
-// Browser (Playwright), iPhone 13, iPad quer, PC 1280; dunkel, ruhige Bewegung:
+// Browser (Playwright), iPhone 13, iPhone SE, iPad hoch und quer, PC 1280; dunkel, ruhige Bewegung:
 //   je Stufe n (alle Bots unter n besiegt): die Welt des naechsten Gegners, wie die Arena sie oeffnet
 //   je fertiger Welt w (Endgegner besiegt): Welt w ueber den Pfeil zurueck (Flos Fall), dazu "alle 30 besiegt"
 // Je Fall: .flo-figur sichtbar (kein display:none, kein .verdeckt), ganz in der Welt, Kreis der Figur ueberlappt keinen
@@ -45,8 +45,13 @@ function pruefe(name, bed, info) {
 const warte = (ms) => new Promise(r => setTimeout(r, ms));
 
 const { defaultBrowserType: _a, ...IPHONE13 } = pw.devices['iPhone 13'];
+const { defaultBrowserType: _b, ...IPHONESE } = pw.devices['iPhone SE'];
+// iPhone SE und iPad hoch seit dem Kaltreview 17.11.2026: auf dem SE (Welt 288x261) stand die Figur am Start jeder Welt
+// 2 px auf der Nummer von Station 1
 const GERAETE = [
   { name: 'iphone13', optionen: IPHONE13 },
+  { name: 'iphonese', optionen: IPHONESE },
+  { name: 'ipad-hoch', optionen: { viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
   { name: 'ipad-quer', optionen: { viewport: { width: 1180, height: 820 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
   { name: 'pc1280', optionen: { viewport: { width: 1280, height: 800 } } },
 ];
