@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="de" data-brett="nacht">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motiv-Bretter</title>
+<!-- Vorschau der 20 Motiv-Bretter, Fassung 3 (Flo 14.11.2026, nur im Zweig, nicht in der App und nicht im Service Worker).
+     Uebersicht: werkzeuge/bretter-vorschau-v3.html                     alle 20 mit Rahmen und echter Stellung
+     Einzeln:    werkzeuge/bretter-vorschau-v3.html?brett=<id>          ein Brett in iPhone-Breite, mit Rahmen, Koordinaten, letztem Zug
+     Messung:    werkzeuge/bretter-vorschau-v3.html?brett=<id>&nur=felder  nur die Felder, 400 px (tests/bretter-v3.test.mjs)
+     Bilder und Liste fuer den Vault macht werkzeuge/bretter-vorschau-v3.mjs. -->
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/board.css">
+<style>
+  :root { --grund: #101218; --text: #eef0f6; --leise: #a9b0c2; --linie: #2a2f3a; }
+  body { margin: 0; background: var(--grund); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 1360px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; margin-top: 18px; }
+  .karte { background: #191c24; border: 1px solid var(--linie); border-radius: 14px; padding: 12px; }
+  .motiv-brett { box-sizing: border-box; }
+  .motiv-brett .brett { width: 100%; aspect-ratio: 1; position: relative; overflow: hidden; }
+  .name { margin-top: 10px; font-weight: 700; display: flex; gap: 6px; align-items: baseline; }
+  .nr { color: var(--leise); font-weight: 500; font-size: 12px; }
+  .zeile { color: var(--leise); font-size: 12px; }
+  .sel { display: inline-block; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+  .sel.selten { background: #1d4a7a; } .sel.episch { background: #5a2a8a; } .sel.legende { background: #8a5a10; }
+  /* Einzelbild: so breit wie ein iPhone (390), 16 px Rand */
+  body.einzeln main { max-width: 390px; padding: 20px 16px 24px; box-sizing: border-box; }
+  body.einzeln .kopf { margin-bottom: 14px; }
+  body.einzeln .kopf b { font-size: 20px; display: block; }
+  body.einzeln .idee { color: var(--leise); font-size: 13px; margin-top: 10px; }
+  /* Messung: nur Felder, ohne Rahmen, genau 400 px */
+  body.felder main { padding: 10px; max-width: none; }
+  body.felder .brett { --brett-radius: 0px; width: 400px; height: 400px; position: relative; border-radius: 0 !important; box-shadow: none !important; }
+</style>
+<style id="motive"></style>
+</head>
+<body>
+<main id="haupt"></main>
+<script type="module">
+  import { Brett } from '../js/board.js';
+  import { WELTEN } from '../js/bots.js';
+  import { MOTIVE, motivCss } from '../js/brett-motive.js';
+  import { wegText } from './bretter-katalog.mjs';
+
+  const FEN = 'r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 7';
+  const LEER = '8/8/8/8/8/8/8/8 w - - 0 1';
+  const SELTEN = { selten: 'Selten', episch: 'Episch', legende: 'Legende' };
+  const weltName = (n) => (WELTEN.find((w) => w.nr === n) || {}).name || 'Welt ' + n;
+  const haupt = document.getElementById('haupt');
+  const q = new URLSearchParams(location.search);
+  const id = q.get('brett'), nurFelder = q.get('nur') === 'felder';
+  const brett = (el, koordinaten = true, fen = FEN) => {
+    const x = new Brett(el, { figurenPfad: '../assets/pieces/', koordinaten, animation: 0, pfeile: false });
+    x.setzeStellung(fen, fen === FEN ? { animieren: false, letzterZug: 'f8c5' } : { animieren: false });
+    return x;
+  };
+  const motivEl = (m) => { const r = document.createElement('div'); r.className = 'motiv-brett'; r.dataset.motiv = m.id; r.innerHTML = '<div class="brett-platz"></div>'; return r; };
+  const liste = id ? MOTIVE.filter((m) => m.id === id) : MOTIVE;
+  if (id && !liste.length) throw new Error('unbekanntes Motiv ' + id);
+  document.getElementById('motive').textContent = liste.map(motivCss).join('\n');
+
+  if (id && nurFelder) {
+    document.body.classList.add('felder');
+    // ohne Rahmen: die Variablen des Motivs gelten, Polster und Hintergrund nicht
+    const r = motivEl(liste[0]);
+    r.style.cssText = 'padding:0;background:none;box-shadow:none;animation:none;width:400px';
+    haupt.append(r);
+    brett(r.firstElementChild, false, LEER);
+  } else if (id) {
+    const m = liste[0];
+    document.body.classList.add('einzeln');
+    haupt.insertAdjacentHTML('beforeend', `<div class="kopf"><b>${m.name}</b><span class="sel ${m.seltenheit}">${SELTEN[m.seltenheit]}</span> <span class="zeile">${wegText(m.weg, weltName)}</span></div>`);
+    const r = motivEl(m);
+    haupt.append(r);
+    brett(r.firstElementChild);
+    haupt.insertAdjacentHTML('beforeend', `<div class="idee">${m.idee}</div>`);
+  } else {
+    haupt.insertAdjacentHTML('beforeend', `<h1>20 Motiv-Bretter, Fassung 3</h1><div class="zeile">Je ein Bild über das ganze Brett, mit eigenem Rahmen und eigener Koordinaten-Schrift. Streichen in Bretter-Auswahl.md (Vault).</div><div class="raster"></div>`);
+    const raster = haupt.querySelector('.raster');
+    MOTIVE.forEach((m, n) => {
+      const karte = document.createElement('div');
+      karte.className = 'karte';
+      const r = motivEl(m);
+      karte.append(r);
+      karte.insertAdjacentHTML('beforeend', `<div class="name"><span class="nr">${n + 1}</span>${m.name}</div><div class="zeile"><span class="sel ${m.seltenheit}">${SELTEN[m.seltenheit]}</span> ${wegText(m.weg, weltName)}</div>`);
+      raster.append(karte);
+      brett(r.firstElementChild);
+    });
+  }
+  window.vorschauFertig = true;
+</script>
+</body>
+</html>

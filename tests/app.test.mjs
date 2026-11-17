@@ -917,13 +917,13 @@ async function testePruefrunde(browser) {
     await seite.waitForSelector('.toast');
     const t = await seite.locator('.toast').innerText();
     pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Vogelscheuche Willi/.test(t), t);
-    // gesperrte Welt: ihr Bot nennt den Endgegner davor, der die Welt öffnet
+    // Vorschau-Welt (Flo 15.11.2026): ihr Bot oeffnet seine Karte, statt "Spielen" nennt sie den Endgegner davor
     await h.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
     await seite.waitForSelector('.knoten[data-bot="lisa"]');
     await h.tippe('.knoten[data-bot="lisa"]');
-    await seite.waitForFunction(() => /öffnet sich mit einem Sieg gegen/.test(document.querySelector('.toast') ? document.querySelector('.toast').textContent : ''), null, { timeout: 5000 }).catch(() => {});
-    const t2 = await seite.locator('.toast').innerText();
-    pruefe('Gesperrte Welt: "öffnet sich mit einem Sieg gegen Janine"', /Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub/.test(t2), t2);
+    await seite.waitForSelector('.detail .sp-gesperrt', { timeout: 5000 }).catch(() => {});
+    const t2 = await seite.evaluate(() => ({ hinweis: (document.querySelector('.detail .sp-gesperrt') || {}).textContent || '', spielen: document.querySelectorAll('.detail [data-aktion="spielen"]').length }));
+    pruefe('Vorschau-Welt: Karte mit "Besiege zuerst Janine" statt Spielen', /^Besiege zuerst Janine vom Scheunenclub\./.test(t2.hinweis) && t2.spielen === 0, JSON.stringify(t2));
     const alle = await seite.evaluate(async () => ({ bots: Object.fromEntries((await import('./js/bots.js')).BOTS
       .map((b, i) => [b.id, { sterne: [true, i > 0, i > 2], partien: 1, siege: 1, remis: 0, niederlagen: 0 }])) }));
     await seite.evaluate((f) => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)), alle);

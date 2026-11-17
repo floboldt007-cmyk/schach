@@ -26,7 +26,6 @@ import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
 import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
-import { hoere } from '../ereignisse.js';
 import { spieleDuell } from './duell.js';
 import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie } from '../storage.js';
 
@@ -59,6 +58,11 @@ const REMIS_SYMBOL = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fo
 // Duell-Intro vor gewerteten Partien (js/ui/duell.js) nur einmal je Partie und nur in der ersten Minute
 const INTRO_SCHLUESSEL = 'schach-arena:online:intro';
 const INTRO_FRIST_MS = 60 * 1000;
+// R19 online ruhig (Flo 14.11.2026: "zu viele Zahlen, zu unuebersichtlich", Wahl 23:00: Entwurf A): die Lobby zeigt EINE
+// Zahl, deine Online-Elo; Spielerleisten nur den Namen; das Ergebnis nur die Kronen-Aenderung (tests/r19-online-ruhig.test.mjs).
+// Die Elo kommt nur vom Server (kronen_mein_stand.elo, supabase/online-elo-schema.sql). Fehlt sie, steht dort die Liga als
+// Wort, ohne Zahl; die Liga-Wertung des Geraets ist die Bot-Liga, eine andere Groesse, und erscheint hier nie.
+const serverElo = (st) => (Number.isInteger(st.elo) && st.elo >= 100 && st.elo <= 4000 ? st.elo : null);
 // neueste laufende Partie zuerst (Befund 2 vom 11.11.: zwei gewertete Partien zugleich, jedes Geraet sass in einer anderen)
 const zeitVon = (row) => Date.parse(row?.erstellt_am || row?.aktualisiert_am || '') || 0;
 const neuesteLaufende = (liste) => (Array.isArray(liste) ? liste : []).filter((row) => row && row.status === 'laeuft')
@@ -167,7 +171,7 @@ export function zeige(root, params, app) {
     + `${art === 'duell' ? '<b class="on-bild-uhr zahl">3:00</b>' : ''}</span>`;
   const tuer = (art, rumpf) => `<section class="on-art on-tuer" data-art="${art}" aria-labelledby="on-${art}-t">
       <div class="on-tuer-kopf">${bild(art)}<div class="on-tuer-text"><span class="on-tuer-ueber">${esc(O(`tuer.${art}.ueber`))}</span>
-        <h2 id="on-${art}-t">${esc(O(`tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
+        <h2 id="on-${art}-t">${esc(O(art === 'duell' ? 'ruhig.duellTitel' : `tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
   const RING = 2 * Math.PI * 44;
   function start() {
     const kopfHtml = seitenKopf({ titel: O('titel'), text: O('kurz') });
@@ -264,7 +268,9 @@ export function zeige(root, params, app) {
       hinweis.textContent = O(gewertet ? 'suche.kiGewertet' : 'suche.kiHinweis');
     }
   }
-  // Liga-Streifen: Stufe, Platz in der Wochen-Gruppe und Kronen (kronen_mein_stand); unbrauchbare Antwort: kein Streifen
+  // Lobby-Zeile aus kronen_mein_stand: EINE grosse Zahl (Elo vom Server) oder ohne sie die Liga als Wort; Stufe, Platz in
+  // der Wochen-Gruppe, Kronen und die feste Bedenkzeit stehen hinter "Mehr" (zu). Vorgelesen wird, was zu sehen ist, den
+  // Rest liest "Mehr" vor. Der Knopf fuehrt wie bisher zur Liga (data-online="liga"). Unbrauchbare Antwort: keine Zeile.
   function zeigeLiga(d) {
     const st = Array.isArray(d) ? d[0] : d;
     const el = inhalt.querySelector('.on-liga');
@@ -275,10 +281,24 @@ export function zeige(root, params, app) {
     const n = Number.isInteger(st.n) && st.n > 0 ? st.n : 30;
     const zeile = Number.isInteger(st.platz) && st.platz > 0 ? O('liga.platz', { platz: st.platz, n }) : O('liga.ohneGruppe');
     const zahlKronen = Math.max(0, Math.trunc(Number(st.kronen)));
-    el.innerHTML = `<span class="on-liga-schild" aria-hidden="true">${icon('liga')}</span><span class="on-liga-text"><b>${esc(stufe)}</b><span>${esc(zeile)}</span></span>`
-      + `<span class="on-liga-kronen zahl" aria-hidden="true">${icon('krone')}${esc(String(zahlKronen))}</span>`;
-    el.setAttribute('aria-label', O('liga.label', { stufe, zeile, kronen: O('liga.kronen', { n: zahlKronen }) }));
+    const elo = serverElo(st);
+    const groesse = O(elo != null ? 'ruhig.elo' : 'ruhig.deineLiga');
+    el.innerHTML = `<span class="on-liga-schild" aria-hidden="true">${icon(elo != null ? 'podest' : 'liga')}</span>`
+      + `<span class="on-gross"><span class="on-gross-wert${elo != null ? ' zahl' : ''}">${esc(elo != null ? String(elo) : stufe)}</span>`
+      + `<span class="on-gross-text">${esc(groesse)}</span></span>`;
+    el.setAttribute('aria-label', `${groesse}: ${elo != null ? elo : stufe}`);
     el.hidden = false;
+    const zeitFest = O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) });
+    const wrap = document.createElement('div');
+    wrap.className = 'on-ruhig';
+    el.replaceWith(wrap);
+    wrap.append(el);
+    // die Texte JEDER Tuer kommen mit nach "Mehr"; erst dann blendet data-mehr sie an den Tueren aus (css/online.css).
+    // Ohne "Mehr" (Stand kaputt, ohne Konto) bleiben sie an der Tuer stehen (Kaltreview 15.11.).
+    const tuerTexte = [...inhalt.querySelectorAll('.on-tuer-text p')].map(p => p.textContent);
+    wrap.insertAdjacentHTML('beforeend', `<details class="on-mehr"><summary class="dr">${esc(O('ruhig.mehr'))}</summary><ul>`
+      + [stufe, zeile, O('liga.kronen', { n: zahlKronen }), zeitFest, ...tuerTexte].map(x => `<li>${esc(x)}</li>`).join('') + '</ul></details>');
+    inhalt.querySelector('.on-tueren')?.setAttribute('data-mehr', '');
   }
   // Laeuft fuer das Konto eine Partie (online_meine), wird die Partie-Tuer zur Karte "Laufende Partie fortsetzen" und
   // oeffnet die NEUESTE laufende (Befund 3 vom 11.11.: kein Weg zurueck; Befund 2: zwei laufende zugleich). Solange eine
@@ -320,9 +340,9 @@ export function zeige(root, params, app) {
         if (!bot) { sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); return; }
         // gewertet mit Beleg und neuem SQL (#213: Vorab-Niederlage, ein offener Beleg): Verlassen zaehlt als Niederlage.
         // Mit altem SQL stimmt der Satz nicht, dort kein Hinweis.
-        // erst wenn die Partie steht: der Seitenwechsel leert die Meldungen (js/app.js zeigeScreen)
-        if (kiRef && lage().vomServer) { const ab = hoere('app:screen', (d) => { if (d.name !== 'partie') return; ab(); app.meldung(O('suche.kiVerlassen'), { dauer: 4500 }); }); }
-        app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl(lage), ki: true, ...(kiRef ? { kiRef } : {}) });
+        // die Meldung zeigt starteKiErsatz erst, wenn die Partie wirklich startet (nicht nach dem Verlassen)
+        const hinweis = kiRef && lage().vomServer ? O('suche.kiVerlassen') : null;
+        import('./ki-ersatz.js').then((m) => m.starteKiErsatz(app, { bot, tempo: tempoWahl(lage), kiRef, weg: () => weg, hinweis })).catch((e) => { console.error(e); sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); });
       },
       beiFehler: (e) => { suche = null; sucheZustand('bereit', O('suche.erklaert')); melde(e?.message || O('fehler')); },
     });
@@ -753,8 +773,9 @@ export function zeige(root, params, app) {
     el.hidden = !ok;
     if (!ok) { el.textContent = ''; return; }
     const d = kronenNach.kronen - kronenVor.kronen;
-    el.innerHTML = `${icon('krone')}<b class="zahl">${d > 0 ? '+' + d : d < 0 ? '−' + Math.abs(d) : '±0'}</b>`
-      + `<span>${esc(O('liga.kronen', { n: kronenNach.kronen }))}</span>`;
+    const aenderung = d > 0 ? '+' + d : d < 0 ? '−' + Math.abs(d) : '±0';
+    // nur die Aenderung dieser Partie (R19 online ruhig), der Wochenstand steht in der Lobby hinter "Mehr"
+    el.innerHTML = `${icon('krone')}<b class="zahl">${aenderung}</b><span>${esc(O('ruhig.kronen'))}</span>`;
   }
   // R7 (Gleichheits-Liste R6, B2): das Ende zeigt das Ergebnisblatt der Bot-Partie (css/ergebnis.css, Aufbau wie baueOverlay
   // in js/ui/partie.js): Kopfwort, Grund, bei gewerteten Partien die Kronen-Aenderung, "Zur Analyse", Revanche und Meine
@@ -874,15 +895,16 @@ export function zeige(root, params, app) {
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
       const { k, name, elo, liga } = spielerDaten(f);
       const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
-      const titel = k && k.titel ? `<small class="on-titel">${esc(k.titel.name)}</small>` : '';
-      // Unterzeile wie in der Bot-Partie: Elo (wenn bekannt) und Liga, sonst die Farbe; dahinter die geschlagenen Figuren
-      const meta = [elo != null ? `Elo ${elo}` : '', liga].filter(Boolean).join(' · ') || (f === 'w' ? O('weiss') : O('schwarz'));
       const avatar = k?.avatar || floAvatar(f);
-      const unter = `<div class="unter bot-meta">${titel}<span class="p-meta">${esc(meta)}</span><span class="geschlagen-ort" data-wer="${f}"></span></div>`;
+      // R19 online ruhig (Flos Wahl A): die Leiste zeigt den Namen, ohne Titel; unter dem Namen die geschlagenen Figuren.
+      // Flo 15.11. 12:50 ("die elo soll man schon sehen koennen"): beim GEGNER davor seine Elo, nur die vom Server
+      // (spielerDaten, 100 bis 4000), ohne sie die Liga als Wort, ohne beides nichts. Die eigene Elo steht in der Lobby.
+      const meta = ort === 'oben' ? (elo != null ? `Elo ${elo}` : liga) : '';
+      const unter = `<div class="unter bot-meta">${meta ? `<span class="p-meta">${esc(meta)}</span>` : ''}<span class="geschlagen-ort" data-wer="${f}"></span></div>`;
       const uhr = `<div class="uhr zahl" data-farbe="${f}"${p.bedenkzeit_s == null ? ' hidden' : ''}>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
       const el = inhalt.querySelector('.on-' + ort);
       el.classList.toggle('mit-banner', !!banner);
-      el.setAttribute('aria-label', name);
+      el.setAttribute('aria-label', meta ? `${name}, ${meta}` : name);
       // Gegner: Bild, Feld info (Name, Unterzeile), Uhr; eigene Leiste: Bild, Name, Unterzeile, Uhr (Gitter aus css/partie.css)
       el.innerHTML = ort === 'oben'
         ? `${banner}<span class="av">${avatar}</span><div class="info"><div class="name"><b>${esc(name)}</b></div>${unter}</div>${uhr}`

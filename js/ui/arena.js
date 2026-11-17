@@ -337,6 +337,10 @@ export function zeige(root, params, app) {
     return 'gesperrt';
   };
   const kurzName = (b) => rufname(b);
+  // Vorschau (Flo 15.11.2026: "die neue Welt, dass man die sehen kann, aber noch nicht gegen die spielen kann", ohne
+  // Schloss): ein Bot einer noch geschlossenen Welt ist zu sehen und zu waehlen, spielbar erst nach einem Sieg ueber den
+  // Endgegner der Welt davor. Liefert diesen Endgegner, sonst null (Bot einer offenen Welt)
+  const vorschauTor = (b) => (istWeltFrei(b.welt, fortschritt) ? null : endgegnerDerWelt(b.welt - 1) || null);
 
   // ---------- Aufbau ----------
   const s = document.createElement('section');
@@ -368,7 +372,6 @@ export function zeige(root, params, app) {
           <div class="ort-karte-boss" hidden></div>
           <div class="ort-karte-event" hidden></div>
           <div class="flo-figur" aria-hidden="true">${floAvatar(letzteFarbe === 'b' ? 'b' : 'w')}</div>
-          <div class="welt-sperre" hidden></div>
         </div>
       </div>
       <aside class="detail" aria-label="${esc(t('arena.aria.gegner'))}"></aside>
@@ -378,7 +381,6 @@ export function zeige(root, params, app) {
   const karte = s.querySelector('.karte');
   const ziehHinweis = s.querySelector('.karte-zieh-hinweis');
   const weltEl = s.querySelector('.welt');
-  const weltSperre = s.querySelector('.welt-sperre');
   const bild = s.querySelector('.welt-bild');
   const detail = s.querySelector('.detail');
   const floFigur = s.querySelector('.flo-figur');
@@ -456,11 +458,11 @@ export function zeige(root, params, app) {
       ${z === 'besiegt' ? `<span class="k-sterne" aria-hidden="true">${kSterneHtml(sterne)}</span>` : ''}
       <span class="avatar"><img src="${esc(avatarVon(b))}" alt="" draggable="false"></span>
       <span class="k-nr zahl" aria-hidden="true">${b.stufe}</span>
-      ${z === 'gesperrt' || b.id === neuId ? `<span class="schloss">${icon('schloss')}</span>` : ''}
+      ${(z === 'gesperrt' && !vorschauTor(b)) || b.id === neuId ? `<span class="schloss">${icon('schloss')}</span>` : ''}
       ${z === 'offen' && neuEingezogen(b) ? `<span class="k-neu">${esc(t('arena.schild.neu'))}</span>` : ''}
       <span class="k-schild"><span class="k-name">${esc(kurzName(b))}</span><span class="k-meta zahl">${b.elo}</span></span>`;
     el.addEventListener('click', () => tippeKnoten(b, el));
-    weltEl.insertBefore(el, weltSperre);
+    weltEl.append(el);
     return el;
   }
   baueKnoten();
@@ -474,18 +476,19 @@ export function zeige(root, params, app) {
   function knotenLabel(b, z) {
     const zustand = { besiegt: 'besiegt', aktuell: 'aktuell', offen: neuEingezogen(b) ? 'neu' : b.endgegner ? 'endgegner' : 'offen', gesperrt: 'gesperrt' }[z];
     const sterne = fortschritt.bots[b.id].sterne;
-    const werte = { ...platzInWelt(b), name: b.name, elo: b.elo, zustand: t('arena.zustand.' + zustand) };
+    const tor = z === 'gesperrt' ? vorschauTor(b) : null;
+    const werte = { ...platzInWelt(b), name: b.name, elo: b.elo,
+      zustand: tor ? t('arena.zustand.vorschau', { name: tor.name }) : t('arena.zustand.' + zustand) };
     return z === 'besiegt' ? t('arena.knoten.labelSterne', { ...werte, sterne: sterne.filter(Boolean).length }) : t('arena.knoten.label', werte);
   }
 
   function tippeKnoten(b, el) {
-    if (el.classList.contains('gesperrt')) {
+    // gesperrt in der offenen Welt: Meldung und Ruetteln; in der Vorschau-Welt oeffnet der Tipp die Karte (zeigeDetail)
+    if (el.classList.contains('gesperrt') && !vorschauTor(b)) {
       // den Bot nennen, den Flo jetzt spielen kann (der direkte Vorgaenger ist evtl. selbst gesperrt)
       const vorher = BOTS.find((x) => x.stufe === b.stufe - 1);
-      const tor = weltFrei ? null : endgegnerDerWelt(weltNr - 1);
-      app.meldung(tor ? t('arena.gesperrt.welt', { name: tor.name })
-        : vorher && vorher.id === naechster.id ? t('arena.gesperrt.erst', { name: vorher.name })
-          : t('arena.gesperrt.zuerst', { name: naechster.name }));
+      app.meldung(vorher && vorher.id === naechster.id ? t('arena.gesperrt.erst', { name: vorher.name })
+        : t('arena.gesperrt.zuerst', { name: naechster.name }));
       el.classList.remove('ruettel');
       void el.offsetWidth;
       el.classList.add('ruettel');
@@ -665,7 +668,9 @@ export function zeige(root, params, app) {
     const laufend = ladeLaufendePartie();
     // W0+a: auch angemeldete Bots (z. B. ein Boss), solange ihr Paket geladen ist (sonst gibt es keine laufende Partie)
     const laufBot = laufend ? botNachId(laufend.botId) : null;
-    const status = t('arena.status.' + (z === 'besiegt' ? 'besiegt' : z === 'aktuell' ? 'aktuell'
+    // Vorschau-Welt: statt "Spielen" der Hinweis, wer die Welt oeffnet; ohne Farbwahl (es gibt noch nichts zu spielen)
+    const tor = z === 'gesperrt' ? vorschauTor(b) : null;
+    const status = t('arena.status.' + (tor ? 'vorschau' : z === 'besiegt' ? 'besiegt' : z === 'aktuell' ? 'aktuell'
       : neuEingezogen(b) ? 'neu' : b.endgegner ? 'endgegner' : 'offen'));
     const satz = begruessung(b);
     detail.style.setProperty('--bf', botFarbe(b));
@@ -699,9 +704,11 @@ export function zeige(root, params, app) {
         <div class="ziel-sterne" aria-label="${esc(t('arena.ziele.aria'))}">
           ${zielSterneHtml(f.sterne)}
         </div>
-        <div class="wahl wahl-farbe"><div class="wahl-titel">${esc(t('arena.farbe.titel'))}</div><div class="farbwahl-ort"></div></div>
+        <div class="wahl wahl-farbe"${tor ? ' hidden' : ''}><div class="wahl-titel">${esc(t('arena.farbe.titel'))}</div><div class="farbwahl-ort"></div></div>
         <div class="ort-tempo" hidden></div>
-        <div class="cta-platz"><button class="knopf primaer gross spielen dr" type="button" data-aktion="spielen"><span class="sp-text">${spielenText(b, z === 'besiegt')}</span><span class="pf">${icon('pfeil')}</span></button></div>
+        <div class="cta-platz">${tor
+    ? `<p class="sp-gesperrt">${esc(t('arena.vorschau.hinweis', { name: tor.name }))}</p>`
+    : `<button class="knopf primaer gross spielen dr" type="button" data-aktion="spielen"><span class="sp-text">${spielenText(b, z === 'besiegt')}</span><span class="pf">${icon('pfeil')}</span></button>`}</div>
       </div>`;
 
       // Farbe als Segment (A): Hooks .farbwahl [data-farbe="w|zufall|b"][aria-checked]
@@ -719,7 +726,7 @@ export function zeige(root, params, app) {
       for (const k of seg.el.querySelectorAll('.seg')) k.dataset.farbe = k.dataset.wert;
       detail.querySelector('.farbwahl-ort').replaceWith(seg.el);
 
-      detail.querySelector('[data-aktion="spielen"]').addEventListener('click', () => spielen(b));
+      detail.querySelector('[data-aktion="spielen"]')?.addEventListener('click', () => spielen(b));
       detail.querySelector('[data-aktion="steckbrief"]').addEventListener('click', () => zeigeSteckbrief(b));
       const fort = detail.querySelector('[data-aktion="fortsetzen"]');
       if (fort) {
@@ -828,6 +835,8 @@ export function zeige(root, params, app) {
   // Spielen: Rueckfrage bei offener Partie, dann das Duell-Intro (js/ui/duell.js) und nach dessen `bereit` die Partie
   async function spielen(b) {
     ladePartieScreen();
+    // nie gegen einen Bot, der noch nicht frei ist (Vorschau-Welt, gesperrte Station); das Vorladen oben schadet nicht
+    if (!istFreigeschaltet(b.stufe, fortschritt)) return;
     const laufend = ladeLaufendePartie();
     if (laufend) {
       const lb = botNachId(laufend.botId);
@@ -978,7 +987,7 @@ export function zeige(root, params, app) {
     ww.querySelector('.ww-name').textContent = welt.name;
     const sterne = LBOTS.reduce((n, b) => n + fortschritt.bots[b.id].sterne.filter(Boolean).length, 0);
     const ww0 = { nr: weltNr, anzahl: WELTEN.length, sterne, max: LBOTS.length * 3 };
-    ww.querySelector('.ww-unter').textContent = !weltFrei ? t('arena.weltwahl.gesperrt', ww0)
+    ww.querySelector('.ww-unter').textContent = !weltFrei ? t('arena.weltwahl.vorschau', ww0)
       : t(hatWeltsiegel(weltNr, fortschritt) ? 'arena.weltwahl.siegel' : 'arena.weltwahl.sterne', ww0);
     ww.classList.toggle('mit-siegel', hatWeltsiegel(weltNr, fortschritt));
     ww.classList.toggle('gesperrt', !weltFrei);
@@ -986,11 +995,6 @@ export function zeige(root, params, app) {
       const ziel = weltNr + Number(k.dataset.richtung);
       k.disabled = !WELTEN.some((w) => w.nr === ziel);
     }
-    // gesperrte Welt: ruhige Silhouette und wer sie oeffnet
-    const tor = endgegnerDerWelt(weltNr - 1);
-    weltSperre.hidden = weltFrei;
-    weltSperre.innerHTML = weltFrei ? '' : `<div class="ws-karte">${icon('schloss')}<b>${esc(welt.name)}</b>`
-      + `<span>${esc(welt.text)} ${esc(t('arena.sperre.text', { name: tor ? tor.name : t('arena.sperre.davor') }))}</span></div>`;
   }
   function wechsleWelt(nr) {
     if (!WELTEN.some((w) => w.nr === nr) || nr === weltNr) return;

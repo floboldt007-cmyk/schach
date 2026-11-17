@@ -17,7 +17,7 @@ const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let ok = 0, fehl = 0;
 const pruefe = (name, bed, info) => { if (bed) ok++; else { fehl++; console.log('FEHLER', name, info === undefined ? '' : JSON.stringify(info)); } };
 
-const { LABOR_BRETTER, BRETT_FAMILIEN, FREIE_BRETTER_PLAN, istLabor } = await import('../js/labor.js');
+const { LABOR_BRETTER, MOTIV_BRETTER, BRETT_FAMILIEN, FREIE_BRETTER_PLAN, istLabor } = await import('../js/labor.js');
 const { EINSTELLUNG_WERTE } = await import('../js/storage.js');
 const { FAMILIEN, STUFEN } = await import('../js/pakete/sammlung/stufen.js');
 const { t, setzeSprache } = await import('../js/sprache.js');
@@ -69,7 +69,9 @@ try { erzeugt = (await import('../werkzeuge/bretter-css.mjs')).bretterCss(); } c
 const zwischen = (/\/\* BRETTER-65 ANFANG[^\n]*\n([\s\S]*?)\/\* BRETTER-65 ENDE \*\//.exec(css) || [])[1];
 pruefe('Block zwischen den Marken ist die Ausgabe von werkzeuge/bretter-css.mjs', erzeugt !== null && zwischen === erzeugt,
   erzeugt === null ? 'Werkzeug fehlt' : zwischen === undefined ? 'Marken fehlen' : 'abweichend');
-pruefe('Einstellung brett kennt alle 65 Ids', ids.every((id) => EINSTELLUNG_WERTE.brett.includes(id)) && EINSTELLUNG_WERTE.brett.length === 65,
+// dazu die 20 Motiv-Bretter (js/labor.js MOTIV_BRETTER, eigener Test tests/bretter-v4-app.test.mjs)
+pruefe('Einstellung brett kennt alle 65 Ids und sonst nur die Motiv-Bretter', ids.every((id) => EINSTELLUNG_WERTE.brett.includes(id))
+  && EINSTELLUNG_WERTE.brett.length === 65 + MOTIV_BRETTER.length,
   ids.filter((id) => !EINSTELLUNG_WERTE.brett.includes(id)));
 for (const sp of ['de', 'en']) {
   setzeSprache(sp);
