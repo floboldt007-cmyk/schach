@@ -227,10 +227,17 @@ async function kleinTeil(browser) {
       const p = await seite(browser, { groesse, schema, lernen: { lek: { turm: { s: 1, z: 15 } } } });
       await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'turm' }));
       await warteLz(p.s, "z.offen && z.phase === 'intro'");
-      await warte(400);
+      // erst messen, wenn das gestaffelte Hereingleiten (ls-aktionen, ls-status, Leisten) fertig ist: unter Last liefen die
+      // Animationen nach festen 400 ms noch, die Knoepfe waren noch nicht auf voller Groesse (Kaltreview 3f 17.11.2026,
+      // nachgestellt mit 6-facher CPU-Drossel: drin=false bei sieben laufenden Animationen)
+      await p.s.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity),
+        null, { timeout: 5000 }).catch(() => {});
+      await warte(100);
       const m = await p.s.evaluate(() => {
         const bs = [...document.querySelectorAll('.ls-runde')].map((b) => b.getBoundingClientRect());
-        return { n: bs.length, drin: bs.every((r) => r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && r.width >= 44 && r.height >= 44),
+        return { rechtecke: bs.map((r) => [r.left, r.top, r.width, r.height].map((x) => Math.round(x * 10) / 10)), fenster: [innerWidth, innerHeight],
+          laufend: document.getAnimations().filter((a) => a.playState === 'running').length,
+          n: bs.length, drin: bs.every((r) => r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && r.width >= 44 && r.height >= 44),
           rollt: document.documentElement.scrollWidth - innerWidth };
       });
       const k = await p.s.evaluate(kontrast);

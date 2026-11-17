@@ -127,13 +127,27 @@ async function gegenzugEcht(s, fenVor, fenNach) {
   if (!m || stellung(m.after) !== stellung(fenNach)) return `gespielt ist nicht bestmove ${a.bestmove} (${fenVor} -> ${fenNach})`;
   return null;
 }
-async function engineZug(s, fen) {
-  return s.evaluate(async ({ fen, knoten }) => {
+// Flos Zug mit der Engine der App. Sie bekommt nur die Stellung (js/engine.js 'position fen', ohne Zugfolge) und sieht darum
+// keine Wiederholung: im roten Lauf von 3f (17.11.2026, opposition) pendelte Weiss e6f6 f6e6 e6f6 f6e6 bis zum Remis, im
+// Nachspiel zog Stockfish ohne Verlauf wieder in die schon gesehene Stellung, mit Verlauf nicht. Darum sucht sie wie bisher mit
+// EINER Linie (n = 1, volle Staerke); nur wenn der Aufrufer diesen Zug meiden will, fragt er die besten KANDIDATEN (MultiPV) ab,
+// je mit Bewertung aus Sicht der Seite am Zug (die App liefert sie aus Sicht von Weiss).
+const KANDIDATEN = 4;
+async function engineZuege(s, fen, n = 1) {
+  return s.evaluate(async ({ fen, knoten, n }) => {
     const e = await window.__app.engine('bewertung');
-    const a = await e.analyse(fen, { nodes: knoten, prioritaet: 'sofort' });
-    return a && typeof a.bestmove === 'string' ? a.bestmove : null;
-  }, { fen, knoten: ENGINE_KNOTEN });
+    const a = await e.analyse(fen, { nodes: knoten, multipv: n, prioritaet: 'sofort' });
+    if (!a) return [];
+    const vz = fen.split(' ')[1] === 'b' ? -1 : 1;
+    const zuege = (a.lines || []).filter(x => x && x.pv && typeof x.pv[0] === 'string')
+      .map(x => ({ u: x.pv[0], cp: x.eval?.cp != null ? vz * x.eval.cp : null, mate: x.eval?.mate != null ? vz * x.eval.mate : null }));
+    if (typeof a.bestmove === 'string' && !zuege.some(x => x.u === a.bestmove)) zuege.unshift({ u: a.bestmove, cp: null, mate: null });
+    return zuege;
+  }, { fen, knoten: ENGINE_KNOTEN, n });
 }
+// gleiches Urteil wie tests/lektion-engine.mjs gut(): haelt der Kandidat noch, was die Lektion verlangt?
+const haeltZiel = (x, art) => !!x && (art === 'halten' ? (x.mate != null ? x.mate > 0 : x.cp != null && x.cp >= -150)
+  : (x.mate != null ? x.mate > 0 : x.cp != null && x.cp >= 400));
 
 // ---------- Browser ----------
 async function klickFeld(s, f) {
@@ -163,6 +177,7 @@ async function probe(s, l, art) {
   const frist = Date.now() + FRIST_MS;
   if (mitEngine(l)) await protokolliere(s);
   let offen = null; r.gegenzuege = 0; // nach Flos Zug: Stellung, auf die die Verteidigung antworten muss
+  const nachFlo = new Set(); // Stellungen nach Flos eigenen Engine-Zuegen (gegen Wiederholung, engineZuege oben)
   for (let runde = 0; runde < 300; runde++) { // Warte-Runden zaehlen mit: lange Matts brauchen bis grenze(ziel) = 56 Zuege
     const z = await lz(s);
     if (offen && ['flo', 'ende'].includes(z.phase)) {
@@ -184,7 +199,18 @@ async function probe(s, l, art) {
     if (artVon(l) === 'folge') { c.reset(); for (const san of l.folge.slice(0, z.schritt)) c.move(san); }
     let m;
     if (artVon(l) === 'folge') m = new Chess(c.fen()).move(l.folge[z.schritt]);
-    else if (mitEngine(l)) { const u = await engineZug(s, z.fen); try { m = u ? new Chess(z.fen).move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }) : null; } catch (e) { m = null; } }
+    else if (mitEngine(l)) {
+      const legal = (x) => { try { return Object.assign(new Chess(z.fen).move({ from: x.u.slice(0, 2), to: x.u.slice(2, 4), promotion: x.u[4] }), { wert: x }); } catch (e) { return null; } };
+      m = legal((await engineZuege(s, z.fen))[0] || { u: '' });
+      // fuehrt der beste Zug in eine Stellung, die nach einem eigenen Zug schon da war: der beste andere Kandidat, der das Ziel
+      // noch haelt (sonst bleibt es beim besten, das Remis ist dann ein echter Befund)
+      if (m && nachFlo.has(stellung(m.after))) {
+        const art = artVon(l);
+        const alt = (await engineZuege(s, z.fen, KANDIDATEN)).map(legal)
+          .find(x => x && !nachFlo.has(stellung(x.after)) && haeltZiel(x.wert, art));
+        if (alt) { m = alt; r.gemieden = (r.gemieden || 0) + 1; }
+      }
+    }
     else m = floZug(l, c, startMat, z.zuege);
     if (!m) { r.fehler.push(`kein Zug fuer Flo in ${z.fen}`); break; }
     const vorher = z.zuege;
@@ -194,7 +220,7 @@ async function probe(s, l, art) {
     if (!weiter) { r.fehler.push(`Klick ${uci(m)} nicht angenommen (${JSON.stringify(await lz(s))})`); break; }
     r.zugfolge.push(uci(m));
     if (vorher === 0) r.handlung = true;
-    if (mitEngine(l)) offen = m.after;
+    if (mitEngine(l)) { offen = m.after; nachFlo.add(stellung(m.after)); }
   }
   await s.waitForSelector('.ls-screen > .ergebnis-overlay:not([hidden]) .ergebnis-karte', { timeout: 8000 }).catch(() => {});
   // Blatt und Knoepfe gleiten gestaffelt herein: erst messen und fotografieren, wenn alles steht
