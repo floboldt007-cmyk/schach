@@ -6,6 +6,7 @@
 //   spiele(sf, l, fen, { go }) -> { ende: 'geschafft' | Grund, zuege, zugliste: [fen vor Flos Zug] }
 //   mattIn(sf, fen, go) -> N | null       Suche (go z. B. 'nodes 3000000') nach "mate N" fuer Weiss
 //   gut(eintrag, art) -> boolean         ein Zug haelt das Ziel (Matt/Gewinn: mate > 0 oder cp >= 400; halten: cp >= -150)
+//   nahBest(eintrag, best, art)          haelt das Ziel und verschenkt hoechstens einen Zug (Messung ohne Nachdenken)
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -98,6 +99,15 @@ export async function mattIn(sf, fen, go) {
   await sf.neu();
   const r = await sf.suche(fen, go);
   return r.mate > 0 ? r.mate : null;
+}
+
+// streng fuer die Messung "ohne Nachdenken": der Zug haelt das Ziel UND verschenkt hoechstens einen Zug (Matt: Mattdistanz
+// <= beste + 1; Gewinn ohne Mattwert: <= 200 cp unter dem besten Zug); halten wie gut()
+export function nahBest(e, best, art) {
+  if (!gut(e, art) || !best) return false;
+  if (art === 'halten') return true;
+  if (best.mate != null && best.mate > 0) return e.mate != null && e.mate <= best.mate + 1;
+  return e.mate != null ? e.mate > 0 : e.cp >= best.cp - 200;
 }
 
 export function gut(e, art) {

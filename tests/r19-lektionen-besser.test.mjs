@@ -18,21 +18,56 @@ const SCHWERE_13 = ['dame', 'zwei-tuerme', 'turm', 'zwei-laeufer', 'erstickt', '
   'erst-koenig', 'opposition', 'schluesselfelder', 'patt-vermeiden', 'philidor', 'lucena', 'dame-bauer'];
 const NUR = process.argv[2] ? process.argv[2].split(',') : null;
 const GO = 'nodes 150000';
+const GO_GEGNER = 'nodes 400000';   // die App verteidigt mit voller Staerke (js/ui/lektion.js ZEIT_GEGNER 450 ms)
 const MATT_SUCHE = 'nodes 3000000';
 const TEXT_MAX = 90;
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') { gesamt++; if (wert) { ok++; console.log('ok     ' + name); } else console.log('FEHLER ' + name + (extra ? '  ' + extra : '')); }
 
+// Kind-Lauf (R19_KIND=1): nur die Engine-Pruefung der genannten Lektionen, ohne die Datenpruefung davor
+const KIND = process.env.R19_KIND === '1';
 const hatRunden = typeof M.rundenVon === 'function';
-pruefe('mattbilder.js exportiert rundenVon(l)', hatRunden);
-if (!hatRunden) { console.log(`\n${ok}/${gesamt} bestanden`); process.exit(1); }
-
-for (const l of M.ALLE.filter((x) => !SCHWERE_13.includes(x.id))) {
-  const r = M.rundenVon(l);
-  if (r.length !== 1 || r[0].fen !== l.fen || r[0].ziel !== l.ziel) pruefe(`${l.id}: andere Lektionen bleiben eine Runde wie bisher`, false, JSON.stringify(r));
+if (!KIND) {
+  pruefe('mattbilder.js exportiert rundenVon(l)', hatRunden);
+  if (!hatRunden) { console.log(`\n${ok}/${gesamt} bestanden`); process.exit(1); }
+  for (const l of M.ALLE.filter((x) => !SCHWERE_13.includes(x.id))) {
+    const r = M.rundenVon(l);
+    if (r.length !== 1 || r[0].fen !== l.fen || r[0].ziel !== l.ziel) pruefe(`${l.id}: andere Lektionen bleiben eine Runde wie bisher`, false, JSON.stringify(r));
+  }
+  pruefe('alle anderen 52 Lektionen bleiben eine Runde mit ihrer Stellung', M.ALLE.filter((x) => !SCHWERE_13.includes(x.id)).every((l) => M.rundenVon(l).length === 1));
 }
-pruefe('alle anderen 52 Lektionen bleiben eine Runde mit ihrer Stellung', M.ALLE.filter((x) => !SCHWERE_13.includes(x.id)).every((l) => M.rundenVon(l).length === 1));
+
+// Ohne Auswahl: je Lektion ein Kind-Prozess, hoechstens PARALLEL gleichzeitig (eine Lektion rechnet bis zu einer Minute,
+// nacheinander lief der Test am 17.11. ueber das Zeitlimit von 900 s). Jedes Kind hat seinen eigenen Stockfish.
+const PARALLEL = Number(process.env.R19_PARALLEL) || 4;
+if (!NUR) {
+  const { spawn } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const datei = fileURLToPath(import.meta.url);
+  const kind = (id) => new Promise((fertig) => {
+    let aus = '';
+    const p = spawn(process.execPath, [datei, id], { env: { ...process.env, R19_KIND: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    p.stdout.on('data', (d) => { aus += d; });
+    p.stderr.on('data', (d) => { aus += d; });
+    p.on('close', (code) => fertig({ id, aus, code }));
+  });
+  const offen = [...SCHWERE_13];
+  const ergebnisse = [];
+  await Promise.all(Array.from({ length: PARALLEL }, async () => {
+    while (offen.length) ergebnisse.push(await kind(offen.shift()));
+  }));
+  for (const id of SCHWERE_13) {
+    const e = ergebnisse.find((x) => x.id === id);
+    const zeilen = e.aus.split('\n').filter((z) => /^(ok|FEHLER) /.test(z));
+    for (const z of zeilen) console.log(z);
+    const m = /(\d+)\/(\d+) bestanden/.exec(e.aus);
+    pruefe(`${id}: Kind-Lauf endet sauber`, !!m && e.code === (m[1] === m[2] ? 0 : 1), `code ${e.code}, ${m ? m[0] : e.aus.slice(-300)}`);
+    if (m) { ok += Number(m[1]); gesamt += Number(m[2]); }
+  }
+  console.log(`\n${ok}/${gesamt} bestanden`);
+  process.exit(ok === gesamt ? 0 : 1);
+}
 
 const figuren = (fen) => [...new Set(fen.split(' ')[0].replace(/[^NBRQP]/g, ''))].sort().join('');
 const texte = (id, n, sprache) => {
@@ -61,12 +96,20 @@ try {
         pruefe(`${tag}: andere Stellung als die Runden davor`, rs.slice(0, i).every((x) => x.fen.split(' ')[0] !== r.fen.split(' ')[0]));
         pruefe(`${tag}: nicht kuerzer als Runde 1 (Ziel ${r.ziel} >= ${l.ziel})`, r.ziel >= l.ziel);
       }
-      const s = await spiele(sf, r, r.fen, { go: GO });
+      const s = await spiele(sf, r, r.fen, { go: GO, goGegner: GO_GEGNER });
       const matt = artVon(l) === 'matt' ? await mattIn(sf, r.fen, MATT_SUCHE) : null;
-      const engine = matt != null ? Math.min(matt, s.zuege) : s.zuege;
       pruefe(`${tag}: Stockfish gegen Stockfish endet geschafft`, s.ende === 'geschafft', `Engine sagt ${s.ende} nach ${s.zuege}`);
-      pruefe(`${tag}: Ziel ${r.ziel} = Engine ${engine}`, s.ende === 'geschafft' && r.ziel === engine,
-        `Text/Daten sagen ${r.ziel}, Engine sagt ${engine} (Selbstspiel ${s.zuege}, Mattsuche ${matt ?? '-'})`);
+      // Matt: Ziel = Mattdistanz der Suche (genau). Halten: Ziel = gehaltene Zuege. Umwandeln/Gewinnen: ohne Mattwert ist
+      // das Selbstspiel nur eine Obergrenze (Stockfish eilt nicht zum Ziel), also muss die Engine selbst drei Sterne holen
+      // (mattbilder.js sterne: zuege <= ziel + ziel/4) und das Ziel darf nicht ueber ihrer Zugzahl liegen
+      const a = artVon(l);
+      // (findet die Mattsuche nichts, gilt bei Matt dieselbe Obergrenzen-Regel wie beim Umwandeln)
+      // (und ist das gefundene Matt laenger als das Selbstspiel, war die Suche zu kurz: dann ebenfalls die Obergrenze)
+      const passt = a === 'matt' && matt != null && matt <= s.zuege ? r.ziel === matt
+        : a === 'halten' ? r.ziel === s.zuege
+          : r.ziel <= s.zuege && s.zuege <= r.ziel + Math.floor(r.ziel / 4);
+      pruefe(`${tag}: Ziel ${r.ziel} passt zur Engine`, s.ende === 'geschafft' && passt,
+        `Text/Daten sagen ${r.ziel}, Engine sagt ${a === 'matt' ? `Matt in ${matt ?? '-'}` : `${s.zuege} Zuege`} (Selbstspiel ${s.zuege})`);
       for (const sprache of ['de', 'en']) {
         for (const { key, text } of texte(id, i + 1, sprache)) {
           const fehlt = !text || text === 'p-lernen.' + key;
