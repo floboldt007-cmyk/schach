@@ -181,6 +181,23 @@ try {
           await griff.click(); await warte(400);
           const zu = await s.evaluate(() => document.querySelector('.screen.arena .detail').classList.contains('offen'));
           pruefe(`${tag}: Griff schliesst sie wieder`, !zu, String(zu));
+          // Tastatur (design-beweis 17.11., WCAG 2.4.11): bei offener Karte fuehrt Umschalt+Tab vom Griff zurueck in die
+          // Welt; die fokussierte Station darf nicht unter der Karte verschwinden
+          await griff.click(); await warte(400);
+          let fokus = null;
+          for (let i = 0; i < 4 && !(fokus && fokus.station); i++) {
+            await s.keyboard.press('Shift+Tab'); await warte(250);
+            fokus = await s.evaluate(() => {
+              const el = document.activeElement;
+              const kn = el && el.closest('.screen.arena .knoten[data-bot]');
+              if (!kn) return { station: false, el: el && el.className };
+              const q = kn.getBoundingClientRect();
+              const frei = [[q.left + q.width / 2, q.top + q.height / 2], [q.left + 4, q.top + 4], [q.right - 4, q.bottom - 4]]
+                .some(([x, y]) => kn.contains(document.elementFromPoint(x, y)));
+              return { station: true, bot: kn.dataset.bot, frei, offen: document.querySelector('.screen.arena .detail').classList.contains('offen') };
+            });
+          }
+          pruefe(`${tag}: Station mit Tastaturfokus nicht unter der offenen Karte verdeckt`, fokus && fokus.station && fokus.frei, fokus);
         }
         const sp = await s.evaluate(() => {
           const b = document.querySelector('.screen.arena .detail [data-aktion="spielen"]');

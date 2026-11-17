@@ -442,6 +442,13 @@ export function zeige(root, params, app) {
   s.querySelector('.inhalt').addEventListener('focusin', (e) => {
     const cta = s.querySelector('.cta-platz');
     const ziel = e.target;
+    // Leiste (R19 B, design-beweis 17.11.2026): die offene Gegner-Karte liegt ueber der Welt; faellt der Fokus auf eine
+    // Station darunter, klappt sie zu (zu deckt die Leiste keine Station, tests/r19-botwelt-leben.test.mjs). Ohne
+    // :focus-visible, weil auch focus() aus Skript oder Vorlesehilfe dort landet; ein Tipp trifft eine verdeckte Station nie
+    if (karteOffen && s.classList.contains('karte-weg') && !detail.contains(ziel)) {
+      const d = detail.getBoundingClientRect(), z = ziel.getBoundingClientRect();
+      if (z.bottom > d.top && z.top < d.bottom && z.right > d.left && z.left < d.right) setzeKarteOffen(false);
+    }
     if (!cta || cta.contains(ziel) || !ziel.matches(':focus-visible')) return;
     const c = cta.getBoundingClientRect(), b = ziel.getBoundingClientRect();
     if (b.bottom <= c.top || b.top >= c.bottom || b.right <= c.left || b.left >= c.right) return;
