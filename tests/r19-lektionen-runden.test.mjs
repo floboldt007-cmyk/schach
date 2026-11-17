@@ -6,7 +6,8 @@
 //   - Runde 3 (Meisterprobe): kein Hinweis-Knopf; geschafft: 3 Sterne
 //   - alter Spielstand mit 3 Sternen: alle Runden offen, Runde 3 vorgewaehlt
 //   - Lektion ohne Runden: keine Rundenknoepfe (wie bisher)
-//   - iPhone SE: Rundenknoepfe ganz sichtbar, nichts rollt waagrecht
+//   - iPhone SE, iPhone 13, iPad hoch, PC, je hell und dunkel: Rundenknoepfe ganz sichtbar, nichts rollt waagrecht,
+//     Ziffern der offenen Runden mit Kontrast >= 4,5 gegen ihre Pille
 //   node tests/r19-lektionen-runden.test.mjs
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -82,8 +83,8 @@ const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 999
 const ERFINDER_ZEILEN = ['erfinder-banner-blatt-0', 'erfinder-titel', 'erfinder-figuren-blaupause', 'erfinder-finisher-signatur']
   .map((stueck_id) => ({ stueck_id }));
 
-async function seite(browser, { groesse = { width: 1180, height: 820 }, lernen = null } = {}) {
-  const k = await browser.newContext({ viewport: groesse, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
+async function seite(browser, { groesse = { width: 1180, height: 820 }, lernen = null, schema = 'light' } = {}) {
+  const k = await browser.newContext({ viewport: groesse, colorScheme: schema, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
   const s = await k.newPage();
   const fehlerListe = [];
   s.on('pageerror', (e) => fehlerListe.push(e.message));
@@ -206,18 +207,39 @@ async function altstandTeil(browser) {
   await p.k.close();
 }
 
+// Kontrast der Ziffer gegen ihre Pille (::before), WCAG 1.4.3: 4,5:1; gesperrte Knoepfe sind ausgenommen (disabled)
+const kontrast = () => {
+  const rgb = (s) => { const m = s.match(/[\d.]+/g).map(Number); return m.length > 3 && m[3] === 0 ? null : m.slice(0, 3); };
+  const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const karte = getComputedStyle(document.querySelector('.ls-status')).backgroundColor;
+  return [...document.querySelectorAll('.ls-runde:not(:disabled)')].map((b) => {
+    const v = rgb(getComputedStyle(b).color);
+    const h = rgb(getComputedStyle(b, '::before').backgroundColor) || rgb(karte);
+    const [a, c] = [lum(v), lum(h)].sort((x, y) => y - x);
+    return { r: b.dataset.r, k: Math.round(((a + 0.05) / (c + 0.05)) * 10) / 10 };
+  });
+};
 async function kleinTeil(browser) {
-  for (const [name, groesse] of [['iPhone SE', { width: 375, height: 667 }], ['iPhone 13', { width: 390, height: 844 }]]) {
-    const p = await seite(browser, { groesse, lernen: { lek: { turm: { s: 1, z: 15 } } } });
-    await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'turm' }));
-    await warteLz(p.s, "z.offen && z.phase === 'intro'");
-    const m = await p.s.evaluate(() => {
-      const bs = [...document.querySelectorAll('.ls-runde')].map((b) => b.getBoundingClientRect());
-      return { n: bs.length, drin: bs.every((r) => r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && r.width >= 44 && r.height >= 44),
-        rollt: document.documentElement.scrollWidth - innerWidth };
-    });
-    pruefe(`${name}: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht`, m.n === 3 && m.drin && m.rollt <= 1, m);
-    await p.k.close();
+  const GERAETE = [['iPhone SE', { width: 375, height: 667 }], ['iPhone 13', { width: 390, height: 844 }],
+    ['iPad hoch', { width: 820, height: 1180 }], ['PC', { width: 1280, height: 800 }]];
+  for (const [name, groesse] of GERAETE) {
+    for (const schema of ['light', 'dark']) {
+      const p = await seite(browser, { groesse, schema, lernen: { lek: { turm: { s: 1, z: 15 } } } });
+      await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'turm' }));
+      await warteLz(p.s, "z.offen && z.phase === 'intro'");
+      await warte(400);
+      const m = await p.s.evaluate(() => {
+        const bs = [...document.querySelectorAll('.ls-runde')].map((b) => b.getBoundingClientRect());
+        return { n: bs.length, drin: bs.every((r) => r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && r.width >= 44 && r.height >= 44),
+          rollt: document.documentElement.scrollWidth - innerWidth };
+      });
+      const k = await p.s.evaluate(kontrast);
+      const modus = schema === 'dark' ? 'dunkel' : 'hell';
+      pruefe(`${name} ${modus}: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht`, m.n === 3 && m.drin && m.rollt <= 1, m);
+      pruefe(`${name} ${modus}: Ziffern der offenen Runden mit Kontrast >= 4,5`, k.length === 2 && k.every((x) => x.k >= 4.5), k);
+      pruefe(`${name} ${modus}: keine Fehler in der Konsole`, !p.fehlerListe.length, p.fehlerListe);
+      await p.k.close();
+    }
   }
 }
 

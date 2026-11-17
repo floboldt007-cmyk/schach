@@ -145,7 +145,7 @@ const blattDa = s => s.evaluate(() => { const o = document.querySelector('.ls-sc
   return !!k && !o.hidden && k.getBoundingClientRect().height > 0; });
 
 async function probe(s, l, art) {
-  const r = { id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, start: false, handlung: false, ende: false, grund: null, zuege: 0, sterne: 0, fehler: [] };
+  const r = { id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, start: false, handlung: false, ende: false, grund: null, zuege: 0, sterne: 0, fehler: [], zugfolge: [], endFen: null };
   await s.evaluate(m => window.__app.setzeEinstellungen({ modus: m, autoDame: true, klang: false }), art.modus);
   // echte Verteidigung: ohne Test-Haken zieht die App selbst mit Stockfish (js/ui/lektion.js engineZug)
   // Haken einmal sichern (zwei Engine-Lektionen nacheinander duerfen ihn nicht mit undefined ueberschreiben)
@@ -192,6 +192,7 @@ async function probe(s, l, art) {
     const weiter = await s.waitForFunction(v => { const x = window.__lektion.zustand(); return x.zuege > v || x.phase === 'ende'; }, vorher, { timeout: 8000 })
       .then(() => true, () => false);
     if (!weiter) { r.fehler.push(`Klick ${uci(m)} nicht angenommen (${JSON.stringify(await lz(s))})`); break; }
+    r.zugfolge.push(uci(m));
     if (vorher === 0) r.handlung = true;
     if (mitEngine(l)) offen = m.after;
   }
@@ -205,7 +206,7 @@ async function probe(s, l, art) {
   r.knoepfe = await s.evaluate(() => [...document.querySelectorAll('.ls-screen > .ergebnis-overlay .ergebnis-karte button')]
     .filter(b => { const k = b.getBoundingClientRect(); return k.width > 0 && k.height > 0 && getComputedStyle(b).visibility !== 'hidden' && +getComputedStyle(b).opacity > 0.5; })
     .map(b => b.dataset.a || b.getAttribute('aria-label') || b.textContent.trim()));
-  Object.assign(r, { grund: z.grund || (z.phase === 'ende' ? 'geschafft' : null), zuege: z.zuege, sterne: z.sterne || 0 });
+  Object.assign(r, { grund: z.grund || (z.phase === 'ende' ? 'geschafft' : null), zuege: z.zuege, sterne: z.sterne || 0, endFen: z.fen || null });
   r.bild = `${l.id}-${art.name}.jpg`;
   await s.screenshot({ path: path.join(BILDER, r.bild), type: 'jpeg', quality: 60 }).catch(() => { r.bild = null; });
   return r;
@@ -248,7 +249,10 @@ try {
       ergebnisse.push(r);
       await writeFile(path.join(BILDER, 'ergebnis.json'), JSON.stringify(ergebnisse, null, 1));
       pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft${mitEngine(l) ? ' (Engine gegen echte Verteidigung)' : ''}`, r.geht,
-        { start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, gegenzuege: r.gegenzuege, fehler: r.fehler, konsole: r.konsole });
+        { start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, gegenzuege: r.gegenzuege, fehler: r.fehler, konsole: r.konsole,
+          // R19 (17.11.2026, CI-Lauf 44163241625: dame-bauer "remis nach 8" in Node nicht nachstellbar): Zugfolge und Endstellung,
+          // damit ein rotes Ende seine Ursache selbst zeigt (Wiederholung, Dame getauscht, ...)
+          ...(r.geht ? {} : { zugfolge: r.zugfolge.join(' '), endFen: r.endFen }) });
     }
     await k.close();
   }
