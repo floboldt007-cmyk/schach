@@ -265,10 +265,23 @@ export async function speichereBenutzername(benutzername) {
       daten: { user_id: userId(s), benutzername }, prefer: 'resolution=merge-duplicates' });
   } catch (e) {
     if (e.status === 409 || e.code === '23505') throw new Error(K('nameVergeben'));
+    // Monats-Sperre des Servers (supabase/benutzername-sperre-schema.sql): detail ist der Zeitpunkt der naechsten Aenderung
+    if (e.code === 'P0001' && e.serverDetails?.message === 'NAME_GESPERRT') {
+      const bis = new Date(e.serverDetails.details);
+      throw new Error(K('nameGesperrt', { datum: Number.isNaN(bis.getTime()) ? '?' : bis.toLocaleDateString(locale()) }));
+    }
     throw e;
   }
   merkeName(benutzername, s);
   return benutzername;
+}
+// Bis wann der Name gesperrt ist (Date) oder null. Ohne eingespieltes SQL fehlt name_geaendert_am: dann null, nie ein Fehler.
+export const NAME_SPERRE_TAGE = 30;
+export function nameSperreBis(p, jetzt = Date.now()) {
+  const am = p && typeof p.name_geaendert_am === 'string' ? Date.parse(p.name_geaendert_am) : NaN;
+  if (!Number.isFinite(am)) return null;
+  const bis = am + NAME_SPERRE_TAGE * 86400000;
+  return bis > jetzt ? new Date(bis) : null;
 }
 function gueltigerStand(stand) {
   return stand && typeof stand === 'object' && !Array.isArray(stand)
@@ -497,6 +510,7 @@ export function kontoGruppe({ app } = {}) {
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
       <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
       <p class="es-hilfe konto-name-hinweis" hidden>${K('nameWaehlen')}</p>
+      <p class="es-hilfe konto-name-sperre" hidden></p>
       <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>${verdraengtZeile()}` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <div class="konto-botschutz" hidden></div><button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
@@ -516,16 +530,23 @@ export function kontoGruppe({ app } = {}) {
   // Eigener Name im Feld; ein Konto ohne Namen (neues Konto) bekommt den Hinweis, einen zu waehlen. Erst nach der
   // Profil-Abfrage, sonst sieht ein bestehendes Konto den Hinweis kurz, bevor sein Name da ist. Nur das Feld und den
   // Hinweis anfassen, nie neu zeichnen: Die Statuszeile (z. B. "Geraetestand hochgeladen") bleibt stehen.
+  // R19: das Profil wird auch mit gemerktem Namen einmal abgefragt, denn erst der Server weiss, ob die Monats-Sperre laeuft
+  // (supabase/benutzername-sperre-schema.sql). Solange sie laeuft, ist das Feld nur lesbar und darunter steht das Datum.
   let profilFuer = null; let profilLaeuft = null;   // Konto-ID, deren Profil schon abgefragt ist bzw. gerade abgefragt wird
+  let sperreBis = null;
   const zeigeName = () => {
     const id = userId(sitzung()); if (!id) return;
     const feld = el.querySelector('.konto-name'); const name = eigenerName();
     if (feld && !feld.value && name) feld.value = name;
     const hinweis = el.querySelector('.konto-name-hinweis'); if (hinweis) hinweis.hidden = !!name || profilFuer !== id;
-    if (name || profilFuer === id || profilLaeuft === id) return;
+    const bis = profilFuer === id ? sperreBis : null;
+    const sperre = el.querySelector('.konto-name-sperre');
+    if (sperre) { sperre.hidden = !bis; sperre.textContent = bis ? K('nameAb', { datum: bis.toLocaleDateString(locale()) }) : ''; }
+    if (feld) feld.readOnly = !!bis;
+    if (profilFuer === id || profilLaeuft === id) return;
     profilLaeuft = id;
     // offline oder Serverfehler: kein Hinweis (der Name koennte existieren), beim naechsten Zeichnen neu fragen
-    ladeProfil().then(() => { if (userId(sitzung()) === id) { profilFuer = id; zeigeName(); } }, () => {})
+    ladeProfil().then((p) => { if (userId(sitzung()) === id) { profilFuer = id; sperreBis = nameSperreBis(p); zeigeName(); } }, () => {})
       .finally(() => { if (profilLaeuft === id) profilLaeuft = null; });
   };
   const verdraengtZeile = () => {
@@ -555,7 +576,9 @@ export function kontoGruppe({ app } = {}) {
         el.querySelector('.konto-code').hidden = false; melden(K('codeGesendet') + ' ' + K(alsApp() ? 'linkNichtInApp' : 'linkHier')); }
       if (a === 'pruefen') { const code = [...el.querySelectorAll('.konto-ziffern input')].map((x) => x.value).join(''); await pruefeCode(email, code); const abgleich = await gleicheNachAnmeldung(); render(); meldeAbgleich(abgleich); }
       if (a === 'sichern') {
-        const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name);
+        // nur ein geaenderter Name geht an den Server; danach das Profil neu fragen (die Sperre beginnt mit der Aenderung)
+        const name = el.querySelector('.konto-name').value.trim();
+        if (name && name !== eigenerName()) { await speichereBenutzername(name); profilFuer = null; }
         // Nie blind hochladen (02.11.2026): Hat ein anderes Geraet inzwischen mehr geschafft, laedt "Jetzt sichern" dessen Stand
         const abgleich = await gleicheNachAnmeldung(); if (abgleich === 'geraet' || abgleich === 'gleich') zuletzt = new Date().toLocaleString(locale());
         render(); meldeAbgleich(abgleich);
