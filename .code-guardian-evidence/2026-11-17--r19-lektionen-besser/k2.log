@@ -1,0 +1,45 @@
+BELEG: v1 werkzeug=beleg-lauf zeit=1794947794 stand=ec21ee7e0e1891529bdf66a496621352c087d66bb3b0d89785095fffe2d2098c head=04614ed48932b8382efa7f3650e5b295fc170e34 kmd=f7631477b4c6e7e40fd97c2c524dfba0c0687a5aa293e926da13e42d1861c520 messung=6a8d3d2a1a7f4a1a5c0c27d20512c39834f2169c2bf0f61ff9eb6b48c5452045 mac=312188bc598966c3f4d6f9f462aecd5579f9c08cd234883762f79fbebec872f7
+kmd: node tests/r19-lektionen-runden.test.mjs
+ok   neu: drei Rundenknoepfe, Runde 1 gewaehlt, 2 und 3 zu
+ok   neu: Runde 1 von 3, Stellung = Lektionsstellung
+ok   patt-vermeiden R1: Node findet einen Weg gegen die Test-Verteidigung (3 Zuege)
+ok   Runde 1 geschafft: 1 Stern, gespeichert
+ok   Runde 1 geschafft: Ergebnisblatt bietet "Weiter mit Runde 2" zuerst
+ok   Runde 2: Stellung und Text der Runde, Knopf 2 gewaehlt
+ok   patt-vermeiden R2: Node findet einen Weg gegen die Test-Verteidigung (3 Zuege)
+ok   Runde 2 geschafft: 2 Sterne
+ok   Meisterprobe: kein Hinweis-Knopf
+ok   patt-vermeiden R3: Node findet einen Weg gegen die Test-Verteidigung (3 Zuege)
+ok   Meisterprobe geschafft: 3 Sterne, "Meisterprobe bestanden!"
+ok   danach: alle drei Runden offen und geschafft
+ok   Runde 1 nochmal waehlbar, Stellung der Runde 1
+ok   keine Fehler in der Konsole
+ok   alter Stand 3 Sterne: Runde 3 vorgewaehlt, alle offen
+ok   Lektion ohne Runden: keine Rundenknoepfe
+ok   keine Fehler in der Konsole (alter Stand)
+ok   iPhone SE hell: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht
+ok   iPhone SE hell: Ziffern der offenen Runden mit Kontrast >= 4,5
+ok   iPhone SE hell: keine Fehler in der Konsole
+ok   iPhone SE dunkel: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht
+ok   iPhone SE dunkel: Ziffern der offenen Runden mit Kontrast >= 4,5
+ok   iPhone SE dunkel: keine Fehler in der Konsole
+ok   iPhone 13 hell: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht
+ok   iPhone 13 hell: Ziffern der offenen Runden mit Kontrast >= 4,5
+ok   iPhone 13 hell: keine Fehler in der Konsole
+ok   iPhone 13 dunkel: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht
+ok   iPhone 13 dunkel: Ziffern der offenen Runden mit Kontrast >= 4,5
+ok   iPhone 13 dunkel: keine Fehler in der Konsole
+ok   iPad hoch hell: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht
+ok   iPad hoch hell: Ziffern der offenen Runden mit Kontrast >= 4,5
+ok   iPad hoch hell: keine Fehler in der Konsole
+ok   iPad hoch dunkel: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht
+ok   iPad hoch dunkel: Ziffern der offenen Runden mit Kontrast >= 4,5
+ok   iPad hoch dunkel: keine Fehler in der Konsole
+ok   PC hell: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht
+ok   PC hell: Ziffern der offenen Runden mit Kontrast >= 4,5
+ok   PC hell: keine Fehler in der Konsole
+ok   PC dunkel: drei Rundenknoepfe ganz sichtbar, Tippflaeche 44 px, nichts rollt waagrecht
+ok   PC dunkel: Ziffern der offenen Runden mit Kontrast >= 4,5
+ok   PC dunkel: keine Fehler in der Konsole
+41/41 bestanden
+exit=0

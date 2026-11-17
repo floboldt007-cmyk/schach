@@ -1,0 +1,21 @@
+BELEG: v1 werkzeug=beleg-lauf zeit=1794950625 stand=ec21ee7e0e1891529bdf66a496621352c087d66bb3b0d89785095fffe2d2098c head=04614ed48932b8382efa7f3650e5b295fc170e34 hinter=1 kmd=e055b2bb85ba2316c978dc9aad36a294c9064380eccb337d447ebf5886070cbe messung=5ecb9f75dfccf974dbbf6399c73ee25c97bb8e2663f279522f1012710137ccc0 mac=ba2be5fe6165700a6588263ffa727afcb68875ff3806ac1ce64819650fa2297b
+kmd: node tests/alle.mjs --nur=r19-lektionen-besser,r19-lektionen-runden
+Crownmate: 2 Testsuiten, parallel 1
+
+… r19-lektionen-besser Feinschliff R19: 13 lange Lektionen mit drei Runden, jede Stellung, jedes Ziel und jede Textbehauptung mit Stockfish nachgerechnet (Node)
+… r19-lektionen-besser: laeuft, zuletzt ok     alle anderen 52 Lektionen bleiben eine Runde mit ihrer Stellung
+… r19-lektionen-besser: laeuft, zuletzt ok     alle anderen 52 Lektionen bleiben eine Runde mit ihrer Stellung
+… r19-lektionen-besser: laeuft, zuletzt ok     alle anderen 52 Lektionen bleiben eine Runde mit ihrer Stellung
+ok     r19-lektionen-besser   369/369    94.5 s
+… r19-lektionen-runden Feinschliff R19: Rundenknoepfe, Runde fuer Runde geschafft, Meisterprobe ohne Hinweis, alter Spielstand, iPhone SE (Browser)
+… r19-lektionen-runden: laeuft, zuletzt ok   patt-vermeiden R2: Node findet einen Weg gegen die Test-Verteidigung (3 Zuege)
+… r19-lektionen-runden: laeuft, zuletzt ok   patt-vermeiden R3: Node findet einen Weg gegen die Test-Verteidigung (3 Zuege)
+ok     r19-lektionen-runden     41/41    78.5 s
+
+Zusammenfassung
+Suite         Prüfungen    Zeit   Ergebnis
+r19-lektionen-besser    369/369    95 s   bestanden
+r19-lektionen-runden      41/41    78 s   bestanden
+
+2/2 Suiten bestanden, 410/410 Prüfungen, 173 s
+exit=0

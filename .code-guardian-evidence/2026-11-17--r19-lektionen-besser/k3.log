@@ -1,0 +1,52 @@
+BELEG: v1 werkzeug=beleg-lauf zeit=1794950451 stand=ec21ee7e0e1891529bdf66a496621352c087d66bb3b0d89785095fffe2d2098c head=04614ed48932b8382efa7f3650e5b295fc170e34 hinter=1 kmd=41f0669162c1d8258fc4805c7002363603d8c6c6fe0292a0dedec8dcd0bd488d messung=4902ec8697d923c3322615105975568c51beed2dc49154983419a43aac76b763 mac=b8b16bae472ae70b51cfa4e7be83533752462531da290c980a8e41ffdd38413b
+kmd: node tests/alle.mjs --nur=lernen,r19-lektionen-probe,funktion-zuzweit-lernen,r15-ich-lektion,sprache
+Crownmate: 5 Testsuiten, parallel 1
+
+… r19-lektionen-probe Funktionsprobe Meisterschule: jede der 65 Lektionen Start, Zug per Klick, Ergebnisblatt (iPhone 13 + PC, hell + dunkel)
+… r19-lektionen-probe: laeuft, zuletzt OK figur-fangen (taktik, iphone13-hell): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft
+… r19-lektionen-probe: laeuft, zuletzt OK springer-bauer (halten, iphone13-hell): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft (Engine gegen echte Verteidigung)
+… r19-lektionen-probe: laeuft, zuletzt OK zwei-tuerme (matt, iphone13-dunkel): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft (Engine gegen echte Verteidigung)
+… r19-lektionen-probe: laeuft, zuletzt OK doppeldrohung (taktik, iphone13-dunkel): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft
+… r19-lektionen-probe: laeuft, zuletzt OK durchbruch (umwandeln, iphone13-dunkel): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft (Engine gegen echte Verteidigung)
+… r19-lektionen-probe: laeuft, zuletzt OK anastasia (matt, pc1280-hell): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft
+… r19-lektionen-probe: laeuft, zuletzt OK abzug (taktik, pc1280-hell): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft
+… r19-lektionen-probe: laeuft, zuletzt OK erst-koenig (umwandeln, pc1280-hell): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft (Engine gegen echte Verteidigung)
+… r19-lektionen-probe: laeuft, zuletzt OK pc1280-dunkel: App-Start ohne Konsolenfehler
+… r19-lektionen-probe: laeuft, zuletzt OK erstickt (matt, pc1280-dunkel): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft (Engine gegen echte Verteidigung)
+… r19-lektionen-probe: laeuft, zuletzt OK ablenkung (taktik, pc1280-dunkel): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft
+… r19-lektionen-probe: laeuft, zuletzt OK lucena (gewinnen, pc1280-dunkel): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft (Engine gegen echte Verteidigung)
+ok     r19-lektionen-probe     70/70   373.1 s
+… funktion-zuzweit-lernen Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft
+… funktion-zuzweit-lernen: laeuft, zuletzt Lektionen: matt=grundreihe (1 Zuege, falsch f2f3) | umwandeln=koenig-sechste (4 Zuege, falsch e6f5) | gewinnen=lucena (2 Zuege, falsch e1e3) | halten=quadrat (5 Zuege, falsch f4f5)
+… funktion-zuzweit-lernen: laeuft, zuletzt OK geht: iphone13: Lektion umwandeln (koenig-sechste): falscher Zug e6f5 zaehlt nicht als geschafft
+… funktion-zuzweit-lernen: laeuft, zuletzt OK geht: iphone13: keine Konsolen- oder Seitenfehler
+… funktion-zuzweit-lernen: laeuft, zuletzt OK geht: pc1280: Zu zweit: Namen eingeben (Anna, Ben)
+ok     funktion-zuzweit-lernen     82/82   139.8 s
+… r15-ich-lektion Feinschliff R15: Vitrine im Banner am PC, Spielerleisten in der Lektion, Zu-zweit-Brett wie die Bot-Partie (Browser)
+… r15-ich-lektion: laeuft, zuletzt OK Lektion iPad quer: keine Seitenfehler
+ok     r15-ich-lektion     88/88    49.9 s
+… lernen       Paket lernen: Meisterschule, leicht gratis, Rest im Trainer, Lektionen mit Engine-Verteidigung
+… lernen: laeuft, zuletzt ok   Grundreihe: Ta8 matt, ein Zug, drei Sterne
+… lernen: laeuft, zuletzt ok   Gratis: gesperrte Lektion per Aufruf führt zur Übersicht im selben Bereich, kein Brett
+… lernen: laeuft, zuletzt ok   Neues Gerät: keine Seitenfehler
+… lernen: laeuft, zuletzt ok   Neues Gerät: keine Seitenfehler
+… lernen: laeuft, zuletzt ok   SE: keine Seitenfehler (B9)
+… lernen: laeuft, zuletzt ok   i13: keine Seitenfehler (B9)
+ok     lernen         125/125   204.4 s
+… sprache      Sprachen: Deutsch und Englisch (Kern-Screens)
+… sprache: laeuft, zuletzt ok   verlauf handy-dunkel: ohne Ueberlauf
+… sprache: laeuft, zuletzt ok   ergebnis ipad-hell: ohne Ueberlauf
+… sprache: laeuft, zuletzt ok   analyse ipad-hell: ohne Ueberlauf
+… sprache: laeuft, zuletzt ok   Schritt 2 handy trainer: keine fehlenden Texte, Konsolenfehler oder unerwarteten Serveraufrufe
+ok     sprache        157/157   122.3 s
+
+Zusammenfassung
+Suite         Prüfungen    Zeit   Ergebnis
+r19-lektionen-probe      70/70   373 s   bestanden
+funktion-zuzweit-lernen      82/82   140 s   bestanden
+r15-ich-lektion      88/88    50 s   bestanden
+lernen          125/125   204 s   bestanden
+sprache         157/157   122 s   bestanden
+
+5/5 Suiten bestanden, 522/522 Prüfungen, 889 s
+exit=0
