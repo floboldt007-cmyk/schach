@@ -69,8 +69,11 @@ const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID }))
 const STAND = { stufe: 2, kronen: 64, platz: 9, ziel: 160, n: 30, woche: tag(-2) };
 // Bauernmarsch: gestern gespielt, 3 Felder gegangen (Feld 3 von 6), heute noch offen
 const SERIE = { stand: 1, tage: [tag(-1)], letzter: tag(-1), aktuell: 1, gesamt: 1, best: 1, felder: 3 };
-// Tagesraetsel der letzten 7 Tage: vorgestern und gestern geloest, vor 3 Tagen falsch, sonst nichts; heute offen -> 2 von 7
-const RAETSEL = { v: 1, tage: { [tag(-3)]: { e: [[2, 0]] }, [tag(-2)]: { e: [[0, 1]] }, [tag(-1)]: { e: [[1, 1]] } } };
+// Tagesraetsel der letzten 7 Tage: vorgestern und gestern geloest, vor 3 Tagen falsch, sonst nichts; heute offen -> 2 von 7.
+// Geloest heisst: ALLE Aufgaben des Tages richtig, und ein Tag in raetsel.json hat 1 oder 2 Aufgaben (Eintrag hoechstens
+// 2 Ergebnisse, logik.js eintragOk). Darum je geloestem Tag zwei richtige Ergebnisse: mit nur einem fiel der Test an
+// Tagen, an denen vorgestern ein Tag mit 2 Aufgaben lag (17.11.: Raetsel 28), und zeigte 1 statt 2.
+const RAETSEL = { v: 1, tage: { [tag(-3)]: { e: [[2, 0]] }, [tag(-2)]: { e: [[0, 1], [0, 1]] }, [tag(-1)]: { e: [[1, 1], [0, 1]] } } };
 const FEN = 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3';
 const karte = (i) => ({ id: `pb${i}x:0`, fen: FEN, besterZug: 'f3e5', gespielt: 'a2a3', klasse: 'patzer', partieId: `pb${i}x`, ply: 0,
   botId: 'rudi', farbe: 'w', vor: null, san: 'a3', loesungSan: 'Sxe5', nummer: 3, coach: 'Probe', datum: heute, gewinn: 0.6, verlust: 0.4,
