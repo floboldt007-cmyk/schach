@@ -331,6 +331,7 @@ async function testeKopf(browser) {
 // Kaltreview 9c: eigene Bestaende. (a) 11 gewertete Bot-Partien, nur die aelteste analysiert: statistik() nimmt die 10
 // neuesten, die Staerke bleibt leer, und der Satz muss genau das sagen. (c) Entscheid a5 16.11. (rueckholbar): nur Partien
 // ohne Zug stehen trotzdem als EINE Zeile.
+const LEERSATZ = 'Erscheint, sobald du in einer deiner letzten 10 gewerteten Partien gegen die Bots selbst gezogen hast und sie analysiert ist.';
 async function legeBestand(browser, art) {
   const { kontext, seite, fehler } = await neueSeite(browser, { speicher: null });
   await oeffne(seite);
@@ -348,6 +349,12 @@ async function legeBestand(browser, art) {
     if (art === 'alt-analysiert') {
       for (let i = 0; i < 10; i++) lege(10 + i, {});
       lege(100, { genauigkeit: 80, spielstaerke: 1500 });
+    } else if (art === 'ohne-eigenen-zug') {
+      // Kaltreview cc 17.11.: Schwarz, der Bot zieht e4, Aufgabe; werteAus() analysiert sie trotzdem (partie.js:1888),
+      // ohne eigenen Zug bleibt die Staerke der eigenen Farbe leer (Review wie partieGenauigkeit([]))
+      lege(10, { spielerFarbe: 'b', ergebnis: 'niederlage', grund: 'aufgabe', zuege: ['e2e4'], san: ['e4'], liveKlassen: [null] });
+      const p = sp.ladePartien()[0];
+      sp.ergaenzeAnalyse(p.id, { genauigkeit: { w: null, b: null }, spielstaerke: { w: null, b: null } });
     } else {
       lege(10, { ergebnis: 'niederlage', grund: 'aufgabe', zuege: [], san: [], liveKlassen: [] });
       lege(20, { ergebnis: 'niederlage', grund: 'aufgabe', zuege: [], san: [], liveKlassen: [] });
@@ -367,7 +374,25 @@ async function testeBestaende(browser) {
     // Vorbedingung: die alte Analyse liegt ausserhalb der 10 neuesten, die Staerke ist wirklich leer
     pruefe('Stärke leer, obwohl eine ältere Partie analysiert ist', e.zahl === '?', e);
     // statistik() nimmt nur WERTENDE Partien (Leiter, Grundstellung), also muss der Satz "gewerteten" sagen wie vl.staerke.text
-    pruefe('Satz sagt, was die Rechnung braucht (letzte 10 gewertete Partien)', e.text === 'Erscheint, sobald eine deiner letzten 10 gewerteten Partien gegen die Bots analysiert ist.', e);
+    pruefe('Satz sagt, was die Rechnung braucht (letzte 10 gewertete Partien)', e.text === LEERSATZ, e);
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  gruppe = 'Analysiert, aber ohne eigenen Zug';
+  {
+    const { kontext, seite, fehler } = await legeBestand(browser, 'ohne-eigenen-zug');
+    const e = await seite.evaluate(() => {
+      const p = testseite.speicher.ladePartien()[0];
+      return {
+        analysiert: p?.analysiert === true, wertet: testseite.speicher.statistik().partien === 1,
+        zahl: (document.querySelector('.vl-staerke-zahl .zahl')?.textContent || '').trim(),
+        text: (document.querySelector('.vl-staerke .vl-staerke-text')?.textContent || '').trim(),
+      };
+    });
+    // Vorbedingung: gewertet und analysiert, die Staerke trotzdem leer
+    pruefe('Gewertet und analysiert, Stärke leer', e.analysiert && e.wertet && e.zahl === '?', e);
+    // der Satz nennt die echte Bedingung: selbst gezogen UND analysiert (Entscheid Hauptfenster 17.11., rueckholbar)
+    pruefe('Satz nennt eigenen Zug als Bedingung', e.text === LEERSATZ, e);
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
