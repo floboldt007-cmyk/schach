@@ -28,6 +28,9 @@ import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { spieleDuell } from './duell.js';
 import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie } from '../storage.js';
+import { fuelle } from '../orte.js';
+import { BRETT_FEIER } from '../feier.js';
+import { tempo } from '../bewegung.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -426,7 +429,7 @@ export function zeige(root, params, app) {
         s.classList.add('partie', 'online-partie', 'im-spiel', 'ohne-balken');
         s.classList.toggle('mit-uhr', p.bedenkzeit_s != null);
         inhalt.innerHTML = `<div class="inhalt on-spiel">
-          <div class="brettzone"><div class="brett-rahmen"><div class="brett on-brett"></div></div></div>
+          <div class="brettzone"><div class="brett-rahmen"><div class="brett on-brett"></div><div class="brett-effekte on-effekte" aria-hidden="true"></div></div></div>
           <div class="seite">
             <div class="spieler gegner on-spieler on-oben" role="group"></div>
             <div class="on-hinweise"><p class="on-angebot" role="alert" hidden></p><p class="on-neuer" hidden></p>
@@ -748,6 +751,32 @@ export function zeige(root, params, app) {
     if (alt.status !== 'laeuft' || p.status !== 'beendet' || !p.ergebnis || p.grund === 'strittig') return;
     if (widerspruch || !endePasst(p, chess)) return;
     try { klang.ende(p.ergebnis === '1/2-1/2' ? null : (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p)); } catch (e) { /* still */ }
+    if (p.grund === 'matt' && (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p)) finisher();
+  }
+  // Matt-Finisher wie in der Bot-Partie (Ort partie:matt, js/pakete/finisher): nur beim eigenen Matt, das diese Ansicht
+  // selbst erlebt hat (klingt oben); ein Tipp oder das Verlassen beendet ihn. Die Buehne ist nur, was der Finisher braucht:
+  // das Feld in Brett-Lage (wie partie.js spalteZeile) und die Effekt-Ebene ueber den Feldern (Kaltreview 6b 17.11.2026).
+  let mattOrt = null;
+  function finisher() {
+    const effekte = inhalt.querySelector('.on-effekte');
+    if (!effekte || !brett) return;
+    const verbose = chess.history({ verbose: true }), m = verbose.at(-1) || null;
+    let koenigFeld = null;
+    for (const reihe of chess.board()) for (const f of reihe) if (f && f.type === 'k' && f.color === chess.turn()) koenigFeld = f.square;
+    const buehne = Object.freeze({ el: s, effekte, brett, feld(f) {
+      if (typeof f !== 'string' || !/^[a-h][1-8]$/.test(f)) return null;
+      const d = f.charCodeAt(0) - 97, r = Number(f[1]) - 1;
+      return brett.ausrichtung === 'w' ? { x: d, y: 7 - r } : { x: 7 - d, y: r };
+    } });
+    const ctrl = new AbortController();
+    s.addEventListener('pointerdown', () => ctrl.abort(), { capture: true, once: true });
+    const reduziert = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || tempo() === 0;
+    mattOrt?.verlasse();
+    mattOrt = fuelle('partie:matt', null, {
+      app, buehne, partieId: p.id, ergebnis: 'sieg', gewinner: 'flo', koenigFeld, fen: chess.fen(), reduziert,
+      letzterZug: m ? Object.freeze({ von: m.from, nach: m.to, san: m.san, figur: m.color + m.piece.toUpperCase() }) : null,
+      signal: ctrl.signal, dauerMs: BRETT_FEIER.dauerMs, kurzMs: BRETT_FEIER.kurzMs,
+    });
   }
   // R7: Kronen-Aenderung einer gewerteten Partie, nur aus dem, was der Server schon liefert. Die Online-Antworten tragen
   // keine Kronen; die Buchung macht der Trigger am Partie-Ende (supabase/kronen-schema.sql). Darum: kronen_mein_stand
@@ -1092,6 +1121,6 @@ export function zeige(root, params, app) {
   });
   if (app.test) window.__online = { partie: () => p, chess: () => chess, brett: () => brett, blockiert: () => blockiert, widerspruch: () => widerspruch, busy: () => busy, rest };
   start();
-  return { verlasse() { weg = true; live?.stop(); clearInterval(restUhr); clearTimeout(introUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
+  return { verlasse() { weg = true; mattOrt?.verlasse(); live?.stop(); clearInterval(restUhr); clearTimeout(introUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
     window.removeEventListener('schach:einstellungen', beiEinstellungen); document.removeEventListener('keydown', zugTasten); schliesseAnsicht(); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
 }

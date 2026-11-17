@@ -238,11 +238,13 @@ function grundText(z, bot) {
 let knopfNr = 0;
 // Flo 31.10.2026: "Emotes und Schnellchat muessen eigentlich nicht gegen die Bots freigeschaltet sein. Das ist eigentlich nur
 // fuers Online gedacht." Gegen Bots (und zu zweit) keine Knoepfe; eine Online-Partie bekommt sie mit modus 'online'.
+// Die Online-Partie, die in js/ui/partie.js laeuft, ist der KI-Ersatz der Gegnersuche (buehne.ki, js/ui/ki-ersatz.js); ihr
+// modus bleibt 'normal' (js/storage.js MODI kennt kein 'online'), darum zaehlt dort buehne.ki (Kaltreview 6b 17.11.2026).
 // Nur die Tests (?test&emotes) zeigen sie weiter in der Bot-Partie, damit Rad, Chat und Bot-Antwort geprueft bleiben.
 const imTestGegenBots = () => typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '') && /[?&]emotes\b/.test(location.search || '');
 function aktionsKnopf(k, art) {
   if (!einstellungen().an) return null;
-  if (k.modus !== 'online' && !imTestGegenBots()) return null;
+  if (k.modus !== 'online' && !(k.buehne && k.buehne.ki === true) && !imTestGegenBots()) return null;
   const { buehne, bot } = k;
   const istEmote = art === 'emotes';
   const b = document.createElement('button'); b.type = 'button'; b.className = 'knopf em-aktion';
