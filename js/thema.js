@@ -137,6 +137,7 @@ export function botFarbe(bot) {
 }
 
 // Profil (js/profil.js, Flo 30.10.2026): gewaehlte Figur und Rahmen; ohne Wahl wie bisher der Koenig ohne Ring
+let portraetNr = 0; // Ausschnitt-Kennungen der Portraets (profilAvatar), eine je Aufruf
 export function floAvatar(farbe = 'w') {
   return profilAvatar(profilWahl(), farbe);
 }
@@ -165,7 +166,9 @@ export function profilAvatar(wahl = {}, farbe = 'w') {
   const grund = profilGrund(p.grund) || `<rect width="120" height="120" fill="${w ? '#2C3038' : '#E9E3D8'}"/>`
     + `<circle cx="60" cy="64" r="42" fill="${w ? '#3A3F48' : '#F7F3EC'}"/>`;
   // Kreatur als Motiv (Flo 31.10.2026): still, ohne die Bewegungen der Emotes (im Spiel soll nichts zappeln)
-  const motiv = portraet ? `<clipPath id="pa-${botId}"><circle cx="60" cy="64" r="42"/></clipPath><image href="${portraet}" x="18" y="22" width="84" height="84" clip-path="url(#pa-${botId})"/>`
+  // eigene Ausschnitt-Kennung je Aufruf (wie js/rahmen-kunst.js): Karte und Auswahl-Blatt zeigen dasselbe Portraet im selben Dokument
+  const clip = portraet ? `pa-${botId}-${++portraetNr}` : '';
+  const motiv = portraet ? `<clipPath id="${clip}"><circle cx="60" cy="64" r="42"/></clipPath><image href="${portraet}" x="18" y="22" width="84" height="84" clip-path="url(#${clip})"/>`
     : KREATUR_MOTIVE.includes(p.figur)
     ? kreaturSvg(p.figur, 'normal').replace(/ class="[^"]*"/g, '').replace('<svg ', '<svg x="14" y="17" width="92" height="92" ')
     : `<image href="${datei}" x="21" y="22" width="78" height="78"/>`;
