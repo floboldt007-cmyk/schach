@@ -119,7 +119,9 @@ try {
     const zu = await s.evaluate(() => getComputedStyle(document.querySelector('.arena .detail .sprechblase')).display);
     pruefe(`B20 ${name}: Leiste zu zeigt keinen Spruch`, zu === 'none', zu);
     await s.click('.arena .detail .karte-griff');
-    await s.waitForFunction(() => !!document.querySelector('.arena .detail.offen .sprechblase') && getComputedStyle(document.querySelector('.arena .detail .sprechblase')).display !== 'none');
+    // offen; ein besonderer Satz (z. B. die Begruessung eines neuen Bots) tritt unter 720 px schon hier zurueck (Regel B20),
+    // darum nur auf die offene Karte warten, nicht auf eine sichtbare Blase
+    await s.waitForFunction(() => !!document.querySelector('.arena .detail.offen .sprechblase'));
     const SATZ = 'Ein neuer Name auf meiner Route! Schön, dich kennenzulernen. Ich hab’s immer ein bisschen eilig, also los, bevor die Post wartet.';
     await s.waitForTimeout(1200);
     // ein langer besonderer Satz (wie die Begruessung eines neuen Bots), danach die Karte neu legen lassen
