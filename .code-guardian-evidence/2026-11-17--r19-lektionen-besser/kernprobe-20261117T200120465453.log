@@ -1,0 +1,6 @@
+BELEG: v1 werkzeug=beleg-lauf zeit=1794942082 stand=e5b84a55f7d5f28b10c9e18186e93c78d32550537395518572303fae82ea34da head=e9abb828ab5c37ad4cabb83af8d7bdea02250f6e kmd=26a7b518744433079cbc19c899f0bf638c701055eacc04074dbafd9fcf61db32 messung=42cb2d97b135dc86c12ad3047bd36a12472d43b6adced66b34ab54a05549e7a5 mac=02a3197c44c745f37e67bcd1d811a46ed28399a21102fe21c9d5e010dacb3108
+kmd: node tests/r19-lektionen-besser.test.mjs
+FEHLER mattbilder.js exportiert rundenVon(l)
+
+0/1 bestanden
+exit=1
