@@ -3,7 +3,8 @@
 // Messung "ohne Nachdenken". Genutzt von tests/r19-lektionen-besser.test.mjs und werkzeuge/lektionen-messen.mjs.
 //
 //   stockfish() -> { init, neu, suche(fen, go) -> { best, mate, cp }, alle(fen, go, n) -> [{ uci, mate, cp }], ende }
-//   spiele(sf, l, fen, { go }) -> { ende: 'geschafft' | Grund, zuege, zugliste: [fen vor Flos Zug] }
+//   spiele(sf, l, fen, { go }) -> { ende: 'geschafft' | Grund, zuege, zugliste: [fen vor Flos Zug], endFen, letzter }
+//   mattform(endFen, letzter) -> { matt, mattzug, nachbarn, erstickt }   (ersticktes Matt: Springer, Koenig nur eigene Nachbarn)
 //   mattIn(sf, fen, go) -> N | null       Suche (go z. B. 'nodes 3000000') nach "mate N" fuer Weiss
 //   gut(eintrag, art) -> boolean         ein Zug haelt das Ziel (Matt/Gewinn: mate > 0 oder cp >= 400; halten: cp >= -150)
 //   nahBest(eintrag, best, art)          haelt das Ziel und verschenkt hoechstens einen Zug (Messung ohne Nachdenken)
@@ -76,23 +77,45 @@ export async function spiele(sf, l, fen, { go = 'movetime 150', goGegner = go } 
   const c = new Chess(fen);
   const start = bilanz(c);
   const zugliste = [];
-  let zuege = 0;
+  let zuege = 0, letzter = null;
+  // endFen und letzter (Flos letzter Zug) fuer die Mattform (mattform unten, Kaltreview 3f 17.11.2026)
+  const aus = (ende) => ({ ende, zuege, zugliste, endFen: c.fen(), letzter });
   await sf.neu();
   for (let runde = 0; runde < grenze(l.ziel) + 5; runde++) {
     zugliste.push(c.fen());
     const f = await sf.suche(c.fen(), go);
-    if (!f.best || f.best === '(none)') return { ende: 'keinZug', zuege, zugliste };
-    uciZug(c, f.best);
+    if (!f.best || f.best === '(none)') return aus('keinZug');
+    const m = uciZug(c, f.best);
+    letzter = { san: m.san, figur: m.piece };
     zuege++;
     let e = pruefeZiel(l, start, c, { wann: 'flo', zuege });
-    if (e) return { ende: e, zuege, zugliste };
+    if (e) return aus(e);
     const g = await sf.suche(c.fen(), goGegner);
-    if (!g.best || g.best === '(none)') return { ende: 'keinZug', zuege, zugliste };
+    if (!g.best || g.best === '(none)') return aus('keinZug');
     uciZug(c, g.best);
     e = pruefeZiel(l, start, c, { wann: 'gegner', zuege });
-    if (e) return { ende: e, zuege, zugliste };
+    if (e) return aus(e);
   }
-  return { ende: 'zuViele', zuege, zugliste };
+  return aus('zuViele');
+}
+
+// Ersticktes Matt: die Stellung ist Matt, der letzte Zug war ein Springer und jedes Nachbarfeld des mattgesetzten Koenigs
+// ist von einer EIGENEN Figur besetzt (am Rand zaehlen nur die Felder auf dem Brett)
+export function mattform(endFen, letzter) {
+  const c = new Chess(endFen);
+  if (!c.isCheckmate()) return { matt: false, erstickt: false };
+  const farbe = c.turn();
+  let k = null;
+  for (const r of c.board()) for (const f of r) if (f && f.type === 'k' && f.color === farbe) k = f.square;
+  const nachbarn = [];
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    const x = k.charCodeAt(0) - 97 + dx, y = Number(k[1]) - 1 + dy;
+    if ((!dx && !dy) || x < 0 || x > 7 || y < 0 || y > 7) continue;
+    const q = String.fromCharCode(97 + x) + (y + 1), f = c.get(q);
+    nachbarn.push(q + ':' + (f ? f.color + f.type : '-'));
+  }
+  const erstickt = !!letzter && letzter.figur === 'n' && nachbarn.every((n) => n.split(':')[1][0] === farbe);
+  return { matt: true, mattzug: letzter ? letzter.san : null, nachbarn: nachbarn.join(' '), erstickt };
 }
 
 export async function mattIn(sf, fen, go) {

@@ -53,7 +53,7 @@ export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'legal', stufe: 'mittel', fen: 'rn1qkbnr/ppp2p1p/3p2p1/4N3/2B1P3/2N5/PPPP1PPP/R1BbK2R w KQkq - 0 6', ziel: 2 }),
   Object.freeze({ id: 'arabisch', stufe: 'mittel', fen: 'r6k/1R6/p7/8/4N3/8/5PPP/6K1 w - - 0 1', ziel: 3 }),
   Object.freeze({ id: 'erstickt', stufe: 'mittel', fen: '4r2k/6pp/8/4N3/2Q5/8/5PPP/6K1 w - - 0 1', ziel: 4,
-    runden: Object.freeze([R('4r2k/6pp/8/3QN3/8/8/5PPP/6K1 w - - 0 1', 4), R('4r2k/7p/8/2p1N3/2Q5/8/5PPP/6K1 w - - 0 1', 7)]) }),
+    runden: Object.freeze([R('4r2k/6pp/8/3QN3/8/8/5PPP/6K1 w - - 0 1', 4), R('4r1k1/6pp/8/4N3/8/8/5PPP/1Q4K1 w - - 0 1', 5)]) }),
   Object.freeze({ id: 'dame', stufe: 'mittel', fen: '8/8/8/4k3/8/8/8/3QK3 w - - 0 1', ziel: 7,
     runden: Object.freeze([R('1K6/1Q6/8/8/8/8/3k4/8 w - - 0 1', 8), R('6Q1/8/8/2k5/8/8/8/7K w - - 0 1', 9)]) }),
   Object.freeze({ id: 'turm', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/R3K3 w - - 0 1', ziel: 13,

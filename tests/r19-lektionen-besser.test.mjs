@@ -10,7 +10,7 @@
 // Aufruf: node tests/r19-lektionen-besser.test.mjs [ids]
 import * as M from '../js/pakete/lernen/mattbilder.js';
 import { pruefeLektion } from '../js/pakete/lernen/mattbilder.js';
-import { stockfish, spiele, mattIn, gut, artVon, Chess } from './lektion-engine.mjs';
+import { stockfish, spiele, mattIn, mattform, gut, artVon, Chess } from './lektion-engine.mjs';
 import { setzeSprache, t } from '../js/sprache.js';
 import '../js/pakete/lernen/texte.js';
 
@@ -99,6 +99,13 @@ try {
       const s = await spiele(sf, r, r.fen, { go: GO, goGegner: GO_GEGNER });
       const matt = artVon(l) === 'matt' ? await mattIn(sf, r.fen, MATT_SUCHE) : null;
       pruefe(`${tag}: Stockfish gegen Stockfish endet geschafft`, s.ende === 'geschafft', `Engine sagt ${s.ende} nach ${s.zuege}`);
+      // Lektionen mit einem Mattbild im Namen: die beste Linie endet auch in DIESEM Bild (Kaltreview 3f 17.11.2026: die
+      // Meisterprobe von "erstickt" endete mit Qxh7#, einem Damenmatt)
+      if (l.id === 'erstickt') {
+        const f = mattform(s.endFen, s.letzter);
+        pruefe(`${tag}: beste Linie endet im erstickten Matt (Springer, Koenig nur von eigenen Steinen umstellt)`, f.erstickt,
+          `${f.mattzug} · ${f.nachbarn}`);
+      }
       // Matt: Ziel = Mattdistanz der Suche (genau). Halten: Ziel = gehaltene Zuege. Umwandeln/Gewinnen: ohne Mattwert ist
       // das Selbstspiel nur eine Obergrenze (Stockfish eilt nicht zum Ziel), also muss die Engine selbst drei Sterne holen
       // (mattbilder.js sterne: zuege <= ziel + ziel/4) und das Ziel darf nicht ueber ihrer Zugzahl liegen
