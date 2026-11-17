@@ -648,6 +648,7 @@ export function zeige(root, params, app) {
     // die Schilder "Endgegner" und "Naechster Gegner" ganz in der Karte (iPhone SE und iPad quer, 08.11.2026: am
     // Kartenrand angeschnitten; der Pfeil der Fahne zeigt weiter auf die Station); gerechnet aus Lage und Breite, nicht
     // aus dem Bild, denn Stationen koennen gerade einschweben
+    restUebergaengeBeenden();
     lage.stationen.forEach(([fx], i) => knoten[i].querySelectorAll('.boss-krone, .fahne').forEach((krone) => {
       const halb = krone.offsetWidth / 2, x = fx * w, rand = 6;
       const dx = Math.max(0, rand + halb - x) - Math.max(0, x + halb - (w - rand));
@@ -695,18 +696,40 @@ export function zeige(root, params, app) {
     const R = ((knoten[i] && knoten[i].offsetWidth) || kn) / 2;
     return freierPlatz(fx * masse.w, yVon(fy), R + r + FLO_ABSTAND, r);
   }
-  // um (cx, cy) im Abstand d (d = 0: zuerst der Punkt selbst) der erste Platz ohne Beruehrung; sonst die erste Richtung
+  // um (cx, cy) im Abstand d (d = 0: zuerst der Punkt selbst) der erste Platz ohne Beruehrung; sonst der mit der meisten
+  // Luft (PC, Start in der Ecke unten links: bis 4 r war keiner frei, die feste erste Richtung lag halb auf Station 1)
   function freierPlatz(cx, cy, d, r) {
     const rand = r + 8;   // wie stelleFlo: so weit bleibt die Figur vom Rand der Karte
+    restUebergaengeBeenden();
     const hoehe = weltEl.offsetHeight || masse.h;
     const hindernisse = flaechenDerStationen();
     const a0 = d || r * 2 + FLO_ABSTAND;
-    const kandidaten = (d > 0 ? [] : [[cx, cy]]).concat(...[a0, a0 + r, a0 + 2 * r, a0 + 4 * r]
+    const kandidaten = (d > 0 ? [] : [[cx, cy]]).concat(...[a0, a0 + r, a0 + 2 * r, a0 + 4 * r, a0 + 6 * r, a0 + 8 * r]
       .map((a) => FLO_RICHTUNGEN.map((g) => [cx + a * Math.cos(g * Math.PI / 180), cy + a * Math.sin(g * Math.PI / 180)])));
-    const passt = ([x, y]) => x >= rand && x <= masse.w - rand && y >= rand && y <= hoehe - rand
-      && hindernisse.every((h) => (h.kreis ? Math.hypot(x - h.x, y - h.y) >= r + h.r + 2
-        : Math.hypot(x - Math.max(h.x, Math.min(x, h.x + h.w)), y - Math.max(h.y, Math.min(y, h.y + h.h))) >= r + 2));
-    return kandidaten.find(passt) || kandidaten[d > 0 ? 0 : 1];
+    // Luft = kleinster Abstand zu Station oder Schild ueber das Noetige hinaus; ausserhalb der Karte keine
+    const luft = ([x, y]) => (x < rand || x > masse.w - rand || y < rand || y > hoehe - rand ? -Infinity
+      : Math.min(...hindernisse.map((h) => (h.kreis ? Math.hypot(x - h.x, y - h.y) - (r + h.r + 2)
+        : Math.hypot(x - Math.max(h.x, Math.min(x, h.x + h.w)), y - Math.max(h.y, Math.min(y, h.y + h.h))) - (r + 2)))));
+    const frei = kandidaten.find((p) => luft(p) >= 0);
+    if (frei) return frei;
+    // vor dem Rueckfall fein nahe suchen (iPhone SE, Welt 288x261, Start jeder Welt: kein Ring frei, der Rueckfall lag
+    // 2 px auf der Nummer von Station 1, frei war ein Platz 6 bis 9 px daneben): Ringe in 4-px-Schritten, alle 15 Grad
+    for (let a = d || 4; a <= a0 + 8 * r; a += 4) {
+      for (let g = 0; g < 360; g += 15) {
+        const p = [cx + a * Math.cos(g * Math.PI / 180), cy + a * Math.sin(g * Math.PI / 180)];
+        if (luft(p) >= 0) return p;
+      }
+    }
+    return kandidaten.reduce((a, b) => (luft(b) > luft(a) ? b : a));
+  }
+  // Bewegung aus (css/tokens.css): jeder Uebergang dauert .01ms, auch Breite und Rand der Stationen, wenn layout() ihre
+  // Groesse setzt; solange er laeuft, melden offsetWidth und Lage noch den alten Wert, und die Figur stand auf der Fahne
+  // (iPad quer, Welt fertig: 4 px). Nur diese Reste werden sofort beendet, echte Uebergaenge laufen weiter
+  function restUebergaengeBeenden() {
+    if (typeof CSSTransition !== 'function' || !weltEl.getAnimations) return;
+    for (const a of weltEl.getAnimations({ subtree: true })) {
+      if (a instanceof CSSTransition && a.effect && a.effect.getTiming().duration <= 1) a.finish();
+    }
   }
   // Kreise der Stationen und Rechtecke ihrer Schilder in Welt-Pixeln, aus dem Layout (offset*), nicht aus dem Bild:
   // Stationen koennen gerade einschweben (transform), ihre Plaetze stehen trotzdem fest
