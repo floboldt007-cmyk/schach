@@ -108,6 +108,25 @@ try {
       await s.locator('.screen.arena .detail .karte-griff').click(); await warte(500);
       const auf = await spielenSicht(s);
       pruefe(`${g.name}: Karte offen, Spielen ganz sichtbar (nicht unter der Reiterleiste), mind. 44 px, ohne Scrollen`, sichtbarGut(auf), auf);
+      // WCAG 2.4.11: der klebende Spielen-Platz darf kein fokussiertes Bedienelement der offenen Karte ganz verdecken
+      // (Tab durch die Karte; je Ziel: liegt seine Mitte unter dem Spielen-Platz?)
+      const verdeckt = [];
+      let besucht = 0;
+      await s.locator('.screen.arena .detail .karte-griff').focus();
+      for (let i = 0; i < 12; i++) {
+        await s.keyboard.press('Tab'); await warte(120);
+        const f = await s.evaluate(() => {
+          const d = document.querySelector('.screen.arena .detail'), e = document.activeElement;
+          if (!d.contains(e)) return null;
+          const r = e.getBoundingClientRect(), cta = d.querySelector('.cta-platz');
+          const oben = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return { name: (e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 30), unterCta: !e.closest('.cta-platz') && !!oben && cta.contains(oben) };
+        });
+        if (!f) break;
+        besucht++;
+        if (f.unterCta) verdeckt.push(f.name);
+      }
+      pruefe(`${g.name}: Tab durch die offene Karte, kein Fokus unter dem klebenden Spielen-Platz (2.4.11)`, besucht > 1 && !verdeckt.length, { besucht, verdeckt });
       pruefe(`${g.name}: keine Seiten- und Konsolenfehler`, !fehler.length, fehler);
     } finally { await k.close(); }
   }
