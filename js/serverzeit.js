@@ -16,8 +16,11 @@
 //
 // R19 online-frist (18.11.): Wer eine laufende Partie neu oeffnet und nichts schreibt, hatte keine frische Probe; mit einer
 // 40 s vorgehenden Geraeteuhr zeigte die Frist 0:00 statt ~23 s. Jede frische Probe merkt den Versatz darum auf dem Geraet
-// (GEMERKT_GILT_MS); die Anzeige nutzt ihn bis zur naechsten frischen Probe. Zeitpruefung und Reklamation (sicher, seit)
-// bleiben bei der Ansichts-Schranke, ein veralteter gemerkter Wert loest also nie eine fruehe Reklamation aus.
+// (GEMERKT_GILT_MS); die Anzeige nutzt ihn bis zur naechsten frischen Probe. Der GEMERKTE Wert geht nie in sicher() und
+// seit(): ohne frische Probe dieser Sitzung bleibt die Reklamation bei der Ansichts-Schranke, ein veralteter gemerkter Wert
+// loest also nie eine fruehe Reklamation aus. Der HTTP-Date-Kopf (online.js anfrage) ist dagegen eine ECHTE frische Probe
+// dieser Sitzung (Entscheid 6f 18.11.) und gilt auch fuer die Reklamation: als abgeschnittene untere Schranke nie zu frueh,
+// hoechstens um die Laufzeit der Antwort plus 1 s zu spaet (Kaltreview de 18.11.: 0/2000 zu frueh, bis 6,6 s spaet).
 export const FRISCH_MS = 6000;
 // Proben veralten: eine spaeter gestellte Geraeteuhr soll nicht fuer immer mit dem alten Versatz rechnen
 export const PROBE_GILT_MS = 10 * 60 * 1000;

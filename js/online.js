@@ -135,7 +135,8 @@ async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
   try { r = await fetchFn(SUPABASE_URL + pfad, { method: methode, headers: kopf, body: daten === undefined ? undefined : JSON.stringify(daten) }); }
   catch (e) { throw new Error(O('offline')); }
   // R19 online-frist (18.11.): der HTTP-Date-Kopf ist die Serveruhr beim Antworten, auf die Sekunde ABGESCHNITTEN, also nie
-  // spaeter als die echte Zeit (untere Schranke wie aktualisiert_am); kam die Antwort schnell, ist er eine frische Probe.
+  // spaeter als die echte Zeit (untere Schranke wie aktualisiert_am); kam die Antwort schnell, ist er eine frische Probe,
+  // und zwar fuer Anzeige UND Reklamation (sicher() gilt danach; zu frueh nie, s. serverzeit.js).
   // Supabase gibt ihn per access-control-expose-headers frei (gemessen 18.11.); ohne ihn bleibt es beim Alten
   const datum = r?.headers?.get?.('date');
   if (datum) { const empfang = Date.now(); zeitProbe(datum, empfang, empfang - gesendet <= FRISCH_MS); }
