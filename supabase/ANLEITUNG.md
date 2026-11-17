@@ -556,7 +556,9 @@ Premium und geänderte Namen bleiben dabei, die Banner aus der Verwaltung und da
 Den ersten Benutzernamen wählt jeder frei. Danach geht höchstens eine eigene Änderung je 30 Tage. Die App zeigt unter
 Einstellungen → Konto „Nächste Änderung ab <Datum>“. Wer es trotzdem versucht (etwa von einem zweiten Gerät aus), bekommt
 eine klare Meldung mit dem Datum. Die Sperre sitzt im Server, also hilft auch kein Aufruf an der App vorbei. Die
-Verwaltung und der SQL Editor bleiben frei. Ohne diese Datei läuft die App wie bisher, nur ohne Sperre und ohne Hinweis.
+Verwaltung und der SQL Editor bleiben frei. Damit niemand die Frist durch Löschen und neu Anlegen umgeht, kann ein
+Spieler sein Profil nicht mehr selbst löschen; „Konto löschen“ in der App löscht es weiter. Ohne diese Datei läuft die
+App wie bisher, nur ohne Sperre und ohne Hinweis.
 
 1. Vorher muss `schema.sql` eingespielt sein.
 2. Im **SQL Editor** den ganzen Inhalt von `supabase/benutzername-sperre-schema.sql` ausführen. Die Datei darf mehrfach
@@ -569,7 +571,7 @@ Verwaltung und der SQL Editor bleiben frei. Ohne diese Datei läuft die App wie 
 `update public.profile set name_geaendert_am = null where user_id = '<id>';`
 
 **Rückweg:** `supabase/benutzername-sperre-zurueck.sql`. Die Namen bleiben, nur der Zeitpunkt der letzten Änderung ist
-danach weg, und der Name ist wieder beliebig oft änderbar.
+danach weg, der Name ist wieder beliebig oft änderbar, und das eigene Profil lässt sich wieder selbst löschen.
 
 ## Google-Anmeldung einrichten
 

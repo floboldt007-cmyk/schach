@@ -3,7 +3,8 @@
 -- Jeder Fehler bricht mit "FEHLER: ..." ab; ohne Fehler endet der Lauf mit ROLLBACK.
 -- Abschnitte: 1 erstes Setzen frei, mitgeschickte Frist verworfen; 2 gleicher Name ist keine Aenderung; 3 erste Aenderung
 -- setzt die Frist, die zweite ist gesperrt (NAME_GESPERRT mit Datum); 4 Frist nicht faelschbar; 5 fremde Zeile (RLS);
--- 6 Besitzer frei und kann die Sperre aufheben; 7 nach 30 Tagen wieder frei.
+-- 6 Besitzer frei und kann die Sperre aufheben; 7 nach 30 Tagen wieder frei; 8 eigenes Loeschen gesperrt (vor 5 geprueft,
+-- Kaltreview 17.11.2026: Loeschen und neu Anlegen setzte die Frist sonst auf null).
 begin;
 
 insert into auth.users (id, email)
@@ -49,6 +50,18 @@ begin
   update public.profile set name_geaendert_am = '2000-01-01' where user_id = 'a7000000-0000-4000-8000-0000000000a7';
   if (select p.name_geaendert_am from public.profile p where p.user_id = 'a7000000-0000-4000-8000-0000000000a7') <> am then
     raise exception 'FEHLER: Frist selbst zurueckdatiert';
+  end if;
+
+  -- 8 Loeschen und neu Anlegen setzt die Frist nicht zurueck: das eigene Loeschen ist gesperrt
+  begin
+    delete from public.profile where user_id = 'a7000000-0000-4000-8000-0000000000a7';
+    raise exception 'FEHLER: eigenes Profil liess sich loeschen (Frist umgehbar)';
+  exception when insufficient_privilege then
+    get stacked diagnostics meldung = message_text;
+    if meldung <> 'PROFIL_LOESCHEN_GESPERRT' then raise exception '%', meldung; end if;
+  end;
+  if (select p.name_geaendert_am from public.profile p where p.user_id = 'a7000000-0000-4000-8000-0000000000a7') <> am then
+    raise exception 'FEHLER: Frist nach Loeschversuch veraendert';
   end if;
 
   -- 5 fremde Zeile: RLS laesst keine Aenderung zu

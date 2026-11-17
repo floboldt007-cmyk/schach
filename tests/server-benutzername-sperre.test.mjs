@@ -134,12 +134,35 @@ await db.exec(BESITZER + `update public.profile set name_geaendert_am = null whe
 f = await versuch(db, ALS(B) + UPSERT(B, 'b_aufgehoben'));
 pruefe('Nach dem Aufheben (Besitzer setzt null) ist die Aenderung frei', !f, f?.message);
 
+// Kaltreview 3f 17.11.2026: Loeschen und neu Anlegen darf die Frist nicht zuruecksetzen (INSERT setzt null)
+const vorLoeschen = (await zeile(db, B)).name_geaendert_am;
+f = await versuch(db, ALS(B) + `delete from public.profile where user_id = '${B}';`);
+pruefe('Das eigene Profil laesst sich nicht selbst loeschen (42501)', f?.code === '42501' && f.message === 'PROFIL_LOESCHEN_GESPERRT',
+  f ? `${f.code} ${f.message}` : 'kein Fehler');
+f = await versuch(db, ALS(B) + `delete from public.profile where user_id = '${B}';` + UPSERT(B, 'b_nach_loeschen'));
+z = await zeile(db, B);
+pruefe('Loeschen + neu Anlegen umgeht die Sperre nicht: Name und Frist bleiben', z?.benutzername === 'b_aufgehoben'
+  && new Date(z.name_geaendert_am).getTime() === new Date(vorLoeschen).getTime(), f?.message || JSON.stringify(z));
+f = await versuch(db, ALS(B) + UPSERT(B, 'b_nach_loeschen'));
+pruefe('Danach bleibt die Aenderung gesperrt', f?.message === 'NAME_GESPERRT', f?.message || 'kein Fehler');
+// auch nach erneutem Einspielen von schema.sql (vergibt delete an authenticated neu) bleibt das Loeschen gesperrt
+await db.exec(BESITZER);
+f = await versuch(db, lies('supabase/schema.sql'));
+pruefe('schema.sql laeuft erneut durch (wiederholbar)', !f, f?.message);
+f = await versuch(db, ALS(B) + `delete from public.profile where user_id = '${B}';`);
+pruefe('Auch danach bleibt das eigene Loeschen gesperrt', f?.message === 'PROFIL_LOESCHEN_GESPERRT', f ? f.message : 'kein Fehler');
+
 // RLS und Eindeutigkeit bleiben
 f = await versuch(db, ALS(A) + `update public.profile set benutzername = 'fremd_name' where user_id = '${B}';`);
 z = await zeile(db, B);
 pruefe('A kann den Namen von B nicht aendern (RLS)', z.benutzername === 'b_aufgehoben', f?.message || JSON.stringify(z));
 f = await versuch(db, ALS(A) + UPSERT(A, 'B_AUFGEHOBEN'));
 pruefe('Eindeutig ohne Gross/Klein bleibt (23505)', f?.code === '23505', f ? f.code : 'kein Fehler');
+// Konto loeschen (konto_loeschen, daten-schema.sql) laeuft als security definer und loescht profile weiter
+await db.exec(BESITZER + `create function public.test_konto_loeschen() returns void language plpgsql security definer set search_path = ''
+  as $$ begin delete from public.profile where user_id = auth.uid(); end; $$;`);
+f = await versuch(db, ALS(A) + `select public.test_konto_loeschen();`);
+pruefe('security definer (wie konto_loeschen) loescht das Profil weiter', !f && (await zeile(db, A)) === null, f?.message);
 
 // Rueckweg
 await db.exec(BESITZER);
@@ -149,6 +172,10 @@ const trig = await db.query(`select 1 from pg_trigger where tgname = 'profile_na
 pruefe('Rueckweg laeuft (zweimal), Spalte und Trigger sind weg', !f && spalte.rows.length === 0 && trig.rows.length === 0, f?.message);
 f = await versuch(db, ALS(B) + UPSERT(B, 'b_frei_eins') + UPSERT(B, 'b_frei_zwei'));
 pruefe('Nach dem Rueckweg ist der Name wieder frei aenderbar', !f, f?.message);
+f = await versuch(db, ALS(B) + `delete from public.profile where user_id = '${B}';`);
+await db.exec(BESITZER);
+const nachLoeschen = (await db.query(`select count(*)::int as n from public.profile where user_id = '${B}'`)).rows[0].n;
+pruefe('Nach dem Rueckweg darf das eigene Profil wieder geloescht werden (Stand schema.sql)', !f && nachLoeschen === 0, f?.message || nachLoeschen);
 await db.exec(BESITZER);
 f = await versuch(db, lies('supabase/benutzername-sperre-schema.sql'));
 pruefe('Danach laesst sich die Sperre wieder einspielen', !f, f?.message);
@@ -167,6 +194,29 @@ pruefe('Danach laesst sich die Sperre wieder einspielen', !f, f?.message);
   await db3.exec(`alter table public.profile add column name_geaendert_am timestamptz;`);
   g = await versuch(db3, lies('supabase/benutzername-sperre-rls-test.sql'));
   pruefe('Gegenprobe: ohne Trigger scheitert der RLS-Test mit FEHLER', /FEHLER/.test(g?.message || ''), g?.message || 'kein Fehler');
+  // Gegenprobe zum Kaltreview 17.11.: Trigger ohne DELETE (Stand 2101314) -> der RLS-Test findet die Umgehung
+  const db4 = new PGlite();
+  await db4.exec(ATTRAPPE); await db4.exec(lies('supabase/schema.sql')); await db4.exec(lies('supabase/benutzername-sperre-schema.sql'));
+  await db4.exec(`drop trigger profile_name_sperre on public.profile; create trigger profile_name_sperre before insert or update
+    on public.profile for each row execute function public.profile_name_sperre();`);
+  g = await versuch(db4, lies('supabase/benutzername-sperre-rls-test.sql'));
+  pruefe('Gegenprobe: Trigger ohne DELETE -> RLS-Test meldet die Umgehung', /eigenes Profil liess sich loeschen/.test(g?.message || ''), g?.message || 'kein Fehler');
+}
+
+// das echte Konto-Loeschen (daten-schema.sql konto_loeschen, security definer) loescht profile trotz Loesch-Sperre
+{
+  const db5 = new PGlite();
+  let g = await versuch(db5, ATTRAPPE) || await versuch(db5, lies('supabase/schema.sql'))
+    || await versuch(db5, lies('supabase/benutzername-sperre-schema.sql')) || await versuch(db5, lies('supabase/daten-schema.sql'));
+  pruefe('daten-schema.sql laeuft nach der Sperre', !g, g?.message);
+  if (!g) {
+    await db5.exec(`insert into auth.users (id, email) values ('${A}', 'a@x');`);
+    g = await versuch(db5, ALS(A) + `insert into public.profile (user_id, benutzername) values ('${A}', 'anna_x');`)
+      || await versuch(db5, ALS(A) + `select public.konto_loeschen();`);
+    await db5.exec(BESITZER);
+    const n = (await db5.query(`select (select count(*) from public.profile)::int as p, (select count(*) from auth.users)::int as u`)).rows[0];
+    pruefe('konto_loeschen loescht Profil und Konto weiter', !g && n.p === 0 && n.u === 0, g?.message || JSON.stringify(n));
+  }
 }
 
 console.log(`\n${ok}/${gesamt} bestanden`);

@@ -7,6 +7,9 @@
 -- (verwaltung_name, security definer) und der SQL Editor laufen als Besitzer und bleiben frei, ohne die Frist zu setzen;
 -- nur der Besitzer kann die Frist ausdruecklich setzen oder aufheben.
 -- Den Namen gleich zu lassen (die App schickt ihn bei "Jetzt sichern" jedes Mal mit) ist keine Aenderung.
+-- Das eigene Profil selbst loeschen geht nicht mehr (Kaltreview 17.11.2026: Loeschen und neu Anlegen setzte die Frist
+-- auf null). Gesperrt im Trigger statt per revoke, weil schema.sql wiederholbar ist und das Recht neu vergibt. Konto
+-- loeschen (konto_loeschen, security definer) laeuft als Besitzer und loescht profile weiter; die App loescht profile nie.
 -- Voraussetzung: schema.sql. Rueckweg: benutzername-sperre-zurueck.sql. Test: benutzername-sperre-rls-test.sql (SQL
 -- Editor) und tests/server-benutzername-sperre.test.mjs (PGlite). Einspielen nur Flo. Wiederholbar.
 
@@ -20,6 +23,12 @@ as $$
 declare
   bis timestamptz;
 begin
+  if tg_op = 'DELETE' then
+    if current_user = 'authenticated' then
+      raise exception 'PROFIL_LOESCHEN_GESPERRT' using errcode = '42501';
+    end if;
+    return old;
+  end if;
   if tg_op = 'INSERT' then
     -- das erste Setzen ist frei; die Frist kann niemand selbst mitschicken
     new.name_geaendert_am := null;
@@ -46,5 +55,5 @@ $$;
 
 drop trigger if exists profile_name_sperre on public.profile;
 create trigger profile_name_sperre
-before insert or update on public.profile
+before insert or update or delete on public.profile
 for each row execute function public.profile_name_sperre();
