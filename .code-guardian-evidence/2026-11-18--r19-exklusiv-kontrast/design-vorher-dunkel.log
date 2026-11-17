@@ -1,0 +1,180 @@
+HINWEIS vorlauf C:\Users\Flo\Documents\KI\schach-R19-exklusiv-kontrast\.code-guardian-evidence\2026-11-18--r19-exklusiv-kontrast\vorlauf-shop-dunkel.js sha256=5685288a453d — die Seite wurde vor dem Laden veraendert
+UNBEKANNT ruhe   a.zum-inhalt "Zum Inhalt springen" — Flaeche nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT hover  a — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+BEFUND focus  a.zum-inhalt "Zum Inhalt springen" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+HINWEIS focus  a.zum-inhalt "Zum Inhalt springen" — Flaeche nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT active a.zum-inhalt "Zum Inhalt springen" — Flaeche nicht messbar: aus-dem-fluss:fixed
+BEFUND ruhe   button.icon-knopf.kopf-knopf — Flaeche gegen Umgebung 1.11:1 unter 3:1 (WCAG 1.4.11)
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.icon-knopf.kopf-knopf — Flaeche gegen Umgebung 1.11:1 unter 3:1 (WCAG 1.4.11)
+BEFUND focus  button.icon-knopf.kopf-knopf — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+BEFUND ruhe   button.icon-knopf.kopf-knopf — Flaeche gegen Umgebung 1.11:1 unter 3:1 (WCAG 1.4.11)
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.icon-knopf.kopf-knopf — Flaeche gegen Umgebung 1.11:1 unter 3:1 (WCAG 1.4.11)
+BEFUND focus  button.icon-knopf.kopf-knopf — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+BEFUND ruhe   button.icon-knopf.kopf-knopf — Flaeche gegen Umgebung 1.11:1 unter 3:1 (WCAG 1.4.11)
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.icon-knopf.kopf-knopf — Flaeche gegen Umgebung 1.11:1 unter 3:1 (WCAG 1.4.11)
+BEFUND focus  button.icon-knopf.kopf-knopf — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+BEFUND ruhe   button.icon-knopf.kopf-knopf — Flaeche gegen Umgebung 1.11:1 unter 3:1 (WCAG 1.4.11)
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.icon-knopf.kopf-knopf — Flaeche gegen Umgebung 1.11:1 unter 3:1 (WCAG 1.4.11)
+BEFUND focus  button.icon-knopf.kopf-knopf — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+BEFUND ruhe   button.knopf.pr-aendern "Profilbild ändern" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von svg.sk-klang
+BEFUND focus  button.knopf.pr-aendern "Profilbild ändern" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.knopf.pr-aendern "Profilbild ändern" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von svg.sk-klang
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.pr-orden.leer "+Erfolg zeigen" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+BEFUND ruhe   button.sa-platz "BannerErster Zug 1 / 10" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von path
+BEFUND focus  button.sa-platz "BannerErster Zug 1 / 10" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.sa-platz "BannerErster Zug 1 / 10" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von path
+BEFUND ruhe   button.sa-platz "TitelFunke 1 / 62" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von path
+BEFUND focus  button.sa-platz "TitelFunke 1 / 62" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.sa-platz "TitelFunke 1 / 62" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von path
+BEFUND ruhe   button.sa-platz "RahmenKein Rahmen 2 / 10" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von path
+BEFUND focus  button.sa-platz "RahmenKein Rahmen 2 / 10" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.sa-platz "RahmenKein Rahmen 2 / 10" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von path
+BEFUND ruhe   button.sa-platz "BretterNacht 3 / 3" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von path
+BEFUND focus  button.sa-platz "BretterNacht 3 / 3" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.sa-platz "BretterNacht 3 / 3" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von path
+BEFUND ruhe   button.sa-platz "KlängeArcade 3 / 7" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von path
+BEFUND focus  button.sa-platz "KlängeArcade 3 / 7" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.sa-platz "KlängeArcade 3 / 7" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von path
+BEFUND ruhe   button.sa-platz "EmotesDaumen hoch, Appla" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von span.shf-bild
+BEFUND focus  button.sa-platz "EmotesDaumen hoch, Appla" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.sa-platz "EmotesDaumen hoch, Appla" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von span.shf-bild
+BEFUND ruhe   button.sa-gross "Erfolge0 / 19" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von span.shf-text "EpischSternwarteFigurens"
+BEFUND focus  button.sa-gross "Erfolge0 / 19" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.sa-gross "Erfolge0 / 19" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von span.shf-text "EpischSternwarteFigurens"
+BEFUND ruhe   button.sa-gross "Shop" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover  button — Zeiger abgefangen von span.shf-text "HäufigApplausEmote"
+BEFUND focus  button.sa-gross "Shop" — Flaeche gegen Umgebung 1.11:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.sa-gross "Shop" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+UNBEKANNT active button — Zeiger abgefangen von span.shf-text "HäufigApplausEmote"
+UNBEKANNT ruhe   button.reiter.dr "Start" — Text nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.reiter.dr "Start" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+HINWEIS focus  button.reiter.dr "Start" — Text nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+UNBEKANNT ruhe   button.reiter.dr "Bots" — Text nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.reiter.dr "Bots" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+HINWEIS focus  button.reiter.dr "Bots" — Text nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+UNBEKANNT ruhe   button.reiter.dr "Liga" — Text nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.reiter.dr "Liga" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+HINWEIS focus  button.reiter.dr "Liga" — Text nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+UNBEKANNT ruhe   button.reiter.dr "Ich" — Text nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT hover  button — Zeiger abgefangen von div.sheet-schleier
+BEFUND focus  button.reiter.dr "Ich" — kein Fokus-Indikator: weder outline noch box-shadow, Rahmen oder Flaeche aendern sich gegenueber dem Ruhezustand
+HINWEIS focus  button.reiter.dr "Ich" — Text nicht messbar: aus-dem-fluss:fixed
+UNBEKANNT active button — Zeiger abgefangen von div.sheet-schleier
+BEFUND ruhe   button.shf-karte "ExklusivMitternacht & Go" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND hover  button.shf-karte "ExklusivMitternacht & Go" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.shf-karte "ExklusivMitternacht & Go" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND active button.shf-karte "ExklusivMitternacht & Go" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND ruhe   button.shf-karte "EpischSternwarteFigurens" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND hover  button.shf-karte "EpischSternwarteFigurens" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.shf-karte "EpischSternwarteFigurens" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND active button.shf-karte "EpischSternwarteFigurens" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND ruhe   button.shf-karte "SeltenKristallKlangset B" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND hover  button.shf-karte "SeltenKristallKlangset B" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.shf-karte "SeltenKristallKlangset B" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND active button.shf-karte "SeltenKristallKlangset B" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND ruhe   button.shf-karte "HäufigApplausEmote Bald" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND hover  button.shf-karte "HäufigApplausEmote Bald" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.shf-karte "HäufigApplausEmote Bald" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND active button.shf-karte "HäufigApplausEmote Bald" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND ruhe   button.shf-karte "EpischKronensturzFinishe" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND hover  button.shf-karte "EpischKronensturzFinishe" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.shf-karte "EpischKronensturzFinishe" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND active button.shf-karte "EpischKronensturzFinishe" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND ruhe   button.knopf.gross "Fertig" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND hover  button.knopf.gross "Fertig" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND focus  button.knopf.gross "Fertig" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+BEFUND active button.knopf.gross "Fertig" — Flaeche gegen Umgebung 1.00:1 unter 3:1 (strenger als WCAG 1.4.11: dort genuegt der Text, der das Element benennt; die Probe verlangt zusaetzlich eine erkennbare Flaeche oder Kante, damit es als bedienbar erkennbar ist)
+UNBEKANNT hover-inhalt element#0 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#2 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#3 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#4 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#5 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#6 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#7 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#8 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#9 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#10 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#11 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#12 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#13 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#14 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#15 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#21 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#22 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#23 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT hover-inhalt element#24 — Messung fehlgeschlagen: elementHandle.hover: Timeout 2000ms exceeded.
+UNBEKANNT verdeckt@1280 a.zum-inhalt "Zum Inhalt springen" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+BEFUND verdeckt@1280 button.icon-knopf.kopf-knopf — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.icon-knopf.kopf-knopf — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.icon-knopf.kopf-knopf — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.icon-knopf.kopf-knopf — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+UNBEKANNT verdeckt@1280 button.knopf.pr-aendern "Profilbild ändern" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+UNBEKANNT verdeckt@1280 button.pr-orden.leer "+Erfolg zeigen" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+UNBEKANNT verdeckt@1280 button.sa-platz "BannerErster Zug 1 / 10" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+BEFUND verdeckt@1280 button.sa-platz "TitelFunke 1 / 62" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.sa-platz "RahmenKein Rahmen 2 / 10" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.sa-platz "BretterNacht 3 / 3" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.sa-platz "KlängeArcade 3 / 7" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.sa-platz "EmotesDaumen hoch, Appla" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.sa-gross "Erfolge0 / 19" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.sa-gross "Shop" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.reiter.dr "Start" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.reiter.dr "Bots" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.reiter.dr "Liga" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@1280 button.reiter.dr "Ich" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+UNBEKANNT verdeckt@375 a.zum-inhalt "Zum Inhalt springen" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+BEFUND verdeckt@375 button.icon-knopf.kopf-knopf — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.icon-knopf.kopf-knopf — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.icon-knopf.kopf-knopf — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+UNBEKANNT verdeckt@375 button.knopf.pr-aendern "Profilbild ändern" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+UNBEKANNT verdeckt@375 button.pr-orden.leer "+Erfolg zeigen" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+UNBEKANNT verdeckt@375 button.sa-platz "BannerErster Zug 1 / 10" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+UNBEKANNT verdeckt@375 button.sa-platz "TitelFunke 1 / 62" — ohne Ausdehnung oder ausserhalb des sichtbaren Bereichs
+BEFUND verdeckt@375 button.sa-platz "RahmenKein Rahmen 2 / 10" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.sa-platz "BretterNacht 3 / 3" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.sa-platz "KlängeArcade 3 / 7" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.sa-platz "EmotesDaumen hoch, Appla" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.sa-gross "Erfolge0 / 19" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.sa-gross "Shop" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.reiter.dr "Start" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.reiter.dr "Bots" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.reiter.dr "Liga" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND verdeckt@375 button.reiter.dr "Ich" — im Fokus vollstaendig von Autoren-Inhalt verdeckt (WCAG 2.4.11)
+BEFUND abstand — 18 verschiedene Abstandswerte, davon 9 neben dem Raster; keine der geprueften Schrittweiten (8/6/5/4) traegt (haeufigste: 10px x66, 12px x41, 2px x29, 8px x27, 4px x23, 16px x21)
+OK     reflow — bei 320 px Breite kein waagerechtes Scrollen
+HINWEIS 36 Zustand/Zustaende am abgefangenen Zeiger gescheitert — ein Element liegt UEBER dem Inhalt (etwa ein Cookie-Banner); mit --vorlauf <datei.js> laesst es sich vor dem Laden wegraeumen
+SUMMARY probe=219 ok=63 befunde=85 unbekannt=71 exit=1
+
+exit=1
