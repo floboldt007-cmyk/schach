@@ -90,7 +90,9 @@
 .heim-naechstes .heim-zeile[data-paket="kartei"] { --ton: var(--sp-blitz); }
 .heim-naechstes .heim-zeile[data-paket="schule"] { --ton: var(--sp-klassisch); }
 .heim-naechstes .heim-zeile[data-paket="start"] { --ton: var(--sp-schnell); }
-.heim-naechstes .heim-zeile[data-aktion="heim-liga"] { --ton: var(--sp-turniere); }
+/* Turnier-Gold ist hell: mit 55 % kam die Abstands-Zahl hell auf --flaeche-2 (Hover) nur auf 4,20:1, mit 45 % auf 5,37:1
+   (design-beweis 17.11.; die uebrigen Toene liegen mit 55 % hell zwischen 4,94 und 7,05:1) */
+.heim-naechstes .heim-zeile[data-aktion="heim-liga"] { --ton: var(--sp-turniere); --ton-stark: color-mix(in srgb, var(--ton) 45%, var(--text)); }
 .heim-naechstes .heim-zeile-bild { border-radius: 12px; color: var(--ton-stark);
   background: linear-gradient(145deg, color-mix(in srgb, var(--ton) 34%, var(--flaeche)), color-mix(in srgb, var(--ton) 14%, var(--flaeche)));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ton) 30%, transparent); }
