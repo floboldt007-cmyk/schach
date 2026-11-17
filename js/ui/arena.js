@@ -1129,9 +1129,9 @@ export function zeige(root, params, app) {
   function wechsleWelt(nr) {
     if (!WELTEN.some((w) => w.nr === nr) || nr === weltNr) return;
     weltNr = nr;
-    // Gegner-Karte unten (R19): in der neuen Welt zugeklappt, sie zeigt einen anderen Gegner
-    karteOffen = false;
-    detail.classList.remove('offen');
+    // Gegner-Karte unten (R19): in der neuen Welt zugeklappt, sie zeigt einen anderen Gegner; ueber setzeKarteOffen, damit
+    // auch der Griff "zu" sagt (eine Vorschau-Welt baut das Detail nicht neu, Kaltreview 6b 17.11.2026)
+    setzeKarteOffen(false);
     welt = WELTEN.find((w) => w.nr === nr);
     LBOTS = botsDerWelt(nr);
     weltFrei = istWeltFrei(nr, fortschritt);

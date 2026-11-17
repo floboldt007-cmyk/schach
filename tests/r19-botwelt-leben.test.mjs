@@ -218,6 +218,21 @@ try {
       pruefe('iphone13 EN: keine Seiten- und Konsolenfehler', !fehler.length, fehler);
     } finally { await k.close(); }
   }
+  // Kaltreview 6b 17.11.2026: offene Karte, dann Wechsel in eine Vorschau-Welt (dort wird das Detail nicht neu gebaut). Die Karte
+  // klappt zu, und der Griff muss das auch sagen, sonst hoert ein Vorleser "erweitert" auf einer zugeklappten Leiste
+  {
+    const { k, s, fehler } = await oeffne(browser, HANDYS[0]);
+    try {
+      await s.locator('.screen.arena .detail .karte-griff').click(); await warte(400);
+      await s.locator('.screen.arena .ww-pfeil[data-richtung="1"]').click(); await warte(800);
+      const g = await s.evaluate(() => { const d = document.querySelector('.screen.arena .detail'), gr = d.querySelector('.karte-griff');
+        return { offen: d.classList.contains('offen'), exp: gr.getAttribute('aria-expanded'), label: gr.getAttribute('aria-label'),
+          unter: document.querySelector('.screen.arena .ww-unter')?.textContent || '' }; });
+      pruefe('iphone13: Wechsel in eine Vorschau-Welt klappt die Karte zu, der Griff sagt zu (aria-expanded false, "Mehr zum Gegner zeigen")',
+        /Vorschau/.test(g.unter) && !g.offen && g.exp === 'false' && g.label === 'Mehr zum Gegner zeigen', g);
+      pruefe('iphone13 Weltwechsel: keine Seiten- und Konsolenfehler', !fehler.length, fehler);
+    } finally { await k.close(); }
+  }
 
   // ---------- iPad und PC: kein Leisten-Layout ----------
   for (const g of GROSS) {
