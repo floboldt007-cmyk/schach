@@ -54,20 +54,25 @@ const EDITION = { produkt_id: 'brett-mitternacht', name: 'Mitternacht & Gold', a
   verkauf_ab: '2026-11-28T10:00:00Z', betrag_cent: 499, waehrung: 'eur' };
 const AUSLAGE = JSON.parse(readFileSync(new URL('../assets/shop/auslage.json', import.meta.url), 'utf8'));
 const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
+// Editionen (Bretter) aus KATALOG in js/pakete/sammlung/shop.js, aus dem Quelltext gelesen
+const KATALOG_EDITIONEN = [...readFileSync(new URL('../js/pakete/sammlung/shop.js', import.meta.url), 'utf8')
+  .matchAll(/^\s*'([a-z0-9-]+)': Object\.freeze\(\{ art: 'brett'/gm)].map((m) => m[1]);
 // Probe "die Datenliste ist die Quelle": andere Figur, ein unbekanntes Emote, kein Klang-Eintrag, Reihenfolge verdreht
 const UMGEBAUT = { plaetze: [{ art: 'emote', id: 'gibt-es-nicht' }, { art: 'finisher', id: 'krone' }, { art: 'figur', id: 'lampion' },
   { art: 'brett', id: 'aurora' }] };
 
-function bediener(z, { fehler = false } = {}) {
+// ohneAlter: Konto ohne "18 oder aelter" (wie unter 18): der Server liefert keine Edition (supabase/ANLEITUNG.md)
+function bediener(z, { fehler = false, ohneAlter = false } = {}) {
   return async (route) => {
     const url = new URL(route.request().url());
     const antwort = (d) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
     if (url.pathname.startsWith('/auth/v1/')) return antwort({ id: UID, email: 'spieler@example.invalid' });
-    if (url.pathname === '/rest/v1/altersangaben') return antwort([{ ab18: true }]);
+    if (url.pathname === '/rest/v1/altersangaben') return antwort(ohneAlter ? [] : [{ ab18: true }]);
     if (url.pathname === '/rest/v1/profile') return antwort([{ user_id: UID, benutzername: 'Mira' }]);
     if (url.pathname === '/rest/v1/sonderstuecke') return antwort([]);
     const rpc = url.pathname.split('/').at(-1);
     z.aufrufe.push(url.pathname.startsWith('/rest/v1/rpc/') ? rpc : url.pathname);
+    if (rpc === 'edition_staende' && ohneAlter) return antwort([]);
     if (rpc === 'edition_staende') return fehler ? route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }) : antwort([EDITION]);
     if (rpc === 'karte_melde_stufen' || rpc === 'karte_waehle') return antwort({ taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } });
     return antwort([]);
@@ -124,19 +129,27 @@ async function schliesse(s) {
   await warte(300);
 }
 
-async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = null, ruhig = false, gast = false, fehler = false } = {}) {
+async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = null, ruhig = false, gast = false, fehler = false, ohneAlter = false } = {}) {
   const gruppe = `${geraet} ${stil || 'standard'}${farbe === 'dunkel' ? ' dunkel' : ''}${auslage ? ' umgebaut' : ''}${ruhig ? ' ruhig' : ''}`
-    + `${gast ? ' gast' : ''}${fehler ? ' serverfehler' : ''}`;
+    + `${gast ? ' gast' : ''}${fehler ? ' serverfehler' : ''}${ohneAlter ? ' ohne 18' : ''}`;
   const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
     colorScheme: farbe === 'dunkel' ? 'dark' : 'light', reducedMotion: ruhig ? 'reduce' : 'no-preference', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
   const z = { aufrufe: [] };
-  await k.route('**/*.supabase.co/**', bediener(z, { fehler }));
+  await k.route('**/*.supabase.co/**', bediener(z, { fehler, ohneAlter }));
   if (auslage) await k.route('**/assets/shop/auslage.json', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(auslage) }));
   await k.addInitScript(initSkript, { sitzung: gast ? null : SITZUNG });
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', (e) => seitenfehler.push(`${gruppe}: ${e.message}`));
   try {
     await oeffneShop(s, stil ? `&shopStil=${stil}` : '');
+    if (stil === 'alt' && ohneAlter) {
+      // so ist es live (main): ein Konto ohne "18 oder aelter" bekommt nur die Altersfrage, keine Edition
+      await s.waitForFunction(() => /18/.test(document.querySelector('.sa-blatt .sh-satz')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+      const alt = await s.evaluate(() => ({ satz: document.querySelector('.sa-blatt .sh-satz')?.textContent || '',
+        editionen: document.querySelectorAll('.sa-blatt .sh-karte').length }));
+      pruefe(`${gruppe}: alter Shop fragt nach dem Alter und zeigt keine Edition`, /18/.test(alt.satz) && alt.editionen === 0, alt);
+      await k.close(); return;
+    }
     if (stil === 'alt' && (gast || fehler)) {
       // der alte Shop bleibt hinter ?shopStil=alt, wie er war: Gast-Satz mit Gast-Karte bzw. "in Vorbereitung"
       await s.waitForFunction(() => /Konto|Vorbereitung/.test(document.querySelector('.sa-blatt .sh-satz')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
@@ -192,9 +205,20 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
       belegt.every((x) => x === 'Bald') && bild.preise.every((x, i) => bild.folgt[i] || bild.schloss[i]) && bild.euro === 0 && !/Preis folgt/.test(bild.text),
       { preise: bild.preise, schloss: bild.schloss, euro: bild.euro });
 
-    if (gast || fehler) {
+    if (gast) {
+      // wie der alte Shop fuer Gaeste (Gast-Karte mit Bild und Name): auch die Edition steht da
       pruefe(`${gruppe}: fuenf Plaetze, alle mit Stueck, Schloss und "Bald"`,
         bild.folgt.every((x) => !x) && bild.preise.every((x) => x === 'Bald') && bild.schloss.every(Boolean), bild.preise);
+      await k.close(); return;
+    }
+    if (fehler || ohneAlter) {
+      // angemeldet zeigt der Shop eine Edition nur, wenn der Server sie liefert (nur ab 18, wie der alte Shop auf main);
+      // ohne Altersangabe oder bei einem Serverfehler bleibt der Edition-Platz "Folgt", die anderen vier stehen
+      const edition = KATALOG_EDITIONEN.includes(AUSLAGE.plaetze.find((p) => p.art === 'brett')?.id);
+      pruefe(`${gruppe}: Edition aus der Auslage ist ein Katalog-Brett (sonst prueft dieser Lauf nichts)`, edition, AUSLAGE.plaetze);
+      pruefe(`${gruppe}: keine Edition ohne Freigabe des Servers, Brett-Platz "Folgt"`, bild.folgt[0] && bild.preise[0] === 'Folgt' && !bild.ids[0], { ids: bild.ids, preise: bild.preise });
+      pruefe(`${gruppe}: die anderen vier Plaetze mit Stueck, Schloss und "Bald"`,
+        bild.folgt.slice(1).every((x) => !x) && bild.preise.slice(1).every((x) => x === 'Bald') && bild.schloss.slice(1).every(Boolean), bild.preise);
       await k.close(); return;
     }
     if (auslage) {
@@ -276,12 +300,18 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
 // Standard, ?shopStil=alt der alte Shop, ohne Kauf-Weg Schloss und Bald; kein "Preis folgt", kein Kaufen mehr versprochen
 {
   const eintrag = (readFileSync(new URL('./alle.mjs', import.meta.url), 'utf8').match(/name: 'r19-shop-fortnite'[^\n]*/) || [''])[0];
-  const kopf = readFileSync(new URL('../js/pakete/sammlung/shop.js', import.meta.url), 'utf8').split('\n').slice(0, 12).join('\n');
-  for (const [wo, text] of [['auslage.json hinweis', AUSLAGE.hinweis], ['tests/alle.mjs', eintrag], ['Kopf shop.js', kopf]]) {
+  const kopfVon = (rel, n) => readFileSync(new URL(rel, import.meta.url), 'utf8').split('\n').slice(0, n).join('\n');
+  const kopf = kopfVon('../js/pakete/sammlung/shop.js', 12);
+  // das Bildwerkzeug des Shops (Fix-Review 17.11.: sein Kopf nannte den alten Shop noch "heute" und Shop A ?shopStil=a)
+  const bilderKopf = kopfVon('./bilder-shop.mjs', 12);
+  for (const [wo, text] of [['auslage.json hinweis', AUSLAGE.hinweis], ['tests/alle.mjs', eintrag], ['Kopf shop.js', kopf], ['Kopf tests/bilder-shop.mjs', bilderKopf]]) {
     pruefe(`Beschreibung ${wo}: Stil A Standard, ?shopStil=alt fuer den alten Shop`, /\?shopStil=alt/.test(text) && !/\?shopStil=a\b/.test(text), text.slice(0, 200));
     pruefe(`Beschreibung ${wo}: kein "Preis folgt", kein Kaufen ohne Kasse`, !/Preis folgt|Kaufen ohne Kasse|Server-Preis/i.test(text), text.slice(0, 200));
   }
   pruefe('Beschreibung auslage.json hinweis: Schloss und Bald, wo es keinen Kauf-Weg gibt', /Schloss/.test(AUSLAGE.hinweis) && /Bald/.test(AUSLAGE.hinweis), AUSLAGE.hinweis);
+  // ein leerer Platz zeigt "Folgt" ohne Schloss: Schloss und Bald gelten nur fuer belegte Plaetze
+  pruefe('Beschreibung auslage.json hinweis: Schloss und Bald nur fuer belegte Plaetze', /jeder belegte Platz/.test(AUSLAGE.hinweis) && !/jeder Platz/.test(AUSLAGE.hinweis), AUSLAGE.hinweis);
+  pruefe('Beschreibung Kopf tests/bilder-shop.mjs: Shop A ist der Standard, der alte Shop heisst nicht mehr "heute"', /Standard/.test(bilderKopf) && !/heute \(ist\)/.test(bilderKopf), bilderKopf.slice(0, 200));
 }
 
 let browser;
@@ -296,7 +326,8 @@ try {
   await lauf(browser, IPHONE, null, { ruhig: true });
   await lauf(browser, IPHONE, null, { auslage: UMGEBAUT });
   // abgemeldet und bei einem Serverfehler: Shop A zeigt trotzdem die fuenf Plaetze, der alte Shop bleibt, wie er war
-  for (const art of [{ gast: true }, { fehler: true }]) { await lauf(browser, IPHONE, null, art); await lauf(browser, IPHONE, 'alt', art); }
+  // angemeldet ohne "18 oder aelter": wie live keine Edition (der alte Shop fragt nach dem Alter, Shop A laesst den Platz "Folgt")
+  for (const art of [{ gast: true }, { fehler: true }, { ohneAlter: true }]) { await lauf(browser, IPHONE, null, art); await lauf(browser, IPHONE, 'alt', art); }
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();

@@ -1,12 +1,12 @@
-// Bilder des Shops (Feinschliff R19): heute (ist) und Shop A mit fuenf festen Plaetzen (?shopStil=a,
-// js/pakete/sammlung/shop-entwurf.js, Belegung aus assets/shop/auslage.json) auf iPhone 13, iPhone SE, iPad hoch und quer und PC,
-// je hell und dunkel. Je Ansicht der Shop-Start und bei a die Vorschau jedes Platzes (Brett, Figur, Klang, Emote,
-// Finisher); heute das Anprobieren der Edition.
+// Bilder des Shops (Feinschliff R19): Shop A, der Standard ohne Kennung (fuenf feste Plaetze, js/pakete/sammlung/shop-entwurf.js,
+// Belegung aus assets/shop/auslage.json), und der alte Shop (Stil ist, nur mit ?shopStil=alt) auf iPhone 13, iPhone SE, iPad hoch
+// und quer und PC, je hell und dunkel. Je Ansicht der Shop-Start und bei a die Vorschau jedes Platzes (Brett, Figur, Klang,
+// Emote, Finisher); beim alten Shop das Anprobieren der Edition.
 // Kein Teil von tests/alle.mjs. Netzwerk ausschliesslich simuliert (Attrappe wie tests/r19-shop-fortnite.test.mjs); die
-// Edition hat dort KEINEN Preis, denn heute steht keiner im Katalog: die Karten zeigen "Preis folgt".
+// Edition hat dort KEINEN Preis: Shop A zeigt Schloss und Bald, der alte Shop seinen Platzhalter statt eines Preises.
 //
-//   node tests/bilder-shop.mjs --bilder=<ordner>      Unterordner ist/, a/ mit shop-<geraet>[-dunkel]-<start|vorschau-art>.png
-//   node tests/bilder-shop.mjs --nur=a ...            nur diese Stile (heute heisst ist)
+//   node tests/bilder-shop.mjs --bilder=<ordner>      Unterordner ist/ (alter Shop), a/ (Shop A) mit shop-<geraet>[-dunkel]-<start|vorschau-art>.png
+//   node tests/bilder-shop.mjs --nur=a ...            nur diese Stile (a = Shop A, ist = alter Shop)
 //   PORT=8992 node tests/bilder-shop.mjs ...          eigener Port (Standard 8992)
 // Exit 0, wenn alle Bilder entstanden sind und jede Ansicht im erwarteten Stil stand; sonst 1.
 import http from 'node:http';

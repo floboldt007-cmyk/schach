@@ -10,7 +10,9 @@
 // schickt, sondern Schloss und "Bald". Die Vorschau ruft nichts beim Server auf.
 //
 //   shopStil() -> 'a' | null
-//   shopEntwurf({ stil, editionen, katalog, produktName, bereich }) -> Promise<div.shf>
+//   Editionen wie im alten Shop (supabase/ANLEITUNG.md): angemeldet nur, was edition_staende liefert (ab 18), sonst
+//   bleibt der Platz "Folgt"; ein Gast sieht sie wie dort als Katalog-Stueck mit Bild und Name (gast: true).
+//   shopEntwurf({ stil, editionen, gast, katalog, produktName, bereich }) -> Promise<div.shf>
 import { Brett } from '../../board.js';
 import { figurenPfad } from '../../figurensatz.js';
 import { sheet } from '../../ui/bauteile.js';
@@ -38,7 +40,7 @@ const schluessel = (x) => { const s = String(x || '').toLowerCase().replace('ä'
 const ladeJson = (pfad, leer) => fetch(pfad).then((r) => (r.ok ? r.json() : leer)).catch(() => leer);
 
 // Ein Eintrag der Auslage als Stueck, oder null, wenn die Id fuer diese Art nicht im Bestand ist
-function stueck(art, eintrag, { vorrat, katalog, editionen, produktName }) {
+function stueck(art, eintrag, { vorrat, katalog, editionen, gast, produktName }) {
   const id = eintrag && typeof eintrag.id === 'string' ? eintrag.id : null;
   if (!id) return null;
   const ausVorrat = (vArt) => (vorrat.stuecke || []).find((v) => v.id === id && v.art === vArt);
@@ -47,6 +49,7 @@ function stueck(art, eintrag, { vorrat, katalog, editionen, produktName }) {
     const k = Object.hasOwn(katalog, id) ? katalog[id] : null;
     if (k && k.art === 'brett') {
       const ed = editionen.find((e) => e.produkt_id === id);
+      if (!ed && !gast) return null;
       return { id, art, name: produktName(id, ed?.name), seltenheit: 'exklusiv', unter: S('entwurf.art.edition'),
         brett: { hell: k.hell, dunkel: k.dunkel } };
     }
@@ -151,7 +154,7 @@ async function vorschau(s, { bereich }) {
   if (bereich && bereich.isConnected) bereich.dispatchEvent(new CustomEvent('sa:oeffne', { bubbles: true }));
 }
 
-export async function shopEntwurf({ stil, editionen = [], katalog = {}, produktName = (id, n) => n || id, bereich = null }) {
+export async function shopEntwurf({ stil, editionen = [], gast = false, katalog = {}, produktName = (id, n) => n || id, bereich = null }) {
   const [vorrat, auslage] = await Promise.all([ladeJson('assets/shop/vorrat.json', { stuecke: [] }), ladeJson('assets/shop/auslage.json', { plaetze: [] })]);
   const plaetze = Array.isArray(auslage?.plaetze) ? auslage.plaetze : [];
   const wahl = (s) => vorschau(s, { bereich });
@@ -160,7 +163,7 @@ export async function shopEntwurf({ stil, editionen = [], katalog = {}, produktN
   wurzel.dataset.shopStil = stil;
   const fuenf = document.createElement('div');
   fuenf.className = 'shf-fuenf';
-  fuenf.append(...ARTEN.map((art) => karte(art, stueck(art, plaetze.find((p) => p && p.art === art), { vorrat, katalog, editionen, produktName }), wahl)));
+  fuenf.append(...ARTEN.map((art) => karte(art, stueck(art, plaetze.find((p) => p && p.art === art), { vorrat, katalog, editionen, gast, produktName }), wahl)));
   wurzel.append(fuenf);
   return wurzel;
 }

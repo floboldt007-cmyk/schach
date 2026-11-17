@@ -138,16 +138,18 @@ export function shopBereich({ app } = {}) {
   };
   async function lade() {
     // R19 Shop A mit fuenf festen Plaetzen (Standard seit 16.11., js/pakete/sammlung/shop-entwurf.js): auch als Gast und bei
-    // einem Serverfehler, dann ohne Editionen; derselbe Aufruf wie unten liefert den Namen der Edition. Der alte Weg darunter
+    // einem Serverfehler; derselbe Aufruf wie unten liefert die Editionen. Angemeldet steht eine Edition nur, wenn der Server
+    // sie liefert (ab 18, wie der alte Weg), ein Gast sieht sie wie unten als Katalog-Stueck. Der alte Weg darunter
     // (Anmelden, Altersfrage, Anprobe) kommt nur noch mit ?shopStil=alt
     const stil = shopStil();
     if (stil) {
       satz(S('shop.laedt'));
       let editionen = [];
-      if (sitzung()) {
+      const gast = !sitzung();
+      if (!gast) {
         try { const r = await rufe('edition_staende', (await aktiveSitzung()).access_token); editionen = Array.isArray(r) ? r : []; } catch (e) { /* ohne Editionen */ }
       }
-      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen, katalog: KATALOG, produktName, bereich: s })); return; }
+      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen, gast, katalog: KATALOG, produktName, bereich: s })); return; }
       catch (e) { console.error(e); }
     }
     if (!sitzung()) {
