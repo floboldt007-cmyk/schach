@@ -107,6 +107,7 @@ const SUITEN = [
   { name: 'funktion-shop-skin', datei: 'funktion-shop-skin.test.mjs', args: [], was: 'Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht' },
   { name: 'r19-shop-fortnite', datei: 'r19-shop-fortnite.test.mjs', args: [], was: 'R19 Shop A: ?shopStil=a, fuenf feste Plaetze aus assets/shop/auslage.json, Server-Preis oder Preis folgt, kein Druck, Vorschau je Art, Kaufen ohne Kasse' },
   { name: 'r19-emotes-finisher', datei: 'r19-emotes-finisher.test.mjs', args: [], was: 'R19 Emotes, Finisher, Klaenge: sechs Premium-Sticker gesperrt, drei Finisher unter 1,5 s, Klangsets Polarlicht und Donner (Labor), Shop-A-Regale mit Schloss und Bald' },
+  { name: 'funktion-emotes-finisher', datei: 'funktion-emotes-finisher.test.mjs', args: [], was: 'Funktionsprobe Emotes, Finisher, Klaenge: Sticker senden, Blitzschlag mit Polarlicht (Erfinder), Shop Anhoeren laedt bei Bedarf (iPhone 13 + PC)' },
   { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
   { name: 'r15-ergebnis-teilen', datei: 'r15-ergebnis-teilen.test.mjs', args: [], was: 'Feinschliff R15: Duell-Nochmal in Suchfarbe, Niederlage mit Liga-Verweis, ein Knopf "Teilen ..." nach dem Sieg (Browser)' },

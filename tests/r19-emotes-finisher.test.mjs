@@ -122,6 +122,11 @@ const labor = await leer(() => import('../js/labor.js'));
 pruefe('Klaenge: zwei neue Sets im Labor (sounds.js und labor.js), Holz und Arcade bleiben die gratis Sets',
   NEU_KLANG.every((id) => sounds.PAKETE_LABOR?.[id] && labor.LABOR_KLAENGE?.includes(id)) && JSON.stringify(Object.keys(sounds.PAKETE_KLANG || {})) === '["holz","arcade"]');
 pruefe('Klaenge: neue Sets ohne Erfinder nicht waehlbar (klangWahl leer)', labor.klangWahl && NEU_KLANG.every((id) => labor.klangWahl(id) === ''));
+// Die Wahl muss den Speicher ueberleben (js/storage.js ERLAUBT), sonst faellt der Erfinder still auf den Standard zurueck
+const speicher = await leer(() => import('../js/storage.js'));
+const bleibt = NEU_KLANG.map((id) => { speicher.speichereEinstellungen({ klangpaket: id }); return speicher.ladeEinstellungen().klangpaket; });
+speicher.speichereEinstellungen({ klangpaket: '' });
+pruefe('Klaenge: gewaehltes neues Set bleibt gespeichert (Erfinder)', JSON.stringify(bleibt) === JSON.stringify(NEU_KLANG), bleibt);
 const juwel = readdirSync(path.join(root, 'assets/klang/juwel')).filter((d) => d.endsWith('.mp3')).sort();
 for (const id of NEU_KLANG) {
   const ordner = path.join(root, 'assets/klang', id);
