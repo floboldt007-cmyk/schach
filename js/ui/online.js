@@ -27,7 +27,7 @@ import { stufenName } from '../pakete/liga/texte.js';
 import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { spieleDuell } from './duell.js';
-import { jetzt as serverJetzt, seit as zeitSeit } from '../serverzeit.js';
+import { jetzt as serverJetzt, anzeigeJetzt, seit as zeitSeit } from '../serverzeit.js';
 import { speicherePartie, ladePartie as ladeGespeichert, aktualisierePartie } from '../storage.js';
 
 const WURZEL = new URL('../../', import.meta.url);
@@ -959,17 +959,18 @@ export function zeige(root, params, app) {
     if (ersteSicht.stand !== p.letzter_zug_am) ersteSicht = { stand: p.letzter_zug_am, am: Date.now() };
     return zeitSeit(s, ersteSicht.am, SICHT_SPIEL_MS);
   }
-  // Zeit seit dem letzten Zug nach der Serveruhr, ohne Schranke: so zeigen Uhr und Frist dieselbe Zeit wie beim Gegner
-  function serverSeitMs() {
+  // Zeit seit dem letzten Zug nach der Serveruhr, ohne Schranke: so zeigen Uhr und Frist dieselbe Zeit wie beim Gegner.
+  // Die Anzeige rechnet ohne frische Probe mit dem gemerkten Versatz (online-frist 18.11.), die Zeitpruefung nicht
+  function serverSeitMs({ anzeige = true } = {}) {
     const s = Date.parse(p.letzter_zug_am || '');
-    return Number.isFinite(s) ? Math.max(0, serverJetzt() - s) : 0;
+    return Number.isFinite(s) ? Math.max(0, (anzeige ? anzeigeJetzt() : serverJetzt()) - s) : 0;
   }
   // Ausloesung der Zeitpruefung: die Schranke nur am eigenen Zug, denn nur dort schluckt eine Reklamation Tipps. Ist der
   // Gegner am Zug, zaehlt die Serveruhr, sonst kaeme die faellige Pruefung nach Neuladen bis zu seiner ganzen Restzeit
   // zu spaet (Fix-Review 84, 16.11.: 298 s bei 5 min). vorlaufMs laeuft immer mit, damit die erste Sicht stimmt
   function ausloeserMs() {
     const geschuetzt = vorlaufMs();
-    return p.am_zug === online.meineFarbe(p) ? geschuetzt : serverSeitMs();
+    return p.am_zug === online.meineFarbe(p) ? geschuetzt : serverSeitMs({ anzeige: false });
   }
   // R19 (Flo 15.11., e7: "Opa beginnt, er hat noch 0:25"): vor dem 2. Halbzug steht die Uhr, es laeuft aber die
   // Erstzug-Frist des Servers. Beide Seiten sehen sie als Zahl und als schmalen Gold-Balken, der schrumpft (matt, ohne Schein)

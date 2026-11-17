@@ -12,11 +12,20 @@
 //   versatz(jetztMs)                      ms, die zur Geraeteuhr kommen; jetzt() = Date.now() + versatz()
 //   sicher(jetztMs)                       gibt es eine frische Probe?
 //   seit(stempel, gesehen, spiel, jetzt)  Verbrauch seit einem Serverstempel, ohne frische Probe mit Ansichts-Schranke
+//   anzeigeJetzt(jetztMs)                 Serveruhr fuer die ANZEIGE: ohne frische Probe mit dem gemerkten Versatz
+//
+// R19 online-frist (18.11.): Wer eine laufende Partie neu oeffnet und nichts schreibt, hatte keine frische Probe; mit einer
+// 40 s vorgehenden Geraeteuhr zeigte die Frist 0:00 statt ~23 s. Jede frische Probe merkt den Versatz darum auf dem Geraet
+// (GEMERKT_GILT_MS); die Anzeige nutzt ihn bis zur naechsten frischen Probe. Zeitpruefung und Reklamation (sicher, seit)
+// bleiben bei der Ansichts-Schranke, ein veralteter gemerkter Wert loest also nie eine fruehe Reklamation aus.
 export const FRISCH_MS = 6000;
 // Proben veralten: eine spaeter gestellte Geraeteuhr soll nicht fuer immer mit dem alten Versatz rechnen
 export const PROBE_GILT_MS = 10 * 60 * 1000;
 // mehr als einen Tag daneben ist keine Uhr, sondern ein falscher Zeitstempel: zaehlt nicht
 export const PLAUSIBEL_MS = 24 * 60 * 60 * 1000;
+// der gemerkte Versatz gilt einen Tag: so lange haelt eine Geraeteuhr ihren Gang, danach zaehlt er nicht mehr
+export const GEMERKT_GILT_MS = 24 * 60 * 60 * 1000;
+const GEMERKT_SCHLUESSEL = 'schach-arena:v1:serverzeit';
 
 let proben = [];
 
@@ -25,6 +34,20 @@ export function probe(serverIso, empfangMs = Date.now(), frisch = false) {
   if (!Number.isFinite(s) || !Number.isFinite(empfangMs) || Math.abs(s - empfangMs) > PLAUSIBEL_MS) return;
   proben.push({ wert: s - empfangMs, frisch: !!frisch, am: empfangMs });
   if (proben.length > 40) proben = proben.slice(-40);
+  if (frisch) {
+    try { globalThis.localStorage?.setItem(GEMERKT_SCHLUESSEL, JSON.stringify({ wert: versatz(empfangMs), am: empfangMs })); }
+    catch (e) { /* ohne Speicher: nur diese Sitzung */ }
+  }
+}
+
+// gemerkter Versatz der letzten frischen Probe auf diesem Geraet, oder null (keiner, zu alt, unsinnig)
+export function gemerkt(jetztMs = Date.now()) {
+  try {
+    const g = JSON.parse(globalThis.localStorage?.getItem(GEMERKT_SCHLUESSEL) || 'null');
+    if (!g || !Number.isFinite(g.wert) || !Number.isFinite(g.am) || Math.abs(g.wert) > PLAUSIBEL_MS) return null;
+    const alter = jetztMs - g.am;
+    return alter >= 0 && alter <= GEMERKT_GILT_MS ? g.wert : null;
+  } catch (e) { return null; }
 }
 
 function gueltig(jetztMs) { return proben.filter((x) => jetztMs - x.am <= PROBE_GILT_MS); }
@@ -40,6 +63,15 @@ export function versatz(jetztMs = Date.now()) {
 
 export function jetzt(jetztMs = Date.now()) { return jetztMs + versatz(jetztMs); }
 
+// Serveruhr fuer die Anzeige (Uhr, Erstzug-Frist): mit frischer Probe wie jetzt(); ohne sie mit dem gemerkten Versatz,
+// nie unter einer Schranke der Proben dieser Sitzung (jede Probe ist eine untere Schranke); ohne beides wie jetzt()
+export function anzeigeJetzt(jetztMs = Date.now()) {
+  const g = sicher(jetztMs) ? null : gemerkt(jetztMs);
+  if (g == null) return jetzt(jetztMs);
+  const schranken = gueltig(jetztMs).map((x) => x.wert);
+  return jetztMs + Math.max(g, ...schranken);
+}
+
 // Verbrauch seit einem Serverstempel: mit frischer Probe nach der Serveruhr; ohne sie hoechstens seit die Ansicht den
 // Stand zuerst sah (gesehenMs, Geraeteuhr) plus spielMs, damit eine vorgehende Geraeteuhr keine Frist und keine Uhr
 // vorzeitig beendet (jede Reklamation setzt busy und schluckt Tipps)
@@ -49,5 +81,8 @@ export function seit(stempelMs, gesehenMs, spielMs, jetztMs = Date.now()) {
   return Math.max(0, sicher(jetztMs) ? roh : Math.min(roh, jetztMs - gesehenMs + spielMs));
 }
 
-// nur fuer Tests
-export function vergiss() { proben = []; }
+// nur fuer Tests (mitGemerkt: auch den gemerkten Versatz des Geraets)
+export function vergiss(mitGemerkt = false) {
+  proben = [];
+  if (mitGemerkt) { try { globalThis.localStorage?.removeItem(GEMERKT_SCHLUESSEL); } catch (e) { /* ohne Speicher */ } }
+}

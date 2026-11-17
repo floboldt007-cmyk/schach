@@ -62,9 +62,12 @@ function neuePartie({ gewertet, alterMs = 0 }) {
   partien.set(p.id, p);
   return p;
 }
-async function bediene(route, uid) {
+// datum: wie Supabase live einen HTTP-Date-Kopf mitsenden (Serveruhr auf die Sekunde, per CORS lesbar: am 18.11. gegen die
+// oeffentliche REST-URL gemessen, access-control-expose-headers nennt Date)
+async function bediene(route, uid, datum = false) {
   const req = route.request(), url = new URL(req.url()), body = req.postDataJSON() || {};
-  const antwort = (d, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(d) });
+  const antwort = (d, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(d),
+    ...(datum ? { headers: { date: new Date().toUTCString(), 'access-control-expose-headers': 'Date' } } : {}) });
   const rpc = url.pathname.split('/').at(-1), p = partien.get(body.partie);
   if (url.pathname.startsWith('/auth/v1/')) return antwort({ id: uid, email: uid + '@example.invalid' });
   if (url.pathname === '/rest/v1/profile') return antwort([{ user_id: uid, benutzername: NAME[uid] }]);
@@ -120,11 +123,11 @@ async function bediene(route, uid) {
 }
 
 // ---------- ein Spieler = ein Kontext ----------
-async function spieler(browser, uid, { bewegung = true, versatz = 0, geraet = null, schema = 'light' } = {}) {
+async function spieler(browser, uid, { bewegung = true, versatz = 0, geraet = null, schema = 'light', datum = false } = {}) {
   const g = geraet || { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true };
   const k = await browser.newContext({ ...g, serviceWorkers: 'block', colorScheme: schema,
     reducedMotion: bewegung ? 'no-preference' : 'reduce', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
-  await k.route('**/*.supabase.co/**', (r) => bediene(r, uid));
+  await k.route('**/*.supabase.co/**', (r) => bediene(r, uid, datum));
   await k.addInitScript(({ sitzung, bewegung, versatz }) => {
     if (!sessionStorage.getItem('online-start')) {
       sessionStorage.setItem('online-start', '1');
@@ -379,6 +382,54 @@ try {
       pruefe(`${name}: keine Seitenfehler`, !flo.fehler.length, flo.fehler);
     } catch (e) { pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]); }
     await flo.k.close().catch(() => {});
+  }
+  // ---------- Neu geoeffnet, Geraeteuhr 40 s vor, ohne frische Zeitprobe (Altbefund Fix-Review 16.11., online-frist 18.11.) ----------
+  // Opa oeffnet neu und schreibt nichts. Vorher: Frist 0:00 statt ~23,5 s, Gegneruhr 0:59 statt 1:38, mit der naechsten
+  // Probe sprang es zurueck. Jetzt: (a) der Date-Kopf jeder Antwort ist eine frische Probe (live per CORS lesbar), (b) ohne
+  // ihn rechnet die Anzeige mit dem auf dem Geraet gemerkten Versatz der letzten frischen Probe
+  const opaVor = async ({ datum, gemerkt = false }) => {
+    const opa = await spieler(browser, 'u2', { versatz: 40000, datum });
+    if (gemerkt) {
+      // eine fruehere frische Probe auf diesem Geraet (Serveruhr = echte Zeit, das Geraet geht 40 s vor), dann neu laden
+      await opa.s.goto(START(PORT) + '#start');
+      await opa.s.waitForFunction(() => !!window.__app, null, { timeout: 30000 });
+      await opa.s.evaluate(async () => { const m = await import('/js/serverzeit.js'); m.probe(new Date(Date.now() - 40000).toISOString(), Date.now(), true); });
+      await opa.s.reload();
+    }
+    return opa;
+  };
+  for (const [datum, gemerkt, text] of [[true, false, 'mit Date-Kopf'], [false, true, 'ohne Date-Kopf, Versatz gemerkt']]) {
+    {
+      const name = `Neu geoeffnet, Geraeteuhr 40 s vor, ${text}: Erstzug-Frist`;
+      const p = neuePartie({ gewertet: true, alterMs: 6500 });
+      const opa = await opaVor({ datum, gemerkt });
+      try {
+        await oeffne(opa, p);
+        await warte(1200);
+        const h = (await opa.s.locator('.on-frist-zeit').innerText().catch(() => '')).trim();
+        const wahr = 30 - (Date.now() - Date.parse(p.erstellt_am)) / 1000;
+        console.log(`   ${name}: Frist "${h}" · wahr ${wahr.toFixed(1)} s`);
+        pruefe(`${name}: Frist zeigt die Restzeit des Servers (hoechstens 2,5 s daneben), nie 0:00 durch die eigene Uhr`,
+          sekunden(h) != null && Math.abs(sekunden(h) - wahr) <= 2.5, { h, wahr });
+        pruefe(`${name}: keine Seitenfehler`, !opa.fehler.length, opa.fehler);
+      } catch (e) { pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]); }
+      await opa.k.close().catch(() => {});
+    }
+    {
+      const name = `Neu geoeffnet, Geraeteuhr 40 s vor, ${text}: Gegneruhr`;
+      const p = laufend({ uhrMs: 100000, seitMs: 2000 });
+      const opa = await opaVor({ datum, gemerkt });
+      try {
+        await oeffne(opa, p);
+        await warte(1200);
+        const a = (await opa.s.locator('.on-oben .uhr-zeit').innerText().catch(() => '')).trim();
+        const wahr = (100000 - (Date.now() - Date.parse(p.letzter_zug_am))) / 1000;
+        console.log(`   ${name}: Gegneruhr "${a}" · wahr ${wahr.toFixed(1)} s`);
+        pruefe(`${name}: Gegneruhr zeigt die Restzeit des Servers (hoechstens 2,5 s daneben)`, sekunden(a) != null && Math.abs(sekunden(a) - wahr) <= 2.5, { a, wahr });
+        pruefe(`${name}: keine Seitenfehler`, !opa.fehler.length, opa.fehler);
+      } catch (e) { pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split(String.fromCharCode(10))[0]); }
+      await opa.k.close().catch(() => {});
+    }
   }
   // Pflicht-Probe (e7 16.11.): die WARTENDE Seite mit vorgehender Geraeteuhr (Flos Ursprungsfehler: Dauer-Reklamation,
   // busy, verworfene Zuege). (a) keine Dauerschleife: hoechstens eine Reklamation je 30 s, (b) nie busy, solange sie

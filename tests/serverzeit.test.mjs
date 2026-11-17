@@ -54,5 +54,37 @@ pruefe('seit: mit frischer Probe zaehlt die Serveruhr, auch vor der ersten Sicht
 pruefe('seit: nie negativ, ohne Stempel 0', seit && seit(T + 60000, T, 2000, T + 1000) === 0 && seit(NaN, T, 2000, T) === 0);
 vergiss();
 
+// online-frist (18.11.): gemerkter Versatz fuer die Anzeige nach dem Neuoeffnen (Geraeteuhr 40 s vor, keine frische Probe)
+const speicher = new Map();
+globalThis.localStorage = { getItem: (k) => (speicher.has(k) ? speicher.get(k) : null), setItem: (k, v) => speicher.set(k, String(v)),
+  removeItem: (k) => speicher.delete(k) };
+const { gemerkt, anzeigeJetzt, GEMERKT_GILT_MS } = SZ;
+vergiss(true);
+pruefe('gemerkt: ohne frische Probe nichts gemerkt', gemerkt(T) === null && anzeigeJetzt(T) === T);
+probe(iso(T), T + 40300, false);
+pruefe('gemerkt: eine alte Probe merkt nichts', gemerkt(T + 40300) === null);
+probe(iso(T), T + 40300, true);
+pruefe('gemerkt: eine frische Probe merkt ihren Versatz', gemerkt(T + 40300) === -40300, gemerkt(T + 40300));
+// neu geoeffnet (Proben dieser Sitzung weg), eine Stunde spaeter, nur eine alte Probe (Zug vor 6,5 s nach der Serveruhr)
+vergiss();
+const spaeter = T + 3600000 + 40000;
+probe(iso(spaeter - 40000 - 6500), spaeter, false);
+pruefe('anzeigeJetzt: ohne frische Probe mit dem gemerkten Versatz (Frist ~23,5 s statt 0:00)', anzeigeJetzt(spaeter) === spaeter - 40300,
+  anzeigeJetzt(spaeter) - spaeter);
+pruefe('jetzt (Zeitpruefung) bleibt ohne frische Probe bei der Geraeteuhr', jetzt(spaeter) === spaeter && !sicher(spaeter));
+pruefe('anzeigeJetzt: nie unter einer Schranke der Sitzung (Geraet geht inzwischen nach)', (() => {
+  probe(iso(spaeter + 10000), spaeter, false); return anzeigeJetzt(spaeter) === spaeter + 10000; })(), anzeigeJetzt(spaeter) - spaeter);
+vergiss();
+pruefe('gemerkt gilt GEMERKT_GILT_MS, danach nicht mehr', gemerkt(T + 40300 + GEMERKT_GILT_MS) === -40300 && gemerkt(T + 40300 + GEMERKT_GILT_MS + 1) === null);
+pruefe('anzeigeJetzt: mit frischer Probe wie jetzt()', (() => { probe(iso(spaeter), spaeter + 200, true); return anzeigeJetzt(spaeter + 300) === jetzt(spaeter + 300); })());
+speicher.set('schach-arena:v1:serverzeit', 'kaputt{');
+pruefe('gemerkt: kaputter Speicher zaehlt nicht', gemerkt(T) === null);
+speicher.set('schach-arena:v1:serverzeit', JSON.stringify({ wert: PLAUSIBEL_MS + 1, am: T }));
+pruefe('gemerkt: unplausibler Wert zaehlt nicht', gemerkt(T) === null);
+vergiss(true);
+delete globalThis.localStorage;
+pruefe('gemerkt: ohne Speicher null, kein Fehler', gemerkt(T) === null && (probe(iso(T), T + 100, true), true));
+vergiss();
+
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);
