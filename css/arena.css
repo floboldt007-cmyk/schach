@@ -34,6 +34,14 @@
   --welt-schatten: rgba(0, 0, 0, .1); --welt-weiss: rgba(255, 255, 255, .2);
   --welt-acker: #E6CB7E; --welt-acker-2: #C9A35A; --welt-halm: #9DB65E; --welt-welle: rgba(255, 255, 255, .8); --welt-muschel: #F2C9B6;
   --welt-alge: #3F9E7A; --welt-koralle: #F08A6E; --welt-blase: rgba(255, 255, 255, .75); --welt-fisch: #FFB54A; --welt-tiefe: #12324E;
+  /* Plakette und lebendige Welt (R19): Teil des Kartenbilds, darum --welt-*; flach in zwei Toenen wie die Zeichnung, ohne Verlauf */
+  --welt-plakette: #1B1A21; --welt-plakette-text: #F7EDD3; --welt-plakette-unter: #D8C08A;
+  --welt-plakette-licht: rgba(255, 255, 255, .09); --welt-plakette-kante: rgba(255, 236, 190, .14); --welt-plakette-schatten: rgba(0, 0, 0, .45);
+  --welt-leben-schimmer: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g fill='%23FFF4CD'><circle cx='50' cy='50' r='50' fill-opacity='.22'/><circle cx='50' cy='50' r='30' fill-opacity='.4'/></g></svg>");
+  --welt-leben-forst: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><g fill='%23FFEC8C'><circle cx='60%25' cy='20%25' r='10' fill-opacity='.35'/><circle cx='60%25' cy='20%25' r='3.5' fill-opacity='.95'/><circle cx='90%25' cy='44%25' r='10' fill-opacity='.35'/><circle cx='90%25' cy='44%25' r='3.5' fill-opacity='.95'/><circle cx='6%25' cy='52%25' r='10' fill-opacity='.35'/><circle cx='6%25' cy='52%25' r='3.5' fill-opacity='.95'/><circle cx='34%25' cy='42%25' r='10' fill-opacity='.35'/><circle cx='34%25' cy='42%25' r='3.5' fill-opacity='.95'/><circle cx='70%25' cy='52%25' r='10' fill-opacity='.35'/><circle cx='70%25' cy='52%25' r='3.5' fill-opacity='.95'/><circle cx='48%25' cy='31%25' r='10' fill-opacity='.35'/><circle cx='48%25' cy='31%25' r='3.5' fill-opacity='.95'/></g></svg>");
+  --welt-leben-wolke: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><g fill='%23FFFFFF'><ellipse cx='50' cy='60' rx='46' ry='40' fill-opacity='.55'/><ellipse cx='50' cy='60' rx='30' ry='26' fill-opacity='.6'/></g></svg>");
+  --welt-leben-glanz: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><g fill='%23FFFFFF' fill-opacity='.8'><ellipse cx='15%25' cy='24%25' rx='9' ry='1.6'/><ellipse cx='40%25' cy='26.5%25' rx='6.5' ry='1.3'/><ellipse cx='62%25' cy='23%25' rx='10' ry='1.6'/><ellipse cx='85%25' cy='27%25' rx='7.5' ry='1.3'/><ellipse cx='28%25' cy='28%25' rx='6.5' ry='1.3'/></g></svg>");
+  --welt-leben-blasen: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><g fill='none' stroke='%23DCF0FF' stroke-opacity='.8'><circle cx='14%25' cy='70%25' r='5'/><circle cx='30%25' cy='92%25' r='3.5'/><circle cx='66%25' cy='80%25' r='6'/><circle cx='86%25' cy='96%25' r='4'/><circle cx='48%25' cy='60%25' r='3.5'/></g></svg>");
 }
 /* ---------- Abendstimmung (dunkel): tiefer Himmel, gedaempftes Gruen, erleuchtete Fenster ---------- */
 :root[data-modus="dunkel"] .arena {
@@ -185,20 +193,19 @@
 .arena .ww-pfeil:disabled { opacity: .35; cursor: default; box-shadow: var(--kante); }
 .arena .ww-pfeil:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 /* Plakette (R19, Flo 15.11.2026: Weltname als Plakette statt grauem Text, Premium-Stil): dunkle Tafel mit Gold-Kante, links das
-   Wappen der Welt (js/ui/arena.js wappenSvg), rechts Name und Zeile darunter. Feste Farben, hell wie dunkel dieselbe Tafel. */
-.arena .ww-mitte { --ww-grund: #1B1A21; --ww-text: #F7EDD3; --ww-unter: #D8C08A;
+   Wappen der Welt (js/ui/arena.js wappenSvg), rechts Name und Zeile darunter. Farben als --welt-plakette* in der Palette, hell wie dunkel dieselbe Tafel. */
+.arena .ww-mitte {
   min-height: var(--tipp); min-width: 0; max-width: min(320px, calc(100% - 2 * var(--tipp) - 40px)); display: grid;
   grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 9px; align-content: center; align-items: center;
-  padding: 4px 16px 4px 6px; border: 1.5px solid var(--gold); border-radius: var(--r-pille); background-color: var(--ww-grund);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, 0) 55%);
-  box-shadow: var(--s2), inset 0 0 0 1px rgba(255, 236, 190, .14); text-align: left; }
-.arena .ww-wappen { grid-row: 1 / span 2; width: 34px; height: 38px; display: block; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .45)); }
+  padding: 4px 16px 4px 6px; border: 1.5px solid var(--gold); border-radius: var(--r-pille); background-color: var(--welt-plakette);
+  box-shadow: var(--s2), inset 0 1px 0 var(--welt-plakette-licht), inset 0 0 0 1px var(--welt-plakette-kante); text-align: left; }
+.arena .ww-wappen { grid-row: 1 / span 2; width: 34px; height: 38px; display: block; filter: drop-shadow(0 1px 1.5px var(--welt-plakette-schatten)); }
 .arena .ww-wappen svg { display: block; width: 100%; height: 100%; }
-.arena .ww-name { font-family: var(--display); font-size: 16px; line-height: 1.15; color: var(--ww-text); letter-spacing: .01em;
+.arena .ww-name { font-family: var(--display); font-size: 16px; line-height: 1.15; color: var(--welt-plakette-text); letter-spacing: .01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.arena .ww-unter { font-size: 12px; font-weight: 650; color: var(--ww-unter); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.arena .weltwahl.mit-siegel .ww-mitte { box-shadow: var(--s2), 0 0 0 2px var(--gold), 0 0 14px rgba(232, 190, 90, .45); }
-.arena .weltwahl.gesperrt .ww-name { color: var(--ww-text); }
+.arena .ww-unter { font-size: 12px; font-weight: 650; color: var(--welt-plakette-unter); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena .weltwahl.mit-siegel .ww-mitte { box-shadow: var(--s2), 0 0 0 2px var(--gold), 0 0 0 6px var(--gold-weich); }
+.arena .weltwahl.gesperrt .ww-name { color: var(--welt-plakette-text); }
 /* Schild "neu eingezogen" an offenen Bots unter Flos bestem Sieg */
 .arena .knoten .k-neu { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 2px 8px 3px; border-radius: var(--r-pille);
   font-size: 12px; font-weight: var(--gw-titel); letter-spacing: .14em; color: var(--auf-tinte); background: var(--tinte); box-shadow: var(--s1); z-index: 3; pointer-events: none; }
@@ -587,6 +594,13 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-leiste .detail:not(.offen) .cta-platz { flex: none; margin: 0; padding: 0; background: none; }
 .arena.karte-leiste .detail:not(.offen) .spielen { width: 56px; min-height: 56px; padding: 0; justify-content: center; border-radius: 18px; }
 .arena.karte-leiste .detail:not(.offen) .spielen .sp-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Feinschliff R6 (B20) gilt auch in der offenen Karte von Handy B: ein besonderer Satz (Mutmacher, Erzfeind, Begruessung)
+   steht in hoechstens zwei ganzen Zeilen; unter 720 px Fensterhoehe (iPhone 13 in Safari, SE) tritt er zurueck, sonst schob
+   er den Spielen-Knopf unter den Rand der Karte (gemessen SE: 42 px; die Partie zeigt denselben Satz zum Start) */
+.arena.karte-leiste .detail.offen .sprechblase.besonders .spruch-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+@media (max-height: 719px) {
+  .arena.karte-leiste .detail.offen .sprechblase.besonders { display: none; }
+}
 .arena.karte-leiste .detail:not(.offen) .spielen .pf { width: 40px; height: 40px; background: none; }
 
 /* ---------- Lebendige Welt (R19, Flo 15.11.2026): je Welt GENAU EIN ruhiges Element ueber der Zeichnung (.welt-leben, unter
@@ -596,41 +610,25 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena .welt-leben { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
 .arena .welt-leben::before { content: ''; position: absolute; will-change: transform, opacity;
   top: -12%; left: 52%; width: 70%; aspect-ratio: 1; border-radius: 50%; opacity: .6;
-  background: radial-gradient(closest-side, rgba(255, 244, 205, .75), rgba(255, 244, 205, .25) 55%, rgba(255, 244, 205, 0));
+  background: var(--welt-leben-schimmer) center / 100% 100% no-repeat;
   animation: wl-schimmer 9s ease-in-out infinite alternate; }
 @keyframes wl-schimmer { from { opacity: .4; transform: scale(.9); } to { opacity: .9; transform: scale(1.06); } }
 .arena .welt[data-welt="springerforst"] .welt-leben::before { inset: 0; width: auto; aspect-ratio: auto; border-radius: 0; opacity: .8;
   /* in den freien Flaechen zwischen den Stationen (Lage hoch und Handy); verdeckt eine Station eines, bleiben die anderen */
-  background:
-    radial-gradient(circle at 60% 20%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
-    radial-gradient(circle at 90% 44%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
-    radial-gradient(circle at 6% 52%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
-    radial-gradient(circle at 34% 42%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
-    radial-gradient(circle at 70% 52%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px),
-    radial-gradient(circle at 48% 31%, rgba(255, 236, 140, .95) 0 3.5px, rgba(255, 236, 140, .35) 4px 10px, transparent 12px);
+  background: var(--welt-leben-forst) center / 100% 100% no-repeat;
   animation: wl-gluehen 7s ease-in-out infinite alternate; }
 @keyframes wl-gluehen { from { opacity: .45; transform: translate(0, 0); } to { opacity: 1; transform: translate(10px, -16px); } }
 .arena .welt[data-welt="turmstadt"] .welt-leben::before { top: 9%; left: -34%; width: 30%; height: 7%; aspect-ratio: auto; border-radius: 50%; opacity: .85;
-  background: radial-gradient(ellipse at 50% 60%, rgba(255, 255, 255, .95), rgba(255, 255, 255, .7) 45%, rgba(255, 255, 255, 0) 70%);
+  background: var(--welt-leben-wolke) center / 100% 100% no-repeat;
   animation: wl-wolke 70s linear infinite; }
 @keyframes wl-wolke { from { transform: translateX(0); } to { transform: translateX(480%); } }
 .arena .welt[data-welt="gezeitenkueste"] .welt-leben::before { inset: 0; width: auto; aspect-ratio: auto; border-radius: 0; opacity: .7;
   /* auf dem Wasserstreifen unter den Bergen (Lage hoch und Handy) */
-  background:
-    radial-gradient(ellipse 14px 2.5px at 15% 24%, rgba(255, 255, 255, .95), transparent),
-    radial-gradient(ellipse 10px 2px at 40% 26.5%, rgba(255, 255, 255, .95), transparent),
-    radial-gradient(ellipse 16px 2.5px at 62% 23%, rgba(255, 255, 255, .95), transparent),
-    radial-gradient(ellipse 12px 2px at 85% 27%, rgba(255, 255, 255, .95), transparent),
-    radial-gradient(ellipse 10px 2px at 28% 28%, rgba(255, 255, 255, .95), transparent);
+  background: var(--welt-leben-glanz) center / 100% 100% no-repeat;
   animation: wl-glanz 5s ease-in-out infinite alternate; }
 @keyframes wl-glanz { from { opacity: .25; transform: translateX(-6px); } to { opacity: .95; transform: translateX(6px); } }
 .arena .welt[data-welt="stockfisch-tiefe"] .welt-leben::before { top: 0; left: 0; width: 100%; height: 140%; aspect-ratio: auto; border-radius: 0; opacity: .7;
-  background:
-    radial-gradient(circle at 14% 70%, transparent 0 4px, rgba(220, 240, 255, .8) 4.5px 5.5px, transparent 6px),
-    radial-gradient(circle at 30% 92%, transparent 0 2.5px, rgba(220, 240, 255, .8) 3px 4px, transparent 4.5px),
-    radial-gradient(circle at 66% 80%, transparent 0 5px, rgba(220, 240, 255, .75) 5.5px 6.5px, transparent 7px),
-    radial-gradient(circle at 86% 96%, transparent 0 3px, rgba(220, 240, 255, .8) 3.5px 4.5px, transparent 5px),
-    radial-gradient(circle at 48% 60%, transparent 0 2.5px, rgba(220, 240, 255, .75) 3px 4px, transparent 4.5px);
+  background: var(--welt-leben-blasen) center / 100% 100% no-repeat;
   animation: wl-blasen 16s linear infinite; }
 @keyframes wl-blasen { 0% { opacity: .35; transform: translateY(0); } 20% { opacity: .85; } 80% { opacity: .85; } 100% { opacity: .35; transform: translateY(-28%); } }
 
