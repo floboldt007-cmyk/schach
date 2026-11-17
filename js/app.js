@@ -80,7 +80,7 @@ import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
 import { brettWahl, klangWahl, brettFlaeche } from './labor.js';
 import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderstuecke.js';
-import { sitzung, eigenerName, ladeProfil } from './konto.js';
+import { sitzung, eigenerName, ladeProfil, userId } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { pruefeUmzug } from './umzug.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
@@ -1159,15 +1159,24 @@ function pruefeSonderstuecke() {
 
 // Eigener Benutzername (js/konto.js eigenerName): angemeldet und noch nicht gemerkt, einmal vom Server holen (Flo 01.11.2026:
 // ein Freund sah "Flo" als seinen Namen). Ohne Benutzernamen erst in 10 Minuten wieder fragen, nach einem Fehler in 1 Minute.
+// R19 (Flo 15.11.2026: "Der Benutzername ist nicht fest"): auch ein gemerkter Name wird einmal je Start und Konto mit dem
+// Server abgeglichen, sonst blieb ein auf einem anderen Geraet geaenderter Name hier fuer immer der alte.
 let nameLaeuft = false;
 let nameBis = 0;
+let nameFuer = null;   // Konto-ID, deren Name in diesem Start schon vom Server kam
 function pruefeName() {
+  let id;
   try {
-    if (nameLaeuft || Date.now() < nameBis || !sitzung() || eigenerName()) return;
+    id = userId(sitzung());
+    if (nameLaeuft || Date.now() < nameBis || !id || (nameFuer === id && eigenerName())) return;
   } catch (e) { return; }
   nameLaeuft = true;
+  const vorher = eigenerName();
   ladeProfil().then(() => {
+    if (userId(sitzung()) !== id) return;
+    nameFuer = id;
     if (!eigenerName()) { nameBis = Date.now() + 600000; return; }
+    if (eigenerName() === vorher) return;
     // die Profilkarte im Ich-Screen zeigt den Namen sofort (nicht mitten in eine Partie)
     if (!aktuell || aktuell.name !== 'ich' || ladeNr !== ladeFertig) return;
     zeigeScreen(aktuell.name, aktuell.params || {}, aktuell.hash);
