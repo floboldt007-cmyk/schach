@@ -1,0 +1,102 @@
+BELEG: v1 werkzeug=beleg-lauf zeit=1794957451 stand=509cdf2389b2db3428e270c99229465bfdf1e25687f0115d2ccd6cf2f0ca769d head=c03c590a9ec4389cc89e1da08c656734abdf52d7 kmd=f117935de8045775d7433237edb9b60dfdf5259acb5c7e4a995dce5917e4d332 messung=87564485ccc3d4138e6fd54f91a9dad8ffa5e44ecc5f00d7f9bd9f1402b4fc44 mac=a242651fc20f68d0cfe5bd4cc09df0d7166d417b4ae470d7d260bb2f6d8db99c
+kmd: node tests/r19-exklusiv-kontrast.test.mjs
+ok   iPhone SE hell: Marke Exklusiv vorhanden
+ok   iPhone SE hell Ruhe: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+     Messwert iPhone SE hell: Exklusiv 4.81:1, Farbton 41 Grad, Schrift rgb(145,108,31)
+ok   iPhone SE hell Ruhe: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   iPhone SE hell Ruhe: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   iPhone SE hell Ruhe: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   iPhone SE hell Ruhe: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   iPhone SE hell Ruhe: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   iPhone SE hell Fokus: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+ok   iPhone SE hell Fokus: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   iPhone SE hell Fokus: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   iPhone SE hell Fokus: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   iPhone SE hell Fokus: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   iPhone SE hell Fokus: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   iPhone SE dunkel: Marke Exklusiv vorhanden
+ok   iPhone SE dunkel Ruhe: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+     Messwert iPhone SE dunkel: Exklusiv 7.52:1, Farbton 41 Grad, Schrift rgb(209,172,95)
+ok   iPhone SE dunkel Ruhe: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   iPhone SE dunkel Ruhe: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   iPhone SE dunkel Ruhe: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   iPhone SE dunkel Ruhe: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   iPhone SE dunkel Ruhe: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   iPhone SE dunkel Fokus: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+ok   iPhone SE dunkel Fokus: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   iPhone SE dunkel Fokus: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   iPhone SE dunkel Fokus: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   iPhone SE dunkel Fokus: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   iPhone SE dunkel Fokus: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   iPhone 13 hell: Marke Exklusiv vorhanden
+ok   iPhone 13 hell Ruhe: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+     Messwert iPhone 13 hell: Exklusiv 4.81:1, Farbton 41 Grad, Schrift rgb(145,108,31)
+ok   iPhone 13 hell Ruhe: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   iPhone 13 hell Ruhe: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   iPhone 13 hell Ruhe: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   iPhone 13 hell Ruhe: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   iPhone 13 hell Ruhe: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   iPhone 13 hell Fokus: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+ok   iPhone 13 hell Fokus: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   iPhone 13 hell Fokus: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   iPhone 13 hell Fokus: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   iPhone 13 hell Fokus: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   iPhone 13 hell Fokus: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   iPhone 13 dunkel: Marke Exklusiv vorhanden
+ok   iPhone 13 dunkel Ruhe: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+     Messwert iPhone 13 dunkel: Exklusiv 7.52:1, Farbton 41 Grad, Schrift rgb(209,172,95)
+ok   iPhone 13 dunkel Ruhe: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   iPhone 13 dunkel Ruhe: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   iPhone 13 dunkel Ruhe: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   iPhone 13 dunkel Ruhe: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   iPhone 13 dunkel Ruhe: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   iPhone 13 dunkel Fokus: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+ok   iPhone 13 dunkel Fokus: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   iPhone 13 dunkel Fokus: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   iPhone 13 dunkel Fokus: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   iPhone 13 dunkel Fokus: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   iPhone 13 dunkel Fokus: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   PC hell: Marke Exklusiv vorhanden
+ok   PC hell Ruhe: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+     Messwert PC hell: Exklusiv 4.81:1, Farbton 41 Grad, Schrift rgb(145,108,31)
+ok   PC hell Ruhe: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   PC hell Ruhe: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   PC hell Ruhe: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   PC hell Ruhe: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   PC hell Ruhe: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   PC hell Zeiger: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+ok   PC hell Zeiger: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   PC hell Zeiger: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   PC hell Zeiger: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   PC hell Zeiger: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   PC hell Zeiger: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   PC hell Fokus: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+ok   PC hell Fokus: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   PC hell Fokus: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   PC hell Fokus: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   PC hell Fokus: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   PC hell Fokus: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   PC dunkel: Marke Exklusiv vorhanden
+ok   PC dunkel Ruhe: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+     Messwert PC dunkel: Exklusiv 7.52:1, Farbton 41 Grad, Schrift rgb(209,172,95)
+ok   PC dunkel Ruhe: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   PC dunkel Ruhe: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   PC dunkel Ruhe: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   PC dunkel Ruhe: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   PC dunkel Ruhe: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   PC dunkel Zeiger: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+ok   PC dunkel Zeiger: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   PC dunkel Zeiger: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   PC dunkel Zeiger: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   PC dunkel Zeiger: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   PC dunkel Zeiger: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   PC dunkel Fokus: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1
+ok   PC dunkel Fokus: Marke Exklusiv bleibt golden (Farbton 30 bis 50 Grad)
+ok   PC dunkel Fokus: Marke "Episch" (episch, figur) mind. 4,5:1
+ok   PC dunkel Fokus: Marke "Selten" (selten, klang) mind. 4,5:1
+ok   PC dunkel Fokus: Marke "Häufig" (haeufig, emote) mind. 4,5:1
+ok   PC dunkel Fokus: Marke "Episch" (episch, finisher) mind. 4,5:1
+ok   keine Seitenfehler
+
+91/91 bestanden
+exit=0

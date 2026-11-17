@@ -1,0 +1,7 @@
+vorher-c03c590 gegen nachher (RGB, Schwelle 8)
+iphone13-dunkel.png box=None pixel>8=0 von 2492280
+iphone13-hell.png box=(33, 472, 210, 498) pixel>8=1536 von 2492280
+iphonese-dunkel.png box=None pixel>8=0 von 2577572
+iphonese-hell.png box=(22, 619, 139, 636) pixel>8=555 von 2577572
+pc-dunkel.png box=None pixel>8=0 von 243960
+pc-hell.png box=(11, 164, 69, 172) pixel>8=76 von 243960

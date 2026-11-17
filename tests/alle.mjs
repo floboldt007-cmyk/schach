@@ -105,6 +105,7 @@ const SUITEN = [
   { name: 'partie-hoehe', datei: 'partie-hoehe.test.mjs', args: [], was: 'Bot-Partie ohne Seitenueberlauf und Sieg-Blatt ohne Innen-Scrollen, Brett nicht kleiner (7 Geraete, R7 B8/B10)' },
   { name: 'layout-r8', datei: 'layout-r8.test.mjs', args: [], was: 'Kritik R8: Liga-Platzzahl deckend ueber dem Banner, Sieg-Blatt SE/PC ohne Innen-Scrollen, Fertig im Bereichs-Blatt volle Breite (Browser)' },
   { name: 'funktion-shop-skin', datei: 'funktion-shop-skin.test.mjs', args: [], was: 'Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht' },
+  { name: 'r19-exklusiv-kontrast', datei: 'r19-exklusiv-kontrast.test.mjs', args: [], was: 'Feinschliff R19: Seltenheits-Marken im Shop A (Exklusiv in Gold) mind. 4,5:1 auf ihrer Karte, hell und dunkel, Ruhe/Zeiger/Fokus (Browser)' },
   { name: 'r19-shop-fortnite', datei: 'r19-shop-fortnite.test.mjs', args: [], was: 'R19 Shop A als Standard (?shopStil=alt alter Shop): fuenf feste Plaetze aus assets/shop/auslage.json, ohne Kauf-Weg Schloss und Bald, kein Druck, Vorschau je Art ohne Kaufknopf und ohne Serveranfrage' },
   { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
