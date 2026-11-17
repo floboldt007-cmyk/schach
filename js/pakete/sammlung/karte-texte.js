@@ -4,9 +4,9 @@ import { registriereTexte } from '../../sprache.js';
 registriereTexte('p-karte', {
   de: {
     'stufe.0': 'Noch offen', 'stufe.1': 'Bronze', 'stufe.2': 'Silber', 'stufe.3': 'Gold',
-    'fam.siege': 'Siegeszug', 'fam.bots': 'Bot-Leiter', 'fam.welten': 'Weltenbummler', 'fam.sterne': 'Sternensammler',
-    'fam.endgegner': 'Endgegner', 'fam.siegesfolge': 'Siegesfolge', 'fam.raetsel': 'Rätselfreund', 'fam.serie': 'Treue',
-    'fam.level': 'Erfahrung', 'fam.liga': 'Ligaaufstieg',
+    'fam.siege': 'Siegeszug', 'fam.bots': 'Bot-Leiter', 'fam.welten': 'Welten\u00ADbummler', 'fam.sterne': 'Sternen\u00ADsammler',
+    'fam.endgegner': 'Endgegner', 'fam.siegesfolge': 'Sieges\u00ADfolge', 'fam.raetsel': 'Rätsel\u00ADfreund', 'fam.serie': 'Treue',
+    'fam.level': 'Erfahrung', 'fam.liga': 'Liga\u00ADaufstieg',
     'was.siege': 'Siege gegen Bots', 'was.bots': 'verschiedene Bots besiegt', 'was.welten': 'Welten gemeistert',
     'was.sterne': 'Sterne', 'was.endgegner': 'Endgegner besiegt', 'was.siegesfolge': 'Siege in Folge',
     'was.raetsel': 'Rätsel gelöst', 'was.serie': 'Tage Serie', 'was.level': 'Level', 'was.liga': 'Kronen-Stufe',
