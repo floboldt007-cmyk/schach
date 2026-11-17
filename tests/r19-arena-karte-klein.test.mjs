@@ -1,7 +1,9 @@
 // Funktionsprobe "Arena-Karte auf kleinen Handys" (R19, Auftrag Hauptfenster 17.11.2026), im Browser wie ein Mensch:
-//   Spielen-Knopf: auf dem kleinsten iPhone SE (320 x 568), dem SE 375 x 667 und dem iPhone 13 ist er bei zugeklappter
-//     und bei offener Gegner-Karte ganz zu sehen (Mitte und Raender treffen den Knopf, nichts liegt darueber, auch nicht
-//     die Reiterleiste), mindestens 44 x 44 px gross und ohne Scrollen erreichbar (Karte und Seite stehen auf 0).
+//   Spielen-Knopf: auf dem kleinsten iPhone SE (320 x 568), dem SE 375 x 667, dem iPhone 13 und den Fenstern aus dem Befund
+//     von 3f (320 x 480, 375 x 548, 390 x 844, 768 x 1024, 1280 x 800) ist er bei zugeklappter und bei offener Gegner-Karte,
+//     auch mit einem besonderen Satz darin, ganz zu sehen (Mitte und Raender treffen den Knopf, nichts liegt darueber, auch
+//     nicht die Reiterleiste), mindestens 44 x 44 px gross und ohne Scrollen erreichbar (Karte und Seite stehen auf 0).
+//     In der offenen Karte liegt beim Tab kein Fokusziel unter dem klebenden Spielen-Platz (WCAG 2.4.11).
 //   Groessenwechsel (Fenster kleiner, Drehen): von 1280 bzw. 1024 direkt auf 375 x 667 wechselt die Arena in die
 //     Handy-Lage (.karte-weg.karte-leiste, kein .karte-quer) und die Karte ist nicht 0 px gross; zurueck auf 1280 wieder
 //     .karte-quer mit voller Karte. Vorher blieb die Arena in .karte-quer haengen: unter der alten Lage war die Karte
@@ -40,6 +42,9 @@ const HANDYS = [
   { name: 'iphonese-320', optionen: SE1 },
   { name: 'iphonese-375', optionen: { ...IPHONE13, viewport: { width: 375, height: 667 }, screen: { width: 375, height: 667 } } },
   { name: 'iphone13', optionen: IPHONE13 },
+  // Fenster aus dem Befund von 3f (tests/r19-arena-klein.test.mjs, 17.11.): kleiner, niedriger, gross, iPad hoch, PC
+  ...[[320, 480], [375, 548], [390, 844], [768, 1024], [1280, 800]].map(([w, h]) => ({ name: `${w}x${h}`, optionen: { viewport: { width: w, height: h },
+    screen: { width: w, height: h }, hasTouch: true, isMobile: w < 700, deviceScaleFactor: 2, ...(w < 700 ? { userAgent: IPHONE13.userAgent } : {}) } })),
 ];
 const SIEG = { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 80 };
 // Welt 1 und zwei Bots von Welt 2 besiegt: Flos Figur steht mitten in Welt 2, der aktuelle Bot ist der dritte
@@ -105,9 +110,17 @@ try {
     const { k, s, fehler } = await oeffne(browser, g);
     try {
       pruefe(`${g.name}: Karte zu, Spielen ganz sichtbar, mind. 44 px, ohne Scrollen`, sichtbarGut(await spielenSicht(s)), await spielenSicht(s));
+      // iPad und PC haben keinen Griff (keine Leiste), dort gibt es nur den Zustand oben
+      if (await s.locator('.screen.arena .detail .karte-griff').isVisible()) {
       await s.locator('.screen.arena .detail .karte-griff').click(); await warte(500);
       const auf = await spielenSicht(s);
       pruefe(`${g.name}: Karte offen, Spielen ganz sichtbar (nicht unter der Reiterleiste), mind. 44 px, ohne Scrollen`, sichtbarGut(auf), auf);
+      // ein besonderer Satz (Begruessung eines neuen Bots) verlaengert die offene Karte (Fall aus dem Test von 3f)
+      await s.evaluate(() => { const b = document.querySelector('.screen.arena .detail .sprechblase'); if (!b) return;
+        b.classList.add('besonders'); (b.querySelector('.spruch-text') || b).textContent = '„Ein neuer Name auf meiner Route! Schön, dich kennenzulernen. Ich hab’s immer ein bisschen eilig, also los, bevor die Post wartet.“'; });
+      await warte(600);
+      const lang = await spielenSicht(s);
+      pruefe(`${g.name}: Karte offen mit besonderem Satz, Spielen ganz sichtbar, mind. 44 px, ohne Scrollen`, sichtbarGut(lang), lang);
       // WCAG 2.4.11: der klebende Spielen-Platz darf kein fokussiertes Bedienelement der offenen Karte ganz verdecken
       // (Tab durch die Karte; je Ziel: liegt seine Mitte unter dem Spielen-Platz?)
       const verdeckt = [];
@@ -127,6 +140,7 @@ try {
         if (f.unterCta) verdeckt.push(f.name);
       }
       pruefe(`${g.name}: Tab durch die offene Karte, kein Fokus unter dem klebenden Spielen-Platz (2.4.11)`, besucht > 1 && !verdeckt.length, { besucht, verdeckt });
+      }
       pruefe(`${g.name}: keine Seiten- und Konsolenfehler`, !fehler.length, fehler);
     } finally { await k.close(); }
   }
@@ -145,6 +159,7 @@ try {
       await s.setViewportSize(start); await warte(900);
       const zurueck = await lage(s);
       pruefe(`${start.width} -> 375 -> ${start.width}: wieder quer mit voller Karte`, zurueck.klassen === 'karte-quer' && zurueck.kw > 0 && zurueck.kh > 0 && zurueck.stationen > 0, zurueck);
+      pruefe(`${start.width} -> 375 -> ${start.width}: Karte so gross wie vor dem Wechsel (+-2 px)`, Math.abs(zurueck.kw - vorher.kw) <= 2 && Math.abs(zurueck.kh - vorher.kh) <= 2, { vorher, zurueck });
       pruefe(`${start.width} Groessenwechsel: keine Seiten- und Konsolenfehler`, !fehler.length, fehler);
     } finally { await k.close(); }
   }
