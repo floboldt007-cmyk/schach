@@ -360,8 +360,14 @@ async function testeBestaende(browser) {
   gruppe = 'Stärke nur aus alter Analyse';
   {
     const { kontext, seite, fehler } = await legeBestand(browser, 'alt-analysiert');
-    const e = await seite.evaluate(() => (document.querySelector('.vl-staerke .vl-staerke-text')?.textContent || '').trim());
-    pruefe('Satz sagt, was die Rechnung braucht (letzte 10 Partien)', e === 'Erscheint, sobald eine deiner letzten 10 Partien gegen die Bots analysiert ist.', e);
+    const e = await seite.evaluate(() => ({
+      zahl: (document.querySelector('.vl-staerke-zahl .zahl')?.textContent || '').trim(),
+      text: (document.querySelector('.vl-staerke .vl-staerke-text')?.textContent || '').trim(),
+    }));
+    // Vorbedingung: die alte Analyse liegt ausserhalb der 10 neuesten, die Staerke ist wirklich leer
+    pruefe('Stärke leer, obwohl eine ältere Partie analysiert ist', e.zahl === '?', e);
+    // statistik() nimmt nur WERTENDE Partien (Leiter, Grundstellung), also muss der Satz "gewerteten" sagen wie vl.staerke.text
+    pruefe('Satz sagt, was die Rechnung braucht (letzte 10 gewertete Partien)', e.text === 'Erscheint, sobald eine deiner letzten 10 gewerteten Partien gegen die Bots analysiert ist.', e);
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
