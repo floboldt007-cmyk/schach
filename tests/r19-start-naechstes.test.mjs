@@ -177,6 +177,14 @@ async function testeGesichter(browser) {
   const a = (await messe(auf.seite)).zeilen['heim-liga'];
   pruefe('Platz 4: "Aufstiegsplatz", keine Zahl', a?.art === 'abstand' && a.ftext === 'Aufstiegsplatz' && /Aufstiegsplatz/.test(a.aria), JSON.stringify(a));
   await auf.kontext.close();
+  // oberste Stufe 17: dort steigt niemand auf (zoneVon 'bleib', die Gruppe sagt "bleibt"), also weder "Aufstiegsplatz"
+  // noch ein Abstand zu Platz 5 (Befund Kaltreview 9b, 17.11.)
+  for (const [platz, kronen] of [[3, 180], [8, 64]]) {
+    const oben = await kontoSeite(browser, { stand: { ...STAND, stufe: 17, platz, kronen } });
+    const ob = (await messe(oben.seite)).zeilen['heim-liga'];
+    pruefe(`Stufe 17 Platz ${platz}: kein "Aufstiegsplatz", kein Abstand zu Platz 5`, ob && !ob.art && !/Aufstiegsplatz|hinter Platz/.test(ob.aria || ''), JSON.stringify(ob));
+    await oben.kontext.close();
+  }
   // ohne Gruppe (ziel und platz null): keine Zahl, die man nicht kennt
   const ohne = await kontoSeite(browser, { stand: { ...STAND, platz: null, ziel: null, kronen: 0 },
     speicher: { ...SPEICHER, [P + 'modul:kronen']: { konto: UID, stand: { ...STAND, platz: null, ziel: null, kronen: 0 }, startGemeldet: true } } });

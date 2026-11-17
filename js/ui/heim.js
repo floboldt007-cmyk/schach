@@ -32,7 +32,7 @@ import { avatarVon } from '../thema.js';
 import { eigenerName, sitzung } from '../konto.js';
 import { holeStand, angemeldet, RANKED_ZEIT } from '../kronen.js';
 import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js';
-import { stufeInfo, kronenSpeicher, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../pakete/liga/kronen.js';
+import { stufeInfo, kronenSpeicher, zoneVon, naechsteStufe, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../pakete/liga/kronen.js';
 import * as serieStand from '../pakete/serie/stand.js';
 import { lage as serieLage } from '../pakete/serie/tag.js';
 import { tagSchluessel, tageZwischen, istSchluessel } from '../tag.js';
@@ -381,8 +381,9 @@ function merke(stand) {
 // kronen = eigene); ohne Gruppe oder ohne ziel steht keine Zahl da (Leitlinie Regel 4: nur was wahr ist). "hinter" statt
 // "bis zum Aufstieg", weil ein Gleichstand mit Platz 5 nicht sicher reicht.
 function ligaAbstand(lg) {
-  if (lg.platz == null) return null;
-  if (lg.platz <= AUFSTIEG_PLAETZE) return { kurz: `<b>${esc(t('heim.liga.aufstieg'))}</b>`, label: t('heim.liga.aufstieg') };
+  // auf der obersten Stufe steigt niemand auf (zoneVon wie die Gruppe): kein "Aufstiegsplatz", kein Abstand zu Platz 5
+  if (lg.platz == null || naechsteStufe(lg.stufe) === null) return null;
+  if (zoneVon(lg.platz, { n: lg.n, stufe: lg.stufe }) === 'auf') return { kurz: `<b>${esc(t('heim.liga.aufstieg'))}</b>`, label: t('heim.liga.aufstieg') };
   const n = lg.ziel != null ? lg.ziel - lg.kronen : 0;
   if (!(n > 0)) return null;
   return { kurz: `<b class="zahl">${esc(zahl(n))}</b> <small>${esc(t('heim.liga.abstandKurz', { platz: zahl(AUFSTIEG_PLAETZE) }))}</small>`,
