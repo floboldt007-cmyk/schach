@@ -137,6 +137,24 @@ const merkeFinisher = (s) => s.evaluate(() => {
   }).observe(document.body, { childList: true, subtree: true });
 });
 const gesehen = (s) => s.evaluate(() => window.__finisherGesehen || []);
+// Was sieht man in der Brettmitte? Alle 50 ms: liegt dort das Ergebnisblatt, und laeuft gerade ein Finisher (3 s lang)
+const sichtProbe = (s) => s.evaluate(() => {
+  const proben = window.__sicht = [];
+  const t0 = performance.now();
+  const takt = setInterval(() => {
+    const b = document.querySelector('.online-screen .on-brett')?.getBoundingClientRect();
+    if (!b) return;
+    const el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    proben.push({ t: Math.round(performance.now() - t0), blatt: !!el?.closest('.ergebnis-overlay'), finisher: !!document.querySelector('.online-screen .finisher') });
+    if (performance.now() - t0 > 3000) clearInterval(takt);
+  }, 50);
+});
+const sichtAuswertung = (s) => s.evaluate(() => {
+  const p = window.__sicht || [];
+  const o = document.querySelector('.online-screen > .ergebnis-overlay');
+  return { proben: p.length, mitFinisher: p.filter((x) => x.finisher).length, blattUeberFinisher: p.filter((x) => x.finisher && x.blatt).length,
+    erstesBlatt: p.find((x) => x.blatt)?.t ?? null, blattJetzt: !!o && !o.hidden, fokusImBlatt: !!o && o.contains(document.activeElement) };
+});
 
 let browser;
 try {
@@ -161,6 +179,7 @@ try {
     const sieg = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4' });
     await oeffneOnline(s, sieg);
     await merkeFinisher(s);
+    await sichtProbe(s);
     await tippe(s, 'd8h4');
     await s.locator('.on-ergebnis:not([hidden])').waitFor();
     await warte(300);
@@ -169,6 +188,25 @@ try {
       g1.length === 1 && g1[0].id === 'blitzschlag' && /brett-effekte/.test(g1[0].im), g1);
     await warte(1800);
     pruefe('Online: der Finisher raeumt sich nach seiner Dauer wieder weg', await s.locator('.online-screen .finisher').count() === 0);
+    // Kaltreview de 17.11.: das Ergebnisblatt (modal) lag sofort ueber der Brettmitte, der Finisher lief abgedunkelt dahinter.
+    // Wie in der Bot-Partie (js/ui/partie.js 1890-1893) kommt das Blatt erst nach dem Finisher.
+    const sicht = await sichtAuswertung(s);
+    pruefe('Online: solange der Finisher laeuft, liegt das Ergebnisblatt nicht ueber der Brettmitte',
+      sicht.mitFinisher > 3 && sicht.blattUeberFinisher === 0, sicht);
+    pruefe('Online: nach dem Finisher oeffnet das Ergebnisblatt (sichtbar, Fokus darin)', sicht.blattJetzt && sicht.fokusImBlatt, sicht);
+
+    // ein Tipp waehrend des Finishers beendet ihn, das Blatt kommt dann sofort
+    const tipp = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4' });
+    await oeffneOnline(s, tipp);
+    await tippe(s, 'd8h4');
+    await s.waitForSelector('.online-screen .finisher', { timeout: 5000 });
+    await warte(150);
+    const t0 = Date.now();
+    await s.mouse.click(5, 5);
+    await s.waitForSelector('.online-screen > .ergebnis-overlay:not([hidden])', { timeout: 5000 });
+    const nachTipp = Date.now() - t0;
+    pruefe('Online: ein Tipp waehrend des Finishers zeigt das Ergebnisblatt sofort (unter 400 ms), der Finisher ist weg',
+      nachTipp < 400 && await s.locator('.online-screen .finisher').count() === 0, { nachTipp });
 
     const schonAus = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4 d8h4', status: 'beendet', ergebnis: '0-1', grund: 'matt' });
     await oeffneOnline(s, schonAus);

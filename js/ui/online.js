@@ -756,7 +756,9 @@ export function zeige(root, params, app) {
   // Matt-Finisher wie in der Bot-Partie (Ort partie:matt, js/pakete/finisher): nur beim eigenen Matt, das diese Ansicht
   // selbst erlebt hat (klingt oben); ein Tipp oder das Verlassen beendet ihn. Die Buehne ist nur, was der Finisher braucht:
   // das Feld in Brett-Lage (wie partie.js spalteZeile) und die Effekt-Ebene ueber den Feldern (Kaltreview 6b 17.11.2026).
-  let mattOrt = null;
+  // feier: solange ein Finisher laeuft, wartet das Ergebnisblatt darauf (baueBlatt), hoechstens BRETT_FEIER.dauerMs, ein Tipp
+  // beendet beides sofort; wie die Bot-Partie (partie.js: erst der Finisher, dann das Blatt; Kaltreview de 17.11.2026)
+  let mattOrt = null, feier = null;
   function finisher() {
     const effekte = inhalt.querySelector('.on-effekte');
     if (!effekte || !brett) return;
@@ -777,6 +779,8 @@ export function zeige(root, params, app) {
       letzterZug: m ? Object.freeze({ von: m.from, nach: m.to, san: m.san, figur: m.color + m.piece.toUpperCase() }) : null,
       signal: ctrl.signal, dauerMs: BRETT_FEIER.dauerMs, kurzMs: BRETT_FEIER.kurzMs,
     });
+    const tipp = new Promise((r) => ctrl.signal.addEventListener('abort', r, { once: true }));
+    feier = mattOrt.wartend > 0 ? Promise.race([mattOrt.fertig, tipp, new Promise((r) => setTimeout(r, BRETT_FEIER.dauerMs))]) : null;
   }
   // R7: Kronen-Aenderung einer gewerteten Partie, nur aus dem, was der Server schon liefert. Die Online-Antworten tragen
   // keine Kronen; die Buchung macht der Trigger am Partie-Ende (supabase/kronen-schema.sql). Darum: kronen_mein_stand
@@ -822,6 +826,7 @@ export function zeige(root, params, app) {
   const blattEl = () => s.querySelector(':scope > .ergebnis-overlay');
   function zeigeBlatt(an) {
     const o = blattEl(); if (!o) return;
+    delete o.dataset.feier;
     o.hidden = !an;
     for (const e of s.children) if (e !== o) e.inert = an;
     if (an) o.querySelector('.ergebnis-karte').focus({ preventScroll: true });
@@ -862,7 +867,13 @@ export function zeige(root, params, app) {
     });
     s.append(o);
     zeigeKronen();
-    zeigeBlatt(true);
+    if (feier) {
+      // Finisher laeuft: das Blatt steht bereit, oeffnet aber erst nach ihm (oder nach einem Tipp)
+      o.hidden = true; o.dataset.feier = '';
+      const f = feier; feier = null;
+      // nur, wenn es niemand inzwischen selbst geoeffnet (und vielleicht wieder geschlossen) hat
+      f.then(() => { if (!weg && blattEl() === o && 'feier' in o.dataset) zeigeBlatt(true); });
+    } else zeigeBlatt(true);
   }
   // Ablage fuer die Analyse: die Spielanalyse (js/ui/analyse.js) und "Meine Partien" (js/ui/verlauf.js) lesen nur Partien vom
   // Geraet. W-online-analyse: jede beendete Online-Partie mit mindestens einem Zug wird beim Ende von selbst abgelegt (auch
