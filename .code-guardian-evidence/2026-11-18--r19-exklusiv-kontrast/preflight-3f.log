@@ -1,0 +1,6 @@
+BELEG: v1 werkzeug=beleg-lauf zeit=1794958221 stand=60db98a04603be194a2344fb73519142def239672ef626a9a17d20d127060ae0 head=501ae58b6cd383b827b6c4ea8aed408f34bc1492 kmd=50ff7878fbbd6b163034f61a9203097db898b0277732e23f5f1e661aa8cc2f0b messung=59beeb7d14b4b633cc0df64c8472df08f3138c2e0626c35f127cd4d4763ab97f mac=b4aa8330189fbd28842c1227b0004b2cdfb88fbe4cb2df121cefc84bf0b4915e
+kmd: git grep -n -e shf-selten -e 'seltenheit="exklusiv"' c03c590 -- css js
+c03c590:css/pakete/sammlung.css:357:.shf-karte[data-seltenheit="exklusiv"] { --shf-farbe: #c38f22; }
+c03c590:css/pakete/sammlung.css:374:.shf-selten { font-size: 12px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; color: color-mix(in srgb, var(--shf-farbe) 78%, var(--text)); }
+c03c590:js/pakete/sammlung/shop-entwurf.js:115:    <span class="shf-text">${selten ? `<span class="shf-selten">${esc(selten)}</span>` : ''}<span class="shf-name"></span><span class="shf-unter"></span></span>
+exit=0

@@ -1,0 +1,38 @@
+BELEG: v1 werkzeug=beleg-lauf zeit=1794958189 stand=60db98a04603be194a2344fb73519142def239672ef626a9a17d20d127060ae0 head=501ae58b6cd383b827b6c4ea8aed408f34bc1492 kmd=3300ff8c81a1e16aecfeecf41fe77c8733cb6986639b742cd40001de8b578cf5 messung=c5701b13b18936500493c0d8e6ed2c3397968dd52d720eb2bc36b13abd02a24d mac=730d6645b7a44ae2925d3ebbb84189bf5584298ca61b65dbd2f54e09c423f618
+kmd: 'C:/Program Files/Git/usr/bin/timeout.exe' 900 node tests/alle.mjs --nur=r19-shop-fortnite,funktion-shop-skin,sammlung,r19-exklusiv-kontrast
+Crownmate: 4 Testsuiten, parallel 1
+
+… funktion-shop-skin Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht
+ok     funktion-shop-skin     37/37     8.6 s
+… r19-exklusiv-kontrast Feinschliff R19: Seltenheits-Marken im Shop A (Exklusiv in Gold) mind. 4,5:1 auf ihrer Karte, hell und dunkel, Ruhe/Zeiger/Fokus (Browser)
+ok     r19-exklusiv-kontrast     91/91    22.6 s
+… r19-shop-fortnite R19 Shop A als Standard (?shopStil=alt alter Shop): fuenf feste Plaetze aus assets/shop/auslage.json, ohne Kauf-Weg Schloss und Bald, kein Druck, Vorschau je Art ohne Kaufknopf und ohne Serveranfrage
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone 13 standard: Anhoeren laeuft ohne Fehler
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone SE standard: Vorschau ohne Kaufen-Knopf und ohne Preis, nur "Schließen"
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone SE standard: Finisher-Vorschau als grosses Standbild
+… r19-shop-fortnite: laeuft, zuletzt ok   iPad standard: Anhoeren laeuft ohne Fehler
+… r19-shop-fortnite: laeuft, zuletzt ok   iPad quer standard: Vorschau ohne Kaufen-Knopf und ohne Preis, nur "Schließen"
+… r19-shop-fortnite: laeuft, zuletzt ok   PC standard: Vorschau ohne Kaufen-Knopf und ohne Preis, nur "Schließen"
+… r19-shop-fortnite: laeuft, zuletzt ok   PC standard: Emote bewegt sich
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone 13 standard dunkel: Vorschau ohne Kaufen-Knopf und ohne Preis, nur "Schließen"
+… r19-shop-fortnite: laeuft, zuletzt ok   PC standard dunkel: Vorschau ohne Kaufen-Knopf und ohne Preis, nur "Schließen"
+… r19-shop-fortnite: laeuft, zuletzt ok   PC standard dunkel: Emote bewegt sich
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone 13 a: Figur-Vorschau ohne Kaufen-Knopf
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone 13 b: Vorschau ohne Kaufen-Knopf und ohne Preis, nur "Schließen"
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone 13 b: Emote bewegt sich
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone 13 standard ruhig: Figur-Vorschau ohne Kaufen-Knopf
+… r19-shop-fortnite: laeuft, zuletzt ok   iPhone 13 alt gast: alter Shop (Gast-Satz mit Gast-Karte, kein Schaufenster)
+ok     r19-shop-fortnite         -   454.8 s
+… sammlung     Paket Sammlung: Reiter Ich, Bereiche mit Schloss, Erfolge
+… sammlung: laeuft, zuletzt ok   Labor: Figurensätze Klassisch, Blaupause, dann Drachen, Zombies, Geister, Lava-Golem, Piraten, Ägypten, Wikinger, Dinos, Feuer, Stein, Halloween, Weihnachten, Ostern, Weltraum
+ok     sammlung       148/148    44.4 s
+
+Zusammenfassung
+Suite         Prüfungen    Zeit   Ergebnis
+funktion-shop-skin      37/37     9 s   bestanden
+r19-exklusiv-kontrast      91/91    23 s   bestanden
+r19-shop-fortnite          -   455 s   bestanden
+sammlung        148/148    44 s   bestanden
+
+4/4 Suiten bestanden, 276/276 Prüfungen, 530 s
+exit=0

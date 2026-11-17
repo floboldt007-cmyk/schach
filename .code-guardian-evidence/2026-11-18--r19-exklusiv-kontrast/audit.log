@@ -1,0 +1,4 @@
+BELEG: v1 werkzeug=beleg-lauf zeit=1794958190 stand=60db98a04603be194a2344fb73519142def239672ef626a9a17d20d127060ae0 head=501ae58b6cd383b827b6c4ea8aed408f34bc1492 kmd=b2822e6a1685f82563babab3790903b32a4a3aa3d92db38d9ca794e73f37249e messung=7b1f96479cd40c833bf47e195f7c130ae60c34719982413ad5348442f18f56f5 mac=20bb1292246e05f90d411a3471c26c9296e841e3e235fa4d1bbda650e9e267a3
+kmd: python3 C:/Users/Flo/.claude/skills/code-guardian/tools/detect-hardcoded-cases.py --git --ref origin/so/R19-shop-a-standard --files css/pakete/sammlung.css tests/r19-exklusiv-kontrast.test.mjs tests/alle.mjs
+SUMMARY findings=0 intentional=0 files-scanned=0 skipped=0 exit=0
+exit=0
