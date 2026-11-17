@@ -6,7 +6,9 @@
 //   node tests/r19-profil-ich.test.mjs      Exit 0 nur, wenn alle Pruefungen bestehen
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, copyFileSync, existsSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
@@ -118,9 +120,34 @@ try {
   pruefe('Banner Erster Zug: Gold-Akzent der App (#E0A22B)', /#E0A22B/i.test(start));
   pruefe('Banner Erster Zug: dunkler, matter Grund', /stop-color="#1[0-9A-F]{5}"/i.test(start));
 
-  for (const sprache of ['de', 'en']) {
-    const { k, s } = await seite(browser, { sprache });
-    const L = sprache.toUpperCase();
+  // ---------- Banner-Werkzeug: ein Lauf verliert keinen Eintrag (der Umbau von "Erster Zug" strich 11 von 21) ----------
+  // Lauf in einer Wegwerf-Kopie, damit der Test nichts im Baum ueberschreibt; Massstab ist der eingecheckte Vorrat
+  {
+    const tmp = mkdtempSync(path.join(tmpdir(), 'banner-vorrat-'));
+    mkdirSync(path.join(tmp, 'werkzeuge'));
+    copyFileSync(path.join(root, 'werkzeuge', 'banner-vorrat.mjs'), path.join(tmp, 'werkzeuge', 'banner-vorrat.mjs'));
+    const lauf = spawnSync(process.execPath, [path.join(tmp, 'werkzeuge', 'banner-vorrat.mjs')], { encoding: 'utf8' });
+    const vorher = JSON.parse(readFileSync(path.join(root, 'assets', 'banner', 'vorrat.json'), 'utf8')).banner.map((b) => b.id);
+    let nachher = [];
+    try { nachher = JSON.parse(readFileSync(path.join(tmp, 'assets', 'banner', 'vorrat.json'), 'utf8')).banner.map((b) => b.id); } catch (e) { /* bleibt leer */ }
+    const fehlt = vorher.filter((id) => !nachher.includes(id));
+    pruefe('Banner-Werkzeug: Lauf endet ohne Fehler', lauf.status === 0, lauf.stderr || lauf.stdout);
+    pruefe(`Banner-Werkzeug: alle ${vorher.length} eingecheckten Banner bleiben im Vorrat`, vorher.length > 0 && fehlt.length === 0, { fehlt, nachher: nachher.length });
+    // die App zeigt Bot-Banner fest (js/ui/visitenkarte.js BOT_BANNER): jedes davon muss das Werkzeug erzeugen
+    const botListe = (readFileSync(path.join(root, 'js', 'ui', 'visitenkarte.js'), 'utf8').match(/BOT_BANNER = Object\.freeze\(\[([^\]]*)\]/) || [])[1] || '';
+    const botBanner = [...botListe.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+    pruefe('Banner-Werkzeug: jedes Bot-Banner der App entsteht im Lauf', botBanner.length > 0 && botBanner.every((id) => nachher.includes(id)), { botBanner, nachher });
+    // nur "Erster Zug" wurde neu gezeichnet: jedes andere Banner kommt Byte fuer Byte wie eingecheckt heraus
+    const anders = nachher.filter((id) => id !== 'start' && existsSync(path.join(tmp, 'assets', 'banner', `${id}.svg`))
+      && readFileSync(path.join(tmp, 'assets', 'banner', `${id}.svg`), 'utf8') !== readFileSync(path.join(root, 'assets', 'banner', `${id}.svg`), 'utf8'));
+    pruefe('Banner-Werkzeug: die uebrigen Banner unveraendert', nachher.length > 1 && anders.length === 0, anders);
+    rmSync(tmp, { recursive: true, force: true });
+  }
+
+  // Vitrine und Rang in drei Breiten (iPhone, iPhone SE 1, iPad hoch), Figuren-Auswahl nur in der ersten
+  for (const [sprache, breite, hoehe] of [['de', 390, 844], ['en', 390, 844], ['de', 320, 568], ['en', 320, 568], ['de', 768, 1024], ['en', 768, 1024]]) {
+    const { k, s } = await seite(browser, { sprache, breite, hoehe });
+    const L = `${sprache.toUpperCase()} ${breite}x${hoehe}`;
     // ---------- Vitrine: grosse Orden mit Bild ----------
     const orden = await s.$$eval('.pr-vitrine .pr-orden:not(.leer)', (xs) => xs.map((x) => {
       const b = x.querySelector('.pr-orden-bild');
@@ -148,6 +175,22 @@ try {
     pruefe(`${L} Rang: Liga-Symbol am Chip (assets/liga/<liga>.svg, geladen)`, /assets\/liga\/(bauer|springer|laeufer|turm|dame|koenig)\.svg$/.test(rang.src) && rang.geladen, rang);
     pruefe(`${L} Rang: Symbol gross genug (mind. 22 px)`, rang.b >= 22 && rang.h >= 22, rang);
     pruefe(`${L} Rang: Symbol ist Schmuck (alt leer, der Text nennt die Stufe)`, rang.alt === '', rang);
+    // nichts abgeschnitten: Orden, Chip und Symbol liegen im Fenster und in ihrem Eltern-Kasten, die Seite ist nicht breiter
+    const raus = await s.evaluate(() => {
+      const vw = document.documentElement.clientWidth;
+      const aus = [];
+      for (const el of document.querySelectorAll('.pr-vitrine .pr-orden, .pr-vitrine .pr-orden-bild, .pr-chip-krone, .pr-chip-krone img.pr-rang')) {
+        const r = el.getBoundingClientRect(), e = el.parentElement.getBoundingClientRect();
+        if (!r.width) continue;
+        if (r.left < -0.5 || r.right > vw + 0.5) aus.push(`${el.className} Fenster ${Math.round(r.left)}..${Math.round(r.right)} von ${vw}`);
+        else if (r.left < e.left - 1 || r.right > e.right + 1) aus.push(`${el.className} Eltern ${Math.round(r.left)}..${Math.round(r.right)} in ${Math.round(e.left)}..${Math.round(e.right)}`);
+        if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth && getComputedStyle(el).overflow !== 'visible') aus.push(`${el.className} Text abgeschnitten`);
+      }
+      if (document.documentElement.scrollWidth > vw + 1) aus.push(`Seite ${document.documentElement.scrollWidth} breiter als ${vw}`);
+      return aus;
+    });
+    pruefe(`${L} Vitrine und Rang: nichts ragt aus Fenster oder Kasten`, raus.length === 0, raus);
+    if (breite !== 390) { await k.close(); continue; }
 
     // ---------- Figuren-Auswahl: die Figuren gross, keine Scheibe als "Logo" ----------
     // in drei Blattbreiten (SE-Blatt 320 bis iPhone 390, drei Spalten): auf dem SE schnitt die Kachel die aeusseren Figuren ab
@@ -220,10 +263,19 @@ try {
       const bild = thema.profilAvatar({ figur: 'bot-fridolin' }, 'w');
       const fremd = ['bot-../x', 'bot-niemand', 'bot-FRIDOLIN', 'bot-'].map((f) => thema.profilAvatar({ figur: f }, 'w'));
       const gegner = thema.avatarVon({ id: 'fridolin', avatar: 'x.svg' });
+      // zwei Portraets desselben Gegners in einem Dokument (Karte und Auswahl-Blatt): jede Ausschnitt-Kennung genau einmal
+      const zwei = document.createElement('div');
+      zwei.innerHTML = thema.profilAvatar({ figur: 'bot-fridolin' }, 'w') + thema.profilAvatar({ figur: 'bot-fridolin' }, 'b');
+      document.body.append(zwei);
+      const kennungen = [...document.querySelectorAll('clipPath[id]')].map((c) => c.id);
+      const doppelt = kennungen.filter((id, i) => kennungen.indexOf(id) !== i);
+      const verweise = [...zwei.querySelectorAll('image[clip-path]')].map((i) => (i.getAttribute('clip-path').match(/url\(#([^)]+)\)/) || [])[1]);
+      const eigen = verweise.length === 2 && verweise[0] !== verweise[1] && verweise.every((v) => zwei.querySelector(`clipPath[id="${v}"]`));
+      zwei.remove();
       profil.setzeProfilWahl({ figur: 'P' });
       return { n: teile.length, fri, lisa, gesperrtWahl, freiWahl, bleibt, bild: /assets\/avatare\/modern\/fridolin\.svg/.test(bild),
         fremd: fremd.map((x) => (x.match(/data-figur="([^"]*)"/) || [])[1]), fremdOhneBild: fremd.every((x) => !/avatare/.test(x)),
-        gegner, karte: KARTE_MOTIVE.includes('bot-fridolin') };
+        gegner, karte: KARTE_MOTIVE.includes('bot-fridolin'), doppelt, eigen, verweise };
     });
     pruefe('Portraets: dreissig Gegner zur Wahl', bp.n === 30, bp.n);
     pruefe('Portraets: Fridolin (besiegt) frei, Lisa (nie gespielt) gesperrt mit Weg "Erster Sieg: <Name>" (Namen tragen teils ihren Artikel, "Besiege Der Stockfisch")', !!(bp.fri && bp.fri.frei && bp.lisa && !bp.lisa.frei && /^Erster Sieg: Lisa/.test(bp.lisa.weg)), { fri: bp.fri, lisa: bp.lisa });
@@ -232,6 +284,8 @@ try {
     pruefe('Portraets: Profilbild zeichnet das Portraet aus dem festen Ordner', bp.bild);
     pruefe('Portraets: fremde Werte fallen auf den Standard, kein Bild', bp.fremd.every((f) => f === 'P') && bp.fremdOhneBild, bp.fremd);
     pruefe('Portraets: Gegner-Avatar unveraendert, Karte fuer andere ohne Portraet-Motiv', bp.gegner === 'assets/avatare/modern/fridolin.svg' && !bp.karte, bp);
+    pruefe('Portraets: zwei Portraets im selben Dokument, keine Ausschnitt-Kennung doppelt', bp.doppelt.length === 0, bp.doppelt);
+    pruefe('Portraets: jedes Portraet schneidet mit seinem eigenen Ausschnitt', bp.eigen, bp.verweise);
     await k.close();
   }
 } finally {
