@@ -272,6 +272,18 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
   await k.close().catch(() => {});
 }
 
+// die Beschreibungen sagen, was der Shop tut (Flo tauscht die Plaetze in auslage.json nach ihrem Hinweis): Stil A ist
+// Standard, ?shopStil=alt der alte Shop, ohne Kauf-Weg Schloss und Bald; kein "Preis folgt", kein Kaufen mehr versprochen
+{
+  const eintrag = (readFileSync(new URL('./alle.mjs', import.meta.url), 'utf8').match(/name: 'r19-shop-fortnite'[^\n]*/) || [''])[0];
+  const kopf = readFileSync(new URL('../js/pakete/sammlung/shop.js', import.meta.url), 'utf8').split('\n').slice(0, 12).join('\n');
+  for (const [wo, text] of [['auslage.json hinweis', AUSLAGE.hinweis], ['tests/alle.mjs', eintrag], ['Kopf shop.js', kopf]]) {
+    pruefe(`Beschreibung ${wo}: Stil A Standard, ?shopStil=alt fuer den alten Shop`, /\?shopStil=alt/.test(text) && !/\?shopStil=a\b/.test(text), text.slice(0, 200));
+    pruefe(`Beschreibung ${wo}: kein "Preis folgt", kein Kaufen ohne Kasse`, !/Preis folgt|Kaufen ohne Kasse|Server-Preis/i.test(text), text.slice(0, 200));
+  }
+  pruefe('Beschreibung auslage.json hinweis: Schloss und Bald, wo es keinen Kauf-Weg gibt', /Schloss/.test(AUSLAGE.hinweis) && /Bald/.test(AUSLAGE.hinweis), AUSLAGE.hinweis);
+}
+
 let browser;
 try {
   browser = await browserTyp(pw).launch({ headless: true });

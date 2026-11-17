@@ -1,4 +1,6 @@
-// Shop-Bereich der Sammlung: limitierte Editionen (Server-Etappe 1, supabase/werkstatt-schema.sql). Verkauft wird noch
+// Shop-Bereich der Sammlung. Seit R19 ist Shop A (js/pakete/sammlung/shop-entwurf.js) der Standard: fuenf feste Plaetze,
+// ohne Kauf-Weg Schloss und "Bald" statt Preis und Kaufen. Der alte Shop unten erscheint nur noch mit ?shopStil=alt.
+// Alter Shop: limitierte Editionen (Server-Etappe 1, supabase/werkstatt-schema.sql). Verkauft wird noch
 // nichts: Der Kaufknopf heisst "Bald verfuegbar", bis Gewerbe und Rechtstexte stehen (ENTSCHEIDUNGEN 29.10. und 30.10.).
 // Regeln (ENTSCHEIDUNGEN 29.10./30.10., Fairness-Test):
 // - Editionen sieht nur, wer angemeldet ist und "18 oder aelter" bestaetigt hat (edition_staende liefert sonst []).
