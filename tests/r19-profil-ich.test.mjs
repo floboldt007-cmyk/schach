@@ -21,6 +21,9 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 if (!pw) { console.log('UEBERSPRUNGEN: Playwright fehlt (PLAYWRIGHT_PFAD setzen)'); process.exit(1); }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+// alle Namen, die eine Vitrine-Kachel tragen kann: Familien und Stufen-Namen (js/pakete/sammlung/karte-texte.js, taten.js)
+const VITRINE_NAMEN = [...new Set(['karte-texte.js', 'taten.js'].flatMap((d) =>
+  [...readFileSync(path.join(root, 'js', 'pakete', 'sammlung', d), 'utf8').matchAll(/'((?:fam|sn)\.[a-z0-9.]+)'/g)].map((m) => m[1])))];
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg' };
 const server = http.createServer((req, res) => {
@@ -190,6 +193,37 @@ try {
       return aus;
     });
     pruefe(`${L} Vitrine und Rang: nichts ragt aus Fenster oder Kasten`, raus.length === 0, raus);
+    // Wortbruch (Fix-Review 17.11.: "Ligaaufstie|g" auf dem SE): jeder Name, der in der Vitrine stehen kann, bricht nur an
+    // Leerzeichen, Bindestrich oder weicher Trennstelle und passt in seine Kachel. Rechtecke allein sehen das nicht.
+    const brueche = await s.evaluate(async (schluessel) => {
+      const { t } = await import('/js/sprache.js');
+      await import('/js/pakete/sammlung/karte-texte.js');
+      await import('/js/pakete/sammlung/taten.js');
+      const b = document.querySelector('.pr-vitrine .pr-orden:not(.leer) b');
+      if (!b) return ['keine Kachel'];
+      const vorher = b.textContent, kachel = b.closest('.pr-orden').getBoundingClientRect(), aus = [];
+      for (const k of schluessel) {
+        const name = t('p-karte.' + k);
+        b.textContent = name;
+        const tn = b.firstChild;
+        // nur Zeichen mit Breite zaehlen (eine ungenutzte Trennstelle hat keine; das erste Zeichen einer neuen Zeile meldet
+        // in Chromium zusaetzlich ein leeres Rechteck am Ende der Zeile davor), der Bruch liegt zwischen vor und i
+        let oben = null, vor = 0;
+        for (let i = 0; i < name.length; i++) {
+          const r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, i + 1);
+          const q = [...r.getClientRects()].filter((x) => x.width > 0).pop();
+          if (!q) continue;
+          const top = q.top;
+          if (oben !== null && top > oben + 2 && !/[\s\u00AD-]/.test(name.slice(vor, i))) aus.push(`${k} "${name.slice(0, i)}|${name.slice(i)}"`);
+          oben = top; vor = i;
+        }
+        const bb = b.getBoundingClientRect();
+        if (b.scrollWidth > b.clientWidth + 1 || bb.left < kachel.left - 0.5 || bb.right > kachel.right + 0.5) aus.push(`${k} "${name}" ragt aus der Kachel`);
+      }
+      b.textContent = vorher;
+      return aus;
+    }, VITRINE_NAMEN);
+    pruefe(`${L} Vitrine: alle ${VITRINE_NAMEN.length} Namen brechen nur an Wortgrenzen oder weicher Trennung und passen in die Kachel`, brueche.length === 0, brueche);
     if (breite !== 390) { await k.close(); continue; }
 
     // ---------- Figuren-Auswahl: die Figuren gross, keine Scheibe als "Logo" ----------
