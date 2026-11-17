@@ -70,7 +70,7 @@ registriereTexte('p-sammlung', {
     'shop.pausiert': 'Verkauf pausiert', 'shop.vergeben': 'Alle {auflage} vergeben', 'shop.beendet': 'Verkauf beendet',
     'shop.produkt.brett-mitternacht': 'Mitternacht & Gold',
     // R19 Shop A (shop-entwurf.js): fuenf feste Plaetze, kein Ablauf, keine Restzahl
-    'entwurf.folgt': 'Folgt', 'entwurf.bald': 'Bald',
+    'entwurf.folgt': 'Folgt', 'entwurf.bald': 'Bald', 'entwurf.mitKonto': 'Mit Konto',
     'entwurf.selten.haeufig': 'Häufig', 'entwurf.selten.selten': 'Selten', 'entwurf.selten.episch': 'Episch', 'entwurf.selten.exklusiv': 'Exklusiv',
     'entwurf.art.edition': 'Edition · Brett', 'entwurf.art.brett': 'Brett', 'entwurf.art.figuren': 'Figurensatz',
     'entwurf.art.klang': 'Klangset', 'entwurf.art.emote': 'Emote', 'entwurf.art.finisher': 'Finisher',
@@ -181,7 +181,7 @@ registriereTexte('p-sammlung', {
     'shop.verfuegbar': '{n} of {auflage} available', 'shop.erhaeltlich': 'Available', 'shop.angekuendigt': 'On sale from {datum}',
     'shop.pausiert': 'Sales paused', 'shop.vergeben': 'All {auflage} taken', 'shop.beendet': 'Sales ended',
     'shop.produkt.brett-mitternacht': 'Midnight & Gold',
-    'entwurf.folgt': 'Coming soon', 'entwurf.bald': 'Soon',
+    'entwurf.folgt': 'Coming soon', 'entwurf.bald': 'Soon', 'entwurf.mitKonto': 'With an account',
     'entwurf.selten.haeufig': 'Common', 'entwurf.selten.selten': 'Rare', 'entwurf.selten.episch': 'Epic', 'entwurf.selten.exklusiv': 'Exclusive',
     'entwurf.art.edition': 'Edition · Board', 'entwurf.art.brett': 'Board', 'entwurf.art.figuren': 'Piece set',
     'entwurf.art.klang': 'Sound set', 'entwurf.art.emote': 'Emote', 'entwurf.art.finisher': 'Finisher',

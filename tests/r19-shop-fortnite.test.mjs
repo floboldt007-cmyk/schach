@@ -181,6 +181,15 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
         // Intl setzt ein geschuetztes Leerzeichen vor das Euro-Zeichen
         preise: karten.map((x) => x.querySelector('.shf-preis')?.textContent.replace(/\s+/g, ' ').trim() ?? null),
         schloss: karten.map((x) => !!x.querySelector('.shf-preis svg.shf-schloss')),
+        // Gast-Karte wie im alten Shop (.sh-karte[data-gast]): Markierung, kein Knopf, Name in --text-2
+        gast: karten.map((x) => x.hasAttribute('data-gast')),
+        knopf: karten.map((x) => x.tagName === 'BUTTON'),
+        nameGrau: karten.map((x) => {
+          const n = x.querySelector('.shf-name'); if (!n) return null;
+          const probe = document.createElement('span'); probe.style.color = 'var(--text-2)'; x.append(probe);
+          const grau = getComputedStyle(probe).color; probe.remove();
+          return getComputedStyle(n).color === grau;
+        }),
         euro: ((shf ? shf.innerText : '').match(/€/g) || []).length,
         text: shf ? shf.innerText : '',
         reihen: document.querySelectorAll('.sa-blatt .shf-reihe, .sa-blatt .shf-held, .sa-blatt .shf-band').length,
@@ -200,15 +209,24 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
     pruefe(`${gruppe}: kein Ueberlauf zur Seite`, !bild.ueberlauf);
     pruefe(`${gruppe}: Karten mindestens 44 px`, bild.klein === 0, bild.klein);
     // kein Versprechen ohne Kauf-Weg: jeder belegte Platz zeigt Schloss und "Bald", nie einen Preis oder "Preis folgt"
-    const belegt = bild.preise.filter((x, i) => !bild.folgt[i]);
+    // (eine Gast-Karte sagt statt "Bald" "Mit Konto", siehe unten)
+    const belegt = bild.preise.filter((x, i) => !bild.folgt[i] && !bild.gast[i]);
     pruefe(`${gruppe}: belegte Plaetze mit Schloss und "Bald", kein Preis, kein "Preis folgt"`,
       belegt.every((x) => x === 'Bald') && bild.preise.every((x, i) => bild.folgt[i] || bild.schloss[i]) && bild.euro === 0 && !/Preis folgt/.test(bild.text),
       { preise: bild.preise, schloss: bild.schloss, euro: bild.euro });
 
     if (gast) {
-      // wie der alte Shop fuer Gaeste (Gast-Karte mit Bild und Name): auch die Edition steht da
-      pruefe(`${gruppe}: fuenf Plaetze, alle mit Stueck, Schloss und "Bald"`,
-        bild.folgt.every((x) => !x) && bild.preise.every((x) => x === 'Bald') && bild.schloss.every(Boolean), bild.preise);
+      // wie der alte Shop fuer Gaeste (Gast-Karte mit Bild und Name): auch die Edition steht da, aber ausgegraut wie
+      // .sh-karte[data-gast] auf main (kein Knopf, Name in --text-2, "Mit Konto"); Kaltreview 9b 17.11.2026
+      const edition = KATALOG_EDITIONEN.includes(AUSLAGE.plaetze.find((p) => p.art === 'brett')?.id);
+      pruefe(`${gruppe}: Edition aus der Auslage ist ein Katalog-Brett (sonst prueft dieser Lauf nichts)`, edition, AUSLAGE.plaetze);
+      pruefe(`${gruppe}: fuenf Plaetze, alle mit Stueck und Schloss`, bild.folgt.every((x) => !x) && bild.schloss.every(Boolean), bild.preise);
+      pruefe(`${gruppe}: Edition als Gast-Karte (data-gast, kein Knopf, Name grau, "Mit Konto")`,
+        bild.gast[0] && !bild.knopf[0] && bild.nameGrau[0] === true && bild.preise[0] === 'Mit Konto',
+        { gast: bild.gast[0], knopf: bild.knopf[0], nameGrau: bild.nameGrau[0], preis: bild.preise[0] });
+      pruefe(`${gruppe}: die anderen vier Plaetze normal (Knopf, "Bald", keine Gast-Markierung)`,
+        bild.gast.slice(1).every((x) => !x) && bild.knopf.slice(1).every(Boolean) && bild.preise.slice(1).every((x) => x === 'Bald'),
+        { gast: bild.gast, preise: bild.preise });
       await k.close(); return;
     }
     if (fehler || ohneAlter) {

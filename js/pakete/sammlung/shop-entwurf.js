@@ -11,7 +11,8 @@
 //
 //   shopStil() -> 'a' | null
 //   Editionen wie im alten Shop (supabase/ANLEITUNG.md): angemeldet nur, was edition_staende liefert (ab 18), sonst
-//   bleibt der Platz "Folgt"; ein Gast sieht sie wie dort als Katalog-Stueck mit Bild und Name (gast: true).
+//   bleibt der Platz "Folgt"; ein Gast sieht sie wie dort als Katalog-Stueck mit Bild und Name (gast: true), ausgegraut
+//   ohne Knopf und mit "Mit Konto" (.shf-karte[data-gast] wie .sh-karte[data-gast]).
 //   shopEntwurf({ stil, editionen, gast, katalog, produktName, bereich }) -> Promise<div.shf>
 import { Brett } from '../../board.js';
 import { figurenPfad } from '../../figurensatz.js';
@@ -51,7 +52,7 @@ function stueck(art, eintrag, { vorrat, katalog, editionen, gast, produktName })
       const ed = editionen.find((e) => e.produkt_id === id);
       if (!ed && !gast) return null;
       return { id, art, name: produktName(id, ed?.name), seltenheit: 'exklusiv', unter: S('entwurf.art.edition'),
-        brett: { hell: k.hell, dunkel: k.dunkel } };
+        brett: { hell: k.hell, dunkel: k.dunkel }, gast: !ed };
     }
     const v = ausVorrat('brett');
     return v ? { id, art, name: v.name, seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.brett'),
@@ -94,7 +95,7 @@ function miniBrett({ hell, dunkel }) {
 const LEER = '<svg viewBox="0 0 64 64" class="shf-leer" aria-hidden="true"><rect x="6" y="6" width="52" height="52" rx="12" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="7 6"/></svg>';
 
 function karte(art, s, beiWahl) {
-  const k = document.createElement(s ? 'button' : 'div');
+  const k = document.createElement(s && !s.gast ? 'button' : 'div');
   k.className = 'shf-karte';
   k.dataset.art = art;
   if (!s) {
@@ -104,7 +105,9 @@ function karte(art, s, beiWahl) {
     k.querySelector('.shf-preis').textContent = S('entwurf.folgt');
     return k;
   }
-  k.type = 'button';
+  return s.gast ? gastKarte(k, s) : stueckKarte(k, s, beiWahl);
+}
+function stueckInhalt(k, s, preis) {
   k.dataset.id = s.id;
   if (s.seltenheit) k.dataset.seltenheit = s.seltenheit;
   const selten = s.seltenheit ? S('entwurf.selten.' + s.seltenheit) : '';
@@ -113,10 +116,21 @@ function karte(art, s, beiWahl) {
     <span class="shf-preis"></span>`;
   k.querySelector('.shf-name').textContent = s.name;
   k.querySelector('.shf-unter').textContent = s.unter;
-  // Schloss und "Bald" statt Preis: es gibt noch keinen Kauf-Weg (Kopf der Datei)
-  k.querySelector('.shf-preis').innerHTML = `${icon('schloss', 'shf-schloss')}<span>${esc(S('entwurf.bald'))}</span>`;
-  k.setAttribute('aria-label', [s.name, s.unter, selten, S('entwurf.bald')].filter(Boolean).join(', '));
+  // Schloss statt Preis: es gibt noch keinen Kauf-Weg (Kopf der Datei)
+  k.querySelector('.shf-preis').innerHTML = `${icon('schloss', 'shf-schloss')}<span>${esc(preis)}</span>`;
+  k.setAttribute('aria-label', [s.name, s.unter, selten, preis].filter(Boolean).join(', '));
+}
+function stueckKarte(k, s, beiWahl) {
+  k.type = 'button';
+  stueckInhalt(k, s, S('entwurf.bald'));
   k.addEventListener('click', () => beiWahl(s));
+  return k;
+}
+// Edition fuer einen Gast wie im alten Shop (.sh-karte[data-gast], shop.js gastKarte): ausgegraut, kein Knopf, "Mit Konto"
+function gastKarte(k, s) {
+  k.dataset.gast = '';
+  k.setAttribute('role', 'group');
+  stueckInhalt(k, s, S('entwurf.mitKonto'));
   return k;
 }
 
