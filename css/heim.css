@@ -81,6 +81,34 @@
 .heim-zeile-pfeil { flex: none; display: grid; place-items: center; color: var(--text-2); }
 .heim-zeile-pfeil svg { width: 18px; height: 18px; }
 .heim-naechstes[hidden] { display: none; }
+/* R19 (Flo 15.11.: "gleich und herzlos"): jede Zeile ihr eigenes Gesicht. --ton ist die Farbe des Pakets (Spielmodus-Toene
+   der Tokens, wie die Kacheln der Wege), daraus matt gemischt: Kachel-Grund, Symbol, Fortschritt. --ton-stark mischt mit
+   --text, ist also hell auf dunkel und dunkel auf hell, ohne eigene Regel je Modus. Liga: das Stufen-Wappen selbst. */
+.heim-naechstes .heim-zeile { --ton: var(--gold); --ton-stark: color-mix(in srgb, var(--ton) 55%, var(--text)); }
+.heim-naechstes .heim-zeile[data-paket="serie"] { --ton: var(--sp-freunde); }
+.heim-naechstes .heim-zeile[data-paket="tagesraetsel"] { --ton: var(--sp-raetsel); }
+.heim-naechstes .heim-zeile[data-paket="kartei"] { --ton: var(--sp-blitz); }
+.heim-naechstes .heim-zeile[data-paket="schule"] { --ton: var(--sp-klassisch); }
+.heim-naechstes .heim-zeile[data-paket="start"] { --ton: var(--sp-schnell); }
+.heim-naechstes .heim-zeile[data-aktion="heim-liga"] { --ton: var(--sp-turniere); }
+.heim-naechstes .heim-zeile-bild { border-radius: 12px; color: var(--ton-stark);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ton) 34%, var(--flaeche)), color-mix(in srgb, var(--ton) 14%, var(--flaeche)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ton) 30%, transparent); }
+.heim-naechstes .heim-zeile-bild.wappen { background: none; box-shadow: none; }
+.heim-zeile-bild.wappen img { width: 40px; height: 40px; object-fit: contain; }
+.heim-zeile-fortschritt { flex: none; display: flex; align-items: center; gap: 4px; color: var(--ton-stark); }
+.heim-zeile-fortschritt[data-art="schritte"] .heim-schritt { width: 8px; height: 8px; border-radius: 2px;
+  background: color-mix(in srgb, var(--ton) 18%, var(--linie-2)); }
+.heim-zeile-fortschritt[data-art="schritte"] .heim-schritt.an { background: var(--ton-stark); }
+.heim-zeile-fortschritt[data-art="zaehler"] { justify-content: center; min-width: 30px; height: 26px; padding: 0 8px; border-radius: var(--r-pille);
+  background: color-mix(in srgb, var(--ton) 16%, var(--flaeche)); font-size: 14px; font-weight: var(--gw-stark); font-variant-numeric: tabular-nums; }
+.heim-zeile-rechts { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.heim-zeile-fortschritt[data-art="abstand"] { gap: 4px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.heim-zeile-fortschritt[data-art="abstand"] b { font-size: 14px; font-weight: var(--gw-stark); }
+.heim-zeile-fortschritt[data-art="abstand"] small { font-size: 12.5px; color: var(--text-2); }
+.heim-naechstes .heim-zeile-balken span { background: var(--ton-stark); }
+/* schmale Spalte (Handy, iPad quer links): der Text behaelt Vorrang, der Abstand nur als Zahl */
+@media (max-width: 420px) { .heim-zeile-fortschritt[data-art="abstand"] small { display: none; } }
 /* Text der Zeile einzeilig, damit jede Zeile gleich hoch ist (die ganze Zeile steht im aria-label) */
 .heim-zeile-text b, .heim-zeile-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

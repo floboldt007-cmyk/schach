@@ -263,7 +263,8 @@ function heimZeile(app, tag, zeile) {
   if (!st.faellig) return null;
   const text = t('p-kartei.faellig', { n: st.faellig });
   return zeile({ symbol: icon('kartei'), titel: t('p-kartei.titel'), text,
-    label: `${t('p-kartei.titel')} · ${text} · ${t('p-kartei.ueben')}`, paket: L.PAKET, beiTipp: (ev) => oeffne(app, ev) });
+    label: `${t('p-kartei.titel')} · ${text} · ${t('p-kartei.ueben')}`, paket: L.PAKET, fortschritt: { art: 'zaehler', wert: st.faellig },
+    beiTipp: (ev) => oeffne(app, ev) });
 }
 
 // ---------- Einhaengen (defensiv) ----------

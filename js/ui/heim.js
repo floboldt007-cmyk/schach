@@ -91,6 +91,9 @@ registriereTexte('heim', {
     'liga.platz': 'Platz {platz} von {n}',
     'liga.ohneGruppe': 'Spiel eine Partie für deine Gruppe',
     'liga.label': '{stufe}, {zeile}, {kronen} Kronen diese Woche',
+    'liga.abstand': '{n} Kronen hinter Platz {platz}',
+    'liga.abstandKurz': 'hinter Platz {platz}',
+    'liga.aufstieg': 'Aufstiegsplatz',
     'online.titel': 'Online',
     'online.text': '{art} {zeit}',
     'raetsel.titel': 'Lernen',
@@ -149,6 +152,9 @@ registriereTexte('heim', {
     'liga.platz': 'Place {platz} of {n}',
     'liga.ohneGruppe': 'Play a game to join your group',
     'liga.label': '{stufe}, {zeile}, {kronen} crowns this week',
+    'liga.abstand': '{n} crowns behind place {platz}',
+    'liga.abstandKurz': 'behind place {platz}',
+    'liga.aufstieg': 'Promotion spot',
     'online.titel': 'Online',
     'online.text': '{art} {zeit}',
     'raetsel.titel': 'Learn',
@@ -370,20 +376,56 @@ function merke(stand) {
 // Tageswerk 10, Tagesraetsel 20, Kartei 25, je nur solange etwas ansteht; die Reihenfolge ist die Prioritaet), dann
 // der Liga-Platz (Kronen der Wochen-Gruppe, Etappe B). Wie viele Zeilen sichtbar sind, entscheidet css/heim.css nach der
 // Fensterhoehe (auf dem Handy scrollt nichts). Ruhig: kein Countdown, kein roter Punkt. Ohne Zeile entfaellt der Abschnitt.
+// R19 (Flo 15.11.: "gleich und herzlos"): das Bildstueck ist das Stufen-Wappen wie in der Gruppe (assets/liga/<liga>.svg),
+// ueber dem Balken steht der Abstand zu Platz 5. Die Zahl kommt nur aus dem Server-Stand (ziel = Kronen auf Platz 5,
+// kronen = eigene); ohne Gruppe oder ohne ziel steht keine Zahl da (Leitlinie Regel 4: nur was wahr ist). "hinter" statt
+// "bis zum Aufstieg", weil ein Gleichstand mit Platz 5 nicht sicher reicht.
+function ligaAbstand(lg) {
+  if (lg.platz == null) return null;
+  if (lg.platz <= AUFSTIEG_PLAETZE) return { kurz: `<b>${esc(t('heim.liga.aufstieg'))}</b>`, label: t('heim.liga.aufstieg') };
+  const n = lg.ziel != null ? lg.ziel - lg.kronen : 0;
+  if (!(n > 0)) return null;
+  return { kurz: `<b class="zahl">${esc(zahl(n))}</b> <small>${esc(t('heim.liga.abstandKurz', { platz: zahl(AUFSTIEG_PLAETZE) }))}</small>`,
+    label: t('heim.liga.abstand', { n: zahl(n), platz: zahl(AUFSTIEG_PLAETZE) }) };
+}
+
 function ligaZeile(lg) {
   if (!lg || lg.ohneKonto) return '';
   const stufe = stufenName(lg.stufe);
   const text = lg.platz != null ? t('heim.liga.platz', { platz: zahl(lg.platz), n: zahl(lg.n) }) : t('heim.liga.ohneGruppe');
-  const label = t('heim.liga.label', { stufe, zeile: text, kronen: zahl(lg.kronen) });
-  return `<button class="heim-zeile dr" type="button" data-aktion="heim-liga" aria-label="${esc(label)}">
-        <span class="heim-zeile-bild" aria-hidden="true">${icon('liga')}</span>
+  const abstand = ligaAbstand(lg);
+  const label = t('heim.liga.label', { stufe, zeile: text, kronen: zahl(lg.kronen) }) + (abstand ? `, ${abstand.label}` : '');
+  const wappen = new URL(`../../assets/liga/${lg.liga}.svg`, import.meta.url).href;
+  return `<button class="heim-zeile dr" type="button" data-aktion="heim-liga" data-liga="${esc(lg.liga)}" aria-label="${esc(label)}">
+        <span class="heim-zeile-bild wappen" aria-hidden="true"><img src="${esc(wappen)}" alt="" draggable="false"></span>
         <span class="heim-zeile-text"><b>${esc(stufe)}</b><span>${esc(text)}</span></span>
-        <span class="heim-zeile-balken" aria-hidden="true"><span style="width: ${Math.round(lg.anteil * 100)}%"></span></span>
+        <span class="heim-zeile-rechts" aria-hidden="true">
+          ${abstand ? `<span class="heim-zeile-fortschritt" data-art="abstand">${abstand.kurz}</span>` : ''}
+          <span class="heim-zeile-balken"><span style="width: ${Math.round(lg.anteil * 100)}%"></span></span>
+        </span>
       </button>`;
 }
 
-// Zeile fuer die Pakete (Kontext zeile() am Ort heim:naechstes): dieselbe Form wie die Liga-Zeile, rechts ein Pfeil
-function paketZeile({ symbol = '', titel = '', text = '', label = '', beiTipp, paket = '' } = {}) {
+// Fortschritt rechts in der Zeile (R19): Schritte (Bauernmarsch, Raetsel-Tage) oder ein Zaehler (faellige Fehler).
+// Nur zum Sehen, die Zahl steht im aria-label der Zeile.
+function fortschrittHtml(f) {
+  if (!f || typeof f !== 'object') return '';
+  if (f.art === 'schritte') {
+    const n = Math.max(0, Math.min(12, Math.floor(Number(f.n) || 0)));
+    const an = Math.max(0, Math.min(n, Math.floor(Number(f.an) || 0)));
+    if (!n) return '';
+    return `<span class="heim-zeile-fortschritt" data-art="schritte" aria-hidden="true">${
+      Array.from({ length: n }, (_, i) => `<i class="heim-schritt${i < an ? ' an' : ''}"></i>`).join('')}</span>`;
+  }
+  if (f.art === 'zaehler' && Number.isFinite(f.wert) && f.wert > 0) {
+    return `<span class="heim-zeile-fortschritt" data-art="zaehler" aria-hidden="true">${esc(zahl(f.wert))}</span>`;
+  }
+  return '';
+}
+
+// Zeile fuer die Pakete (Kontext zeile() am Ort heim:naechstes): dieselbe Form wie die Liga-Zeile, rechts ein Pfeil;
+// mit fortschritt ({ art: 'schritte', n, an } oder { art: 'zaehler', wert }) steht der Fortschritt davor
+function paketZeile({ symbol = '', titel = '', text = '', label = '', beiTipp, paket = '', fortschritt = null } = {}) {
   const k = document.createElement('button');
   k.type = 'button';
   k.className = 'heim-zeile dr';
@@ -391,6 +433,7 @@ function paketZeile({ symbol = '', titel = '', text = '', label = '', beiTipp, p
   if (label) k.setAttribute('aria-label', label);
   k.innerHTML = `<span class="heim-zeile-bild" aria-hidden="true">${symbol}</span>
       <span class="heim-zeile-text"><b>${esc(titel)}</b><span>${esc(text)}</span></span>
+      ${fortschrittHtml(fortschritt)}
       <span class="heim-zeile-pfeil" aria-hidden="true">${icon('vor')}</span>`;
   if (typeof beiTipp === 'function') k.addEventListener('click', (e) => { e.stopPropagation(); beiTipp(e); });
   return k;
