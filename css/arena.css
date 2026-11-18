@@ -587,7 +587,7 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
   align-items: flex-start; padding-top: 6px; }
 .arena.karte-leiste .detail:not(.offen) .detail-kopf { flex: 1 1 0; min-width: 0; gap: 10px; }
 .arena.karte-leiste .detail:not(.offen) .detail-kopf .av { width: 48px; height: 48px; border-radius: 14px; }
-.arena.karte-leiste .detail:not(.offen) .detail-ueber { margin-bottom: 1px; font-size: 11px; line-height: 1.25; }
+.arena.karte-leiste .detail:not(.offen) .detail-ueber { margin-bottom: 1px; font-size: 12px; line-height: 13.75px; }
 .arena.karte-leiste .detail:not(.offen) h2 { font-size: 17px; line-height: 1.15; }
 .arena.karte-leiste .detail:not(.offen) .elo { margin-top: 1px; font-size: 12px; }
 .arena.karte-leiste .detail:not(.offen) .mini-sterne { display: none; }
@@ -596,7 +596,7 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-leiste .detail:not(.offen) .fortsetzen { flex-basis: 100%; margin-bottom: 8px; }
 .arena.karte-leiste .detail:not(.offen) .cta-platz { flex: none; margin: 0; padding: 0; background: none; }
 .arena.karte-leiste .detail:not(.offen) .spielen { width: 56px; min-height: 56px; padding: 0; justify-content: center; border-radius: 18px; }
-.arena.karte-leiste .detail:not(.offen) .spielen .sp-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.arena.karte-leiste .detail:not(.offen) .spielen .sp-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; opacity: 0; }
 /* Feinschliff R6 (B20) gilt auch in der offenen Karte von Handy B: ein besonderer Satz (Mutmacher, Erzfeind, Begruessung)
    steht in hoechstens zwei ganzen Zeilen; unter 720 px Fensterhoehe (iPhone 13 in Safari, SE) tritt er zurueck, sonst schob
    er den Spielen-Knopf unter den Rand der Karte (gemessen SE: 42 px; die Partie zeigt denselben Satz zum Start) */
