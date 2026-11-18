@@ -113,8 +113,9 @@ const ueberlauf = (seite) => seite.evaluate(() => {
   const raus = [...document.querySelectorAll('.screen *')].filter((el) => {
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) return false;
-    // Leisten zum Wischen ragen absichtlich hinaus (Momente der Analyse, Menue der Einstellungen auf dem Handy)
-    if (el.closest('.an-momente, .vl-dialog-hg, .es-nav')) return false;
+    // Leisten zum Wischen ragen absichtlich hinaus (Momente der Analyse samt kompakter Zeile auf kurzen Handys, Menue der
+    // Einstellungen auf dem Handy)
+    if (el.closest('.an-momente, .an-momente-zeile, .vl-dialog-hg, .es-nav')) return false;
     return r.right > innerWidth + 1 || r.left < -1;
   }).slice(0, 3).map((el) => el.className.baseVal ?? el.className);
   return { doc, scr, raus };
@@ -274,6 +275,9 @@ async function testeAnalyse(browser, d) {
   pruefe('Wischen nach rechts: ein Zug zurück', (await aktuellerPly(seite)) === -1);
 
   // --- Kurve antippen
+  // seit R19 "Analyse neu" stehen die Schluesselmomente ueber dem Verlauf (Flos Wunsch): erst hinscrollen, wie unten beim Finger
+  await seite.locator('.an-kurve-wrap').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await seite.waitForTimeout(300);
   const kb = await seite.locator('.an-kurve-wrap').boundingBox();
   await seite.mouse.click(kb.x + kb.width * (20 / 33), kb.y + kb.height / 2);
   pruefe('Kurve antippen: springt zu Ply 19', (await aktuellerPly(seite)) === 19, String(await aktuellerPly(seite)));
