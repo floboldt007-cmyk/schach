@@ -51,7 +51,7 @@ const seitenfehler = [];
 async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', bewegung = false } = {}) {
   const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1, hasTouch: breite < 700, isMobile: breite < 700,
     serviceWorkers: 'block', colorScheme: 'dark', reducedMotion: bewegung ? 'no-preference' : 'reduce', locale: sprache === 'de' ? 'de-DE' : 'en-GB',
-    timezoneId: 'Europe/Berlin' });
+    timezoneId: 'Europe/Berlin', permissions: ['clipboard-read', 'clipboard-write'] });
   await k.route('**/*.supabase.co/**', (r) => {
     const name = (r.request().url().match(/\/rpc\/([a-z_]+)/) || [])[1];
     const antwort = (d) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
@@ -224,6 +224,20 @@ try {
       return aus;
     }, VITRINE_NAMEN);
     pruefe(`${L} Vitrine: alle ${VITRINE_NAMEN.length} Namen brechen nur an Wortgrenzen oder weicher Trennung und passen in die Kachel`, brueche.length === 0, brueche);
+    // Kopieren (Kaltreview 9b 17.11.): wer einen Namen mit weicher Trennstelle markiert und kopiert, bekommt das Wort ohne U+00AD
+    const kopie = await s.evaluate(async (schluessel) => {
+      const { t } = await import('/js/sprache.js');
+      const b = document.querySelector('.pr-vitrine .pr-orden:not(.leer) b');
+      const SHY = String.fromCharCode(0xAD);
+      const vorher = b.textContent, name = schluessel.map((k) => t('p-karte.' + k)).find((n) => n.includes(SHY)) || '';
+      b.textContent = name;
+      const sel = getSelection(), rg = document.createRange(); rg.selectNodeContents(b); sel.removeAllRanges(); sel.addRange(rg);
+      document.execCommand('copy');
+      sel.removeAllRanges();
+      b.textContent = vorher;
+      return { mitTrennung: name.includes(SHY), ablage: await navigator.clipboard.readText(), ohne: name.split(SHY).join('') };
+    }, VITRINE_NAMEN);
+    pruefe(`${L} Vitrine: kopierter Name ohne weiche Trennstelle ("${kopie.ohne}")`, kopie.mitTrennung && kopie.ablage === kopie.ohne, kopie);
     if (breite !== 390) { await k.close(); continue; }
 
     // ---------- Figuren-Auswahl: die Figuren gross, keine Scheibe als "Logo" ----------
@@ -312,7 +326,7 @@ try {
         gegner, karte: KARTE_MOTIVE.includes('bot-fridolin'), doppelt, eigen, verweise };
     });
     pruefe('Portraets: dreissig Gegner zur Wahl', bp.n === 30, bp.n);
-    pruefe('Portraets: Fridolin (besiegt) frei, Lisa (nie gespielt) gesperrt mit Weg "Erster Sieg: <Name>" (Namen tragen teils ihren Artikel, "Besiege Der Stockfisch")', !!(bp.fri && bp.fri.frei && bp.lisa && !bp.lisa.frei && /^Erster Sieg: Lisa/.test(bp.lisa.weg)), { fri: bp.fri, lisa: bp.lisa });
+    pruefe('Portraets: Fridolin (besiegt) frei, Lisa (nie gespielt) gesperrt mit Weg "Besiegen zum Freischalten", der Untertitel wiederholt den Namen nicht (Flo 17.11.)', !!(bp.fri && bp.fri.frei && bp.lisa && !bp.lisa.frei && bp.lisa.weg === 'Besiegen zum Freischalten' && !bp.lisa.weg.includes(bp.lisa.name)), { fri: bp.fri, lisa: bp.lisa });
     pruefe('Portraets: gesperrtes Portraet laesst sich nicht setzen (Standard bleibt)', bp.gesperrtWahl === 'P', bp.gesperrtWahl);
     pruefe('Portraets: freies Portraet wird Profilbild und bleibt beim Speichern der Vitrine', bp.freiWahl === 'bot-fridolin' && bp.bleibt === 'bot-fridolin', bp);
     pruefe('Portraets: Profilbild zeichnet das Portraet aus dem festen Ordner', bp.bild);

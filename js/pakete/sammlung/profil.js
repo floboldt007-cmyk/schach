@@ -220,14 +220,14 @@ export function motivTeile(erfolge = teileErfolge(), erfinder = istErfinder()) {
   });
   return [...figuren, ...kreaturen];
 }
-// R19 Profil Ich (16.11.2026): Portraets der Gegner, frei mit dem ersten Sieg gegen den Bot; gesperrt sagt die Kachel, wen
-// man besiegen muss (kein Kauf, kein Preis)
+// R19 Profil Ich (16.11.2026): Portraets der Gegner, frei mit dem ersten Sieg gegen den Bot; gesperrt sagt die Kachel, wie
+// es frei wird, ohne den Namen darueber zu wiederholen (Flo 17.11.; kein Kauf, kein Preis)
 export function portraetTeile() {
   return BOT_PORTRAETS.map((id) => {
     const bot = botNachId(id);
     const name = bot ? bot.name : id;
     const frei = botMotivFrei('bot-' + id);
-    return { id: 'bot-' + id, bot: id, name, frei, weg: frei ? '' : S('portraet.weg', { name }) };
+    return { id: 'bot-' + id, bot: id, name, frei, weg: frei ? '' : S('portraet.weg') };
   });
 }
 export function grundTeile(erfinder = istErfinder()) {
