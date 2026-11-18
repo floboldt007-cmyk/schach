@@ -21,6 +21,7 @@ import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
 import { fremdeKarte, bannerUrl } from './visitenkarte.js';
+import { zeigeGegnerProfil, profilText } from './gegner-profil.js';
 import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
 import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
@@ -905,14 +906,25 @@ export function zeige(root, params, app) {
       const el = inhalt.querySelector('.on-' + ort);
       el.classList.toggle('mit-banner', !!banner);
       el.setAttribute('aria-label', meta ? `${name}, ${meta}` : name);
-      // Gegner: Bild, Feld info (Name, Unterzeile), Uhr; eigene Leiste: Bild, Name, Unterzeile, Uhr (Gitter aus css/partie.css)
+      // Gegner: Bild, Feld info (Name, Unterzeile), Uhr; eigene Leiste: Bild, Name, Unterzeile, Uhr (Gitter aus css/partie.css).
+      // R19 M6: ueber der Gegnerleiste liegt ein durchsichtiger Knopf, ein Tipp oeffnet sein Profil (js/ui/gegner-profil.js)
+      const profil = `<button class="on-gegner-knopf" type="button" data-online="gegner" aria-label="${esc(profilText('oeffnen', { name }))}"></button>`;
       el.innerHTML = ort === 'oben'
-        ? `${banner}<span class="av">${avatar}</span><div class="info"><div class="name"><b>${esc(name)}</b></div>${unter}</div>${uhr}`
+        ? `${banner}<span class="av">${avatar}</span><div class="info"><div class="name"><b>${esc(name)}</b></div>${unter}</div>${uhr}${profil}`
         : `${banner}<span class="av">${avatar}</span><div class="name"><b>${esc(name)}</b></div>${unter}${uhr}`;
     }
     zeichneGeschlagen();
     zeigeKopfTitel();
     tick();
+  }
+  // R19 M6: Profil des Gegners ueber der laufenden Partie (die Abfrage laeuft weiter, Zuege kommen an); ist die Karte noch
+  // nicht da, holt das Blatt sie einmal nach, ohne Antwort zeigt es den Namen aus der Leiste
+  function zeigeGegner() {
+    if (!p) return;
+    const f = andere(online.meineFarbe(p)), id = p.id;
+    const { k, name } = spielerDaten(f);
+    zeigeGegnerProfil({ karte: k, name, partie: true,
+      laden: k || !id ? null : () => karteDerPartie(id).then((d) => (d ? (f === 'w' ? d.w : d.s) : null)) });
   }
   // geschlagene Figuren je Seite und Materialvorsprung "+n" (wie zeichneGeschlagen in js/ui/partie.js)
   function zeichneGeschlagen() {
@@ -1041,6 +1053,7 @@ export function zeige(root, params, app) {
     const knopf = e.target.closest('button'); if (!knopf || weg) return;
     if (knopf.dataset.partie) { app.gehe('online', { partieId: knopf.dataset.partie }); return; }
     const a = knopf.dataset.online;
+    if (a === 'gegner') { zeigeGegner(); return; }
     if (knopf.dataset.zeit) {
       for (const z of knopf.parentNode.querySelectorAll('[data-zeit]')) z.setAttribute('aria-checked', String(z === knopf));
       return;
