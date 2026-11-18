@@ -1,13 +1,15 @@
 // Emote-Rad und Schnell-Chat. Der Transport bleibt absichtlich hinter senden(): Online kann spaeter andocken.
 import { anbieten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
-import { ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
+import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen, ladeFortschritt, endgegnerBesiegt, alleBotsBesiegt } from '../../storage.js';
 import { t } from '../../sprache.js';
 import { bereich } from '../../ui/ich.js';
 import { istErfinder } from '../../sonderstuecke.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
 import { emoteSvg, EMOTE_PREMIUM } from '../../emote-kunst.js';
 import { klang } from '../../sounds.js';
+import { WELTEN, endgegnerDerWelt, rufname } from '../../bots.js';
+import { alleStuecke } from '../funken/level.js';
 import './texte.js';
 
 const MODUL = 'emotes';
@@ -45,21 +47,43 @@ const einstellungen = () => {
 };
 const setze = (teil) => speichereModulEinstellungen(SPEICHER, { ...einstellungen(), ...teil });
 
+// ---------- Erspielen (R19, Flos Wahl Variante C vom 18.11.2026) ----------
+// Die Freigabe wird nur aus dem Spielstand berechnet und nie gespeichert. Kreatur: der Endgegner ihrer Welt, Kronli (ohne
+// Welt): alle Bots aller Welten. Sticker: ihr Funken-Level aus der Leiter (funken/level.js). Das Erfinder-Konto hat alles frei.
+const weltNr = (k) => WELTEN.find((w) => w.id === k.welt)?.nr ?? null;
+const stickerLevel = (id) => alleStuecke().find((s) => s.id === 'emote-' + id)?.level ?? null;
+function funkenLevel() {
+  const st = ladeModul('funken', {});
+  return Number.isInteger(st && st.level) ? Math.max(1, st.level) : 1;
+}
+export function kreaturFrei(id, f = ladeFortschritt()) {
+  const k = KREATUREN.find((x) => x.id === id);
+  if (!k) return false;
+  return k.welt ? endgegnerBesiegt(weltNr(k), f) : alleBotsBesiegt(f);
+}
+export function stickerFrei(id, level = funkenLevel()) {
+  const ab = stickerLevel(id);
+  return ab != null && level >= ab;
+}
+export const freieSticker = (erfinder = istErfinder()) => EMOTE_PREMIUM.filter((id) => erfinder || stickerFrei(id));
+
 // ---------- Kreaturen (js/kreaturen-kunst.js) ----------
 // Vier Emotes des Rads zeigt die gewaehlte Kreatur statt des Strichsymbols; Id, Text und Bot-Antwort bleiben gleich.
-// Erst im Labor: nur das Erfinder-Konto waehlt und sieht sie (Flo 30.10.2026); spaeter schaltet die Welt sie frei.
 // Die Verbeugung gehoert zu Respekt (Flo 08.11.2026: Respekt, Gut gespielt und Fehler sagen drei verschiedene Dinge)
 const KREATUR_EMOTES = Object.freeze({ hallo: 'winken', staunen: 'staunen', denken: 'denken', respekt: 'verbeugen' });
-const kreaturAktiv = (e = einstellungen(), erfinder = istErfinder()) => (erfinder && e.kreatur ? e.kreatur : null);
-// Eintraege des Rads: mit Kreatur stehen ihre vier Emotes vorn (eine Reihe), die Strichsymbole danach
-function radEintraege(kreatur = null) {
+const kreaturAktiv = (e = einstellungen(), darf = istErfinder() || kreaturFrei(e.kreatur)) => (darf && e.kreatur ? e.kreatur : null);
+// Eintraege des Rads: mit Kreatur stehen ihre vier Emotes vorn (eine Reihe), die Strichsymbole danach, am Ende die
+// freigespielten Sticker (extra: Ids aus EMOTE_PREMIUM)
+function radEintraege(kreatur = null, extra = []) {
   const eintrag = ([id]) => {
     const art = kreatur && KREATUR_EMOTES[id];
     // ohne Kreatur der bunte, bewegte Sticker (js/emote-kunst.js, Flo 01.11.2026), das Strichsymbol nur als Rueckfall
     return { id, schluessel: 'emote.' + id, text: T('emote.' + id), svg: art ? kreaturSvg(kreatur, art) : (emoteSvg(id) || icon(id)), kreatur: !!art };
   };
   const alle = EMOTES.map(eintrag);
-  return kreatur ? [...alle.filter((e) => e.kreatur).sort((a, b) => Object.keys(KREATUR_EMOTES).indexOf(a.id) - Object.keys(KREATUR_EMOTES).indexOf(b.id)), ...alle.filter((e) => !e.kreatur)] : alle;
+  const sticker = extra.map((id) => ({ id, schluessel: 'emote.' + id, text: T('emote.' + id), svg: emoteSvg(id), kreatur: false }));
+  const grund = kreatur ? [...alle.filter((e) => e.kreatur).sort((a, b) => Object.keys(KREATUR_EMOTES).indexOf(a.id) - Object.keys(KREATUR_EMOTES).indexOf(b.id)), ...alle.filter((e) => !e.kreatur)] : alle;
+  return [...grund, ...sticker];
 }
 
 // ---------- Takt (rein, ohne DOM, in Node testbar) ----------
@@ -171,6 +195,7 @@ function popup(knopf, art, eintraege, waehlen) {
 const ARTEN = Object.freeze({
   'emote.daumen': 'lob', 'emote.applaus': 'lob', 'emote.staunen': 'staunen', 'emote.denken': 'denken',
   'emote.respekt': 'lob', 'emote.hallo': 'gruss', 'emote.gut': 'lob', 'emote.uff': 'missgeschick',
+  'emote.krone': 'lob', 'emote.feuer': 'lob', 'emote.herz': 'lob', 'emote.springer': 'lob', 'emote.blitz': 'staunen', 'emote.diamant': 'lob',
   'chat.0': 'glueck', 'chat.1': 'lob', 'chat.2': 'denken', 'chat.3': 'lob', 'chat.4': 'dank', 'chat.5': 'nochmal',
 });
 const ANTWORT_ART = Object.freeze({
@@ -280,7 +305,7 @@ function aktionsKnopf(k, art) {
     const vorher = auffrischen();
     if (!vorher.frei) { gesperrt(vorher); return; }
     const daten = istEmote
-      ? radEintraege(kreaturAktiv())
+      ? radEintraege(kreaturAktiv(), freieSticker())
       : Array.from({ length: 6 }, (_, i) => ({ id: String(i), schluessel: 'chat.' + i, text: T('chat.' + i) }));
     popup(b, art, daten, (e) => {
       // erneut pruefen: waehrend das Fenster offen war, kann der Gegner gezogen oder die Partie geendet haben
@@ -317,27 +342,34 @@ function gruppe() {
 }
 
 // Sammlung, Bereich Emotes (Flo 01.11.2026: "die Kreaturen gehoeren zu den Emotes"): oben die acht Sticker, darunter die
-// Kreaturen des Labors, nur fuer den Erfinder (andere sehen sie erst, wenn Welten sie freischalten). Gewaehlt wird die Kreatur
-// nur hier (Flo 31.10.2026: nichts doppelt in den Einstellungen); ein zweiter Tipp auf die ausgeruestete Kreatur nimmt sie
-// ab, dann zeigt das Rad wieder die Sticker.
+// erspielbaren Sticker und die Kreaturen; Gesperrtes nennt seinen Weg. Gewaehlt wird die Kreatur nur hier (Flo 31.10.2026:
+// nichts doppelt in den Einstellungen); ein zweiter Tipp auf die ausgeruestete Kreatur nimmt sie ab, dann zeigt das Rad
+// wieder die Sticker.
+function kreaturWeg(k) {
+  return k.welt ? T('weg.endgegner', { name: rufname(endgegnerDerWelt(weltNr(k))) }) : T('weg.alleWelten');
+}
 export function teileEmotes(erfinder = istErfinder()) {
   const sticker = EMOTES.map(([id]) => ({ id: 'emote-' + id, name: T('emote.' + id), frei: true, zeile: '', gruppe: T('gruppe.sticker'),
     bild: emoteSvg(id) || icon(id) }));
-  // Premium-Sticker (R19, Flo 15.11.2026): die acht oben bleiben gratis wie heute; die neuen sind gesperrt ("Bald im Shop"),
-  // nur das Labor des Erfinders hat sie frei (Freischalt-Regeln unveraendert). Das Rad zeigt weiter nur die acht.
-  const premium = EMOTE_PREMIUM.map((id) => ({ id: 'emote-' + id, name: T('emote.' + id), frei: erfinder, labor: erfinder,
-    zeile: erfinder ? '' : T('bald'), gruppe: T('gruppe.premium'), bild: emoteSvg(id) }));
-  if (!erfinder) return [...sticker, ...premium];
-  const aktiv = kreaturAktiv(einstellungen(), true);
-  return [...sticker, ...premium, ...KREATUREN.map((k) => ({
-    id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true, gruppe: T('kreaturen'),
-    wahl: () => setze({ kreatur: k.id }), abwahl: () => setze({ kreatur: null }),
-    zeile: k.welt ? t(`bots.welten.${k.welt}.kurz`) : T('maskottchen'), bild: kreaturSvg(k.id, 'normal'),
-  }))];
+  const level = funkenLevel();
+  const premium = EMOTE_PREMIUM.map((id) => {
+    const frei = erfinder || stickerFrei(id, level);
+    return { id: 'emote-' + id, name: T('emote.' + id), frei, labor: erfinder, zeile: frei ? '' : T('weg.level', { level: stickerLevel(id) }),
+      gruppe: T('gruppe.premium'), bild: emoteSvg(id) };
+  });
+  const f = ladeFortschritt();
+  const gewaehlt = einstellungen().kreatur;
+  return [...sticker, ...premium, ...KREATUREN.map((k) => {
+    const frei = erfinder || kreaturFrei(k.id, f);
+    return {
+      id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei, an: frei && gewaehlt === k.id, labor: erfinder, gruppe: T('kreaturen'),
+      ...(frei ? { wahl: () => setze({ kreatur: k.id }), abwahl: () => setze({ kreatur: null }) } : {}),
+      zeile: !frei ? kreaturWeg(k) : k.welt ? t(`bots.welten.${k.welt}.kurz`) : T('maskottchen'), bild: kreaturSvg(k.id, 'normal'),
+    };
+  })];
 }
 function emoteBereich() {
-  const erfinder = istErfinder();
-  return bereich({ id: 'emotes', name: T('emotes'), teile: teileEmotes(erfinder), hinweis: erfinder ? T('kreaturenHinweis') : '' });
+  return bereich({ id: 'emotes', name: T('emotes'), teile: teileEmotes(), hinweis: T('kreaturenHinweis') });
 }
 
 function ladeCss() {
@@ -350,7 +382,7 @@ anbieten('partie:aktionen', (k) => aktionsKnopf(k, 'emotes'), { paket: MODUL, re
 anbieten('partie:aktionen', (k) => aktionsKnopf(k, 'chat'), { paket: MODUL, reihenfolge: 21 });
 anbieten('partie:spieler-leiste', ({ buehne }) => { if (!einstellungen().an) return null; const e = document.createElement('span'); e.className = 'em-live sr'; e.setAttribute('aria-live', 'polite'); buehne.el.append(e); return e; }, { paket: MODUL, reihenfolge: 80 });
 anbieten('einstellungen:gruppen', () => gruppe(), { paket: MODUL, reihenfolge: 40 });
-// Sammlung (Reiter Ich): die Emotes des Rads, alle frei (weitere kommen erst mit dem Emote-Rad, funken/level.js)
+// Sammlung (Reiter Ich): die Emotes des Rads, die erspielbaren Sticker und die Kreaturen
 anbieten('sammlung:bereich', () => emoteBereich(), { paket: MODUL, reihenfolge: 20 });
 
 export {

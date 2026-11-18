@@ -1,4 +1,4 @@
-.em-popup { position: absolute; z-index: 45; left: 50%; bottom: calc(72px + env(safe-area-inset-bottom)); width: min(400px, calc(100% - 20px)); max-height: min(430px, calc(100% - 100px)); overflow: auto; transform: translateX(-50%); padding: 12px; border: 1px solid var(--linie); border-radius: var(--r-karte); background: var(--flaeche); color: var(--text); box-shadow: var(--s3); }
+.em-popup { position: absolute; z-index: 45; left: 50%; bottom: calc(72px + env(safe-area-inset-bottom)); width: min(400px, calc(100% - 20px)); max-height: min(470px, calc(100% - 100px)); overflow: auto; transform: translateX(-50%); padding: 12px; border: 1px solid var(--linie); border-radius: var(--r-karte); background: var(--flaeche); color: var(--text); box-shadow: var(--s3); }
 .em-kopf { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .em-zu { width: var(--tap); height: var(--tap); border: 0; border-radius: var(--r-knopf); background: var(--flaeche-2); font-size: 25px; }
 .em-auswahl { display: grid; grid-template-columns: 1fr; gap: 8px; }

@@ -1,10 +1,9 @@
 // Mehr Emotes, Finisher und Klaenge (Feinschliff R19, Flo 15.11.2026: "wenig gratis, das Gesperrte sieht krasser aus";
-// Leitlinie Punkt 6 "Erspielen gegen Kaufen"). Freischalt-Regeln unveraendert: gratis bleibt genau die heutige
-// Grundausstattung (8 Sticker im Rad, Klangsets Holz und Arcade), alles Neue ist fuer jedes Konto ohne Erfinder-Titel
-// gesperrt und fuer den Erfinder wie heute im Labor nutzbar.
+// Leitlinie Punkt 6 "Erspielen gegen Kaufen"). Gratis bleibt genau die Grundausstattung (8 Sticker im Rad, Klangsets Holz
+// und Arcade); wie Neues frei wird, prueft tests/r19-emotes-erspielbar.test.mjs (Flos Wahl Variante C vom 18.11.2026).
 //   Neu: 6 Premium-Sticker (js/emote-kunst.js EMOTE_PREMIUM), 3 Finisher (hoechstens 1400 ms, ruhig bei weniger
 //   Bewegung), 2 eigene Klangsets (werkzeuge/klang-sets-r19.mjs, eigene Synthese, nur bei Bedarf im Cache: sw.js laedt
-//   Labor-Klaenge nicht vor). Shop A zeigt unter den fuenf Plaetzen Regale "Mehr Emotes", "Mehr Finisher", "Mehr Klaenge"
+//   Labor-Klaenge nicht vor). Shop A zeigt unter den fuenf Plaetzen die Regale "Mehr Finisher" und "Mehr Klaenge"
 //   (assets/shop/auslage.json "regale"), jede Karte mit Schloss und "Bald", Vorschau zum Ansehen und Anhoeren, kein Kauf.
 // iPhone 13, iPhone SE, iPad hoch und quer, PC, hell und dunkel, dazu weniger Bewegung. Netz nur simuliert.
 //
@@ -57,16 +56,16 @@ const nurTransform = [...emoteCss.matchAll(/@keyframes (ep-[a-z-]+)\s*\{([\s\S]*
 pruefe('Emotes: Premium-Bewegung nur ueber transform und opacity (keine Ruckler am Handy)', nurTransform.length === 0, nurTransform);
 const ohne = emotes.teileEmotes ? emotes.teileEmotes(false) : [];
 const DE_E = emoteTexte.DE || {}, EN_E = emoteTexte.EN || {};
-pruefe('Sammlung Emotes ohne Erfinder: 8 Sticker frei wie heute, dahinter 6 Premium gesperrt mit "Bald im Shop"',
+pruefe('Sammlung Emotes ohne Erfinder: 8 Sticker frei wie heute, dahinter 6 Premium gesperrt mit ihrem Funken-Level',
   // die acht in der Reihenfolge des Rads (EMOTES in emotes/index.js), darum als Menge verglichen
-  ohne.length === 14 && ohne.slice(0, 8).every((x) => x.frei) && ohne.slice(0, 8).map((x) => x.id).sort().join() === GRATIS_STICKER.map((id) => 'emote-' + id).sort().join()
-  && ohne.slice(8).every((x, i) => !x.frei && x.id === 'emote-' + PREMIUM[i] && x.zeile === DE_E.bald && x.gruppe === DE_E['gruppe.premium'] && /emote-premium/.test(x.bild)),
+  ohne.filter((x) => /^emote-/.test(x.id)).length === 14 && ohne.slice(0, 8).every((x) => x.frei) && ohne.slice(0, 8).map((x) => x.id).sort().join() === GRATIS_STICKER.map((id) => 'emote-' + id).sort().join()
+  && ohne.slice(8, 14).every((x, i) => !x.frei && x.id === 'emote-' + PREMIUM[i] && x.zeile === `Ab Level ${12 + i * 6}` && x.gruppe === DE_E['gruppe.premium'] && /emote-premium/.test(x.bild)),
   ohne.map((x) => `${x.id}:${x.frei}:${x.zeile}`));
 const mit = emotes.teileEmotes ? emotes.teileEmotes(true) : [];
 pruefe('Sammlung Emotes mit Erfinder: Premium im Labor frei', mit.filter((x) => /^emote-/.test(x.id)).length === 14
   && mit.filter((x) => PREMIUM.some((p) => x.id === 'emote-' + p)).every((x) => x.frei && x.labor), mit.map((x) => `${x.id}:${x.frei}`));
-pruefe('Emotes: Texte DE und EN fuer jeden Premium-Sticker, Gruppe und "Bald im Shop"',
-  PREMIUM.every((id) => DE_E['emote.' + id] && EN_E['emote.' + id]) && DE_E.bald === 'Bald im Shop' && EN_E.bald && DE_E['gruppe.premium'] && EN_E['gruppe.premium']);
+pruefe('Emotes: Texte DE und EN fuer jeden Premium-Sticker und die Gruppe',
+  PREMIUM.every((id) => DE_E['emote.' + id] && EN_E['emote.' + id]) && DE_E['gruppe.premium'] && EN_E['gruppe.premium']);
 
 // ---------- Finisher ----------
 const finisher = await leer(() => import('../js/pakete/finisher/index.js'));
@@ -151,10 +150,11 @@ pruefe('Texte DE und EN: Klangset-Namen und Regal-Titel', NEU_KLANG.every((id) =
 const AUSLAGE = JSON.parse(lies('assets/shop/auslage.json'));
 const R = AUSLAGE.regale || {};
 const platz = (art) => AUSLAGE.plaetze.find((p) => p.art === art)?.id;
-pruefe('Auslage: drei Regale (emote, finisher, klang), nichts doppelt zu den fuenf Plaetzen, kein Preis, Signatur nie',
-  ['emote', 'finisher', 'klang'].every((a) => Array.isArray(R[a]) && R[a].length >= 2 && !R[a].some((x) => x.id === platz(a)))
+const REGALE = ['finisher', 'klang'];
+pruefe('Auslage: zwei Regale (finisher, klang), das Emote-Regal ist leer, nichts doppelt zu den fuenf Plaetzen, kein Preis, Signatur nie',
+  REGALE.every((a) => Array.isArray(R[a]) && R[a].length >= 2 && !R[a].some((x) => x.id === platz(a)))
   && !JSON.stringify(R).match(/preis|cent|€|signatur/i)
-  && JSON.stringify(R.emote.map((x) => x.id)) === JSON.stringify(PREMIUM)
+  && Array.isArray(R.emote) && R.emote.length === 0
   && NEU_FINISHER.every((id) => R.finisher.some((x) => x.id === id)) && NEU_KLANG.every((id) => R.klang.some((x) => x.id === id)), R);
 
 // ---------- Browser: Shop-Regale ----------
@@ -223,10 +223,8 @@ async function vorschau(s, art) {
   await warte(500);
   const v = await s.evaluate(() => {
     const ort = document.querySelector('.sheet-karte .shf-vorschau');
-    const sticker = ort?.querySelector('svg.emote-premium');
-    const bewegt = sticker ? [...sticker.querySelectorAll('*')].some((e) => getComputedStyle(e).animationName !== 'none') : null;
     return { knoepfe: [...document.querySelectorAll('.sheet-karte .sheet-knoepfe button')].map((b) => b.textContent.trim()),
-      premium: !!sticker, bewegt, anhoeren: !!ort?.querySelector('.shf-anhoeren'), still: !!ort?.querySelector('.shf-gross.shf-still'), bild: !!ort?.querySelector('svg') };
+      anhoeren: !!ort?.querySelector('.shf-anhoeren'), still: !!ort?.querySelector('.shf-gross.shf-still'), bild: !!ort?.querySelector('svg') };
   });
   if (v.anhoeren) await s.locator('.sheet-karte .shf-anhoeren').click();
   await s.locator('.sheet-karte .sheet-knoepfe button').first().click();
@@ -237,7 +235,7 @@ async function vorschau(s, art) {
 
 const IPHONE = ['iPhone 13', 390, 844], SE = ['iPhone SE', 375, 667], IPAD = ['iPad', 820, 1180], IPAD_QUER = ['iPad quer', 1180, 820], PC = ['PC', 1280, 720];
 const seitenfehler = [];
-const TITEL = { emote: 'Mehr Emotes', finisher: 'Mehr Finisher', klang: 'Mehr Klänge' };
+const TITEL = { finisher: 'Mehr Finisher', klang: 'Mehr Klänge' };
 async function lauf(browser, [geraet, w, h], { farbe = 'hell', ruhig = false, gast = false } = {}) {
   const gruppe = `${geraet}${farbe === 'dunkel' ? ' dunkel' : ''}${ruhig ? ' ruhig' : ''}${gast ? ' gast' : ''}`;
   const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
@@ -269,18 +267,15 @@ async function lauf(browser, [geraet, w, h], { farbe = 'hell', ruhig = false, ga
       };
     });
     pruefe(`${gruppe}: die fuenf Plaetze bleiben`, bild.fuenf === 5, bild.fuenf);
-    pruefe(`${gruppe}: drei Regale in fester Reihenfolge mit Titel`, JSON.stringify(bild.arten) === '["emote","finisher","klang"]'
-      && bild.titel.join() === [TITEL.emote, TITEL.finisher, TITEL.klang].join(), bild.titel);
-    pruefe(`${gruppe}: Regale zeigen die Liste aus auslage.json`, ['emote', 'finisher', 'klang'].every((a) => JSON.stringify(bild.ids[a]) === JSON.stringify(R[a].map((x) => x.id))), bild.ids);
+    pruefe(`${gruppe}: zwei Regale in fester Reihenfolge mit Titel, kein leeres Emote-Regal`, JSON.stringify(bild.arten) === '["finisher","klang"]'
+      && bild.titel.join() === [TITEL.finisher, TITEL.klang].join(), bild.titel);
+    pruefe(`${gruppe}: Regale zeigen die Liste aus auslage.json`, REGALE.every((a) => JSON.stringify(bild.ids[a]) === JSON.stringify(R[a].map((x) => x.id))), bild.ids);
     pruefe(`${gruppe}: jede Regal-Karte mit Bild, Schloss und "Bald", kein Preis (auch nicht bei Server-Preis)`,
       bild.preise.length > 0 && bild.preise.every((x) => x === 'Bald') && bild.schloss && bild.mitBild && bild.euro === 0 && bild.label, bild.preise);
     pruefe(`${gruppe}: kein Ueberlauf der Seite, Regale passen in die Breite`, !bild.seiteUeber && !bild.regalUeber, bild);
     pruefe(`${gruppe}: Regal-Karten mindestens 44 px`, bild.klein === 0, bild.klein);
     if (gast) { await k.close(); return; }
     const vor = z.aufrufe.length;
-    const e = await vorschau(s, 'emote');
-    pruefe(`${gruppe}: Emote-Vorschau zeigt den Premium-Sticker gross${ruhig ? ', still' : ', bewegt'}, nur "Schließen"`,
-      e.premium && e.bewegt === !ruhig && JSON.stringify(e.knoepfe) === '["Schließen"]', e);
     const f = await vorschau(s, 'finisher');
     pruefe(`${gruppe}: Finisher-Vorschau als Bild, nur "Schließen"`, f.still && f.bild && JSON.stringify(f.knoepfe) === '["Schließen"]', f);
     const kl = await vorschau(s, 'klang');

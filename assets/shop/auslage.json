@@ -1,6 +1,6 @@
 {
   "stand": "2026-11-16",
-  "hinweis": "Shop A ist der Standard (?shopStil=alt zeigt den alten Shop): je Art genau ein Platz, Reihenfolge fest (brett, figur, klang, emote, finisher). Tauschen = nur die id einer Zeile aendern. Erlaubt: brett = Brett aus vorrat.json oder Edition aus KATALOG (js/pakete/sammlung/shop.js); figur = Figurensatz aus vorrat.json; klang = Klangset aus js/sounds.js (PAKETE_KLANG, PAKETE_LABOR); emote = Sticker aus js/emote-kunst.js; finisher = krone, welle, koenig, kronensturz. Unbekannt oder fehlend: der Platz zeigt Folgt. seltenheit nur fuer klang, emote, finisher (Brett und Figur bringen ihre eigene mit). Keine Preise: solange es keinen Kauf-Weg gibt, zeigt jeder belegte Platz Schloss und Bald, auch wenn der Server einen Preis meldet. Regale (R19): unter den fuenf Plaetzen je eine Liste fuer emote (Premium-Sticker aus js/emote-kunst.js EMOTE_PREMIUM), finisher (krone, welle, koenig, kronensturz, blitzschlag, goldregen, schockwelle) und klang (Klangset aus PAKETE_LABOR); das Stueck des Platzes zeigt das Regal nicht noch einmal; Reihenfolge = Liste.",
+  "hinweis": "Shop A ist der Standard (?shopStil=alt zeigt den alten Shop): je Art genau ein Platz, Reihenfolge fest (brett, figur, klang, emote, finisher). Tauschen = nur die id einer Zeile aendern. Erlaubt: brett = Brett aus vorrat.json oder Edition aus KATALOG (js/pakete/sammlung/shop.js); figur = Figurensatz aus vorrat.json; klang = Klangset aus js/sounds.js (PAKETE_KLANG, PAKETE_LABOR); emote = Sticker aus js/emote-kunst.js; finisher = krone, welle, koenig, kronensturz. Unbekannt oder fehlend: der Platz zeigt Folgt. seltenheit nur fuer klang, emote, finisher (Brett und Figur bringen ihre eigene mit). Keine Preise: solange es keinen Kauf-Weg gibt, zeigt jeder belegte Platz Schloss und Bald, auch wenn der Server einen Preis meldet. Regale (R19): unter den fuenf Plaetzen je eine Liste fuer emote, finisher (kronensturz, blitzschlag, goldregen, schockwelle) und klang (Klangset aus PAKETE_LABOR); das Stueck des Platzes zeigt das Regal nicht noch einmal; Reihenfolge = Liste; eine leere Liste laesst das Regal wegfallen. Erspielbares gehoert nicht ins Regal (Flo 18.11.2026): die sechs Sticker aus EMOTE_PREMIUM (Funken-Level) und die Finisher krone, welle, koenig (Welt-Endgegner).",
   "plaetze": [
     { "art": "brett", "id": "brett-mitternacht" },
     { "art": "figur", "id": "sternwarte" },
@@ -9,21 +9,11 @@
     { "art": "finisher", "id": "kronensturz", "seltenheit": "Episch" }
   ],
   "regale": {
-    "emote": [
-      { "id": "krone", "seltenheit": "Episch" },
-      { "id": "feuer", "seltenheit": "Episch" },
-      { "id": "herz", "seltenheit": "Episch" },
-      { "id": "springer", "seltenheit": "Episch" },
-      { "id": "blitz", "seltenheit": "Episch" },
-      { "id": "diamant", "seltenheit": "Episch" }
-    ],
+    "emote": [],
     "finisher": [
       { "id": "blitzschlag", "seltenheit": "Exklusiv" },
       { "id": "goldregen", "seltenheit": "Exklusiv" },
-      { "id": "schockwelle", "seltenheit": "Exklusiv" },
-      { "id": "krone", "seltenheit": "Selten" },
-      { "id": "welle", "seltenheit": "Selten" },
-      { "id": "koenig", "seltenheit": "Selten" }
+      { "id": "schockwelle", "seltenheit": "Exklusiv" }
     ],
     "klang": [
       { "id": "polarlicht", "seltenheit": "Episch" },

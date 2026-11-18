@@ -553,8 +553,11 @@ async function erfinderTeil(browser) {
   await p.s.evaluate(() => window.__app.gehe('ich', { bereich: 'finisher' }));
   await p.s.waitForSelector('.sa-screen', { timeout: 15000 }).catch(() => {});
   await warte(500);
-  // Flo 01.11.2026: "Finisher ins Labor, nur ich soll die sehen, die kommen in den Shop"
-  pruefe('Ohne Sonderstücke: kein Finisher-Bereich (Labor, später Shop)', await p.s.locator('.sa-bereich[data-bereich="finisher"], .sa-platz[data-bereich="finisher"]').count() === 0);
+  // R19, Variante C: den Bereich sehen alle, jeder Finisher nennt seinen Weg; die Signatur bleibt ohne Sonderstueck unsichtbar
+  pruefe('Ohne Sonderstücke: Finisher-Bereich mit sieben gesperrten Stücken, ohne Schild Labor', await p.s.evaluate(() => {
+    const t = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')];
+    return t.length === 7 && t.every((x) => x.dataset.zustand === 'zu' && !x.querySelector('.sa-labor'));
+  }));
   await p.k.close();
 }
 
@@ -787,8 +790,8 @@ async function browserTeil() {
       await s.waitForSelector('.sa-screen', { timeout: 15000 });
       await warte(700);
       const bereiche = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich')].map((x) => x.dataset.bereich).join());
-      // ohne Erfinder-Konto keine Finisher (Labor, Flo 01.11.2026)
-      pruefe(`${name}: acht Bereiche (Emotes, Titel, Banner, Rahmen, Bretter, Klänge, Erfolge, Shop), keine Finisher`, bereiche === 'emotes,titel,banner,rahmen,bretter,klaenge,erfolge,shop', bereiche);
+      // Finisher sehen seit R19 alle (Variante C, gesperrte Stuecke nennen ihren Weg)
+      pruefe(`${name}: neun Bereiche (Finisher, Emotes, Titel, Banner, Rahmen, Bretter, Klänge, Erfolge, Shop)`, bereiche === 'finisher,emotes,titel,banner,rahmen,bretter,klaenge,erfolge,shop', bereiche);
       // R4a (Kritik 09.11., pc-ich.jpg): am PC war die Liste "So sehen dich andere" 704 px, die Profilkarte 884 px breit;
       // eine leere Vitrine (neuer Spieler) war drei grosse Kaesten; die Banner-Vorschau zeigte nur den leeren Teil des Banners
       const ich = await s.evaluate(() => {

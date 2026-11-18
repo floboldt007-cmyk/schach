@@ -10,6 +10,7 @@ export const DE = {
   signatur: 'Signatur', einmalig: 'Erfinder · Nr. 0',
   an: 'Finisher nach dem Matt', anText: 'Spielt kurz ab, wenn du einen Bot mattsetzt.',
   wahlHinweis: 'Welchen Finisher du zeigst, wählst du in der Sammlung.',
+  'weg.endgegner': 'Besiege {name}', bald: 'Bald im Shop',
 };
 export const EN = {
   titel: 'Finishers', erklaerung: 'Your short finale when you checkmate a bot.', aus: 'Off',
@@ -20,6 +21,7 @@ export const EN = {
   signatur: 'Signature', einmalig: 'Creator · No. 0',
   an: 'Finisher after checkmate', anText: 'Plays briefly when you checkmate a bot.',
   wahlHinweis: 'Pick which finisher to show in the collection.',
+  'weg.endgegner': 'Beat {name}', bald: 'Soon in the shop',
 };
 
 registriereTexte('p-finisher', { de: DE, en: EN });

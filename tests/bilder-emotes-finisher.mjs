@@ -122,13 +122,13 @@ try {
         await oeffneShop(s);
         if (variante === 'b') await s.addStyleTag({ content: VARIANTE_B });
         const regale = await s.evaluate(() => [...document.querySelectorAll('.sa-blatt .shf-regal')].map((r) => r.dataset.art).join());
-        pruefe(`${gruppe}: drei Regale`, regale === 'emote,finisher,klang', regale);
-        await s.locator('.sa-blatt .shf-regal[data-art="emote"]').scrollIntoViewIfNeeded();
-        await s.evaluate(() => document.querySelector('.sa-blatt .shf-regal[data-art="emote"]')?.scrollIntoView({ block: 'start' }));
+        pruefe(`${gruppe}: zwei Regale`, regale === 'finisher,klang', regale);
+        await s.locator('.sa-blatt .shf-regal[data-art="finisher"]').scrollIntoViewIfNeeded();
+        await s.evaluate(() => document.querySelector('.sa-blatt .shf-regal[data-art="finisher"]')?.scrollIntoView({ block: 'start' }));
         await warte(500);
         await bild('regale');
         if (variante === 'a') {
-          for (const art of ['emote', 'finisher', 'klang']) {
+          for (const art of ['finisher', 'klang']) {
             const karte = s.locator(`.sa-blatt .shf-regal[data-art="${art}"] .shf-rk`).first();
             await karte.scrollIntoViewIfNeeded();
             await karte.click();
