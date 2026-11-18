@@ -6,7 +6,7 @@ import { t } from '../../sprache.js';
 import { bereich } from '../../ui/ich.js';
 import { istErfinder } from '../../sonderstuecke.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
-import { emoteSvg } from '../../emote-kunst.js';
+import { emoteSvg, EMOTE_PREMIUM } from '../../emote-kunst.js';
 import { klang } from '../../sounds.js';
 import './texte.js';
 
@@ -238,11 +238,13 @@ function grundText(z, bot) {
 let knopfNr = 0;
 // Flo 31.10.2026: "Emotes und Schnellchat muessen eigentlich nicht gegen die Bots freigeschaltet sein. Das ist eigentlich nur
 // fuers Online gedacht." Gegen Bots (und zu zweit) keine Knoepfe; eine Online-Partie bekommt sie mit modus 'online'.
+// Die Online-Partie, die in js/ui/partie.js laeuft, ist der KI-Ersatz der Gegnersuche (buehne.ki, js/ui/ki-ersatz.js); ihr
+// modus bleibt 'normal' (js/storage.js MODI kennt kein 'online'), darum zaehlt dort buehne.ki (Kaltreview 6b 17.11.2026).
 // Nur die Tests (?test&emotes) zeigen sie weiter in der Bot-Partie, damit Rad, Chat und Bot-Antwort geprueft bleiben.
 const imTestGegenBots = () => typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '') && /[?&]emotes\b/.test(location.search || '');
 function aktionsKnopf(k, art) {
   if (!einstellungen().an) return null;
-  if (k.modus !== 'online' && !imTestGegenBots()) return null;
+  if (k.modus !== 'online' && !(k.buehne && k.buehne.ki === true) && !imTestGegenBots()) return null;
   const { buehne, bot } = k;
   const istEmote = art === 'emotes';
   const b = document.createElement('button'); b.type = 'button'; b.className = 'knopf em-aktion';
@@ -321,9 +323,13 @@ function gruppe() {
 export function teileEmotes(erfinder = istErfinder()) {
   const sticker = EMOTES.map(([id]) => ({ id: 'emote-' + id, name: T('emote.' + id), frei: true, zeile: '', gruppe: T('gruppe.sticker'),
     bild: emoteSvg(id) || icon(id) }));
-  if (!erfinder) return sticker;
+  // Premium-Sticker (R19, Flo 15.11.2026): die acht oben bleiben gratis wie heute; die neuen sind gesperrt ("Bald im Shop"),
+  // nur das Labor des Erfinders hat sie frei (Freischalt-Regeln unveraendert). Das Rad zeigt weiter nur die acht.
+  const premium = EMOTE_PREMIUM.map((id) => ({ id: 'emote-' + id, name: T('emote.' + id), frei: erfinder, labor: erfinder,
+    zeile: erfinder ? '' : T('bald'), gruppe: T('gruppe.premium'), bild: emoteSvg(id) }));
+  if (!erfinder) return [...sticker, ...premium];
   const aktiv = kreaturAktiv(einstellungen(), true);
-  return [...sticker, ...KREATUREN.map((k) => ({
+  return [...sticker, ...premium, ...KREATUREN.map((k) => ({
     id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true, gruppe: T('kreaturen'),
     wahl: () => setze({ kreatur: k.id }), abwahl: () => setze({ kreatur: null }),
     zeile: k.welt ? t(`bots.welten.${k.welt}.kurz`) : T('maskottchen'), bild: kreaturSvg(k.id, 'normal'),

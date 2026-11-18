@@ -77,10 +77,11 @@ export function teileBretter(e = ladeEinstellungen(), app = null) {
 }
 
 // Figurensaetze: Klassisch fuer alle, Blaupause mit Sonderstueck, die Saetze des Labors fuer den Erfinder. Bild: weisser
-// Springer und schwarzer Koenig des Satzes auf einer Scheibe
+// Springer, schwarze Dame und weisser Koenig des Satzes gross nebeneinander (R19 Profil Ich, Flo 15.11.2026: "das Logo ist
+// zu gross, man sieht die Figuren nicht"; vorher zwei kleine Figuren auf einer Scheibe)
 const figurenBild = (satz) => {
   const pfad = (f) => new URL(`../../../assets/pieces/${satz === 'cburnett' ? '' : satz + '/'}${f}.svg`, import.meta.url).href;
-  return `<span class="sk-figuren" data-satz="${satz}"><img src="${pfad('wN')}" alt=""><img src="${pfad('bK')}" alt=""></span>`;
+  return `<span class="sk-figuren" data-satz="${satz}">${['wN', 'bQ', 'wK'].map((f) => `<img src="${pfad(f)}" alt="">`).join('')}</span>`;
 };
 export function teileFiguren(e = ladeEinstellungen(), app = null) {
   const an = figurenSatz(e);

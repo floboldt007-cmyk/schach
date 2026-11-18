@@ -311,6 +311,10 @@ declare
   b jsonb;
 begin
   if not exists (select 1 from public.liga_gruppen x where not x.abgerechnet and x.woche < heute) then
+    -- Saison (saison-schema.sql, falls eingespielt): auch ohne offene Woche kann eine Saison zu Ende sein
+    if pg_catalog.to_regprocedure('public.saison_abrechnen()') is not null then
+      perform public.saison_abrechnen();
+    end if;
     return;
   end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('liga-abrechnen'));
@@ -345,6 +349,10 @@ begin
     end loop;
     update public.liga_gruppen x set abgerechnet = true where x.id = g.id;
   end loop;
+  -- Saison nach der Abrechnung ihrer letzten Woche und vor jeder Gruppe der neuen Saison (saison-schema.sql)
+  if pg_catalog.to_regprocedure('public.saison_abrechnen()') is not null then
+    perform public.saison_abrechnen();
+  end if;
   -- einmal je neuer Woche: Wochen ueber 52 Wochen zurueck loeschen (Aufbewahrung oben)
   perform public.liga_alte_wochen_loeschen();
 end;

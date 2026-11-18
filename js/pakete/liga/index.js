@@ -4,13 +4,13 @@ import { hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { BOTS, botNachId } from '../../bots.js';
 import { ladeModul, speichereModul, ladePartie, wertet, MODUL_BUDGET, eigeneZuege, BESTWERT_MIN_ZUEGE } from '../../storage.js';
-import { registriereIcon } from '../../ui/icons.js';
 import './texte.js';
 import {
   normalisiereStand, beendeSaisonLiga, buchePartie, bucheGenauigkeit, belegFuer, imBudget, STUFEN,
 } from './wertung.js';
-import { verlaufKarte, botBilanz, abrechnungsZeile } from './ansicht.js';
+import { botBilanz, abrechnungsZeile } from './ansicht.js';
 import { reiterGruppe, huelleGruppe } from './gruppe.js';
+import { reiterWelt, huelleWelt } from './welt.js';
 import { protokolliere } from '../../protokoll.js';
 
 const MODUL = 'liga';
@@ -128,14 +128,26 @@ if (typeof document !== 'undefined') {
     css.href = new URL('../../../css/pakete/liga.css', import.meta.url).href;
     css.dataset.paket = MODUL;
     document.head.append(css);
-    registriereIcon('liga-wappen', '<path d="M5 4h14v8c0 4-4 7-7 9-3-2-7-5-7-9z"/><path d="m8 9 4 3 4-3M8 14l4 3 4-3"/>');
   })();
-  const kontext = { lese };
   // Die Saison-Liga-Karte der Bots-Seite (Ort arena:panel-oben) entfaellt mit der einen Liga (Flo 08.11.2026)
   anbieten('arena:panel-bot', sicher((k) => botBilanz(k)), { reihenfolge: 15, paket: MODUL });
   anbieten('ergebnis:abrechnung', sicher((k) => abrechnungsZeile(k, lese())), { reihenfolge: 30, paket: MODUL });
-  anbieten('verlauf:seite', sicher(() => verlaufKarte(kontext)), { reihenfolge: 20, paket: MODUL });
+  // Die Karte "Deine Liga-Wertung" im Verlauf (verlauf:seite, verlaufKarte in ansicht.js) entfaellt (R19, 15.11.2026): sie
+  // zeigte nur den beendeten Stand der alten Liga; Flo will im Verlauf EINE Staerke-Zahl, die Spielstaerke (verlauf.js).
+  // Die gespeicherte Wertung, Kurve und die Abzeichen bleiben im Modul-Speicher.
+  // R19 Season (supabase/saison-schema.sql, Vorschlag): Leiste im Profil gleich nach der Profilkarte (Paket sammlung, 10)
+  // saison.js erst hier nachladen (wie kronen.js oben): sie zieht Konto, Thema und Profil mit
+  anbieten('ich:kopf', sicher(() => {
+    const el = document.createElement('section');
+    el.className = 'ss-leiste liga-karte';
+    el.hidden = true;
+    import('./saison.js').then((m) => m.fuelleSaison(el)).catch(() => {});
+    return el;
+  }), { reihenfolge: 12, paket: MODUL });
   // Wochen-Gruppe der Kronen-Liga (07.11.2026): erster Reiter der Bestenliste, Freunde (Paket punkte, 8) gleich dahinter
   anbieten('bestenliste:reiter', sicher((k) => (k && k.reiter === 'gruppe' ? reiterGruppe(k) : { el: huelleGruppe(), verlasse() {} })),
     { reihenfolge: 5, paket: MODUL });
+  // Weltrangliste nach Online-Elo (G-006 AC-11, 14.11.2026): letzter Reiter, nach Bots (20); nur mit eigener Zustimmung
+  anbieten('bestenliste:reiter', sicher((k) => (k && k.reiter === 'welt' ? reiterWelt() : { el: huelleWelt(), verlasse() {} })),
+    { reihenfolge: 30, paket: MODUL });
 }

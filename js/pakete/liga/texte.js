@@ -1,19 +1,13 @@
 // Woerterbuch des Pakets liga (Englische Version, Teil 2). Schluessel t('p-liga.x'); de = die bisherigen deutschen Texte
 // woertlich. Rein, ohne DOM.
-// Eine Liga (Flo 08.11.2026): angezeigt wird nur noch die Kronen-Liga. Von der alten Saison-Liga bleiben die Stufen-Namen
-// fuer die verdienten Abzeichen im Verlauf ('stufe.<i>', de aus wertung.js STUFEN[i].name). Die Spielklasse traegt keinen
-// Figurennamen mehr ("Springer" gehoert der Kronen-Liga), sie steht nur als Wertungszahl da.
+// Eine Liga (Flo 08.11.2026): angezeigt wird nur noch die Kronen-Liga. Die Spielklasse traegt keinen Figurennamen mehr
+// ("Springer" gehoert der Kronen-Liga), sie steht nur als Wertungszahl da. Die Texte der Verlaufs-Karte (Wertung, Kurve,
+// alte Saison-Abzeichen) sind seit R19 (15.11.2026) mit der Karte entfallen.
 // Englisch: Wertung = rating, Liga-Stufe = tier, Saison = season.
 import { registriereTexte, t } from '../../sprache.js';
-import { STUFEN } from './wertung.js';
 import { stufeInfo } from './kronen.js';
 
-const stufenDe = Object.fromEntries(STUFEN.map((s, i) => ['stufe.' + i, s.name]));
-
 export const DE = {
-  // Wertung
-  wert: '≈ {wert} ± {u}',
-  wertVorlaeufig: '≈ {wert} ± {u} · vorläufig',
   // Bilanz im Panel
   'bilanz.text': 'Du gegen {name}: {siege} · {remis} · {niederlagen}',
   'bilanz.siege.eins': '{n} Sieg',
@@ -25,16 +19,6 @@ export const DE = {
   // Abrechnung im Ergebnis (nur die Wertung, Liga-Punkte gibt es seit 08.11.2026 nicht mehr)
   'abr.blitz': 'Blitz-Wertung {diff}',
   'abr.arena': 'Liga-Wertung {diff}',
-  // Verlauf
-  'kurve.leer': 'Deine Wertungskurve wächst mit den nächsten normalen Partien.',
-  'kurve.label': 'Verlauf der normalen Liga-Wertung',
-  'kurve.titel': 'Liga-Wertung: {a} bis {b}',
-  'kurve.text': '{a} → {b} · letzte {n} normale Partien',
-  'verlauf.titel': 'Deine Liga-Wertung',
-  'verlauf.abzeichen': 'Deine Abzeichen der alten Saison-Liga',
-  'verlauf.saison': 'Saison {nr}: {stufe}',
-  'verlauf.punkte': '{punkte} Punkte · Rechenstand {stand}',
-  'verlauf.fuss': 'Liga-Wertung mit Verlustschutz · Rechenstand {stand}. Die Bot-Skala ist vorläufig.',
   // Kronen-Liga mit Wochen-Gruppen (kronen.js LIGEN, Umbau 07.11.2026). Ruhige Fakten, kein Druck (fairness Regel 9/10):
   // der untere Abschnitt heisst "Eine Stufe tiefer", die Woche "Ende am Sonntag"
   // Liga-Namen Satz A (Flo 14.11.2026), auch deutsch englisch; die IDs bleiben die Figuren aus kronen.js LIGEN
@@ -71,7 +55,8 @@ export const DE = {
   'gruppe.taler': '{n} Taler',
   'gruppe.talerText': '{n} Taler für deine Sammlung',
   'gruppe.belohnung': 'Belohnung für Platz {platz}',
-  'gruppe.gemerkt': 'Wird gemerkt und mit dem Shop gutgeschrieben.',
+  'gruppe.preis.banner': 'Halte Platz 1 bis Sonntag, dann hängt dieses Banner in deiner Sammlung.',
+  'gruppe.preis.taler': 'Halte den Platz bis Sonntag, dann gehören dir die Taler. Wir heben sie für dich auf.',
   'gruppe.keine': 'Ab Platz 21 ohne Belohnung, die Kronen zählen trotzdem.',
   'gruppe.offen': 'Gemerkt: {n} Belohnungen aus früheren Wochen',
   'gruppe.offenEins': 'Gemerkt: 1 Belohnung aus einer früheren Woche',
@@ -91,12 +76,68 @@ export const DE = {
   'gruppe.regeln.titel': 'So zählen Kronen',
   'gruppe.regeln.kronen': 'Online und im Rätsel-Duell gegen Menschen: Sieg +{os}, Remis +{or}, Niederlage −{on}. Gegen den KI-Gegner: Sieg +{ks}, Remis +{kr}, Niederlage −{kn}. Bot-Leiter: Sieg +{bs}, Remis +{br}, eine Niederlage kostet nichts.',
   'gruppe.regeln.woche': 'Jede Woche spielst du in einer Gruppe mit {gruppe} Plätzen. Am Sonntag steigen die besten {auf} eine Stufe auf, die letzten {ab} gehen eine Stufe tiefer. Belohnung gibt es bis Platz {lohn}. Gewertet werden je Tag {botTag} Bot-Partien und {kiTag} Partien gegen den KI-Gegner, zusammen höchstens {woche} Kronen je Woche.',
-  ...stufenDe,
+  // R19 Season (supabase/saison-schema.sql): "Season" bleibt auch deutsch (Flo: "Crownmaster Season N"), damit sie sich
+  // klar von den alten Saison-Abzeichen der frueheren Saison-Liga unterscheidet
+  'season.titel': 'Season {n}',
+  'season.vorsaison': 'Season 1 beginnt am {datum}. Bis dahin läuft die Wochen-Liga wie gewohnt.',
+  'season.lauf': 'Woche {woche} von {wochen} · endet am {datum}',
+  'season.bisher': 'Beste Stufe dieser Season: {stufe}',
+  'season.keineWoche': 'Noch keine Liga-Woche in dieser Season.',
+  'season.abzeichen': 'Deine Season-Abzeichen',
+  'season.titelWahl': 'Season-Titel auf deiner Karte',
+  'season.keinTitel': 'Keinen zeigen',
+  'season.hilfe': 'Titel gibt es am Season-Ende: Crownmaster für Crownmate I, Top 10 und Top 100 nach Elo ab 20 Online-Partien mit Kronen.',
+  'season.vorschau': 'So sehen dich deine Gegner',
+  'season.fehler': 'Das hat gerade nicht geklappt. Später noch einmal versuchen.',
+  // "Alle Ligen" (saison.js zeigeLigen): je Liga ein wahrer Satz zum Aufsteigen, die Zahlen aus kronen.js
+  'season.ligen.titel': 'Alle Ligen',
+  'season.ligen.oeffnen': 'Alle Ligen ansehen',
+  'season.ligen.zu': 'Schließen',
+  'season.ligen.du': 'Du',
+  // Abstieg wie zoneVon und der Server: auf jeder Stufe ausser Squire III (Kaltreview df 15.11., tests/r19-ligen-satz)
+  'season.ligen.satz.bauer': 'Hier beginnt jeder. Mit Platz 1 bis {auf} deiner Wochen-Gruppe steigst du am Sonntag auf. Die letzten {ab} gehen eine Stufe tiefer, nur aus Squire III fällt niemand.',
+  'season.ligen.satz.springer': 'Siege bringen Kronen. Die ersten {auf} der Woche steigen auf, die letzten {ab} gehen eine Stufe tiefer.',
+  'season.ligen.satz.laeufer': 'Höher startet niemand. Auch hier bringen dich die ersten {auf} Plätze weiter, die letzten {ab} gehen eine Stufe tiefer.',
+  'season.ligen.satz.turm': 'Jede Krone zählt: die ersten {auf} steigen auf, die letzten {ab} gehen eine Stufe tiefer.',
+  'season.ligen.satz.dame': 'Eine Liga vor der Krone. Platz 1 bis {auf} bringt dich Crownmate näher, die letzten {ab} gehen eine Stufe tiefer.',
+  'season.ligen.satz.koenig': 'Die Spitze. Platz 1 bis {auf} steigt bis Crownmate I auf, die letzten {ab} gehen eine Stufe tiefer. Wer am Season-Ende in Crownmate I steht, wird Crownmaster.',
+  'season.ligen.regel': 'Eine Season dauert {wochen} Wochen. Deine beste Stufe wird dein Abzeichen und bleibt für immer. Danach geht es {zurueck} Stufen tiefer weiter, nie unter {boden}. Deine Elo bleibt.',
+  'season.ende.titel': 'Season {n} ist vorbei',
+  'season.ende.abzeichen': 'Dein Abzeichen: {stufe}',
+  'season.ende.titelEins': 'Neuer Titel',
+  'season.ende.titelMehr': 'Neue Titel',
+  'season.ende.neu': 'Season {n} startet für dich bei {stufe}.',
+  'season.ende.weiter': 'Weiter',
+  // Weltrangliste nach Online-Elo (welt.js, G-006 AC-11): ruhige Fakten, wer was sieht, keine erfundenen Zahlen
+  'welt.reiter': 'Welt',
+  'welt.aria': 'Weltrangliste nach Online-Elo',
+  'welt.titel': 'Weltrangliste',
+  'welt.untertitel': 'Nach Online-Elo, ab {ab} gewerteten Online-Partien',
+  'welt.erklaerung': 'In der Weltrangliste stehen nur Spieler, die mitmachen. Machst du mit, sehen alle angemeldeten Spieler deinen Benutzernamen, dein Banner und deine Online-Elo. Du zählst ab {ab} gewerteten Online-Partien mit und kannst jederzeit wieder austreten.',
+  'welt.mitmachen': 'Mitmachen',
+  'welt.austreten': 'Nicht mehr zeigen',
+  'welt.dabei': 'Du bist auf Platz {rang} · Elo {elo}',
+  'welt.platz.abstand': 'Noch {n} Elo bis Platz {platz}',
+  'welt.platz.erster': 'Du führst die Weltrangliste an',
+  'welt.platz.balken': '{n} Elo fehlen bis Platz {platz}',
+  'welt.zaehltNochEins': 'Noch 1 gewertete Online-Partie, dann zählst du mit.',
+  'welt.zaehltNoch': 'Noch {n} gewertete Online-Partien, dann zählst du mit.',
+  'welt.ohneName': 'Leg in deinem Konto einen Benutzernamen fest, dann erscheinst du in der Liste.',
+  'welt.leer': 'Noch steht niemand in der Weltrangliste.',
+  'welt.ohneKonto': 'Mit einem Konto kannst du in der Weltrangliste mitmachen.',
+  'welt.kontoLink': 'Zum Konto',
+  'welt.fehler': 'Die Weltrangliste ist gerade nicht erreichbar. Später noch einmal versuchen.',
+  'welt.fehlerAktion': 'Das hat gerade nicht geklappt. Bitte noch einmal versuchen.',
+  'welt.rang': 'Platz {rang}',
+  'welt.du': 'Du',
+  'welt.elo': 'Elo',
+  'welt.eloLang': 'Online-Elo {elo}',
+  // R19 (Flo 14.11.2026): wer die Start-Elo selbst angegeben hat, zaehlt erst ab {abStart} Partien (weltrang-schema.sql ab_start)
+  'welt.erklaerungStart': 'Hast du deine Start-Elo selbst angegeben, zählst du erst ab {abStart} Partien mit.',
+  'welt.fussnote': 'Elo aus Online-Partien, Startwert selbst angegeben.',
 };
 
 export const EN = {
-  wert: '≈ {wert} ± {u}',
-  wertVorlaeufig: '≈ {wert} ± {u} · provisional',
   'bilanz.text': 'You vs. {name}: {siege} · {remis} · {niederlagen}',
   'bilanz.siege.eins': '{n} win',
   'bilanz.siege.mehr': '{n} wins',
@@ -106,24 +147,6 @@ export const EN = {
   'bilanz.niederlagen.mehr': '{n} losses',
   'abr.blitz': 'Blitz rating {diff}',
   'abr.arena': 'League rating {diff}',
-  'kurve.leer': 'Your rating curve grows with your next standard games.',
-  'kurve.label': 'History of your standard league rating',
-  'kurve.titel': 'League rating: {a} to {b}',
-  'kurve.text': '{a} → {b} · last {n} standard games',
-  'verlauf.titel': 'Your league rating',
-  'verlauf.abzeichen': 'Your badges from the old season league',
-  'verlauf.saison': 'Season {nr}: {stufe}',
-  'verlauf.punkte': '{punkte} points · scoring version {stand}',
-  'verlauf.fuss': 'League rating with loss protection · scoring version {stand}. The bot scale is provisional.',
-  // Stufen der alten Saison-Liga (wertung.js STUFEN), nur noch fuer die Abzeichen im Verlauf: Holz bis Gold wie im
-  // Deutschen, oben die Krone statt "Meister"
-  'stufe.0': 'Wood',
-  'stufe.1': 'Bronze',
-  'stufe.2': 'Silver',
-  'stufe.3': 'Gold',
-  'stufe.4': 'Platinum',
-  'stufe.5': 'Diamond',
-  'stufe.6': 'Crown',
   'kliga.bauer': 'Squire', 'kliga.springer': 'Knight', 'kliga.laeufer': 'Warden', 'kliga.turm': 'Baron', 'kliga.dame': 'Sovereign',
   'kliga.koenig': 'Crownmate',
   'gruppe.reiter': 'Group',
@@ -157,7 +180,8 @@ export const EN = {
   'gruppe.taler': '{n} thalers',
   'gruppe.talerText': '{n} thalers for your collection',
   'gruppe.belohnung': 'Reward for place {platz}',
-  'gruppe.gemerkt': 'Saved and credited once the shop opens.',
+  'gruppe.preis.banner': 'Hold first place until Sunday and this banner joins your collection.',
+  'gruppe.preis.taler': 'Hold this place until Sunday and the thalers are yours. We keep them safe for you.',
   'gruppe.keine': 'No reward from place 21, your crowns still count.',
   'gruppe.offen': 'Saved: {n} rewards from earlier weeks',
   'gruppe.offenEins': 'Saved: 1 reward from an earlier week',
@@ -176,6 +200,59 @@ export const EN = {
   'gruppe.regeln.titel': 'How crowns count',
   'gruppe.regeln.kronen': 'Online and in the puzzle duel against people: win +{os}, draw +{or}, loss −{on}. Against the AI opponent: win +{ks}, draw +{kr}, loss −{kn}. Bot ladder: win +{bs}, draw +{br}, a loss costs nothing.',
   'gruppe.regeln.woche': 'Every week you play in a group of {gruppe}. On Sunday the top {auf} move up a tier, the last {ab} move down a tier. Rewards go up to place {lohn}. Each day {botTag} bot games and {kiTag} games against the AI opponent count, together at most {woche} crowns a week.',
+  'season.titel': 'Season {n}',
+  'season.vorsaison': 'Season 1 starts on {datum}. Until then the weekly league runs as usual.',
+  'season.lauf': 'Week {woche} of {wochen} · ends on {datum}',
+  'season.bisher': 'Best tier this season: {stufe}',
+  'season.keineWoche': 'No league week in this season yet.',
+  'season.abzeichen': 'Your season badges',
+  'season.titelWahl': 'Season title on your card',
+  'season.keinTitel': 'Show none',
+  'season.hilfe': 'Titles come at the end of a season: Crownmaster for Crownmate I, Top 10 and Top 100 by Elo from 20 online games with crowns.',
+  'season.vorschau': 'How your opponents see you',
+  'season.fehler': 'That did not work just now. Please try again later.',
+  'season.ligen.titel': 'All leagues',
+  'season.ligen.oeffnen': 'See all leagues',
+  'season.ligen.zu': 'Close',
+  'season.ligen.du': 'You',
+  'season.ligen.satz.bauer': 'Everyone starts here. Finish in the top {auf} of your weekly group and you move up on Sunday. The last {ab} go one tier down, only Squire III has no drop.',
+  'season.ligen.satz.springer': 'Wins bring crowns. The top {auf} of the week move up, the last {ab} go one tier down.',
+  'season.ligen.satz.laeufer': 'Nobody starts higher. Here too the top {auf} places take you further, the last {ab} go one tier down.',
+  'season.ligen.satz.turm': 'Every crown counts: the top {auf} move up, the last {ab} go one tier down.',
+  'season.ligen.satz.dame': 'One league below the crown. Places 1 to {auf} bring you closer to Crownmate, the last {ab} go one tier down.',
+  'season.ligen.satz.koenig': 'The top. Places 1 to {auf} climb up to Crownmate I, the last {ab} go one tier down. Whoever is in Crownmate I at the end of a season becomes Crownmaster.',
+  'season.ligen.regel': 'A season lasts {wochen} weeks. Your best tier becomes your badge and stays forever. Then you carry on {zurueck} tiers lower, never below {boden}. Your Elo stays.',
+  'season.ende.titel': 'Season {n} is over',
+  'season.ende.abzeichen': 'Your badge: {stufe}',
+  'season.ende.titelEins': 'New title',
+  'season.ende.titelMehr': 'New titles',
+  'season.ende.neu': 'Season {n} starts for you at {stufe}.',
+  'season.ende.weiter': 'Continue',
+  'welt.reiter': 'World',
+  'welt.aria': 'World ranking by online Elo',
+  'welt.titel': 'World ranking',
+  'welt.untertitel': 'By online Elo, from {ab} rated online games',
+  'welt.erklaerung': 'The world ranking only lists players who join. If you join, every signed-in player sees your username, your banner and your online Elo. You count from {ab} rated online games and can leave at any time.',
+  'welt.mitmachen': 'Join',
+  'welt.austreten': 'Stop showing me',
+  'welt.dabei': 'You are in place {rang} · Elo {elo}',
+  'welt.platz.abstand': '{n} Elo to place {platz}',
+  'welt.platz.erster': 'You lead the world ranking',
+  'welt.platz.balken': '{n} Elo short of place {platz}',
+  'welt.zaehltNochEins': '1 more rated online game and you count.',
+  'welt.zaehltNoch': '{n} more rated online games and you count.',
+  'welt.ohneName': 'Choose a username in your account and you appear in the list.',
+  'welt.leer': 'Nobody is in the world ranking yet.',
+  'welt.ohneKonto': 'With an account you can join the world ranking.',
+  'welt.kontoLink': 'Go to account',
+  'welt.fehler': 'The world ranking is not available right now. Please try again later.',
+  'welt.fehlerAktion': 'That did not work just now. Please try again.',
+  'welt.rang': 'Place {rang}',
+  'welt.du': 'You',
+  'welt.elo': 'Elo',
+  'welt.eloLang': 'Online Elo {elo}',
+  'welt.erklaerungStart': 'If you set your starting Elo yourself, you count from {abStart} games.',
+  'welt.fussnote': 'Elo from online games, starting value self-reported.',
 };
 
 registriereTexte('p-liga', { de: DE, en: EN });

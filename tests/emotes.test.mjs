@@ -98,9 +98,12 @@ pruefe('Handy und reduzierte Bewegung sind gestaltet', /max-width: 420px/.test(c
   pruefe('Rad ohne Kreatur zeigt die Sticker', radEintraege(null).every((e) => /class="emote-sticker"/.test(e.svg) && new RegExp(`data-emote="${e.id}"`).test(e.svg)));
   const ohne = teileEmotes(false);
   const mit = teileEmotes(true);
+  // seit R19 (tests/r19-emotes-finisher.test.mjs): hinter den acht Gratis-Stickern stehen sechs Premium-Sticker, gesperrt
+  // ausser im Labor des Erfinders; die Kreaturen kommen danach
   pruefe('Sammlung: Kreaturen gehoeren zu den Emotes (Gruppe unter den Stickern), nur fuer den Erfinder',
-    ohne.length === 8 && ohne.every((x) => x.frei && /emote-sticker/.test(x.bild) && x.gruppe === DE['gruppe.sticker'])
-    && mit.length === 8 + KREATUREN.length && mit.slice(8).every((x) => x.labor && x.gruppe === DE.kreaturen && /data-kreatur=/.test(x.bild) && typeof x.wahl === 'function'),
+    ohne.length === 14 && ohne.slice(0, 8).every((x) => x.frei && /emote-sticker/.test(x.bild) && x.gruppe === DE['gruppe.sticker'])
+    && ohne.slice(8).every((x) => !x.frei && x.gruppe === DE['gruppe.premium'])
+    && mit.length === 14 + KREATUREN.length && mit.slice(14).every((x) => x.labor && x.gruppe === DE.kreaturen && /data-kreatur=/.test(x.bild) && typeof x.wahl === 'function'),
     { ohne: ohne.length, mit: mit.length });
 }
 
