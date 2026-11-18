@@ -21,8 +21,8 @@
 //                   Felder und Koordinaten setzt brettFlaeche als Stylesheet am Sockel (.brett-rahmen)
 //   BRETT_FAMILIEN  die sechs Familien in Reihenfolge; FREIE_BRETTER_PLAN dieselben Angaben fuer Nacht, Gruen, Holz
 //   LABOR_FIGUREN   ['kuerbis', ...]          Saetze unter assets/pieces/<id>/ (werkzeuge/figuren-3d.mjs, figuren-stile.mjs)
-//   LABOR_KLAENGE   ['juwel', 'grusel', 'kristall']  Klangsets unter assets/klang/<id>/ (werkzeuge/klang-juwel.mjs,
-//                   werkzeuge/labor-klaenge.mjs, js/sounds.js)
+//   LABOR_KLAENGE   ['juwel', 'grusel', 'kristall', 'polarlicht', 'donner']  Klangsets unter assets/klang/<id>/
+//                   (werkzeuge/klang-juwel.mjs, werkzeuge/labor-klaenge.mjs, werkzeuge/klang-sets-r19.mjs, js/sounds.js)
 //   istLabor(art, id) -> boolean               art 'brett' | 'figuren' | 'klang'
 //   laborFrei() -> boolean                     nur der Erfinder
 //   brettWahl(id) -> id                        ein Labor-Brett ohne Erfinder faellt still auf 'nacht'
@@ -155,7 +155,7 @@ export const MOTIV_BRETTER = Object.freeze([
 // danach Piraten, Aegypten, Wikinger und Dinos ("Denk dir mehr aus")
 export const LABOR_FIGUREN = Object.freeze(['drachen', 'zombies', 'geister', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos', 'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'moosgeister', 'tiefsee', 'elfenbein',
   'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'pixel', 'geo']);
-export const LABOR_KLAENGE = Object.freeze(['juwel', 'grusel', 'kristall']);
+export const LABOR_KLAENGE = Object.freeze(['juwel', 'grusel', 'kristall', 'polarlicht', 'donner']);
 
 export function istLabor(art, id) {
   if (art === 'brett') return LABOR_BRETTER.some((b) => b.id === id) || MOTIV_BRETTER.some((b) => b.id === id);

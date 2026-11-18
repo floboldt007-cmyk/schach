@@ -31,6 +31,11 @@ export const FINISHER = Object.freeze([
   Object.freeze({ id: 'koenig', text: 'koenig', klang: 'finisher-tinte' }),
   // Kronensturz (Flo 08.11.2026): die Krone faellt vom mattgesetzten Koenig, rollt aus und bleibt liegen; Klang wie Krone
   Object.freeze({ id: 'kronensturz', text: 'kronensturz', klang: 'finisher-glocke' }),
+  // R19 (Flo 15.11.2026: mehr Finisher, Gekauftes krasser): kurz (dauer hoechstens 1400 ms, die alten bleiben, wie sie sind),
+  // nur transform und opacity; frei wie jeder Finisher heute nur im Labor des Erfinders, sonst im Shop mit Schloss
+  Object.freeze({ id: 'blitzschlag', text: 'blitzschlag', klang: 'finisher-kreide', dauer: 1300 }),
+  Object.freeze({ id: 'goldregen', text: 'goldregen', klang: 'finisher-glocke', dauer: 1400 }),
+  Object.freeze({ id: 'schockwelle', text: 'schockwelle', klang: 'finisher-tinte', dauer: 1200 }),
   Object.freeze({ id: 'signatur', text: 'signatur', klang: 'finisher-tinte', sonder: ERFINDER.finisher }),
 ]);
 // was dieses Konto sehen darf: alle Stufen-Finisher, Sonderstuecke nur mit Besitz
@@ -67,7 +72,7 @@ export function starteFinisher(ctx, id = auswahl()) {
   // schon abgebrochen (frueher Tipp): ohne Klang und Animation sofort fertig, das Ergebnis wartet nicht
   if (ctx.signal && ctx.signal.aborted) return { fertig: Promise.resolve(), verlasse: () => {} };
   const reduziert = !!ctx.reduziert;
-  const ziel = id === 'koenig' || id === 'kronensturz' ? ctx.koenigFeld : (ctx.letzterZug && ctx.letzterZug.nach);
+  const ziel = id === 'koenig' || id === 'kronensturz' || id === 'blitzschlag' ? ctx.koenigFeld : (ctx.letzterZug && ctx.letzterZug.nach);
   const p = punkt(ctx.buehne, ziel);
   const el = document.createElement('div');
   el.className = `finisher finisher-${id}${reduziert ? ' ist-ruhig' : ''}`;
@@ -80,6 +85,18 @@ export function starteFinisher(ctx, id = auswahl()) {
   // Signatur: ein goldener Namenszug und eine Linie unter der Partie, darunter "Nr. 0"
   if (id === 'signatur') el.innerHTML = '<svg class="fi-signatur" viewBox="0 0 100 40"><path class="fi-zug" d="M10 26c9-2 16-12 20-21 2 9-2 18 2 20s9-12 11-16c0 7 2 12 11 12 6 0 10-4 14-8"/>'
     + '<path class="fi-linie" d="M8 34h84"/></svg><span class="fi-nr">Nr. 0</span>';
+  // Blitzschlag: ein goldener Blitz faehrt in den mattgesetzten Koenig, das Brett leuchtet einmal auf, ein Ring laeuft aus
+  if (id === 'blitzschlag') el.innerHTML = '<span class="fi-licht"></span><span class="fi-ring"></span>'
+    + '<svg class="fi-blitz" viewBox="0 0 40 100" preserveAspectRatio="none"><path d="M26 0L8 52h13L12 100l22-60H21z"/></svg>';
+  // Goldregen: goldene Muenzen und Funken fallen ueber das ganze Brett
+  if (id === 'goldregen') {
+    el.innerHTML = Array.from({ length: 18 }, (_, i) => {
+      const x = (i * 37 + 11) % 96 + 2, v = (i * 53) % 420, art = i % 3 ? 'fi-muenze' : 'fi-funke';
+      return `<i class="${art}" style="--x:${x}%;--y:${(i * 41) % 90};--v:${v}ms;--d:${(i * 29) % 70 - 35}deg"></i>`;
+    }).join('');
+  }
+  // Schockwelle: vom Mattfeld laufen zwei goldene Ringe ueber das Brett
+  if (id === 'schockwelle') el.innerHTML = '<span class="fi-welle1"></span><span class="fi-welle2"></span><span class="fi-kern"></span>';
   if (id === 'welle') {
     el.innerHTML = Array.from({ length: 64 }, (_, i) => {
       const x = i % 8, y = Math.floor(i / 8), abstand = Math.abs(x + .5 - p.x / 12.5) + Math.abs(y + .5 - p.y / 12.5);
@@ -93,7 +110,9 @@ export function starteFinisher(ctx, id = auswahl()) {
   let timer = null, fertig;
   const aufraeumen = () => { if (timer) clearTimeout(timer); el.remove(); fertig(); };
   const promise = new Promise((resolve) => { fertig = resolve; });
-  const dauer = reduziert ? Math.min(650, ctx.kurzMs || 650) : Math.min(1750, ctx.dauerMs || 1750);
+  // die neuen Finisher tragen ihre eigene Hoechstdauer (unter 1,5 s), die alten laufen wie bisher bis 1750 ms
+  const hoechst = (f && f.dauer) || 1750;
+  const dauer = reduziert ? Math.min(650, ctx.kurzMs || 650) : Math.min(hoechst, ctx.dauerMs || hoechst);
   timer = setTimeout(aufraeumen, dauer);
   if (ctx.signal) ctx.signal.addEventListener('abort', aufraeumen, { once: true });
   return { fertig: promise, verlasse: aufraeumen };

@@ -1,12 +1,12 @@
-// Bilder des Shops (Feinschliff R19): heute (ist) und Shop A mit fuenf festen Plaetzen (?shopStil=a,
-// js/pakete/sammlung/shop-entwurf.js, Belegung aus assets/shop/auslage.json) auf iPhone 13, iPhone SE, iPad und PC, hell,
-// iPhone 13 und PC auch dunkel. Je Ansicht der Shop-Start und bei a die Vorschau jedes Platzes (Brett, Figur, Klang, Emote,
-// Finisher); heute das Anprobieren der Edition.
+// Bilder des Shops (Feinschliff R19): Shop A, der Standard ohne Kennung (fuenf feste Plaetze, js/pakete/sammlung/shop-entwurf.js,
+// Belegung aus assets/shop/auslage.json), und der alte Shop (Stil ist, nur mit ?shopStil=alt) auf iPhone 13, iPhone SE, iPad hoch
+// und quer und PC, je hell und dunkel. Je Ansicht der Shop-Start und bei a die Vorschau jedes Platzes (Brett, Figur, Klang,
+// Emote, Finisher); beim alten Shop das Anprobieren der Edition.
 // Kein Teil von tests/alle.mjs. Netzwerk ausschliesslich simuliert (Attrappe wie tests/r19-shop-fortnite.test.mjs); die
-// Edition hat dort KEINEN Preis, denn heute steht keiner im Katalog: die Karten zeigen "Preis folgt".
+// Edition hat dort KEINEN Preis: Shop A zeigt Schloss und Bald, der alte Shop seinen Platzhalter statt eines Preises.
 //
-//   node tests/bilder-shop.mjs --bilder=<ordner>      Unterordner ist/, a/ mit shop-<geraet>[-dunkel]-<start|vorschau-art>.png
-//   node tests/bilder-shop.mjs --nur=a ...            nur diese Stile (heute heisst ist)
+//   node tests/bilder-shop.mjs --bilder=<ordner>      Unterordner ist/ (alter Shop), a/ (Shop A) mit shop-<geraet>[-dunkel]-<start|vorschau-art>.png
+//   node tests/bilder-shop.mjs --nur=a ...            nur diese Stile (a = Shop A, ist = alter Shop)
 //   PORT=8992 node tests/bilder-shop.mjs ...          eigener Port (Standard 8992)
 // Exit 0, wenn alle Bilder entstanden sind und jede Ansicht im erwarteten Stil stand; sonst 1.
 import http from 'node:http';
@@ -78,8 +78,9 @@ function initSkript({ sitzung }) {
 const bilderFertig = (s, wurzel) => s.waitForFunction((w) => [...document.querySelectorAll(`${w} img`)].every((i) => i.complete), wurzel, { timeout: 15000 })
   .catch(() => {}).then(() => warte(400));
 
-const GERAETE = [['iphone13', 390, 844, 'hell'], ['iphonese', 375, 667, 'hell'], ['ipad', 820, 1180, 'hell'], ['pc', 1280, 720, 'hell'],
-  ['iphone13', 390, 844, 'dunkel'], ['pc', 1280, 720, 'dunkel']];
+// R19 shop-a-standard (16.11.): alle fuenf Geraete in hell und dunkel, dazu iPad quer
+const GERAETE = [['iphone13', 390, 844], ['iphonese', 375, 667], ['ipad', 820, 1180], ['ipadquer', 1180, 820], ['pc', 1280, 720]]
+  .flatMap((g) => [[...g, 'hell'], [...g, 'dunkel']]);
 const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
 const seitenfehler = [];
 let browser;
@@ -102,7 +103,7 @@ try {
         pruefe(`${gruppe}: Bild ${teil}`, da);
       };
       try {
-        await s.goto(`http://127.0.0.1:${PORT}/index.html?test${stil === 'ist' ? '' : '&shopStil=' + stil}#heim`);
+        await s.goto(`http://127.0.0.1:${PORT}/index.html?test&shopStil=${stil === 'ist' ? 'alt' : stil}#heim`);
         await s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('.screen.heim-screen'), null, { timeout: 45000 });
         await s.evaluate(() => window.__app.gehe('ich'));
         await s.waitForSelector('.sa-screen', { timeout: 30000 });

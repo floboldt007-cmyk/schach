@@ -127,6 +127,8 @@ const DATEIEN = [
   'js/pakete/liga/wertung.js',
   'js/pakete/liga/kronen.js',
   'js/pakete/liga/gruppe.js',
+  'js/pakete/liga/saison.js',
+  'js/pakete/liga/welt.js',
   'assets/liga/bauer.svg',
   'assets/liga/springer.svg',
   'assets/liga/laeufer.svg',

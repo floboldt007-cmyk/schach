@@ -39,6 +39,8 @@ import './texte.js';
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Texte erst beim Zeichnen (Woerterbuch p-punkte; Farben und Ergebnisse aus allgemein)
 const FENSTER = ['woche', 'monat', 'allzeit'];
+// Medaille je Platz (Bots-Uebersicht, Freunde): Farbe in css/pakete/punkte.css
+export const MEDAILLE = { 1: 'gold', 2: 'silber', 3: 'bronze' };
 function fensterText(f) {
   return FENSTER.includes(f) ? t('p-punkte.fenster.' + f) : '';
 }
@@ -240,7 +242,10 @@ function besteKarte(app, woche, neu) {
     k.querySelector('.bl-spielen').addEventListener('click', () => { try { app?.gehe?.('arena'); } catch (e) { /* egal */ } });
     return k;
   }
-  const bot = botNachId(r.tafel);
+  // die Tafel-ID traegt Bot und Farbe ("bot:willi:w"); nach der ganzen ID gesucht fand sich nie ein Bot, die Karte zeigte
+  // immer das Podest statt des Bot-Bilds (R19 Liga neu)
+  const z = T.zerlegeId(r.tafel);
+  const bot = z && z.art === 'bot' ? botNachId(z.botId) : null;
   const tag = ladePartie(r.id) ? 'button' : 'div';
   const was = r.e === 'sieg' ? t('p-punkte.ich.besteSieg', { name: kurzName(r.tafel) })
     : r.e === 'remis' ? t('p-punkte.ich.besteRemis', { name: kurzName(r.tafel) }) : nameVon(r.tafel);
@@ -289,10 +294,12 @@ function bilanzKarte() {
   const k = el('article', 'bl-karte bl-bilanz');
   const prozent = Number.isFinite(st.schnittGenauigkeit)
     ? t('p-punkte.ich.bilanz.prozent', { wert: zahl(st.schnittGenauigkeit, { maximumFractionDigits: 1, useGrouping: false }) }) : '–';
-  const werte = [['partien', zahlText(st.partien)], ['siege', zahlText(st.siege)], ['genauigkeit', prozent],
-    ['staerke', st.spielstaerke ? '≈ ' + zahlText(st.spielstaerke) : '–']];
+  // je Zahl ein Symbol und eine Farbe (R19 Liga neu: "Zahlen bekommen ein Symbol und eine Farbe"), Farbe per data-art in CSS
+  const werte = [['partien', zahlText(st.partien), 'bauer'], ['siege', zahlText(st.siege), 'pokal'], ['genauigkeit', prozent, 'ziel'],
+    ['staerke', st.spielstaerke ? '≈ ' + zahlText(st.spielstaerke) : '–', 'blitz']];
   k.innerHTML = `<span class="ueberzeile">${esc(t('p-punkte.ich.bilanz'))}</span>
-    <dl class="bl-bilanz-werte">${werte.map(([id, w]) => `<div><dt>${esc(t('p-punkte.ich.bilanz.' + id))}</dt><dd class="zahl">${esc(w)}</dd></div>`).join('')}</dl>`;
+    <dl class="bl-bilanz-werte">${werte.map(([id, w, sy]) => `<div data-art="${id}"><span class="bl-bilanz-sy">${icon(sy)}</span>`
+      + `<dt>${esc(t('p-punkte.ich.bilanz.' + id))}</dt><dd class="zahl">${esc(w)}</dd></div>`).join('')}</dl>`;
   return k;
 }
 
@@ -368,8 +375,13 @@ function botBilanzHtml(z, bot) {
   const f = ladeFortschritt().bots[bot.id] || {};
   const n = (x) => (Number.isFinite(x) && x > 0 ? x : 0);
   if (!n(f.siege) && !n(f.remis) && !n(f.niederlagen)) return '';
-  return `<p class="bl-bot-bilanz">${esc(t('p-punkte.bots.bilanz', { name: kurzName(bot.id), siege: t('p-punkte.bots.siege', { n: n(f.siege) }),
-    remis: t('p-punkte.bots.remis', { n: n(f.remis) }), niederlagen: t('p-punkte.bots.niederlagen', { n: n(f.niederlagen) }) }))}</p>`;
+  // die drei Werte als farbige Chips (R19 Liga neu); der Satz bleibt Wort fuer Wort derselbe, nur die Teile sind eingefasst
+  const teile = [['sieg', t('p-punkte.bots.siege', { n: n(f.siege) })], ['remis', t('p-punkte.bots.remis', { n: n(f.remis) })],
+    ['niederlage', t('p-punkte.bots.niederlagen', { n: n(f.niederlagen) })]];
+  const marke = (i) => String.fromCharCode(0xE000 + i);
+  let html = esc(t('p-punkte.bots.bilanz', { name: kurzName(bot.id), siege: marke(0), remis: marke(1), niederlagen: marke(2) }));
+  teile.forEach(([art, text], i) => { html = html.replace(marke(i), `<span class="bl-t-chip" data-art="${art}">${esc(text)}</span>`); });
+  return `<p class="bl-bot-bilanz">${html}</p>`;
 }
 
 export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) {
@@ -420,10 +432,17 @@ export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) 
     liste.innerHTML = gruppen.map((g) => `${g.titel ? `<h3 class="ueberzeile bl-g-welt">${esc(g.titel)}</h3>` : ''}`
       + g.teile.map(({ x, b }) => {
         const r = meinBestes(x.id);
-        const zeile = r ? t('p-punkte.bots.platzWert', { platz: r.platz, wert: zahlText(r.w) }) : t('p-punkte.bots.keinEintrag');
-        return `<button class="bl-gegner-zeile dr${r ? ' mit-eintrag' : ''}" type="button" role="listitem" data-tafel="${esc(x.id)}"${x.id === aktiv ? ' aria-current="true"' : ''}>`
+        const name = b && !x.boss ? b.name : x.name;
+        // mit Eintrag: der Platz als Medaille (1 Gold, 2 Silber, 3 Bronze) und die Punkte mit Stern statt "Platz 1 · 8.700 Punkte";
+        // der Satz bleibt fuer den Vorleser im aria-label
+        const stand = r
+          ? `<span class="bl-g-stand" aria-hidden="true"><span class="bl-g-platz" data-medaille="${MEDAILLE[r.platz] || ''}">#${esc(r.platz)}</span>`
+            + `<span class="bl-g-wert">${icon('stern')}${esc(zahlText(r.w))}</span></span>`
+          : `<span>${esc(t('p-punkte.bots.keinEintrag'))}</span>`;
+        const label = r ? ` aria-label="${esc(name + ', ' + t('p-punkte.bots.platzWert', { platz: r.platz, wert: zahlText(r.w) }))}"` : '';
+        return `<button class="bl-gegner-zeile dr${r ? ' mit-eintrag' : ''}" type="button" role="listitem" data-tafel="${esc(x.id)}"${label}${x.id === aktiv ? ' aria-current="true"' : ''}>`
           + `<span class="bl-g-av">${b ? `<img src="${esc(avatarVon(b))}" alt="" draggable="false">` : icon('podest')}</span>`
-          + `<span class="bl-g-mitte"><b>${esc(b && !x.boss ? b.name : x.name)}</b><span>${esc(zeile)}</span></span>`
+          + `<span class="bl-g-mitte"><b>${esc(name)}</b>${r ? '' : stand}</span>${r ? stand : ''}`
           + `<span class="bl-g-pfeil" aria-hidden="true">${icon('vor')}</span></button>`;
       }).join('')).join('');
     if (tempo() > 0) staffel(liste.querySelectorAll('.bl-gegner-zeile'), { d: 380, abstand: 30, von: 'translateY(8px)' });
@@ -447,7 +466,10 @@ export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) 
     const leerText = esc(allzeit
       ? t('p-punkte.bots.leerFenster', { fenster: fensterText(fenster), name: nameVon(id), wert: zahlText(allzeit.w) })
       : t('p-punkte.bots.leer', { name: nameVon(id), gegner: bot ? bot.name : t('p-punkte.bots.diesenGegner') }));
-    karte.innerHTML = `<header class="bl-k-kopf"><div><span class="ueberzeile">${esc(fensterText(fenster))}</span>
+    // Kopf der Tafel mit dem grossen Bild des Bots (R19 Liga neu: rechts war viel leere Flaeche ohne Bild)
+    const bild = z && z.art === 'bot' && bot && bot.avatar
+      ? `<span class="bl-t-bild" aria-hidden="true"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></span>` : '';
+    karte.innerHTML = `<header class="bl-k-kopf${bild ? ' mit-bild' : ''}">${bild}<div><span class="ueberzeile">${esc(fensterText(fenster))}</span>
         <h2>${esc(nameVon(id))}</h2></div><span class="bl-k-hinweis">${esc(t('p-punkte.bots.zeilen'))}</span></header>
       ${botBilanzHtml(z, bot)}
       ${zeilen.length ? `<ol class="bl-zeilen">${zeilen.map((r) => zeileHtml(r, { neu: r.eigen && neu.has(r.id) })).join('')}</ol>` : `<p class="bl-leer">${leerText}</p>`}

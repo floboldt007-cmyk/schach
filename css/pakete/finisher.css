@@ -18,6 +18,33 @@
 @keyframes fi-glanz { 0% { transform: translate(-10%, -20%) scale(.4); opacity: 0; } 45% { opacity: 1; } 100% { transform: translate(30%, -75%) scale(1.2); opacity: 0; } }
 @keyframes fi-koenig { 0%, 18% { transform: translate(-50%, -50%) rotate(0); opacity: 1; } 78% { transform: translate(-50%, -50%) rotate(72deg); opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(72deg); opacity: 0; } }
 @keyframes fi-welle { 0% { transform: perspective(180px) rotateX(0); opacity: 0; } 30% { transform: perspective(180px) rotateX(32deg); opacity: .72; } 75% { transform: perspective(180px) rotateX(0); opacity: .35; } 100% { transform: none; opacity: 0; } }
+/* R19: Blitzschlag, Goldregen, Schockwelle (je hoechstens 1,4 s, nur transform und opacity) */
+.finisher-blitzschlag .fi-blitz { position: absolute; left: var(--fx); top: 0; width: 12.5%; height: var(--fy); overflow: visible;
+  transform-origin: 50% 0; transform: translateX(-50%); animation: fi-blitzschlag 1.1s var(--gleiten) both; }
+.fi-blitz path { fill: #FFE08A; stroke: #E0A22B; stroke-width: 2; stroke-linejoin: round; }
+.finisher-blitzschlag .fi-licht { position: absolute; inset: 0; background: radial-gradient(circle at var(--fx) var(--fy), rgba(255, 236, 170, .75), rgba(255, 236, 170, 0) 55%);
+  animation: fi-licht .6s .12s ease-out both; }
+.finisher-blitzschlag .fi-ring, .finisher-schockwelle .fi-welle1, .finisher-schockwelle .fi-welle2 { position: absolute; left: var(--fx); top: var(--fy);
+  width: 12.5%; aspect-ratio: 1; border-radius: 50%; border: 3px solid #F2BE4A; transform: translate(-50%, -50%) scale(.2); opacity: 0; }
+.finisher-blitzschlag .fi-ring { animation: fi-ring .8s .15s var(--gleiten) both; }
+.finisher-schockwelle .fi-welle1 { animation: fi-ring .9s var(--gleiten) both; }
+.finisher-schockwelle .fi-welle2 { border-width: 2px; border-color: #FFE08A; animation: fi-ring .9s .25s var(--gleiten) both; }
+.finisher-schockwelle .fi-kern { position: absolute; left: var(--fx); top: var(--fy); width: 12.5%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 224, 138, .9), rgba(255, 224, 138, 0) 70%); transform: translate(-50%, -50%); animation: fi-licht .7s ease-out both; }
+.finisher-goldregen i { position: absolute; left: var(--x); top: 0; width: 4.5%; aspect-ratio: 1; border-radius: 50%; opacity: 0;
+  animation: fi-regen .9s var(--v) cubic-bezier(.45, .05, .7, .6) both; }
+.finisher-goldregen .fi-muenze { background: radial-gradient(circle at 35% 30%, #FFF3B0, #F2BE4A 55%, #9C6B12); box-shadow: inset 0 0 0 1px #9C6B12; }
+.finisher-goldregen .fi-funke { width: 2.6%; background: #FFF1C1; }
+@keyframes fi-blitzschlag { 0% { transform: translateX(-50%) scaleY(0); opacity: 1; } 14% { transform: translateX(-50%) scaleY(1); opacity: 1; }
+  22% { opacity: .35; } 30% { opacity: 1; } 75% { transform: translateX(-50%) scaleY(1); opacity: 1; } 100% { transform: translateX(-50%) scaleY(1); opacity: 0; } }
+@keyframes fi-licht { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fi-ring { 0% { transform: translate(-50%, -50%) scale(.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(7); opacity: 0; } }
+@keyframes fi-regen { 0% { transform: translateY(-20%) rotate(0); opacity: 0; } 12% { opacity: 1; } 85% { opacity: 1; }
+  100% { transform: translateY(2200%) rotate(var(--d)); opacity: 0; } }
+.finisher.ist-ruhig .fi-blitz { transform: translateX(-50%); }
+.finisher.ist-ruhig .fi-ring, .finisher.ist-ruhig .fi-welle1, .finisher.ist-ruhig .fi-welle2 { transform: translate(-50%, -50%) scale(2.5); }
+/* ruhig: die Muenzen liegen verstreut still auf dem Brett (--y 0..89, je Einheit 22 % der eigenen Hoehe) */
+.finisher.ist-ruhig.finisher-goldregen i { transform: translateY(calc(var(--y) * 22%)); opacity: .72; }
 .finisher-signatur { color: #E0A22B; }
 .fi-signatur { position: absolute; left: 10%; bottom: 9%; width: 80%; height: auto; overflow: visible; }
 .fi-signatur path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
