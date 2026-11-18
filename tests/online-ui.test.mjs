@@ -40,7 +40,8 @@ let erfinder = false, sonderVerzug = 0;
 // R2: Tageskontingent der Live-Bewertung (online_live_bewertung_frei/nutzen), Antwort wie supabase/zwei-ligen-schema.sql
 let liveFrei = { frei: true, rest: 1, unbegrenzt: false };
 const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
-const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
+// wie der Trigger setze_aktualisiert_am (now()): echte Zeit, streng steigend (Serveruhr fuer js/serverzeit.js, R19)
+const aktualisieren = p => { stamp = Math.max(Date.now(), stamp + 1); p.aktualisiert_am = new Date(stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234', gewertet = false } = {}) {
   const c = new Chess(); for (const u of zuege.split(' ').filter(Boolean)) c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
   const p = aktualisieren({ id: 'partie-' + ++nummer, code, weiss: farbe === 'w' ? 'u1' : 'u2', schwarz: farbe === 'b' ? 'u1' : 'u2', erstellt_von: 'u1',
