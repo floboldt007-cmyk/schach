@@ -1,6 +1,6 @@
 // Baut die App-Icons von Crownmate: das Premium-Wappen (Krone auf Scheibe mit Strahlenkranz) auf dunklem Grund.
 // Schreibt favicon.svg und rendert per Playwright (Chromium) die PNGs:
-//   icon-192.png, icon-512.png          Zweck "any": abgerundetes Quadrat, Ecken durchsichtig
+//   icon-192.png, icon-512.png          Zweck "any": volle Flaeche, ohne Alphakanal (keine hellen Ecken)
 //   icon-maskable-512.png               Zweck "maskable": volle Flaeche, Wappen in der Sicherheitszone
 //   apple-touch-icon.png (180)          volle Flaeche, ohne Alphakanal (iOS rundet selbst)
 //
@@ -44,19 +44,17 @@ ${fein ? `<circle cx="60" cy="60" r="35" fill="none" stroke="${GOLD}" stroke-wid
 <circle cx="60" cy="63" r="4.2" fill="${FLAECHE}" stroke="${AKZENT}" stroke-width="2.6"/>
 <circle cx="46" cy="66" r="2.6" fill="${AKZENT}"/><circle cx="74" cy="66" r="2.6" fill="${AKZENT}"/>
 <circle cx="33" cy="46" r="3" fill="${GOLD}"/><circle cx="60" cy="37" r="3.4" fill="${GOLD}"/><circle cx="87" cy="46" r="3" fill="${GOLD}"/>
-${fein ? `${funkel(21, 28, 7)}${funkel(100, 22, 5)}${funkel(103, 92, 6)}` : ''}`;
+${fein ? `${funkel(16.8, 31.1, 7)}${funkel(88.9, 16.8, 5)}${funkel(103.2, 88.9, 6)}` : ''}`;   // Funken je mittig zwischen zwei Strahlen
 }
 
-// art: 'rund' (Zweck any, Ecken frei), 'voll' (Apple, ganze Flaeche), 'maskable', 'favicon'
-export function iconSvg(art = 'rund') {
+// art: 'voll' (Zweck any und Apple, ganze Flaeche), 'maskable', 'favicon' (Ecken frei)
+export function iconSvg(art = 'voll') {
   const S = 512;
-  const voll = art === 'voll' || art === 'maskable';
   const fav = art === 'favicon';
   // maskable: alles bleibt im Kreis der Sicherheitszone (Radius 40 %); Favicon: nur Scheibe und Krone, gross
   const skala = art === 'maskable' ? 3.4 : fav ? 6 : 4;
   const versatz = S / 2 - 60 * skala;
-  const flaeche = voll ? `<rect width="${S}" height="${S}" fill="${GRUND}"/>`
-    : `<rect width="${S}" height="${S}" rx="${fav ? 112 : 114}" fill="${GRUND}"/>`;
+  const flaeche = `<rect width="${S}" height="${S}"${fav ? ' rx="112"' : ''} fill="${GRUND}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}">
 ${flaeche}
 <g transform="translate(${versatz} ${versatz}) scale(${skala})">
@@ -169,8 +167,8 @@ async function baue() {
   const browser = await chromium.launch();
   try {
     const ziele = [
-      ['icon-192.png', 'rund', 192, true],
-      ['icon-512.png', 'rund', 512, true],
+      ['icon-192.png', 'voll', 192, false],
+      ['icon-512.png', 'voll', 512, false],
       ['icon-maskable-512.png', 'maskable', 512, false],
       ['apple-touch-icon.png', 'voll', 180, false],
     ];
