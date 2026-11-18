@@ -75,7 +75,13 @@ img { display: block; }
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: var(--r-pille);
   background: var(--flaeche); color: var(--text); border: 1px solid var(--linie); box-shadow: var(--s1); font-size: 14px; font-weight: 750; white-space: nowrap; }
 .chip svg { width: 16px; height: 16px; }
-.stern { color: var(--gold); }
+.stern { color: var(--stern-an); }
+/* Nicht verdiente Sterne app-weit als Umriss (R19): die Farbe kommt je Ort aus --stern-aus, hier steht nur die Form. Das
+   Symbol (js/ui/icons.js) fuellt und umrandet mit currentColor; ohne Fuellung bleibt der Rand, etwas kraeftiger, damit er
+   auch bei 12 px noch traegt. Das Schriftzeichen bekommt eine Kontur statt Fuellung. */
+:is(.k-sterne svg.aus, .mini-sterne svg.aus, .ziel-sterne > div:not(.an) b svg, .ms-sterne > i:not(.an) svg, .erg-stern.aus .e-stern svg) path {
+  fill: none; stroke-width: 2; }
+:is(.an-vs-sterne, .vl-sterne) > .aus { -webkit-text-fill-color: transparent; -webkit-text-stroke: 1.2px currentColor; }
 
 .flaeche { background-color: var(--flaeche); background-image: var(--textur-flaeche, none);
   border: 1px solid var(--linie); border-radius: var(--radius); box-shadow: var(--s1); }

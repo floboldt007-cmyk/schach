@@ -36,6 +36,10 @@
   --vorzug-start: rgba(70, 87, 120, .34); --vorzug-ziel: rgba(204, 72, 32, .36);
   --pfeil-nutzer: rgba(230, 126, 34, .82); --marke-nutzer: rgba(230, 126, 34, .45);
   --gold: #E0A22B; --gold-weich: rgba(224, 162, 43, .16);
+  /* Sterne (R19): verdient 70 % Gold mit Textfarbe wie die Marke Exklusiv (hell ~3,9:1 statt 2,24:1), nicht verdient als
+     Umriss in --text-2 (statt --linie-2, 1,33:1); WCAG 1.4.11 verlangt 3:1 fuer Grafik mit Information */
+  --stern-an: color-mix(in srgb, var(--gold) 70%, var(--text)); --stern-aus: var(--text-2);
+  --stern-auf-tinte: var(--gold);
   --gut: #2E9E63;
   --warn: #D2453A; --warn-weich: rgba(210, 69, 58, .12);
   --glas: rgba(250, 248, 244, .72); --glas-filter: saturate(1.6) blur(18px);
@@ -148,6 +152,8 @@
   --vorzug-start: rgba(166, 177, 202, .30); --vorzug-ziel: rgba(255, 106, 66, .34);
   --pfeil-nutzer: rgba(255, 150, 60, .82); --marke-nutzer: rgba(255, 150, 60, .45);
   --gold: #F2BE4A; --gold-weich: rgba(242, 190, 74, .14);
+  --stern-an: var(--gold); --stern-aus: var(--text-2);
+  --stern-auf-tinte: color-mix(in srgb, var(--gold) 55%, var(--auf-tinte));
   --gut: #4CC488;
   --warn: #FF6B5E; --warn-weich: rgba(255, 107, 94, .14);
   --glas: rgba(24, 26, 31, .7); --glas-filter: saturate(1.6) blur(18px);
@@ -221,6 +227,8 @@
     --vorzug-start: rgba(166, 177, 202, .30); --vorzug-ziel: rgba(255, 106, 66, .34);
     --pfeil-nutzer: rgba(255, 150, 60, .82); --marke-nutzer: rgba(255, 150, 60, .45);
     --gold: #F2BE4A; --gold-weich: rgba(242, 190, 74, .14);
+    --stern-an: var(--gold); --stern-aus: var(--text-2);
+    --stern-auf-tinte: color-mix(in srgb, var(--gold) 55%, var(--auf-tinte));
     --gut: #4CC488;
     --warn: #FF6B5E; --warn-weich: rgba(255, 107, 94, .14);
     --glas: rgba(24, 26, 31, .7); --glas-filter: saturate(1.6) blur(18px);
