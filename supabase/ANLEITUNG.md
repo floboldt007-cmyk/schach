@@ -526,6 +526,36 @@ Bis Schritt 1 eingespielt ist, zeigt der Reiter „Die Weltrangliste ist gerade 
 **Rückweg:** `supabase/weltrang-zurueck.sql` entfernt beide Funktionen und die Tabelle der Zustimmungen (die
 Zustimmungen gehen dabei verloren, Elo und Liga bleiben). Danach `notify pgrst, 'reload schema';`.
 
+## Saison, Weltrangliste und Online-Elo (Stand 18.11.2026, vorbereitet, noch nicht eingespielt)
+
+Diese drei Teile gehören zu Paket 2. Voraussetzung sind die live eingespielten Dateien `kronen-schema.sql`,
+`zwei-ligen-schema.sql` und `karte-schema.sql`. Jede Datei lässt sich gefahrlos zweimal einspielen.
+
+| Nr. | Was | Datei | Prüfen (Erwartung) |
+| --- | --- | --- | --- |
+| 1 | Saison: Abzeichen, Titel, weicher Reset | `saison-schema.sql` | `saison-rls-test.sql`: unten `Saison-RLS-Test erfolgreich`, nichts bleibt zurück |
+| 2 | Weltrangliste | `weltrang-schema.sql` | `weltrang-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK` |
+| 3 | Eigene Online-Elo auf der Online-Seite | `online-elo-schema.sql` | `online-elo-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK` |
+| 4 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
+
+**Titel „Top 10“ und „Top 100“:** Es zählen Konten mit mindestens 20 Online-Partien mit Kronen in der Saison und einer
+bestätigten Elo, also ab 15 gewerteten Partien, mit selbst angegebener Start-Elo ab 30. Das ist dieselbe Schwelle wie
+in der Weltrangliste.
+
+**Wichtig:** Läuft `zwei-ligen-schema.sql` noch einmal, danach `online-elo-schema.sql` wieder einspielen. Sonst zeigt die
+Online-Seite wieder die Liga statt der Elo.
+
+**Rückweg, in dieser Reihenfolge:**
+
+1. `online-elo-zurueck.sql` nimmt das Feld `elo` wieder heraus. Daten gehen keine verloren.
+2. `weltrang-zurueck.sql` entfernt die Weltrangliste. Die Zustimmungen gehen dabei verloren.
+3. `saison-zurueck.sql` entfernt die Saison. Abzeichen, Titel und Wahl gehen dabei verloren. Ein schon angewandter
+   Reset der Liga-Stufen wird nicht zurückgebucht.
+4. `notify pgrst, 'reload schema';`
+
+`daten-auskunft-zurueck.sql` läuft erst nach den Schritten 2 und 3. Vorher bricht die Datei mit einer Meldung ab, damit
+Saison und Weltrangliste nicht still aus der Datenauskunft fallen.
+
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 
 Flo: „Die ersten 100 Spieler bekommen einen Titel freigeschaltet.“ Die Datei `supabase/pionier-schema.sql` gibt den

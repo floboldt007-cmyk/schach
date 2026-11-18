@@ -1,6 +1,7 @@
 -- VORSCHLAG, NOCH NICHT EINGESPIELT (R19, 14.11.2026): Saison-System der Online-Liga.
 -- Einspielen (Flo, nie Claude): im Supabase SQL Editor NUR diese Datei, nach kronen-schema.sql und zwei-ligen-schema.sql
 -- (live). Danach supabase/saison-rls-test.sql (rollt zurueck). Rueckweg: supabase/saison-zurueck.sql. Wiederholbar.
+-- Danach die App neu einlesen lassen: notify pgrst, 'reload schema';  Reihenfolge aller Teile: supabase/ANLEITUNG.md.
 --
 -- Eine Saison dauert 8 Wochen; Saison 1 beginnt Montag 04.01.2027 (erster Montag nach dem Launch), davor ist Vorsaison
 -- (kein Abzeichen, kein Reset, die Wochen-Liga laeuft normal). Der Start ist EINE Konstante (saison_konstanten).
@@ -10,7 +11,9 @@
 --   3. "crownmaster": wer am Saisonende bei Crownmate I steht (Stufe 17).
 --   4. "top10" / "top100": Rang nach Online-Elo (rank, Gleichstand teilt den Platz) unter den Konten mit mindestens 20
 --      Online-Partien MIT KRONEN in Wochen der Saison (kronen_buchungen quelle 'online': gewertet, ab 4 Halbzuegen,
---      hoechstens 3 je Gegnerpaar und Tag, wie die Elo); ein Titel je Konto und Saison, der bessere.
+--      hoechstens 3 je Gegnerpaar und Tag, wie die Elo); ein Titel je Konto und Saison, der bessere. Mitgezaehlt wird nur
+--      eine bestaetigte Elo, dieselbe Schwelle wie in weltrang-schema.sql: elo_n ab 15, mit selbst gesetzter Start-Elo
+--      (kronen_start) ab 30. Der Rang entsteht erst danach, ehrliche Konten ruecken also nach.
 --   Dazu: daten-auskunft-zurueck.sql bricht ab, solange diese Datei eingespielt ist (zuerst saison-zurueck.sql).
 --   5. Weicher Reset: Stufe minus 3, nie unter Squire III (0), nur fuer Teilnehmer. Die Elo bleibt immer.
 -- Eine Pause ueber mehrere Saisons ergibt genau einen Reset (nur die Saison mit Ligawochen setzt zurueck).
@@ -80,7 +83,7 @@ immutable
 set search_path = ''
 as $$
   select jsonb_build_object('start', '2027-01-04', 'wochen', 8, 'reset', 3, 'top', jsonb_build_array(10, 100),
-    'mindest_partien', 20);
+    'mindest_partien', 20, 'elo_ab', 15, 'elo_ab_start', 30);
 $$;
 
 -- Nummer der Saison einer Liga-Woche (Montag): 0 = Vorsaison
@@ -118,6 +121,8 @@ declare
   top1 integer := (k -> 'top' ->> 0)::integer;
   top2 integer := (k -> 'top' ->> 1)::integer;
   mindest integer := (k ->> 'mindest_partien')::integer;
+  elo_ab integer := (k ->> 'elo_ab')::integer;
+  elo_ab_start integer := (k ->> 'elo_ab_start')::integer;
   jetzt integer := public.saison_nummer(public.liga_woche_heute());
   s integer;
   von date;
@@ -154,6 +159,7 @@ begin
       join (select b.user_id from public.kronen_buchungen b
             where b.quelle = 'online' and b.woche >= von and b.woche < bis
             group by b.user_id having count(*) >= mindest) e on e.user_id = st.user_id
+      where st.elo_n >= case when st.start_gesetzt then elo_ab_start else elo_ab end
     ) r
     where r.rang <= top2
     on conflict do nothing;

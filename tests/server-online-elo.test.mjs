@@ -138,6 +138,9 @@ const vorher = {};
     .replace(/--.*$/gm, '').replace(/\s+/g, ' ');
   const zurueck = rumpf(lies('supabase/online-elo-zurueck.sql'));
   pruefe('Rueckweg ist wortgleich mit zwei-ligen-schema.sql', zurueck !== '' && zurueck === rumpf(lies('supabase/zwei-ligen-schema.sql')));
+  // Kaltreview Paket 2: zwei-ligen-schema.sql bringt kronen_mein_stand() ohne das Feld elo mit
+  const kopf = SCHEMA.split('\n').filter((z) => z.startsWith('--')).join('\n');
+  pruefe('Kopf: nach erneutem zwei-ligen-schema.sql diese Datei wieder einspielen', /erneuten Lauf von zwei-ligen-schema\.sql/.test(kopf), kopf);
 }
 
 // ---------- Gegenprobe: liest der Vorschlag die Elo ohne Bindung an das eigene Konto, wird die Probe rot ----------

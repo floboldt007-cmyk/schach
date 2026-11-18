@@ -3,10 +3,15 @@
 -- Funktion. Ausfuehren im Supabase SQL Editor, danach: notify pgrst, 'reload schema';
 -- Reihenfolge (R19, 14.11.2026): Diese Fassung kennt die Saison nicht. Solange saison-schema.sql eingespielt ist, bricht
 -- sie ab, damit Abzeichen und Titel nicht still aus der Datenauskunft fallen: zuerst supabase/saison-zurueck.sql.
+-- Dasselbe gilt fuer die Zustimmung zur Weltrangliste: solange weltrang-schema.sql eingespielt ist, zuerst
+-- supabase/weltrang-zurueck.sql.
 do $$
 begin
   if pg_catalog.to_regclass('public.saison_abzeichen') is not null then
     raise exception 'ZUERST supabase/saison-zurueck.sql einspielen: diese Fassung von meine_daten() kennt die Saison nicht';
+  end if;
+  if pg_catalog.to_regclass('public.weltrang_teilnahme') is not null then
+    raise exception 'ZUERST supabase/weltrang-zurueck.sql einspielen: diese Fassung von meine_daten() kennt die Weltrangliste nicht';
   end if;
 end;
 $$;
