@@ -83,7 +83,7 @@
       "text": "Tiefblau mit winzigen Sternen.",
       "datei": "assets/shop/bretter/mitternacht.svg",
       "hell": "#C9CFE6",
-      "dunkel": "#2E3766",
+      "dunkel": "#46549B",
       "rand": "#12152B"
     },
     {
@@ -149,7 +149,7 @@
       "text": "Nordlicht zieht als Schleier um das Brett.",
       "datei": "assets/shop/bretter/aurora.svg",
       "hell": "#E8F1F7",
-      "dunkel": "#1E3050",
+      "dunkel": "#375994",
       "rand": "#0D1626"
     },
     {
@@ -160,7 +160,7 @@
       "text": "Sonder-Brett: Weinrot und Gold mit Kronen im Feld.",
       "datei": "assets/shop/bretter/kronsaal.svg",
       "hell": "#F3E3B6",
-      "dunkel": "#7A1F2E",
+      "dunkel": "#A52A3E",
       "rand": "#B8862B"
     },
     {

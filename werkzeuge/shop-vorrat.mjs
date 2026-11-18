@@ -163,7 +163,7 @@ const BRETTER = [
     muster: () => je(HELL, (x, y) => `<circle cx="${x + 3}" cy="${y + 4}" r=".7"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".5"/>`).replace(/<circle/g, '<circle fill="rgba(120,80,40,.28)"')
       + je(DUNKEL, (x, y) => `<circle fill="rgba(80,40,10,.25)" cx="${x + 4}" cy="${y + 7}" r=".8"/>`) },
   // Kennung bleibt mitternacht; der sichtbare Name weicht der Edition "Mitternacht & Gold" aus (Freigabe 18.11.2026)
-  { id: 'mitternacht', name: 'Nachtblau', nameEn: 'Night Blue', seltenheit: 'Selten', hell: '#C9CFE6', dunkel: '#2E3766', rand: '#12152B', text: 'Tiefblau mit winzigen Sternen.',
+  { id: 'mitternacht', name: 'Nachtblau', nameEn: 'Night Blue', seltenheit: 'Selten', hell: '#C9CFE6', dunkel: '#46549B', rand: '#12152B', text: 'Tiefblau mit winzigen Sternen.',
     muster: () => je(DUNKEL, (x, y) => `<circle cx="${x + 3}" cy="${y + 3}" r=".55"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".4"/>`).replace(/<circle/g, '<circle fill="rgba(255,255,255,.7)"') },
   { id: 'kirschbluete', name: 'Kirschblüte', seltenheit: 'Selten', hell: '#FBE8EC', dunkel: '#D98AA0', rand: '#6B2E3E', text: 'Zartrosa mit kleinen Blueten.',
     muster: () => je(HELL, (x, y) => [0, 1, 2, 3, 4].map((i) => { const w = -Math.PI / 2 + (i * 2 * Math.PI) / 5; return `<circle fill="rgba(217,138,160,.4)" cx="${n(x + 5.5 + 1.5 * Math.cos(w))}" cy="${n(y + 5.5 + 1.5 * Math.sin(w))}" r="1"/>`; }).join('')) },
@@ -178,11 +178,12 @@ const BRETTER = [
     muster: () => '', rahmen: () => '<g fill="#D99A6C">' + [[3, 3], [97, 3], [3, 97], [97, 97], [50, 3], [50, 97], [3, 50], [97, 50]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3"/>`).join('') + '</g>' },
   // G-002 (Ausreisser 07.11.): Felder waren unter dem Schleier schlecht zu unterscheiden; jetzt hellere helle und dunklere
   // dunkle Felder, das Nordlicht liegt nur im Rahmen und als feine Kante um das Feld
-  { id: 'aurora', name: 'Aurora', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#1E3050', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
+  // 18.11.2026: dunkel bei Aurora, Nachtblau und Kronsaal aufgehellt, schwarze Figuren brauchen dort mindestens 3:1
+  { id: 'aurora', name: 'Aurora', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#375994', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
     muster: () => '', defs: '<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3BE8B0"/><stop offset=".5" stop-color="#4C6EF5"/><stop offset="1" stop-color="#B565F0"/></linearGradient>',
     ueber: '<path d="M0 6a6 6 0 0 1 6-6h88a6 6 0 0 1 6 6v88a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6zM6 6v88h88V6z" fill="url(#a)" fill-rule="evenodd" opacity=".85"/>'
       + '<rect x="6" y="6" width="88" height="88" fill="none" stroke="url(#a)" stroke-width=".8"/>' },
-  { id: 'kronsaal', name: 'Kronsaal', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#7A1F2E', rand: '#B8862B', text: 'Sonder-Brett: Weinrot und Gold mit Kronen im Feld.',
+  { id: 'kronsaal', name: 'Kronsaal', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#A52A3E', rand: '#B8862B', text: 'Sonder-Brett: Weinrot und Gold mit Kronen im Feld.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x + 3} ${y + 7.5}V${y + 4}l1.5 1.5 1-2 1 2 1.5-1.5v3.5z" fill="rgba(232,190,90,.5)"/>`),
     rahmen: () => '<rect x="3.2" y="3.2" width="93.6" height="93.6" rx="4" fill="none" stroke="#F3D27A" stroke-width=".9"/><rect x="6" y="6" width="88" height="88" fill="none" stroke="#5A3A08" stroke-width=".7"/>' },
 ];
@@ -218,8 +219,8 @@ const EFFEKTE = [
       return `<rect x="${x}" y="-4" width="4" height="8" rx="1" fill="${KONFETTI_FARBEN[i % 5]}">${bewegt('translate', `0 -12;${(i % 3) * 6 - 6} 112`, d, s)}${bewegt('rotate', `0 ${x + 2} 0;${i % 2 ? 360 : -360} ${x + 2} 0`, d, s, true)}</rect>`; }).join('') + '</g>' },
   { id: 'lichtsaeule', name: 'Lichtsäule', art: 'sieg', seltenheit: 'Selten', text: 'Ein Lichtstrahl steigt ueber dem Koenig auf.',
     // Freigabe 18.11.2026 (wirkte wie ein dicker Balken): schmaler Kegel, feiner Kern, Ring am Fuss, aufsteigende Funkel
-    svg: () => '<defs><linearGradient id="s" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFC233" stop-opacity=".7"/><stop offset="1" stop-color="#FFC233" stop-opacity="0"/></linearGradient>'
-      + '<linearGradient id="k" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFF1C2"/><stop offset="1" stop-color="#FFF1C2" stop-opacity="0"/></linearGradient></defs>'
+    svg: () => '<defs><linearGradient id="s" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFC233" stop-opacity="0"/><stop offset=".16" stop-color="#FFC233" stop-opacity=".7"/><stop offset="1" stop-color="#FFC233" stop-opacity="0"/></linearGradient>'
+      + '<linearGradient id="k" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFF1C2" stop-opacity="0"/><stop offset=".16" stop-color="#FFF1C2"/><stop offset="1" stop-color="#FFF1C2" stop-opacity="0"/></linearGradient></defs>'
       + `<path d="M43 92L49 6h2L57 92z" fill="url(#s)">${anim('opacity', '.4;1;.4', 1.6)}</path><rect x="49.2" y="10" width="1.6" height="82" rx=".8" fill="url(#k)">${anim('opacity', '.6;1;.6', 1.6)}</rect>`
       + `<ellipse cx="50" cy="92" rx="6" ry="2" fill="none" stroke="#FFC233" stroke-width="1.2">${anim('rx', '6;20', 1.6)}${anim('ry', '2;5', 1.6)}${anim('opacity', '1;0', 1.6)}</ellipse>`
       + '<g fill="#FFC233" stroke="#8A6100" stroke-width=".6">' + [[40, 84, 0], [60, 78, -0.6], [46, 70, -1.2]].map(([x, y, s]) => `<path d="${funkel(x, y, 3.2)}">${bewegt('translate', '0 0;0 -56', 1.8, s)}${anim('opacity', '0;1;0', 1.8, s)}</path>`).join('') + '</g>' },
