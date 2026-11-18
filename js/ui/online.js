@@ -924,7 +924,13 @@ export function zeige(root, params, app) {
     const f = andere(online.meineFarbe(p)), id = p.id;
     const { k, name } = spielerDaten(f);
     zeigeGegnerProfil({ karte: k, name, partie: true,
-      laden: k || !id ? null : () => karteDerPartie(id).then((d) => (d ? (f === 'w' ? d.w : d.s) : null)) });
+      laden: k || !id ? null : () => karteDerPartie(id).then((d) => (d ? (f === 'w' ? d.w : d.s) : null)) })
+      .then(() => {
+        // kam bei offenem Blatt ein Zug, hat karten() die Leiste samt Knopf neu gebaut; das Blatt findet den alten Knopf
+        // nicht mehr, der Fokus fiele auf body (Kaltreview 6b, F1): dann auf den neuen Knopf
+        const a = document.activeElement;
+        if (!weg && (!a || a === document.body)) inhalt.querySelector('.on-oben .on-gegner-knopf')?.focus({ preventScroll: true });
+      });
   }
   // geschlagene Figuren je Seite und Materialvorsprung "+n" (wie zeichneGeschlagen in js/ui/partie.js)
   function zeichneGeschlagen() {
