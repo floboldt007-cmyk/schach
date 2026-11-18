@@ -68,7 +68,7 @@
 //
 // Daten-Fundament (DSGVO, 22.10.2026): datenfreigabe 'aus' | 'an' (Standard aus): angemeldete Spieler teilen fertige
 //   Partien und anonyme Nutzung nur mit dieser ausdruecklichen Freigabe (js/daten.js). Falscher Wert -> 'aus'.
-import { BOTS, botNachId } from './bots.js';
+import { BOTS, botNachId, endgegnerDerWelt } from './bots.js';
 import { sende } from './ereignisse.js';
 import { kompaktReview, ergaenzeReviewFelder, begrenzeLeistung } from './review.js';
 
@@ -424,6 +424,14 @@ export function istWeltFrei(nr, f = ladeFortschritt()) {
 export function hatWeltsiegel(nr, f = ladeFortschritt()) {
   const bots = BOTS.filter((x) => x.welt === nr);
   return bots.length > 0 && bots.every((x) => f.bots[x.id] && f.bots[x.id].sterne.every(Boolean));
+}
+// Erspielbare Stuecke (R19, Variante C): Endgegner einer Welt besiegt; jeder Bot aller Welten mindestens einmal besiegt
+export function endgegnerBesiegt(nr, f = ladeFortschritt()) {
+  const b = endgegnerDerWelt(nr);
+  return !!(b && f.bots[b.id] && f.bots[b.id].sterne[0]);
+}
+export function alleBotsBesiegt(f = ladeFortschritt()) {
+  return BOTS.every((b) => f.bots[b.id] && f.bots[b.id].sterne[0]);
 }
 
 // Hoechste Stufe auf dem normalen Weg (ohne die direkt herausforderbaren Endgegner): Massstab fuer Empfehlungen

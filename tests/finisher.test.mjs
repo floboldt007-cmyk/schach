@@ -8,8 +8,8 @@ const { klang, KATALOG } = await import('../js/sounds.js');
 
 // R19: Blitzschlag, Goldregen, Schockwelle vor der Signatur (tests/r19-emotes-finisher.test.mjs)
 assert.deepEqual(FINISHER.map((x) => x.id), ['aus', 'krone', 'welle', 'koenig', 'kronensturz', 'blitzschlag', 'goldregen', 'schockwelle', 'signatur']);
-// Labor (Flo 01.11.2026: "Finisher ins Labor, nur ich soll die sehen, die kommen in den Shop"): ohne Erfinder-Konto ist
-// kein Finisher frei, auch nicht ueber das Level, und die Wahl ist "aus"
+// Ohne Erfinder-Konto und ohne besiegten Endgegner ist kein Finisher frei, auch nicht ueber das Level, und die Wahl ist "aus"
+// (die Freigabe ueber die Welt-Endgegner prueft tests/r19-emotes-erspielbar.test.mjs)
 assert.equal(istFrei('signatur'), false, 'Signatur ohne Sonderstueck gesperrt');
 assert.ok(['krone', 'welle', 'koenig', 'kronensturz', 'blitzschlag', 'goldregen', 'schockwelle'].every((id) => !istFrei(id)), 'ohne Erfinder: kein Finisher frei');
 assert.equal(istFrei('aus'), true);
