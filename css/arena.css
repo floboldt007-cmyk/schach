@@ -291,8 +291,8 @@
 .arena .knoten .k-sterne { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); display: flex; gap: 1px; padding: 3px 6px;
   border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s1), var(--kante); z-index: 3; pointer-events: none; }
 .arena .knoten .k-sterne .ico { width: 14px; height: 14px; }
-.arena .knoten .k-sterne .stern { color: var(--gold); }
-.arena .knoten .k-sterne .aus { color: var(--linie-2); }
+.arena .knoten .k-sterne .stern { color: var(--stern-an); }
+.arena .knoten .k-sterne .aus { color: var(--stern-aus); }
 /* Namensschild unter der Station: Pille, gewaehlt in Tinte */
 .arena .knoten .k-schild { position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); display: inline-flex; align-items: baseline; gap: 5px;
   white-space: nowrap; padding: 3px 10px 4px; border-radius: var(--r-pille); background: var(--flaeche); color: var(--text);
@@ -347,8 +347,8 @@
 .arena .detail .elo { margin-top: 5px; font-size: 14px; font-weight: 650; color: var(--text-2); }
 .arena .mini-sterne { display: inline-flex; gap: 2px; margin-top: 6px; vertical-align: middle; }
 .arena .mini-sterne .ico { width: 15px; height: 15px; }
-.arena .mini-sterne .stern { color: var(--gold); }
-.arena .mini-sterne .aus { color: var(--linie-2); }
+.arena .mini-sterne .stern { color: var(--stern-an); }
+.arena .mini-sterne .aus { color: var(--stern-aus); }
 /* Spruch-Karte (Hook .sprechblase bleibt; Optik nach A, keine CSS-Animation: das Panel wechselt gestaffelt per JS) */
 .arena .detail .sprechblase { margin-top: 2px; padding: 13px 15px; border: 0; border-radius: 18px; background: var(--flaeche-2); box-shadow: var(--kante);
   color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.4; animation: none; transform-origin: 32px 0; }
@@ -388,10 +388,10 @@
 /* Bedingungen: drei Sterne (Hook .ziel-sterne > div, .an) */
 .arena .ziel-sterne { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .arena .ziel-sterne > div { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; font-weight: 650; color: var(--text-2); line-height: 1.2; }
-.arena .ziel-sterne b { display: flex; flex: none; color: var(--linie-2); }
+.arena .ziel-sterne b { display: flex; flex: none; color: var(--stern-aus); }
 .arena .ziel-sterne b .ico { width: 17px; height: 17px; }
 .arena .ziel-sterne .an { color: var(--text); }
-.arena .ziel-sterne .an b { color: var(--gold); }
+.arena .ziel-sterne .an b { color: var(--stern-an); }
 /* Wahl: Farbe als Segment (js/ui/bauteile.js), Platz fuer die Bedenkzeit (W0+b fuellt .ort-tempo) */
 .arena .wahl-titel { font-size: 13px; font-weight: var(--gw-stark); color: var(--text-2); margin-bottom: 8px; }
 .arena .farbwahl .seg img { width: 24px; height: 24px; }

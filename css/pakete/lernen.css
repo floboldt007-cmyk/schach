@@ -39,6 +39,9 @@
 .ms-bk-sterne .von, .ms-bk-gratis { opacity: .72; }
 .ms-bk-balken { display: block; height: 5px; border-radius: var(--r-pille); background: var(--linie); overflow: hidden; }
 .ms-bkarte[aria-pressed="true"] .ms-bk-balken { background: rgba(255, 255, 255, .22); }
+/* gewaehlte Buch-Karte: Grund ist --tinte (hell fast schwarz, dunkel fast weiss); dort traegt --stern-auf-tinte das Gold
+   mit >= 3:1 (dunkel vorher 1,52:1, R19 Sterne) */
+.ms-bkarte[aria-pressed="true"] .ms-bk-sterne .ico { color: var(--stern-auf-tinte); }
 .ms-willkommen { display: flex; align-items: center; gap: 8px; margin: 12px 2px 0; color: var(--text-2); font-size: 14px; font-weight: 600; line-height: 1.4; }
 .ms-willkommen .ico { flex: none; width: 16px; height: 16px; color: var(--stern); }
 .ms-bk-balken > i { display: block; height: 100%; border-radius: inherit; background: var(--stern); }
@@ -73,7 +76,7 @@
 .ms-stufe[data-stufe="schwer"] { background: var(--tinte); color: var(--auf-tinte); box-shadow: none; }
 .ms-stufe[data-stufe="meister"] { background: #1C1B19; color: #F5C451; box-shadow: none; }
 .ms-sterne { display: inline-flex; gap: 2px; }
-.ms-sterne > i { display: grid; color: var(--linie-2); }
+.ms-sterne > i { display: grid; color: var(--stern-aus); }
 .ms-sterne > i.an { color: var(--stern); }
 .ms-sterne .ico { width: 18px; height: 18px; }
 .ms-pfeil { display: grid; color: var(--text-3); }
