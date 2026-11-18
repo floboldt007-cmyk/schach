@@ -162,7 +162,6 @@ function initSkript({ modus, saat, lernen }) {
 }
 
 const seitenfehler = [];
-const analyseGesehen = new Set();
 const browser = await pw.chromium.launch({ headless: true });
 try {
   for (const [geraet, opt] of GERAETE) {
@@ -207,7 +206,7 @@ try {
         // Verlauf und Analyse: eine Bot-Partie ueber die Testseite (ohne Review)
         await s.goto(`http://127.0.0.1:${PORT}/tests/screens.html?screen=keiner`);
         await s.waitForFunction(() => window.testseiteBereit === true, null, { timeout: 30000 });
-        const id = await s.evaluate(async () => (await testseite.botPartie({ gegner: 'kalle', flo: 'greta', mitReview: false, datum: Date.now() - 3600e3 })).id);
+        const id = await s.evaluate(async () => (await testseite.botPartie({ gegner: 'kalle', flo: 'greta', mitReview: true, tiefe: 6, datum: Date.now() - 3600e3 })).id);
         await s.goto(`http://127.0.0.1:${PORT}/tests/screens.html?screen=verlauf`);
         await s.waitForFunction(() => window.testseiteBereit === true, null, { timeout: 30000 });
         // die Testseite laedt js/thema.js nicht; das setzt in der App html[data-modus] (thema.js:246), hier von Hand
@@ -218,16 +217,15 @@ try {
         await s.goto(`http://127.0.0.1:${PORT}/tests/screens.html?screen=analyse&partieId=${id}&neueSterne=1,0,0`);
         await s.waitForFunction(() => window.testseiteBereit === true, null, { timeout: 30000 });
         await s.evaluate((m) => { document.documentElement.dataset.modus = m; }, farbe);
-        // auf dem PC (1280x800) rendert die Testseite die Stern-Zeile der Analyse nicht (Stand d16f03d, offen); dort nur Hinweis
-        if (!(await s.waitForSelector('.an-vs-sterne', { timeout: 8000 }).then(() => true).catch(() => false))) console.log(`     HINWEIS ${gruppe}: Analyse ohne Stern-Zeile`);
+        // die Stern-Zeile steht in der Genauigkeits-Karte, und die braucht die Auswertung: sie liegt der Partie schon bei (mitReview),
+        // sonst rechnete Stockfish sie erst auf der Seite und kam unter Last nicht rechtzeitig (k2.log 18.11.: Analyse dunkel fehlte)
+        await s.waitForSelector('.an-vs-sterne', { timeout: 30000 });
         await warte(1500);
         await messeOrte(s, gruppe + ' Analyse', gesehen);
       } finally { await k.close(); }
-      for (const ort of PFLICHT) if (ort !== 'Analyse') pruefe(`${gruppe}: Ort ${ort} gemessen`, gesehen.has(ort), [...gesehen]);
-      if (gesehen.has('Analyse')) analyseGesehen.add(farbe);
+      for (const ort of PFLICHT) pruefe(`${gruppe}: Ort ${ort} gemessen`, gesehen.has(ort), [...gesehen]);
     }
   }
-  pruefe('Analyse in hell und dunkel gemessen', analyseGesehen.size === 2, [...analyseGesehen]);
   pruefe('keine Seitenfehler', !seitenfehler.length, seitenfehler);
 } finally {
   await browser.close();
