@@ -53,6 +53,7 @@ const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID }))
 const EDITION = { produkt_id: 'brett-mitternacht', name: 'Mitternacht & Gold', auflage: 10, status: 'erhaeltlich', restzahl: 9,
   verkauf_ab: '2026-11-28T10:00:00Z', betrag_cent: 499, waehrung: 'eur' };
 const AUSLAGE = JSON.parse(readFileSync(new URL('../assets/shop/auslage.json', import.meta.url), 'utf8'));
+const VORRAT = JSON.parse(readFileSync(new URL('../assets/shop/vorrat.json', import.meta.url), 'utf8'));
 const ARTEN = ['brett', 'figur', 'klang', 'finisher'];
 const { EMOTE_STICKER } = await import('../js/emote-kunst.js');
 const angeboteneEmotes = [...AUSLAGE.plaetze.filter((p) => p.art === 'emote'), ...(AUSLAGE.regale?.emote || [])].map((x) => x.id);
@@ -273,9 +274,9 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
     // Figur: der Satz auf dem echten Brett; Oeffnen und Schliessen der Vorschau ruft nichts beim Server auf
     const vorher = z.aufrufe.length;
     await oeffneVorschau(s, 'figur');
-    const figurId = soll[1];
-    const satz = await s.evaluate((id) => [...document.querySelectorAll('.sheet-karte .shf-vorschau .brett img.figur')]
-      .filter((i) => i.getAttribute('src').includes(`assets/shop/figuren/${id}/`)).length, figurId);
+    const figurOrdner = VORRAT.stuecke.find((v) => v.art === 'figuren' && v.id === soll[1])?.ordner;
+    const satz = await s.evaluate((ordner) => [...document.querySelectorAll('.sheet-karte .shf-vorschau .brett img.figur')]
+      .filter((i) => i.getAttribute('src').includes(`${ordner}/`)).length, figurOrdner);
     pruefe(`${gruppe}: Figur-Vorschau zeigt den Satz auf dem echten Brett`, satz === 32, satz);
     pruefe(`${gruppe}: Figur-Vorschau ohne Kaufen-Knopf`, await s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Kaufen' }).count() === 0);
     await schliesse(s);

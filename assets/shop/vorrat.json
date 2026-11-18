@@ -64,6 +64,16 @@
       "figuren": 12
     },
     {
+      "id": "goldelfenbein",
+      "art": "figuren",
+      "name": "Gold und Elfenbein",
+      "name_en": "Gold and Ivory",
+      "seltenheit": "Episch",
+      "text": "Klassische Formen in Gold und Elfenbein.",
+      "ordner": "assets/pieces/goldelfenbein",
+      "figuren": 12
+    },
+    {
       "id": "sandstein",
       "art": "brett",
       "name": "Sandstein",

@@ -252,6 +252,8 @@ for (const set of SETS) {
   }
   stuecke.push({ id: set.id, art: 'figuren', name: set.name, seltenheit: set.seltenheit, text: set.text, ordner: `assets/shop/figuren/${set.id}`, figuren: 12 });
 }
+// Fertiger Satz aus assets/pieces (Flos Wahl 18.11.2026): steht im Vorrat, wird hier nicht gezeichnet
+stuecke.push({ id: 'goldelfenbein', art: 'figuren', name: 'Gold und Elfenbein', name_en: 'Gold and Ivory', seltenheit: 'Episch', text: 'Klassische Formen in Gold und Elfenbein.', ordner: 'assets/pieces/goldelfenbein', figuren: 12 });
 for (const b of BRETTER) {
   const rel = `assets/shop/bretter/${b.id}.svg`;
   groessen.push([rel, schreibe(rel, brettSvg(b))]);
