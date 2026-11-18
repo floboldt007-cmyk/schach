@@ -54,9 +54,10 @@ pruefe('Client: Erstzug-Frist nach Serveruhr, ohne frische Probe begrenzt durch 
   /return zeitSeit\(s, ersteSicht\.am, SICHT_SPIEL_MS\);/.test(js));
 // Kaltreview F3 + Fix-Review 84 (16.11.): die Zeitpruefung (Uhr und Erstzug-Frist) loest am EIGENEN Zug mit der
 // Ansichts-Schranke aus (nie allein nach einer vorgehenden Geraeteuhr), ist der Gegner am Zug nach der Serveruhr (sonst
-// kommt sie nach Neuladen bis zu seiner ganzen Restzeit zu spaet)
-pruefe('Client: Ausloesung mit Schranke nur am eigenen Zug, sonst nach der Serveruhr',
-  /const geschuetzt = vorlaufMs\(\);\s*return p\.am_zug === online\.meineFarbe\(p\) \? geschuetzt : serverSeitMs\(\);/.test(js));
+// kommt sie nach Neuladen bis zu seiner ganzen Restzeit zu spaet). online-frist 18.11.: nach der Serveruhr der Proben, nie
+// mit dem gemerkten Versatz der Anzeige (anzeige: false)
+pruefe('Client: Ausloesung mit Schranke nur am eigenen Zug, sonst nach der Serveruhr (ohne gemerkten Anzeige-Versatz)',
+  /const geschuetzt = vorlaufMs\(\);\s*return p\.am_zug === online\.meineFarbe\(p\) \? geschuetzt : serverSeitMs\(\{ anzeige: false \}\);/.test(js));
 pruefe('Client: tick loest Uhr und Erstzug-Frist ueber ausloeserMs aus',
   /halbzuege >= 2 && rest\(p\.am_zug, ausloeserMs\(\)\) === 0/.test(js) && /halbzuege < 2 && p\.letzter_zug_am && ausloeserMs\(\) >= haengtNachMs\(p\)/.test(js));
 // Pflicht-Probe e7 (16.11.): die wartende Seite reklamiert still (ohne aktion, also ohne busy) und hoechstens alle 30 s
