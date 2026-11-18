@@ -8,6 +8,8 @@
 -- Einspielen (Flo, nie Claude): nach kronen- und zwei-ligen-schema.sql im SQL Editor; danach
 -- notify pgrst, 'reload schema';  Probe: supabase/online-elo-rls-test.sql. Rueckweg: supabase/online-elo-zurueck.sql.
 -- Test: tests/server-online-elo.test.mjs. Wiederholbar.
+-- Wichtig: Nach einem erneuten Lauf von zwei-ligen-schema.sql diese Datei wieder einspielen, denn zwei-ligen-schema.sql
+-- bringt kronen_mein_stand() ohne das Feld elo mit (die App zeigt dann wieder die Liga statt der Elo).
 
 create or replace function public.kronen_mein_stand()
 returns jsonb

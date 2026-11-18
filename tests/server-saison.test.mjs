@@ -394,6 +394,43 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
   pruefe('daten-verwaltung-zurueck.sql traegt den Saison-Block (Auskunft verliert die Saison nicht)', !v && /'saison', saison/.test(lies('supabase/daten-verwaltung-zurueck.sql')), v);
 }
 
+// ---------- 3d. Kaltreview Paket 2: top10/top100 nur mit der Schwelle der Weltrangliste (15, selbst gesetzter Start 30) ----------
+{
+  const { db, fehler } = await neueDb();
+  pruefe('Titel-Schwelle: Schemas laufen', !fehler, fehler);
+  if (!fehler) {
+    const K = (n) => `c0000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`;
+    const START = K(1), S29 = K(2), S30 = K(3), N14 = K(4), N15 = K(5);
+    const E = (n) => K(10 + n); // E1 bis E12: ehrliche Konten unter allen anderen
+    const ehrlich = Array.from({ length: 12 }, (_, i) => i + 1);
+    const alle = [START, S29, S30, N14, N15, ...ehrlich.map(E)];
+    await db.exec(`insert into auth.users (id, email) values ${alle.map((u, i) => `('${u}', 'k${i}@x')`).join(', ')};
+      insert into public.kronen_stand (user_id, elo, elo_n, start_gesetzt) values
+        ('${S29}', 2700, 29, true), ('${S30}', 2600, 30, true), ('${N14}', 2500, 14, false), ('${N15}', 2400, 15, false),
+        ${ehrlich.map((n) => `('${E(n)}', ${1800 - n * 10}, 40, false)`).join(', ')};
+      ${HEUTE('2027-01-11')}`);
+    const start = await als(db, START, 'select public.kronen_start(2800) as d');
+    pruefe('Fehlerfall: kronen_start(2800) wird angenommen', start?.d?.stufe === 6, JSON.stringify(start));
+    for (let i = 0; i < 20; i++) await db.exec(`select public.kronen_online_buchen('${START}', gen_random_uuid(), 0, 1000);`);
+    const st = await wert(db, `select elo, elo_n from public.kronen_stand where user_id = '${START}'`);
+    pruefe('Fehlerfall: nach 20 Niederlagen noch Elo 2040 bei 20 Partien', st.elo === 2040 && st.elo_n === 20, JSON.stringify(st));
+    const buchungen = [];
+    for (const u of alle.filter((x) => x !== START)) for (let i = 0; i < 20; i++) buchungen.push(`('${u}', 'online', 'schwelle-${i}', 5, '2027-01-11')`);
+    await db.exec(`insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche) values ${buchungen.join(', ')};
+      ${HEUTE('2027-03-01')} select public.kronen_stand_sichern('${START}');`);
+    pruefe('selbst gesetzte 2800, 20 Niederlagen: kein Titel', (await titelVon(db, START)).length === 0, JSON.stringify(await titelVon(db, START)));
+    pruefe('selbst gesetzter Start mit 29 Partien: kein Titel', (await titelVon(db, S29)).length === 0, JSON.stringify(await titelVon(db, S29)));
+    pruefe('selbst gesetzter Start mit 30 Partien: Rang 1, top10', JSON.stringify(await titelVon(db, S30)) === '["top10-s1"]', JSON.stringify(await titelVon(db, S30)));
+    pruefe('ohne selbst gesetzten Start mit 14 Partien: kein Titel', (await titelVon(db, N14)).length === 0, JSON.stringify(await titelVon(db, N14)));
+    pruefe('ohne selbst gesetzten Start mit 15 Partien: Rang 2, top10', JSON.stringify(await titelVon(db, N15)) === '["top10-s1"]', JSON.stringify(await titelVon(db, N15)));
+    pruefe('ehrliche Konten ruecken nach: E8 steht auf Rang 10 (top10)', JSON.stringify(await titelVon(db, E(8))) === '["top10-s1"]', JSON.stringify(await titelVon(db, E(8))));
+    pruefe('ehrliche Konten ruecken nach: E9 steht auf Rang 11 (top100)', JSON.stringify(await titelVon(db, E(9))) === '["top100-s1"]', JSON.stringify(await titelVon(db, E(9))));
+  }
+  const kopf = lies('supabase/saison-schema.sql').split('\n').slice(0, 30).join('\n');
+  pruefe('Kopf nennt das Neueinlesen (notify pgrst)', /notify pgrst, 'reload schema';/.test(kopf));
+  pruefe('ANLEITUNG hat den Abschnitt zu Saison, Weltrangliste und Online-Elo', /^## Saison, Weltrangliste und Online-Elo/m.test(lies('supabase/ANLEITUNG.md')));
+}
+
 // ---------- 4. Die Probe fuer den SQL Editor (saison-rls-test.sql) laeuft durch und rollt zurueck ----------
 {
   const { db, fehler } = await neueDb();

@@ -175,14 +175,23 @@ try {
 pruefe('anon darf meine_daten() nicht aufrufen', anonFehler !== null, anonFehler);
 
 // ---------- Rueckweg: alte Funktion, danach wieder die neue ----------
+// Kaltreview Paket 2: diese Fassung kennt die Weltrangliste nicht, die Zustimmung darf nicht still aus der Auskunft fallen
 f = await lauf(db, 'daten-auskunft-zurueck.sql', lies('supabase/daten-auskunft-zurueck.sql'));
-pruefe('daten-auskunft-zurueck.sql laeuft', f === null, f);
+pruefe('daten-auskunft-zurueck.sql bricht ab, solange die Weltrangliste eingespielt ist', /ZUERST supabase\/weltrang-zurueck\.sql/.test(f || ''), f);
+d = await auskunft(A);
+pruefe('nach dem Abbruch: die Auskunft nennt die Weltrangliste weiter', d && 'weltrang' in (d.kronen || {}), Object.keys(d?.kronen || {}).join());
+f = await lauf(db, 'weltrang-zurueck.sql', lies('supabase/weltrang-zurueck.sql'));
+pruefe('weltrang-zurueck.sql laeuft', f === null, f);
+f = await lauf(db, 'daten-auskunft-zurueck.sql', lies('supabase/daten-auskunft-zurueck.sql'));
+pruefe('nach weltrang-zurueck.sql laeuft daten-auskunft-zurueck.sql', f === null, f);
 d = await auskunft(A);
 pruefe('nach dem Rueckweg: alte Auskunft ohne die neuen Teile', d && !('coach' in d) && 'kronen' in d, Object.keys(d || {}).join());
+f = await lauf(db, 'weltrang-schema.sql (nach Rueckweg)', lies('supabase/weltrang-schema.sql'));
+pruefe('weltrang-schema.sql laesst sich danach wieder einspielen', f === null, f);
 f = await lauf(db, 'daten-schema.sql (nach Rueckweg)', lies('supabase/daten-schema.sql'));
 pruefe('daten-schema.sql laesst sich danach wieder einspielen', f === null, f);
 d = await auskunft(A);
-pruefe('danach ist die volle Auskunft wieder da', d && 'coach' in d && 'schule' in d, Object.keys(d || {}).join());
+pruefe('danach ist die volle Auskunft wieder da', d && 'coach' in d && 'schule' in d && 'weltrang' in (d.kronen || {}), Object.keys(d || {}).join());
 
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);
