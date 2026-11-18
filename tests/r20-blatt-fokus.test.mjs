@@ -89,6 +89,7 @@ try {
     try {
       await s.goto(`http://127.0.0.1:${PORT}/index.html?test#arena`);
       await s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function', null, { timeout: 30000 });
+      await s.waitForFunction(() => !!document.querySelector('#app > .screen:not(.lade-screen)'), null, { timeout: 30000 });
       await zuIch(s);
       for (const [name, sel] of OEFFNER) {
         const knopf = s.locator(sel).first();
