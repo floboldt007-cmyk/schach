@@ -572,6 +572,9 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-weg .detail-welt { display: none; }
 .arena.karte-weg .detail:not(.offen) :is(.sprechblase, .ziel-sterne, .wahl-farbe, .ort-tempo) { display: none; }
 .arena.karte-weg .cta-platz { position: static; margin: 0 -16px; padding: 4px 16px 14px; border-radius: 0 0 24px 24px; }
+/* offen klebt der Spielen-Platz unten in der Karte wie im Panel (.arena .cta-platz): auf dem kleinsten SE (320 x 568) ist die
+   offene Karte hoeher als ihr Platz und scrollt, der Knopf lag sonst 94 px tief unter der Reiterleiste (R19 arena-karte-klein) */
+.arena.karte-weg .detail.offen .cta-platz { position: sticky; bottom: 0; }
 .arena.karte-weg .spielen { min-height: 56px; }
 .arena.karte-weg .knoten .fahne { bottom: calc(100% + 8px); }
 /* Variante R19 B (.karte-leiste): zu ist die Karte eine schmale Leiste, Kopf und runder Spielen-Knopf in einer Zeile; die

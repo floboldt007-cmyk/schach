@@ -582,17 +582,21 @@ export function zeige(root, params, app) {
   let wegGezeichnet = reduziert();
   function layout() {
     if (weg) return;
-    const kw = karte.clientWidth;
+    const kwAlt = karte.clientWidth;
     const kh = karte.clientHeight;
-    if (!kw || !kh) return;
-    const quer = !window.matchMedia('(orientation: portrait), (max-width: 760px)').matches && kh >= 420;
+    // Groessenwechsel (Fenster kleiner, Drehen): unter der alten Lage kann die Karte 0 px gross sein (.karte-quer bei 375 px,
+    // das Panel nimmt die ganze Breite). Dann entscheidet das Fenster ueber die Lage, gemessen wird erst danach; vorher brach
+    // layout() hier ab und die Arena blieb in .karte-quer haengen
+    const schmal = window.matchMedia('(orientation: portrait), (max-width: 760px)').matches;
+    if (!schmal && !kh) return;
+    const quer = !schmal && kh >= 420;
     const vorher = modus;
     modus = quer ? 'quer' : 'hoch';
     // Handy hoch, Variante R19 B (Flo 14.11.: "sieht gequetscht aus"): die ganze Welt bleibt auf einen Blick (Flo 31.10.:
     // "alles auf einmal sehen"), bekommt aber die volle Hoehe; der Gegner schwebt als schmale Leiste unten ueber der Welt
     // und geht als Karte auf (.karte-weg.karte-leiste, css/arena.css). Kein Scrollen in der Karte.
     const kompakt = false;
-    const wegModus = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
+    const wegModus = !quer && (kwAlt || window.innerWidth) < 600 && window.matchMedia('(orientation: portrait)').matches;
     s.classList.toggle('karte-leiste', wegModus);
     lageModus = quer ? 'quer' : wegModus ? 'kompakt' : 'hoch';
     s.classList.toggle('karte-quer', quer);
@@ -602,6 +606,8 @@ export function zeige(root, params, app) {
     // die Klassen aendern die Groesse der Karte (Weg: volle Hoehe statt Platz fuer das Panel); danach neu messen, sonst rechnet
     // die Welt mit der alten Hoehe und der ResizeObserver sieht keine Aenderung mehr
     const khNeu = karte.clientHeight || kh;
+    const kw = karte.clientWidth;
+    if (!kw || !khNeu) return;
     const lage = LAGEN[lageModus];
     const w = kw;
     weltEl.dataset.welt = welt.id;
