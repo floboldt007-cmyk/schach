@@ -102,11 +102,11 @@
 .erg-sterne { display: flex; justify-content: center; align-items: flex-start; gap: clamp(8px, 4vw, 28px); margin-top: 6px; }
 .erg-stern { position: relative; flex: 0 1 120px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px;
   font-size: 13px; line-height: 1.25; color: var(--text-2); }
-.e-stern { position: relative; display: block; width: 62px; height: 62px; color: var(--linie-2); }
+.e-stern { position: relative; display: block; width: 62px; height: 62px; color: var(--stern-aus); }
 .erg-stern:nth-child(2) .e-stern { width: 76px; height: 76px; margin-top: -8px; }
 .e-stern .ico { width: 100%; height: 100%; display: block; }
 .e-stern::after { content: ""; position: absolute; left: 24%; right: 24%; bottom: -4px; height: 6px; border-radius: 50%; background: var(--gold-weich); }
-.erg-stern.an .e-stern { color: var(--gold);
+.erg-stern.an .e-stern { color: var(--stern-an);
   animation: erg-stern calc(720ms * var(--tempo)) var(--feder-hupf) calc((360ms + var(--i) * 250ms) * var(--tempo)) both; }
 .erg-stern.aus .e-stern { animation: overlay-ein calc(400ms * var(--tempo)) var(--sanft) calc((360ms + var(--i) * 250ms) * var(--tempo)) both; }
 .erg-stern.wartet .e-stern { opacity: .5; }
