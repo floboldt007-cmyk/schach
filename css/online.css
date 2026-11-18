@@ -245,6 +245,9 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .on-inhalt > .on-tueren { grid-template-rows: auto minmax(0, 36px) auto; }   /* + zweimal 12 px Rasterluecke = 60 px */
   .on-tueren > .on-tuer:first-child { grid-row: 1; }
   .on-tueren > .on-tuer + .on-tuer { grid-row: 3; }
+  /* abgemeldet fehlt der Liga-Streifen, die Mittelreihe blieb leer (R20 B1, tests/r20-online-handy.test.mjs): dort 0, die
+     Rasterluecken bleiben (24 px), der Block steht weiter mittig */
+  .on-inhalt > .on-tueren[data-zustand="ohne"] { grid-template-rows: auto 0 auto; }
 }
 
 /* ---------- R19 online ruhig (Flo 14.11.2026: "zu viele Zahlen", Wahl 23:00: Entwurf A, js/ui/online.js zeigeLiga,
