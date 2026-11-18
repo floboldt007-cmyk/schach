@@ -33,7 +33,7 @@ begin
   end if;
   g := public.liga_gruppe('raetsel');
   if g->>'liga' <> 'raetsel' or g->>'gruppe' is not null or jsonb_array_length(g->'mitglieder') <> 0
-     or (g->'bot_ki'->>'max')::int <> 300 or jsonb_typeof(g->'offen') <> 'array' then
+     or (g->'bot_ki'->>'max')::int <> 60 or jsonb_typeof(g->'offen') <> 'array' then
     raise exception 'FEHLER: Raetsel-Gruppe ohne Buchung falsch (%)', g;
   end if;
   if public.kronen_mein_stand() ? 'liga' or public.liga_meine_gruppe() ? 'liga' then
@@ -174,9 +174,9 @@ declare
   r jsonb;
 begin
   perform public.kronen_stand_sichern(d);
-  -- Online-Deckel voll (300 aus KI-Gegnern)
+  -- Online-Deckel voll (60 aus KI-Gegnern, Flos Wahl R13-K1)
   insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche)
-  values (d, 'ki', 'voll-1', 300, public.liga_woche_am(clock_timestamp()));
+  values (d, 'ki', 'voll-1', 60, public.liga_woche_am(clock_timestamp()));
   r := public.kronen_einfach_buchen(d, 'bot', 'bot-d', 'sieg');
   if (r->>'delta')::int <> 0 or not (r->>'bot_ki_voll')::boolean then
     raise exception 'FEHLER: Online-Deckel greift nicht (%)', r;
