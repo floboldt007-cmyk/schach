@@ -232,7 +232,9 @@ try {
   pruefe('Tastatur: Escape schliesst, der Fokus steht wieder auf der Gegnerleiste', tZu && await weiss.evaluate(() =>
     document.activeElement?.matches('.on-oben button[data-online="gegner"]')), await weiss.evaluate(() => document.activeElement?.outerHTML.slice(0, 80)));
   // 5b. Kaltreview 6b (F1): kommt bei offenem Profil ein Gegnerzug an, baut die Partie die Leiste neu; der Fokus muss
-  // nach Escape trotzdem auf dem (neuen) Knopf stehen, nicht auf body
+  // nach Escape trotzdem auf dem (neuen) Knopf stehen, nicht auf body. Mit Bewegung "normal" wie bei echten Nutzern: dann
+  // bleibt das Blatt nach dem Schliessen 260 ms im DOM (Nach-Review 6b)
+  await schwarz.evaluate(async () => (await import('./js/bewegung.js')).setzeBewegung('normal'));
   await schwarz.locator('.on-oben button[data-online="gegner"]').focus();
   await schwarz.keyboard.press('Enter');
   const zOffen = await blattDa(schwarz);
@@ -240,8 +242,10 @@ try {
   const zSieht = await sieht(schwarz, 'g1f3');
   await schwarz.keyboard.press('Escape');
   const zZu = await blattZu(schwarz);
+  await schwarz.waitForTimeout(400);
   const zFokus = await schwarz.evaluate(() => document.activeElement?.matches('.on-oben button[data-online="gegner"]') ? 'knopf'
     : (document.activeElement?.outerHTML || 'null').slice(0, 60));
+  await schwarz.evaluate(async () => (await import('./js/bewegung.js')).setzeBewegung('aus'));
   pruefe('Tastatur mit Zug: Enter, Gegner zieht g1-f3 bei offenem Profil, Escape: Fokus wieder auf der Gegnerleiste', zOffen && zSieht && zZu
     && zFokus === 'knopf', { zOffen, zSieht, zZu, zFokus });
   pruefe('Das Profil fragt keine neuen Server-Daten an (nur karte_der_partie, einmal je Sitzung und Partie)', karteRufe.every(r => r.partie === id)

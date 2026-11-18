@@ -927,9 +927,10 @@ export function zeige(root, params, app) {
       laden: k || !id ? null : () => karteDerPartie(id).then((d) => (d ? (f === 'w' ? d.w : d.s) : null)) })
       .then(() => {
         // kam bei offenem Blatt ein Zug, hat karten() die Leiste samt Knopf neu gebaut; das Blatt findet den alten Knopf
-        // nicht mehr, der Fokus fiele auf body (Kaltreview 6b, F1): dann auf den neuen Knopf
+        // nicht mehr, der Fokus fiele auf body (Kaltreview 6b, F1): dann auf den neuen Knopf. Mit Animation steht er beim
+        // resolve noch im schliessenden Blatt (.sheet-ort.weg, 260 ms im DOM) und faellt erst danach auf body
         const a = document.activeElement;
-        if (!weg && (!a || a === document.body)) inhalt.querySelector('.on-oben .on-gegner-knopf')?.focus({ preventScroll: true });
+        if (!weg && (!a || a === document.body || a.closest('.sheet-ort.weg'))) inhalt.querySelector('.on-oben .on-gegner-knopf')?.focus({ preventScroll: true });
       });
   }
   // geschlagene Figuren je Seite und Materialvorsprung "+n" (wie zeichneGeschlagen in js/ui/partie.js)
