@@ -1,14 +1,15 @@
 // Shop A "Schaufenster" (Feinschliff R19, Flos Wahl 15.11.2026, fuer alle seit Flos JA 16.11. 21:40): der Standard. Nur mit
 // der Kennung ?shopStil=alt (fuer Tests) zeigt shop.js den alten Shop (Bilder: tests/bilder-shop.mjs, Probe:
 // tests/r19-shop-fortnite.test.mjs).
-//   Fuenf feste Plaetze, je Art genau einer, immer in der Reihenfolge Brett, Figur, Klang, Emote, Finisher. Welches Stueck
-//   auf einem Platz liegt, steht in assets/shop/auslage.json (Flo tauscht dort nur Zeilen). Ein fehlender oder unbekannter
-//   Eintrag laesst den Platz mit "Folgt" stehen: es bleiben immer fuenf.
+//   Vier feste Plaetze, je Art genau einer, immer in der Reihenfolge Brett, Figur, Klang, Finisher. Welches Stueck auf einem
+//   Platz liegt, steht in assets/shop/auslage.json (Flo tauscht dort nur Zeilen). Ein fehlender oder unbekannter Eintrag
+//   laesst den Platz mit "Folgt" stehen: es bleiben immer vier. Einen Emote-Platz gibt es seit dem 18.11.2026 nicht mehr:
+//   Emotes sind erspielbar (Variante C), und der Shop bietet nichts als kommend an, das jeder schon besitzt.
 // Grenzen (design/runde4/SPIELKONZEPT.md, Regeln der Werkstatt): kein Countdown, keine Rotation, nichts verschwindet, keine
 // Restzahl. Kein Versprechen ohne Kauf-Weg (Entscheid 16.11. 21:40, RUECKHOLBAR: so/R19-shop-a-standard, Laufzettel): es gibt
 // noch keinen echten Kauf, also kein Kaufen-Knopf, kein Preis und kein "Preis folgt", auch wenn der Server einen Preis
 // schickt, sondern Schloss und "Bald". Die Vorschau ruft nichts beim Server auf.
-// Regale (R19, Flo 15.11.2026: "mehr Emotes, Finisher und Klaenge"): unter den fuenf Plaetzen je ein Regal "Mehr Emotes",
+// Regale (R19, Flo 15.11.2026: "mehr Emotes, Finisher und Klaenge"): unter den vier Plaetzen je ein Regal "Mehr Emotes",
 //   "Mehr Finisher", "Mehr Klaenge" (auslage.json "regale", ohne das Stueck, das schon auf dem Platz liegt), Karten wie die
 //   Plaetze (Schloss und "Bald", gleiche Vorschau). Ein Regal ohne bekanntes Stueck faellt weg.
 //
@@ -36,7 +37,7 @@ export function shopStil() {
   try { return new URLSearchParams(location.search).get('shopStil') === 'alt' ? null : 'a'; } catch (e) { return 'a'; }
 }
 
-const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
+const ARTEN = ['brett', 'figur', 'klang', 'finisher'];
 // Seltenheit aus Vorrat bzw. Auslage ("Häufig" ...) als Schluessel; die Edition gilt als exklusiv (limitiert)
 const SELTENHEITEN = ['haeufig', 'selten', 'episch', 'exklusiv'];
 const schluessel = (x) => { const s = String(x || '').toLowerCase().replace('ä', 'ae'); return SELTENHEITEN.includes(s) ? s : null; };
@@ -196,11 +197,11 @@ export async function shopEntwurf({ stil, editionen = [], gast = false, katalog 
   const wurzel = document.createElement('div');
   wurzel.className = 'shf';
   wurzel.dataset.shopStil = stil;
-  const fuenf = document.createElement('div');
-  fuenf.className = 'shf-fuenf';
+  const schaufenster = document.createElement('div');
+  schaufenster.className = 'shf-plaetze';
   const kontext = { vorrat, katalog, editionen, gast, produktName };
-  fuenf.append(...ARTEN.map((art) => karte(art, stueck(art, plaetze.find((p) => p && p.art === art), kontext), wahl)));
+  schaufenster.append(...ARTEN.map((art) => karte(art, stueck(art, plaetze.find((p) => p && p.art === art), kontext), wahl)));
   const regale = auslage && typeof auslage.regale === 'object' && auslage.regale ? auslage.regale : {};
-  wurzel.append(fuenf, ...REGALE.map((art) => regal(art, regale[art], plaetze.find((p) => p && p.art === art)?.id, kontext, wahl)).filter(Boolean));
+  wurzel.append(schaufenster, ...REGALE.map((art) => regal(art, regale[art], plaetze.find((p) => p && p.art === art)?.id, kontext, wahl)).filter(Boolean));
   return wurzel;
 }

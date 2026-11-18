@@ -349,7 +349,9 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
    grosse Karten mit Bild und Preis, Farbe je Seltenheit; kein Ablauf, keine Restzahl */
 .shf { display: grid; gap: 22px; min-width: 0; max-width: 1100px; }
 .sh-inhalt:has(> .shf) { max-width: none; }
-.shf-fuenf { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+/* Vier Plaetze: 2 x 2 oder 1 x 4, nie eine Reihe mit Luecke */
+.shf-plaetze { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+@media (min-width: 700px) { .shf-plaetze { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .shf-karte, .shf-rk { --shf-farbe: #7a8494; }
 :is(.shf-karte, .shf-rk)[data-seltenheit="haeufig"] { --shf-farbe: #4f9a64; }
 :is(.shf-karte, .shf-rk)[data-seltenheit="selten"] { --shf-farbe: #3a78d4; }

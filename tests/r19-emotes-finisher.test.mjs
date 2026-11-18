@@ -252,7 +252,7 @@ async function lauf(browser, [geraet, w, h], { farbe = 'hell', ruhig = false, ga
       const regale = [...document.querySelectorAll('.sa-blatt .shf-regal')];
       const rk = [...document.querySelectorAll('.sa-blatt .shf-rk')];
       return {
-        fuenf: document.querySelectorAll('.sa-blatt .shf-karte').length,
+        plaetze: document.querySelectorAll('.sa-blatt .shf-karte').length,
         arten: regale.map((r) => r.dataset.art),
         titel: regale.map((r) => r.querySelector('.shf-regal-titel')?.textContent.trim()),
         ids: Object.fromEntries(regale.map((r) => [r.dataset.art, [...r.querySelectorAll('.shf-rk')].map((x) => x.dataset.id)])),
@@ -266,7 +266,7 @@ async function lauf(browser, [geraet, w, h], { farbe = 'hell', ruhig = false, ga
         label: rk.every((x) => /Bald/.test(x.getAttribute('aria-label') || '')),
       };
     });
-    pruefe(`${gruppe}: die fuenf Plaetze bleiben`, bild.fuenf === 5, bild.fuenf);
+    pruefe(`${gruppe}: die vier Plaetze bleiben`, bild.plaetze === 4, bild.plaetze);
     pruefe(`${gruppe}: zwei Regale in fester Reihenfolge mit Titel, kein leeres Emote-Regal`, JSON.stringify(bild.arten) === '["finisher","klang"]'
       && bild.titel.join() === [TITEL.finisher, TITEL.klang].join(), bild.titel);
     pruefe(`${gruppe}: Regale zeigen die Liste aus auslage.json`, REGALE.every((a) => JSON.stringify(bild.ids[a]) === JSON.stringify(R[a].map((x) => x.id))), bild.ids);

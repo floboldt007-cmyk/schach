@@ -1,14 +1,14 @@
-// Shop A "Schaufenster" (Feinschliff R19, Flos Wahl 15.11.2026, fuer alle seit Flos JA 16.11. 21:40): fuenf feste Plaetze
+// Shop A "Schaufenster" (Feinschliff R19, Flos Wahl 15.11.2026, fuer alle seit Flos JA 16.11. 21:40): vier feste Plaetze
 // (js/pakete/sammlung/shop-entwurf.js, Belegung aus assets/shop/auslage.json). Nur mit ?shopStil=alt (fuer Tests) kommt
 // der alte Shop: eine Edition, Kaufknopf "Bald verfuegbar" abgeschaltet.
-//   Je Art genau ein Platz, immer in dieser Reihenfolge: Brett, Figur, Klang, Emote, Finisher. Ein fehlender oder
-//   unbekannter Eintrag laesst seinen Platz mit "Folgt" stehen, es bleiben fuenf.
+//   Je Art genau ein Platz, immer in dieser Reihenfolge: Brett, Figur, Klang, Finisher. Ein fehlender oder unbekannter
+//   Eintrag laesst seinen Platz mit "Folgt" stehen, es bleiben vier. Der Emote-Platz ist seit dem 18.11.2026 weg: Emotes
+//   sind erspielbar (Variante C), und der Shop bietet nichts als kommend an, das jeder schon besitzt.
 // Feste Grenzen (design/runde4/SPIELKONZEPT.md, Regeln der Werkstatt): kein Countdown, keine Rotation, nichts verschwindet,
 // keine Restzahl. Ohne echten Kauf-Weg kein Versprechen (Entscheid 16.11. 21:40, rueckholbar): kein Kaufen-Knopf, kein Preis
 // und kein "Preis folgt", auch wenn der Server einen Preis schickt (betrag_cent), sondern Schloss und "Bald"; die Vorschau
 // ruft nichts beim Server auf (keine Kasse, kein Stripe).
-// Vorschau je Art: Brett und Figur auf dem ECHTEN Brett (js/board.js), Klang mit Anhoeren-Knopf, Emote gross (bewegt nur
-// ohne "weniger Bewegung"), Finisher als Standbild.
+// Vorschau je Art: Brett und Figur auf dem ECHTEN Brett (js/board.js), Klang mit Anhoeren-Knopf, Finisher als Standbild.
 // iPhone 13, iPhone SE, iPad hoch und quer und PC, hell und dunkel. Netz nur simuliert.
 //
 //   node tests/r19-shop-fortnite.test.mjs
@@ -53,12 +53,16 @@ const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID }))
 const EDITION = { produkt_id: 'brett-mitternacht', name: 'Mitternacht & Gold', auflage: 10, status: 'erhaeltlich', restzahl: 9,
   verkauf_ab: '2026-11-28T10:00:00Z', betrag_cent: 499, waehrung: 'eur' };
 const AUSLAGE = JSON.parse(readFileSync(new URL('../assets/shop/auslage.json', import.meta.url), 'utf8'));
-const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
+const ARTEN = ['brett', 'figur', 'klang', 'finisher'];
+const { EMOTE_STICKER } = await import('../js/emote-kunst.js');
+const angeboteneEmotes = [...AUSLAGE.plaetze.filter((p) => p.art === 'emote'), ...(AUSLAGE.regale?.emote || [])].map((x) => x.id);
+pruefe('Auslage: kein fester Emote-Platz', !AUSLAGE.plaetze.some((p) => p.art === 'emote'), AUSLAGE.plaetze);
+pruefe('Auslage: kein Grund-Sticker wird angeboten, den jeder schon besitzt', EMOTE_STICKER.length === 8 && !angeboteneEmotes.some((id) => EMOTE_STICKER.includes(id)), angeboteneEmotes);
 // Editionen (Bretter) aus KATALOG in js/pakete/sammlung/shop.js, aus dem Quelltext gelesen
 const KATALOG_EDITIONEN = [...readFileSync(new URL('../js/pakete/sammlung/shop.js', import.meta.url), 'utf8')
   .matchAll(/^\s*'([a-z0-9-]+)': Object\.freeze\(\{ art: 'brett'/gm)].map((m) => m[1]);
-// Probe "die Datenliste ist die Quelle": andere Figur, ein unbekanntes Emote, kein Klang-Eintrag, Reihenfolge verdreht
-const UMGEBAUT = { plaetze: [{ art: 'emote', id: 'gibt-es-nicht' }, { art: 'finisher', id: 'krone' }, { art: 'figur', id: 'lampion' },
+// Probe "die Datenliste ist die Quelle": andere Figur, kein Klang-Eintrag, Reihenfolge verdreht; ein Emote-Eintrag bekommt keinen Platz
+const UMGEBAUT = { plaetze: [{ art: 'emote', id: 'applaus' }, { art: 'finisher', id: 'krone' }, { art: 'figur', id: 'lampion' },
   { art: 'brett', id: 'aurora' }] };
 
 // ohneAlter: Konto ohne "18 oder aelter" (wie unter 18): der Server liefert keine Edition (supabase/ANLEITUNG.md)
@@ -201,8 +205,8 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
       };
     });
     pruefe(`${gruppe}: Kennung a gesetzt`, bild.stil === 'a', bild.stil);
-    pruefe(`${gruppe}: genau fuenf Plaetze, je Art einer, in fester Reihenfolge`, JSON.stringify(bild.arten) === JSON.stringify(ARTEN), bild.arten);
-    pruefe(`${gruppe}: keine Reihen, kein Highlight (nur die fuenf Plaetze)`, bild.reihen === 0, bild.reihen);
+    pruefe(`${gruppe}: genau vier Plaetze, je Art einer, in fester Reihenfolge`, JSON.stringify(bild.arten) === JSON.stringify(ARTEN), bild.arten);
+    pruefe(`${gruppe}: keine Reihen, kein Highlight (nur die vier Plaetze)`, bild.reihen === 0, bild.reihen);
     pruefe(`${gruppe}: jeder Platz hat ein Bild`, bild.mitBild.every(Boolean), bild.mitBild);
     pruefe(`${gruppe}: gleich grosse Karten`, bild.gleichBreit && bild.hoehen.length <= 2, { hoehen: bild.hoehen, gleichBreit: bild.gleichBreit });
     pruefe(`${gruppe}: kein Countdown, keine Restzahl, kein "nur heute", kein "diese Woche"`, !DRUCK.test(bild.text), (bild.text.match(DRUCK) || [])[0]);
@@ -220,30 +224,30 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
       // .sh-karte[data-gast] auf main (kein Knopf, Name in --text-2, "Mit Konto"); Kaltreview 9b 17.11.2026
       const edition = KATALOG_EDITIONEN.includes(AUSLAGE.plaetze.find((p) => p.art === 'brett')?.id);
       pruefe(`${gruppe}: Edition aus der Auslage ist ein Katalog-Brett (sonst prueft dieser Lauf nichts)`, edition, AUSLAGE.plaetze);
-      pruefe(`${gruppe}: fuenf Plaetze, alle mit Stueck und Schloss`, bild.folgt.every((x) => !x) && bild.schloss.every(Boolean), bild.preise);
+      pruefe(`${gruppe}: vier Plaetze, alle mit Stueck und Schloss`, bild.folgt.every((x) => !x) && bild.schloss.every(Boolean), bild.preise);
       pruefe(`${gruppe}: Edition als Gast-Karte (data-gast, kein Knopf, Name grau, "Mit Konto")`,
         bild.gast[0] && !bild.knopf[0] && bild.nameGrau[0] === true && bild.preise[0] === 'Mit Konto',
         { gast: bild.gast[0], knopf: bild.knopf[0], nameGrau: bild.nameGrau[0], preis: bild.preise[0] });
-      pruefe(`${gruppe}: die anderen vier Plaetze normal (Knopf, "Bald", keine Gast-Markierung)`,
+      pruefe(`${gruppe}: die anderen drei Plaetze normal (Knopf, "Bald", keine Gast-Markierung)`,
         bild.gast.slice(1).every((x) => !x) && bild.knopf.slice(1).every(Boolean) && bild.preise.slice(1).every((x) => x === 'Bald'),
         { gast: bild.gast, preise: bild.preise });
       await k.close(); return;
     }
     if (fehler || ohneAlter) {
       // angemeldet zeigt der Shop eine Edition nur, wenn der Server sie liefert (nur ab 18, wie der alte Shop auf main);
-      // ohne Altersangabe oder bei einem Serverfehler bleibt der Edition-Platz "Folgt", die anderen vier stehen
+      // ohne Altersangabe oder bei einem Serverfehler bleibt der Edition-Platz "Folgt", die anderen drei stehen
       const edition = KATALOG_EDITIONEN.includes(AUSLAGE.plaetze.find((p) => p.art === 'brett')?.id);
       pruefe(`${gruppe}: Edition aus der Auslage ist ein Katalog-Brett (sonst prueft dieser Lauf nichts)`, edition, AUSLAGE.plaetze);
       pruefe(`${gruppe}: keine Edition ohne Freigabe des Servers, Brett-Platz "Folgt"`, bild.folgt[0] && bild.preise[0] === 'Folgt' && !bild.ids[0], { ids: bild.ids, preise: bild.preise });
-      pruefe(`${gruppe}: die anderen vier Plaetze mit Stueck, Schloss und "Bald"`,
+      pruefe(`${gruppe}: die anderen drei Plaetze mit Stueck, Schloss und "Bald"`,
         bild.folgt.slice(1).every((x) => !x) && bild.preise.slice(1).every((x) => x === 'Bald') && bild.schloss.slice(1).every(Boolean), bild.preise);
       await k.close(); return;
     }
     if (auslage) {
       pruefe(`${gruppe}: Belegung kommt aus auslage.json (Brett Aurora, Figur Lampion, Finisher Krone)`,
-        bild.ids[0] === 'aurora' && bild.ids[1] === 'lampion' && bild.ids[4] === 'krone', bild.ids);
-      pruefe(`${gruppe}: fehlender Klang und unbekanntes Emote stehen als "Folgt"`, bild.folgt[2] && bild.folgt[3] && !bild.folgt[0] && !bild.folgt[1] && !bild.folgt[4], bild.folgt);
-      pruefe(`${gruppe}: ein "Folgt"-Platz hat keinen Preis und keinen Kaufen-Weg`, bild.preise[2] === 'Folgt' && bild.preise[3] === 'Folgt', bild.preise);
+        bild.ids[0] === 'aurora' && bild.ids[1] === 'lampion' && bild.ids[3] === 'krone', bild.ids);
+      pruefe(`${gruppe}: fehlender Klang steht als "Folgt"`, bild.folgt[2] && !bild.folgt[0] && !bild.folgt[1] && !bild.folgt[3], bild.folgt);
+      pruefe(`${gruppe}: ein "Folgt"-Platz hat keinen Preis und keinen Kaufen-Weg`, bild.preise[2] === 'Folgt', bild.preise);
       await k.close(); return;
     }
     const soll = ARTEN.map((art) => AUSLAGE.plaetze.find((p) => p.art === art)?.id ?? null);
@@ -294,14 +298,6 @@ async function lauf(browser, [geraet, w, h], stil, { farbe = 'hell', auslage = n
     pruefe(`${gruppe}: Anhoeren laeuft ohne Fehler`, seitenfehler.length === fehlerVorher, seitenfehler.slice(fehlerVorher));
     await schliesse(s);
 
-    // Emote: gross, bewegt nur ohne "weniger Bewegung"
-    await oeffneVorschau(s, 'emote');
-    const emote = await s.evaluate(() => { const e = document.querySelector('.sheet-karte .shf-vorschau svg.emote-sticker');
-      return e ? { breite: Math.round(e.getBoundingClientRect().width), laeuft: e.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length } : null; });
-    pruefe(`${gruppe}: Emote-Vorschau gross (ab 120 px)`, !!emote && emote.breite >= 120, emote);
-    pruefe(`${gruppe}: Emote ${ruhig ? 'steht still (weniger Bewegung)' : 'bewegt sich'}`, !!emote && (ruhig ? emote.laeuft === 0 : emote.laeuft > 0), emote);
-    await schliesse(s);
-
     // Finisher: als Standbild
     await oeffneVorschau(s, 'finisher');
     const fin = await s.evaluate(() => { const e = document.querySelector('.sheet-karte .shf-vorschau svg.sk-finisher');
@@ -343,9 +339,23 @@ try {
   for (const g of [IPHONE, PC]) await lauf(browser, g, 'alt');
   await lauf(browser, IPHONE, null, { ruhig: true });
   await lauf(browser, IPHONE, null, { auslage: UMGEBAUT });
-  // abgemeldet und bei einem Serverfehler: Shop A zeigt trotzdem die fuenf Plaetze, der alte Shop bleibt, wie er war
+  // abgemeldet und bei einem Serverfehler: Shop A zeigt trotzdem die vier Plaetze, der alte Shop bleibt, wie er war
   // angemeldet ohne "18 oder aelter": wie live keine Edition (der alte Shop fragt nach dem Alter, Shop A laesst den Platz "Folgt")
   for (const art of [{ gast: true }, { fehler: true }, { ohneAlter: true }]) { await lauf(browser, IPHONE, null, art); await lauf(browser, IPHONE, 'alt', art); }
+  // Schaufenster ohne Luecke: in jeder Fensterbreite ist jede Reihe voll (2 x 2 oder 1 x 4)
+  for (const breite of [320, 375, 390, 667, 820, 1180, 1440]) {
+    const k = await browser.newContext({ viewport: { width: breite, height: 844 }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block', locale: 'de-DE' });
+    await k.route('**/*.supabase.co/**', bediener({ aufrufe: [] }));
+    await k.addInitScript(initSkript, { sitzung: SITZUNG });
+    const s = await k.newPage(); s.setDefaultTimeout(15000);
+    s.on('pageerror', (e) => seitenfehler.push(`${breite} px: ${e.message}`));
+    await oeffneShop(s, '');
+    await s.waitForSelector('.sa-blatt .shf .shf-karte', { timeout: 15000 }).catch(() => {});
+    await warte(300);
+    const reihen = await s.evaluate(() => { const je = {}; for (const x of document.querySelectorAll('.sa-blatt .shf-karte')) { const t = Math.round(x.getBoundingClientRect().top); je[t] = (je[t] || 0) + 1; } return Object.values(je); });
+    pruefe(`${breite} px: Schaufenster ohne Luecke (2 x 2 oder 1 x 4)`, ['2,2', '4'].includes(reihen.join()), reihen);
+    await k.close();
+  }
 } finally {
   if (browser) await browser.close().catch(() => {});
   server.close();

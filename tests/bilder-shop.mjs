@@ -1,4 +1,4 @@
-// Bilder des Shops (Feinschliff R19): Shop A, der Standard ohne Kennung (fuenf feste Plaetze, js/pakete/sammlung/shop-entwurf.js,
+// Bilder des Shops (Feinschliff R19): Shop A, der Standard ohne Kennung (vier feste Plaetze, js/pakete/sammlung/shop-entwurf.js,
 // Belegung aus assets/shop/auslage.json), und der alte Shop (Stil ist, nur mit ?shopStil=alt) auf iPhone 13, iPhone SE, iPad hoch
 // und quer und PC, je hell und dunkel. Je Ansicht der Shop-Start und bei a die Vorschau jedes Platzes (Brett, Figur, Klang,
 // Emote, Finisher); beim alten Shop das Anprobieren der Edition.
@@ -81,7 +81,7 @@ const bilderFertig = (s, wurzel) => s.waitForFunction((w) => [...document.queryS
 // R19 shop-a-standard (16.11.): alle fuenf Geraete in hell und dunkel, dazu iPad quer
 const GERAETE = [['iphone13', 390, 844], ['iphonese', 375, 667], ['ipad', 820, 1180], ['ipadquer', 1180, 820], ['pc', 1280, 720]]
   .flatMap((g) => [[...g, 'hell'], [...g, 'dunkel']]);
-const ARTEN = ['brett', 'figur', 'klang', 'emote', 'finisher'];
+const ARTEN = ['brett', 'figur', 'klang', 'finisher'];
 const seitenfehler = [];
 let browser;
 try {
