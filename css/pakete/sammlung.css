@@ -345,7 +345,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   .pr-vitrine-ort .pr-vitrine[data-leer] .pr-orden { min-height: 44px; }
 }
 
-/* R19 Shop A (shop-entwurf.js, nur mit ?shopStil=a): fuenf feste Plaetze (Brett, Figur, Klang, Emote, Finisher), gleich
+/* R19 Shop A (shop-entwurf.js, der Standard; der alte Shop nur noch mit ?shopStil=alt): fuenf feste Plaetze (Brett, Figur, Klang, Emote, Finisher), gleich
    grosse Karten mit Bild und Preis, Farbe je Seltenheit; kein Ablauf, keine Restzahl */
 .shf { display: grid; gap: 22px; min-width: 0; max-width: 1100px; }
 .sh-inhalt:has(> .shf) { max-width: none; }
