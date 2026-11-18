@@ -424,7 +424,7 @@ html[data-brett="tiefenleuchten"] {
 :root {
   --ui-bg: var(--grund); --ui-flaeche: var(--flaeche); --ui-flaeche-2: var(--flaeche-2);
   --ui-text: var(--text); --ui-gedimmt: var(--text-2); --ui-rand: var(--linie); --ui-rand-stark: var(--linie-2);
-  --stern: var(--stern-an); --schlecht: var(--warn); --eval-weiss: var(--balken-weiss); --eval-schwarz: var(--balken-schwarz);
+  --stern: var(--gold); --schlecht: var(--warn); --eval-weiss: var(--balken-weiss); --eval-schwarz: var(--balken-schwarz);
   --schrift-display: var(--display); --radius: var(--r-m); --tap: var(--tipp);
   /* Neon-Reste ruhig stellen, bis ihr Abschnitt geloescht ist */
   --neon-cyan: var(--text-2); --neon-violett: var(--text-2); --neon-pink: var(--akzent); --neon-orange: var(--akzent);
