@@ -1,6 +1,6 @@
 {
-  "stand": "2026-11-06",
-  "hinweis": "Nur Grafiken, noch nicht in die App eingebaut. Flo gibt jedes Stueck frei. Keine Preise: die stehen nur im Vault.",
+  "stand": "2026-11-18",
+  "hinweis": "Grafiken fuer den Shop, die App liest diese Liste (js/pakete/sammlung/shop-entwurf.js). Verkauft wird damit noch nichts. Flo gibt jedes Stueck frei. Keine Preise: die stehen nur im Vault.",
   "quelle": "werkzeuge/shop-vorrat.mjs",
   "seltenheiten": [
     "Häufig",
@@ -77,7 +77,8 @@
     {
       "id": "mitternacht",
       "art": "brett",
-      "name": "Mitternacht",
+      "name": "Nachtblau",
+      "name_en": "Night Blue",
       "seltenheit": "Selten",
       "text": "Tiefblau mit winzigen Sternen.",
       "datei": "assets/shop/bretter/mitternacht.svg",

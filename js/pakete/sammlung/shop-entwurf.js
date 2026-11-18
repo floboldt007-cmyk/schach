@@ -21,7 +21,7 @@
 import { Brett } from '../../board.js';
 import { figurenPfad } from '../../figurensatz.js';
 import { sheet } from '../../ui/bauteile.js';
-import { t } from '../../sprache.js';
+import { t, sprache } from '../../sprache.js';
 import { PAKETE_KLANG, PAKETE_LABOR, klang } from '../../sounds.js';
 import { klangKunst, finisherKunst } from '../../sammlung-kunst.js';
 import { emoteSvg } from '../../emote-kunst.js';
@@ -43,6 +43,8 @@ const SELTENHEITEN = ['haeufig', 'selten', 'episch', 'exklusiv'];
 const schluessel = (x) => { const s = String(x || '').toLowerCase().replace('ä', 'ae'); return SELTENHEITEN.includes(s) ? s : null; };
 
 const ladeJson = (pfad, leer) => fetch(pfad).then((r) => (r.ok ? r.json() : leer)).catch(() => leer);
+// Name eines Vorrat-Stuecks: auf Englisch name_en, wenn es ihn gibt
+const vorratName = (v) => (sprache() === 'en' && v.name_en) || v.name;
 
 // Ein Eintrag der Auslage als Stueck, oder null, wenn die Id fuer diese Art nicht im Bestand ist
 function stueck(art, eintrag, { vorrat, katalog, editionen, gast, produktName }) {
@@ -59,12 +61,12 @@ function stueck(art, eintrag, { vorrat, katalog, editionen, gast, produktName })
         brett: { hell: k.hell, dunkel: k.dunkel }, gast: !ed };
     }
     const v = ausVorrat('brett');
-    return v ? { id, art, name: v.name, seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.brett'),
+    return v ? { id, art, name: vorratName(v), seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.brett'),
       brett: { hell: v.hell, dunkel: v.dunkel }, bild: v.datei } : null;
   }
   if (art === 'figur') {
     const v = ausVorrat('figuren');
-    return v ? { id, art, name: v.name, seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.figuren'), figuren: v.ordner } : null;
+    return v ? { id, art, name: vorratName(v), seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.figuren'), figuren: v.ordner } : null;
   }
   if (art === 'klang') {
     if (!Object.hasOwn(PAKETE_KLANG, id) && !Object.hasOwn(PAKETE_LABOR, id)) return null;
