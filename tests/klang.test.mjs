@@ -12,7 +12,7 @@
 //
 //   node tests/klang.test.mjs               alles
 //   node tests/klang.test.mjs --nur-node    ohne Browser
-//   PORT=8961 node tests/klang.test.mjs     eigener Port (Standard 8837)
+//   PORT=8961 node tests/klang.test.mjs     eigener Port (Standard: frei)
 //
 // Neue oder neu erzeugte Klaenge: Tabelle PEGEL unten aus der pegel.json des Werkzeugs neu schreiben
 // (node tests/klang.test.mjs --tabelle=/pfad/zu/pegel.json gibt sie aus).
@@ -26,7 +26,7 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8837);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const NUR_NODE = process.argv.includes('--nur-node');
 const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
 

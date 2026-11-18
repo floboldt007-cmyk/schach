@@ -141,7 +141,12 @@ registriereTexte('einstellungen', {
     'info.datenschutz': 'Datenschutzerklärung',
     'info.impressum': 'Impressum',
     'info.stockfish': 'Schach-Engine als WebAssembly (stockfish.js, lite), GPL-3.0. Quellen: {link}',
-    'info.chessjs': 'Schachregeln, BSD-2-Clause',
+    'info.chessjs': 'Schachregeln von Jeff Hlywa, BSD-2-Clause',
+    'info.quellcode': 'Der Quellcode von {app} steht offen auf {link} (GPL-3.0).',
+    'info.lizenztext': 'Lizenztext',
+    'info.lichess': 'Rätsel im Rätsel-Duell',
+    'info.lichessText': 'Aus der {link}, CC0',
+    'info.lichessDb': 'Lichess-Rätsel-Datenbank',
     'info.figuren': 'Figuren „cburnett“',
     'info.figurenText': 'von Colin M. L. Burnett, GPLv2+',
     'info.schriften': 'Schriften Manrope und Bricolage Grotesque',
@@ -177,10 +182,14 @@ registriereTexte('einstellungen', {
     'zz.zuege': 'Züge',
     'zz.ergebnis': 'Ergebnis',
     'zz.amZug': '{name} ist am Zug',
+    'zz.introTitel': 'Weiß beginnt',
+    'zz.introUnter': '{name} zieht zuerst',
     'zz.amZugSchach': '{name} ist am Zug · Schach',
     'zz.beendet': 'Partie beendet',
     'zz.gewinnt': '{name} gewinnt',
     'zz.revanche': 'Revanche',
+    // Kopf der laufenden Partie (R6-Befund B11): Zurueck zum Start, Klang-Schalter wie in der Bot-Partie
+    'zz.start': 'Start', 'zz.zurueckStart': 'Zurück zum Start', 'zz.klang': 'Klang', 'zz.klangAn': 'Klang an', 'zz.klangAus': 'Klang aus',
     'zz.bietetRemis': '{name} bietet Remis',
     'zz.entscheidet': '{name} entscheidet.',
     'zz.weiterspielen': 'Weiterspielen',
@@ -313,6 +322,7 @@ registriereTexte('einstellungen', {
       + 'karte: deine Erfolgs-Stufen, Taler-Buchungen, Banner und die gewählte Visitenkarte. '
       + 'online_versuche: falsch eingegebene Einladungscodes je Tag. mengenzaehler: wie viele Zeilen dein Konto je Stunde geteilt hat '
       + '(nur Zahlen, für die Mengenbremse, nach 48 Stunden gelöscht). '
+      + 'verwaltung: was der Betreiber über die Verwaltung an deinem Konto geändert hat (Premium, Name, Banner, mit vorher und nachher). '
       + 'geraet: der Spielstand in diesem Browser. noch_nicht_gesendet: geteilte Daten, die noch auf diesem Gerät warten. '
       + 'zustimmung: wann du das Teilen eingeschaltet hast. widerruf_offen: ein Widerruf, der den Server noch nicht erreicht hat.',
     'daten.teilenTitel': 'Crownmate: meine Daten',
@@ -353,6 +363,9 @@ registriereTexte('einstellungen', {
     'konto.sitzungAbgelaufen': 'Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.',
     'konto.emailNichtFreigegeben': 'An diese E-Mail-Adresse kann die App im Moment noch keinen Code schicken (Testphase).',
     'konto.codeZuOft': 'Zu viele Versuche. Warte bitte kurz und versuche es dann erneut.',
+    'konto.mailZuOft': 'Gerade wurden zu viele Codes verschickt. Versuche es gleich noch einmal oder melde dich mit Google an.',
+    'konto.anmeldungGeschlossen': 'Neue Konten sind gerade noch nicht freigeschaltet. Bitte versuche es später noch einmal.',
+    'konto.nameWaehlen': 'Wähle jetzt einen Benutzernamen und tippe dann auf „Jetzt sichern“.',
     'konto.kontoGesperrt': 'Dieses Konto ist derzeit gesperrt.',
     'konto.emailUngueltig': 'Bitte eine gültige E-Mail-Adresse eingeben.',
     'konto.sitzungUnvollstaendig': 'Die Sitzung vom Server ist unvollständig.',
@@ -361,6 +374,9 @@ registriereTexte('einstellungen', {
     'konto.keineId': 'Die Sitzung enthält keine Benutzer-ID.',
     'konto.nameRegel': 'Der Benutzername braucht 3 bis 20 Zeichen: Buchstaben, Zahlen oder _.',
     'konto.nameVergeben': 'Dieser Benutzername ist schon vergeben.',
+    // Monats-Sperre (supabase/benutzername-sperre-schema.sql, R19): der Server entscheidet, die App nennt nur das Datum
+    'konto.nameAb': 'Nächste Änderung ab {datum}',
+    'konto.nameGesperrt': 'Den Benutzernamen kannst du einmal in 30 Tagen ändern. Nächste Änderung ab {datum}.',
     'konto.cloudFormat': 'Der Cloud-Spielstand hat ein unbekanntes Format.',
     'konto.rueckfallFehler': 'Die Rückfall-Sicherung konnte nicht gespeichert werden.',
     'konto.cloudLadenFehler': 'Cloud-Spielstand konnte nicht geladen werden. Der bisherige Stand bleibt erhalten.',
@@ -545,7 +561,12 @@ registriereTexte('einstellungen', {
     'info.datenschutz': 'Privacy policy',
     'info.impressum': 'Legal notice',
     'info.stockfish': 'Chess engine as WebAssembly (stockfish.js, lite), GPL-3.0. Source code: {link}',
-    'info.chessjs': 'Chess rules, BSD-2-Clause',
+    'info.chessjs': 'Chess rules by Jeff Hlywa, BSD-2-Clause',
+    'info.quellcode': 'The source code of {app} is public on {link} (GPL-3.0).',
+    'info.lizenztext': 'License text',
+    'info.lichess': 'Puzzles in the puzzle duel',
+    'info.lichessText': 'From the {link}, CC0',
+    'info.lichessDb': 'Lichess puzzle database',
     'info.figuren': 'Pieces “cburnett”',
     'info.figurenText': 'by Colin M. L. Burnett, GPLv2+',
     'info.schriften': 'Fonts Manrope and Bricolage Grotesque',
@@ -581,10 +602,13 @@ registriereTexte('einstellungen', {
     'zz.zuege': 'Moves',
     'zz.ergebnis': 'Result',
     'zz.amZug': '{name} to move',
+    'zz.introTitel': 'White starts',
+    'zz.introUnter': '{name} moves first',
     'zz.amZugSchach': '{name} to move · check',
     'zz.beendet': 'Game finished',
     'zz.gewinnt': '{name} wins',
     'zz.revanche': 'Rematch',
+    'zz.start': 'Home', 'zz.zurueckStart': 'Back to home', 'zz.klang': 'Sound', 'zz.klangAn': 'Sound on', 'zz.klangAus': 'Sound off',
     'zz.bietetRemis': '{name} offers a draw',
     'zz.entscheidet': '{name} decides.',
     'zz.weiterspielen': 'Keep playing',
@@ -717,6 +741,7 @@ registriereTexte('einstellungen', {
       + 'karte: your achievement tiers, thaler entries, banners and the business card you chose. '
       + 'online_versuche: wrong invitation codes entered per day. mengenzaehler: how many rows your account shared per hour '
       + '(numbers only, for the rate limit, deleted after 48 hours). '
+      + 'verwaltung: what the operator changed on your account through the admin tools (Premium, name, banner, with before and after). '
       + 'geraet: the progress in this browser. noch_nicht_gesendet: shared data that is still waiting on this device. '
       + 'zustimmung: when you turned on sharing. widerruf_offen: a withdrawal of consent that has not reached the server yet.',
     'daten.teilenTitel': 'Crownmate: my data',
@@ -757,6 +782,9 @@ registriereTexte('einstellungen', {
     'konto.sitzungAbgelaufen': 'Your sign-in has expired. Please sign in again.',
     'konto.emailNichtFreigegeben': 'The app cannot send a code to this email address yet (test phase).',
     'konto.codeZuOft': 'Too many attempts. Please wait briefly and try again.',
+    'konto.mailZuOft': 'Too many codes were sent just now. Try again in a moment or sign in with Google.',
+    'konto.anmeldungGeschlossen': 'New accounts are not open yet. Please try again later.',
+    'konto.nameWaehlen': 'Choose a username now, then tap “Back up now”.',
     'konto.kontoGesperrt': 'This account is currently suspended.',
     'konto.emailUngueltig': 'Please enter a valid email address.',
     'konto.sitzungUnvollstaendig': 'The session from the server is incomplete.',
@@ -765,6 +793,8 @@ registriereTexte('einstellungen', {
     'konto.keineId': 'The session has no user ID.',
     'konto.nameRegel': 'The username needs 3 to 20 characters: letters, numbers or _.',
     'konto.nameVergeben': 'This username is already taken.',
+    'konto.nameAb': 'Next change from {datum}',
+    'konto.nameGesperrt': 'You can change your username once every 30 days. Next change from {datum}.',
     'konto.cloudFormat': 'The cloud progress has an unknown format.',
     'konto.rueckfallFehler': 'The fallback backup could not be saved.',
     'konto.cloudLadenFehler': 'The cloud progress could not be loaded. Your current progress stays as it is.',

@@ -7,6 +7,7 @@ import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudSta
   SYNC_SCHLUESSEL, VERDRAENGT_SCHLUESSEL, synchronisiere, standHash, verdraengterStand, holeVerdraengtZurueck, gemerkterStand, cloudStand,
  } from '../js/konto.js';
 import { SUPABASE_URL } from '../js/konto-config.js';
+import { setzeSprache } from '../js/sprache.js';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') { gesamt++; if (wert) ok++; else console.error('FEHLER ' + name, extra); }
@@ -105,11 +106,88 @@ pruefe('Ohne Kennung nur der Status', serverFehler === 'Serverfehler (500)', ser
 mitAntwort(400, { code: 400, error_code: 'captcha_failed', msg: 'captcha protection: request disallowed (no captcha_token found)' });
 serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
 pruefe('Bot-Schutz abgelehnt (captcha_failed): eigener Text statt Serverfehler', /Bot-Schutz/.test(serverFehler) && !/captcha/i.test(serverFehler), serverFehler);
+// Neue Konten gesperrt (Supabase "Allow new users to sign up" aus): /otp legt das Konto ueber Signup an und meldet
+// signup_disabled, mit create_user:false kaeme otp_disabled (supabase/auth internal/api/signup.go, otp.go)
+for (const [kennung, msg] of [['signup_disabled', 'Signups not allowed for this instance'], ['otp_disabled', 'Signups not allowed for otp']]) {
+  mitAntwort(422, { code: 422, error_code: kennung, msg });
+  serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+  pruefe(`Neue Konten gesperrt (${kennung}): eigener Text statt Serverfehler, nie der Server-Text`,
+    /noch nicht freigeschaltet/.test(serverFehler) && !/Signups|Serverfehler/.test(serverFehler), serverFehler);
+}
+mitAntwort(429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('Mail-Grenze (429 over_email_send_rate_limit): gleich nochmal oder mit Google', /gleich noch einmal/.test(serverFehler) && /Google/.test(serverFehler) && !/rate limit/.test(serverFehler), serverFehler);
+// Kaltreview 13.11.: geerbte Eigenschaften des Objekts sind keine Kennungen
+for (const kennung of ['toString', '__proto__', 'constructor']) {
+  mitAntwort(400, { code: 400, error_code: kennung, msg: 'x' });
+  serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+  pruefe(`Kennung ${kennung}: Sammeltext, kein Objekt-Text`, /^Serverfehler \(400/.test(serverFehler) && !/function|\[object|einstellungen\./.test(serverFehler), serverFehler);
+}
+mitAntwort(429, { msg: 'Too many requests' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('429 ohne Kennung: Text "Zu viele Versuche" statt Serverfehler', /Zu viele Versuche/.test(serverFehler), serverFehler);
+// Kaltreview 13.11. (K2): dieselben Faelle auf Englisch, nie der Server-Text
+setzeSprache('en');
+for (const [name, status, body, fn, muster] of [
+  ['falscher Code', 403, { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' }, () => pruefeCode('a@b.de', '123456'), /wrong or has expired/],
+  ['signup_disabled', 422, { code: 422, error_code: 'signup_disabled', msg: 'Signups not allowed for this instance' }, () => fordereCodeAn('a@b.de'), /not open yet/],
+  ['429 Mail-Grenze', 429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' }, () => fordereCodeAn('a@b.de'), /again in a moment.*Google/],
+]) {
+  mitAntwort(status, body);
+  serverFehler = ''; try { await fn(); } catch (e) { serverFehler = e.message; }
+  pruefe(`[en] ${name}: englischer Text, kein Server-Text`, muster.test(serverFehler) && !serverFehler.includes(body.msg), serverFehler);
+}
+setzeSprache('de');
 localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
 mitAntwort(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' });
 serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
 pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel zu (die Gruppe zeigt dann "abgemeldet")',
   /Anmeldung ist abgelaufen/.test(serverFehler) && sitzung() === null && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null, serverFehler);
+// R17: altes OAuth2-Format von Supabase Auth (error invalid_grant, kein error_code) ist dieselbe tote Sitzung
+localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
+mitAntwort(400, { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' });
+serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
+pruefe('Tote Sitzung im alten Format (invalid_grant): Text "Anmeldung abgelaufen", lokal abgemeldet, Riegel zu, kein Server-Text',
+  /Anmeldung ist abgelaufen/.test(serverFehler) && !/invalid|Refresh Token/i.test(serverFehler) && sitzung() === null && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null, serverFehler);
+// R18: Gesperrtes Konto (user_banned) und ungueltige Sitzung (validation_failed) beim Erneuern melden ebenfalls ab.
+// Der Fehlertext bleibt der eigene der Kennung (Entscheid loeschseite-3), nur die Sitzung faellt weg.
+for (const [kennung, status, muster] of [['user_banned', 403, /gesperrt/], ['validation_failed', 400, /^Serverfehler \(400, validation_failed\)$/]]) {
+  localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
+  mitAntwort(status, { code: status, error_code: kennung, msg: 'Server-Text mit a@b.de' });
+  serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
+  pruefe(`Erneuern mit ${kennung}: lokal abgemeldet, Riegel zu, eigener Text, kein Server-Text`,
+    muster.test(serverFehler) && !serverFehler.includes('a@b.de') && sitzung() === null && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null, serverFehler);
+}
+// Andere Auth-Aufrufe bleiben: user_banned beim Code pruefen behaelt seinen Text und laesst die gespeicherte Sitzung stehen
+localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(session));
+mitAntwort(403, { code: 403, error_code: 'user_banned', msg: 'User is banned' });
+serverFehler = ''; try { await pruefeCode('a@b.de', '123456'); } catch (e) { serverFehler = e.message; }
+pruefe('Code pruefen mit user_banned: Text "gesperrt", Sitzung bleibt', /gesperrt/.test(serverFehler) && sitzung()?.refresh_token === 'r', serverFehler);
+// Eine Antwort ohne Kennung beim Erneuern (500) meldet weiter NICHT ab
+localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 }));
+mitAntwort(500, { msg: 'kaputt' });
+serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
+pruefe('Erneuern mit 500 ohne Kennung: Sitzung bleibt', /Serverfehler/.test(serverFehler) && sitzung()?.refresh_token === 'r', serverFehler);
+// Kaltreview R18 (37, Befund 1): eine spaete user_banned-Antwort einer alten Erneuerung meldet eine neuere Sitzung nie ab
+// (Schutz ueber epoche und refresh_token in erneuere; Muster kaltreview-belege/probe.mjs Block 4)
+{
+  const tokVon = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
+  for (const [fall, waehrend, soll] of [
+    ['Ab- und Neuanmeldung', async () => { await abmelden({ frist: 5 }); localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, refresh_token: 'r2' })); }, 'r2'],
+    ['anderer Tab, anderes Konto', async () => { localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: tokVon('u7'), refresh_token: 'r-u7', expires_at: 9999999999, user: { id: 'u7', email: 'c@d.de' } })); }, 'r-u7'],
+  ]) {
+    localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, refresh_token: 'r1', expires_at: 1 }));
+    let gib; const spaet = new Promise((r) => { gib = r; });
+    setzeKontoFetch(async (url) => {
+      if (url.includes('grant_type=refresh_token')) { await spaet; return { ok: false, status: 403, async json() { return { code: 403, error_code: 'user_banned', msg: 'x' }; } }; }
+      return { ok: true, status: 204, async json() { return null; } };
+    });
+    const lauf = aktiveSitzung().then(() => 'ok', (e) => e.message);
+    await new Promise((r) => setTimeout(r, 10)); await waehrend(); gib();
+    const text = await lauf;
+    pruefe(`Veraltete user_banned-Antwort (${fall}): neuere Sitzung bleibt`, sitzung()?.refresh_token === soll, { text, gespeichert: sitzung()?.refresh_token });
+  }
+}
 { // Anmelde-Link (Rueckfall ohne SMTP): Sitzung uebernehmen, Token aus der Adresse entfernen
   const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u9', email: 'link@b.de' })).toString('base64url') + '.x';
   let neu = null; const ort = { hash: `#access_token=${tok}&expires_in=3600&refresh_token=rl&token_type=bearer&type=magiclink`, pathname: '/schach/', search: '' };

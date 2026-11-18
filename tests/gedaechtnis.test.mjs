@@ -35,7 +35,7 @@ import { BOTS as LEITER } from '../js/bots.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8862);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const ERW = 'pakete/gedaechtnis/index';
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=${ERW}`;
 const NUR_NODE = process.argv.includes('--nur-node');
@@ -528,7 +528,7 @@ async function bereite(seite, { partien = [], fortschritt = null, einstellungen 
   await seite.goto(BASIS + hash);
   await seite.reload();
   // window.__app gibt es schon vor dem Laden der Pakete; der erste Screen kommt erst danach
-  await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="gedaechtnis"]') && !!document.querySelector('.screen'), null, { timeout: 20000 });
+  await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="gedaechtnis"]') && !!document.documentElement.dataset.screen, null, { timeout: 20000 });
 }
 
 // Fortschritt mit freien Bots bis Stufe "bis" und Zaehlern
@@ -905,18 +905,24 @@ async function browserTeil(browser) {
       const e = document.querySelector('.steckbrief .gd-erzfeind');
       const r = e.getBoundingClientRect();
       const cs = getComputedStyle(e);
-      const bl = document.querySelector('.detail .sprechblase');
-      const rb = bl ? bl.getBoundingClientRect() : { height: 0 };
       return { links: r.left, rechts: r.right, oben: r.top, unten: r.bottom, breite: innerWidth, hoch: innerHeight, hoehe: r.height, text: e.textContent.trim(),
-        farbe: cs.color, hg: cs.backgroundColor, scroll: document.documentElement.scrollWidth <= innerWidth + 1,
-        blase: bl ? bl.textContent : '', blaseHoehe: rb.height };
+        farbe: cs.color, hg: cs.backgroundColor, scroll: document.documentElement.scrollWidth <= innerWidth + 1 };
     });
     const sollH = await erwartet(h.seite, 'kalle');
     pruefe(`${dunkel ? 'dunkel' : 'hell'}: Erzfeind-Zeile im Steckbrief sichtbar, ganz im Bild (390 px), eine ruhige Zeile, keine waagrechte Rolle`,
       ezH.hoehe >= 20 && ezH.hoehe <= 60 && ezH.links >= 0 && ezH.rechts <= ezH.breite && ezH.oben >= 0 && ezH.unten <= ezH.hoch && ezH.scroll
       && ezH.text === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' && ezH.farbe !== ezH.hg, JSON.stringify(ezH));
+    // Die geschlossene Leiste zeigt keine Sprechblase (css/arena.css .karte-weg), der Satz steht in der offenen Karte
+    await steckbriefZu(h.seite);
+    await h.seite.locator('.screen.arena .karte-griff').click();
+    await h.seite.waitForSelector('.screen.arena .detail.offen', { timeout: 5000 });
+    await warte(400);
+    const blaseH = await h.seite.evaluate(() => {
+      const bl = document.querySelector('.detail .sprechblase');
+      return { blase: bl ? bl.textContent : '', hoehe: bl ? bl.getBoundingClientRect().height : 0 };
+    });
     pruefe(`${dunkel ? 'dunkel' : 'hell'}: Panel-Begruessung nach 3 Niederlagen in Folge: Mut-Satz, genau die bestimmte Variante, sichtbar`,
-      sollH && sollH.grund === 'mutmachen' && ezH.blase === `„${sollH.text}“` && ezH.blaseHoehe > 0, JSON.stringify({ blase: ezH.blase, hoehe: ezH.blaseHoehe, soll: sollH }));
+      sollH && sollH.grund === 'mutmachen' && blaseH.blase === `„${sollH.text}“` && blaseH.hoehe > 0, JSON.stringify({ ...blaseH, soll: sollH }));
     await h.seite.screenshot({ path: path.join(BILDER, `panel-erzfeind-handy-${dunkel ? 'dunkel' : 'hell'}.png`) });
     pruefe(`${dunkel ? 'dunkel' : 'hell'}: Konsole ohne Fehler`, h.fehler.length === 0, h.fehler.join(' | '));
     await h.kontext.close();
@@ -953,7 +959,7 @@ let browser = null;
 try {
   await nodeTeil();
   if (!NUR_NODE) {
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await browserTyp(ladePlaywright()).launch();
     await browserTeil(browser);

@@ -242,15 +242,19 @@ export function merkeFast(st, e) {
   return T.merkeFast(st.tafeln[e.tafel], e.fast, { id: e.id });
 }
 
-// ohne Tafel: warum (Abrechnung sagt es ehrlich)
+// ohne Tafel: warum (Abrechnung sagt es ehrlich). "kurz" (R9-PunkteKurz, Variante A): vor dem 10. eigenen Zug
+// (formel.MIN_ZUEGE) zaehlt nur ein Sieg ("Ein Sieg zaehlt immer", R12-F2); Niederlage, Remis und Abbruch bekommen keinen
+// Eintrag und damit keinen Wochenwert (freunde.wochenwertung liest die Tafeln). Die Formel bleibt dabei unveraendert.
 export function grundOhneTafel(d, p, hilfe) {
   const modus = (p && p.modus) || d.modus || 'normal';
+  const kurz = !!p && p.ergebnis !== 'sieg' && eigeneZuege(p) < F.MIN_ZUEGE;
   if (modus === 'uebung') return 'uebung';
   if (modus === 'frei' || modus === 'spiel') return modus;
-  if (modus === 'boss') return hilfe ? 'hilfe' : (p && p.boss ? null : 'gast');
+  if (modus === 'boss') return hilfe ? 'hilfe' : (p && p.boss ? (kurz ? 'kurz' : null) : 'gast');
   if (hilfe) return 'hilfe';
   if (p && typeof p.startFen === 'string' && p.startFen && !wertet({ modus: 'normal', startFen: p.startFen })) return 'stellung';
   if (!wertet(p)) return 'gast';
+  if (kurz) return 'kurz';
   return null;
 }
 

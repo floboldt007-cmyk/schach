@@ -4,7 +4,8 @@
 // Kopiert werden die Ordner der App (css, js, assets, vendor, daten) und jede Datei aus der Liste DATEIEN in sw.js
 // (dieselbe Liste, die der Service Worker offline vorhaelt). Danach wird geprueft, dass wirklich jede Datei dieser
 // Liste im Ziel liegt; fehlt eine, bricht das Skript mit einer klaren Meldung ab. Nicht kopiert werden tests/, design/,
-// supabase/ und native/ selbst. native/www ist per .gitignore ausgeschlossen.
+// supabase/, native/ selbst und daten/beispiel/ (nur Format-Beispiel fuer Tests, wird nie ausgeliefert, ARCHITEKTUR.md).
+// native/www ist per .gitignore ausgeschlossen.
 import { readFileSync, rmSync, mkdirSync, cpSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,8 @@ const HIER = path.dirname(fileURLToPath(import.meta.url));
 export const WURZEL = path.resolve(HIER, '..');
 export const ORDNER = ['css', 'js', 'assets', 'vendor', 'daten'];
 export const EINZELN = ['index.html', 'manifest.webmanifest', 'sw.js', 'LICENSE'];
+// Unterordner der App-Ordner, die nicht in die Store-App gehoeren (Pfade relativ zum Repo, mit /)
+export const AUSSER = ['daten/beispiel'];
 
 // Liste DATEIEN aus dem Text von sw.js
 export function dateienAusSw(text) {
@@ -34,8 +37,12 @@ export function kopiereWeb(ziel = path.join(HIER, 'www'), { wurzel = WURZEL } = 
   if (fehltQuelle.length) throw new Error(`Diese Dateien aus sw.js gibt es im Repo nicht: ${fehltQuelle.join(', ')}`);
   rmSync(z, { recursive: true, force: true });
   mkdirSync(z, { recursive: true });
+  const draussen = (quelle) => {
+    const rel = path.relative(w, quelle).split(path.sep).join('/');
+    return AUSSER.some((a) => rel === a || rel.startsWith(a + '/'));
+  };
   for (const o of ORDNER) {
-    if (existsSync(path.join(w, o))) cpSync(path.join(w, o), path.join(z, o), { recursive: true });
+    if (existsSync(path.join(w, o))) cpSync(path.join(w, o), path.join(z, o), { recursive: true, filter: (q) => !draussen(q) });
   }
   for (const d of alle) {
     mkdirSync(path.dirname(path.join(z, d)), { recursive: true });

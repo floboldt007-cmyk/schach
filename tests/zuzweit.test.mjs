@@ -20,7 +20,7 @@ const server = http.createServer((req, res) => {
   try { const inhalt = readFileSync(p); res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(inhalt); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-await new Promise(r => server.listen(8886, '127.0.0.1', r));
+await new Promise(r => server.listen(Number(process.env.PORT || 0), '127.0.0.1', r));
 let browser, kontext, ok = 0, gesamt = 0;
 const fehler = [];
 function pruefe(name, gut, detail = '') {
@@ -46,7 +46,9 @@ try {
   const merke = () => seite.evaluate(() => { window.__altesZ = window.__partie?.z || null; });
   const wartePartie = () => seite.waitForFunction(() => window.__partie?.z?.modus === 'zuzweit' && window.__partie.z !== window.__altesZ);
   const knopf = name => seite.locator(`[data-zz="${name}"]`);
-  async function start(tempo = 'ohne', drehen = false) {
+  // introWarten: eine neue Partie zeigt erst 1 s das Mini-Intro (R8-IntroZuzweit B), die Uhr startet danach; die Pruefungen
+  // beginnen wie ein Mensch nach dem Intro ("reduziert" ist keine Bewegungsstufe, das Intro laeuft hier also)
+  async function start(tempo = 'ohne', drehen = false, introWarten = true) {
     await merke();
     // Flo 08.11.2026: keine Karte mehr unter Lernen, Einstieg ist die Startseite (heim-zuzweit)
     await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();
@@ -59,6 +61,7 @@ try {
     await seite.getByRole('button', { name: 'Los', exact: true }).click();
     if (await seite.getByRole('button', { name: 'Neue Partie', exact: true }).isVisible()) await seite.getByRole('button', { name: 'Neue Partie', exact: true }).click();
     await wartePartie();
+    if (introWarten) await seite.waitForFunction(() => !document.documentElement.dataset.duell, null, { timeout: 4000 });
   }
   async function feld(f) {
     const r = await seite.locator(`.zz-brett .feld[data-feld="${f}"]`).boundingBox();
@@ -76,8 +79,8 @@ try {
     await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
     await seite.locator('.zz-ergebnis:not([hidden])').waitFor();
   }
-  await seite.goto('http://127.0.0.1:8886/?test#training');
-  await seite.waitForFunction(() => !!window.__app);
+  await seite.goto(`http://127.0.0.1:${server.address().port}/?test#training`);
+  await seite.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen);
   pruefe('Lernen: keine Karte "Zu zweit" mehr (Flo 08.11.2026, Zu zweit ist kein Lernen)', await seite.evaluate(() => !document.querySelector('.zz-karte')));
   await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();
   await seite.locator('[name="weiss"]').waitFor({ state: 'attached' });
@@ -117,6 +120,9 @@ try {
   const mitUhr = await uhrSatz();
   await seite.locator('[name="bedenkzeit"][value="ohne"]').check();
   pruefe('Startblatt: Uhr-Satz nur mit gewaehlter Uhr (U11)', !ohneUhr && mitUhr && !(await uhrSatz()), { ohneUhr, mitUhr });
+  // R8 (L6): Kopf wie Bot-Partie, Raetsel-Duell und Lektion: Klang UND Einstellungen
+  const kopfStart = await seite.evaluate(() => ['klang', 'einstellungen'].map((a) => !!document.querySelector(`.zz-startblatt > .kopf [data-aktion="${a}"]`)));
+  pruefe('Startblatt-Kopf (L6): Klang und Einstellungen', kopfStart.every(Boolean), kopfStart);
   await start();
   const fortschritt = await seite.evaluate(() => localStorage.getItem('schach-arena:v1:fortschritt'));
   await zug('e2e4'); await zug('e7e5', true); await zug('g1f3'); await zug('b8c6', true);
@@ -124,8 +130,42 @@ try {
   pruefe('Tippen und Ziehen beider Seiten, keine Engine oder Bot-Antwort', await seite.evaluate(() => window.__partie.z.zuege.join(',') === 'e2e4,e7e5,g1f3,b8c6' && window.__workerZahl === 0));
   pruefe('Keine Hilfen, Weiss unten, obere Spielerkarte umgedreht', await seite.evaluate(() => !document.querySelector('.zz-screen .balken, .zz-screen .coach, .zz-screen [data-aktion="hinweis"], .zz-screen [data-aktion="zuruecknahme"]')
     && window.__partie.brett.ausrichtung === 'w' && document.querySelector('.zz-oben').classList.contains('zz-gegenueber')));
+  // R8 (L6): Kopf der Partie mit Klang und Einstellungen; Einstellungen und zurueck setzen die Partie fort (wie die
+  // Bot-Partie: vorher sichern, zurueck ueber den Verlauf)
+  const kopfPartie = await seite.evaluate(() => ['klang', 'einstellungen'].map((a) => !!document.querySelector(`.zz-screen > .kopf [data-aktion="${a}"]`)));
+  await merke();
+  await seite.locator('.zz-screen > .kopf [data-aktion="einstellungen"]').click();
+  await seite.waitForFunction(() => document.documentElement.dataset.screen === 'einstellungen');
+  await seite.evaluate(() => window.__app.zurueck());
+  await wartePartie();
+  const nachEinst = await seite.evaluate(() => window.__partie.z.zuege.join(','));
+  pruefe('Partie-Kopf (L6): Klang und Einstellungen; Einstellungen und zurueck setzt die Partie fort', kopfPartie.every(Boolean) && nachEinst === 'e2e4,e7e5,g1f3,b8c6', { kopfPartie, nachEinst });
+  // R8 (B4/L6): Zuege als Zugliste bzw. Zugstreifen wie in der Bot-Partie, Leisten mit Unterzeile und geschlagenen Figuren
+  const zuegeBau = await seite.evaluate(() => ({ nr: document.querySelectorAll('.zz-zuege .zugleiste .nr').length, z: document.querySelectorAll('.zz-zuege .zugleiste .z').length,
+    aktuell: document.querySelector('.zz-zuege .zugleiste .z.aktuell')?.textContent, orte: document.querySelectorAll('.zz-spieler .unter .geschlagen-ort').length }));
+  pruefe('Zuege und Leisten wie Bot-Partie (B4/L6): 2 Nummern, 4 Zuege, letzter hervorgehoben, Orte fuer geschlagene Figuren', zuegeBau.nr === 2 && zuegeBau.z === 4 && zuegeBau.orte === 2 && /c6/.test(zuegeBau.aktuell || ''), zuegeBau);
   const h1Partie = await seite.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.offsetParent).map((e) => e.textContent));
   pruefe('Partie zu zweit: genau eine h1 im Kopf', h1Partie.length === 1 && await seite.locator('.zz-screen > .kopf h1').count() === 1, JSON.stringify(h1Partie));
+  // R6-Befund B11 (12.11.2026): Leisten mit eingegebenem Namen und Farbe je einmal; Klang-Knopf wie in der Bot-Partie
+  const leisten = () => seite.evaluate(() => [...document.querySelectorAll('.zz-screen .zz-spieler')].map((e) => [e.querySelector('.zz-name'), e.querySelector('.p-meta')]
+    .map((x) => x?.innerText || '').join(' ').replace(/\s+/g, ' ').trim()));
+  const mitNamen = await leisten();
+  pruefe('Leisten (B11): eingegebene Namen mit Farbe, je einmal', mitNamen.join('|') === 'Ben Schwarz|Anna Weiß', mitNamen);
+  const klangKnopf = seite.locator('.zz-screen > .kopf [data-aktion="klang"]');
+  const klangVorher = await klangKnopf.count() === 1 && await klangKnopf.getAttribute('aria-pressed') === 'false' && /Klang/.test(await klangKnopf.getAttribute('aria-label') || '');
+  let klangNachher = false, klangZurueck = false;
+  if (klangVorher) {
+    await seite.evaluate(() => { const alt = window.__app.meldung; window.__meldungen = []; window.__app.meldung = (text, o) => { window.__meldungen.push(text); return alt(text, o); }; });
+    await klangKnopf.click();
+    klangNachher = await seite.evaluate(() => window.__app.einstellungen().klang === true) && await klangKnopf.getAttribute('aria-pressed') === 'true'
+      && await seite.evaluate(() => window.__meldungen.join('|') === 'Klang an');
+    await klangKnopf.click();
+    klangZurueck = await seite.evaluate(() => window.__app.einstellungen().klang === false) && await klangKnopf.getAttribute('aria-pressed') === 'false';
+  }
+  pruefe('Klang-Knopf im Kopf (B11): da, zeigt den Stand, schaltet an und wieder aus (wie die Bot-Partie)', klangVorher && klangNachher && klangZurueck,
+    { klangVorher, klangNachher, klangZurueck });
+  const kopfKnoepfe = await seite.evaluate(() => [...document.querySelectorAll('.zz-screen > .kopf button')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); }));
+  pruefe('Kopf zu zweit (B11): alle Knoepfe mindestens 44 px', kopfKnoepfe.length >= 2 && kopfKnoepfe.every((x) => x >= 44), kopfKnoepfe);
   // Flo 30.10. abends: zu zweit darf man einen Zug zuruecknehmen (gegen Bots nicht)
   await zug('f1c4');
   await knopf('zugzurueck').click();
@@ -136,12 +176,52 @@ try {
   await seite.getByRole('button', { name: 'Weiterspielen', exact: true }).click();
   pruefe('Remis abgelehnt: Partie laeuft weiter', await seite.evaluate(() => window.__partie.phase() === 'spiel'));
   await knopf('remis').click(); await seite.getByRole('button', { name: 'Annehmen', exact: true }).click();
+  await seite.locator('.zz-ergebnis:not([hidden])').waitFor();
   pruefe('Remis angenommen, Ergebnis ohne Sterne', (await seite.locator('.zz-ergebnis').innerText()).startsWith('Remis') && !(await seite.locator('.zz-ergebnis').innerText()).includes('Stern'));
+  // R9 (13.11.2026): das Ende ist das Ergebnisblatt der Bot-Partie (css/ergebnis.css, gebaut wie baueBlatt in
+  // js/ui/lektion.js): Schleier ueber dem Screen, Fokus in der Karte, der Screen dahinter inert, Karte 540 px breit.
+  // Knoepfe mit Symbol wie die Bot-Partie (B11).
+  const blattInfo = await seite.evaluate(() => {
+    const o = document.querySelector('.zz-screen > .ergebnis-overlay'), k = o?.querySelector('.ergebnis-karte');
+    return { da: !!o && !o.hidden && o.classList.contains('remis'), dialog: o?.getAttribute('role') === 'dialog' && o?.getAttribute('aria-modal') === 'true',
+      karteZz: !!k?.classList.contains('zz-ergebnis'), fokus: !!k && document.activeElement === k, breite: k ? k.offsetWidth : 0, // ohne die Feder-Animation der Karte (transform)
+      inert: [...document.querySelector('.zz-screen').children].filter((e) => e !== o).every((e) => e.inert),
+      knoepfe: [...(o?.querySelectorAll('.erg-knoepfe button') || [])].map((b) => b.dataset.zz + ':' + !!b.querySelector('svg')).join(),
+      primaer: o?.querySelector('.erg-knoepfe .primaer')?.dataset.zz, lobby: o?.querySelector('.erg-lobby')?.dataset.zz,
+      spalte: [...document.querySelectorAll('.zz-spielbereich > .zz-aktionen button')].map((b) => b.dataset.zz).join() };
+  });
+  pruefe('Ergebnisblatt wie Bot-Partie (R9): Schleier als Dialog, Fokus in der Karte, Screen dahinter inert, Karte 540 px',
+    blattInfo.da && blattInfo.dialog && blattInfo.karteZz && blattInfo.fokus && blattInfo.inert && blattInfo.breite === 540, blattInfo);
+  pruefe('Knoepfe im Blatt (R9/B11): Nochmal vorne, Revanche, Analyse mit Symbol, darunter der Weg zum Start; in der Spalte nur "Ergebnis"',
+    blattInfo.knoepfe === 'nochmal:true,revanche:true,analyse:true' && blattInfo.primaer === 'nochmal' && blattInfo.lobby === 'fertig' && blattInfo.spalte === 'ergebnis', blattInfo);
+  // Tab kreist im Blatt (der Screen dahinter ist inert)
+  for (let i = 0; i < 7; i++) await seite.keyboard.press('Tab');
+  pruefe('Tab bleibt im Ergebnisblatt', await seite.evaluate(() => !!document.activeElement?.closest('.zz-screen > .ergebnis-overlay')));
+  const blattZu = () => seite.evaluate(() => ({ zu: document.querySelector('.zz-screen > .ergebnis-overlay').hidden,
+    inert: [...document.querySelector('.zz-screen').children].some((e) => e.inert), fokus: document.activeElement?.dataset.zz || null }));
+  await seite.keyboard.press('Escape');
+  const nachEsc = await blattZu();
+  pruefe('Escape zeigt das Brett, der Fokus liegt auf "Ergebnis"', nachEsc.zu && !nachEsc.inert && nachEsc.fokus === 'ergebnis', nachEsc);
+  const blattOffen = () => seite.evaluate(() => { const o = document.querySelector('.zz-screen > .ergebnis-overlay');
+    return !o.hidden && document.activeElement === o.querySelector('.ergebnis-karte'); });
+  await knopf('ergebnis').click();
+  pruefe('"Ergebnis" holt das Blatt zurueck, Fokus wieder in der Karte', await blattOffen());
+  await seite.locator('.zz-screen .erg-zu').click();
+  const nachAuge = await blattZu();
+  pruefe('Das Auge im Blatt zeigt das Brett wie Escape', nachAuge.zu && !nachAuge.inert && nachAuge.fokus === 'ergebnis', nachAuge);
+  await knopf('ergebnis').click();
+  pruefe('Blatt wieder offen', await blattOffen());
   pruefe('Keine Wertung oder Freischaltung', await seite.evaluate(v => localStorage.getItem('schach-arena:v1:fortschritt') === v, fortschritt));
   await merke(); await knopf('revanche').click(); await wartePartie();
   pruefe('Revanche tauscht Namen und startet leeres Brett', await seite.evaluate(() => window.__partie.z.zuzweit.weiss === 'Ben' && window.__partie.z.zuzweit.schwarz === 'Anna' && !window.__partie.z.zuege.length));
   await aufgeben();
   pruefe('Aufgabe der Seite am Zug: benannter Sieger', (await seite.locator('.zz-ergebnis h3').innerText()) === 'Anna gewinnt');
+  pruefe('Ein Sieg zeigt das Blatt im Sieg-Look mit dem Grund', await seite.evaluate(() => document.querySelector('.zz-screen > .ergebnis-overlay').classList.contains('sieg')
+    && document.querySelector('.zz-ergebnis .erg-unter').textContent.trim() !== ''));
+  // R9: "Nochmal" startet mit denselben Namen (Revanche tauscht sie, siehe oben)
+  await merke(); await knopf('nochmal').click(); await wartePartie();
+  pruefe('Nochmal behaelt die Namen und startet ein leeres Brett', await seite.evaluate(() => window.__partie.z.zuzweit.weiss === 'Ben'
+    && window.__partie.z.zuzweit.schwarz === 'Anna' && !window.__partie.z.zuege.length));
   await start('15', true);
   await seite.evaluate(() => { window.__versatz += 2500; });
   await zug('d2d4');
@@ -180,7 +260,9 @@ try {
   await klasse.click(); const erster = await seite.locator('.an-c-kopf').innerText();
   await klasse.click(); const zweiter = await seite.locator('.an-c-kopf').innerText();
   pruefe('Klassen-Tabelle springt zu beiden Seiten', erster !== zweiter && /Anna|Ben/.test(erster + zweiter), { erster, zweiter });
-  for (const [width, height] of [[1180, 820], [820, 1180], [390, 844]]) for (const modus of ['hell', 'dunkel']) {
+  // R8-quer (13.11.2026): dazu Handy quer (844 x 390, 667 x 375): Brett, Leisten und Knoepfe ganz im Bild ohne Scrollen,
+  // auch das Ergebnis nach dem Aufgeben; LG1: oben kopfueber nur auf Handy und iPad hoch, am grossen Schirm quer aufrecht
+  for (const [width, height] of [[1180, 820], [820, 1180], [390, 844], [375, 667], [844, 390], [667, 375]]) for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width, height });
     await seite.evaluate(modus => window.__app.setzeEinstellungen({ modus }), modus);
     await start('5');
@@ -188,12 +270,75 @@ try {
     const masse = await seite.evaluate(() => {
       const b = document.querySelector('.zz-brett').getBoundingClientRect();
       return { quer: document.documentElement.scrollWidth <= innerWidth, brett: b.x >= 0 && b.right <= innerWidth + 1 && b.y >= 0 && b.bottom <= innerHeight + 1,
-        knoepfe: [...document.querySelectorAll('.zz-screen button')].every(b => b.getBoundingClientRect().height >= 44), namen: document.querySelectorAll('.zz-name b').length === 2 };
+        knoepfe: [...document.querySelectorAll('.zz-screen button')].every(b => b.getBoundingClientRect().height >= 44), namen: document.querySelectorAll('.zz-name b').length === 2,
+        // R6-Befund B11: die Spielknoepfe tragen Symbole wie in der Bot-Partie, und kein Text laeuft aus seinem Knopf
+        symbole: [...document.querySelectorAll('.zz-spielbereich > .zz-aktionen button')].map((b) => b.dataset.zz + ':' + !!b.querySelector('svg')).join() === 'zugzurueck:true,remis:true,aufgeben:true',
+        passt: [...document.querySelectorAll('.zz-screen button')].every((b) => b.scrollWidth <= b.clientWidth + 1 && b.scrollHeight <= b.clientHeight + 1),
+        // R8-quer: ohne Scrollen alles erreichbar (nicht erst nach scrollIntoView)
+        imBild: [...document.querySelectorAll('.zz-spielbereich > .zz-spieler, .zz-spielbereich > .zz-aktionen button, .zz-brett')].every((e) => { const r = e.getBoundingClientRect();
+          return r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5; }),
+        keinScroll: document.documentElement.scrollHeight <= innerHeight + 1 && window.scrollY === 0,
+        uhren: [...document.querySelectorAll('.zz-spieler .uhr')].filter((u) => !u.hidden && u.getClientRects().length).length === 2,
+        lg1: getComputedStyle(document.querySelector('.zz-oben')).transform.startsWith('matrix(-1') === !(innerWidth > innerHeight && innerHeight > 500) };
     });
-    pruefe(`${width}x${height} ${modus}: Brett sichtbar, kein Ueberlauf, Namen und Tippflaechen`, Object.values(masse).every(Boolean), masse);
+    pruefe(`${width}x${height} ${modus}: Brett sichtbar, kein Ueberlauf, Namen, Tippflaechen und Symbole`, Object.values(masse).every(Boolean), masse);
+    // R9-1: hoch keine Leere ueber 60 px zwischen den Zeilen der Spalte (iPhone 13 hatte 126 px unter "Weiß", iPad hoch 64)
+    if (height > width) {
+      const luecke = await seite.evaluate(() => { const z = [...document.querySelectorAll('.zz-spielbereich > *')].filter((e) => e.getClientRects().length && !e.matches('.zz-ergebnis'))
+        .map((e) => e.getBoundingClientRect()).sort((a, b) => a.top - b.top); let m = 0; for (let i = 1; i < z.length; i++) m = Math.max(m, z[i].top - z[i - 1].bottom); return Math.round(m); });
+      pruefe(`${width}x${height} ${modus}: hoch keine Luecke ueber 60 px in der Spalte (R9-1)`, luecke <= 60, { luecke });
+    }
     if (process.env.BILDER) { mkdirSync(process.env.BILDER, { recursive: true }); await seite.screenshot({ path: path.join(process.env.BILDER, `zuzweit-${width}-${modus}.png`) }); }
     await aufgeben();
+    const erg = await seite.evaluate(() => [...document.querySelectorAll('.zz-ergebnis, .zz-ergebnis button')].every((e) => { const r = e.getBoundingClientRect();
+      return r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5; }) && document.documentElement.scrollHeight <= innerHeight + 1);
+    pruefe(`${width}x${height} ${modus}: Ergebnis und seine Knoepfe ganz im Bild`, erg);
   }
+  // R6-Befund B11: der Einstieg liegt auf Start (Flo 08.11.: Zu zweit ist kein Lernen); "Fertig" und Zurueck fuehren
+  // dorthin, und der Zurueck-Knopf heisst wie sein Ziel
+  await knopf('fertig').click();
+  await seite.waitForFunction(() => document.documentElement.dataset.screen !== 'partie');
+  pruefe('Fertig nach der Partie fuehrt zum Start (B11)', await seite.evaluate(() => document.documentElement.dataset.screen === 'heim'),
+    await seite.evaluate(() => document.documentElement.dataset.screen));
+  await merke();
+  await seite.evaluate(() => window.__app.gehe('partie', { modus: 'zuzweit', zuzweit: { weiss: 'Weiß', schwarz: 'Schwarz', drehen: false }, tempo: null }));
+  await wartePartie();
+  const ohneNamen = await leisten();
+  pruefe('Leisten ohne eigene Namen (B11): "Schwarz" und "Weiß" je einmal, nicht doppelt', ohneNamen.join('|') === 'Schwarz|Weiß', ohneNamen);
+  const zk = await seite.evaluate(() => { const b = document.querySelector('.zz-screen > .kopf [data-zz="zurueck"]'); return b && { text: b.innerText.trim(), label: b.getAttribute('aria-label') || '', symbol: !!b.querySelector('svg') }; });
+  await knopf('zurueck').click();
+  await seite.waitForFunction(() => document.documentElement.dataset.screen !== 'partie');
+  const ziel = await seite.evaluate(() => document.documentElement.dataset.screen);
+  // R8 (L6): Symbol-Knopf wie in der Bot-Partie (js/ui/partie.js), die Ansage nennt weiter das Ziel (B11)
+  pruefe('Zurueck-Knopf (B11/L6): Symbol wie in der Bot-Partie, Ansage nennt das Ziel (Start), fuehrt dorthin', !!zk && zk.text === ''
+    && zk.label === 'Zurück zum Start' && zk.symbol && ziel === 'heim', { zk, ziel });
+  // R8-IntroZuzweit (Vorbau B): mit Bewegung zeigt eine neue Partie 1 s "Weiss beginnt" (js/ui/duell.js spieleMiniIntro);
+  // die Uhr laeuft erst danach, ein Zug waehrend des Intros beendet es ohne Zeitabzug, Einstellung "aus" zeigt nichts
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'normal', duellIntro: 'besondere' }));
+  await start('15', false, false);
+  const mini = await seite.waitForSelector('.zz-screen .duell-mini', { timeout: 3000 }).then(() => seite.evaluate(() => ({
+    text: document.querySelector('.duell-mini').innerText.replace(/\s+/g, ' ').trim(), html: document.documentElement.dataset.duell }))).catch(() => null);
+  await seite.evaluate(() => { window.__versatz += 5000; });
+  const miniWeg = await seite.waitForFunction(() => !document.querySelector('.duell-mini') && !document.documentElement.dataset.duell, null, { timeout: 4000 }).then(() => true).catch(() => false);
+  const restNach = await seite.evaluate(() => window.__partie.uhr.rest('w'));
+  pruefe('Mini-Intro: "Weiß beginnt / Anna zieht zuerst" ueber dem Brett, verschwindet von selbst, die Uhr zaehlt die Intro-Zeit nicht',
+    !!mini && mini.text === 'Weiß beginnt Anna zieht zuerst' && mini.html === 'laeuft' && miniWeg && restNach > 899000, { mini, miniWeg, restNach });
+  await aufgeben(); await knopf('fertig').click(); await seite.waitForFunction(() => document.documentElement.dataset.screen === 'heim');
+  await seite.evaluate(() => { window.__miniEnde = null; document.addEventListener('duell:fertig', (e) => { window.__miniEnde = e.detail; }); });
+  await start('15', false, false);
+  await seite.waitForSelector('.zz-screen .duell-mini', { timeout: 3000 });
+  await seite.evaluate(() => { window.__versatz += 5000; });
+  await zug('e2e4');
+  const imIntro = await seite.evaluate(() => ({ mini: !!document.querySelector('.duell-mini'), ende: window.__miniEnde, w: window.__partie.uhr.rest('w') }));
+  pruefe('Mini-Intro: ein Zug waehrend des Intros ueberspringt es, Weiss verliert dabei keine Intro-Zeit (15 min + 10 s Zuschlag)',
+    !imIntro.mini && imIntro.ende?.art === 'mini' && imIntro.ende.uebersprungen === true && imIntro.w > 909000, imIntro);
+  await aufgeben(); await knopf('fertig').click(); await seite.waitForFunction(() => document.documentElement.dataset.screen === 'heim');
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ duellIntro: 'aus' }));
+  await start('15');
+  await seite.waitForTimeout(400);
+  const aus = await seite.evaluate(() => ({ mini: !!document.querySelector('.duell-mini'), html: document.documentElement.dataset.duell || null }));
+  pruefe('Mini-Intro: Einstellung Duell-Intro "aus" zeigt keins', !aus.mini && !aus.html, aus);
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'reduziert', duellIntro: 'besondere' }));
   pruefe('Keine Konsolen- oder Seitenfehler', fehler.length === 0, fehler);
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
 finally { await kontext?.close(); await browser?.close(); await new Promise(r => server.close(r)); }

@@ -2,6 +2,7 @@
 // Prueft Konfiguration, feste Versionen, .gitignore und dass kopiere-web.mjs jede Datei aus sw.js mitnimmt.
 import { readFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +10,7 @@ let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') { gesamt++; if (wert) { ok++; console.log('ok   ' + name); } else console.error('FEHLER ' + name, extra); }
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lies = (p) => readFileSync(path.join(WURZEL, p), 'utf8');
+const gitDateien = (pfad) => execSync(`git ls-files -- ${pfad}`, { cwd: WURZEL, encoding: 'utf8' }).split('\n').filter(Boolean);
 
 const pkg = JSON.parse(lies('native/package.json'));
 const cfg = JSON.parse(lies('native/capacitor.config.json'));
@@ -46,6 +48,13 @@ try {
   pruefe('kopiereWeb: sw.js, index.html und LICENSE dabei, tests/ design/ supabase/ native/ nicht', ['sw.js', 'index.html', 'LICENSE'].every((d) => existsSync(path.join(ziel, d)))
     && ['tests', 'design', 'supabase', 'native'].every((d) => !existsSync(path.join(ziel, d))));
   pruefe('kopiereWeb: ganze App-Ordner kopiert (auch Dateien, die erst spaeter geladen werden)', ORDNER.every((o) => !existsSync(path.join(WURZEL, o)) || existsSync(path.join(ziel, o))));
+  // daten/beispiel/ ist nur ein Format-Beispiel fuer Tests und wird nie ausgeliefert (ARCHITEKTUR.md, tests/sw.test.mjs);
+  // jede andere versionierte Datei der App-Ordner kommt mit, auch was sw.js erst mit einem Paket nachlaedt (R18)
+  const ordnerDateien = gitDateien(ORDNER.join(' '));
+  const soll = ordnerDateien.filter((d) => !d.startsWith('daten/beispiel/'));
+  pruefe('kopiereWeb: daten/beispiel/ bleibt draussen', ordnerDateien.some((d) => d.startsWith('daten/beispiel/')) && !existsSync(path.join(ziel, 'daten', 'beispiel')));
+  pruefe('kopiereWeb: alle anderen Dateien der App-Ordner sind dabei', soll.length > liste.length / 2 && soll.every((d) => existsSync(path.join(ziel, d))),
+    soll.filter((d) => !existsSync(path.join(ziel, d))).slice(0, 5));
   pruefe('kopiereWeb: Inhalt identisch (index.html, js/app.js)', readFileSync(path.join(ziel, 'index.html'), 'utf8') === lies('index.html') && readFileSync(path.join(ziel, 'js/app.js'), 'utf8') === lies('js/app.js'));
   writeFileSync(path.join(ziel, 'veraltet.txt'), 'weg');
   kopiereWeb(ziel);

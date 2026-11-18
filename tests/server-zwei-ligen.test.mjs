@@ -54,8 +54,9 @@ async function lauf(db, name, sql) {
   }
 }
 
-// Reihenfolge wie in Supabase: Grundschema, Online, Kronen, Raetsel-Duell (+ Daten), Karte, Liga-Bild, Daten-Auskunft
-const BISHER = ['supabase/schema.sql', 'supabase/online-schema.sql', 'supabase/kronen-schema.sql',
+// Reihenfolge wie in Supabase: Grundschema, Abo, Online, Kronen, Raetsel-Duell (+ Daten), Karte, Liga-Bild, Daten-Auskunft
+// (abo-schema.sql, damit Abschnitt 12 des RLS-Tests auch den Premium-Fall der Live-Bewertung prueft)
+const BISHER = ['supabase/schema.sql', 'supabase/abo-schema.sql', 'supabase/online-schema.sql', 'supabase/kronen-schema.sql',
   'supabase/raetsel-duell-schema.sql', 'supabase/raetsel-duell-daten.sql', 'supabase/karte-schema.sql',
   'supabase/liga-bild-schema.sql', 'supabase/daten-schema.sql'];
 // alte Pruefungen, die nach den zwei Ligen unveraendert gelten muessen (Abwaertsvertraeglichkeit)
@@ -116,6 +117,41 @@ const zahl = async (db, sql) => Number(Object.values((await db.query(sql)).rows[
   await db.close();
 }
 
+// ---------- Teil 1b: Deckel 60 fuer Bot- und KI-Kronen (Flos Wahl R13-K1, 10.11.2026) ----------
+// Gewinne gegen Bot und KI bringen je Woche und Liga hoechstens 60 Kronen (etwa drei KI-Siege); Menschen-Partien frei.
+{
+  const db = await neueDb();
+  const f0 = await lauf(db, 'zwei-ligen-schema.sql', lies('supabase/zwei-ligen-schema.sql'));
+  pruefe('Deckel: zwei-ligen-schema.sql laeuft', f0 === null, f0);
+  const B = 'f7000000-0000-4000-8000-000000000007';
+  await db.exec(`insert into auth.users (id, email) values ('${B}', 'deckel@example.invalid');`);
+  pruefe('Deckel: Konstante bot_ki_wochen_max ist 60',
+    await zahl(db, `select (public.kronen_konstanten() ->> 'bot_ki_wochen_max')::int`) === 60);
+  const buche = async (art, ref) => (await db.query(
+    `select public.kronen_einfach_buchen('${B}', '${art}', '${ref}', 'sieg') as r`)).rows[0].r;
+  const k1 = await buche('ki', 'deckel-ki-1');
+  const k2 = await buche('ki', 'deckel-ki-2');
+  const b1 = await buche('bot', 'deckel-bot-1');
+  pruefe('Deckel: unter 60 zaehlt jeder Sieg voll (20 + 20 + 15)',
+    k1.delta === 20 && k2.delta === 20 && b1.delta === 15 && !b1.bot_ki_voll, JSON.stringify([k1, k2, b1]));
+  const k3 = await buche('ki', 'deckel-ki-3');
+  pruefe('Deckel: der KI-Sieg bringt nur den Rest bis 60 (5 statt 20)', k3.delta === 5 && k3.bot_ki_voll === true,
+    JSON.stringify(k3));
+  const b2 = await buche('bot', 'deckel-bot-2');
+  pruefe('Deckel: die 61. Bot-/KI-Krone zaehlt nicht', b2.delta === 0 && b2.bot_ki_voll === true, JSON.stringify(b2));
+  await db.exec(`select public.kronen_online_buchen('${B}', 'f7000000-0000-4000-8000-0000000000a1', 1, 1000);
+                 select public.kronen_online_buchen('${B}', 'f7000000-0000-4000-8000-0000000000a2', 1, 1000);`);
+  pruefe('Deckel: Siege gegen Menschen zaehlen weiter voll (60 + 30 + 30 = 120 Wochen-Kronen Online)',
+    await zahl(db, `select kronen from public.liga_mitglieder where user_id = '${B}' and liga = 'online'`) === 120);
+  const d1 = await buche('duell_ki', 'deckel-duell-ki-1');
+  pruefe('Deckel: die Raetsel-Liga hat ihren eigenen Deckel (KI-Duell 20)', d1.delta === 20 && !d1.bot_ki_voll,
+    JSON.stringify(d1));
+  await db.query(`select set_config('request.jwt.claims', '{"sub":"${B}","role":"authenticated"}', false)`);
+  const bk = (await db.query(`select public.liga_gruppe('online') as g`)).rows[0].g?.bot_ki;
+  pruefe('Deckel: die Liga-Ansicht meldet genutzt 60 von max 60', bk?.max === 60 && bk?.genutzt === 60, JSON.stringify(bk));
+  await db.close();
+}
+
 // ---------- Teil 2: Pruefungen, Abwaertsvertraeglichkeit, Rueckweg ----------
 const db = await neueDb();
 pruefe('bisherige Schemas laufen', true);
@@ -167,12 +203,14 @@ for (const d of ['supabase/kronen-schema.sql', 'supabase/raetsel-duell-schema.sq
   pruefe(`${d} laeuft nach dem Rueckweg`, f === null, f);
 }
 const u = (await db.query(`select
-    (select count(*)::int from pg_tables where schemaname = 'public' and tablename = 'raetsel_stand') as tabelle,
+    (select count(*)::int from pg_tables where schemaname = 'public'
+       and tablename in ('raetsel_stand', 'live_bewertung_nutzung')) as tabelle,
     (select count(*)::int from information_schema.columns where table_schema = 'public' and column_name = 'liga'
        and table_name in ('liga_gruppen', 'liga_mitglieder', 'liga_belohnungen')) as spalten,
     (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
        where n.nspname = 'public' and p.proname in ('liga_stand', 'liga_staende', 'liga_gruppe', 'liga_buchen_in',
-         'raetsel_stand_sichern')) as funktionen`)).rows[0];
+         'raetsel_stand_sichern', 'online_live_bewertung_frei', 'online_live_bewertung_nutzen',
+         'live_bewertung_unbegrenzt')) as funktionen`)).rows[0];
 pruefe('nach dem Rueckweg keine Raetsel-Tabelle, Spalte oder neue Funktion', u.tabelle === 0 && u.spalten === 0 && u.funktionen === 0,
   JSON.stringify(u));
 // kronen-rls-test.sql nicht: er erwartet nicht ausgezahlte Banner, mit karte-schema.sql zahlt die Abrechnung sie sofort aus

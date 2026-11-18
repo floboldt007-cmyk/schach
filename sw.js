@@ -7,14 +7,15 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 297;
-const STAND = '5960af58205c';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 353;
+const STAND = '48bc22b0a42f';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  'js/pakete/sammlung/taten.js',
   // Etappe 4b: Visitenkarte, Erfolgs-Stufen, Taler; Banner ohne Shop (der kommt spaeter)
   'js/besitz.js',
   'js/karte.js',
@@ -62,6 +63,7 @@ const DATEIEN = [
   'js/pakete/lobby/index.js',
   'js/pakete/lobby/texte.js',
   'js/ui/lobby.js',
+  'js/ui/ki-ersatz.js',
   'css/pakete/raetsel-duell.css',
   'js/pakete/lobby/raetsel-duell.js',
   'js/pakete/lobby/raetsel-duell-texte.js',
@@ -71,6 +73,7 @@ const DATEIEN = [
   'css/pakete/sammlung.css',
   'js/pakete/sammlung/index.js',
   'js/pakete/sammlung/shop.js',
+  'js/pakete/sammlung/shop-entwurf.js',
   'js/pakete/sammlung/erfinder.js',
   'js/pakete/sammlung/profil.js',
   'js/pakete/sammlung/titel.js',
@@ -80,6 +83,7 @@ const DATEIEN = [
   'js/pakete/finisher/texte.js',
   'js/sprachen/bericht.js',
   'js/pakete/abo/texte.js',
+  'js/pakete/verwaltung/texte.js',
   'js/pakete/coach-ki/texte.js',
   'js/pakete/online/texte.js',
   'js/pakete/schule/texte.js',
@@ -89,6 +93,7 @@ const DATEIEN = [
   'js/sprachen/schule.js',
   'datenschutz-en.html',
   'impressum-en.html',
+  'konto-loeschen-en.html',
   'js/pakete/funken/texte.js',
   'js/pakete/gedaechtnis/texte.js',
   'js/pakete/kartei/texte.js',
@@ -175,6 +180,8 @@ const DATEIEN = [
   'index.html',
   'datenschutz.html',
   'impressum.html',
+  'konto-loeschen.html',
+  'js/konto-loeschen.js',
   'manifest.webmanifest',
   'LICENSE',
   'css/tokens.css',
@@ -215,17 +222,21 @@ const DATEIEN = [
   'js/konto.js',
   'js/umzug.js',
   'js/profil.js', 'js/rahmen-kunst.js', 'js/sammlung-kunst.js', 'js/kreaturen-kunst.js', 'js/emote-kunst.js', 'js/titel-kunst.js',
-  'js/sonderstuecke.js', 'js/labor.js',
+  'js/sonderstuecke.js', 'js/labor.js', 'js/brett-flaechen.js', 'js/brett-motive.js', 'js/brett-motive-v4.js',
   'js/figurensatz.js',
   'js/abo.js',
+  'js/verwaltung.js',
   'js/pakete/abo/index.js',
   'js/pakete/abo/trainer.js',
+  'js/pakete/verwaltung/index.js',
   'js/coach-ki.js',
   'js/pakete/coach-ki/index.js',
   'js/schule.js',
   'js/pakete/schule/index.js',
   'js/nachholen.js',
   'js/online.js',
+  'js/serverzeit.js',
+  'js/uhr.js',
   'js/freunde.js',
   'js/kronen.js',
   'js/gegnersuche.js',
@@ -248,6 +259,7 @@ const DATEIEN = [
   'js/ui/analyse.js',
   'js/ui/arena.js',
   'js/ui/bauteile.js',
+  'js/ui/brett-einstellungen.js',
   'js/ui/duell.js',
   'js/ui/einstellungen.js',
   'js/ui/premium.js',

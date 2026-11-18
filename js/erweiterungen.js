@@ -19,10 +19,12 @@
 // Stufe 2, Schritt 1 (Flo 23.10.2026: zwei Schritte): alles, was ohne Server laeuft. Reihenfolge = Ladereihenfolge; die
 // Orte ordnen ueber ihre eigene reihenfolge. Schritt 2 (wenn Supabase und Stripe eingerichtet sind): 'pakete/online/index',
 // 'pakete/abo/index', 'pakete/coach-ki/index', 'pakete/schule/index'.
+// verwaltung (G-006 M3): Flos Verwaltung. Ohne Anmeldung, ohne Recht, offline oder ohne verwaltung-schema.sql bleibt die
+// Gruppe still unsichtbar (tests/verwaltung-browser.test.mjs); die Rechte prueft allein der Server.
 export const PAKETE = Object.freeze(['sicherung', 'daten', 'pakete/liga/index', 'pakete/funken/index', 'pakete/punkte/index',
   'pakete/serie/index', 'pakete/teilen/index', 'pakete/gedaechtnis/index', 'pakete/kartei/index', 'pakete/start/index',
   'pakete/zuzweit/index', 'pakete/tagesraetsel/index', 'pakete/finisher/index', 'pakete/emotes/index', 'pakete/musik/index',
-  'pakete/sammlung/index', 'pakete/lernen/index', 'pakete/lobby/index']);
+  'pakete/sammlung/index', 'pakete/lernen/index', 'pakete/lobby/index', 'pakete/verwaltung/index']);
 // pakete/boss/index (Wochen-Boss, Funken-Wochenende) ist gebaut, aber bewusst noch nicht eingeschaltet: Countdown und eine
 // nur in einer Woche erspielbare Trophaee widersprechen den Fairness-Regeln, es fehlt ein Archiv (Ultracode-Pruefung 30.10.).
 // Ohne das Paket gibt es auch kein Funken-Wochenende (funken liest den Spielplan nur auf sein Signal).

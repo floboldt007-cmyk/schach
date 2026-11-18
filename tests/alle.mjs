@@ -32,17 +32,30 @@ if (!Number.isInteger(PARALLEL) || PARALLEL < 1 || (teilArg && !TEIL)
 
 const SUITEN = [
   { name: 'zeitwaechter', datei: 'zeitwaechter.test.mjs', args: [], was: 'Zeitgrenzen, Fehler und Prozess-Aufraeumen' },
+  { name: 'testserver', datei: 'testserver.test.mjs', args: [], was: 'Gemeinsamer Test-Server der Browser-Suiten: MIME-Typen, 404/301/304, Last ohne Verweigerung' },
   { name: 'konto', datei: 'konto.test.mjs', args: [], was: 'Konto, Anmeldung und Cloud-Spielstand' },
   { name: 'konto-link', datei: 'konto-link.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster (Dialoge, Uhr)', was: 'Anmelde-Link: Rückkehr, Abgleich-Riegel, zwei Tabs (Browser)' },
+  { name: 'apple-knopf', datei: 'apple-knopf.test.mjs', args: [], was: 'Anmeldeblatt: abgeschalteter Apple-Weg berechnet unsichtbar, Google und Code-Anmeldung sichtbar (Browser)' },
   { name: 'online', datei: 'online.test.mjs', args: [], was: 'Online gegen Freunde: Einladung, Zuege, Abfrage' },
+  { name: 'online-haengt-vertrag', datei: 'online-haengt-vertrag.test.mjs', args: [], was: 'Haengende Online-Partie: Client wartet gewertet ranked_haengt_s + 1 s, sonst 10 Min (Vertrag mit zwei-ligen-schema.sql)' },
+  { name: 'serverzeit', datei: 'serverzeit.test.mjs', args: [], was: 'Serveruhr minus Geraeteuhr fuer Online-Uhr, Erstzug-Frist und Intro (R19)' },
+  { name: 'online-start', datei: 'online-start.test.mjs', args: [], was: 'Online-Start mit zwei Spielern: Intro sperrt nie, Erstzug-Frist auf beiden Seiten, Uhr trotz falscher Geraeteuhr (R19)' },
+  { name: 'online-live-eigene', datei: 'online-live-eigene.test.mjs', args: [], was: 'Online-Live-Bewertung: nur eigene Zuege, kein bester Zug, Ranked nur mit Server-Kontingent' },
   { name: 'freunde', datei: 'freunde.test.mjs', args: [], was: 'Freunde: Anfrage, Antwort, Einladungslink (Server abgefangen)' },
-  // Fester Port: zuzweit wertet PORT noch nicht aus und bleibt deshalb exklusiv (online-ui sicherheitshalber auch).
-  { name: 'online-ui', datei: 'online-ui.test.mjs', args: [], exklusiv: 'fester Port 8887', was: 'Online-Oberflaeche mit abgefangenen Server-Anfragen' },
+  { name: 'online-ui', datei: 'online-ui.test.mjs', args: [], was: 'Online-Oberflaeche mit abgefangenen Server-Anfragen' },
+  { name: 'online-ranked-probe', datei: 'online-ranked-probe.test.mjs', args: [], was: 'Funktionsprobe Ranked: zwei Sitzungen gegen einen nachgebauten Server (harte Befund-Pruefungen nur mit PROBE_STRENG=1)' },
+  { name: 'online-suche-gleichzeitig', datei: 'online-suche-gleichzeitig.test.mjs', args: [], was: 'Feinschliff R15: zwei Konten suchen gleichzeitig, sofort gepaart, Visitenkarte, Elo und Sondertitel in Leiste und Duell-Intro (Browser)' },
   { name: 'server-online-zug', datei: 'server-online-zug.test.mjs', args: [], was: 'Online-Zuege: Edge Function prueft Regeln und Ende (Server, Anti-Cheat 1a)' },
-  { name: 'zuzweit', datei: 'zuzweit.test.mjs', args: [], exklusiv: 'fester Port 8886', was: 'Zu zweit: Namen, Uhr, Ergebnis und neutrale Analyse' },
+  { name: 'zuzweit', datei: 'zuzweit.test.mjs', args: [], was: 'Zu zweit: Namen, Uhr, Ergebnis und neutrale Analyse' },
   { name: 'daten', datei: 'daten.test.mjs', args: [], was: 'Datenfreigabe, Datenauskunft, Konto löschen (DSGVO)' },
+  { name: 'konto-loeschen', datei: 'konto-loeschen.test.mjs', args: [], was: 'Löschseite ohne App (Google Play): Anmeldung, zweistufig löschen, Mail-Weg (Browser)' },
+  { name: 'r19-bots-se', datei: 'r19-bots-se.test.mjs', args: [], was: 'Bots: klebender Spielen-Knopf verdeckt kein Fokusziel (7 Größen, in Ruhe bildgleich); Löschseite: Sprunglink zu "Selbst löschen" (Browser)' },
   { name: 'server-abo', datei: 'server-abo.test.mjs', args: [], was: 'Abo: Stripe-Webhook und Schema-Vertrag (Server)' },
   { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Trainer“: Stand, Kauf, Blatt' },
+  // server-verwaltung steht wie alle PGlite-Suiten (server-karte*, server-daten*) nicht hier: PGlite gibt es nur im CI-Job
+  // sql (.github/workflows/tests.yml), im Browser-Job brach die Suite ab (R17-sammelfix2, Run 43587846003)
+  { name: 'verwaltung', datei: 'verwaltung.test.mjs', args: [], was: 'Verwaltung fuer Flo: Recht still pruefen, Aufrufe, Fehlertexte, Ansichten (ohne Browser)' },
+  { name: 'verwaltung-browser', datei: 'verwaltung-browser.test.mjs', args: [], was: 'Verwaltung im Browser: still unsichtbar ohne Recht, Menue-Eintrag nach spaeter Antwort (PC und Handy)' },
   { name: 'server-coach', datei: 'server-coach.test.mjs', args: [], was: 'Frag den Coach: Edge Function, Prompt, Tageslimit (Server)' },
   { name: 'coach-ki', datei: 'coach-ki.test.mjs', args: [], was: 'Frag den Coach: Knopf und Antwort in der Analyse' },
   { name: 'server-schule', datei: 'server-schule.test.mjs', args: [], was: 'Schulmodus: Schema-Vertrag, Rechte, Grenzen (Server)' },
@@ -52,6 +65,9 @@ const SUITEN = [
   { name: 'kronen', datei: 'kronen.test.mjs', args: [], was: 'Liga mit Kronen: reine Rechnung (Stufen, Saison, Boden, Start aus Elo)' },
   { name: 'kronen-vertrag', datei: 'kronen-vertrag.test.mjs', args: [], was: 'Liga mit Kronen: Schema-Vertrag mit js/pakete/liga/kronen.js, Rechte, Rueckweg (Server)' },
   { name: 'besitz', datei: 'besitz.test.mjs', args: [], was: 'Etappe 4b: Erfolge in Stufen, lokales Taler- und Banner-Buch (ohne Konto)' },
+  { name: 'r19-titel-erfolge', datei: 'r19-titel-erfolge.test.mjs', args: [], was: 'R19: Taten-Titel und lokale Erfolgs-Familien (ohne Taler, ohne Server)' },
+  { name: 'r19-liga-namen', datei: 'r19-liga-namen.test.mjs', args: [], was: 'Liga-Namen Satz A (Squire bis Crownmate, auch deutsch), Figuren und IDs unverändert, alte Spielklassen nie angezeigt' },
+  { name: 'r19-lobby-farbe', datei: 'r19-lobby-farbe.test.mjs', args: [], was: 'Spiel-Symbole: gefuellt und farbig in Lobby, Startseite und Leiste, je Symbol mind. 3:1 an Pixeln hell und dunkel, Startseite scrollt nicht (Browser)' },
   { name: 'karte', datei: 'karte.test.mjs', args: [], was: 'Etappe 4b: js/karte.js gegen einen nachgebildeten Server (Stufen melden, Karte waehlen, Karte der Partie)' },
   { name: 'karte-vertrag', datei: 'karte-vertrag.test.mjs', args: [], was: 'Etappe 4b: Schema-Vertrag Visitenkarte (Zahlen, feste Listen, Rechte, Rueckweg, nie kaeuflich)' },
   { name: 'raetsel-duell', datei: 'raetsel-duell.test.mjs', args: [], was: 'Raetsel-Duell: reine Rechnung (Uhr, Phase, Stand) und Vertrag mit duell_konstanten' },
@@ -59,26 +75,52 @@ const SUITEN = [
   { name: 'raetsel-duell-ui', datei: 'raetsel-duell-ui.test.mjs', args: [], was: 'Raetsel-Duell: Screen gegen nachgebauten Server (KI-Duell bis zur Wertung, Link, Labor)' },
   { name: 'zaehler', datei: 'zaehler.test.mjs', args: [], was: 'Tageszaehler ohne Personenbezug: Client und SQL-Vertrag (aus bis zur Rechtspruefung)' },
   { name: 'storage', datei: 'storage.test.mjs', args: [], was: 'Speicher, Sterne, Freischaltung' },
-  { name: 'liga', datei: 'liga.test.mjs', args: [], exklusiv: 'fester Port 8847', was: 'Arena-Wertung, Spielklassen, Saison und Vereinsmeisterschaft' },
+  { name: 'liga', datei: 'liga.test.mjs', args: [], was: 'Arena-Wertung, Spielklassen, Saison und Vereinsmeisterschaft' },
   { name: 'sicherung', datei: 'sicherung.test.mjs', args: [], was: 'Export, Import und Sicherungshinweis' },
   { name: 'review', datei: 'review.test.mjs', args: SCHNELL ? ['--nur-node'] : [], was: 'Zug-Klassen, Genauigkeit, Coach' },
+  { name: 'analyse-start', datei: 'analyse-start.test.mjs', args: [], was: 'Analyse: Satz der Start-Karte und Zug beim Oeffnen (kurze Partie)' },
+  { name: 'online-analyse', datei: 'online-analyse.test.mjs', args: [], was: 'Analyse der Online-Partie: Kennzeichen online, Du gegen Gegner, Ende ohne Ergebnis ehrlich' },
   { name: 'ereignisse', datei: 'ereignisse.test.mjs', args: [], was: 'Ereignis-Bus, Anzeige-Orte, Feier-Budget' },
   { name: 'fairness', datei: 'fairness.test.mjs', args: [], was: 'Fairness-Regeln (Runde 4)' },
   { name: 'spiel', datei: 'spiel.test.mjs', args: [], was: 'Spiel-Fundament: Tag, Inhalte, Spielplan, Bot-Register' },
   { name: 'engine-bots', datei: 'engine-bots.test.mjs', args: ['--schnell'], exklusiv: 'hohe Rechenlast', was: 'Stockfish-Wrapper und Bots' },
   { name: 'board', datei: 'board.test.mjs', args: [], was: 'Brett: Tippen, Ziehen, Effekte' },
   { name: 'vorzuege', datei: 'vorzuege.test.mjs', args: [], was: 'Vorzug-Kette mit Nummern, Pfeil-Tipp' },
+  { name: 'partie-figurensatz', datei: 'partie-figurensatz.test.mjs', args: [], was: 'Bot-Partie: Figurensatz wechselt ohne Neuladen (spaeter Erfinder-Status, Wahl in den Einstellungen)' },
+  { name: 'zuzweit-lektion-figurensatz', datei: 'zuzweit-lektion-figurensatz.test.mjs', args: [], was: 'Zu zweit und Meisterschule-Lektion: Figurensatz wechselt ohne Neuladen (spaeter Erfinder-Status, Wahl in den Einstellungen)' },
+  { name: 'funktion-partie', datei: 'funktion-partie.test.mjs', args: [], was: 'Funktionsprobe Bot-Partie: Start, Zug, Hinweis, Sieg, Aufgeben, Ergebnisblatt (iPhone 13 + PC)' },
+  { name: 'r19-lektionen-probe', datei: 'r19-lektionen-probe.mjs', args: [], was: 'Funktionsprobe Meisterschule: jede der 65 Lektionen Start, Zug per Klick, Ergebnisblatt (iPhone 13 + PC, hell + dunkel)' },
+  { name: 'r19-lektionen-besser', datei: 'r19-lektionen-besser.test.mjs', args: [], was: 'Feinschliff R19: 13 lange Lektionen mit drei Runden, jede Stellung, jedes Ziel und jede Textbehauptung mit Stockfish nachgerechnet (Node)' },
+  { name: 'r19-lektionen-runden', datei: 'r19-lektionen-runden.test.mjs', args: [], was: 'Feinschliff R19: Rundenknoepfe, Runde fuer Runde geschafft, Meisterprobe ohne Hinweis, alter Spielstand, iPhone SE (Browser)' },
+  { name: 'ergebnis-einmal', datei: 'ergebnis-einmal.test.mjs', args: [], was: 'Ergebnisblatt der Bot-Partie: Spruch einmal, ein Nochmal-Knopf (Revanche), Knoepfe ab 44 px (iPhone 13 + PC)' },
+  { name: 'r17-ende-feinschliff', datei: 'r17-ende-feinschliff.test.mjs', args: [], was: 'R17: Fokus nach Niederlage auf Zur Analyse, Namen auf der Duell-Ende-Karte, kein Streifen unter dem Profilbanner (Browser)' },
+  { name: 'liga-kontrast', datei: 'liga-kontrast.test.mjs', args: [], was: 'Kritik R6: Marke "neu" als Chip, Code-Teilen als Knopf, Kontraste Bronze/Gold/Aufstieg/"!", Knoepfe hinter dem Ergebnis-Blatt gesperrt (Browser)' },
+  { name: 'liga-wertung-text', datei: 'liga-wertung-text.test.mjs', args: [], was: 'Liga-Texte: die Wertung heisst Liga-Wertung / League rating, nie Arena' },
+  { name: 'r19-mail-datenschutz', datei: 'r19-mail-datenschutz.test.mjs', args: [], was: 'Kontakt kontakt@crownmate.de überall, kein Entwurfs-Kasten, Löschliste mit Abo, Coach und Klassen der Leitung (DE/EN), Sprunglink Löschseite EN' },
+  { name: 'datenschutz-karte', datei: 'datenschutz-karte.test.mjs', args: [], was: 'Datenschutz Visitenkarte: Online-Elo nur in gewerteten Partien, Erfinder/Pionier nur auf der eigenen Karte' },
+  { name: 'datenschutz-verwaltung', datei: 'datenschutz-verwaltung.test.mjs', args: [], was: 'Datenschutz Verwaltung durch den Betreiber: Daten, Aenderungen, Protokoll, lit. b/f, Auskunft, Loeschung' },
+  { name: 'partie-hoehe', datei: 'partie-hoehe.test.mjs', args: [], was: 'Bot-Partie ohne Seitenueberlauf und Sieg-Blatt ohne Innen-Scrollen, Brett nicht kleiner (7 Geraete, R7 B8/B10)' },
+  { name: 'layout-r8', datei: 'layout-r8.test.mjs', args: [], was: 'Kritik R8: Liga-Platzzahl deckend ueber dem Banner, Sieg-Blatt SE/PC ohne Innen-Scrollen, Fertig im Bereichs-Blatt volle Breite (Browser)' },
+  { name: 'funktion-shop-skin', datei: 'funktion-shop-skin.test.mjs', args: [], was: 'Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht' },
+  { name: 'r19-shop-fortnite', datei: 'r19-shop-fortnite.test.mjs', args: [], was: 'R19 Shop A: ?shopStil=a, fuenf feste Plaetze aus assets/shop/auslage.json, Server-Preis oder Preis folgt, kein Druck, Vorschau je Art, Kaufen ohne Kasse' },
+  { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
+  { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
+  { name: 'r15-ergebnis-teilen', datei: 'r15-ergebnis-teilen.test.mjs', args: [], was: 'Feinschliff R15: Duell-Nochmal in Suchfarbe, Niederlage mit Liga-Verweis, ein Knopf "Teilen ..." nach dem Sieg (Browser)' },
+  { name: 'r15-ich-lektion', datei: 'r15-ich-lektion.test.mjs', args: [], was: 'Feinschliff R15: Vitrine im Banner am PC, Spielerleisten in der Lektion, Zu-zweit-Brett wie die Bot-Partie (Browser)' },
   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
   { name: 'sw-update', datei: 'sw-update.test.mjs', args: [], was: 'SW-Update laedt nur geaenderte Dateien (ETag/304)' },
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
+  { name: 'info-lizenzen', datei: 'info-lizenzen.test.mjs', args: [], was: 'Info und Lizenzen: jede Fremdlizenz und der eigene Quellcode in DE und EN, Herkunft Kuerbis/Frost/Gold (Browser)' },
+  { name: 'r18-botschutz-link', datei: 'r18-botschutz-link.test.mjs', args: [], was: 'Bot-Schutz-Hinweis der Anmeldung: Link "Mehr dazu" >= 44 px und an 9 Punkten genau getroffen, 7 Groessen hell und dunkel (Browser)' },
   { name: 'klang', datei: 'klang.test.mjs', args: [], was: 'Klangpakete: Katalog, Dateien, Pegel, Abspielen' },
   { name: 'musik', datei: 'musik.test.mjs', args: [], was: 'Lobby-Musik: Standard, Beruehrung, Welten und Freischaltung' },
   { name: 'navigation', datei: 'navigation.test.mjs', args: [], was: 'Reiter-Leiste, Kopf, Bauteile, Training-Hülle' },
   { name: 'arena', datei: 'arena.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], exklusiv: 'Animations-Zeitfenster unter CPU-Last', was: 'Arena als Weltkarte, Detail-Panel, Duell-Intro, Porträts' },
   { name: 'ansicht', datei: 'ansicht.test.mjs', args: [], was: 'Ansicht: jeder Bildschirm in 7 Größen (Schrift, Knöpfe, Überlauf, Überlappung)' },
+  { name: 'ansicht-befunde', datei: 'ansicht-befunde.test.mjs', args: [], was: 'Ansichts-Befunde an Probe-Seiten: nichts unter [inert] oder unsichtbarem Vorfahren zaehlt, Offenes wird gefunden (Browser)' },
   { name: 'funken', datei: 'funken.test.mjs', args: [], was: 'Paket Funken und Level: Rechnung, Speicher, Orte, Aufstieg' },
   { name: 'punkte', datei: 'punkte.test.mjs', args: SCHNELL ? ['--schnell'] : [], exklusiv: 'Zeitfenster unter CPU-Last', was: 'Paket Punkte und Bestenliste: Formel, Tafeln, Codes, Abrechnung' },
   { name: 'serie', datei: 'serie.test.mjs', args: [], was: 'Paket Serie: Bauernmarsch und Siegeslauf (Tageswerk, Meilensteine, Orte)' },
@@ -86,6 +128,11 @@ const SUITEN = [
   { name: 'gedaechtnis', datei: 'gedaechtnis.test.mjs', args: [], was: 'Paket gedaechtnis: Bots erinnern sich, Revanche, Erzfeind (Welle A2)' },
   { name: 'emotes', datei: 'emotes.test.mjs', args: [], was: 'Paket Emotes: Rad, Schnell-Chat, Bot-Antwort und Barrierefreiheit' },
   { name: 'sammlung', datei: 'sammlung.test.mjs', args: [], was: 'Paket Sammlung: Reiter Ich, Bereiche mit Schloss, Erfolge' },
+  { name: 'bretter-65', datei: 'bretter-65.test.mjs', args: [], was: '65 Bretter: Katalog, Gleichlauf mit tokens.css, Kontrast und Figuren-Lesbarkeit, Glanz nur ohne weniger Bewegung' },
+  { name: 'bretter-oberflaechen', datei: 'bretter-oberflaechen.test.mjs', args: [], was: 'Brett-Oberflaechen: Seltenheit gewoehnlich, Oberflaeche je seltenem Brett, Farbabstand, Kontrast mit Oberflaeche, Feldausschnitt im Browser' },
+  { name: 'bretter-v3', datei: 'bretter-v3.test.mjs', args: [], was: 'Motiv-Bretter Fassung 3 (Entwurf): 20 Motive, Helligkeitsbaender, Kontrast am echten Brett, Bewegung nur ohne weniger Bewegung' },
+  { name: 'bretter-v4', datei: 'bretter-v4.test.mjs', args: [], was: 'Motiv-Bretter Fassung 4: 20 Motive, Textur je Feld, Feld 3,0, Textur 1,15, Koordinaten 3,0, Bewegung nur am Rahmen' },
+  { name: 'bretter-v4-app', datei: 'bretter-v4-app.test.mjs', args: [], was: 'Motiv-Bretter in der App: Katalog nur Erfinder, Rahmen in Bot/Online/Zu zweit/Raetsel-Duell, Handy ohne Rahmen, Sammlung' },
   { name: 'lernen', datei: 'lernen.test.mjs', args: [], was: 'Paket lernen: Meisterschule, leicht gratis, Rest im Trainer, Lektionen mit Engine-Verteidigung' },
   { name: 'lobby', datei: 'lobby.test.mjs', args: [], was: 'Paket lobby: Online-Lobby als Vorschau im Labor (Umschalter, Bedenkzeiten, Suche, Partie mit Uhr)' },
   { name: 'finisher', datei: 'finisher.test.mjs', args: [], was: 'Paket Finisher: Freischaltung und sichere Standardwahl' },
@@ -104,6 +151,29 @@ const SUITEN = [
   { name: 'native', datei: 'native.test.mjs', args: [], was: 'App-Store-Huelle (Capacitor): Konfiguration, Kopie der Web-App' },
   { name: 'einfuehrung-rand', datei: 'einfuehrung-rand.test.mjs', args: [], was: 'Einführung: jeder Knopf ohne Scrollen ganz sichtbar, mind. 44 px (SE, 13, iPad, PC), Klartext Bauernmarsch' },
   { name: 'systeme-texte', datei: 'systeme-texte.test.mjs', args: [], was: 'Spielsysteme: Funken, Duell, Liga nennen in DE und EN dieselben Zahlen wie der Code' },
+  { name: 'start-befunde', datei: 'start-befunde.test.mjs', args: [], was: 'Feinschliff R6: Serie "1 Tag", Bot-Spruch ohne angeschnittene Zeile, Leiter auf Start quer, ein Begriff fuer Online (Browser)' },
+  { name: 'r17-heim-hover', datei: 'r17-heim-hover.test.mjs', args: [], was: 'Feinschliff R17: Knoepfe der Startseite in Ruhe, Zeiger, Fokus, gedrueckt mind. 4,5:1, Zeiger sichtbar (Browser)' },
+  { name: 'r17-hover-handy', datei: 'r17-hover-handy.test.mjs', args: [], was: 'Feinschliff R17: Zeiger-Zustand bleibt am Handy nach dem Tippen nicht haengen, am PC unveraendert (Browser)' },
+  { name: 'geschmack-r8', datei: 'geschmack-r8.test.mjs', args: [], was: 'Feinschliff R8: Serien-Chip neben dem Gruss auf kurzen Handys, Erfolgs-Fenster nie ueber einem offenen Blatt (Browser)' },
+  { name: 'r16-p1', datei: 'r16-p1.test.mjs', args: [], was: 'Feinschliff R16 Paket 1: Konto-Fehlertext, Lobby-Gegnerkarte (VS, Sondertitel-Wappen, Elo), Vitrine, Lektion auf dem iPhone SE (Browser)' },
+  { name: 'r19-online', datei: 'r19-online.test.mjs', args: [], was: 'Feinschliff R19: Online abgemeldet Konto-Hinweis unter den Tueren und ungestreckt, angemeldet Liga, Tueren, Freunde, Tueren-Ueberzeile mind. 12 px (Browser)' },
+  { name: 'r19-online-weg', datei: 'r19-online-weg.test.mjs', args: [], was: 'Feinschliff R19: KI-Ersatz mit Duell-Intro (Online-Seite und Labor-Lobby), Kopf Online gewertet 5 + 3, Spielerleisten ohne Streifen und ohne Abschneiden (4 Geraete), Umschalter Online fuehrt zur echten Seite (Browser)' },
+  { name: 'r19-online-ruhig', datei: 'r19-online-ruhig.test.mjs', args: [], was: 'Feinschliff R19: Online ruhiger (Entwurf A einzig), eine Zahl (Server-Elo) oder Liga als Wort, Tuertexte sichtbar oder in Mehr, Leisten nur Name (Browser)' },
+  { name: 'r19-welten-sehen', datei: 'r19-welten-sehen.test.mjs', args: [], was: 'Feinschliff R19: alle Bot-Welten zu sehen, noch nicht offene Welt ohne Schloss und nicht startbar, spielbar nach dem Endgegner davor (4 Geraete, hell/dunkel, Browser)' },
+  { name: 'r19-avatar-modern', datei: 'r19-avatar-modern.test.mjs', args: [], was: 'Feinschliff R19: jeder Bot zeigt in jeder Ansicht das moderne Portraet (Zuordnung ueber avatarVon, Node)' },
+  { name: 'r19-uhr', datei: 'r19-uhr.test.mjs', args: [], was: 'Feinschliff R19: Schachuhr in Bot- und KI-Partie (Kern: Abzug, Zuschlag, Pause, Zeitende, Fortsetzen aus zeiten, Wanduhr gewertet, Remis ohne Mattmaterial)' },
+  { name: 'r19-arena-figur', datei: 'r19-arena-figur.test.mjs', args: [], was: 'Feinschliff R19: eigene Figur in der Bot-Welt bei jeder Stufe und fertiger Welt frei neben ihrer Station (iPhone 13, iPad, PC, Browser)' },
+  { name: 'r19-botwelt-leben', datei: 'r19-botwelt-leben.test.mjs', args: [], was: 'Bot-Welt lebendig: Handy B (ganze Welt, Gegner als Leiste), Weltname als Plakette mit Wappen, je Welt ein ruhiges Element (reduced-motion still)' },
+  { name: 'r19-arena-karte-klein', datei: 'r19-arena-karte-klein.test.mjs', args: [], was: 'Arena kleine Handys: Spielen-Knopf zu und offen ganz sichtbar (SE 320/375, iPhone 13), Groessenwechsel 1280/1024 -> 375 -> zurueck stellt die Lage richtig' },
+  { name: 'r17-kopf', datei: 'r17-kopf.test.mjs', args: [], was: 'Feinschliff R17: Kopf-Knoepfe (Premium, rund) in Ruhe, Zeiger, Fokus, gedrueckt lesbar, Zeiger nur bei hover:hover, Handy ohne haengenden Zustand (Browser)' },
+  { name: 'r18-hover-rest', datei: 'r18-hover-rest.test.mjs', args: [], was: 'Feinschliff R18: Einstellungen-Navigation und Kopf-Chips am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover (Browser)' },
+  { name: 'r18-rd-hover', datei: 'r18-rd-hover.test.mjs', args: [], was: 'Feinschliff R18: Knoepfe des Raetsel-Duells (Start, Ende) am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover, Kontrast in vier Zustaenden mind. 4,5:1 (Browser)' },
+  { name: 'r19-rand-handy', datei: 'r19-rand-handy.mjs', args: [], was: 'Feinschliff R19: Brett mit Koordinaten am Rand ragt auf 6 Geraeten nicht ueber Sockel oder Seite, auch nach Brettwechsel in der Partie (<= 0,5 px) (Browser)' },
+  { name: 'r19-effekt-ebene', datei: 'r19-effekt-ebene.mjs', args: [], was: 'Feinschliff R19: mit jedem Motiv-Brett deckt sich die Effekt-Ebene auf 5 Geraeten (ecke/rand) auf 0,5 px mit dem Brett, nie breiter, kein Ueberlauf (Browser)' },
+  { name: 'r19-start-naechstes', datei: 'r19-start-naechstes.test.mjs', args: [], was: 'Feinschliff R19: Start "Als Naechstes" mit eigenem Gesicht je Zeile (Farbe, Bildstueck) und wahrem Fortschritt (Marsch, Raetsel-Tage, faellige Fehler, Liga-Wappen und Abstand), Hoehe SE und PC (Browser)' },
+  { name: 'r19-benutzername', datei: 'r19-benutzername.test.mjs', args: [], was: 'Feinschliff R19: gemerkter Benutzername wird einmal je Start mit dem Server abgeglichen, ohne Server bleibt er (Browser)' },
+  { name: 'r19-analyse-neu', datei: 'r19-analyse-neu.test.mjs', args: [], was: 'Feinschliff R19: Analyse neu (Schluesselmomente als Karten oben, Symbole gross, Verlauf ohne Kleintext, Ergebnis-Karte, Tempo, Auto-Abspielen) (Browser)' },
+  { name: 'r19-verlauf-neu', datei: 'r19-verlauf-neu.test.mjs', args: [], was: 'Feinschliff R19: Verlauf neu (Partien ohne Zug als eine Zeile, Ergebniszeichen, Zu-zweit-Bild, leiser Muelleimer, eine Staerke-Zahl, Level-Karte im Rahmen)' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
@@ -118,6 +188,7 @@ const DAUERN = new Map([
   ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
+  ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60],
 ]);
 
 function teile(suiten, anzahl) {
@@ -131,7 +202,7 @@ function teile(suiten, anzahl) {
   return gruppen;
 }
 
-async function lauf(suite, index) {
+async function lauf(suite) {
   if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
     return { ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, fehler: [`FEHLER Suite-Datei fehlt: tests/${suite.datei}`], ende: [] };
   }
@@ -142,9 +213,8 @@ async function lauf(suite, index) {
       cwd: WURZEL,
       env: {
         ...process.env,
-        // Seriell bleiben die bewaehrten Standardports erhalten. Nur gleichzeitig
-        // laufende Suiten brauchen einen vom Listenplatz abgeleiteten eigenen Port.
-        ...(PARALLEL > 1 && !suite.exklusiv ? { PORT: String(9200 + index) } : {}),
+        // Kein PORT von hier: jede Suite nimmt ohne PORT einen freien Port (tests/freier-port.mjs). Vom Listenplatz
+        // abgeleitete Ports (9200 + Platz) stiessen zusammen, sobald zwei Worktrees gleichzeitig alle.mjs liefen.
         ...(process.env.BILDER ? { BILDER: path.join(process.env.BILDER, suite.name) } : {}),
       },
       // 20 Minuten je Suite, nicht fuer die gesamte Sammlung (der volle Lauf braucht laenger).
@@ -173,9 +243,8 @@ console.log(`Crownmate: ${auswahl.length} Testsuiten${SCHNELL ? ' (schnell)' : '
 const t0 = Date.now();
 const ergebnisse = [];
 async function starte(s) {
-  const index = SUITEN.indexOf(s);
   process.stdout.write(`… ${s.name.padEnd(12)} ${s.was}\n`);
-  const e = await lauf(s, index);
+  const e = await lauf(s);
   ergebnisse.push(e);
   if (LAUT && e.ende) {
     console.log(`\n--- ${s.name}: Ausgabe ---`);

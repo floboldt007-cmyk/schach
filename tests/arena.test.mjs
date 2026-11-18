@@ -9,7 +9,7 @@
 //   node tests/arena.test.mjs                 alles
 //   node tests/arena.test.mjs --nur-node      ohne Browser
 //   node tests/arena.test.mjs --ohne-bilder   ohne Bilder
-//   PORT=9100 node tests/arena.test.mjs       eigener Port (Standard 8838)
+//   PORT=9100 node tests/arena.test.mjs       eigener Port (Standard: frei)
 //   BILDER=<Ordner>                           Bilder dorthin (Standard design/app-shots, per .gitignore ausgeschlossen)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
@@ -25,7 +25,7 @@ import { duellArt, BESONDERE, DAUER_MAX, WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN,
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8838);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // &kern: ohne die fest eingetragenen PAKETE und REITER (die pruefen die Integration und e2e)
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const NUR_NODE = process.argv.includes('--nur-node');
@@ -153,8 +153,8 @@ function nodeTeil() {
   const arenaJs = lies('js/ui/arena.js');
   pruefe('arena.js: Stationen als button.stufe.knoten[data-bot], Scroll-Behaelter .karte, Orte auf der Karte', /stufe knoten/.test(arenaJs) && /class="karte"/.test(arenaJs)
     && /fuelle\('arena:karte-boss'/.test(arenaJs) && /fuelle\('arena:karte-event'/.test(arenaJs) && /fuelle\('arena:start'/.test(arenaJs));
-  pruefe('arena.js: Welten: Weltwahl mit Pfeilen (.weltwahl .ww-pfeil[data-richtung]), gesperrte Welt (.welt-sperre), Schild .k-neu, Endgegner (b.endgegner) statt fester Stufe',
-    /class="ww-pfeil dr" type="button" data-richtung="-1"/.test(arenaJs) && /data-richtung="1"/.test(arenaJs) && /class="welt-sperre"/.test(arenaJs) && /class="k-neu"/.test(arenaJs)
+  pruefe('arena.js: Welten: Weltwahl mit Pfeilen (.weltwahl .ww-pfeil[data-richtung]), Vorschau-Welt ohne Sperrkarte (kein .welt-sperre), Schild .k-neu, Endgegner (b.endgegner) statt fester Stufe',
+    /class="ww-pfeil dr" type="button" data-richtung="-1"/.test(arenaJs) && /data-richtung="1"/.test(arenaJs) && !/welt-sperre/.test(arenaJs) && /class="k-neu"/.test(arenaJs)
     && /b\.endgegner \? ' boss'/.test(arenaJs) && !/stufe === 10/.test(arenaJs));
   pruefe('arena.js: Portraets ueber avatarVon, Flos Figur ueber floAvatar, Farbe als Segment, Duell ueber spieleDuell', /avatarVon\(/.test(arenaJs) && /floAvatar\(/.test(arenaJs) && /segment\(\{/.test(arenaJs) && /spieleDuell\(/.test(arenaJs));
   pruefe('arena.js: nach bereit app.gehe(\'partie\', ...)', /await duell\.bereit;[\s\S]{0,80}app\.gehe\('partie'/.test(arenaJs));
@@ -265,6 +265,9 @@ const ueberlauf = (seite) => seite.evaluate(() => {
 const abgeschnitten = (seite) => seite.evaluate(() => [...document.querySelectorAll('.k-schild, .k-name, .k-meta, .spielen .sp-text, .fahne, .boss-krone, .detail h2, .detail .elo, .detail-ueber, '
   + '.merkmal, .m-label, .m-wert, .ziel-sterne > div, .fortsetzen .ft-text, .fortsetzen .ft-text > *, .farbwahl .seg')]
   .filter((el) => {
+    // Handy B (R19, Flo 14.11.2026): zu zeigt die Leiste nur den runden Knopf, sein Text ist bewusst nur optisch verborgen
+    // (fuer Vorleser da); das pruefen die Handy-Gruppen eigens, offen gilt die Regel hier wieder
+    if (el.matches('.arena.karte-leiste .detail:not(.offen) .spielen .sp-text')) return false;
     const cs = getComputedStyle(el);
     const schneidetY = cs.overflowY !== 'visible';
     return el.scrollWidth > el.clientWidth + 1 || (schneidetY && el.scrollHeight > el.clientHeight + 2) || cs.textOverflow === 'ellipsis' || cs.display === 'none' && el.matches('.k-name');
@@ -626,13 +629,22 @@ async function testeSpielenFrei(browser) {
     const m = await seite.evaluate(() => {
       const r = (q) => { const e = document.querySelector(q); if (!e) return null; const b = e.getBoundingClientRect(); return { t: Math.round(b.top), b: Math.round(b.bottom) }; };
       const zs = document.querySelector('.arena .ziel-sterne');
-      return { ih: innerHeight, spielen: r('.arena .spielen'), reiter: r('.reiter-leiste'), karte: r('.arena .karte'),
+      return { ih: innerHeight, spielen: r('.arena .spielen'), reiter: r('.reiter-leiste'), karte: r('.arena .karte'), leiste: !!document.querySelector('.arena.karte-leiste .detail:not(.offen)'),
         ziele: zs ? { n: zs.children.length, h: Math.round(zs.getBoundingClientRect().height), zeilen: new Set([...zs.children].map((c) => Math.round(c.getBoundingClientRect().top))).size } : null };
     });
     const frei = m.spielen && m.reiter && m.spielen.b <= m.reiter.t && m.spielen.t >= 0 && m.spielen.b <= m.ih;
     pruefe(`${w} × ${h}: Spielen-Knopf ganz ueber der Reiterleiste und im Fenster, ohne Scrollen`, frei, JSON.stringify(m));
-    // Auswahl W2 B (Flo 09.11.2026): die drei Sterne-Ziele stehen auch kompakt da, als eine Zeile
-    pruefe(`${w} × ${h}: Sterne-Ziele sichtbar als eine Zeile`, m.ziele && m.ziele.n === 3 && m.ziele.h > 0 && m.ziele.zeilen === 1, JSON.stringify(m.ziele));
+    // Auswahl W2 B (Flo 09.11.2026): die drei Sterne-Ziele stehen auch kompakt da, als eine Zeile. Handy B (Flo 14.11.2026)
+    // zeigt sie zu nicht (die Sterne je Station stehen auf der Karte); erreichbar sind sie ueber den Griff, dort als eine Zeile
+    if (m.leiste) {
+      pruefe(`${w} × ${h}: Gegner-Leiste zu zeigt keine Sterne-Ziele`, m.ziele && m.ziele.h === 0, JSON.stringify(m.ziele));
+      await seite.click('.arena .detail .karte-griff');
+      await seite.waitForSelector('.arena .detail.offen');
+      await warte(900);
+      const zo = await seite.evaluate(() => { const zs = document.querySelector('.arena .ziel-sterne');
+        return { n: zs.children.length, h: Math.round(zs.getBoundingClientRect().height), zeilen: new Set([...zs.children].map((c) => Math.round(c.getBoundingClientRect().top))).size }; });
+      pruefe(`${w} × ${h}: Gegner-Karte offen: Sterne-Ziele sichtbar als eine Zeile`, zo.n === 3 && zo.h > 0 && zo.zeilen === 1, JSON.stringify(zo));
+    } else pruefe(`${w} × ${h}: Sterne-Ziele sichtbar als eine Zeile`, m.ziele && m.ziele.n === 3 && m.ziele.h > 0 && m.ziele.zeilen === 1, JSON.stringify(m.ziele));
     if (w >= 375) pruefe(`${w} × ${h}: die Karte bleibt mindestens 250 px hoch`, m.karte && m.karte.b - m.karte.t >= 250, JSON.stringify(m.karte));
     pruefe(`${w} × ${h}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
     await kontext.close();
@@ -709,13 +721,22 @@ async function testeHochformate(browser) {
       const radius = parseFloat(getComputedStyle(karte).borderBottomLeftRadius) || 0;
       const schild = document.querySelector('.knoten.aktuell .k-schild')?.getBoundingClientRect();
       const flo = document.querySelector('.flo-figur').getBoundingClientRect();
-      return { kompakt: document.querySelector('.arena').classList.contains('karte-kompakt'), knoten: document.querySelectorAll('.knoten').length,
+      // Handy B (R19, Flo 14.11.2026, vorher .karte-kompakt): Gegner als Leiste unten ueber der Welt; keine Station und kein
+      // Schild liegt unter der zugeklappten Leiste, ihr Spruch erscheint erst nach dem Griff
+      const cl = document.querySelector('.arena').classList;
+      const leisteOben = document.querySelector('.arena .detail').getBoundingClientRect().top;
+      const unterLeiste = [...document.querySelectorAll('.knoten')].flatMap((kn) => [kn, kn.querySelector('.k-schild')].filter(Boolean))
+        .filter((t) => t.getBoundingClientRect().bottom > leisteOben + 1).length;
+      const blase = document.querySelector('.arena .detail .sprechblase');
+      return { leiste: cl.contains('karte-weg') && cl.contains('karte-leiste') && !document.querySelector('.arena .detail').classList.contains('offen'),
+        unterLeiste, spruchZu: !blase || getComputedStyle(blase).display === 'none', knoten: document.querySelectorAll('.knoten').length,
         scrollt: karte.scrollHeight > karte.clientHeight + 2, drin, hinweis: document.querySelectorAll('.karte-zieh-hinweis:not([hidden])').length,
         farbeVorKnopf: fw.bottom <= sp.top + 1, knopfDrin: sp.bottom <= inh.bottom + 1,
         schildAbstand: schild ? Math.round(kb.bottom - schild.bottom) : null, radius, floLinks: Math.round(flo.left - kb.left), floRechts: Math.round(kb.right - flo.right) };
     });
     pruefe('ganze Welt auf einen Blick: sechs Stationen samt Schild in der Karte, Karte scrollt nicht, kein Zieh-Hinweis',
-      k.kompakt && k.knoten === 6 && !k.scrollt && k.drin && k.hinweis === 0, JSON.stringify(k));
+      k.leiste && k.knoten === 6 && !k.scrollt && k.drin && k.hinweis === 0, JSON.stringify(k));
+    pruefe('Gegner-Leiste zu: keine Station und kein Schild darunter, Spruch erst nach dem Griff', k.leiste && k.unterLeiste === 0 && k.spruchZu, JSON.stringify(k));
     pruefe('Schild der aktuellen Station unten mindestens halben Eckenradius ueber dem Kartenrand (nicht abgeschnitten)',
       k.schildAbstand != null && k.schildAbstand >= k.radius / 2, JSON.stringify(k));
     pruefe('Flos Figur ganz in der Karte (links und rechts mindestens 4 px Rand)', k.floLinks >= 4 && k.floRechts >= 4, JSON.stringify(k));
@@ -736,14 +757,17 @@ async function testeHochformate(browser) {
         const k = document.querySelector('.karte');
         const kb = k.getBoundingClientRect();
         const a = document.querySelector('.knoten.aktuell .avatar').getBoundingClientRect();
+        const leisteOben = document.querySelector('.arena .detail').getBoundingClientRect().top;
         const sp = document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect();
         const nav = document.querySelector('.reiter-leiste');
         const nb = nav ? nav.getBoundingClientRect() : null;
         return { klasse: document.querySelector('.arena').className, scrollbar: k.scrollHeight > k.clientHeight + 20, scrollTop: k.scrollTop,
-          aktuellDrin: a.top >= kb.top && a.bottom <= kb.bottom, karteBreit: Math.abs(kb.width - (innerWidth - 32)) <= 1,
+          aktuellDrin: a.top >= kb.top && a.bottom <= Math.min(kb.bottom, leisteOben), karteBreit: Math.abs(kb.width - (innerWidth - 32)) <= 1,
           spielen: { t: sp.top, b: sp.bottom, l: sp.left, r: sp.right, h: sp.height }, leiste: nb ? { t: nb.top, b: nb.bottom } : null, reiter: document.documentElement.dataset.reiter || null, ih: innerHeight, iw: innerWidth };
       });
-      pruefe('Karte kompakt (ganze Welt, scrollt nicht), naechster Gegner sichtbar, volle Breite', /karte-hoch/.test(m.klasse) && /karte-kompakt/.test(m.klasse)
+      // Handy B (R19, vorher /karte-kompakt/): ganze Welt mit Gegner-Leiste; der naechste Gegner steht ueber der Leiste
+      pruefe('Karte mit Gegner-Leiste (ganze Welt, scrollt nicht), naechster Gegner ueber der Leiste sichtbar, volle Breite', /karte-hoch/.test(m.klasse)
+        && /karte-weg/.test(m.klasse) && /karte-leiste/.test(m.klasse)
         && !m.scrollbar && m.scrollTop === 0 && m.aktuellDrin && m.karteBreit, JSON.stringify(m));
       pruefe('Spielen-Knopf klebt sichtbar im Viewport, ueber der Reiter-Leiste, mindestens 56 px hoch', m.reiter === 'unten' && !!m.leiste && m.spielen.t >= 0 && m.spielen.b <= m.leiste.t && m.spielen.l >= 0 && m.spielen.r <= m.iw && m.spielen.h >= 56, JSON.stringify(m));
       // nach dem Scrollen des Panels bleibt der Knopf im Bild (sticky)
@@ -763,6 +787,21 @@ async function testeHochformate(browser) {
       pruefe('kein waagrechter Ueberlauf', u.seite <= 0 && u.screen <= 0 && u.karte <= 0, JSON.stringify(u));
       const ab = await abgeschnitten(seite);
       pruefe('kein Name und kein Schild abgeschnitten', ab.length === 0, ab.join(' | '));
+      // Handy B: zu liest ein Vorleser den Knopf als "Spielen gegen <Name>"; offen steht der Text sichtbar und ganz da
+      const vl = await seite.evaluate(() => { const sp = document.querySelector('.arena .detail [data-aktion="spielen"]');
+        return { zu: !!document.querySelector('.arena.karte-leiste .detail:not(.offen)'), text: sp.querySelector('.sp-text').textContent.trim(),
+          name: (sp.querySelector('.sp-name') || {}).textContent || '', h2: document.querySelector('.arena .detail h2').textContent }; });
+      if (vl.zu) {
+        pruefe('Gegner-Leiste zu: Knopftext fuer Vorleser da, mit dem Namen des Gegners', vl.text.length > 0 && vl.name.length > 0 && vl.h2.includes(vl.name), JSON.stringify(vl));
+        await seite.click('.arena .detail .karte-griff');
+        await seite.waitForSelector('.arena .detail.offen');
+        await warte(900);
+        const abOffen = await abgeschnitten(seite);
+        pruefe('Gegner-Karte offen: kein Name und kein Knopftext abgeschnitten', abOffen.length === 0, abOffen.join(' | '));
+        await seite.click('.arena .detail .karte-griff');
+        await seite.waitForFunction(() => !document.querySelector('.arena .detail.offen'));
+        await warte(600);
+      }
       const kl = await kartenLage(seite);
       pruefe('Beschriftungen innerhalb der Karte, keine ueberdeckt eine andere Station', kl.ueber.length === 0 && kl.raus.length === 0, JSON.stringify(kl));
       const klein = await kleineTippflaechen(seite);
@@ -826,12 +865,16 @@ async function testeHandyQuer(browser) {
 // in allen Ziel-Lagen: echte Panels (alle besiegt, Welt fuer Welt jede Station antippen: "Revanche gegen …") und der
 // Spielen-Text jedes Bots im echten Knopf (spielenText aus js/ui/arena.js, dieselbe Funktion wie im Panel)
 async function testeKnopftext(browser) {
-  for (const vp of [{ w: 375, h: 667, handy: true }, { w: 390, h: 844, handy: true }, { w: 820, h: 1180 }, { w: 1024, h: 768 }, { w: 1180, h: 820 }, { w: 844, h: 390, handy: true }]) {
-    gruppe = `Knopftext ${vp.w} × ${vp.h}`;
+  // last: CPU 8x gedrosselt (R17, 14.11.2026): Die Vorprobe a2d6aba war unter Last rot ("Revanche gegen Johann" ragt aus dem
+  // 56-px-Knopf), einzeln gruen. Gemessen wurde mitten im Hereingleiten des Panels (staffel in js/ui/arena.js zeigeDetail):
+  // Die cta-platz-Zeile stand um 9,15 px verschoben, und das Rechteck des 56 px hohen Knopfs kam knapp unter 56 heraus.
+  for (const vp of [{ w: 375, h: 667, handy: true }, { w: 375, h: 667, handy: true, last: 8 }, { w: 390, h: 844, handy: true }, { w: 820, h: 1180 }, { w: 1024, h: 768 }, { w: 1180, h: 820 }, { w: 844, h: 390, handy: true }]) {
+    gruppe = `Knopftext ${vp.w} × ${vp.h}${vp.last ? ` unter CPU-Last (${vp.last}x)` : ''}`;
     const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, handy: !!vp.handy, saat: SAAT_ALLE });
     await seite.goto(BASIS + (vp.handy ? '&reiter=verlauf' : '') + '#arena');
     await seite.waitForSelector('.screen.arena .knoten');
     await warte(900);
+    if (vp.last) await (await kontext.newCDPSession(seite)).send('Emulation.setCPUThrottlingRate', { rate: vp.last });
     const echt = [];
     const texte = [];
     const ab = new Set();
@@ -841,6 +884,10 @@ async function testeKnopftext(browser) {
       for (const id of ids) {
         await seite.evaluate((i) => document.querySelector(`.knoten[data-bot="${i}"]`).click(), id);
         texte.push(await seite.evaluate(() => document.querySelector('.detail [data-aktion="spielen"]').textContent.trim()));
+        // erst messen, wenn das Panel steht: die Staffel ans Ende springen lassen statt sie abzuwarten (bis 682 ms je Panel);
+        // finish() wirft bei einer unendlichen Animation, darum nur die endlichen
+        await seite.evaluate(() => document.querySelector('.detail').getAnimations({ subtree: true })
+          .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity).forEach((a) => a.finish()));
         const r = await spielenPasst(seite);
         if (r) echt.push(r);
         for (const x of await abgeschnitten(seite)) ab.add(id + ' ' + x);
@@ -877,15 +924,14 @@ async function testeKnopftext(browser) {
 }
 
 // Welten (Flo 23.10.): die Karte zeigt die sechs Stationen einer Welt; Weltwahl mit Pfeilen, gesperrte Welten
-// (.welt-sperre), Schild NEU (.k-neu), Endgegner direkt herausforderbar, alle 30 Bots Welt fuer Welt
+// (seit 15.11.2026 als Vorschau ohne Sperrkarte), Schild NEU (.k-neu), Endgegner direkt herausforderbar, alle 30 Bots Welt fuer Welt
 const weltwahl = (seite) => seite.evaluate(() => {
   const ww = document.querySelector('.weltwahl');
-  const sperre = document.querySelector('.welt-sperre');
   const w = document.querySelector('.welt');
   return { name: ww.querySelector('.ww-name').textContent, unter: ww.querySelector('.ww-unter').textContent,
     zurueckAus: ww.querySelector('[data-richtung="-1"]').disabled, vorAus: ww.querySelector('[data-richtung="1"]').disabled,
     siegel: ww.classList.contains('mit-siegel'), wwGesperrt: ww.classList.contains('gesperrt'), welt: w.dataset.welt, weltGesperrt: w.classList.contains('gesperrt'),
-    sperre: !sperre.hidden, sperreText: sperre.textContent.replace(/\s+/g, ' ').trim(), flo: getComputedStyle(document.querySelector('.flo-figur')).display,
+    sperre: !!document.querySelector('.welt-sperre, .ws-karte'), svgFilter: getComputedStyle(w.querySelector('.welt-svg')).filter, flo: getComputedStyle(document.querySelector('.flo-figur')).display,
     ids: [...document.querySelectorAll('.welt button.stufe.knoten[data-bot]')].map((k) => k.dataset.bot),
     zustaende: [...document.querySelectorAll('.welt button.stufe.knoten[data-bot]')].map((k) => ['besiegt', 'aktuell', 'offen', 'gesperrt'].find((z) => k.classList.contains(z))).join(),
     nr: [...document.querySelectorAll('.welt .knoten .k-nr')].map((e) => e.textContent).join(), elo: [...document.querySelectorAll('.welt .knoten .k-meta')].map((e) => e.textContent).join() };
@@ -922,18 +968,19 @@ async function testeWelten(browser) {
     await tippe(seite, '.ww-pfeil[data-richtung="1"]');
     await warte(500);
     w = await weltwahl(seite);
-    pruefe('Pfeil vor: Welt 2 „Der Springerforst“, gesperrt (Weltwahl und Karte grau, .welt-sperre nennt den Schluessel: Sieg gegen Janine), Flos Figur weg',
-      w.name === 'Der Springerforst' && w.unter === 'Welt 2 von 5 · gesperrt' && w.wwGesperrt && w.weltGesperrt && w.welt === 'springerforst' && w.sperre && !w.zurueckAus && !w.vorAus && w.flo === 'none'
-      && /Dichter Mischwald mit Lichtungen und Bach\. Ein Sieg gegen Janine vom Scheunenclub öffnet sie\.$/.test(w.sperreText) && w.sperreText.startsWith('Der Springerforst'), JSON.stringify(w));
-    pruefe('gesperrte Welt: alle sechs Stationen gesperrt mit Schloss, der Endgegner (Ritter Thorsten) als Silhouette mit „?“, die anderen in Graustufen',
-      w.ids.join() === WELT_IDS[1].join() && w.zustaende === 'gesperrt,gesperrt,gesperrt,gesperrt,gesperrt,gesperrt' && await seite.evaluate(() => document.querySelectorAll('.welt .knoten.gesperrt .schloss').length === 6
+    // Vorschau (Flo 15.11.2026): die naechste Welt ist zu sehen, in Farbe und ohne Schloss, aber noch nicht spielbar
+    pruefe('Pfeil vor: Welt 2 „Der Springerforst“ als Vorschau (Weltwahl „Vorschau“, Landschaft in Farbe, keine Sperrkarte), Flos Figur weg',
+      w.name === 'Der Springerforst' && w.unter === 'Welt 2 von 5 · Vorschau' && w.wwGesperrt && w.weltGesperrt && w.welt === 'springerforst' && !w.sperre && w.svgFilter === 'none' && !w.zurueckAus && !w.vorAus && w.flo === 'none', JSON.stringify(w));
+    pruefe('Vorschau-Welt: alle sechs Stationen gesperrt OHNE Schloss, der Endgegner (Ritter Thorsten) als Silhouette mit „?“, die anderen leicht gedimmt',
+      w.ids.join() === WELT_IDS[1].join() && w.zustaende === 'gesperrt,gesperrt,gesperrt,gesperrt,gesperrt,gesperrt' && await seite.evaluate(() => document.querySelectorAll('.welt .knoten .schloss').length === 0
         && /brightness\(0\)/.test(getComputedStyle(document.querySelector('.knoten.boss[data-bot="rudi"] .avatar img')).filter) && /grayscale/.test(getComputedStyle(document.querySelector('.knoten[data-bot="kalle"] .avatar img')).filter)
         && document.querySelectorAll('.knoten .fahne').length === 0 && /ENDGEGNER/.test(document.querySelector('.knoten.boss .boss-krone').textContent)), JSON.stringify(w));
     await tippe(seite, '.knoten[data-bot="kalle"]');
-    await seite.waitForSelector('.toast');
-    const sp = await seite.evaluate(() => ({ toast: document.querySelector('.toast').textContent, h2: document.querySelector('.detail h2').textContent }));
-    pruefe('Tipp auf eine Station der gesperrten Welt: „Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub.“, das Panel bleibt bei Janine',
-      sp.toast === 'Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub.' && sp.h2 === 'Janine vom Scheunenclub', JSON.stringify(sp));
+    await warte(700);
+    const sp = await seite.evaluate(() => ({ toast: document.querySelectorAll('.toast').length, h2: document.querySelector('.detail h2').textContent,
+      spielen: document.querySelectorAll('.detail [data-aktion="spielen"]').length, hinweis: (document.querySelector('.detail .sp-gesperrt') || {}).textContent }));
+    pruefe('Tipp auf eine Station der Vorschau-Welt: ihre Karte geht auf, statt „Spielen“ „Besiege zuerst Janine vom Scheunenclub. Dann öffnet sich diese Welt.“, keine Meldung',
+      sp.toast === 0 && sp.h2 === 'Maxi vom Stammtisch' && sp.spielen === 0 && sp.hinweis === 'Besiege zuerst Janine vom Scheunenclub. Dann öffnet sich diese Welt.', JSON.stringify(sp));
     await seite.evaluate(() => { for (const x of document.querySelectorAll('.toast')) x.remove(); });
     // alle fuenf Welten der Reihe nach: sechs Stationen, Stufe 1 bis 30 mit Elo 100 bis 3000, nichts ueberdeckt oder abgeschnitten
     await geheZuWelt(seite, 1);
@@ -964,7 +1011,7 @@ async function testeWelten(browser) {
     await arenaNeu(seite, { welt: 3 });
     w = await weltwahl(seite);
     const h3 = await seite.evaluate(() => document.querySelector('.detail h2').textContent);
-    pruefe('gehe(arena, { welt: 3 }): zeigt Die Turmstadt (gesperrt), das Panel bleibt beim naechsten Gegner', w.name === 'Die Turmstadt' && w.unter === 'Welt 3 von 5 · gesperrt' && w.weltGesperrt && h3 === 'Postbotin Paula', JSON.stringify([w.name, w.unter, h3]));
+    pruefe('gehe(arena, { welt: 3 }): zeigt Die Turmstadt (Vorschau), das Panel bleibt beim naechsten Gegner', w.name === 'Die Turmstadt' && w.unter === 'Welt 3 von 5 · Vorschau' && w.weltGesperrt && h3 === 'Postbotin Paula', JSON.stringify([w.name, w.unter, h3]));
     await arenaNeu(seite, { waehle: 'janine' });
     w = await weltwahl(seite);
     const hj = await seite.evaluate(() => ({ h2: document.querySelector('.detail h2').textContent, gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot }));
@@ -1690,7 +1737,7 @@ if (!NUR_NODE) {
   let browser = null;
   try {
     const { chromium } = ladePlaywright();
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await chromium.launch();
     await browserTeil(browser);

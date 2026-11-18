@@ -21,7 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
 import { alteOrte } from './ohne-host.mjs';
-import { setzeSpeicher, MODUL_BUDGET, speicherePartie, ladeModul } from '../js/storage.js';
+import { setzeSpeicher, MODUL_BUDGET, speicherePartie, ladeModul, statistik, BESTWERT_MIN_ZUEGE } from '../js/storage.js';
 import { hoere, sende, EREIGNISSE } from '../js/ereignisse.js';
 import { fuerOverlay, melde } from '../js/feier.js';
 import { addiereTage, wochenSchluessel } from '../js/tag.js';
@@ -32,10 +32,11 @@ import * as T from '../js/pakete/punkte/tafel.js';
 import * as C from '../js/pakete/punkte/code.js';
 import * as S from '../js/pakete/punkte/stand.js';
 import * as A from '../js/pakete/punkte/ansicht.js';
+import * as L from '../js/pakete/punkte/liste.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8868);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const NUR_NODE = process.argv.includes('--nur-node');
 const SCHNELL = process.argv.includes('--schnell');
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
@@ -478,6 +479,33 @@ gruppe = 'Speicher';
   pruefe('lade: kaputtes JSON ergibt den Standard', JSON.stringify(S.lade()) === JSON.stringify(S.standard()));
 }
 
+// R9-PunkteKurz (Variante A): vor dem 10. eigenen Zug (formel.MIN_ZUEGE) zaehlt nur ein Sieg ("Ein Sieg zaehlt immer",
+// R12-F2). Niederlage, Remis und Abbruch bekommen keinen Tafeleintrag (grund kurz) und damit keinen Wochenwert, den
+// freunde.wochenwertung aus den Tafeln meldet. Die Formel bleibt unveraendert (formel.STAND).
+gruppe = 'Kurze Partien ohne Sieg';
+{
+  setzeSpeicher(fakeSpeicher());
+  const st = S.lade();
+  const eigene = (n) => [...z('buch', Math.min(2, n)), ...z('gut', Math.max(0, n - 2))];
+  const kurz = (id, o) => S.bewerte(st, analysiert(bauePartie(id, { zuege: 4, ...o }), eigene(o.zuege || 4)), { jetzt });
+  const nieder = kurz('k1', { ergebnis: 'niederlage' });
+  const remis = kurz('k2', { ergebnis: 'remis' });
+  const abbruch = kurz('k3', { ergebnis: null });
+  pruefe('Niederlage, Remis und Abbruch vor dem 10. eigenen Zug: kein Tafeleintrag, Grund „kurz“',
+    [nieder, remis, abbruch].every((x) => x && x.tafel === null && x.grund === 'kurz') && !st.tafeln['bot:rudi'], [nieder, remis, abbruch].map((x) => x && [x.tafel, x.grund]));
+  pruefe('… und damit kein Wochenwert (wochenwertung liest nur Tafeln)', Object.values(st.tafeln).every((tf) => T.eigene(tf, 'woche', new Date(jetzt)).length === 0));
+  const sieg = kurz('k4', { ergebnis: 'sieg' });
+  pruefe('Sieg im 4. Zug: Tafeleintrag wie bisher (ein Sieg zählt immer)', sieg.tafel === 'bot:rudi' && sieg.grund === null && st.tafeln['bot:rudi'].eintraege.length === 1, sieg);
+  const lang = kurz('k5', { ergebnis: 'niederlage', zuege: F.MIN_ZUEGE });
+  pruefe(`Niederlage mit ${F.MIN_ZUEGE} eigenen Zügen: Tafeleintrag (Grenze wie formel.MIN_ZUEGE)`, lang.tafel === 'bot:rudi' && st.tafeln['bot:rudi'].eintraege.length === 2, lang);
+  const hilfe = kurz('k6', { ergebnis: 'niederlage', hinweise: 1 });
+  pruefe('Kurz und mit Hinweis: Grund bleibt „hilfe“', hilfe.tafel === null && hilfe.grund === 'hilfe');
+  const boss = kurz('k7', { ergebnis: 'remis', modus: 'boss', botId: 'baron-gambit', boss: { id: 'baron-gambit', stufe: 'meister', staerke: 1100 } });
+  pruefe('Boss-Partie kurz und ohne Sieg: kein Eintrag auf der Wochen-Tafel des Bosses', boss.tafel === null && boss.grund === 'kurz' && !st.tafeln['boss:baron-gambit:meister']);
+  pruefe('Satz der Abrechnung: „Zu kurz für die Wertung“', A.unterText({ ...nieder, tafel: null, grund: 'kurz' }) === 'Zu kurz für die Wertung: vor dem 10. eigenen Zug zählt nur ein Sieg',
+    A.unterText({ ...nieder }));
+}
+
 gruppe = 'Speicher-Budget';
 {
   setzeSpeicher(fakeSpeicher());
@@ -604,6 +632,24 @@ gruppe = 'Bot-Läufe (vorläufig, 3.13 „Schon in S1 nicht leer“)';
     && S.setzeBotLaeufe({ tafeln: { 'bot:rudi': [{ bot: 'rudi', lauf: 'best', w: 1 }] } }) === 0);
 }
 
+// R7, Befund B15/B16 aus dem Gesamtdurchgang R6: Liga/Ich zeigte "Ø Genauigkeit –" und daneben die beste Partie mit
+// "4 Züge · 88,6 %". Die Bilanz (storage.statistik) zaehlt Genauigkeit erst ab BESTWERT_MIN_ZUEGE eigenen Zuegen, die
+// Zeilen zeigten sie immer. Eine Regel fuer beide Stellen: eine Zeile zeigt die Genauigkeit nur, wenn die Bilanz sie zaehlt.
+gruppe = 'Liga Ich: eine Quelle für die Genauigkeit';
+{
+  setzeSpeicher(fakeSpeicher());
+  speicherePartie({ ...bauePartie('kurz1', { zuege: 4 }), genauigkeit: 88.6 });
+  const st = statistik();
+  const zeile = (zz) => L._intern.infoText({ t: jetzt.getTime(), f: 'w', e: 's', z: zz, g: 88.6 });
+  pruefe('Bilanz: eine Partie mit 4 eigenen Zügen zählt nicht in die Ø Genauigkeit', st.partien === 1 && st.schnittGenauigkeit == null, st);
+  pruefe('Zeile derselben Partie (4 Züge): keine Genauigkeit, wie die Bilanz', !/%/.test(zeile(4)) && /4 Züge/.test(zeile(4)), zeile(4));
+  pruefe(`Zeile ab ${BESTWERT_MIN_ZUEGE} eigenen Zügen: Genauigkeit wie bisher`, /88,6 %/.test(zeile(BESTWERT_MIN_ZUEGE)), zeile(BESTWERT_MIN_ZUEGE));
+  pruefe('Zeile ohne bekannte Zugzahl (alter Eintrag): Genauigkeit bleibt', /88,6 %/.test(L._intern.infoText({ t: jetzt.getTime(), z: null, g: 88.6 })));
+  speicherePartie({ ...bauePartie('lang1', { zuege: 12 }), genauigkeit: 80 });
+  pruefe('Bilanz und Zeile einig, sobald eine Partie zählt: Ø 80 %, Zeile 80 %', statistik().schnittGenauigkeit === 80
+    && /80 %/.test(L._intern.infoText({ t: jetzt.getTime(), z: 12, g: 80 })), statistik());
+}
+
 gruppe = 'Abrechnung: Sätze';
 {
   const n = 'Thorstens Tafel';
@@ -615,6 +661,22 @@ gruppe = 'Abrechnung: Sätze';
     && A.unterText({ ...basis, wochenPlatz: 2 }, n) === 'Diese Woche: Platz 2 auf Thorstens Tafel'
     && A.unterText({ ...basis, fast: { prozent: 97 } }, n) === 'So nah wie noch nie: 97 % deines Rekords auf Thorstens Tafel'
     && A.unterText({ ...basis, bestwert: 23100 }, n) === 'Thorstens Tafel: dein Bestwert 23.100');
+  // R7, Befund B15: nach Matt im 2. Zug stand unter "Genauigkeit: zu kurz" die Zeile "PUNKTE 100 / Platz 4 auf Lukas'
+  // Tafel". Eine Partie vor dem 10. eigenen Zug (posten.kurz, dieselbe Grenze wie "zu kurz" in der Genauigkeit) nennt
+  // den Grund fuer die kleine Zahl statt Platz, Woche, so nah oder Bestwert. Neuigkeiten (erster Eintrag, Rekord) bleiben.
+  // Ein kurzer Sieg (Schaefermatt, Verwertung bis 3.000) bleibt beim Platz; ebenso eine lange Niederlage.
+  const kurz = { ...basis, w: 100, erg: 'niederlage', posten: { kurz: true } };
+  pruefe('Kurzer Sieg und lange Niederlage: Satz wie bisher (Platz, so nah)', A.unterText({ ...kurz, erg: 'sieg', platz: 4 }, n) === 'Platz 4 auf Thorstens Tafel'
+    && /^So nah/.test(A.unterText({ ...kurz, erg: 'sieg', fast: { prozent: 97 } }, n))
+    && A.unterText({ ...kurz, posten: { kurz: false }, platz: 4 }, n) === 'Platz 4 auf Thorstens Tafel');
+  pruefe('Kurzes Remis: Grund statt Platz', A.unterText({ ...kurz, erg: 'remis', platz: 2 }, n) === 'Zu kurz für die volle Wertung: vor dem 10. eigenen Zug kein Ergebnis-Bonus');
+  pruefe('Kurze Niederlage: Satz nennt den Grund statt Platz, Woche, so nah oder Bestwert',
+    [{ platz: 4 }, { wochenPlatz: 2 }, { fast: { prozent: 95 } }, { bestwert: 3500 }].every((x) => A.unterText({ ...kurz, ...x }, n) === 'Zu kurz für die volle Wertung: vor dem 10. eigenen Zug kein Ergebnis-Bonus'),
+    [{ platz: 4 }, { bestwert: 3500 }].map((x) => A.unterText({ ...kurz, ...x }, n)));
+  pruefe('Kurze Partie: erster Eintrag und Rekord bleiben Neuigkeit; ohne Tafel der Grund ohne Tafel',
+    A.unterText({ ...kurz, erster: true }, n) === 'Erster Eintrag auf Thorstens Tafel'
+    && A.unterText({ ...kurz, rekord: true, vorher: 40 }, n) === 'Rekord auf Thorstens Tafel · +60'
+    && A.unterText({ ...kurz, tafel: null, grund: 'gast' }, n) === 'Gast-Partie: zählt für keine Tafel');
   pruefe('„So nah“ steht vor dem Platz (eine Partie mit 90 % des Rekords steht fast immer unter deinen drei Besten)',
     A.unterText({ ...basis, platz: 2, fast: { prozent: 95 } }, n) === 'So nah wie noch nie: 95 % deines Rekords auf Thorstens Tafel'
     && A.unterText({ ...basis, platz: 2, wochenPlatz: 1, fast: null }, n) === 'Platz 2 auf Thorstens Tafel');
@@ -1109,6 +1171,19 @@ async function testeBrowser(browser) {
   pruefe('Rechnet die Analyse noch: „Punkte werden gezählt …“ mit ruhigem Schimmer; ohne Analyse: „Punkte folgen mit der Analyse“; Übung und ohne eigenen Zug: keine Zeile',
     wartend.t.length === 2 && /pk-schimmer/.test(wartend.t[0]) && /Punkte werden gezählt …/.test(wartend.t[0]) && !/pk-schimmer/.test(wartend.t[1])
     && /Punkte folgen mit der Analyse/.test(wartend.t[1]) && wartend.u === 0 && wartend.n === 0, wartend);
+  // R9-PunkteKurz: kurze Partie ohne Sieg (grund kurz) zeigt keine Zahl, nur den Satz; die Rueckgabe bleibt { el, beende, verlasse }
+  const kurzZeile = await seite.evaluate(async () => {
+    const A = await import('./js/pakete/punkte/ansicht.js');
+    let gemerkt = 0;
+    const z = A.abrechnungsZeile({ ergebnis: { id: 'kurz1', w: 100, erg: 'niederlage', tafel: null, grund: 'kurz', posten: { kurz: true } }, merke: () => { gemerkt++; } });
+    const aus = { el: !!(z && z.el), fn: typeof z.beende === 'function' && typeof z.verlasse === 'function', wert: z.el.querySelectorAll('.pk-wert, .pk-alt').length,
+      label: z.el.querySelector('.pk-label')?.textContent, text: z.el.querySelector('.pk-satz')?.textContent, kurz: z.el.dataset.kurz, gemerkt };
+    z.beende(); z.verlasse();
+    return aus;
+  });
+  pruefe('Kurze Partie ohne Sieg: Zeile ohne Punktzahl, nur „Zu kurz für die Wertung …“, Rückgabe { el, beende, verlasse }',
+    kurzZeile.el && kurzZeile.fn && kurzZeile.wert === 0 && kurzZeile.kurz === '1' && kurzZeile.gemerkt === 1
+    && kurzZeile.label === 'Punkte' && kurzZeile.text === 'Zu kurz für die Wertung: vor dem 10. eigenen Zug zählt nur ein Sieg', kurzZeile);
 
   // ---------- 4. Erste Partie: Abrechnung "Erster Eintrag" ----------
   await h.klangSpion();
@@ -1158,8 +1233,9 @@ async function testeBrowser(browser) {
     return z && { platz: z.querySelector('.bl-platz').textContent, name: z.querySelector('.bl-z-name').textContent, info: z.querySelector('.bl-z-info').textContent,
       punkte: z.querySelector('.bl-punkte').textContent, neu: z.dataset.neu, linie: getComputedStyle(z).boxShadow, hoehe: Math.round(z.getBoundingClientRect().height) };
   });
-  pruefe('Eigene Zeile hervorgehoben (Akzentlinie): Platz, „Du“, Punkte, Datum, Farbe, Ergebnis, Züge, Genauigkeit, 56 px hoch', zeile && zeile.platz === '1'
-    && /^Du/.test(zeile.name) && zeile.punkte === zahlText(e1.w) && /\d\d\.\d\d\. · Weiß · Sieg · 4 Züge · [\d,]+ %/.test(zeile.info) && /inset/.test(zeile.linie)
+  // 4 eigene Zuege: ohne Genauigkeit, wie die Bilanz (R7, B16; ab BESTWERT_MIN_ZUEGE steht sie, Node-Gruppe "Liga Ich")
+  pruefe('Eigene Zeile hervorgehoben (Akzentlinie): Platz, „Du“, Punkte, Datum, Farbe, Ergebnis, Züge (4 Züge ohne Genauigkeit), 56 px hoch', zeile && zeile.platz === '1'
+    && /^Du/.test(zeile.name) && zeile.punkte === zahlText(e1.w) && /\d\d\.\d\d\. · Weiß · Sieg · 4 Züge$/.test(zeile.info.trim()) && /inset/.test(zeile.linie)
     && zeile.hoehe >= 56, zeile);
   pruefe('Punkt „neu“ an der neuen Zeile, nach dem Ansehen weg', zeile && zeile.neu === '1' && (await h.stand()).neu.length === 0);
   await h.fenster('allzeit');
@@ -1605,7 +1681,7 @@ async function testeBrowser(browser) {
 
 if (!NUR_NODE) {
   mkdirSync(BILDER, { recursive: true });
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser;
   try {
     await warteAufServer(BASIS);

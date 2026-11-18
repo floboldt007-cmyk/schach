@@ -22,7 +22,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8831);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // Kern-Gruppen laufen mit ?test&kern: ohne die Spielpakete aus PAKETE (js/erweiterungen.js), damit sie den Kern
 // pruefen und nicht mit jedem neuen Paket umgeschrieben werden muessen. Die echte Paketliste pruefen die
 // Erweiterungs-Gruppen hier (MIT_PAKET, MIT_W0PLUS) sowie e2e, arena, navigation und screens.
@@ -100,6 +100,13 @@ async function warteAufServer(url, ms = 10000) {
 
 const ergebnisse = [];
 const hinweiseBauB = [];
+// Umgebung (R8, 13.11.2026): laufen viele Browser-Suiten parallel, gehen unter Windows die Sockets aus (gemessen 6.000 bis
+// 8.800 Verbindungen in TIME_WAIT). Dann scheitert ab und zu eine Datei des eigenen Testservers mit einem Netzfehler des
+// Systems, ein Modul laedt nicht, die Arena erscheint nie, und eine Pruefung ohne Bezug lief 30 s ins Leere (lokal an
+// wechselnden Stellen, in der CI nie). Solche Fehler sind kein Fehler der App: sie zaehlen nicht als Konsolenfehler,
+// sondern hier, und oeffneArena laedt dann genau einmal neu. 404, Seitenfehler und alles andere bleiben Fehler.
+const NETZ_UMGEBUNG = /net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_ABORTED|NO_BUFFER_SPACE|ADDRESS_IN_USE)/;
+const umgebung = [];
 let gruppe = '';
 function pruefe(name, ok, detail = '') {
   ergebnisse.push({ name: (gruppe ? gruppe + ': ' : '') + name, ok: !!ok, detail });
@@ -131,11 +138,23 @@ async function neueSeite(browser, { w = 1180, h = 820, touch = true, handy = fal
   }
   const seite = await kontext.newPage();
   const fehler = [];
+  // Netzfehler des Systems an Dateien des eigenen Testservers (siehe NETZ_UMGEBUNG); die Folgemeldung der App zu genau
+  // dieser Datei ("Failed to fetch dynamically imported module: <url>") kann vor oder nach dem Ereignis kommen
+  const netzUrls = new Set();
+  seite.__netz = [];
+  const umgebungMeldung = (text) => NETZ_UMGEBUNG.test(text) || [...netzUrls].some((u) => text.includes(u));
+  seite.on('requestfailed', (r) => {
+    const grund = r.failure()?.errorText || '';
+    if (!r.url().startsWith(`http://127.0.0.1:${PORT}/`) || !NETZ_UMGEBUNG.test(grund)) return;
+    netzUrls.add(r.url()); seite.__netz.push(`${grund} @ ${r.url()}`); umgebung.push(`${gruppe}: ${grund} @ ${r.url()}`);
+    for (let i = fehler.length - 1; i >= 0; i--) if (fehler[i].includes(r.url())) fehler.splice(i, 1);
+  });
   seite.on('console', (m) => {
     if (m.type() !== 'error') return;
     const url = (m.location() && m.location().url) || '';
     if (/favicon/.test(url)) return;
     if (BAU_B.test(url)) { hinweiseBauB.push(m.text()); return; }
+    if (umgebungMeldung(m.text())) { umgebung.push(`${gruppe}: ${m.text()}`); return; }
     fehler.push(m.text() + (url ? ' @ ' + url : ''));
   });
   seite.on('pageerror', (e) => {
@@ -143,6 +162,25 @@ async function neueSeite(browser, { w = 1180, h = 820, touch = true, handy = fal
     fehler.push('Seitenfehler: ' + e.message);
   });
   return { kontext, seite, fehler };
+}
+
+// goto(url) bzw. ohne url reload(), dann warten, bis sel steht. Erscheint sel nicht UND ist seitdem ein Netzfehler des
+// Systems belegt (NETZ_UMGEBUNG), laedt sie das Dokument genau einmal neu (ueber about:blank, damit auch ein reiner
+// Hash-Wechsel neu laedt); ohne diesen Beleg bleibt das Timeout ein Fehler. Ein laengeres Warten haette nichts
+// geholfen: das Modul, das fehlt, wird ohne Neuladen nie mehr angefragt.
+async function oeffneArena(seite, url, sel = '.screen.arena') {
+  const netz = seite.__netz || []; // Seiten ohne neueSeite: ohne Beleg, also nie neu geladen
+  const vorher = netz.length;
+  const ziel = url ?? seite.url();
+  if (url == null) await seite.reload(); else await seite.goto(url);
+  try { await seite.waitForSelector(sel); } catch (e) {
+    const neu = netz.slice(vorher);
+    if (!neu.length) throw e;
+    console.log(`Umgebung: ${sel} kam nicht (${neu.length} Netzfehler, zuerst ${neu[0]}), einmal neu geladen`);
+    await seite.goto('about:blank');
+    await seite.goto(ziel);
+    await seite.waitForSelector(sel);
+  }
 }
 
 function hilfen(seite, { touch = true } = {}) {
@@ -444,8 +482,7 @@ async function testePartie(seite, h, fehler) {
 // ---------- 3. Sieg ----------
 async function testeSieg(seite, h, fehler) {
   gruppe = 'Sieg';
-  await seite.goto(BASIS + '#arena');
-  await seite.waitForSelector('.screen.arena');
+  await oeffneArena(seite, BASIS + '#arena');
   await h.schaefermatt();
   await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 30000 });
   await warte(2600);
@@ -548,8 +585,7 @@ async function testeSchwarz(seite, h, fehler) {
   await seite.locator('.dialog-knoepfe .knopf.primaer').click();
   await seite.waitForSelector('.screen.arena');
   pruefe('Arena bietet "Fortsetzen" an', await seite.locator('.detail .fortsetzen [data-aktion="fortsetzen"]').count() === 1);
-  await seite.reload();
-  await seite.waitForSelector('.screen.arena');
+  await oeffneArena(seite, null);
   pruefe('Auch nach Neuladen der Arena', await seite.locator('.detail .fortsetzen [data-aktion="fortsetzen"]').count() === 1);
   await h.tippe('.detail .fortsetzen [data-aktion="fortsetzen"]');
   await seite.waitForSelector('.screen.partie');
@@ -672,8 +708,7 @@ async function testePruefrunde(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     // wertende Partie (Grundstellung): fortgesetztes Schaefermatt, Flo setzt mit Dxf7# matt
     await seite.evaluate((l) => localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l)), LAUF(SCHAEFER));
     await h.starte({ botId: 'benno', farbe: 'w', fortsetzen: true });
@@ -764,8 +799,7 @@ async function testePruefrunde(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     // Knopf "Ergebnis" nach "Brett ansehen": Tipp in die Mitte
     await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1 });
     await h.warteFlo();
@@ -798,7 +832,9 @@ async function testePruefrunde(browser) {
     await seite.waitForSelector('.dialog-ort .dialog');
     await seite.waitForSelector('.ergebnis-overlay', { timeout: 15000 });
     await warte(400);
-    pruefe('Bot setzt matt: Rückfrage "Aufgeben?" ist zu', await seite.locator('.dialog-ort').count() === 0);
+    // Die Rueckfrage klappt beim Matt 200 ms zu (.dialog-ort.weg) und steht so lange noch im DOM: auf den Endzustand
+    // warten statt nach fester Pause zu zaehlen. Bliebe sie offen, verschwaende sie nie, und die Pruefung schlaegt fehl.
+    pruefe('Bot setzt matt: Rückfrage "Aufgeben?" ist zu', await seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false));
     pruefe('Bot setzt matt: Ergebnis Niederlage durch Matt', /matt/i.test(await seite.locator('.erg-unter').innerText()));
     await seite.evaluate(() => { window.__test = {}; });
 
@@ -881,13 +917,13 @@ async function testePruefrunde(browser) {
     await seite.waitForSelector('.toast');
     const t = await seite.locator('.toast').innerText();
     pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Vogelscheuche Willi/.test(t), t);
-    // gesperrte Welt: ihr Bot nennt den Endgegner davor, der die Welt öffnet
+    // Vorschau-Welt (Flo 15.11.2026): ihr Bot oeffnet seine Karte, statt "Spielen" nennt sie den Endgegner davor
     await h.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
     await seite.waitForSelector('.knoten[data-bot="lisa"]');
     await h.tippe('.knoten[data-bot="lisa"]');
-    await seite.waitForFunction(() => /öffnet sich mit einem Sieg gegen/.test(document.querySelector('.toast') ? document.querySelector('.toast').textContent : ''), null, { timeout: 5000 }).catch(() => {});
-    const t2 = await seite.locator('.toast').innerText();
-    pruefe('Gesperrte Welt: "öffnet sich mit einem Sieg gegen Janine"', /Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub/.test(t2), t2);
+    await seite.waitForSelector('.detail .sp-gesperrt', { timeout: 5000 }).catch(() => {});
+    const t2 = await seite.evaluate(() => ({ hinweis: (document.querySelector('.detail .sp-gesperrt') || {}).textContent || '', spielen: document.querySelectorAll('.detail [data-aktion="spielen"]').length }));
+    pruefe('Vorschau-Welt: Karte mit "Besiege zuerst Janine" statt Spielen', /^Besiege zuerst Janine vom Scheunenclub\./.test(t2.hinweis) && t2.spielen === 0, JSON.stringify(t2));
     const alle = await seite.evaluate(async () => ({ bots: Object.fromEntries((await import('./js/bots.js')).BOTS
       .map((b, i) => [b.id, { sterne: [true, i > 0, i > 2], partien: 1, siege: 1, remis: 0, niederlagen: 0 }])) }));
     await seite.evaluate((f) => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)), alle);
@@ -904,8 +940,7 @@ async function testePruefrunde(browser) {
     const { kontext, seite } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
     await seite.route('**/stockfish-19-lite-single.wasm', (r) => r.fulfill({ status: 200, contentType: 'application/wasm', body: Buffer.from('kaputt') }));
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     await seite.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
     await h.warteFlo();
     await seite.waitForSelector('.dialog-ort .dialog', { timeout: 10000 }).catch(() => {});
@@ -917,7 +952,9 @@ async function testePruefrunde(browser) {
     await seite.waitForFunction(() => window.__partie && window.__partie.z.zuege.length === 2, null, { timeout: 20000 }).catch(() => {});
     const dauer = Date.now() - t0;
     pruefe('Kaputte Engine-Datei: Bot zieht ohne langes Warten', dauer < 6000, dauer + ' ms');
-    pruefe('Kaputte Engine-Datei: nur eine Meldung', await seite.locator('.dialog-ort').count() === 0);
+    // Die weggetippte Meldung klappt 200 ms zu (.dialog-ort.weg): auf den Endzustand warten statt auf die Pausen davor
+    // zu bauen. Eine zweite Meldung bliebe offen, verschwaende nie, und die Pruefung schlaegt fehl.
+    pruefe('Kaputte Engine-Datei: nur eine Meldung', await seite.waitForSelector('.dialog-ort', { state: 'detached', timeout: 3000 }).then(() => true, () => false));
     await kontext.close();
   }
   {
@@ -941,8 +978,7 @@ async function testePruefrunde(browser) {
     await seite.waitForSelector('.dialog-ort .dialog', { timeout: 10000 });
     pruefe('Safari-Tab: Tipp "Zum Home-Bildschirm"', /Home-Bildschirm/.test(await seite.locator('.dialog-ort').innerText()));
     await seite.locator('.dialog-knoepfe .knopf').click();
-    await seite.reload();
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, null);
     await warte(1800);
     pruefe('Safari-Tab: Tipp nur einmal', await seite.locator('.dialog-ort').count() === 0);
     await kontext.close();
@@ -1048,8 +1084,7 @@ async function testeNachpruefung(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     // Live-Suchen (mit movetime) aufzeichnen; flach: sie enden bei Tiefe 4 wie eine Suche, die das Zeitlimit kappt.
     // Matt- und Pattstellungen beantwortet die Engine ohne Suche (Tiefe 0), die zaehlen nicht als flach.
     await seite.evaluate(async () => {
@@ -1100,8 +1135,7 @@ async function testeNachpruefung(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     await seite.evaluate(() => {
       window.__test = { maxWarten: 0, botPause: 50, botZug: () => {
         const v = window.__partie.chess().history({ verbose: true });
@@ -1145,8 +1179,7 @@ async function testeNachpruefung(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     await schaeferBisMatt(seite, h);
     // Auswertung langsam und ohne Vorab-Analysen (sonst ist sie bei der Schaefermatt-Partie sofort fertig):
     // 8 Stellungen zu je mindestens 700 ms, neu geladen wird nach 1200 ms
@@ -1154,8 +1187,7 @@ async function testeNachpruefung(browser) {
     await seite.evaluate(() => window.__app.vorab.clear());
     await h.zugTippen('h5f7');
     await warte(1200);
-    await seite.reload();
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, null);
     await bremse(seite, 250);
     await seite.evaluate(async () => {
       const { hoere } = await import('./js/ereignisse.js');
@@ -1198,8 +1230,7 @@ async function testeNachpruefung(browser) {
     await seite.evaluate(() => window.__app.vorab.clear());
     await h.zugTippen('h5f7');
     await warte(1200);
-    await seite.reload();
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, null);
     await bremse(seite, 600);
     const offen = (await h.gespeichert())[0] || {};
     pruefe('Zweiter Abbruch: Sieg gespeichert, Genauigkeit fehlt', offen.ergebnis === 'sieg' && offen.genauigkeit == null, JSON.stringify({ g: offen.genauigkeit }));
@@ -1232,8 +1263,7 @@ async function testeNachpruefung(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     await schaeferBisMatt(seite, h);
     // alle eigenen Zuege sind live bewertet; die Schluss-Analyse langsam und ohne Vorab-Analysen
     await seite.waitForFunction(() => [0, 2, 4].every((i) => window.__partie.z.live[i] && window.__partie.z.live[i].status === 'fertig'), null, { timeout: 30000 });
@@ -1275,8 +1305,7 @@ async function testeNachpruefung(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-    await seite.goto(MIT_W0PLUS('wpboss') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpboss') + '#arena');
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botZug: () => 'f8e7' }; });
     await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'standard', staerke: 1080 } });
     await h.warteFlo();
@@ -1291,8 +1320,7 @@ async function testeNachpruefung(browser) {
     await seite.waitForSelector('.dialog-ort .dialog');
     await seite.locator('.dialog-knoepfe .knopf.gefahr').click();
     await warte(800);
-    await seite.reload();
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, null);
     await seite.evaluate(async () => {
       const { hoere } = await import('./js/ereignisse.js');
       window.__an = [];
@@ -1325,8 +1353,7 @@ async function testeNachpruefung(browser) {
         return u;
       };
     });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     const info = () => seite.evaluate(async () => {
       const e = await window.__app.engine('bewertung');
       const a = await e.analyse('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', { depth: 6 });
@@ -1337,14 +1364,12 @@ async function testeNachpruefung(browser) {
     const merkAlter = Date.now() - Number(i1.direkt);
     pruefe('Blob-Start scheitert: Engine läuft trotzdem (lädt selbst), Gerät merkt es sich (mit Zeitpunkt)', i1.tiefe === 6 && /\/vendor\/stockfish\/stockfish-19-lite-single\.js$/.test(i1.pfad)
       && merkAlter >= 0 && merkAlter < 120000 && i1.blobs === 1, JSON.stringify(i1));
-    await seite.reload();
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, null);
     const i2 = await info();
     pruefe('Nächster Start: gleich direkt, kein neuer Blob-Versuch', i2.tiefe === 6 && !/^blob:/.test(i2.pfad) && i2.blobs === 0, JSON.stringify(i2));
     // nach 30 Tagen (oder nach "Fortschritt zuruecksetzen") versucht es das Geraet wieder per Blob
     await seite.evaluate(() => localStorage.setItem('schach-arena:v1:wasm-direkt', String(Date.now() - 31 * 86400000)));
-    await seite.reload();
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, null);
     const i3 = await info();
     pruefe('Nach 30 Tagen: wieder ein Blob-Versuch (scheitert hier erneut, neu gemerkt)', i3.tiefe === 6 && i3.blobs === 1 && Date.now() - Number(i3.direkt) < 120000, JSON.stringify(i3));
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -1366,8 +1391,7 @@ async function testeNachpruefung(browser) {
         return new Echt(url, opt);
       };
     });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     // beide Engines (die Arena startet sie vorab): je ein Blob-Versuch, der am Zeitlimit scheitert
     const z1 = await seite.evaluate(async () => {
       const [b, e] = await Promise.all([window.__app.engine('bot'), window.__app.engine('bewertung')]);
@@ -1376,8 +1400,7 @@ async function testeNachpruefung(browser) {
     });
     pruefe('Zeitlimit beim Blob-Start: beide Engines laufen direkt, nichts gemerkt', z1.tiefe === 6 && z1.blob === 2 && z1.direkt === null
       && z1.pfade.every((p) => /\/vendor\/stockfish\/stockfish-19-lite-single\.js$/.test(p)), JSON.stringify(z1));
-    await seite.reload();
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, null);
     const z2 = await seite.evaluate(async () => { await Promise.all([window.__app.engine('bot'), window.__app.engine('bewertung')]); return window.__blobWorker; });
     pruefe('Nach einem Zeitlimit: nächster Start versucht es wieder per Blob', z2 === 2, String(z2));
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -1395,8 +1418,7 @@ async function testeNachpruefung(browser) {
         return u;
       };
     });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     const i3 = await seite.evaluate(async () => {
       const t0 = performance.now();
       const e = await window.__app.engine('bewertung');
@@ -1413,6 +1435,26 @@ async function testeNachpruefung(browser) {
   }
 }
 
+// Gegenprobe zu oeffneArena und NETZ_UMGEBUNG (R8, 13.11.2026): der Ausfall unter Last nachgestellt, das Arena-Modul
+// (dynamischer Import in js/app.js) scheitert einmal mit ERR_CONNECTION_REFUSED; ohne Netzfehler bleibt ein Timeout rot
+async function testeUmgebung(browser) {
+  gruppe = 'Umgebung';
+  const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+  let abgebrochen = 0;
+  await seite.route('**/js/ui/arena.js', (r) => (abgebrochen++ === 0 ? r.abort('connectionrefused') : r.continue()));
+  await seite.setDefaultTimeout(5000);
+  const nachher = umgebung.length;
+  let ok = true; try { await oeffneArena(seite, BASIS + '#arena'); } catch (e) { ok = false; }
+  pruefe('Arena-Modul faellt einmal mit ERR_CONNECTION_REFUSED aus: einmal neu geladen, Arena steht, kein Konsolenfehler',
+    ok && abgebrochen >= 2 && fehler.length === 0 && umgebung.length > nachher, JSON.stringify({ ok, abgebrochen, fehler }));
+  const vorGegenprobe = umgebung.length;
+  let rot = false; try { await oeffneArena(seite, BASIS + '#arena', '.gibt-es-nicht'); } catch (e) { rot = true; }
+  pruefe('Ohne Netzfehler bleibt ein Timeout ein Fehler (kein Neuladen)', rot && umgebung.length === vorGegenprobe,
+    JSON.stringify({ rot, neu: umgebung.slice(vorGegenprobe) }));
+  umgebung.length = nachher; // nachgestellt, kein Hinweis am Ende
+  await kontext.close();
+}
+
 async function testeErweiterungen(browser) {
   // --- Router und ?erw ohne Paket ---
   gruppe = 'Erweiterungen: Router';
@@ -1421,8 +1463,7 @@ async function testeErweiterungen(browser) {
     const anfragen = [];
     seite.on('request', (r) => anfragen.push(new URL(r.url()).pathname));
     // Premium-Umbau U2 (PLAN 2.10): training ist Kern-Screen (Training-Huelle); der Rueckfall gilt weiter fuer start
-    await seite.goto(BASIS + '#start');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#start');
     pruefe('#start ohne Paket-Screen: still zur Arena', (await seite.evaluate(() => location.hash)) === '#arena' && await seite.locator('.screen.platzhalter').count() === 0);
     await seite.goto(BASIS + '#training');
     await seite.waitForSelector('.screen.training-screen');
@@ -1437,8 +1478,7 @@ async function testeErweiterungen(browser) {
     pruefe('Rückfall: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
     // ungueltige ?erw-Pfade werden ignoriert
     anfragen.length = 0;
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&erw=../tests/app,Pakete/X,pakete/a.b,/abs#arena`);
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, `http://127.0.0.1:${PORT}/index.html?test&erw=../tests/app,Pakete/X,pakete/a.b,/abs#arena`);
     await warte(300);
     pruefe('?erw: ungültige Pfade werden nicht geladen', !anfragen.some((a) => /tests\/app|Pakete|a\.b|\/abs/.test(a)), anfragen.filter((a) => /js\//.test(a) && !/js\/(ui\/)?[a-z]+\.js$/.test(a)).join(', '));
     pruefe('Sichtbarkeit: html[data-sichtbar="ja"]', (await seite.evaluate(() => document.documentElement.dataset.sichtbar)) === 'ja');
@@ -1452,8 +1492,7 @@ async function testeErweiterungen(browser) {
     await seite.route('**/js/pakete/w0-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET }));
     // Ohne fest installierte Pakete bleibt die Aussage ueber ?erw unabhaengig von PAKETE.
     await seite.route('**/js/erweiterungen.js', r => r.fulfill({ contentType: 'text/javascript', body: 'export const PAKETE = []; export const REITER = [];' }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?erw=pakete/w0-test/index#arena`);
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, `http://127.0.0.1:${PORT}/index.html?erw=pakete/w0-test/index#arena`);
     await warte(400);
     // PAKETE ist hier leer (Route oben): dann laedt die App ohne ?test gar kein Paket, auch nicht ueber ?erw
     pruefe('?erw ohne ?test wird ignoriert', !anfragen.some((a) => a.includes('/pakete/')) && await seite.evaluate(() => !window.__w0));
@@ -1549,7 +1588,8 @@ async function testeErweiterungen(browser) {
   pruefe('Ort ergebnis:karte zwischen .erg-feier und .erg-bot', ov.karte && iF >= 0 && ov.kinder[iF + 1] === 'erg-karte-ort' && iB > iF + 1
     && ov.kinder.slice(iF + 2, iB).every((k) => k === 'erg-liga-verweis'), ov.kinder.join(' '));
   // W0+a: dazu boss (Modus boss, sonst null)
-  pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
+  // R14-G2: herausfordern { text, teile } (nach einem Sieg, sonst null) fuer den gemeinsamen Teilen-Knopf
+  pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'herausfordern', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
   pruefe('Feier im Ergebnis: höchstens 3, höchstens 1 groß, nach prio (doppelte Meldung zählt einmal)', JSON.stringify(ov.feier) === JSON.stringify(['G:GROSS A', 'Zeile C', 'Zeile D']), JSON.stringify(ov.feier));
   pruefe('Feier-Zeile groß mit Symbol (Icon)', ov.symbol);
   await h.tippe('.ergebnis-karte .erg-wort');
@@ -2001,8 +2041,7 @@ async function testeErweiterungenFix(browser) {
     });
     const seite = await kontext.newPage();
     const h = hilfen(seite, { touch: true });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     await seite.evaluate(async (reg) => {
       const { klang, registriereKlang } = await import('./js/sounds.js');
       window.__sterne = [];
@@ -2191,8 +2230,7 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     await seite.route('**/js/ui/ich.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_ICH }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&kern&reiter=bestenliste,ich#arena`);
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, `http://127.0.0.1:${PORT}/index.html?test&kern&reiter=bestenliste,ich#arena`);
     const l1 = await seite.evaluate(() => {
       const n = document.querySelector('.reiter-leiste');
       return n && { hidden: n.hidden, reiter: [...n.querySelectorAll('[data-reiter]')].map((b) => b.dataset.reiter + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join(),
@@ -2226,8 +2264,7 @@ async function testeSpielFundament(browser) {
     await seite.waitForSelector('.screen.es-screen');
     await seite.waitForFunction(() => document.querySelector('.reiter-leiste').hidden, null, { timeout: 2000 }).catch(() => {});
     pruefe('Leiste: auf Screens ohne Reiter (Einstellungen) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=verlauf#arena`);
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, `http://127.0.0.1:${PORT}/index.html?reiter=verlauf#arena`);
     // mit fest eingetragenen REITER (seit Etappe A: Liga und Ich, dazu immer Start und Bots) gibt es die Leiste, aber
     // ?reiter fuegt ohne ?test nichts hinzu
     pruefe('Leiste: ohne ?test genau die festen Reiter, ?reiter bleibt wirkungslos', await seite.evaluate(() =>
@@ -2357,7 +2394,7 @@ async function testeSpielFundament(browser) {
     });
     pruefe('Abrechnung: Hülle an ergebnis:karte, Punkte vor Funken vor Liga, rollen im Abstand von 200 ms ein', abr.zeilen === 'punkte,funken,liga' && abr.t === '300ms,500ms,700ms'
       && abr.rollt && abr.rollen === 'listitem,listitem,listitem' && abr.erstes && !abr.tipp, JSON.stringify(abr));
-    pruefe('Abrechnung: Kontext der Zeilen wie ergebnis:karte (mit boss)', JSON.stringify(abr.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(abr.kontext));
+    pruefe('Abrechnung: Kontext der Zeilen wie ergebnis:karte (mit boss)', JSON.stringify(abr.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'herausfordern', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(abr.kontext));
     pruefe('Matt ohne Finisher-Anbieter: kein Matt-Hook, Ablauf wie vorher', abr.hook === false);
     await seite.evaluate(() => { window.__abrVorher = document.querySelector('.ergebnis-overlay .abrechnung'); });
     await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 90000 });
@@ -2377,8 +2414,7 @@ async function testeSpielFundament(browser) {
     await seite.waitForSelector('.screen.arena');
     pruefe('partie:gegner-leiste: verlasse() beim Verlassen der Partie', (await seite.evaluate(() => window.__wp.leisteWeg)) >= 1);
     // Fuenf Test-Zeilen plus die echte Liga: weiterhin hoechstens vier, in Anbieter-Reihenfolge.
-    await seite.goto(MIT_W0PLUS('wpabr&wpabr5') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpabr&wpabr5') + '#arena');
     await h.schaefermatt();
     await seite.waitForSelector('.ergebnis-overlay .erg-karte-ort .abrechnung', { timeout: 20000 });
     const vierZeilen = await seite.evaluate(() => [...document.querySelector('.ergebnis-overlay .abrechnung').children].map((x) => x.dataset.zeile).join());
@@ -2393,8 +2429,7 @@ async function testeSpielFundament(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-    await seite.goto(MIT_W0PLUS('wpmatt') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpmatt') + '#arena');
     await schaeferBisMatt(seite, h);
     await h.zugTippen('h5f7');
     await seite.waitForFunction(() => window.__wp.matt.length === 1, null, { timeout: 15000 });
@@ -2459,8 +2494,7 @@ async function testeSpielFundament(browser) {
       r3.m.t > tippT && r3.m.schonAbgebrochen === true && r3.ende.abgebrochen === true && r3.overlayT - r3.m.t < 700, JSON.stringify({ ...r3, tippT }));
     pruefe('Matt-Hook: keine Konsolenfehler (drei Partien)', fehler.length === 0, fehler.join(' | '));
     // Anbieter, der null liefert (Finisher aus): kein Warten, der Klassen-Effekt des Mattzugs ("Stärkster Zug") kommt doch
-    await seite.goto(MIT_W0PLUS('wpmattnull') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpmattnull') + '#arena');
     await schaeferBisMatt(seite, h);
     await h.zugTippen('h5f7');
     await seite.waitForSelector('.ergebnis-overlay', { timeout: 15000 });
@@ -2484,8 +2518,7 @@ async function testeSpielFundament(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true, saat: SAAT });
     const h = hilfen(seite, { touch: true });
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-    await seite.goto(MIT_W0PLUS('wpboss&wpleiste') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpboss&wpleiste') + '#arena');
     const sterneVorher = await seite.evaluate(async () => (await import('./js/storage.js')).gesamtSterne());
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botZug: () => 'f8e7' }; });
     await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'meister', woche: '2026-10-12' },
@@ -2601,8 +2634,7 @@ async function testeSpielFundament(browser) {
     for (const vp of FORMATE) {
       const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, touch: true, handy: !!vp.handy });
       await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-      await seite.goto(MIT_W0PLUS('wpheute&reiter=bestenliste,ich') + '#arena');
-      await seite.waitForSelector('.screen.arena .detail [data-aktion="spielen"]');
+      await oeffneArena(seite, MIT_W0PLUS('wpheute&reiter=bestenliste,ich') + '#arena', '.screen.arena .detail [data-aktion="spielen"]');
       await warte(400);
       const r = await seite.evaluate(() => {
         const leiste = document.querySelector('.reiter-leiste').getBoundingClientRect();
@@ -2644,8 +2676,7 @@ async function testeSpielFundament(browser) {
   gruppe = 'w0plus-a-fix: Werkstatt';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
-    await seite.goto(BASIS + '#werkstatt');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#werkstatt');
     const ohne = await seite.evaluate(() => ({ hash: location.hash, platzhalter: !!document.querySelector('.screen.platzhalter') }));
     pruefe('Screen werkstatt ohne Datei: still zur Arena, kein Platzhalter', ohne.hash === '#arena' && !ohne.platzhalter, JSON.stringify(ohne));
     const FAKE_WERKSTATT = FAKE_ICH.replace('ich-test', 'werkstatt-test').replace("'Ich'", "'Werkstatt'");
@@ -2667,8 +2698,7 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, BASIS + '#arena');
     await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
     await h.starte({ botId: 'benno', farbe: 'w' });
     const ohne = await seite.evaluate(() => {
@@ -2683,8 +2713,7 @@ async function testeSpielFundament(browser) {
     pruefe('Ohne Paket: Spieler-Leiste und Aktionen versteckt, Knopfreihe mit 3 Spalten', ohne.spieler && ohne.aktionen && ohne.spalten === 3 && ohne.attr
       && ohne.knoepfe === 3 && !ohne.klasse, JSON.stringify(ohne));
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-    await seite.goto(MIT_W0PLUS('wpspieler&wpaktion') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpspieler&wpaktion') + '#arena');
     await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
     await h.starte({ botId: 'benno', farbe: 'w' });
     await h.warteFlo();
@@ -2727,8 +2756,7 @@ async function testeSpielFundament(browser) {
     await seite.waitForSelector('.screen.arena');
     pruefe('Spieler-Leiste und Aktionen: verlasse() beim Verlassen der Partie', await seite.evaluate(() => window.__wp.spielerWeg === 1 && window.__wp.aktionWeg === 1));
     // drei Anbieter: hoechstens zwei Knoepfe (6 Spalten), kein Ueberlauf
-    await seite.goto(MIT_W0PLUS('wpaktion&wpaktion3') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpaktion&wpaktion3') + '#arena');
     await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
     await h.starte({ botId: 'benno', farbe: 'w' });
     const drei = await seite.evaluate(() => {
@@ -2748,8 +2776,7 @@ async function testeSpielFundament(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, touch: true, handy: true });
     const h = hilfen(seite, { touch: true });
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-    await seite.goto(MIT_W0PLUS('wpboss&wpleiste') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpboss&wpleiste') + '#arena');
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botZug: () => 'f8e7' }; });
     await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'standard' } });
     await seite.waitForSelector('.screen.partie.hat-blase', { timeout: 10000 });
@@ -2778,8 +2805,7 @@ async function testeSpielFundament(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-    await seite.goto(MIT_W0PLUS('wpmatt&wpabr') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpmatt&wpabr') + '#arena');
     await schaeferBisMatt(seite, h);
     await seite.waitForFunction(() => window.__wp.ereignisse.filter((e) => e.name === 'zug:bewertet').length >= 3, null, { timeout: 30000 });
     const bew = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'zug:bewertet')
@@ -2830,8 +2856,7 @@ async function testeSpielFundament(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true, saat: SAAT });
     const h = hilfen(seite, { touch: true });
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-    await seite.goto(MIT_W0PLUS('wpgast&wpboss') + '#arena');
-    await seite.waitForSelector('.screen.arena');
+    await oeffneArena(seite, MIT_W0PLUS('wpgast&wpboss') + '#arena');
     const stand = () => seite.evaluate(async () => {
       const st = await import('./js/storage.js');
       return { sterne: st.gesamtSterne(), partien: st.statistik().partien, fortschritt: localStorage.getItem('schach-arena:v1:fortschritt'), d: st.ladePartien()[0] || null };
@@ -3083,8 +3108,7 @@ async function u7Seite(browser, { w = 1180, h = 820, schema = 'light', handy = f
   const fehler = [];
   seite.on('console', (m) => { if (m.type() === 'error' && !/favicon/.test((m.location() || {}).url || '')) fehler.push(m.text()); });
   seite.on('pageerror', (e) => fehler.push('Seitenfehler: ' + e.message));
-  await seite.goto(BASIS + '#arena');
-  await seite.waitForSelector('.screen.arena');
+  await oeffneArena(seite, BASIS + '#arena');
   return { kontext, seite, fehler, h: hilfen(seite, { touch: true }) };
 }
 // Bot-Plan fuer __test.botZug: Antwort je letztem Zug (uci -> uci), sonst null (Engine)
@@ -3172,7 +3196,8 @@ async function testeU7(browser) {
         pruefe('Ab 760 px Höhe: Zugstreifen zwischen Coach und Aktionen, im Bild', !m.streifenUnten && m.streifen.t >= m.coach.b - 0.5 && m.streifen.b <= m.knoepfe.t + 0.5 && m.streifen.b <= m.ih,
           JSON.stringify([m.coach, m.streifen, m.knoepfe]));
       } else {
-        pruefe('Unter 760 px Höhe: Zugstreifen nach den Aktionen, durch Scrollen der Spalte erreichbar', m.streifenUnten && m.streifen.t >= m.knoepfe.b - 0.5 && m.scrollt > 0,
+        // R7 (Befund B8, 12.11.2026): der Streifen lag nach den Aktionen unter dem Rand, die Spalte scrollte; jetzt entfaellt er dort
+        pruefe('Unter 760 px Höhe: kein Zugstreifen (Züge über die Pfeile der Knopfreihe), die Spalte scrollt nicht', m.streifenUnten && m.streifen.h === 0 && m.scrollt <= 1,
           JSON.stringify([m.streifen, m.knoepfe, m.scrollt]));
         // Handy-Runde K (08.11.2026): Zug zurueck und vor liegen dann in der Knopfreihe, im Bild und antippbar
         const pf = await seite.evaluate(() => [...document.querySelectorAll('.partie .spielknoepfe > .sk-pfeil')].map((e) => {
@@ -3881,12 +3906,31 @@ async function testeU7(browser) {
       const inh = getComputedStyle(document.querySelector('.screen.partie > .inhalt')).transform;
       const k = [...document.querySelectorAll('.erg-aktionen [data-ziel], .erg-aktionen .erg-lobby')].map((b) => { const r = b.getBoundingClientRect();
         return { ziel: b.dataset.ziel || 'lobby', primaer: b.classList.contains('primaer'), knopf: b.classList.contains('knopf'), t: r.top, u: r.bottom, l: r.left, w: r.width, hh: r.height }; });
-      return { text: wort.textContent, ausruf: aus && getComputedStyle(aus).color, gold: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim(),
+      // Grund hinter dem Wort: erstes deckendes Element darueber (fuer den Kontrast des Ausrufezeichens)
+      let grundEl = wort, grund = '';
+      while (grundEl && !grund) { const c = getComputedStyle(grundEl).backgroundColor; if (c && !/^transparent$|,\s*0\)$/.test(c)) grund = c; grundEl = grundEl.parentElement; }
+      // --gold als berechnete Farbe (eine Variable allein liefert den rohen Text)
+      const probe = document.createElement('i'); probe.style.color = 'var(--gold)'; document.body.append(probe); const goldFarbe = getComputedStyle(probe).color; probe.remove();
+      return { text: wort.textContent, ausruf: aus && getComputedStyle(aus).color, gold: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim(), goldFarbe, grund,
         konfetti: document.querySelectorAll('.konfetti').length, schleier: getComputedStyle(o).backgroundColor, filter: getComputedStyle(o).backdropFilter || getComputedStyle(o).webkitBackdropFilter || 'none',
         zurueck: document.querySelector('.screen.partie').classList.contains('mit-ergebnis'), inh, sterne: document.querySelectorAll('.erg-stern .e-stern svg').length, knoepfe: k };
     });
-    const hex = (c) => { const m = String(c).match(/\d+/g); return m ? '#' + m.slice(0, 3).map((x) => Number(x).toString(16).padStart(2, '0')).join('').toUpperCase() : c; };
-    pruefe('Sieg: „Sieg!“ mit goldenem Ausrufezeichen, kein Konfetti, Sterne als Symbole', sieg.text === 'Sieg!' && hex(sieg.ausruf) === sieg.gold.toUpperCase() && sieg.konfetti === 0 && sieg.sterne === 3, JSON.stringify(sieg));
+    // Das "!" ist seit Kritik R6 (B25) bewusst kein reines --gold mehr: pur hatte es hell nur 2,24:1, grosse Schrift braucht
+    // 3:1 (WCAG 1.4.3). css/ergebnis.css mischt es per color-mix zur Textfarbe hin. Geprueft wird deshalb, was zaehlt:
+    // es bleibt in der Gold-Familie (Farbton hoechstens 20 Grad von --gold, sichtbar farbig) UND erfuellt den Kontrast 3:1.
+    const goldAusruf = (() => {
+      const rgb = (c) => { const t = String(c); const f = t.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+        if (f) return f.slice(1, 4).map((x) => Number(x) * 255); const m = t.match(/[\d.]+/g); return m ? m.slice(0, 3).map(Number) : null; };
+      const ton = ([r, g, b]) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (!d) return { h: 0, s: 0 };
+        const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: (h * 60 + 360) % 360, s: d / mx }; };
+      const lum = (c) => { const [r, g, b] = c.map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const a = rgb(sieg.ausruf), gd = rgb(sieg.goldFarbe), gr = rgb(sieg.grund);
+      if (!a || !gd || !gr) return { ok: false, grund: 'Farbe nicht lesbar' };
+      const ha = ton(a), hg = ton(gd), dh = Math.min(Math.abs(ha.h - hg.h), 360 - Math.abs(ha.h - hg.h));
+      const [l1, l2] = [lum(a), lum(gr)].sort((x, y) => y - x), kontrast = (l1 + 0.05) / (l2 + 0.05);
+      return { ok: dh <= 20 && ha.s >= 0.25 && kontrast >= 3, dh: Math.round(dh), saett: +ha.s.toFixed(2), kontrast: +kontrast.toFixed(2) };
+    })();
+    pruefe('Sieg: „Sieg!“ mit goldenem Ausrufezeichen (Gold-Familie, Kontrast mindestens 3:1), kein Konfetti, Sterne als Symbole', sieg.text === 'Sieg!' && goldAusruf.ok && sieg.konfetti === 0 && sieg.sterne === 3, JSON.stringify({ ...sieg, goldAusruf }));
     pruefe('Schleier ohne Weichzeichner, der Screen dahinter tritt zurück (scale .975)', /rgba?\(/.test(sieg.schleier) && (sieg.filter === 'none' || !sieg.filter) && sieg.zurueck && /matrix\(0\.975/.test(sieg.inh), JSON.stringify(sieg));
     const a = sieg.knoepfe.find((x) => x.ziel === 'analyse');
     const b = sieg.knoepfe.find((x) => x.ziel === 'weiter');
@@ -4035,7 +4079,7 @@ async function testeU7(browser) {
 }
 
 // ---------- Ablauf ----------
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
 let code = 1;
 const t0 = Date.now();
@@ -4054,6 +4098,7 @@ try {
     await testeNebenlaeufig(seite, h, fehler);
     await kontext.close();
   }
+  await testeUmgebung(browser);
   if (!NUR || NUR_PRUEFRUNDE) await testePruefrunde(browser);
   if (!NUR || NUR_ERWEITERUNGEN) await testeErweiterungen(browser);
   if (!NUR || NUR_NACHPRUEFUNG) await testeNachpruefung(browser);
@@ -4064,6 +4109,7 @@ try {
   console.log(`\n${ergebnisse.length - fehlend.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of fehlend) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + f.detail + ')' : ''));
   if (hinweiseBauB.length) console.log('Hinweis (Konsole aus Dateien von Bau B): ' + [...new Set(hinweiseBauB)].join(' | '));
+  if (umgebung.length) console.log(`Hinweis (Umgebung, ${umgebung.length} Netzfehler des Systems, kein Fehler der App): ` + [...new Set(umgebung)].slice(0, 5).join(' | '));
   console.log('Bilder: ' + BILDER);
   code = fehlend.length ? 1 : 0;
 } catch (e) {

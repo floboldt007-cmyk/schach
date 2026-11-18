@@ -11,14 +11,41 @@
   .vl-inhalt { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 20px; }
 }
 
-.vl-statistik { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 12px 8px; }
-.vl-kachel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 64px; padding: 4px 2px; text-align: center; min-width: 0; }
-.vl-kachel b { font-family: var(--display); font-size: 21px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; }
+/* R19 (Flo 15.11.: "muss ueberarbeitet werden"): ein Rahmen fuer alle Karten der Seitenspalte, auch die der Pakete im Ort
+   verlauf:seite (Level und Funken), damit Kopf, Paketkarten und Schatzkiste wie aus einem Guss wirken */
+.vl-seite .vl-statistik, .vl-seite .vl-schatz, .vl-seite .vl-ort > * { border-radius: var(--r-l, 18px); background: var(--flaeche);
+  border: 1px solid var(--linie); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gold) 38%, transparent), var(--s1); }
+.vl-ort { display: flex; flex-direction: column; gap: 14px; }
+.vl-ort[hidden] { display: none; }
+
+/* Statistik-Kopf: Partien gross, Bilanz als Balken, darunter Genauigkeit, Bestwert, Sterne und EINE Staerke-Zahl */
+.vl-statistik { display: grid; gap: 12px; padding: 16px; }
+.vl-stat-oben { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.vl-stat-partien { flex: none; display: flex; flex-direction: column; min-width: 64px; }
+.vl-stat-partien b { font-family: var(--display); font-size: 34px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; }
+.vl-stat-partien span { margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.vl-bilanz { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.vl-bilanz-balken { display: flex; gap: 2px; height: 10px; border-radius: 999px; overflow: hidden; background: var(--flaeche-3); }
+.vl-bilanz-balken span { flex-basis: 0; min-width: 0; }
+.vl-bilanz-balken .sieg { background: var(--kt-bester); }
+.vl-bilanz-balken .remis { background: var(--text-2); }
+.vl-bilanz-balken .niederlage { background: var(--kt-patzer); }
+.vl-bilanz-zahlen { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.vl-bilanz-zahlen b { font-size: 16px; font-weight: 800; color: var(--text); }
+.vl-bilanz-zahlen .sieg b { color: var(--kt-bester); }
+.vl-bilanz-zahlen .niederlage b { color: var(--kt-patzer); }
+.vl-stat-reihe { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.vl-kachel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 64px; padding: 6px 4px; text-align: center; min-width: 0;
+  border-radius: 14px; background: var(--flaeche-2); }
+.vl-kachel b { font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; }
 .vl-kachel > span { font-size: 12px; font-weight: 600; color: var(--text-2); line-height: 1.2; }
-.vl-kachel b .stern { font-size: .85em; }
-.vl-kachel.sieg b { color: var(--kt-bester); }
-.vl-kachel.remis b { color: var(--text); }
-.vl-kachel.niederlage b { color: var(--text-2); }
+.vl-kachel b .stern { font-size: .85em; color: var(--gold); }
+.vl-staerke { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 14px; background: var(--flaeche-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 50%, var(--linie)); }
+.vl-staerke-zahl { flex: none; display: flex; flex-direction: column; }
+.vl-staerke-zahl b { font-family: var(--display); font-size: 24px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; }
+.vl-staerke-zahl span { font-size: 12px; font-weight: 700; color: var(--text-2); }
+.vl-staerke-text { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-2); }
 
 .vl-schatz { padding: 14px; background: var(--flaeche); border-color: var(--linie); }
 .vl-schatz-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -58,21 +85,55 @@
 .vl-z1 { display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; min-width: 0; }
 /* Namen nie abschneiden (Flos iPhone-Befund): lieber zweizeilig */
 .vl-name { font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
-.vl-ergebnis { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; line-height: 1.35; }
-.vl-ergebnis.sieg { color: #FFFFFF; background: #23794C; }
-.vl-ergebnis.niederlage { color: var(--text-2); background: var(--flaeche-3); }
-.vl-ergebnis.remis { color: #1C1B19; background: var(--gold); }
+/* R19: Ergebnis als Zeichen unten rechts am Bild, je Ergebnis eigene Form; die Glyphe in der Kartenfarbe, ein Ring trennt
+   es vom Bild */
+.vl-bild { position: relative; flex: none; display: inline-grid; }
+.vl-ergebnis { position: absolute; right: -6px; bottom: -6px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  color: var(--flaeche); box-shadow: 0 0 0 2.5px var(--flaeche); }
+.vl-ergebnis svg { width: 17px; height: 17px; }
+.vl-ergebnis[data-ergebnis="sieg"] { background: var(--kt-bester); }
+.vl-ergebnis[data-ergebnis="remis"] { background: var(--text-2); }
+.vl-ergebnis[data-ergebnis="niederlage"] { background: var(--kt-patzer); }
+.vl-ergebnis[data-ergebnis="offen"] { background: var(--text-2); }
+.vl-ergebnis[data-ergebnis="weiss"] { color: #1C1B19; background: #FFFFFF; box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 3.5px var(--text-2); }
+.vl-ergebnis[data-ergebnis="schwarz"] { color: #FFFFFF; background: #1C1B19; box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 3.5px var(--text-2); }
+/* Eigene Bilder: Zu zweit zwei Bauern auf ruhigem Grau, Online ein Globus */
+.vl-av-zuzweit { background: linear-gradient(135deg, #9AA0AA, #5A606B); }
+.vl-av-online { background: var(--flaeche-3); color: var(--text); }
+.vl-bild-svg { display: block; width: 100%; height: 100%; }
 /* Nebenzeilen (Eroeffnungsname, Datum) ebenfalls nie abschneiden: umbrechen statt Ellipse */
 .vl-z2, .vl-z3 { font-size: 13px; line-height: 1.3; color: var(--text-2); overflow-wrap: break-word; }
 .vl-z2 { color: var(--text-2); font-weight: 600; }
+.vl-grund { font-size: 12px; font-weight: 700; }
 .vl-werte { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding-left: 4px; }
 .vl-genau { font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel); color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vl-genau.offen { font-size: 13px; font-weight: 700; color: var(--text-2); }
 .vl-sterne { font-size: 15px; letter-spacing: 1px; line-height: 1; }
 .vl-sterne .an { color: var(--gold); }
 .vl-sterne .aus { color: var(--linie-2); }
-.vl-muell { color: var(--text-2); background: var(--flaeche-2); box-shadow: none; }
-.vl-muell:active { color: var(--warn); }
+/* R19: Muelleimer leise, ohne Flaeche in jedem Zustand (eine blasse Hover-Flaeche hob sich nur 1.1:1 ab); Zeiger und Fokus
+   machen das Zeichen dunkler, der Fokusring kommt von der App; Loeschen weiter mit Rueckfrage */
+.vl-screen .vl-muell, .vl-screen .vl-muell:hover, .vl-screen .vl-muell:focus-visible, .vl-screen .vl-muell:active {
+  background: transparent; border-color: transparent; box-shadow: none; }
+.vl-screen .vl-muell { color: var(--text-2); }
+.vl-screen .vl-muell:hover, .vl-screen .vl-muell:focus-visible { color: var(--text); }
+.vl-screen .vl-muell:active { color: var(--kt-patzer); }
+
+/* R19: Partien ohne Zug als eine aufklappbare Zeile am Ende der Liste */
+.vl-ohne-gruppe { display: grid; gap: 10px; }
+.vl-ohne { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 8px 14px 8px 10px; border: 1px dashed var(--text-2);
+  border-radius: 18px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.vl-ohne:hover { background: var(--flaeche); }
+.vl-ohne:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.vl-ohne-bild { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--flaeche-2); color: var(--text-2); }
+.vl-ohne-bild svg { width: 22px; height: 22px; }
+.vl-ohne-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vl-ohne-text b { font-size: 15px; font-weight: 800; }
+.vl-ohne-text span { font-size: 13px; color: var(--text-2); }
+.vl-ohne-pfeil { flex: none; display: grid; color: var(--text-2); }
+.vl-ohne-pfeil svg { width: 20px; height: 20px; transition: transform .2s ease; }
+.vl-ohne[aria-expanded="true"] .vl-ohne-pfeil svg { transform: rotate(90deg); }
+.vl-ohne-liste[hidden] { display: none; }
 
 .vl-leer { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 32px 20px; text-align: center; }
 .vl-leer h3 { margin: 6px 0 0; font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
@@ -91,14 +152,15 @@
 @media (max-width: 520px) {
   .vl-screen .kopf { height: 56px; padding: 0 10px; }
   .vl-inhalt { padding: 0 10px 20px; gap: 12px; }
-  .vl-statistik { padding: 8px 4px; }
+  .vl-statistik { padding: 12px; gap: 10px; }
+  .vl-stat-partien b { font-size: 28px; }
   .vl-kachel { min-height: 56px; }
   .vl-kachel b { font-size: 17px; }
   .vl-kachel > span { font-size: 12px; }
   .vl-oeffnen { gap: 10px; padding: 4px 2px; }
   .vl-oeffnen .an-avatar { --g: 44px; border-radius: 12px; }
   .vl-name { font-size: 16px; }
-  .vl-z3 { display: none; }
+  .vl-z3 { font-size: 12px; }
   .vl-genau { font-size: 16px; }
   .vl-sterne { font-size: 13px; }
   .vl-screen .vl-muell { --tap: 44px; }

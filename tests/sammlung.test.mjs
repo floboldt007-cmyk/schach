@@ -27,7 +27,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8917);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -82,15 +82,19 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
   const { brettKunst } = await import('../js/sammlung-kunst.js');
   const css = readFileSync(path.join(WURZEL, 'css/tokens.css'), 'utf8');
   const innen = (url) => decodeURIComponent(url).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+  // seit den 65 Brettern (14.11.2026) je Welt drei; die Zeichnung muss bei jedem Brett mit muster gleich sein
   const welten = LABOR_BRETTER.filter((b) => b.welt);
-  const abweichend = welten.filter((b) => {
+  const abweichend = LABOR_BRETTER.filter((b) => b.muster).filter((b) => {
     const block = new RegExp(`html\\[data-brett="${b.id}"\\] \\{([^}]*)\\}`).exec(css);
     const url = (n) => (block && new RegExp(`--feld-muster-${n}: url\\("data:image/svg\\+xml,([^"]+)"\\)`).exec(block[1]) || [])[1] || '';
     return !block || innen(url('hell')) !== b.muster.h || innen(url('dunkel')) !== b.muster.d;
   }).map((b) => b.id);
-  pruefe('Welten-Bretter: fünf (Welt 1 bis 5), Zeichnung im Spiel und im Sammelbild gleich', welten.map((b) => b.welt).join() === '1,2,3,4,5'
-    && abweichend.length === 0, abweichend);
-  pruefe('Welten-Bretter: das Sammelbild trägt die Zeichnung je Feld, die Themen-Bretter ohne', (brettKunst('#fff', '#000', '#111', '', welten[0].muster).match(/class="sk-muster"/g) || []).length === 9
+  pruefe('Welten-Bretter: je Welt drei (Welt 1 bis 5), jede Zeichnung im Spiel und im Sammelbild gleich',
+    welten.map((b) => b.welt).sort().join() === '1,1,1,2,2,2,3,3,3,4,4,4,5,5,5' && abweichend.length === 0, abweichend);
+  // seit den Oberflaechen (14.11.2026) zeichnen nur noch die gewoehnlichen je Feld (Heuboden ist ein Welten-Brett); die
+  // seltenen tragen eine Oberflaeche aus js/brett-flaechen.js, Spiel und Sammelbild nehmen sie aus brettMuster
+  const jeFeld = welten.find((b) => b.muster);
+  pruefe('Welten-Bretter: das Sammelbild trägt die Zeichnung je Feld, die Themen-Bretter ohne', !!jeFeld && (brettKunst('#fff', '#000', '#111', '', jeFeld.muster).match(/class="sk-muster"/g) || []).length === 9
     && !/sk-muster/.test(brettKunst('#fff', '#000', '#111', '')));
 }
 
@@ -394,7 +398,7 @@ async function shopTeil(browser) {
     return { filter: c.filter, rand: getComputedStyle(b.querySelector('.sh-brett')).boxShadow }; });
   pruefe('Shop abgemeldet: Vorschau zeigt volle Farben, kein Grau-Filter, aber mit Brettrand (R13-Shop)', !/grayscale/.test(vorschau.filter)
     && vorschau.rand !== 'none', vorschau);
-  pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
+  pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} Sammelstücken freigeschaltet`, zaehl);
   // Kundenblick 09.11.2026 (Befund 12): kein leeres "0 / 0" auf "Ich", ohne Partie auch keine Spielzahl im Profil
   const ich = await p.s.evaluate(() => ({ zahlen: [...document.querySelectorAll('.sa-gross .zahl, .sa-platz-zahl')].map((z) => z.textContent.trim()),
     seit: document.querySelector('.pr-seit')?.textContent || '' }));
@@ -467,6 +471,11 @@ async function erfinderTeil(browser) {
   pruefe('Erfinder: „Der Erfinder“ und „Nr. 0 · 1 von 1“, Knopf für die Blaupause', !!info && info.chips === 'Der Erfinder|Nr. 0 · 1 von 1'
     && info.knopf === 'Blaupause-Figuren benutzen', info);
   pruefe('Erfinder: Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // Befund ed (14.11.2026): Erfinder auf neuem Geraet, der Status kommt erst nach dem Laden; die Oberflaechen der seltenen
+  // Bretter muessen trotzdem im Sammelbild erscheinen (vorher entschied eine Modul-Konstante beim Laden fuer immer)
+  const flaechen = await p.s.waitForFunction(() => document.querySelectorAll('.sa-bereich[data-bereich="bretter"] clipPath[id^="skf"]').length,
+    null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => 0);
+  pruefe('Erfinder auf neuem Gerät: Sammelbild der Bretter zeigt die Oberflächen, sobald der Server den Erfinder meldet', flaechen > 0, flaechen);
   // G-002 (Sammlung B): Plaetze statt Reiter; auf dem Handy alle im Bild, gross genug, ohne Ueberlappung
   pruefe('Handy: alle Plätze der Sammlung sichtbar (mindestens 44 px hoch, keiner überlappt, nichts ragt rechts heraus)', await p.s.evaluate((seg) => {
     const ueber = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
@@ -571,7 +580,11 @@ async function laborTeil(browser) {
   const bretter = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="bretter"] .sa-teil')]
     .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
   const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
-  pruefe('Labor: zehn Bretter mit Schild (fünf Themen, fünf Welten), nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker,brett-moos,brett-pflaster,brett-brandung,brett-tiefsee', bretter);
+  // seit den 65 Brettern (14.11.2026): alle 62 Labor-Bretter in der Reihenfolge von js/labor.js, dahinter die 20 Motiv-Bretter
+  const { LABOR_BRETTER, MOTIV_BRETTER } = await import('../js/labor.js');
+  const laborIds = [...LABOR_BRETTER, ...MOTIV_BRETTER].map((b) => 'brett-' + b.id).join();
+  pruefe('Labor: alle 62 Labor-Bretter und 20 Motiv-Bretter mit Schild, nur diese markiert', lab === laborIds && lab.split(',').length === 82
+    && lab.startsWith('brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker'), bretter.length);
   await ruesteAus(p.s, 'brett-kuerbis');
   pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
     && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));
@@ -656,7 +669,7 @@ async function profilTeil(browser) {
   pruefe('Freischalt-Moment: der erste Sieg zeigt sich beim Öffnen von „Ich“', p.moment >= 1, p.moment);
   const vorher = await p.s.evaluate(() => ({ karte: !!document.querySelector('.pr-karte'), figur: document.querySelector('.pr-av svg')?.dataset.figur,
     leer: document.querySelectorAll('.pr-orden.leer').length, oben: !!document.querySelector('.sa-kopf-ort .pr-karte') }));
-  pruefe('Profil: Karte oben im Reiter „Ich“, Bauer als Bild, drei leere Plätze', vorher.karte && vorher.oben && vorher.figur === 'P' && vorher.leer === 3, vorher);
+  pruefe('Profil: Karte oben im Reiter „Ich“, Bauer als Bild, leere Vitrine als ein schmaler Platz', vorher.karte && vorher.oben && vorher.figur === 'P' && vorher.leer === 1, vorher);
   const rahmen = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="rahmen"] .sa-teil')].map((x) => ({
     id: x.dataset.teil, z: x.dataset.zustand, zeile: x.querySelector('.sa-zeile')?.textContent })));
   const r = (id) => rahmen.find((x) => x.id === 'rahmen-' + id) || {};
@@ -746,7 +759,7 @@ async function nameTeil(browser) {
 
 async function browserTeil() {
   const pw = ladePlaywright();
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
@@ -771,9 +784,26 @@ async function browserTeil() {
       const bereiche = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich')].map((x) => x.dataset.bereich).join());
       // ohne Erfinder-Konto keine Finisher (Labor, Flo 01.11.2026)
       pruefe(`${name}: acht Bereiche (Emotes, Titel, Banner, Rahmen, Bretter, Klänge, Erfolge, Shop), keine Finisher`, bereiche === 'emotes,titel,banner,rahmen,bretter,klaenge,erfolge,shop', bereiche);
+      // R4a (Kritik 09.11., pc-ich.jpg): am PC war die Liste "So sehen dich andere" 704 px, die Profilkarte 884 px breit;
+      // eine leere Vitrine (neuer Spieler) war drei grosse Kaesten; die Banner-Vorschau zeigte nur den leeren Teil des Banners
+      const ich = await s.evaluate(() => {
+        const w = (sel) => Math.round(document.querySelector(sel)?.getBoundingClientRect().width || 0);
+        const v = document.querySelector('.pr-vitrine');
+        const bild = document.querySelector('.sa-platz[data-bereich="banner"] .sa-platz-bild img');
+        // der Zaehler (.sa-stand) traegt den Seitenrand als Innenabstand: gemessen wird seine Inhaltsbreite
+        const st = document.querySelector('.sa-stand');
+        const cs = st && getComputedStyle(st);
+        const stand = st ? Math.round(st.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) : 0;
+        return { karte: w('.pr-karte'), liste: w('.sa-platz-liste'), stand, leer: v?.querySelectorAll('.pr-orden.leer').length,
+          vitrineH: Math.round(v?.getBoundingClientRect().height || 0), leerFlag: v?.hasAttribute('data-leer'),
+          bannerPos: bild ? getComputedStyle(bild).objectPosition : '' };
+      });
+      pruefe(`${name}: Profilkarte, Zähler und Liste „So sehen dich andere“ gleich breit`, ich.karte > 0 && ich.karte === ich.liste && ich.stand === ich.liste, ich);
+      pruefe(`${name}: leere Vitrine ist ein schmaler Platz statt drei Kästen (höchstens 48 px hoch)`, ich.leerFlag && ich.leer === 1 && ich.vitrineH <= 48, ich);
+      pruefe(`${name}: Banner-Vorschau zeigt das Motiv (nicht die leere Mitte des Banners)`, /^19% /.test(ich.bannerPos), ich);
       const stand = await s.locator('.sa-stand').innerText();
       const zaehl = await s.evaluate(() => ({ alle: document.querySelectorAll('.sa-teil').length, frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
-      pruefe(`${name}: Zähler „N von M freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
+      pruefe(`${name}: Zähler „N von M Sammelstücken freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} Sammelstücken freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
       await waehle(s, 'titel');
       const tit = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="titel"] .sa-teil')].map((x) => ({
         id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild .sa-frage'), zeile: x.querySelector('.sa-zeile').textContent,
@@ -810,7 +840,7 @@ async function browserTeil() {
     await s.waitForSelector('.sa-screen', { timeout: 30000 });
     await waehle(s, 'titel');
     const text = (await s.locator('.sa-screen').innerText()) + '\n' + (await s.locator('.sa-blatt').innerText());
-    pruefe('Englisch: Me (Reitername), unlocked, From level', /^Me$/m.test(text) && /of \d+ unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
+    pruefe('Englisch: Me (Reitername), unlocked, From level', /^Me$/m.test(text) && /of \d+ collectibles unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
     await k.close();
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);

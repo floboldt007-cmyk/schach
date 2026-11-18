@@ -5,7 +5,7 @@
 //
 //   node tests/navigation.test.mjs              alles
 //   node tests/navigation.test.mjs --nur-node   ohne Browser
-//   PORT=8951 node tests/navigation.test.mjs    eigener Port (Standard 8837)
+//   PORT=8951 node tests/navigation.test.mjs    eigener Port (Standard: frei)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn } from 'node:child_process';
@@ -17,7 +17,7 @@ import { icon, iconNamen } from '../js/ui/icons.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8837);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // &kern: ohne die fest eingetragenen PAKETE und REITER (die pruefen die Integration und e2e)
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const NUR_NODE = process.argv.includes('--nur-node');
@@ -51,8 +51,10 @@ function nodeTeil() {
   const app = lies('js/app.js');
   const paketScreens = (app.match(/const PAKET_SCREENS = new Set\(\[([^\]]*)\]\)/) || [])[1] || '';
   pruefe('training ist Kern-Screen (nicht mehr in PAKET_SCREENS), start bleibt Paket-Screen', !/'training'/.test(paketScreens) && /'start'/.test(paketScreens), paketScreens);
+  // R19 Lobby-Farbe (14.11.2026): die Reiter tragen gefuellte Spiel-Symbole (js/ui/icons.js spielSymbol)
   pruefe('Reiter nach Konzept 2026-11-06: Start, Bots, Liga, Ich (Training und Verlauf sind keine Reiter mehr)',
-    /const REITER_ALLE = \[\['heim', 'Start', 'haus'\], \['arena', 'Bots', 'pokal'\], \['bestenliste', 'Liga', 'liga'\], \['ich', 'Ich', 'person'\]\]/.test(app));
+    /const REITER_ALLE = \[\['heim', 'Start', 'heim'\], \['arena', 'Bots', 'bots'\], \['bestenliste', 'Liga', 'liga'\], \['ich', 'Ich', 'ich'\]\]/.test(app)
+    && /\$\{spielSymbol\(ic\)\}<span>\$\{t\('rahmen\.reiter\.'/.test(app));
   pruefe('Seitenleiste im Querformat ab 1021 px', /min-width: 1021px\) and \(orientation: landscape\)/.test(app) && /'seite'/.test(app));
   pruefe('Icon liga (Kronen-Umriss) fuer den Liga-Reiter', iconNamen().includes('liga') && !/fill="currentColor"/.test(icon('liga')));
   pruefe('erweiterungen.js: REITER bestenliste und ich', /export const REITER = Object\.freeze\(\['bestenliste', 'ich'\]\)/.test(lies('js/erweiterungen.js')));
@@ -814,7 +816,8 @@ async function testeBauteile(browser) {
     const r = await d.seite.evaluate(() => ({ an: getComputedStyle(document.querySelector('.schalter'), '::before').backgroundColor,
       pille: getComputedStyle(document.querySelector('.seg-pille')).backgroundColor, grund: getComputedStyle(document.body).backgroundColor,
       doc: document.scrollingElement.scrollWidth - innerWidth,
-      klein: [...document.querySelectorAll('#app button, .regler')].filter((b) => { const x = b.getBoundingClientRect(); return x.width && (x.height < 44 || x.width < 44); })
+      // ohne [inert] (stillgelegter Hintergrund hinter einem offenen Blatt, js/ui/bauteile.js)
+      klein: [...document.querySelectorAll('#app button, .regler')].filter((b) => { const x = b.getBoundingClientRect(); return x.width && !b.closest('[inert]') && (x.height < 44 || x.width < 44); })
         .map((b) => b.className) }));
     pruefe('Schalter an in Tinte (#F3F1EC), Segment-Pille --flaeche-3, Schiefer', r.an === 'rgb(243, 241, 236)' && r.pille === 'rgb(44, 48, 56)' && r.grund === 'rgb(21, 23, 27)',
       JSON.stringify(r));
@@ -978,7 +981,7 @@ if (!NUR_NODE) {
   let browser = null;
   try {
     const { chromium } = ladePlaywright();
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await chromium.launch();
     await browserTeil(browser);

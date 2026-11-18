@@ -32,10 +32,10 @@
 .vk-kopf { position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; min-height: 100px; padding: 10px 14px; }
 .vk-av { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 8px rgba(0, 0, 0, .45); background: #2C3038; }
 .vk-av svg, .vk-av img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.vk-text { display: grid; gap: 3px; min-width: 0; color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
+.vk-text { display: grid; gap: 3px; min-width: 0; text-align: start; color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
 .vk-namenszeile { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .vk-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 19px; line-height: 1.15; }
-.vk-titel { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font-size: 13px; font-weight: 700; color: #F2C66B; }
+.vk-titel { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font-size: 13px; font-weight: 700; color: #FFD47A; }
 .vk-titel > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vk-titel svg, .vk-titel .vk-wappen { width: 20px; height: 20px; flex: none; }
 .vk-krone { font-size: 12.5px; font-weight: 600; opacity: .92; }
@@ -64,7 +64,8 @@
 /* ---------- Lobby: Gegner gefunden ---------- */
 .lb-karten { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; }
 .lb-karten[hidden] { display: none !important; }
-.lb-karten-vs { font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 18px; color: var(--gold, #E0A22B); }
+/* R16 K1: Gold auf der hellen Lobby nur 2,2:1; der Akzent fuer Text haelt in beiden Modi >= 4,5:1 */
+.lb-karten-vs { font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 18px; color: var(--akzent-text); }
 .lb-suche:has(.lb-karten:not([hidden])) .lb-radar { display: none; }
 @media (max-width: 640px) {
   .lb-karten { grid-template-columns: minmax(0, 1fr); justify-items: stretch; gap: 6px; }
@@ -86,6 +87,9 @@
 .pr-karte .pr-kopf { position: relative; overflow: hidden; min-height: 112px; padding: 12px 14px; margin: -14px -14px 0; border-radius: var(--r-l, 18px) var(--r-l, 18px) 0 0; }
 .pr-karte .pr-kopf > :not(.pr-banner) { position: relative; z-index: 1; }
 .pr-banner { position: absolute; inset: 0; z-index: 0; }
+/* R16-Kritik I3 (Auswahl a): im Profilkopf das Bild senkrecht mittig. Die Verschiebung um h/15 nach oben (oben) liess hier
+   unten einen Streifen in der Grundfarbe stehen (PC 7 px, iPhone 3 px), weil das Bild nur so hoch ist wie der Kopf. */
+.pr-karte .pr-banner { background-position-y: center; }
 .pr-karte .pr-kopf .pr-av { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 8px rgba(0, 0, 0, .45); }
 .pr-karte .pr-kopf .pr-name b, .pr-karte .pr-kopf .pr-seit { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
 .pr-chip.pr-chip-krone { color: #FFFFFF; background: rgba(255, 255, 255, .16); }
@@ -94,21 +98,16 @@
 .pr-orden[data-stufe="1"] { border-color: var(--st-bronze); }
 .pr-orden[data-stufe="2"] { border-color: var(--st-silber); }
 .pr-orden[data-stufe="3"] { border-color: var(--st-gold); box-shadow: 0 0 10px rgba(224, 162, 43, .3); }
-.pr-orden-stufe { font-size: 11.5px; color: var(--text-2); }
+.pr-orden-stufe { font-size: 12px; color: var(--text-2); }
 .pr-orden-knopf[data-stufe="1"] { border-color: var(--st-bronze); }
 .pr-orden-knopf[data-stufe="2"] { border-color: var(--st-silber); }
 .pr-orden-knopf[data-stufe="3"] { border-color: var(--st-gold); }
 
-/* Banner-Wahl im Blatt und in der Sammlung */
-.pr-banner-wahl-liste { display: grid; gap: 10px; }
-.pr-banner-knopf { display: grid; grid-template-columns: 120px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-items: center; min-height: 48px;
-  padding: 8px; border-radius: var(--r-m, 14px); border: 1px solid var(--linie); background: var(--flaeche); color: var(--text); text-align: start; font: inherit; cursor: pointer; }
-.pr-banner-knopf img { grid-row: 1 / 3; width: 120px; height: 30px; object-fit: cover; object-position: 30% center; border-radius: 6px; }
-.pr-banner-knopf small { color: var(--text-2); }
-.pr-banner-knopf[aria-pressed="true"] { border-color: var(--akzent); box-shadow: inset 0 0 0 1px var(--akzent); }
-.pr-banner-knopf:disabled { cursor: default; opacity: .7; }
-.pr-banner-knopf:focus-visible { outline: 3px solid var(--fokus, var(--akzent)); outline-offset: 2px; }
+/* Banner in der Sammlung (die Wahl laeuft ueber die Zeile "Banner" unter "So sehen dich andere") */
 .sa-bild img.sk-banner { width: 100%; max-width: 168px; height: 42px; object-fit: cover; object-position: 30% center; border-radius: 6px; }
+/* Platz "Banner" (64 x 64, cover): das 4:1-Bild ist dort 256 px breit; die Mitte (Vorgabe 50 %) war die leere dunkle Flaeche.
+   Das Motiv liegt bei x 0,267 (siehe oben): 0,267 * 256 - 32 = 36 px von 192 px Ueberstand, also 19 % */
+.sa-platz-bild img.sk-banner { object-position: 19% center; }
 
 /* ---------- Freischalt-Moment ---------- */
 .st-moment { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; padding: 16px; background: rgba(8, 10, 14, .62); }
@@ -123,9 +122,11 @@
 .st-karte .st-bild svg { width: 88px; height: 88px; }
 .st-name { font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 22px; }
 .st-stufe { font-weight: 800; font-size: 15px; }
-.st-karte[data-stufe="1"] .st-stufe { color: var(--st-bronze); }
+/* Schrift in Stufenfarbe, zur Textfarbe hin gemischt: Bronze pur hatte 4,23:1 hell und 3,82:1 dunkel, Gold pur 2,24:1 hell
+   (Kritik R6, B25; Soll 4,5:1). Die Mischung mit --text wird hell dunkler und dunkel heller, ohne eigene Dunkel-Regel */
+.st-karte[data-stufe="1"] .st-stufe { color: color-mix(in srgb, var(--st-bronze) 80%, var(--text)); }
 .st-karte[data-stufe="2"] .st-stufe { color: var(--text); }
-.st-karte[data-stufe="3"] .st-stufe { color: var(--st-gold); }
+.st-karte[data-stufe="3"] .st-stufe { color: color-mix(in srgb, var(--st-gold) 60%, var(--text)); }
 .st-ziel { font-size: 13px; color: var(--text-2); }
 .st-lohn { font-size: 14px; font-weight: 700; }
 .st-lohn-gold { color: var(--st-gold); }

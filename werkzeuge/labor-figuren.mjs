@@ -1,8 +1,9 @@
 // Figurensaetze im Labor (Flo 31.10.2026: "Mehr Bretter-Skins ... nur in meinem Account, ich sage, welche dann irgendwann
-// erwerblich sind ... z. B. Halloween-Skins, auch die Figuren"): Kuerbis (Halloween), Frost und Gold. Abgeleitet aus
-// "cburnett" (Colin M.L. Burnett, GPLv2 oder neuer, wie die Vorlage; assets/LIZENZ-KUNST.md): nur Farben getauscht,
-// wie bei der Blaupause (werkzeuge/blaupause.mjs). Welche Saetze nur der Erfinder sieht, steht in js/labor.js.
-//   node werkzeuge/labor-figuren.mjs    schreibt assets/pieces/<satz>/*.svg neu
+// erwerblich sind ... z. B. Halloween-Skins, auch die Figuren"). Umfaerbung aus "cburnett" (Colin M.L. Burnett, GPLv2
+// oder neuer) wie bei der Blaupause (werkzeuge/blaupause.mjs). Heute ohne Saetze (SAETZE unten leer): Kuerbis, Frost und
+// Gold zeichnet werkzeuge/figuren-3d.mjs mit eigenen Formen (GPL-3.0, assets/LIZENZ-KUNST.md), nicht dieses Werkzeug.
+// Welche Saetze nur der Erfinder sieht, steht in js/labor.js.
+//   node werkzeuge/labor-figuren.mjs    schreibt assets/pieces/<satz>/*.svg fuer die Saetze in SAETZE (zur Zeit keine)
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';

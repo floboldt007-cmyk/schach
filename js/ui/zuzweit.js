@@ -2,9 +2,11 @@
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
-import { anim } from '../bewegung.js';
+import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
+import { anim, tempo as bewegungsTempo } from '../bewegung.js';
+import { spieleMiniIntro } from './duell.js';
 import { klang, zugKlangName } from '../sounds.js';
-import { sanAnzeige } from '../review.js';
+import { sanAnzeige, materialBilanz } from '../review.js';
 import { sende } from '../ereignisse.js';
 import {
   pruefeZuzweit, pruefeTempo, ladeModulEinstellungen, speichereModulEinstellungen,
@@ -15,6 +17,7 @@ import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
+import '../sprachen/partie.js'; // partie.zuege.leer (Zugliste wie in der Bot-Partie)
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -22,10 +25,20 @@ const TEMPI = { ohne: null, '5': { grund: 300, zuschlag: 0 }, '10': { grund: 600
 // Texte beim Zeichnen (js/sprachen/einstellungen.js, Schluessel zz.*)
 const GRUENDE = ['matt', 'patt', 'material', 'wiederholung', '50-zuege', 'aufgabe', 'zeit', 'vereinbart'];
 function Z(k, w) { return t('einstellungen.zz.' + k, w); }
+// Zurueck und "Fertig" fuehren zum Start: dort liegt der Einstieg (Flo 08.11.2026, Zu zweit ist kein Lernen)
+const ZIEL = 'heim';
+// R6-Befund B11: Knoepfe mit Symbol und Text wie die Spielknoepfe der Bot-Partie (js/ui/partie.js knopf)
+const zzKnopf = (aktion, ico, text, extra = '') =>
+  `<button class="knopf dr ${extra}" type="button" data-zz="${aktion}">${icon(ico)}<span>${esc(text)}</span></button>`;
 function grundText(grund) {
   return GRUENDE.includes(grund) ? Z('grund.' + grund) : '';
 }
 const andere = (farbe) => farbe === 'w' ? 'b' : 'w';
+// R8 (B4, Gleichheits-Liste): Leisten wie in der Bot-Partie (js/ui/partie.js): Bild, Name, Unterzeile mit Farbe und
+// geschlagenen Figuren, Uhr mit Symbol fuer die Warnung. Wert der Figuren fuer die Reihenfolge wie dort.
+const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+const UHR_SYMBOL = '<svg class="ico uhr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+  + 'stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>';
 function farbwort(farbe) {
   return farbe === 'w' ? t('allgemein.weiss') : t('allgemein.schwarz');
 }
@@ -37,6 +50,12 @@ function anzeigeName(n) {
 // Zugliste: in der eingestellten Sprache wie in Partie und Analyse (review.sanAnzeige: Deutsch K D T L S, Englisch
 // K Q R B N, Rochade mit Nullen)
 const sanText = (san) => sanAnzeige(san);
+
+// Figurensatz wirkt sofort (R4, 12.11.2026): kommt der Erfinder-Status erst nach dem Aufbau (js/app.js pruefeSonderstuecke
+// wendet die Einstellungen dann neu an) oder waehlt der Spieler einen anderen Satz, folgen die Koenige des Startblatts und
+// das Spielbrett (dort mit allen Brett-Einstellungen, wendeBrettEinstellungenAn in js/ui/brett-einstellungen.js).
+// Ohne detail kein Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto.
+const satzPfad = (d) => { const p = figurenPfad(d); return p ? new URL(p, WURZEL).href : null; };
 
 function stil() {
   if (document.querySelector('link[data-zuzweit]')) return;
@@ -64,7 +83,7 @@ function startblatt(root, app) {
   const s = document.createElement('section');
   s.className = 'screen zz-screen zz-startblatt';
   s.setAttribute('aria-label', Z('amBrett'));
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: Z('titel'), chips: '', klang: false })}
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: Z('titel'), chips: '' })}
     <div class="zz-rumpf"><form class="zz-start">
       <div class="zz-buehne">
         <div class="zz-paar" aria-hidden="true"><img src="${esc(pfad)}wK.svg" alt="" draggable="false"><img src="${esc(pfad)}bK.svg" alt="" draggable="false"></div>
@@ -98,6 +117,13 @@ function startblatt(root, app) {
   zeigeUhrSatz();
   form.addEventListener('change', zeigeUhrSatz);
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  // die beiden Koenige folgen dem Figurensatz sofort (satzPfad oben, hier ohne Brett)
+  const koenige = [...s.querySelectorAll('.zz-paar img')];
+  const beiEinstellungen = (e) => {
+    const p = e.detail ? satzPfad(e.detail) : null;
+    if (p) koenige.forEach((img, i) => { img.src = p + (i ? 'bK' : 'wK') + '.svg'; });
+  };
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (startet) return;
@@ -112,7 +138,7 @@ function startblatt(root, app) {
     speichereModulEinstellungen('zuzweit', { ...zuzweit, bedenkzeit });
     app.gehe('partie', { modus: 'zuzweit', zuzweit, tempo: TEMPI[bedenkzeit] || null });
   });
-  return { verlasse() { weg = true; try { kopf.verlasse(); } catch (e) { /* egal */ } } };
+  return { verlasse() { weg = true; window.removeEventListener('schach:einstellungen', beiEinstellungen); try { kopf.verlasse(); } catch (e) { /* egal */ } } };
 }
 
 function partie(root, quelle, app, fortgesetzt) {
@@ -145,25 +171,29 @@ function partie(root, quelle, app, fortgesetzt) {
   let seit = gespeichertUhr && Number.isFinite(gespeichertUhr.seit) ? Math.min(Date.now(), gespeichertUhr.seit) : Date.now();
   let weg = false, fragt = false, gespeichert = null, drehenAnimation = null;
   let uhrTimer;
+  let intro = null;     // laufendes Mini-Intro (spieleMiniIntro), bis es fertig ist
   const gewarnt = {};   // Uhr-Warnung schon gespielt je Farbe
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
   s.setAttribute('aria-label', Z('amBrett'));
-  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.training')}</button><h1>${Z('titel')}</h1></header>
+  // R8 (L6, Gleichheits-Liste): Kopf wie in der Bot-Partie (js/ui/partie.js .p-kopf): Zurueck als Symbol (die Ansage
+  // nennt das Ziel, B11), Titel mit Unterzeile, Klang und Einstellungen
+  s.innerHTML = `<header class="kopf p-kopf"><button class="icon-knopf zz-zurueck dr" type="button" data-zz="zurueck" aria-label="${esc(Z('zurueckStart'))}">${icon('zurueck')}</button>`
+    + `<div class="titel"><h1>${Z('titel')}</h1><div class="unter"><span class="zz-kopf-namen">${esc(name('w'))} – ${esc(name('b'))}</span></div></div>`
+    + `<button class="icon-knopf knopf-klang dr" type="button" data-zz="klang" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(Z('klang'))}">${icon('klang')}</button>`
+    + `<button class="icon-knopf dr" type="button" data-zz="einstellungen" data-aktion="einstellungen" aria-label="${esc(t('allgemein.einstellungen'))}">${icon('einst')}</button></header>
     <div class="zz-rumpf"><div class="zz-spielbereich">
-      <div class="zz-spieler zz-oben" role="group"></div>
+      <div class="spieler gegner zz-spieler zz-oben" role="group"></div>
       <div class="zz-feld"><div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div></div>
-      <div class="zz-spieler zz-unten" role="group"></div>
+      <div class="spieler ich zz-spieler zz-unten" role="group"></div>
       <p class="zz-status" role="status"></p>
-      <div class="zz-aktionen"><button class="knopf" type="button" data-zz="zugzurueck">${Z('zugZurueck')}</button><button class="knopf" type="button" data-zz="remis">${Z('remisAnbieten')}</button><button class="knopf" type="button" data-zz="aufgeben">${Z('aufgeben')}</button></div>
-      <div class="zz-zuege" aria-label="${Z('zuege')}"></div>
-      <section class="zz-ergebnis flaeche" aria-label="${Z('ergebnis')}" hidden></section>
+      <div class="zz-aktionen">${zzKnopf('zugzurueck', 'undo', Z('zugZurueck'))}${zzKnopf('remis', 'personen', Z('remisAnbieten'))}${zzKnopf('aufgeben', 'flagge', Z('aufgeben'))}</div>
+      <div class="zz-zuege zugbox" role="region" aria-label="${Z('zuege')}"><div class="zb-kopf"><span class="zb-titel">${esc(Z('zuege'))}</span></div><div class="zugliste"></div><div class="zugleiste"></div></div>
     </div></div>`;
   root.append(s);
   const brettEl = s.querySelector('.brett');
   const brett = new Brett(brettEl, { figurenPfad: new URL(figurenPfad(), WURZEL).href, beiZug,
-    koordinaten: einst.koordinaten !== false, koordLage: einst.koordLage, autoDame: einst.autoDame !== false,
-    turmRochade: einst.turmRochade === true, steuerung: einst.steuerung, pfeile: einst.pfeile !== false });
+    ...brettOptionen(einst), turmRochade: einst.turmRochade === true });
   brett.setzeDauer(300);
   const wert = (f, jetzt = Date.now()) => Math.max(0, rest[f] - (tempo && z.phase === 'spiel' && chess.turn() === f ? Math.max(0, jetzt - seit) : 0));
   const uhrText = (ms) => { const sec = Math.ceil(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
@@ -178,10 +208,47 @@ function partie(root, quelle, app, fortgesetzt) {
     const unten = brett.ausrichtung, oben = andere(unten);
     for (const [lage, f] of [['oben', oben], ['unten', unten]]) {
       const el = s.querySelector('.zz-' + lage);
-      el.dataset.farbe = f; el.setAttribute('aria-label', `${name(f)} · ${farbwort(f)}`);
+      // R6-Befund B11: ohne eigenen Namen ist der Name schon die Farbe, dann steht sie nur einmal da (nicht "Weiß / Weiß")
+      const eigen = name(f) !== farbwort(f);
+      el.dataset.farbe = f; el.setAttribute('aria-label', eigen ? `${name(f)} · ${farbwort(f)}` : name(f));
       el.classList.toggle('zz-gegenueber', lage === 'oben' && !namen.drehen);
-      el.innerHTML = `<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div class="zz-name"><b>${esc(name(f))}</b><span>${farbwort(f)}</span></div>
-        <div class="uhr zahl" data-farbe="${f}"${tempo ? '' : ' hidden'}><span class="uhr-zeit"></span></div>`;
+      // Gitter aus css/partie.css: oben Bild, Feld info (Name, Unterzeile), Uhr; unten Bild, Name, Unterzeile, Uhr
+      const av = `<span class="av"><img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt="" draggable="false"></span>`;
+      const kopf = `<div class="name zz-name"><b>${esc(name(f))}</b></div>`;
+      const unter = `<div class="unter bot-meta"><span class="p-meta">${eigen ? esc(farbwort(f)) : ''}</span><span class="geschlagen-ort" data-wer="${f}"></span></div>`;
+      const uhr = `<div class="uhr zahl" data-farbe="${f}"${tempo ? '' : ' hidden'}>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
+      el.innerHTML = lage === 'oben' ? `${av}<div class="info">${kopf}${unter}</div>${uhr}` : `${av}${kopf}${unter}${uhr}`;
+    }
+    zeichneGeschlagen();
+  }
+  // R8 (L6): Zuege wie in der Bot-Partie: quer die Zugliste im Kasten (Nummer, Weiss, Schwarz), hoch der Zugstreifen
+  // (css/partie.css .zugliste und .zugleiste); der letzte Zug ist hervorgehoben
+  function zeichneZuege() {
+    const zelle = (i) => (i < z.san.length ? `<span class="z${i === z.san.length - 1 ? ' aktuell' : ''}">${esc(sanText(z.san[i]))}</span>` : '<span class="z leer"></span>');
+    let liste = '', leiste = '';
+    for (let i = 0; i < z.san.length; i += 2) {
+      liste += `<span class="nr">${i / 2 + 1}.</span>${zelle(i)}${zelle(i + 1)}`;
+      leiste += `<span class="nr">${i / 2 + 1}.</span>${zelle(i)}${i + 1 < z.san.length ? zelle(i + 1) : ''}`;
+    }
+    const leer = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
+    const listeEl = s.querySelector('.zz-zuege .zugliste'), leisteEl = s.querySelector('.zz-zuege .zugleiste');
+    listeEl.innerHTML = liste || leer; listeEl.scrollTop = listeEl.scrollHeight;
+    leisteEl.innerHTML = leiste || leer; leisteEl.scrollLeft = leisteEl.scrollWidth;
+  }
+  // geschlagene Figuren je Seite und Materialvorsprung "+n" (wie zeichneGeschlagen in js/ui/partie.js und js/ui/online.js)
+  function zeichneGeschlagen() {
+    const von = { w: [], b: [] };
+    for (const m of chess.history({ verbose: true })) if (m.captured) von[m.color].push(m.captured);
+    const bilanz = materialBilanz(chess.fen());
+    for (const ort of s.querySelectorAll('.geschlagen-ort')) {
+      const f = ort.dataset.wer;
+      const plus = bilanz * (f === 'w' ? 1 : -1);
+      const liste = von[f].sort((a, b) => WERT[b] - WERT[a]);
+      let vor = null;
+      const imgs = liste.map((x) => { const neu = vor !== null && vor !== x; vor = x;
+        return `<img${neu ? ' class="neu-gruppe"' : ''} src="${new URL(`assets/pieces/${andere(f)}${x.toUpperCase()}.svg`, WURZEL).href}" alt="" decoding="sync">`; }).join('');
+      ort.innerHTML = !liste.length && plus <= 0 ? '<span class="geschlagen leer"></span>'
+        : `<span class="geschlagen">${imgs}${plus > 0 ? `<span class="plus zahl">+${plus}</span>` : ''}</span>`;
     }
   }
   function tick() {
@@ -191,6 +258,7 @@ function partie(root, quelle, app, fortgesetzt) {
       const f = el.dataset.farbe, ms = wert(f);
       el.querySelector('.uhr-zeit').textContent = uhrText(ms);
       el.classList.toggle('laeuft', !!tempo && chess.turn() === f);
+      el.classList.toggle('am-zug', chess.turn() === f); // dunkel wie in der Bot-Partie, auch ohne laufende Uhr
       el.classList.toggle('warn', !!tempo && ms < 20000);
       el.setAttribute('aria-label', `${name(f)}: ${uhrText(ms)}`);
       // einmal je Seite, wenn ihre laufende Uhr unter 20 s faellt
@@ -213,10 +281,11 @@ function partie(root, quelle, app, fortgesetzt) {
     s.querySelector('.zz-status').textContent = z.phase === 'spiel' ? Z(chess.inCheck() ? 'amZugSchach' : 'amZug', { name: name(chess.turn()) }) : Z('beendet');
     const zurueckKnopf = s.querySelector('[data-zz="zugzurueck"]');
     if (zurueckKnopf) zurueckKnopf.disabled = z.phase !== 'spiel' || !z.zuege.length;
-    s.querySelector('.zz-zuege').textContent = z.san.map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanText(san)}`).join(' ');
+    zeichneZuege();
   }
   function beiZug(von, nach, umwandlung) {
     if (weg || fragt || z.phase !== 'spiel') return false;
+    intro?.ueberspringe();
     tick(); if (z.phase !== 'spiel') return false;
     const f = chess.turn(), jetzt = Date.now();
     const verbraucht = Math.max(0, jetzt - seit);
@@ -257,21 +326,75 @@ function partie(root, quelle, app, fortgesetzt) {
     sende('partie:beendet', { laufId, partieId: gespeichert.partie.id, botId: null, farbe: 'w', modus: 'zuzweit', wertet: false,
       ergebnis, grund, eigeneZuege: Math.floor(z.zuege.length / 2), hinweise: 0, zuruecknahmen: 0, liveKlassen: [], maxSerie: 0,
       neueSterne: [false, false, false], neuFreigeschaltet: null, extra: {}, datum: gespeichert.partie.datum });
-    for (const el of s.querySelectorAll('.zz-aktionen button')) el.disabled = true;
     for (const el of s.querySelectorAll('.uhr')) {
-      el.classList.remove('laeuft'); el.querySelector('.uhr-zeit').textContent = uhrText(rest[el.dataset.farbe]);
+      el.classList.remove('laeuft', 'am-zug'); el.querySelector('.uhr-zeit').textContent = uhrText(rest[el.dataset.farbe]);
     }
     s.querySelector('.zz-status').textContent = Z('beendet');
-    const el = s.querySelector('.zz-ergebnis');
-    el.innerHTML = `<h3>${gewinner ? Z('gewinnt', { name: esc(name(gewinner)) }) : t('allgemein.remis')}</h3><p>${grundText(grund)}</p>
-      <div class="zz-aktionen"><button class="knopf primaer" data-zz="analyse">${t('allgemein.analyse')}</button><button class="knopf" data-zz="revanche">${Z('revanche')}</button><button class="knopf" data-zz="fertig">${t('allgemein.fertig')}</button></div>`;
-    el.hidden = false; el.scrollIntoView({ block: 'nearest' });
+    // in der Spalte bleibt nur der Weg zurueck zum Blatt (wie "Ergebnis" in der Bot-Partie und der Lektion)
+    const aktionen = s.querySelector('.zz-spielbereich > .zz-aktionen');
+    aktionen.classList.add('nach-ende');
+    aktionen.innerHTML = zzKnopf('ergebnis', 'pokal', t('partie.knopf.ergebnis'), 'primaer');
+    baueBlatt(gewinner, grund);
+  }
+  // R9 (13.11.2026): das Ende zeigt das Ergebnisblatt der Bot-Partie (css/ergebnis.css), gebaut wie baueBlatt in
+  // js/ui/lektion.js: Schleier ueber dem ganzen Screen, Fokus in der Karte, Tab kreist im Blatt, Escape und das Auge
+  // zeigen das Brett, "Ergebnis" in der Spalte holt das Blatt zurueck. Die Karte traegt weiter .zz-ergebnis und den
+  // Titel als h3, daran messen tests/funktion-zuzweit-lernen.test.mjs und tests/gleichheit-ansichten.test.mjs.
+  const blattEl = () => s.querySelector(':scope > .ergebnis-overlay');
+  function zeigeBlatt(an) {
+    const o = blattEl();
+    if (!o || weg) return;
+    o.hidden = !an;
+    for (const e of s.children) if (e !== o) e.inert = an;
+    s.classList.toggle('mit-ergebnis', an);
+    if (an) o.querySelector('.ergebnis-karte').focus({ preventScroll: true });
+    else s.querySelector('[data-zz="ergebnis"]')?.focus({ preventScroll: true });
+  }
+  const blattKnopf = (aktion, ico, text, primaer = false) =>
+    `<button class="knopf gross${primaer ? ' primaer' : ''}" type="button" data-zz="${aktion}">${icon(ico)} ${esc(text)}</button>`;
+  function baueBlatt(gewinner, grund) {
+    const o = document.createElement('div');
+    o.className = `ergebnis-overlay zz-erg ${gewinner ? 'sieg' : 'remis'}`;
+    o.setAttribute('role', 'dialog');
+    o.setAttribute('aria-modal', 'true');
+    o.setAttribute('aria-labelledby', 'zz-erg-wort');
+    o.hidden = true;
+    // "Nochmal" mit denselben Seiten vorne, "Revanche" tauscht die Namen (gab es schon), die Analyse bleibt; der Weg
+    // zum Start steht darunter wie "Zu den Bots"
+    o.innerHTML = `<div class="ergebnis-karte zz-ergebnis" tabindex="-1">
+        <button class="icon-knopf erg-zu" type="button" aria-label="${esc(t('partie.erg.brettAnsehen'))}">${icon('auge')}</button>
+        <div class="erg-rumpf"><h3 class="erg-wort disp" id="zz-erg-wort">${esc(gewinner ? Z('gewinnt', { name: name(gewinner) }) : t('allgemein.remis'))}</h3>
+          <p class="erg-unter">${esc(grundText(grund))}</p></div>
+        <div class="erg-aktionen"><div class="erg-knoepfe">${blattKnopf('nochmal', 'nochmal', t('partie.erg.nochmal'), true)}`
+      + `${blattKnopf('revanche', 'drehen', Z('revanche'))}${blattKnopf('analyse', 'analyse', t('allgemein.analyse'))}</div>
+          <button class="erg-lobby" type="button" data-zz="fertig">${icon('haus')}<span>${esc(Z('zurueckStart'))}</span></button></div>
+      </div>`;
+    // drei Knoepfe: "Nochmal" nimmt die ganze erste Reihe, Revanche und Analyse teilen sich die zweite
+    o.querySelector('.erg-knoepfe').firstElementChild.style.gridColumn = '1 / -1';
+    o.querySelector('.erg-zu').addEventListener('click', () => zeigeBlatt(false));
+    o.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); zeigeBlatt(false); return; }
+      if (e.key !== 'Tab') return;
+      const ziele = [...o.querySelectorAll('button')].filter((x) => !x.disabled && x.getClientRects().length);
+      if (!ziele.length) return;
+      const jetzt = document.activeElement;
+      if (e.shiftKey && (jetzt === ziele[0] || !ziele.includes(jetzt))) { e.preventDefault(); ziele[ziele.length - 1].focus(); }
+      else if (!e.shiftKey && (jetzt === ziele[ziele.length - 1] || !ziele.includes(jetzt))) { e.preventDefault(); ziele[0].focus(); }
+    });
+    s.append(o);
+    // kurz warten, damit der letzte Zug auf dem Brett noch zu sehen ist (wie die Lektion)
+    setTimeout(() => { if (!weg && blattEl() === o) zeigeBlatt(true); }, bewegungsTempo() > 0 ? 650 : 0);
   }
   s.addEventListener('click', async (e) => {
     const aktion = e.target.closest('[data-zz]')?.dataset.zz;
     if (!aktion || weg) return;
-    if (aktion === 'zurueck' || aktion === 'fertig') { app.gehe('training'); return; }
+    if (aktion === 'zurueck' || aktion === 'fertig') { app.gehe(ZIEL); return; }
+    // wie die Bot-Partie: erst sichern, die Einstellungen kehren ueber den Verlauf in die laufende Partie zurueck
+    if (aktion === 'einstellungen') { if (z.phase === 'spiel') { tick(); speichere(); } app.gehe('einstellungen'); return; }
+    if (aktion === 'klang') { klangUmschalten(e.target.closest('[data-zz]')); return; }
     if (aktion === 'analyse' && gespeichert) { app.gehe('analyse', { partieId: gespeichert.partie.id }); return; }
+    if (aktion === 'ergebnis') { zeigeBlatt(true); return; }
+    if (aktion === 'nochmal' && gespeichert) { app.gehe('partie', { modus: 'zuzweit', zuzweit: namen, tempo }); return; }
     if (aktion === 'revanche' && gespeichert) {
       app.gehe('partie', { modus: 'zuzweit', zuzweit: { weiss: namen.schwarz, schwarz: namen.weiss, drehen: namen.drehen }, tempo }); return;
     }
@@ -297,16 +420,42 @@ function partie(root, quelle, app, fortgesetzt) {
     if (ok) ende(aktion === 'remis' ? null : andere(amZug), aktion === 'remis' ? 'vereinbart' : 'aufgabe');
     else zeichne(false);
   });
+  // Klang-Schalter im Kopf wie in der Bot-Partie: stumm/an, die Lautstaerke bleibt
+  function klangUmschalten(k) {
+    const an = app.einstellungen().klang === false;
+    app.setzeEinstellungen({ klang: an });
+    k.setAttribute('aria-pressed', an ? 'true' : 'false');
+    const svg = k.querySelector('svg');
+    if (svg) anim(svg, [{ transform: 'scale(.7)' }, { transform: 'none' }], { d: 520, k: 'hupf' });
+    if (an) { try { klang.spiele('schalter'); } catch (f) { /* still */ } }
+    app.meldung(Z(an ? 'klangAn' : 'klangAus'), { dauer: 1600 });
+  }
   const sichern = () => { tick(); speichere(); };
   window.addEventListener('pagehide', sichern);
   document.addEventListener('visibilitychange', sichern);
+  // alle Brett-Einstellungen wirken sofort, wie in der Bot-Partie (F-einst)
+  const klangKnopf = s.querySelector('[data-zz="klang"]');
+  const beiEinstellungen = (e) => {
+    wendeBrettEinstellungenAn(brett, e.detail, WURZEL);
+    if (e.detail) klangKnopf.setAttribute('aria-pressed', e.detail.klang !== false ? 'true' : 'false');
+  };
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
   speichere(); zeichne(false);
-  if (!pruefeEnde() && z.phase === 'spiel' && tempo) uhrTimer = setInterval(tick, 100);
+  const uhrAn = () => { if (!weg && z.phase === 'spiel' && tempo && !uhrTimer) uhrTimer = setInterval(tick, 100); };
+  // R8-IntroZuzweit (Vorbau B): vor einer neuen Partie 1 s "Weiss beginnt" ueber dem Brett (js/ui/duell.js
+  // spieleMiniIntro, Einstellung duellIntro wie in der Arena). Die Uhr startet erst danach; ein Tipp oder Zug beendet es.
+  if (!fortgesetzt && !z.zuege.length && z.phase === 'spiel') {
+    const eigen = name('w') !== farbwort('w');
+    intro = spieleMiniIntro({ ziel: s.querySelector('.zz-rahmen'), titel: Z('introTitel'), unter: eigen ? Z('introUnter', { name: name('w') }) : '',
+      bild: `<img src="${new URL('assets/pieces/wK.svg', WURZEL).href}" alt="" draggable="false">`, einstellung: einst.duellIntro || 'besondere' });
+    intro.fertig.then(() => { intro = null; if (!weg && !z.zuege.length) seit = Date.now(); uhrAn(); });
+  } else if (!pruefeEnde()) uhrAn();
   if (app.test) window.__partie = { z, brett, bereit: true, chess: () => chess, phase: () => z.phase, uhr: { rest: wert } };
   return { verlasse() {
     if (weg) return;
-    sichern(); weg = true; clearInterval(uhrTimer); drehenAnimation?.cancel();
+    sichern(); weg = true; clearInterval(uhrTimer); drehenAnimation?.cancel(); intro?.ueberspringe();
     window.removeEventListener('pagehide', sichern); document.removeEventListener('visibilitychange', sichern);
+    window.removeEventListener('schach:einstellungen', beiEinstellungen);
     brett.zerstoere();
     if (app.test && window.__partie?.z === z) delete window.__partie;
   } };

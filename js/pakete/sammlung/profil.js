@@ -24,10 +24,11 @@ import { meinName, sitzung, userId } from '../../konto.js';
 import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
 import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
-import { visitenkarte, botKarte, karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN } from '../../ui/visitenkarte.js';
+import { karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN } from '../../ui/visitenkarte.js';
 import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
-import { teileErfolge, teileErfolgsStufen, familienOrden, karteAbgleichen, spielstand, titelDaten, schulStand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
+import { teileErfolge, teileErfolgsStufen, teileLokaleStufen, familienOrden, karteAbgleichen, spielstand, titelDaten, schulStand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
+import { tatenFrei } from './taten.js';
 import { familieVonAlt, FAMILIEN } from './stufen.js';
 import './texte.js';
 import './karte-texte.js';
@@ -71,7 +72,7 @@ function rahmenBild(id) {
 // Errungenschaften der Vitrine, die (noch) frei sind; ein Platz mit einem nicht mehr freien Erfolg bleibt leer.
 // Etappe 4b: ausgestellt werden Erfolgs-Familien mit ihrer Stufe ('stufe-<familie>'); ein frueher gespeicherter
 // Einzel-Erfolg zeigt seine Familie, einer ohne Familie (z. B. Sieg mit Schwarz) bleibt wie bisher stehen.
-function vitrineTeile(erfolge = teileErfolge(), stufen = teileErfolgsStufen()) {
+function vitrineTeile(erfolge = teileErfolge(), stufen = [...teileErfolgsStufen(), ...teileLokaleStufen()]) {
   const frei = new Map(erfolge.filter((e) => e.frei).map((e) => [e.id, e]));
   const fam = new Map(stufen.filter((s) => s.frei).map((s) => [s.id, s]));
   const schon = new Set();
@@ -109,9 +110,13 @@ export function eigeneKartenDaten() {
     titel: tj ? { name: tj.name, bild: titelBild(tj, 'vk-wappen') } : null,
     orden: vitrineTeile(erfolge).filter(Boolean).map((e) => ({ name: e.name, bild: e.bild || '', stufe: e.stufe })) };
 }
-// Titel eines anderen Spielers (Id vom Server): Name und Wappen aus der festen Liste, unbekannte Ids ohne Titel
+// Titel eines anderen Spielers (Id vom Server): Name und Wappen aus der festen Liste, unbekannte Ids ohne Titel. Die
+// Sondertitel (supabase/karte-sondertitel-schema.sql: 'erfinder', 'pionier-001' bis 'pionier-100') kommen aus derselben
+// Liste wie bei der eigenen Karte, damit sie dasselbe Wappen tragen (R16 K2)
 export function titelVonId(id) {
-  const x = titelListe({ level: 1000, alle: true }).find((y) => y.id === id);
+  const pi = /^pionier-(\d{3})$/.exec(typeof id === 'string' ? id : '');
+  const x = titelListe({ level: 1000, alle: true, erfinder: id === 'erfinder', pionier: pi ? Number(pi[1]) : null })
+    .find((y) => y.id === (pi ? 'pionier' : id));
   return x ? { name: x.name, bild: titelBild(x, 'vk-wappen') } : null;
 }
 
@@ -149,11 +154,18 @@ function titelStand(erfolge = teileErfolge()) {
   let schule = null;
   try { schule = schulStand(); } catch (e) { schule = null; }
   try {
-    const neu = koennenFrei(ladePartien().filter(wertet), (id) => (botNachId(id) || {}).elo || 0, titelDaten(undefined, schule))
+    const partien = ladePartien().filter(wertet);
+    const daten = titelDaten(undefined, schule);
+    // R19 Taten-Titel (./taten.js) teilen sich die gemerkte Liste mit den Koennen-Titeln (Ids 'tat-...')
+    const neu = [...koennenFrei(partien, (id) => (botNachId(id) || {}).elo || 0, daten), ...tatenFrei(partien, daten)]
       .filter((x) => !koennen.includes(x));
     if (neu.length) { merkeErspielteTitel(neu); koennen = [...koennen, ...neu]; }
   } catch (e) { /* ohne Archiv nur die gemerkten */ }
-  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, labor: !!schule };
+  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, taten: koennen, labor: !!schule };
+}
+// R19 Familie Titeltraeger: wie viele Titel frei sind
+export function titelFreiZahl(erfolge = teileErfolge()) {
+  return titelListe(titelStand(erfolge)).filter((x) => x.frei).length;
 }
 export function titelJetzt(erfolge = teileErfolge()) {
   return aktuellerTitel({ ...titelStand(erfolge), wahl: profilWahl().titel });
@@ -162,7 +174,7 @@ export function titelTeile(erfolge = teileErfolge()) {
   const stand = titelStand(erfolge);
   const jetzt = aktuellerTitel({ ...stand, wahl: profilWahl().titel });
   const gruppe = { erfinder: S('gruppe.titelErfinder'), pionier: S('gruppe.titelErfinder'), level: S('gruppe.titelLevel'), erfolg: S('gruppe.titelErfolg'),
-    koennen: S('gruppe.titelKoennen') };
+    koennen: S('gruppe.titelKoennen'), tat: S('gruppe.titelTat') };
   return titelListe(stand).map((x) => {
     const an = !!jetzt && jetzt.id === x.id;
     return { id: 'titel-' + x.id, name: x.name, frei: x.frei, an, gruppe: gruppe[x.art],
@@ -281,7 +293,7 @@ function waehleAussehen(app) {
 
 // Etappe 4b: zur Wahl stehen die erreichten Erfolgs-Familien (mit Stufe), nie etwas Gekauftes
 function waehleOrden(app, platz) {
-  const erfolge = teileErfolgsStufen().filter((e) => e.frei);
+  const erfolge = [...teileErfolgsStufen(), ...teileLokaleStufen()].filter((e) => e.frei);
   const wahl = profilWahl();
   const jetzt = vitrineTeile()[platz];
   const inhalt = document.createElement('div');
@@ -307,26 +319,6 @@ function waehleOrden(app, platz) {
   }).catch(() => {});
 }
 
-// Banner der Karte waehlen: nur Eigenes ist waehlbar, Gesperrtes nennt seinen Weg (Gold-Erfolg, Saison)
-function waehleBanner(app) {
-  const inhalt = document.createElement('div');
-  inhalt.className = 'pr-banner-wahl-liste';
-  inhalt.innerHTML = bannerTeile().map((b) => `<button type="button" class="pr-banner-knopf" data-banner="${esc(b.id.slice(7))}" aria-pressed="${b.an}"
-    ${b.frei ? '' : 'disabled'}>${b.bild}<b>${esc(b.name)}</b><small>${esc(b.zeile)}</small></button>`).join('')
-    + `<p class="pr-hilfe">${esc(KT('banner.hinweis'))}</p>`;
-  inhalt.addEventListener('click', (ev) => {
-    const b = ev.target.closest('.pr-banner-knopf');
-    if (!b || b.disabled) return;
-    setzeProfilWahl({ banner: b.dataset.banner });
-    for (const x of inhalt.querySelectorAll('.pr-banner-knopf')) {
-      x.setAttribute('aria-pressed', String(x === b));
-      if (!x.disabled) x.querySelector('small').textContent = x === b ? KT('karte.bannerAn') : KT('karte.bannerFrei');
-    }
-  });
-  sheet({ titel: KT('karte.banner'), inhalt, klasse: 'pr-blatt', knoepfe: [{ text: S('profil.fertig'), wert: true, art: 'primaer' }], abbrechen: true })
-    .then(() => neuZeichnen(app)).catch(() => {});
-}
-
 // "Dabei seit Okt. 2026" (Flo 31.10.2026: "soll man im Profil sehen koennen, wie lange jemand dabei ist")
 export function seitText(tag = dabeiSeit()) {
   let monat = tag.slice(0, 7);
@@ -348,33 +340,33 @@ export function profilKarte({ app } = {}) {
   const krone = kronenText(eigeneKronenStufe());
   // Kundenblick 09.11.2026 (Befund 12): "Ich" zeigt wenigstens eine Spielzahl
   const partienZahl = ladePartien().filter(wertet).length;
+  // R4a (Kritik 09.11.): ganz leer zeigt die Vitrine einen schmalen Platz (waehlt Platz 1) statt drei grosser leerer Kaesten.
+  // R15 (R4-Banner A): Titel und Vitrine stehen in .pr-vitrine-ort; am Handy und iPad hoch wirkt die Huelle nicht (display:
+  // contents), am PC legt css/pakete/sammlung.css sie rechts in das Banner der Karte.
+  const leer = vitrine.every((e) => !e);
+  const plaetze = leer ? vitrine.slice(0, 1) : vitrine;
   k.innerHTML = `<div class="pr-kopf"><span class="pr-banner" aria-hidden="true" style="background-image:url('${bannerUrl(banner)}')"></span>
       <span class="pr-av">${floAvatar('w')}</span>
       <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone">${esc(krone)}</span>` : ''}</div>
         <small class="pr-seit">${esc(seitText())}${partienZahl ? ' · ' + esc(S(partienZahl === 1 ? 'profil.partieEine' : 'profil.partien', { zahl: partienZahl })) : ''}</small></div></div>
-    <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
-      <button type="button" class="knopf pr-banner-wahl">${esc(KT('karte.banner'))}</button></div>
-    <h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>
-    <div class="pr-vitrine">${vitrine.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"${e && e.stufe ? ` data-stufe="${e.stufe}"` : ''}
+    <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button></div>
+    <div class="pr-vitrine-ort"><h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>
+    <div class="pr-vitrine"${leer ? ' data-leer' : ''}>${plaetze.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"${e && e.stufe ? ` data-stufe="${e.stufe}"` : ''}
       aria-label="${esc(e ? (e.stufe ? `${e.name}, ${KT('stufe.' + e.stufe)}` : e.name) : S('profil.leer'))}">${e ? `<span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b>${e.stufe ? `<small class="pr-orden-stufe">${esc(KT('stufe.' + e.stufe))}</small>` : ''}`
       : `<span class="pr-plus" aria-hidden="true">+</span><small>${esc(S('profil.leer'))}</small>`}</button>`).join('')}</div>
-    <p class="pr-hilfe">${esc(S('profil.vitrineHilfe'))}</p>`;
+    <p class="pr-hilfe">${esc(S('profil.vitrineHilfe'))}</p></div>`;
   k.querySelector('.pr-aendern').addEventListener('click', () => waehleAussehen(app));
-  k.querySelector('.pr-banner-wahl').addEventListener('click', () => waehleBanner(app));
   for (const b of k.querySelectorAll('.pr-orden')) b.addEventListener('click', () => waehleOrden(app, Number(b.dataset.platz)));
   return k;
 }
 
 anbieten('ich:kopf', ({ app }) => profilKarte({ app }), { reihenfolge: 10, paket: PAKET });
 anbieten('duell:profil?', () => duellProfil(), { reihenfolge: 10, paket: PAKET });
-// Etappe 4b: die eigene Karte fuer Lobby und Partie; Spielerleisten nur gegen einen KI-Gegner der Liga (Bot-Leiter-Partien
-// zeigen den Bot wie bisher, Online-Partien zeichnet js/ui/online.js selbst)
+// Etappe 4b: die eigene Karte fuer Lobby und Partie. R19 online-weg (Flo 15.11.2026): keine Visitenkarten-Streifen mehr
+// in den Spielerleisten der KI-Partie (neben dem eigenen Namen doppelt, schnitt den Level-Chip ab; beim Gegner auf
+// "KI" gestaucht, das Abzeichen KI-Gegner reicht). Das Intro zeigt Titel und Banner weiter.
 anbieten('karte:eigene?', () => eigeneKartenDaten(), { reihenfolge: 10, paket: PAKET });
 anbieten('karte:fremde?', ({ daten }) => karteVomServer(daten, { orden: familienOrden, titel: titelVonId }), { reihenfolge: 10, paket: PAKET });
-anbieten('partie:spieler-leiste', ({ buehne }) => (buehne && buehne.ki ? visitenkarte(eigeneKartenDaten(), { groesse: 'streifen' }) : null),
-  { reihenfolge: 5, paket: PAKET });
-anbieten('partie:gegner-leiste', ({ buehne, bot }) => (buehne && buehne.ki ? visitenkarte(botKarte(bot), { groesse: 'streifen' }) : null),
-  { reihenfolge: 5, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'banner', name: KT('banner'), teile: bannerTeile(), hinweis: KT('banner.hinweis') }),
   { reihenfolge: 32, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'titel', name: S('titel'), teile: titelTeile(), hinweis: S('titel.hinweis') }),

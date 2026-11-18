@@ -83,6 +83,7 @@ export const DE = {
   'karte.archiv': 'Archiv · {n}',
   'karte.loesen': 'Lösen',
   'heute.text': 'Rätsel {nummer}, {zuege}',
+  'heute.woche': '{n} der letzten 7 Tage gelöst',
 };
 
 export const EN = {
@@ -152,6 +153,7 @@ export const EN = {
   'karte.archiv': 'Archive · {n}',
   'karte.loesen': 'Solve',
   'heute.text': 'Puzzle {nummer}, {zuege}',
+  'heute.woche': '{n} of the last 7 days solved',
 };
 
 registriereTexte('p-tagesraetsel', { de: DE, en: EN });

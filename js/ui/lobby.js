@@ -14,28 +14,43 @@
 // des Servers (window.__lobbyBotMs verkuerzt sie im Test) startet die Partie gegen den passenden Bot als KI-Gegner (params ki, kiRef).
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { segment } from './bauteile.js';
-import { icon } from './icons.js';
+import { icon, spielSymbol } from './icons.js';
 import { staffel, tempo, anim } from '../bewegung.js';
 import { laborFrei } from '../labor.js';
-import { ladeFortschritt } from '../storage.js';
+import { ladeFortschritt, ladeModul } from '../storage.js';
+import { sitzung } from '../konto.js';
+import { stufeInfo, kronenSpeicher, startStufeAusElo } from '../pakete/liga/kronen.js';
+import { stufenName } from '../pakete/liga/texte.js';
 import { avatarVon, floAvatar } from '../thema.js';
 import { t } from '../sprache.js';
 import { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, modusLeiste, ladeLobbyCss } from '../pakete/lobby/index.js';
 import { suche as kronenSuche, angemeldet as kronenAngemeldet, RANKED_ZEIT } from '../kronen.js';
 import { karteDerPartie } from '../karte.js';
 import { visitenkarte, eigeneKarte, fremdeKarte, botKarte, karteVomServer } from './visitenkarte.js';
-import { hoere } from '../ereignisse.js';
+import { starteKiErsatz } from './ki-ersatz.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
+import '../sprachen/online.js';
 
 const L = (k, w) => t('p-lobby.' + k, w);
+const O = (k, w) => t('online.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const ART_ICON = { blitz: 'blitz', schnell: 'play', klassisch: 'verlauf' };
+const ART_ICON = { blitz: 'blitz', schnell: 'schnell', klassisch: 'klassisch' };
 // so lange sucht die Vorschau, bevor der Gegner "gefunden" ist (ms); window.__lobbySuche verkuerzt es im Test
 const SUCHDAUER = 2600;
 // Etappe 4b: so lange stehen die Visitenkarten nach einem Treffer oder dem KI-Ersatz (ms); window.__lobbyGefundenMs im Test
 const GEFUNDEN_MS = 1800;
 const KT = (k, w) => t('p-karte.' + k, w);
+
+// Sondertitel (supabase/karte-sondertitel-schema.sql): die Sammlung kennt sie nur fuer das eigene Konto, deshalb hier
+// benannt; dieselbe Regel steht in js/ui/online.js spielerDaten (Duell-Intro), beide gleich halten
+function mitSondertitel(k, roh) {
+  if (!k || k.titel || !roh || typeof roh.titel !== 'string') return k;
+  const pionier = /^pionier-(\d{3})$/.exec(roh.titel);
+  if (roh.titel === 'erfinder') k.titel = { name: O('titel.erfinder') };
+  else if (pionier && Number(pionier[1]) >= 1 && Number(pionier[1]) <= 100) k.titel = { name: O('titel.pionier', { n: Number(pionier[1]) }) };
+  return k;
+}
 
 export function zeige(root, params, app) {
   const s = document.createElement('section');
@@ -50,6 +65,9 @@ export function zeige(root, params, app) {
   ladeLobbyCss();
   const f = ladeFortschritt();
   const wertung = schaetzeWertung(f);
+  // Rang-Wappen: der gemerkte Liga-Stand desselben Kontos (wie die Startseite), sonst die Start-Liga aus der geschaetzten Wertung
+  const gemerkt = kronenSpeicher(ladeModul('kronen'));
+  const rang = gemerkt.stand && gemerkt.konto && gemerkt.konto === sitzung()?.user?.id ? gemerkt.stand.stufe : startStufeAusElo(wertung);
   let zeit = ZEITEN.find((z) => z.id === (params && params.zeit)) || ZEITEN.find((z) => z.id === STANDARD_ZEIT);
   let gewertet = true;
   const uhren = new Set();
@@ -60,29 +78,32 @@ export function zeige(root, params, app) {
   s.innerHTML = `${hauptKopf({ unter: L('unter'), premium: true })}
     <div class="lb-rumpf">
       <div class="lb-modus-ort"></div>
-      <section class="lb-karte lb-spielen" aria-labelledby="lb-spielen-titel">
-        <span class="ueberzeile">${esc(L('spielen.ueber'))}</span>
-        <h2 id="lb-spielen-titel">${esc(L('spielen.titel'))}</h2>
-        <div class="lb-zeiten" role="radiogroup" aria-label="${esc(L('zeit.label'))}">
-          ${ARTEN.map((art) => `<div class="lb-gruppe" data-art="${art}"><span class="lb-gruppe-name">${icon(ART_ICON[art])}${esc(L('art.' + art))}</span>
-            <div class="lb-chips">${ZEITEN.filter((z) => z.art === art).map(zeitKnopf).join('')}</div></div>`).join('')}
+      <section class="lb-karte lb-spielen" data-variante="lobby-a" aria-labelledby="lb-spielen-titel">
+        <div class="lb-kopfzeile">
+          <div><span class="ueberzeile">${esc(L('spielen.ueber'))}</span><h2 id="lb-spielen-titel">${esc(L('a.titel'))}</h2></div>
+          <div class="lb-rang" role="img" aria-label="${esc(L('rang.aria', { stufe: stufenName(rang), wert: `${wertung} (${L('geschaetzt')})` }))}">
+            <img src="${esc(new URL(`../../assets/liga/${stufeInfo(rang).liga}.svg`, import.meta.url).href)}" alt="" width="44" height="53">
+            <span><b>${esc(stufenName(rang))}</b><small class="zahl">${wertung} · ${esc(L('geschaetzt'))}</small></span>
+          </div>
         </div>
         <div class="lb-wertung-ort"></div>
+        <div class="lb-arten" role="radiogroup" aria-label="${esc(L('a.arten'))}">
+          ${ARTEN.map((art) => `<button type="button" class="lb-art dr" role="radio" data-art="${art}">${spielSymbol(ART_ICON[art])}<b>${esc(L('a.art.' + art))}</b><small class="zahl"></small></button>`).join('')}
+        </div>
+        <details class="lb-aendern">
+          <summary class="dr">${esc(L('a.zeitAendern'))}</summary>
+          <div class="lb-zeiten" role="radiogroup" aria-label="${esc(L('zeit.label'))}">
+            ${ARTEN.map((art) => `<div class="lb-gruppe" data-art="${art}"><div class="lb-chips">${ZEITEN.filter((z) => z.art === art).map(zeitKnopf).join('')}</div></div>`).join('')}
+          </div>
+        </details>
         <button type="button" class="knopf primaer dr lb-suchen">${esc(L('suchen'))}${icon('vor')}</button>
-        <p class="lb-zeile"></p>
-      </section>
-      <section class="lb-karte lb-wertungen" aria-labelledby="lb-wertungen-titel">
-        <h2 id="lb-wertungen-titel">${esc(L('wertungen.titel'))}</h2>
-        <div class="lb-werte">${ARTEN.map((art) => `<div class="lb-wert" data-art="${art}">${icon(ART_ICON[art])}<span>${esc(L('art.' + art))}</span>
-          <b class="zahl">${wertung}</b><small>${esc(L('geschaetzt'))}</small></div>`).join('')}</div>
-        <p class="lb-text">${esc(L('wertungen.text'))}</p>
       </section>
       <section class="lb-mehr" aria-labelledby="lb-mehr-titel">
         <h2 id="lb-mehr-titel">${esc(L('mehr.titel'))}</h2>
         <div class="lb-mehr-liste">
-          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="online">${icon('person')}<span><b>${esc(L('freunde.titel'))}</b><small>${esc(L('freunde.text'))}</small></span>${icon('vor')}</button>
-          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="turniere" disabled>${icon('pokal')}<span><b>${esc(L('turniere.titel'))}</b><small>${esc(L('turniere.text'))}</small></span><span class="lb-bald">${esc(L('bald'))}</span></button>
-          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="duell">${icon('ziel')}<span><b>${esc(L('duell.titel'))}</b><small>${esc(L('duell.text'))}</small></span>${icon('vor')}</button>
+          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="online">${spielSymbol('freunde')}<span><b>${esc(L('freunde.titel'))}</b><small>${esc(L('freunde.text'))}</small></span>${icon('vor')}</button>
+          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="turniere" disabled>${spielSymbol('turniere')}<span><b>${esc(L('turniere.titel'))}</b><small>${esc(L('turniere.text'))}</small></span><span class="lb-bald">${esc(L('bald'))}</span></button>
+          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="duell">${spielSymbol('raetsel')}<span><b>${esc(L('duell.titel'))}</b><small>${esc(L('duell.text'))}</small></span>${icon('vor')}</button>
         </div>
       </section>
     </div>`;
@@ -90,15 +111,36 @@ export function zeige(root, params, app) {
   const leiste = modusLeiste(app, 'online');
   if (leiste) s.querySelector('.lb-modus-ort').replaceWith(leiste);
   else s.querySelector('.lb-modus-ort').remove();
-  const zeile = s.querySelector('.lb-zeile');
-  const setzeZeile = () => { zeile.textContent = L('deine.wertung', { art: L('art.' + zeit.art), wert: `${wertung} (${L('geschaetzt')})` }); };
-  setzeZeile();
+  // R19 Lobby A: drei Spielart-Knoepfe, je mit ihrer gewaehlten Zeit; "Zeit aendern" zeigt nur die Zeiten der gewaehlten Art.
+  // Gewertet gibt es nur im Blitz (RANKED_ZEIT), Schnell und Klassisch sind dann gesperrt.
+  const wahl = Object.fromEntries(ARTEN.map((a) => [a, (zeit.art === a ? zeit : ZEITEN.find((z) => z.art === a)).id]));
+  const artenEl = s.querySelector('.lb-arten');
+  const aendernEl = s.querySelector('.lb-aendern');
   const zeitenEl = s.querySelector('.lb-zeiten');
+  const setzeZeile = () => {
+    for (const b of artenEl.querySelectorAll('.lb-art')) {
+      const art = b.dataset.art;
+      const gesperrt = gewertet && art !== RANKED_ZEIT.art;
+      b.disabled = gesperrt;
+      b.setAttribute('aria-checked', String(gewertet ? art === RANKED_ZEIT.art : art === zeit.art));
+      b.querySelector('small').textContent = gesperrt ? L('a.nurFreundschaft')
+        : zeitText(gewertet ? RANKED_ZEIT : ZEITEN.find((z) => z.id === wahl[art]));
+    }
+    aendernEl.hidden = gewertet;
+    for (const g of zeitenEl.querySelectorAll('.lb-gruppe')) g.hidden = g.dataset.art !== zeit.art;
+    for (const b of zeitenEl.querySelectorAll('.lb-zeit')) b.setAttribute('aria-checked', String(b.dataset.zeit === zeit.id));
+  };
+  artenEl.addEventListener('click', (e) => {
+    const k = e.target.closest('.lb-art');
+    if (!k || k.disabled) return;
+    zeit = ZEITEN.find((z) => z.id === wahl[k.dataset.art]) || zeit;
+    setzeZeile();
+  });
   zeitenEl.addEventListener('click', (e) => {
     const k = e.target.closest('.lb-zeit');
     if (!k) return;
     zeit = ZEITEN.find((z) => z.id === k.dataset.zeit) || zeit;
-    for (const b of zeitenEl.querySelectorAll('.lb-zeit')) b.setAttribute('aria-checked', String(b === k));
+    wahl[zeit.art] = zeit.id;
     setzeZeile();
     try {
       const h = history.state;
@@ -108,7 +150,7 @@ export function zeige(root, params, app) {
   // Pfeiltasten in der Gruppe der Bedenkzeiten (Radiogruppe)
   zeitenEl.addEventListener('keydown', (e) => {
     if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
-    const alle = [...zeitenEl.querySelectorAll('.lb-zeit')];
+    const alle = [...zeitenEl.querySelectorAll('.lb-gruppe:not([hidden]) .lb-zeit')];
     const i = alle.findIndex((b) => b.dataset.zeit === zeit.id);
     const n = alle[(i + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : alle.length - 1)) % alle.length];
     e.preventDefault();
@@ -118,8 +160,8 @@ export function zeige(root, params, app) {
   const seg = segment({ name: 'lb-wertung', label: L('wertung.label'), wert: 'gewertet',
     optionen: [{ id: 'gewertet', text: L('gewertet') }, { id: 'freundschaft', text: L('freundschaft') }],
     // Ranked hat eine feste Bedenkzeit (RANKED_ZEIT, Konzept "Zwei Ligen"): die Wahl gibt es nur fuer Freundschaft
-    beiWahl: (id) => { gewertet = id === 'gewertet'; zeitenEl.hidden = gewertet; } });
-  zeitenEl.hidden = gewertet;
+    beiWahl: (id) => { gewertet = id === 'gewertet'; setzeZeile(); } });
+  setzeZeile();
   s.querySelector('.lb-wertung-ort').replaceWith(seg.el);
 
   s.querySelector('.lb-mehr').addEventListener('click', (e) => {
@@ -240,7 +282,7 @@ export function zeige(root, params, app) {
               const fremd = d.w && d.w.du ? d.s : d.w;
               const alt = el.querySelector('.lb-karte-gegner');
               if (!fremd || !alt) return;
-              const neu = visitenkarte(fremdeKarte(fremd), { groesse: 'mittel' });
+              const neu = visitenkarte(mitSondertitel(fremdeKarte(fremd), fremd), { groesse: 'mittel' });
               neu.classList.add('lb-karte-gegner');
               alt.replaceWith(neu);
             });
@@ -249,11 +291,8 @@ export function zeige(root, params, app) {
             if (!suche || suche.el !== el) return;
             // wie Online: nur mit Beleg und neuem SQL (#213) der Hinweis, dass Verlassen als Niederlage zaehlt
             const verlassen = !!kiRef && suche.server.lage().vomServer;
-            gefundenUndWeiter(el, botKarte(bot), () => {
-              // erst wenn die Partie steht: der Seitenwechsel leert die Meldungen (js/app.js zeigeScreen)
-              if (verlassen) { const ab = hoere('app:screen', (d) => { if (d.name !== 'partie') return; ab(); app.meldung(L('suche.kiVerlassen'), { dauer: 4500 }); }); }
-              app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl, ki: true, ...(kiRef ? { kiRef } : {}) });
-            });
+            // kein weg: nach "Gegner gefunden" fuehrt auch Wegnavigieren in die Partie (verlasse, der Beleg steht)
+            gefundenUndWeiter(el, botKarte(bot), () => starteKiErsatz(app, { bot, tempo: tempoWahl, kiRef, hinweis: verlassen ? L('suche.kiVerlassen') : null }));
           },
           beiFehler: () => {
             if (!suche || suche.el !== el) return;

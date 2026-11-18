@@ -31,7 +31,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8867);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const ERW = 'pakete/start/index';
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=${ERW}`;
 const NUR_NODE = process.argv.includes('--nur-node');
@@ -1178,7 +1178,7 @@ let browser = null;
 try {
   await nodeTeil();
   if (!NUR_NODE) {
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await browserTyp(ladePlaywright()).launch();
     await browserTeil(browser);

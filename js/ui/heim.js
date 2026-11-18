@@ -18,8 +18,9 @@
 // ("Läufer II") und "Platz 3 von 30" bzw. "Spiel eine Partie für deine Gruppe", Balken bis Platz 5. Erst der gemerkte
 // Stand (Modul kronen, nur fuer dasselbe Konto), dann der Server-Stand (js/kronen.js holeStand), gemerkt. Ohne Konto
 // oder ohne jeden Stand entfaellt die Zeile still.
-// DOM: section.screen.heim-screen > header.haupt-kopf, .heim-rumpf > .heim-links (.heim-gruss, .heim-buehne[data-art]),
-// .heim-rechts (.heim-naechstes?, .heim-wege > button.heim-modus[data-aktion]). Optik: css/heim.css, nur Tokens.
+// DOM: section.screen.heim-screen > header.haupt-kopf, .heim-rumpf > .heim-links (.heim-gruss, .heim-buehne[data-art],
+// .heim-leiter? ohne Partie), .heim-rechts (.heim-naechstes?, .heim-wege > button.heim-modus[data-aktion]). Optik:
+// css/heim.css, nur Tokens.
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
 import { Brett } from '../board.js';
@@ -27,10 +28,11 @@ import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
 import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen, ladePartien } from '../storage.js';
 import { BOTS, botNachId, rufname } from '../bots.js';
+import { avatarVon } from '../thema.js';
 import { eigenerName, sitzung } from '../konto.js';
-import { holeStand, angemeldet } from '../kronen.js';
+import { holeStand, angemeldet, RANKED_ZEIT } from '../kronen.js';
 import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js';
-import { stufeInfo, kronenSpeicher, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../pakete/liga/kronen.js';
+import { stufeInfo, kronenSpeicher, zoneVon, naechsteStufe, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../pakete/liga/kronen.js';
 import * as serieStand from '../pakete/serie/stand.js';
 import { lage as serieLage } from '../pakete/serie/tag.js';
 import { tagSchluessel, tageZwischen, istSchluessel } from '../tag.js';
@@ -38,8 +40,11 @@ import { fuelle } from '../orte.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { t, zahl, registriereTexte } from '../sprache.js';
 import { stufenName } from '../pakete/liga/texte.js';
+import { KATALOG, brettSvg, produktName } from '../pakete/sammlung/shop.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
+// Art der Online-Partie ("Blitz", online.zeit.*): der Weg Online nennt sie wie die Online-Seite (Feinschliff R6, B26)
+import '../sprachen/online.js';
 
 registriereTexte('heim', {
   de: {
@@ -50,8 +55,10 @@ registriereTexte('heim', {
     'gruss.name': '{gruss}, {name}',
     'titel.partie': 'Deine Partie wartet.',
     'titel.leer': 'Bereit für die nächste Partie?',
-    serie: '{n} Tage',
-    serieTitel: '{n} Tage in Folge gespielt',
+    'serie.eins': '{n:zahl} Tag',
+    'serie.mehr': '{n:zahl} Tage',
+    'serieTitel.eins': '{n:zahl} Tag in Folge gespielt',
+    'serieTitel.mehr': '{n:zahl} Tage in Folge gespielt',
     gegen: 'gegen {name} · Bot {elo}',
     zuzweit: '{weiss} gegen {schwarz} · Zu zweit',
     weiss: 'Weiß',
@@ -78,11 +85,17 @@ registriereTexte('heim', {
     spielen: 'Spielen',
     elo: 'Elo {elo}',
     naechstes: 'Als Nächstes',
+    'shop.titel': 'Neu im Shop',
+    'shop.zum': 'Zum Shop',
+    'shop.karte': '{name} im Shop ansehen',
     'liga.platz': 'Platz {platz} von {n}',
     'liga.ohneGruppe': 'Spiel eine Partie für deine Gruppe',
     'liga.label': '{stufe}, {zeile}, {kronen} Kronen diese Woche',
+    'liga.abstand': '{n} Kronen hinter Platz {platz}',
+    'liga.abstandKurz': 'hinter Platz {platz}',
+    'liga.aufstieg': 'Aufstiegsplatz',
     'online.titel': 'Online',
-    'online.text': 'Schnellpartie',
+    'online.text': '{art} {zeit}',
     'raetsel.titel': 'Lernen',
     'raetsel.text': 'Rätsel und Meisterschule',
     'zuzweit.titel': 'Zu zweit',
@@ -103,8 +116,10 @@ registriereTexte('heim', {
     'gruss.name': '{gruss}, {name}',
     'titel.partie': 'Your game is waiting.',
     'titel.leer': 'Ready for the next game?',
-    serie: '{n} days',
-    serieTitel: '{n} days in a row',
+    'serie.eins': '{n:zahl} day',
+    'serie.mehr': '{n:zahl} days',
+    'serieTitel.eins': '{n:zahl} day in a row',
+    'serieTitel.mehr': '{n:zahl} days in a row',
     gegen: 'vs {name} · Bot {elo}',
     zuzweit: '{weiss} vs {schwarz} · Two players',
     weiss: 'White',
@@ -131,11 +146,17 @@ registriereTexte('heim', {
     spielen: 'Play',
     elo: 'Elo {elo}',
     naechstes: 'Up next',
+    'shop.titel': 'New in the shop',
+    'shop.zum': 'Go to shop',
+    'shop.karte': 'View {name} in the shop',
     'liga.platz': 'Place {platz} of {n}',
     'liga.ohneGruppe': 'Play a game to join your group',
     'liga.label': '{stufe}, {zeile}, {kronen} crowns this week',
+    'liga.abstand': '{n} crowns behind place {platz}',
+    'liga.abstandKurz': 'behind place {platz}',
+    'liga.aufstieg': 'Promotion spot',
     'online.titel': 'Online',
-    'online.text': 'Quick game',
+    'online.text': '{art} {zeit}',
     'raetsel.titel': 'Learn',
     'raetsel.text': 'Puzzles and master school',
     'zuzweit.titel': 'Two players',
@@ -152,6 +173,9 @@ registriereTexte('heim', {
 
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const WEGE = [['online', 'blitz'], ['raetsel', 'ziel'], ['zuzweit', 'personen']];
+// Untertitel des Wegs Online: Art und Bedenkzeit der gewerteten Partie aus RANKED_ZEIT, wie die Online-Seite sie nennt
+// ("Bedenkzeit 5 + 3 · Blitz", js/ui/online.js); vorher stand hier "Schnellpartie" (Feinschliff R6, B26)
+const wegWerte = () => ({ art: t('online.zeit.' + RANKED_ZEIT.art), zeit: RANKED_ZEIT.id.replace('+', ' + ') });
 const BEWERTUNG_TIEFE = 10;
 
 // Punkte und Stufe der laufenden Saison; jeder Fehler ergibt Holz und 0. vorhanden: es gibt einen Liga-Stand
@@ -290,7 +314,7 @@ function buehnePartie(laufend, st) {
 }
 
 function buehneGegner(bot) {
-  return `<div class="heim-portraet" style="--bot-farbe: var(--bot-${esc(bot.id)}, var(--gold))"><img src="${esc(bot.avatar)}" alt="" draggable="false"></div>
+  return `<div class="heim-portraet" style="--bot-farbe: var(--bot-${esc(bot.id)}, var(--gold))"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></div>
     <div class="heim-buehne-text">
       <small class="heim-ueber">${esc(t('heim.naechsterGegner'))}</small>
       <div class="heim-name"><h2 class="heim-gegner">${esc(bot.name)}</h2>
@@ -308,7 +332,7 @@ function leiterZeile(bot) {
       <h3 id="heim-leiter-titel">${esc(t('heim.leiter'))}</h3>
       <button class="heim-leiter-liste dr" type="button" data-aktion="heim-leiter">
         ${danach.map((b) => `<span class="heim-leiter-bot" style="--bot-farbe: var(--bot-${esc(b.id)}, var(--gold))">
-          <img src="${esc(b.avatar)}" alt="" draggable="false"><span><b>${esc(b.name)}</b><small class="zahl">${esc(zahl(b.elo))}</small></span>
+          <img src="${esc(avatarVon(b))}" alt="" draggable="false"><span><b>${esc(b.name)}</b><small class="zahl">${esc(zahl(b.elo))}</small></span>
         </span>`).join('')}
       </button>
     </section>`;
@@ -352,20 +376,57 @@ function merke(stand) {
 // Tageswerk 10, Tagesraetsel 20, Kartei 25, je nur solange etwas ansteht; die Reihenfolge ist die Prioritaet), dann
 // der Liga-Platz (Kronen der Wochen-Gruppe, Etappe B). Wie viele Zeilen sichtbar sind, entscheidet css/heim.css nach der
 // Fensterhoehe (auf dem Handy scrollt nichts). Ruhig: kein Countdown, kein roter Punkt. Ohne Zeile entfaellt der Abschnitt.
+// R19 (Flo 15.11.: "gleich und herzlos"): das Bildstueck ist das Stufen-Wappen wie in der Gruppe (assets/liga/<liga>.svg),
+// ueber dem Balken steht der Abstand zu Platz 5. Die Zahl kommt nur aus dem Server-Stand (ziel = Kronen auf Platz 5,
+// kronen = eigene); ohne Gruppe oder ohne ziel steht keine Zahl da (Leitlinie Regel 4: nur was wahr ist). "hinter" statt
+// "bis zum Aufstieg", weil ein Gleichstand mit Platz 5 nicht sicher reicht.
+function ligaAbstand(lg) {
+  // auf der obersten Stufe steigt niemand auf (zoneVon wie die Gruppe): kein "Aufstiegsplatz", kein Abstand zu Platz 5
+  if (lg.platz == null || naechsteStufe(lg.stufe) === null) return null;
+  if (zoneVon(lg.platz, { n: lg.n, stufe: lg.stufe }) === 'auf') return { kurz: `<b>${esc(t('heim.liga.aufstieg'))}</b>`, label: t('heim.liga.aufstieg') };
+  const n = lg.ziel != null ? lg.ziel - lg.kronen : 0;
+  if (!(n > 0)) return null;
+  return { kurz: `<b class="zahl">${esc(zahl(n))}</b> <small>${esc(t('heim.liga.abstandKurz', { platz: zahl(AUFSTIEG_PLAETZE) }))}</small>`,
+    label: t('heim.liga.abstand', { n: zahl(n), platz: zahl(AUFSTIEG_PLAETZE) }) };
+}
+
 function ligaZeile(lg) {
   if (!lg || lg.ohneKonto) return '';
   const stufe = stufenName(lg.stufe);
   const text = lg.platz != null ? t('heim.liga.platz', { platz: zahl(lg.platz), n: zahl(lg.n) }) : t('heim.liga.ohneGruppe');
-  const label = t('heim.liga.label', { stufe, zeile: text, kronen: zahl(lg.kronen) });
-  return `<button class="heim-zeile dr" type="button" data-aktion="heim-liga" aria-label="${esc(label)}">
-        <span class="heim-zeile-bild" aria-hidden="true">${icon('liga')}</span>
+  const abstand = ligaAbstand(lg);
+  const label = t('heim.liga.label', { stufe, zeile: text, kronen: zahl(lg.kronen) }) + (abstand ? `, ${abstand.label}` : '');
+  const wappen = new URL(`../../assets/liga/${lg.liga}.svg`, import.meta.url).href;
+  return `<button class="heim-zeile dr" type="button" data-aktion="heim-liga" data-liga="${esc(lg.liga)}" aria-label="${esc(label)}">
+        <span class="heim-zeile-bild wappen" aria-hidden="true"><img src="${esc(wappen)}" alt="" draggable="false"></span>
         <span class="heim-zeile-text"><b>${esc(stufe)}</b><span>${esc(text)}</span></span>
-        <span class="heim-zeile-balken" aria-hidden="true"><span style="width: ${Math.round(lg.anteil * 100)}%"></span></span>
+        <span class="heim-zeile-rechts" aria-hidden="true">
+          ${abstand ? `<span class="heim-zeile-fortschritt" data-art="abstand">${abstand.kurz}</span>` : ''}
+          <span class="heim-zeile-balken"><span style="width: ${Math.round(lg.anteil * 100)}%"></span></span>
+        </span>
       </button>`;
 }
 
-// Zeile fuer die Pakete (Kontext zeile() am Ort heim:naechstes): dieselbe Form wie die Liga-Zeile, rechts ein Pfeil
-function paketZeile({ symbol = '', titel = '', text = '', label = '', beiTipp, paket = '' } = {}) {
+// Fortschritt rechts in der Zeile (R19): Schritte (Bauernmarsch, Raetsel-Tage) oder ein Zaehler (faellige Fehler).
+// Nur zum Sehen, die Zahl steht im aria-label der Zeile.
+function fortschrittHtml(f) {
+  if (!f || typeof f !== 'object') return '';
+  if (f.art === 'schritte') {
+    const n = Math.max(0, Math.min(12, Math.floor(Number(f.n) || 0)));
+    const an = Math.max(0, Math.min(n, Math.floor(Number(f.an) || 0)));
+    if (!n) return '';
+    return `<span class="heim-zeile-fortschritt" data-art="schritte" aria-hidden="true">${
+      Array.from({ length: n }, (_, i) => `<i class="heim-schritt${i < an ? ' an' : ''}"></i>`).join('')}</span>`;
+  }
+  if (f.art === 'zaehler' && Number.isFinite(f.wert) && f.wert > 0) {
+    return `<span class="heim-zeile-fortschritt" data-art="zaehler" aria-hidden="true">${esc(zahl(f.wert))}</span>`;
+  }
+  return '';
+}
+
+// Zeile fuer die Pakete (Kontext zeile() am Ort heim:naechstes): dieselbe Form wie die Liga-Zeile, rechts ein Pfeil;
+// mit fortschritt ({ art: 'schritte', n, an } oder { art: 'zaehler', wert }) steht der Fortschritt davor
+function paketZeile({ symbol = '', titel = '', text = '', label = '', beiTipp, paket = '', fortschritt = null } = {}) {
   const k = document.createElement('button');
   k.type = 'button';
   k.className = 'heim-zeile dr';
@@ -373,6 +434,7 @@ function paketZeile({ symbol = '', titel = '', text = '', label = '', beiTipp, p
   if (label) k.setAttribute('aria-label', label);
   k.innerHTML = `<span class="heim-zeile-bild" aria-hidden="true">${symbol}</span>
       <span class="heim-zeile-text"><b>${esc(titel)}</b><span>${esc(text)}</span></span>
+      ${fortschrittHtml(fortschritt)}
       <span class="heim-zeile-pfeil" aria-hidden="true">${icon('vor')}</span>`;
   if (typeof beiTipp === 'function') k.addEventListener('click', (e) => { e.stopPropagation(); beiTipp(e); });
   return k;
@@ -393,30 +455,48 @@ function zeichneLiga(s, lg) {
   zeigeNaechstes(s);
 }
 
+// R19 Shopleiste A (Flo 14.11.: "Shop auf die Startseite"): die Stuecke des Katalogs mit grossem Brettbild und Namen,
+// wie der Gast sie im Shop sieht. Kein Preis, kein Stand, kein Kaufknopf; jede Karte und "Zum Shop" fuehren in den Shop.
+function shopLeiste() {
+  const karten = Object.entries(KATALOG).map(([id, a]) => {
+    const name = produktName(id);
+    return `<button class="heim-shop-karte dr" type="button" data-aktion="heim-shop" data-produkt="${esc(id)}"
+      aria-label="${esc(t('heim.shop.karte', { name }))}">${brettSvg(a, 'heim-shop-bild')}
+      <span class="heim-shop-text"><small><span class="heim-shop-neu">${esc(t('heim.shop.titel'))} · </span>${esc(t('p-sammlung.shop.gastUeber'))}</small><b>${esc(name)}</b></span></button>`;
+  }).join('');
+  return `<section class="heim-shop" data-variante="shopleiste-a" aria-labelledby="heim-shop-titel">
+    <div class="heim-shop-kopf"><h3 id="heim-shop-titel">${esc(t('heim.shop.titel'))}</h3>
+      <button class="heim-shop-zum" type="button" data-aktion="heim-shop">${esc(t('heim.shop.zum'))}${icon('pfeil')}</button></div>
+    <div class="heim-shop-karten" data-anzahl="${Object.keys(KATALOG).length}">${karten}</div>
+  </section>`;
+}
+
 export function zeigeHeim(app, { jetzt = new Date() } = {}) {
   const laufend = ladeLaufendePartie();
   const st = laufend ? stellung(laufend) : null;
   const partie = !!(laufend && st);
   const bot = partie ? null : naechsterGegner();
   const tage = serieTage(jetzt);
-  const chips = tage > 0
-    ? `<span class="chip zahl heim-serie" title="${esc(t('heim.serieTitel', { n: zahl(tage) }))}"><i class="heim-punkt" aria-hidden="true"></i>${esc(t('heim.serie', { n: zahl(tage) }))}</span>`
-    : '';
+  // der Serien-Chip steht im Kopf; auf kurzen Handys zeigt css/heim.css stattdessen den zweiten neben dem Gruss (LG2 A)
+  const serieChip = (extra = '') => (tage > 0
+    ? `<span class="chip zahl heim-serie${extra}" title="${esc(t('heim.serieTitel', { n: tage }))}"><i class="heim-punkt" aria-hidden="true"></i>${esc(t('heim.serie', { n: tage }))}</span>`
+    : '');
+  const chips = serieChip();
   const s = document.createElement('section');
   s.className = 'screen heim-screen';
   s.setAttribute('aria-label', t('heim.aria'));
   s.innerHTML = `${hauptKopf({ titelElement: 'div', premium: true, klang: false, chips })}
     <div class="heim-rumpf">
       <div class="heim-links">
-        <div class="heim-gruss"><small>${esc(gruss(jetzt))}</small><h1>${esc(t(partie ? 'heim.titel.partie' : 'heim.titel.leer'))}</h1></div>
+        <div class="heim-gruss"><small>${esc(gruss(jetzt))}</small>${serieChip(' heim-serie-gruss')}<h1>${esc(t(partie ? 'heim.titel.partie' : 'heim.titel.leer'))}</h1></div>
         <div class="heim-buehne" data-art="${partie ? 'partie' : 'gegner'}">${partie ? buehnePartie(laufend, st) : buehneGegner(bot)}</div>
+        ${partie ? '' : leiterZeile(bot)}
       </div>
       <div class="heim-rechts">
-        ${partie ? '' : leiterZeile(bot)}
         <div class="heim-wege">
           ${WEGE.map(([id, ic]) => `<button class="heim-modus dr" type="button" data-aktion="heim-${id}" data-weg="${id}">
             <span class="heim-symbol" aria-hidden="true">${icon(ic)}</span>
-            <span class="heim-text"><b>${esc(t('heim.' + id + '.titel'))}</b><span>${esc(t('heim.' + id + '.text'))}</span></span>
+            <span class="heim-text"><b>${esc(t('heim.' + id + '.titel'))}</b><span>${esc(t('heim.' + id + '.text', wegWerte()))}</span></span>
           </button>`).join('')}
         </div>
         <section class="heim-naechstes" aria-labelledby="heim-naechstes-titel" hidden>
@@ -424,6 +504,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
           <div class="heim-liste"></div>
         </section>
       </div>
+      ${shopLeiste()}
     </div>`;
   s._orte = fuelle('heim:naechstes', s.querySelector('.heim-liste'), { app, tag: tagSchluessel(jetzt), zeile: paketZeile });
   zeichneLiga(s, ersteLage());
@@ -452,6 +533,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
     else if (a === 'heim-online') app.gehe('online');
     else if (a === 'heim-raetsel') app.gehe('training');
     else if (a === 'heim-zuzweit') app.gehe('partie', { modus: 'zuzweit' });
+    else if (a === 'heim-shop') app.gehe('ich', { bereich: 'shop' });
   });
   if (partie) {
     // dasselbe Brett wie in der Partie (Figurensatz, Brettfarben, Koordinaten aus den Einstellungen), nur zum Ansehen:

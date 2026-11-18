@@ -8,15 +8,15 @@
 /* ---------- Umschalter Welten | Online ---------- */
 .arena .ort-arena-modus { display: flex; justify-content: center; padding: 6px var(--rand) 10px; }
 .arena .ort-arena-modus[hidden] { display: none; }
-.lb-modus { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: min(100%, 360px); height: 44px; padding: 3px;
+.lb-modus { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: min(100%, 360px); height: calc(var(--tipp) + 6px); padding: 3px;
   border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s1), var(--kante); flex: none; }
 .lb-modus-pille { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: var(--r-pille); background: var(--tinte);
   transition: transform var(--d-s, .2s) var(--sanft, ease); }
 .lb-modus[data-aktiv="online"] .lb-modus-pille { transform: translateX(100%); }
-.lb-modus-knopf { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px;
+.lb-modus-knopf { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--tipp);
   border: 0; border-radius: var(--r-pille); background: none; color: var(--text-2); font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
 .lb-modus-knopf[aria-pressed="true"] { color: var(--auf-tinte); }
-.lb-labor { display: inline-block; padding: 1px 7px; border-radius: var(--r-pille); font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+.lb-labor { display: inline-block; padding: 1px 7px; border-radius: var(--r-pille); font-size: 12px; font-weight: 800; letter-spacing: .04em;
   color: #F5C451; background: #1C1B19; }
 .lb-modus-knopf[aria-pressed="true"] .lb-labor { box-shadow: 0 0 0 1px #F5C451; }
 
@@ -51,6 +51,50 @@
 .lb-suchen { width: 100%; min-height: 56px; justify-content: space-between; font-size: 18px; padding: 0 20px; }
 .lb-zeile { margin: -4px 0 0; color: var(--text-2); font-size: 13.5px; font-weight: 650; text-align: center; }
 
+/* R19 Lobby A: Kopfzeile mit Rang-Wappen, drei Spielart-Knoepfe, "Zeit aendern" */
+.lb-kopfzeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lb-kopfzeile .ueberzeile { display: block; }
+.lb-spielen .lb-kopfzeile .ueberzeile + h2 { margin-top: 2px; font-size: 26px; }
+.lb-rang { display: flex; align-items: center; gap: 10px; flex: none; }
+.lb-rang img { width: 44px; height: 53px; display: block; }
+.lb-rang > span { display: flex; flex-direction: column; gap: 1px; }
+.lb-rang b { font-size: 15px; font-weight: 800; }
+.lb-rang small { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.lb-arten { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lb-art { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 96px; padding: 10px 6px;
+  border: 0; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text); font: inherit; cursor: pointer;
+  transition: transform var(--d-s, .2s) var(--sanft, ease), background-color var(--d-s, .2s) var(--sanft, ease); }
+.lb-art .ico { width: 24px; height: 24px; color: var(--akzent); }
+.lb-art > .sy { width: 44px; height: 44px; }
+.lb-art b { font-size: 16px; font-weight: 800; }
+.lb-art small { font-size: 14px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.lb-art:active { transform: scale(.97); }
+/* R19 Lobby-Farbe: jede Spielart traegt ihre Farbe (css/bauteile.css --sp-*) als Verlauf und Rand; gewaehlt ein doppelter
+   Ring (innen der dunkle Rand fuer hellen Grund, aussen die Mitte fuer dunklen), so traegt die Wahl in beiden Modi 3:1 */
+.lb-art[data-art="blitz"] { --sp: var(--sp-blitz); --sp-rand: var(--sp-blitz-rand); }
+.lb-art[data-art="schnell"] { --sp: var(--sp-schnell); --sp-rand: var(--sp-schnell-rand); }
+.lb-art[data-art="klassisch"] { --sp: var(--sp-klassisch); --sp-rand: var(--sp-klassisch-rand); }
+.lb-modus-karte[data-ziel="online"] { --sp: var(--sp-freunde); --sp-rand: var(--sp-freunde-rand); }
+.lb-modus-karte[data-ziel="turniere"] { --sp: var(--sp-turniere); --sp-rand: var(--sp-turniere-rand); }
+.lb-modus-karte[data-ziel="duell"] { --sp: var(--sp-raetsel); --sp-rand: var(--sp-raetsel-rand); }
+.lb-art[data-art], .lb-modus-karte[data-ziel] {
+  background: linear-gradient(155deg, color-mix(in srgb, var(--sp) 20%, var(--flaeche-2)), var(--flaeche-2) 72%);
+  box-shadow: var(--kante), inset 0 0 0 1.5px color-mix(in srgb, var(--sp) 38%, transparent); }
+.lb-art[aria-checked="true"] { background: linear-gradient(155deg, color-mix(in srgb, var(--sp) 34%, var(--flaeche)), color-mix(in srgb, var(--sp) 12%, var(--flaeche)));
+  color: var(--text); box-shadow: var(--s1), inset 0 0 0 2px var(--sp-rand), 0 0 0 2px var(--sp); }
+.lb-art[aria-checked="true"] small { color: var(--text); }
+.lb-art:disabled { cursor: default; }
+.lb-art:disabled b, .lb-art:disabled .ico { color: var(--text-3); }
+.lb-aendern[hidden], .lb-gruppe[hidden] { display: none; }
+.lb-aendern > summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; list-style: none; cursor: pointer;
+  color: var(--akzent-text); font-weight: 750; font-size: 14.5px; }
+.lb-aendern > summary::-webkit-details-marker { display: none; }
+.lb-aendern > summary::after { content: ''; width: 7px; height: 7px; margin-left: 8px; border: solid currentColor; border-width: 0 2px 2px 0;
+  transform: translateY(-2px) rotate(45deg); transition: transform var(--d-s, .2s) var(--sanft, ease); }
+.lb-aendern[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+.lb-aendern .lb-gruppe { grid-template-columns: minmax(0, 1fr); }
+.lb-aendern .lb-zeiten { padding-top: 4px; }
+
 /* Wertungen */
 .lb-werte { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .lb-wert { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border-radius: var(--r-m); background: var(--flaeche-2);
@@ -63,10 +107,11 @@
 /* Mehr Spielarten */
 .lb-mehr { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .lb-mehr-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 10px; }
-.lb-modus-karte { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 76px; padding: 12px 16px;
+.lb-modus-karte { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 76px; padding: 12px 16px;
   font: inherit; text-align: left; cursor: pointer; flex-direction: row; }
 .lb-modus-karte > .ico { width: 26px; height: 26px; color: var(--akzent); }
 .lb-modus-karte > .ico:last-child { width: 18px; height: 18px; color: var(--text-3); }
+.lb-modus-karte > .sy { width: 46px; height: 46px; }
 .lb-modus-karte > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .lb-modus-karte b { font-weight: 800; font-size: 16px; }
 .lb-modus-karte small { color: var(--text-2); font-size: 13px; line-height: 1.35; }
@@ -79,6 +124,9 @@
   .lobby .lb-rumpf { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 18px; }
   .lobby .lb-rumpf > .lb-modus, .lobby .lb-rumpf > .lb-mehr { grid-column: 1 / -1; }
   .lobby .lb-spielen { grid-row: span 2; align-self: start; }
+  /* Lobby A: ohne den Kasten "Deine Wertungen" bleibt eine Spalte; die Karte steht mittig */
+  .lobby .lb-rumpf:has(> .lb-spielen[data-variante="lobby-a"]) { grid-template-columns: minmax(0, 1fr); }
+  .lobby .lb-spielen[data-variante="lobby-a"] { grid-row: auto; justify-self: center; width: min(100%, 680px); }
 }
 /* Handy: Gruppe ueber den Zeiten, dichter */
 @media (max-width: 520px) {
@@ -110,7 +158,7 @@
 .lb-ich > svg, .lb-ich > img, .lb-gegner > img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .lb-gegner { opacity: 0; }
 .lb-vs { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(.6); opacity: 0; font-weight: 900; font-size: 15px;
-  letter-spacing: .06em; color: var(--akzent); transition: opacity .3s var(--sanft, ease) .2s, transform .3s var(--sanft, ease) .2s; }
+  letter-spacing: .06em; color: var(--akzent-text); transition: opacity .3s var(--sanft, ease) .2s, transform .3s var(--sanft, ease) .2s; }
 .lb-suche[data-phase="gefunden"] .lb-vs { opacity: 1; transform: translate(-50%, -50%); }
 .lb-suche[data-phase="gefunden"] .lb-radar > i { animation: none; opacity: 0; }
 .lb-suche[data-phase="gefunden"] .lb-ich { transform: translateX(-54px); }

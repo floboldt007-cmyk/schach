@@ -13,7 +13,13 @@
 //       eine Vitrine, haelt die Vollfassung bis HALTE_VITRINE (4,3 s) statt HALTE_BIS, Titel und Errungenschaften kommen
 //       nacheinander, ein Balken zeigt die Zeit bis zum Start, harte Grenze DAUER_VITRINE (5,3 s). Tippen startet sofort.
 //       Seit 01.11.2026 (Flo, Handy: "zu kurz") haelt sie bis 4,3 s statt 3,3 s.
-//   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
+//   spieleDuell({ bot, farbe, anlass, von, art?, einstellung?, bildschirm?, mitFarbe?, mitVitrine? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
+//       bildschirm: Name des Screens, in dem die Portraets landen (Vorgabe 'partie'; Online nutzt 'online' und ruft das
+//       Intro, wenn die Partie schon dasteht). Ziel ist .screen.<bildschirm>, wenn er .spieler-Leisten mit .av hat
+//       (Raetsel-Duell), sonst .screen.partie. mitFarbe false laesst Weiss/Schwarz aus den Unterzeilen weg (Raetsel-Duell:
+//       die Farbe wechselt mit jedem Raetsel), mitVitrine false laesst die Vitrine weg (nie die lange Fassung, das Intro
+//       muss in den Vorlauf des Raetsel-Duells passen). bot.liga (Text) ersetzt die Stufe im Chip, ohne
+//       Zahl in bot.elo entfaellt "Elo" in der Unterzeile (Gegner aus Fleisch und Blut, js/ui/online.js).
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
 //       duellArt(). bereit erfuellt sich, sobald die Buehne den ganzen Schirm deckt (ihre Animation ist fertig,
@@ -26,6 +32,8 @@
 //       Tempo: die Vollfassung laeuft hoechstens im normalen Tempo (Bewegung "langsam" dehnt sie nicht, sie muss in
 //       1,4 s passen), "schnell" verkuerzt sie.
 //   aktivesDuell() -> { fertig } | null     laeuft gerade ein Intro (fuer die Partie: Uhr und Bot-Zug erst danach)
+//   spieleMiniIntro({ ziel, titel, unter, bild, einstellung }) -> { fertig, ueberspringe(), art }   Mini-Intro vor Zu zweit
+//       (R8-IntroZuzweit B): eine Pille ueber dem Brett, 1 s, gleicher Vertrag; Beschreibung bei der Funktion
 //
 // Vertrag mit der Partie (U7 baut die andere Seite): solange das Intro laeuft, steht
 // document.documentElement.dataset.duell = 'laeuft'; beim Ende (auch beim Ueberspringen) wird das Attribut entfernt
@@ -92,6 +100,18 @@ export function aktivesDuell() {
   return aktiv ? { fertig: aktiv.fertig } : null;
 }
 
+// Titel (mit Wappen, wenn es eines aus js/titel-kunst.js ist) und bis zu drei Errungenschaften unter einem Namen
+function vitrineHtml(titel, titelBild, orden) {
+  const wappen = typeof titelBild === 'string' && titelBild.startsWith('<svg class="titel-wappen') ? titelBild : '';
+  return `${titel ? `<div class="duell-titel">${wappen}<span>${esc(titel)}</span></div>` : ''}${orden.length
+    ? `<div class="duell-vitrine">${orden.map((o) => {
+      // Abzeichen nur, wenn es eines aus js/sammlung-kunst.js ist (eigenes SVG); sonst nur der Name wie bisher
+      const bild = typeof o.bild === 'string' && o.bild.startsWith('<svg viewBox="0 0 120 120" class="sk-erfolg"') ? o.bild : '';
+      const selten = ['frei', 'selten', 'episch', 'legende'].includes(o.seltenheit) ? o.seltenheit : 'frei';
+      return `<span class="duell-orden${bild ? ' mit-bild' : ''}" data-seltenheit="${selten}">${bild}<span>${esc(o.name)}</span></span>`;
+    }).join('')}</div>` : ''}`;
+}
+
 function protokolliere(eintrag) {
   if (!TEST || typeof window === 'undefined') return;
   (window.__duellProtokoll = window.__duellProtokoll || []).push(eintrag);
@@ -151,15 +171,23 @@ function flieger(html, von, nach, { d = 440, v = 0, k = 'weich', rund = true } =
   return { el, a };
 }
 
-export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art = null, einstellung = 'besondere' } = {}) {
+export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art = null, einstellung = 'besondere', bildschirm = 'partie', mitFarbe = true, mitVitrine = true } = {}) {
   const f = farbe === 'b' ? 'b' : 'w';
   // Vitrine (Flo, 30.10.2026: "beim Matchbeginn kurz flexen"): Titel und bis zu drei Errungenschaften unter Flos Namen,
   // vom Ort duell:profil? (Paket sammlung); ohne Anbieter wie bisher. Wer etwas zu zeigen hat, bekommt die Buehne.
+  // mitVitrine false (Raetsel-Duell): keine Vitrine und damit nie die lange Fassung, das Intro passt in den Vorlauf.
   let profil = null;
   const vorgegeben = ['voll', 'kurz', 'aus'].includes(art);
-  try { profil = (vorgegeben ? art === 'voll' : einstellung !== 'aus' && tempo() !== 0) && bot ? waehle('duell:profil?', {}) : null; } catch (e) { profil = null; }
+  try { profil = mitVitrine && (vorgegeben ? art === 'voll' : einstellung !== 'aus' && tempo() !== 0) && bot ? waehle('duell:profil?', {}) : null; } catch (e) { profil = null; }
   const orden = profil && Array.isArray(profil.orden) ? profil.orden.slice(0, 3) : [];
-  const hatVitrine = !!(profil && (profil.titel || orden.length));
+  // Online gegen Menschen (R15, Flo 13.11.: "Elo sieht und die Banner sieht"): bot.karte ist die Visitenkarte des
+  // Gegners (js/ui/visitenkarte.js fremdeKarte) mit Titel, Erfolgen und Banner-Bild; Bots haben keine
+  const gk = mitVitrine && bot && bot.karte && typeof bot.karte === 'object' ? bot.karte : null;
+  const gOrden = gk && Array.isArray(gk.orden) ? gk.orden.slice(0, 3) : [];
+  const gTitel = gk && gk.titel && typeof gk.titel.name === 'string' ? gk.titel : null;
+  const gBanner = gk && typeof gk.bannerBild === 'string' && /^(https?:\/\/[^\s'"()\\]+|[^\s'"():\\]+)\.svg$/.test(gk.bannerBild) ? gk.bannerBild : '';
+  // beim Gegner machen nur Erfolge die lange Fassung: fast jeder traegt einen Level-Titel, und die Uhr laeuft schon
+  const hatVitrine = !!(profil && (profil.titel || orden.length)) || gOrden.length > 0;
   const gewaehlteArt = vorgegeben ? art : duellArt({ einstellung, anlass, reduziert: tempo() === 0, vitrine: hatVitrine });
   const t0 = jetzt();
   // Zeitfaktor: hoechstens normales Tempo (das Intro muss in DAUER_MAX passen). A() bewegt mit diesem Faktor statt mit
@@ -216,36 +244,37 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   ueber.setAttribute('role', voll ? 'dialog' : 'presentation');
   ueber.tabIndex = -1;
   if (voll) ueber.setAttribute('aria-label', t('arena.duell.aria', { name: bot.name }));
-  const stufeText = bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
+  // Online (Ranked gegen Menschen): statt der Bot-Stufe die Liga des Gegners als Text (bot.liga)
+  const stufeText = typeof bot.liga === 'string' && bot.liga ? bot.liga : bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
   const anlassText = ANLASS_TEXT[anlass] ? t(ANLASS_TEXT[anlass]) : '';
   // lange Fassung nur in der Vollfassung mit Vitrine (Zeiten absolut, die Haltephase dehnt sich nicht mit dem Tempo)
   const lang = voll && hatVitrine;
   const halteBis = lang ? HALTE_VITRINE : HALTE_BIS;
   const dauerMax = lang ? DAUER_VITRINE : DAUER_MAX;
   if (lang) { ueber.classList.add('lang'); html.dataset.duellMax = String(dauerMax); }
-  const vitrine = voll && profil ? `${profil.titel ? `<div class="duell-titel">${typeof profil.titelBild === 'string' && profil.titelBild.startsWith('<svg class="titel-wappen') ? profil.titelBild : ''}<span>${esc(profil.titel)}</span></div>` : ''}${orden.length
-    ? `<div class="duell-vitrine">${orden.map((o) => {
-      // Abzeichen nur, wenn es eines aus js/sammlung-kunst.js ist (eigenes SVG); sonst nur der Name wie bisher
-      const bild = typeof o.bild === 'string' && o.bild.startsWith('<svg viewBox="0 0 120 120" class="sk-erfolg"') ? o.bild : '';
-      const selten = ['frei', 'selten', 'episch', 'legende'].includes(o.seltenheit) ? o.seltenheit : 'frei';
-      return `<span class="duell-orden${bild ? ' mit-bild' : ''}" data-seltenheit="${selten}">${bild}<span>${esc(o.name)}</span></span>`;
-    }).join('')}</div>` : ''}` : '';
+  const vitrine = voll && profil ? vitrineHtml(profil.titel, profil.titelBild, orden) : '';
+  const gVitrine = voll && gk ? vitrineHtml(gTitel && gTitel.name, gTitel && gTitel.bild, gOrden) : '';
+  const gBannerHtml = voll && gBanner ? `<span class="duell-banner" aria-hidden="true" style="background-image:url('${esc(gBanner)}')"></span>` : '';
+  // Unterzeile des Gegners: Elo (nur mit Zahl) und seine Farbe; ohne Farbe (mitFarbe false, Raetsel-Duell: die Farbe
+  // wechselt mit jedem Raetsel) nur die Elo, ohne beides entfaellt die Zeile
+  const botUnter = [Number.isFinite(Number(bot.elo)) && bot.elo !== null && bot.elo !== '' ? `Elo ${esc(bot.elo)}` : '',
+    mitFarbe ? esc(t(FARBE_NAME[f === 'w' ? 'b' : 'w'])) : ''].filter(Boolean).join(' · ');
   if (voll) {
     ueber.innerHTML = `
       <div class="duell-buehne"></div>
       <div class="duell-flo"><i></i><span class="naht"></span></div>
       <div class="duell-inhalt">
         <div class="duell-paar">
-          <div class="duell-seite bot">
+          <div class="duell-seite bot${gVitrine ? ' mit-karte' : ''}">
             <div class="duell-av" data-rolle="bot"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></div>
             <div class="duell-name">${esc(bot.name)}</div>
-            <div class="duell-unter">Elo ${esc(bot.elo)} · ${esc(t(FARBE_NAME[f === 'w' ? 'b' : 'w']))}</div>
+            ${botUnter ? `<div class="duell-unter">${botUnter}</div>` : ''}${gBannerHtml}${gVitrine}
           </div>
           <div class="duell-gegen">${esc(t('arena.duell.gegen'))}</div>
           <div class="duell-seite flo">
             <div class="duell-av" data-rolle="flo">${floAvatar(f)}</div>
             <div class="duell-name">${esc(meinName())}</div>
-            <div class="duell-unter">${esc(t(FARBE_NAME[f]))}</div>${vitrine}
+            ${mitFarbe ? `<div class="duell-unter">${esc(t(FARBE_NAME[f]))}</div>` : ''}${vitrine}
           </div>
         </div>
       </div>
@@ -311,7 +340,9 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     if (zuEnde || phase2Lief) return;
     phase2Lief = true;
     ueber.classList.add('phase-2', 'durch');
-    const partie = document.querySelector('.screen.partie');
+    // Ziel-Screen: der eigene (bildschirm, z. B. 'raetsel-duell' mit .spieler-Leisten), sonst die Partie (Bot und Online)
+    const partie = [/^[a-z-]+$/.test(bildschirm) ? `.screen.${bildschirm}` : null, '.screen.partie'].filter(Boolean)
+      .map((q) => document.querySelector(q)).find((el) => el && el.querySelector('.spieler.gegner .av, .spieler.ich .av')) || null;
     const zielBot = partie ? partie.querySelector('.spieler.gegner .av') : null;
     const zielFlo = partie ? partie.querySelector('.spieler.ich .av') : null;
     const ziele = [zielBot, zielFlo].filter((z) => z && imBild(rect(z)));
@@ -364,7 +395,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const startScreen = html.dataset.screen || null;
   const beiPartie = (d) => {
     if (!d || zuEnde) return;
-    if (d.name !== 'partie') {
+    if (d.name !== bildschirm) {
       if (partieAb != null || d.name !== startScreen) ueberspringe();
       return;
     }
@@ -381,6 +412,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     });
   };
   try { abPartie = hoere('app:screen', beiPartie); } catch (e) { abPartie = null; }
+  // Online ruft das Intro erst, wenn die Partie schon dasteht (bildschirm 'online'): dann gilt sie als angekommen
+  if (bildschirm !== 'partie' && startScreen === bildschirm) beiPartie({ name: bildschirm });
   // haerteste Grenze: hoechstens dauerMax ms (DAUER_MAX, lange Fassung DAUER_VITRINE), auch wenn die Partie nicht kommt
   spaeter(() => { if (!zuEnde) ende(); }, dauerMax);
 
@@ -421,8 +454,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   // Titel und Vitrine kommen kurz nach Flos Namen; in der langen Fassung die Errungenschaften nacheinander, gut lesbar
   if (!lang) ueber.querySelectorAll('.duell-titel, .duell-vitrine').forEach((t) => A(t, [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { d: 400, v: 360, k: 'weich' }));
   else {
-    const titelEl = ueber.querySelector('.duell-titel');
-    if (titelEl) A(titelEl, [{ opacity: 0, transform: 'translateY(10px) scale(.92)' }, { opacity: 1, transform: 'none' }], { d: 420, v: 520, k: 'hupf' });
+    // online steht auch beim Gegner ein Titel: beide bekommen ihren Auftritt
+    ueber.querySelectorAll('.duell-titel').forEach((el, i) => A(el, [{ opacity: 0, transform: 'translateY(10px) scale(.92)' }, { opacity: 1, transform: 'none' }], { d: 420, v: 520 + i * 160, k: 'hupf' }));
     ueber.querySelectorAll('.duell-orden').forEach((o, i) => anim(o, [{ opacity: 0, transform: 'translateY(12px) scale(.7)' }, { opacity: 1, transform: 'none' }],
       { d: absolut(420 * zf), v: absolut((ORDEN_AB + i * ORDEN_TAKT) * zf), k: 'hupf', fill: 'backwards' }));
     const zeit = ueber.querySelector('.duell-zeit i');
@@ -451,4 +484,57 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   spaeter(meldeBereit, HALTE_BIS * zf);
 
   return { bereit, fertig, ueberspringe, art: gewaehlteArt };
+}
+
+// Mini-Intro (R8-IntroZuzweit, Variante B, Vorbau): vor einer Partie zu zweit steht MINI_DAUER lang eine Pille ueber dem
+// kurz abgedunkelten Brett ("Weiss beginnt", darunter wer zuerst zieht). Gleicher Vertrag wie spieleDuell: solange es
+// laeuft, steht dataset.duell = 'laeuft' und aktivesDuell() liefert es; am Ende kommt duell:fertig (art 'mini'). Tippen
+// ueberspringt, der Tipp geht ans Brett durch (pointer-events none, css/duell.css). Einstellung duellIntro 'aus' oder
+// reduzierte Bewegung (Tempo 0): kein Intro, fertig ist sofort erfuellt.
+//   spieleMiniIntro({ ziel, titel, unter?, bild?, einstellung? }) -> { fertig: Promise, ueberspringe(), art: 'mini' | 'aus' }
+//       ziel: das Element, ueber dem die Pille liegt (Brett-Rahmen, position relative); bild: fertiges HTML (Figur)
+export const MINI_DAUER = 1000;
+export function spieleMiniIntro({ ziel = null, titel = '', unter = '', bild = '', einstellung = 'besondere' } = {}) {
+  if (einstellung === 'aus' || tempo() === 0 || !ziel || typeof document === 'undefined') {
+    protokolliere({ art: 'aus', mini: true, uebersprungen: false, dauer: 0 });
+    return { fertig: Promise.resolve(), ueberspringe() {}, art: 'aus' };
+  }
+  if (aktiv) aktiv.ueberspringe();
+  const t0 = jetzt();
+  const html = document.documentElement;
+  html.dataset.duell = 'laeuft';
+  const ueber = document.createElement('div');
+  ueber.className = 'duell duell-mini';
+  ueber.dataset.art = 'mini';
+  ueber.setAttribute('role', 'status');
+  ueber.innerHTML = `<div class="duell-pille">${bild ? `<span class="duell-pille-av">${bild}</span>` : ''}`
+    + `<span class="duell-pille-text"><b>${esc(titel)}</b>${unter ? `<small>${esc(unter)}</small>` : ''}</span></div>`;
+  ziel.append(ueber);
+  let fertigLoes = null;
+  const fertig = new Promise((r) => { fertigLoes = r; });
+  let zuEnde = false;
+  let uebersprungen = false;
+  let uhr = null;
+  const ende = () => {
+    if (zuEnde) return;
+    zuEnde = true;
+    clearTimeout(uhr);
+    try { document.removeEventListener('pointerdown', tipp, true); } catch (e) { /* egal */ }
+    try { ueber.remove(); } catch (e) { /* egal */ }
+    if (aktiv && aktiv.ueber === ueber) aktiv = null;
+    if (html.dataset.duell === 'laeuft' && !aktiv) { delete html.dataset.duell; delete html.dataset.duellMax; }
+    protokolliere({ art: 'mini', mini: true, uebersprungen, dauer: Math.round(jetzt() - t0) });
+    fertigLoes();
+    try { document.dispatchEvent(new CustomEvent('duell:fertig', { detail: { art: 'mini', uebersprungen } })); } catch (e) { /* egal */ }
+  };
+  const ueberspringe = () => { if (zuEnde) return; uebersprungen = true; ende(); };
+  const tipp = () => ueberspringe();
+  document.addEventListener('pointerdown', tipp, { capture: true, passive: true });
+  aktiv = { ueber, fertig, ueberspringe };
+  // nur opacity und transform; die Zeit ist absolut (anim rechnet mit dem Tempo, daher geteilt), das Intro dehnt sich nicht
+  const absolut = (x) => x / Math.max(tempo(), 0.01);
+  anim(ueber, [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { d: absolut(MINI_DAUER), k: 'linear', fill: 'forwards' });
+  anim(ueber.querySelector('.duell-pille'), [{ transform: 'scale(.92)' }, { transform: 'none' }], { d: absolut(260), k: 'hupf' });
+  uhr = setTimeout(ende, MINI_DAUER);
+  return { fertig, ueberspringe, art: 'mini' };
 }

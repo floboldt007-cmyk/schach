@@ -7,6 +7,9 @@
    ============================================================ */
 .rs-screen .rs-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; container: rs / size; }
+/* Seitentitel (z. B. "Tagesrätsel") im Kopf auch neben der Seitenleiste (dort tritt die Marke sonst zurueck,
+   css/navigation.css), wie am Handy (R6 B23, 12.11.2026) */
+html[data-reiter="seite"] .rs-screen .haupt-kopf .marke { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; }
 
 .rs-inhalt { --rs-seite: 360px; --rs-luft: 28px;
   --rs-b: min(calc(100cqh - 88px), calc(100cqw - 2 * var(--rand) - var(--rs-seite) - var(--rs-luft)), 700px);

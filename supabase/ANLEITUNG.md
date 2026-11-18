@@ -16,7 +16,7 @@ ruft die neuen Funktionen nicht auf, das schadet also nicht, aber die neue App b
 | Nr. | Was | Datei oder Ort | Prüfen (Erwartung) |
 | --- | --- | --- | --- |
 | 1 | Zeitplaner einschalten | Dashboard → **Integrations** → **Cron** → die Erweiterung `pg_cron` einschalten (ältere Dashboards: **Database** → **Extensions** → `pg_cron`) | `select extname from pg_extension where extname = 'pg_cron';` ergibt eine Zeile. Geht es im Tarif nicht: weiter, das Duell wertet dann bei der nächsten Suche aus |
-| 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300`. Mit Cron zeigt `select jobname, schedule from cron.job;` auch `liga-alte-wochen-loeschen` mit `17 3 * * *` |
+| 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300`; nach `zwei-ligen-schema.sql` (gilt live seit 11.11.2026) ergibt sie `60`. Mit Cron zeigt `select jobname, schedule from cron.job;` auch `liga-alte-wochen-loeschen` mit `17 3 * * *` |
 | 3 | Tageszähler (bleiben aus) | `zaehler-schema.sql` | `zaehler-rls-test.sql`: kein `FEHLER:`, `ROLLBACK` |
 | 4 | Visitenkarte, Erfolge, Banner | `karte-schema.sql` | `karte-rls-test.sql`: kein `FEHLER:`, der Editor meldet „Success“ |
 | 5 | Rätsel-Duell, Teil 1 | `raetsel-duell-schema.sql` | Mit Cron: `select jobname, schedule from cron.job;` zeigt jetzt zusätzlich `raetsel-duell-auswerten` mit `*/10 * * * *` (ohne Cron meldet diese Abfrage, dass es `cron.job` nicht gibt; das ist dann richtig) |
@@ -103,7 +103,8 @@ heißen.
    wird: nicht die App auf dem Home-Bildschirm (iPad, iPhone) und nicht den Browser eines anderen Geräts. Vor Testern
    mit iPad deshalb zuerst SMTP und die Code-Vorlage einrichten.
 5. **Adressen setzen:** Unter **Authentication > URL Configuration** als **Site URL** exakt
-   `https://floboldt007-cmyk.github.io/schach/` eintragen. Dieselbe exakte Adresse bei **Redirect URLs** hinzufügen.
+   `https://crownmate.de/` eintragen (die App läuft dort; floboldt007-cmyk.github.io/schach leitet per 301 dorthin um).
+   Dieselbe exakte Adresse bei **Redirect URLs** hinzufügen. Alte github.io-Einträge erst nach der Probe entfernen.
    Keine pauschale Wildcard für die Produktionsseite verwenden.
 6. **Versandgrenzen prüfen:** Unter **Authentication > Rate Limits** das Mindestintervall zwischen zwei Code-Mails
    und die OTP-Grenze kontrollieren. Erst vorsichtig testen und die Grenzen nicht unnötig erhöhen. Der
@@ -378,7 +379,7 @@ nie unter 0. Online zählen nur gewertete Partien aus der Gegnersuche (Freundes-
 nicht unter 4 Halbzügen und höchstens 3 am Tag gegen denselben Gegner. Bot-Leiter höchstens 10, KI-Gegner höchstens 20
 Ergebnisse am Tag (Europe/Berlin); ein KI-Ergebnis zählt nur mit einem eigenen Suchbeleg, frühestens 60 Sekunden nach
 der Ausgabe. **Schummel-Schutz:** Bot- und KI-Ergebnisse meldet das Gerät selbst, deshalb bringen sie zusammen
-höchstens 300 Kronen je Woche und Konto (`bot_ki_wochen_max`, KI-Rätsel-Duelle zählen mit); ab Montag ist der Deckel
+höchstens 60 Kronen je Woche und Konto (`bot_ki_wochen_max`, seit `zwei-ligen-schema.sql`, vorher 300; KI-Rätsel-Duelle zählen mit); ab Montag ist der Deckel
 wieder frei, Online-Kronen und Rätsel-Duelle gegen Menschen zählen nie dagegen. Die Start-Liga (Stufe III der Liga zur Elo, höchstens Läufer III, egal welche Elo das Gerät
 meldet) gilt einmal je Konto und nur vor der
 ersten Partie mit Kronen. Andere sehen in der Gruppe nur Benutzername und Kronen, nie eine Kennung oder E-Mail. Mit dem
@@ -524,6 +525,54 @@ Nummer hat, sieht den Titel gar nicht.
 Nummer genau einmal, höchstens 100. Ein gelöschtes Konto gibt seine Nummer nicht frei. Geht bei der Vergabe etwas
 schief, klappt die Anmeldung trotzdem (nur ohne Nummer).
 
+## Verwaltung für Flo (Stand 13.11.2026, vorbereitet, noch nicht eingespielt)
+
+In der App unter Einstellungen erscheint dann die Gruppe „Verwaltung“, aber nur für dein Konto: Konten mit E-Mail und
+letzter Anmeldung ansehen, Premium freischalten oder zurücknehmen, Käufe ansehen, Benutzername ändern, Banner vergeben
+oder wegnehmen. Jede Änderung steht im Protokoll; wird ein Konto gelöscht, gehen seine Protokollzeilen mit. Ein
+Stripe-Abo, das nicht endgültig beendet ist (auch in der Mahnphase, wenn eine Zahlung offen ist), kann die Verwaltung
+nicht ändern, das geht nur in Stripe. Taler, Kronen, Liga und Sonderstücke bleiben unberührt.
+
+1. Vorher müssen `schema.sql`, `abo-schema.sql`, `werkstatt-schema.sql`, `pionier-schema.sql` und `karte-schema.sql`
+   eingespielt sein.
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/verwaltung-schema.sql`
+   einfügen und **Run** drücken. Die Datei darf mehrfach laufen.
+3. Dein Konto eintragen (deine ID steht unter **Authentication → Users**):
+   `insert into public.verwalter (user_id) values ('<deine id>');`
+4. `supabase/daten-schema.sql` noch einmal ausführen: Ab dann zeigt die Datenauskunft jedem Konto, was die Verwaltung
+   an ihm geändert hat (Art. 15). Rückweg nur für diesen Teil: `supabase/daten-verwaltung-zurueck.sql`.
+5. `notify pgrst, 'reload schema';` ausführen.
+6. Prüfen: den Inhalt von `supabase/verwaltung-rls-test.sql` ausführen. Am Ende steht „Verwaltung-RLS-Test
+   erfolgreich“, und nichts bleibt zurück.
+
+**Was der Server sicherstellt:** Jede Verwaltungsfunktion prüft zuerst, ob das angemeldete Konto in `verwalter` steht.
+Kein Konto kann sich selbst eintragen oder die Liste lesen. Ohne Anmeldung gibt es gar keinen Aufruf.
+
+**Rückweg:** `supabase/verwaltung-zurueck.sql` (vorher die Sicherungszeilen oben in der Datei lesen). Freigeschaltetes
+Premium und geänderte Namen bleiben dabei, die Banner aus der Verwaltung und das Protokoll sind danach weg.
+
+## Benutzername: einmal in 30 Tagen ändern (Stand 15.11.2026, vorbereitet, noch nicht eingespielt)
+
+Den ersten Benutzernamen wählt jeder frei. Danach geht höchstens eine eigene Änderung je 30 Tage. Die App zeigt unter
+Einstellungen → Konto „Nächste Änderung ab <Datum>“. Wer es trotzdem versucht (etwa von einem zweiten Gerät aus), bekommt
+eine klare Meldung mit dem Datum. Die Sperre sitzt im Server, also hilft auch kein Aufruf an der App vorbei. Die
+Verwaltung und der SQL Editor bleiben frei. Damit niemand die Frist durch Löschen und neu Anlegen umgeht, kann ein
+Spieler sein Profil nicht mehr selbst löschen; „Konto löschen“ in der App löscht es weiter. Ohne diese Datei läuft die
+App wie bisher, nur ohne Sperre und ohne Hinweis.
+
+1. Vorher muss `schema.sql` eingespielt sein.
+2. Im **SQL Editor** den ganzen Inhalt von `supabase/benutzername-sperre-schema.sql` ausführen. Die Datei darf mehrfach
+   laufen.
+3. `notify pgrst, 'reload schema';` ausführen.
+4. Prüfen: den Inhalt von `supabase/benutzername-sperre-rls-test.sql` ausführen. Am Ende steht
+   „benutzername-sperre-rls-test: alles gruen“, und nichts bleibt zurück.
+
+**Sperre für ein Konto aufheben** (nur SQL Editor):
+`update public.profile set name_geaendert_am = null where user_id = '<id>';`
+
+**Rückweg:** `supabase/benutzername-sperre-zurueck.sql`. Die Namen bleiben, nur der Zeitpunkt der letzten Änderung ist
+danach weg, der Name ist wieder beliebig oft änderbar, und das eigene Profil lässt sich wieder selbst löschen.
+
 ## Google-Anmeldung einrichten
 
 Die App hat in der Konto-Gruppe den Knopf „Mit Google anmelden“. Er leitet zu Supabase
@@ -533,19 +582,19 @@ Besitzer im Supabase-Dashboard ein, **nie** in App-Dateien, Git, Screenshots ode
 
 1. **Google Cloud Console** (console.cloud.google.com) öffnen, ein Projekt anlegen oder wählen.
 2. **OAuth-Zustimmungsbildschirm** (Google Auth Platform > Branding/Zielgruppe) einrichten: App-Name `Crownmate`,
-   Support-E-Mail, Link zur Datenschutzerklärung (`https://floboldt007-cmyk.github.io/schach/datenschutz.html`, erst wenn
+   Support-E-Mail, Link zur Datenschutzerklärung (`https://crownmate.de/datenschutz.html`, erst wenn
    sie fertig geprüft ist) und zum Impressum. Nur die Standard-Bereiche `openid`, `email` und `profile` verwenden, keine
    weiteren. Zum Ausprobieren reicht der Testmodus mit eingetragenen Testnutzern; für alle Nutzer die App veröffentlichen.
 3. **Anmeldedaten > Anmeldedaten erstellen > OAuth-Client-ID**, Anwendungstyp **Webanwendung**.
-   - **Autorisierte JavaScript-Quellen:** `https://floboldt007-cmyk.github.io`
+   - **Autorisierte JavaScript-Quellen:** `https://crownmate.de`
    - **Autorisierte Weiterleitungs-URIs:** genau `https://usaamcqypmvgqmsbfecb.supabase.co/auth/v1/callback`
    Erstellen. Google zeigt Client-ID und Client-Secret.
 4. **Supabase-Dashboard > Authentication > Sign In / Providers > Google:** einschalten, Client-ID und Client-Secret dort
    einfügen, speichern. Diese beiden Werte gehören nirgendwo sonst hin. Ein versehentlich veröffentlichtes Secret sofort
    in der Google Cloud Console ersetzen und in Supabase neu eintragen.
 5. **Rückkehr-Adresse:** Unter **Authentication > URL Configuration** muss die Site URL
-   `https://floboldt007-cmyk.github.io/schach/` sein (Schritt 5 oben). Die App schickt als Rückkehr-Adresse dieselbe
-   Adresse mit `#konto`. Sicherheitshalber genau `https://floboldt007-cmyk.github.io/schach/#konto` zusätzlich unter
+   `https://crownmate.de/` sein (Schritt 5 oben). Die App schickt als Rückkehr-Adresse dieselbe
+   Adresse mit `#konto`. Sicherheitshalber genau `https://crownmate.de/#konto` zusätzlich unter
    **Redirect URLs** eintragen (keine Wildcard). Lehnt Supabase die Rückkehr-Adresse ab, landet man auf der Site URL; die
    App übernimmt die Anmeldung auch dort. Zum lokalen Testen die Testadresse (zum Beispiel `http://localhost:8000/`)
    vorübergehend unter **Redirect URLs** eintragen und danach wieder entfernen.
@@ -558,6 +607,13 @@ Besitzer im Supabase-Dashboard ein, **nie** in App-Dateien, Git, Screenshots ode
 **Hinweis für eine spätere App im Apple App Store:** Wer dort eine Anmeldung über einen fremden Anbieter wie Google
 anbietet, muss nach Apples Regeln zusätzlich „Sign in with Apple“ anbieten (oder eine gleichwertige datensparsame
 Anmeldung). Das betrifft nur eine native App im App Store, nicht die Web-App.
+
+**Löschseite für Google Play (Stand 13.11.2026):** `konto-loeschen.html` und `konto-loeschen-en.html` löschen das
+Konto auch ohne die App, mit E-Mail-Code oder Google und demselben Server-Aufruf `konto_loeschen` wie die App. Damit
+die Google-Anmeldung dorthin zurückkommt, unter **Authentication > URL Configuration > Redirect URLs** zusätzlich genau
+`https://crownmate.de/konto-loeschen.html#konto` und `https://crownmate.de/konto-loeschen-en.html#konto` eintragen
+(keine Wildcard). Fehlt der Eintrag, landet man nach Google auf der Startseite der App, angemeldet; gelöscht ist dann
+noch nichts. Die Adresse für die Play Console ist `https://crownmate.de/konto-loeschen.html`.
 
 ## Bot-Schutz für die Anmeldung (Cloudflare Turnstile, Stand 09.11.2026)
 
@@ -598,6 +654,37 @@ mit, Supabase ignoriert es dann). Ganz zurück: Claude setzt `TURNSTILE_SITEKEY`
 Datenschutz: Der Abschnitt „Bot-Schutz bei der Anmeldung“ in `datenschutz.html` und `datenschutz-en.html` beschreibt den
 Dienst. Er gilt ab Schritt 4; die Datenschutzerklärung ist insgesamt noch ein Entwurf (Prüfung durch eine fachkundige
 Person steht aus).
+
+### Prüfliste für den Start der Anmeldung (Stand 13.11.2026)
+
+Zum Abhaken, in dieser Reihenfolge. Jeder Punkt ist ein Häkchen, kein Schritt darf übersprungen werden.
+
+- [ ] Widget „Crownmate Anmeldung“ für `crownmate.de` steht, den Site Key hat Claude (Schritt 2). Der Key gilt nur auf
+      crownmate.de, nicht auf `localhost`. Die alte Adresse floboldt007-cmyk.github.io/schach leitet auf crownmate.de um.
+- [ ] Der Site Key ist live: crownmate.de → Einstellungen → Konto zeigt über der Statuszeile „Die Anmeldung schützt
+      Cloudflare Turnstile vor Bots“ und dem Link „Mehr dazu in der Datenschutzerklärung“ (Schritt 3).
+- [ ] CAPTCHA in Supabase an, Secret Key nur dort eingetragen (Schritt 4).
+- [ ] Probe mit einem bestehenden Konto im privaten Fenster: Code kommt an, Anmeldung klappt (Schritt 5).
+- [ ] **Mail-Versand geklärt** (siehe unten). Ohne eigenen SMTP-Versand bekommen fremde neue Nutzer keinen Code.
+- [ ] **Authentication → URL Configuration:** Site URL `https://crownmate.de/`, Redirect URLs genau `https://crownmate.de/`
+      und `https://crownmate.de/#konto` (keine Wildcard; die github.io-Einträge erst nach den Proben unten entfernen).
+- [ ] **Google Auth Platform:** App veröffentlicht (nicht Testmodus, sonst kommen nur eingetragene Testnutzer durch und
+      alle anderen bekommen „access_denied“), Datenschutz- und Impressum-Link auf crownmate.de. Ob Google für
+      `openid`, `email` und `profile` eine Prüfung verlangt, in der Console nachsehen.
+- [ ] „Allow new users to sign up“ an (Schritt 6).
+- [ ] Probe mit einer neuen Adresse: Code kommt an, nach der Anmeldung steht „Wähle jetzt einen Benutzernamen…“, Name
+      eingeben → „Jetzt sichern“ → der Name steht im Feld.
+- [ ] Probe Google mit einem neuen Google-Konto: Rückkehr auf die Konto-Seite, derselbe Namens-Hinweis.
+- [ ] Gegenprobe: Steht die Anmeldung noch auf „aus“, sagt die App „Neue Konten sind gerade noch nicht freigeschaltet“
+      (bei Code und bei Google), nicht „Serverfehler“ und nicht „Link abgelaufen“.
+
+**Eigener Mail-Versand (SMTP).** Der eingebaute Versand von Supabase ist nur zum Ausprobieren da. Er schickt nur an
+Adressen aus dem eigenen Supabase-Team (sonst `email_address_not_authorized`, die App sagt dann „…noch keinen Code
+schicken (Testphase)“) und nur sehr wenige Mails pro Stunde (dann `over_email_send_rate_limit`, die App sagt „Gerade
+wurden zu viele Codes verschickt. Versuche es gleich noch einmal oder melde dich mit Google an“). Für fremde Nutzer
+per Code deshalb vorher einen eigenen SMTP-Anbieter eintragen: **Authentication → Emails → SMTP Settings** (Zugangsdaten
+trägt nur der Besitzer ein, nie in einen Chat), danach die Code-Vorlage und die Grenzen wie oben im Abschnitt
+„Supabase für „Konto light“ einrichten“, Schritte 4 („Code-Mail einrichten“) und 6 („Versandgrenzen prüfen“). Bis dahin ist Google der Weg für neue Nutzer, der ohne Mail auskommt.
 
 ## Abo „Crownmate Trainer“ mit Stripe
 

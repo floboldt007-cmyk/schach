@@ -5,7 +5,7 @@
 //
 //   node tests/thema.test.mjs              alles
 //   node tests/thema.test.mjs --nur-node   ohne Browser
-//   PORT=8951 node tests/thema.test.mjs    eigener Port (Standard 8834)
+//   PORT=8951 node tests/thema.test.mjs    eigener Port (Standard: frei)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn } from 'node:child_process';
@@ -23,7 +23,7 @@ import { STANDARD_EINSTELLUNGEN, EINSTELLUNG_WERTE } from '../js/storage.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8834);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const START = `http://127.0.0.1:${PORT}/index.html?test`;
 const NUR_NODE = process.argv.includes('--nur-node');
 
@@ -76,9 +76,17 @@ export function leseCss(text) {
       const kopf = t.slice(i, auf).trim();
       i = auf + 1;
       if (/^@(media|supports)/.test(kopf)) { block(kopf); continue; }
-      const zu = t.indexOf('}', i);
+      // die schliessende Klammer zaehlend suchen: @keyframes traegt eigene Bloecke (from {…} to {…}), die erste "}" waere
+      // deren Ende und alles danach (etwa :root in tokens.css) ginge verloren
+      let zu = i;
+      for (let tiefe = 0; zu < t.length; zu++) {
+        if (t[zu] === '{') tiefe++;
+        else if (t[zu] === '}' && tiefe-- === 0) break;
+      }
+      if (zu >= t.length) { regeln.push({ media, selektor: kopf, decls: [], kaputt: true }); i = t.length; return; }
       const inhalt = t.slice(i, zu);
       i = zu + 1;
+      if (inhalt.includes('{')) { regeln.push({ media, selektor: kopf, decls: [], verschachtelt: true }); continue; }
       const decls = inhalt.split(';').map((d) => d.trim()).filter(Boolean).map((d) => {
         const k = d.indexOf(':');
         return [d.slice(0, k).trim(), d.slice(k + 1).trim()];
@@ -265,6 +273,8 @@ function nodeTeil() {
     && /@fontsource-variable\/bricolage-grotesque@5\.3\.0/.test(modernCss));
 
   gruppe = 'tokens.css';
+  const leserProbe = leseCss('@keyframes k { from { opacity: 0; } to { opacity: 1; } } :root { --nach: 1; }');
+  pruefe('Selbstprobe Leser: Regel nach @keyframes wird gelesen', leserProbe.some((r) => r.selektor === ':root' && r.decls.some(([k]) => k === '--nach')));
   const tok = lies('css/tokens.css');
   const tr = leseCss(tok);
   const tn = new Set(tr.flatMap((r) => r.decls.map(([k]) => k)));
@@ -761,7 +771,7 @@ try {
   const kontext = nodeTeil();
   await nodeTeilAsync(kontext);
   if (!NUR_NODE) {
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(START);
     const { chromium } = ladePlaywright();
     browser = await chromium.launch();

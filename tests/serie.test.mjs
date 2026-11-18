@@ -30,7 +30,7 @@ import * as S from '../js/pakete/serie/stand.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8868);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const NUR_NODE = process.argv.includes('--nur-node');
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(os.tmpdir(), 'crownmate-serie-bilder');
@@ -833,7 +833,7 @@ async function testeBrowser(browser) {
   pruefe('heim:naechstes: Zeile „Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen“ (als erste, ohne Klassen-Aufgabe)',
     (await seite.locator(SZ).innerText()).replace(/\s+/g, ' ').includes('Bauernmarsch Heute: 1 Partie oder 3 Rätsel spielen')
     && await seite.evaluate((s) => document.querySelector('.heim-liste').firstElementChild === document.querySelector(s), SZ)
-    && await seite.locator(SZ).getAttribute('aria-label') === 'Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen');
+    && await seite.locator(SZ).getAttribute('aria-label') === 'Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen · noch 6 Felder bis zur Umwandlung');
   await seite.locator(SZ).click();
   pruefe('Ohne Trainings-Karten öffnet die Zeile das Serien-Blatt', await seite.waitForSelector('.se-blatt-ort .se-blatt', { timeout: 3000 }).then(() => true, () => false));
   await seite.keyboard.press('Escape');
@@ -1211,7 +1211,7 @@ async function testeBrowser(browser) {
 // =====================================================================
 if (!NUR_NODE) {
   mkdirSync(BILDER, { recursive: true });
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser = null;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);

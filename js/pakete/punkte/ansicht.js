@@ -50,7 +50,7 @@ export function tafelName(tafelId, botNachId = () => null) {
   return t('p-punkte.tafel.allein');
 }
 
-const GRUENDE = ['hilfe', 'frei', 'spiel', 'gast', 'stellung'];
+const GRUENDE = ['hilfe', 'frei', 'spiel', 'gast', 'stellung', 'kurz'];
 
 export function unterText(e, name = t('p-punkte.tafel.allein')) {
   if (!e) return '';
@@ -59,6 +59,10 @@ export function unterText(e, name = t('p-punkte.tafel.allein')) {
   // Platz gewonnen: "Platz 3 auf Thorstens Tafel" (der Pfeil ^ 2 und die durchgestrichene alte Zahl stehen daneben)
   if (e.rekord && e.aufstieg > 0 && e.platz != null) return t('p-punkte.platzAuf', { platz: e.platz, name });
   if (e.rekord) return t('p-punkte.rekordPlus', { name, plus: zahlText(e.w - (e.vorher || 0)) });
+  // Ohne Sieg vor dem 10. eigenen Zug beendet (formel.MIN_ZUEGE, dieselbe Grenze wie "zu kurz" in der Genauigkeit
+  // darueber): die Zahl besteht nur aus Theorie und Zugpunkten, der Satz erklaert sie statt eines Platzes; nach Matt im
+  // 2. Zug stand sonst "Platz 4 auf Lukas' Tafel" (R7, B15). Ein kurzer Sieg traegt die Verwertung und bleibt beim Platz.
+  if (e.posten && e.posten.kurz && e.erg !== 'sieg') return t('p-punkte.kurz');
   // "So nah" vor dem Platz: eine Partie mit 90 % des Rekords steht fast immer unter deinen drei Besten, und der leise
   // Moment (hoechstens einmal je Tafel und Woche) waere sonst nie zu sehen
   if (e.fast) return t('p-punkte.fast', { prozent: e.fast.prozent, name });
@@ -169,6 +173,16 @@ export function abrechnungsZeile({ ergebnis: e, tafelName: name = t('p-punkte.ta
   const z = el('div', 'pk-abr');
   z.dataset.zeile = 'punkte';
   z.dataset.paket = 'punkte';
+  // R9-PunkteKurz: kurze Partie ohne Sieg zaehlt nicht, also keine Zahl und kein Hochzaehlen, nur der Satz (wie wartezeile)
+  if (e.grund === 'kurz') {
+    z.dataset.kurz = '1';
+    z.innerHTML = `<div class="pk-abr-knopf pk-statisch"><span class="pk-symbol" aria-hidden="true">${icon('podest')}</span>
+      <span class="pk-abr-mitte"><span class="pk-label">${esc(t('p-punkte.label'))}</span><span class="pk-text"><span class="pk-satz"></span></span></span></div>`;
+    z.querySelector('.pk-satz').textContent = unterText(e, name);
+    if (!schonGezeigt) merke();
+    z.dataset.fertig = '1';
+    return { el: z, beende() {}, verlasse() {} };
+  }
   if (e.rekord) z.dataset.rekord = '1';
   if (e.aufstieg > 0) z.dataset.aufstieg = String(e.aufstieg);
   const id = 'pk-d-' + String(e.id).replace(/[^a-z0-9]/gi, '').slice(0, 20);

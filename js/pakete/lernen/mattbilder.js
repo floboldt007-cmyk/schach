@@ -11,6 +11,8 @@
 //   sterneFolge({ fehler, hinweise }) -> 1 | 2 | 3   Zugfolge: 3 ohne Fehler und Hinweis, 2 bei hoechstens zwei, sonst 1
 //   STUFEN ['leicht', 'mittel', 'schwer', 'meister']
 //   lektion(id) -> Lektion | null          sucht in allen Bereichen
+//   rundenVon(l) -> [{ fen, ziel }]        Runde 1 = l selbst, dazu l.runden (R19: die 13 langen Lektionen haben drei Runden:
+//                                          Lernen, Ueben, Meisterprobe ohne Hinweis); Sterne dort = geschaffte Runden
 //   sterne({ ziel, zuege, hinweise }) -> 1 | 2 | 3   3: hoechstens ziel + ziel/4 Zuege, 2: hoechstens 1,5 * ziel + 2;
 //                                                     mit Hinweis hoechstens 2 Sterne
 //   grenze(ziel) -> Zahl                  Flos Zuege, nach denen die Lektion als nicht geschafft gilt (2 * ziel + 10)
@@ -29,6 +31,9 @@ import { EROEFFNUNGEN } from './eroeffnungen.js';
 import { TAKTIK } from './taktik.js';
 
 export const STUFEN = Object.freeze(['leicht', 'mittel', 'schwer', 'meister']);
+// Runde 2 (Ueben) und 3 (Meisterprobe) der langen Lektionen (R19, Flo 14.11.2026: "Lektionen zu schnell durch"), Stellungen
+// und Ziele mit Stockfish belegt in tests/r19-lektionen-besser.test.mjs
+const R = (fen, ziel) => Object.freeze({ fen, ziel });
 
 export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'grundreihe', stufe: 'leicht', fen: '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', ziel: 1 }),
@@ -36,7 +41,8 @@ export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'epaulette', stufe: 'leicht', fen: '3rkr2/pp4pp/8/3P4/8/7Q/5PPP/6K1 w - - 0 1', ziel: 1 }),
   Object.freeze({ id: 'todeskuss', stufe: 'leicht', fen: '3rk3/3p1p2/8/5N2/7Q/8/5PPP/6K1 w - - 0 1', ziel: 1 }),
   Object.freeze({ id: 'blackburne', stufe: 'leicht', fen: '5rk1/pp6/8/6N1/8/3B4/1B3PPP/6K1 w - - 0 1', ziel: 1 }),
-  Object.freeze({ id: 'zwei-tuerme', stufe: 'leicht', fen: '8/8/8/3k4/8/8/8/R3K2R w - - 0 1', ziel: 5 }),
+  Object.freeze({ id: 'zwei-tuerme', stufe: 'leicht', fen: '8/8/8/3k4/8/8/8/R3K2R w - - 0 1', ziel: 5,
+    runden: Object.freeze([R('8/8/2K5/2R5/4k3/8/6R1/8 w - - 0 1', 5), R('6K1/8/3k4/8/8/4R3/6R1/8 w - - 0 1', 6)]) }),
   Object.freeze({ id: 'anderssen', stufe: 'mittel', fen: '8/6Pk/5K2/8/8/8/8/R7 w - - 0 1', ziel: 2 }),
   Object.freeze({ id: 'lolli', stufe: 'mittel', fen: '5rk1/pp3p1p/5Pp1/8/8/8/3Q1PPP/6K1 w - - 0 1', ziel: 2 }),
   Object.freeze({ id: 'damiano', stufe: 'mittel', fen: '5rk1/pp3p2/6P1/8/8/8/3Q1PP1/6KR w - - 0 1', ziel: 2 }),
@@ -46,11 +52,16 @@ export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'boden', stufe: 'mittel', fen: '2kr4/pp1n1ppp/2n5/8/5B2/5Q2/5PPP/5BK1 w - - 0 1', ziel: 2 }),
   Object.freeze({ id: 'legal', stufe: 'mittel', fen: 'rn1qkbnr/ppp2p1p/3p2p1/4N3/2B1P3/2N5/PPPP1PPP/R1BbK2R w KQkq - 0 6', ziel: 2 }),
   Object.freeze({ id: 'arabisch', stufe: 'mittel', fen: 'r6k/1R6/p7/8/4N3/8/5PPP/6K1 w - - 0 1', ziel: 3 }),
-  Object.freeze({ id: 'erstickt', stufe: 'mittel', fen: '4r2k/6pp/8/4N3/2Q5/8/5PPP/6K1 w - - 0 1', ziel: 4 }),
-  Object.freeze({ id: 'dame', stufe: 'mittel', fen: '8/8/8/4k3/8/8/8/3QK3 w - - 0 1', ziel: 7 }),
-  Object.freeze({ id: 'turm', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/R3K3 w - - 0 1', ziel: 13 }),
-  Object.freeze({ id: 'zwei-laeufer', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1', ziel: 18 }),
-  Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 23 }),
+  Object.freeze({ id: 'erstickt', stufe: 'mittel', fen: '4r2k/6pp/8/4N3/2Q5/8/5PPP/6K1 w - - 0 1', ziel: 4,
+    runden: Object.freeze([R('4r2k/6pp/8/3QN3/8/8/5PPP/6K1 w - - 0 1', 4), R('4r1k1/6pp/8/4N3/8/8/5PPP/1Q4K1 w - - 0 1', 5)]) }),
+  Object.freeze({ id: 'dame', stufe: 'mittel', fen: '8/8/8/4k3/8/8/8/3QK3 w - - 0 1', ziel: 7,
+    runden: Object.freeze([R('1K6/1Q6/8/8/8/8/3k4/8 w - - 0 1', 8), R('6Q1/8/8/2k5/8/8/8/7K w - - 0 1', 9)]) }),
+  Object.freeze({ id: 'turm', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/R3K3 w - - 0 1', ziel: 13,
+    runden: Object.freeze([R('8/8/3R4/8/8/8/2k5/K7 w - - 0 1', 14), R('6R1/8/8/2k5/8/8/8/7K w - - 0 1', 16)]) }),
+  Object.freeze({ id: 'zwei-laeufer', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1', ziel: 19,
+    runden: Object.freeze([R('8/8/4k3/8/8/8/3BK1B1/8 w - - 0 1', 19), R('8/8/5k2/8/8/8/3B1KB1/8 w - - 0 1', 19)]) }),
+  Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 24,
+    runden: Object.freeze([R('8/3B2K1/8/8/8/k2N4/8/8 w - - 0 1', 26), R('8/8/8/7K/8/8/1N6/1B2k3 w - - 0 1', 31)]) }),
 ]);
 export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik']);
 export const BEREICHE = Object.freeze([
@@ -63,6 +74,8 @@ export const ALLE = Object.freeze(BEREICHE.flatMap((b) => b.lektionen));
 export const artVon = (l) => (l && l.art) || 'matt';
 export const bereichVon = (l) => BEREICHE.find((b) => b.lektionen.includes(l)) || BEREICHE[0];
 export const lektion = (id) => ALLE.find((l) => l.id === id) || null;
+// Runde 1 ist die Lektionsstellung selbst; Lektionen ohne runden haben genau diese eine
+export const rundenVon = (l) => (l ? [{ fen: l.fen, ziel: l.ziel }, ...(Array.isArray(l.runden) ? l.runden : [])] : []);
 
 const WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 export function bilanz(chess) {

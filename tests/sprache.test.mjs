@@ -22,7 +22,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8881);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 // --pakete: mit allen Paketen aus PAKETE (Englisch Teil 2), sonst nur der Kern (?kern)
 const PAKETE_MODUS = process.argv.includes('--pakete');
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test${PAKETE_MODUS ? '' : '&kern'}`;
@@ -367,6 +367,8 @@ async function schrittZwei(browser) {
         bots_besiegt: 2, sterne: 4, partien: 5, genauigkeit_schnitt: 61.5, haeufigste_fehler: { arten: [{ art: 'fehler', anzahl: 2 }] }, erledigt: [], aktualisiert_am: '2026-10-22' } }],
       aufgaben: [{ id: 'aufgabe', titel: 'Play Thorsten', art: 'bot', ziel: { bot: 'rudi', sterne: 2 }, faellig: '2026-10-30', erledigt: 0 }] };
       else if (u.pathname.endsWith('/ist_premium')) body = false;
+      // G-006 M3: die Gruppe "Verwaltung" fragt bei freigeschaltetem Konto, ob es ein Verwalter ist (hier: nein)
+      else if (u.pathname.endsWith('/ist_verwalter')) body = false;
       else if (u.pathname === '/rest/v1/produkte') body = [{ id: 'trainer', name: 'Crownmate Trainer', preis_text: 'Test price from server', beschreibung: 'Training for your chess', kauf_link: 'https://buy.stripe.com/test_probe' }];
       // Sonderstuecke: die App fragt seit dem 31.10.2026 fuer jedes angemeldete Konto nach (Erfinder-Status, js/app.js)
       else if (['/rest/v1/abos', '/rest/v1/profile', '/rest/v1/spielstaende', '/rest/v1/sonderstuecke'].includes(u.pathname) || u.pathname.endsWith('/online_meine') || u.pathname === '/rest/v1/partien_online') body = [];
@@ -411,7 +413,7 @@ async function schrittZwei(browser) {
       await seite.evaluate(() => localStorage.clear());
       await seite.goto('about:blank');
       await seite.goto(basis + '#konto');
-      await seite.waitForFunction(() => !!window.__app && localStorage.getItem('schach-arena:konto:sichtbar') === '1');
+      await seite.waitForFunction(() => !!window.__app && localStorage.getItem('schach-arena:konto:sichtbar') === '1' && !!document.documentElement.dataset.screen);
       // Handy: Konto, Schule und Abo sind eigene Seiten der Einstellungen (#einstellungen/<seite>, 31.10.2026)
       await seite.evaluate(() => window.__app.gehe('einstellungen', { seite: 'konto' }));
       await seite.waitForSelector('.konto-gruppe');
@@ -488,14 +490,21 @@ async function browserTeil(browser) {
       && /Einstellungen/.test(await seite.locator('#app').innerText()));
     pruefe('Sprachwahl sichtbar (Geraet, Deutsch, English), Geraet gewaehlt', await seite.locator('[data-einstellung="sprache"] .es-seg').count() === 3
       && await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="auto"]').getAttribute('aria-checked') === 'true');
-    await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="en"]').click();
-    await seite.waitForFunction(() => document.documentElement.lang === 'en', null, { timeout: 10000 });
-    const gespeichert = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')));
-    pruefe('Wahl English: Seite laedt neu und ist englisch', gespeichert.sprache === 'en' && gespeichert.spracheGewaehlt === true);
-    await seite.waitForFunction(() => !!document.querySelector('[data-einstellung="sprache"] .es-seg[aria-checked="true"]'), null, { timeout: 10000 });
-    await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="auto"]').click();
-    await seite.waitForFunction(() => document.documentElement.lang === 'de', null, { timeout: 10000 });
-    pruefe('Wahl Geraet: zurueck auf die Sprache des Geraets (Test: deutsch)', await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).spracheGewaehlt) === false);
+    // Die Wahl setzt lang sofort und laedt 60 ms spaeter neu (js/ui/einstellungen.js). Auf lang zu warten traf darum die
+    // alte Seite (gemessen 10 von 10), das naechste evaluate starb im Neuladen (CI, PR #243). Abgewartet wird das load
+    // der neuen Seite; die Marke __vorDerWahl beweist, dass wirklich neu geladen wurde.
+    const waehleUndWarteNeuladen = async (wert) => {
+      await seite.evaluate(() => { window.__vorDerWahl = true; });
+      const geladen = seite.waitForEvent('load', { timeout: 15000 });
+      await seite.locator(`[data-einstellung="sprache"] .es-seg[data-wert="${wert}"]`).click();
+      await geladen;
+      await seite.waitForFunction(() => !!window.__app && !!document.querySelector('[data-einstellung="sprache"] .es-seg[aria-checked="true"]'), null, { timeout: 20000 });
+      return seite.evaluate(() => ({ neu: window.__vorDerWahl === undefined, lang: document.documentElement.lang, e: JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')) }));
+    };
+    const nachEn = await waehleUndWarteNeuladen('en');
+    pruefe('Wahl English: Seite laedt neu und ist englisch', nachEn.neu && nachEn.lang === 'en' && nachEn.e.sprache === 'en' && nachEn.e.spracheGewaehlt === true, nachEn);
+    const nachAuto = await waehleUndWarteNeuladen('auto');
+    pruefe('Wahl Geraet: zurueck auf die Sprache des Geraets (Test: deutsch)', nachAuto.neu && nachAuto.lang === 'de' && nachAuto.e.spracheGewaehlt === false, nachAuto);
     await kontext.close();
   }
   // Sprache des Geraets ohne eigene Wahl (?autosprache: auch im Testlauf wie auf einem echten Geraet)
@@ -554,7 +563,7 @@ let browser = null;
 try {
   await nodeTeil();
   if (!NUR_NODE) {
-    server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+    server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await browserTyp(ladePlaywright()).launch();
     await browserTeil(browser);

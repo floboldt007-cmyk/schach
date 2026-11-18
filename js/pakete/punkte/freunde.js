@@ -163,9 +163,11 @@ export function reiterFreunde({ app, fenster = 'woche', jetzt = new Date() } = {
   const s = huelle('freunde', t('p-punkte.reiter.freunde'));
   s.hidden = false;
   const karte = el('article', 'bl-karte bl-fr');
-  const codes = el('details', 'bl-fr-codes', `<summary>${esc(P('codes'))}</summary>`);
-  // ohne Konto sind die Codes der einzige Weg zu Freunden: dann offen, und ohne Rangliste kein Zeitfenster
-  codes.open = !sitzung()?.access_token;
+  // ohne Konto sind die Codes der einzige Weg zu Freunden: dann offen, und ohne Rangliste kein Zeitfenster. Angemeldet
+  // bleiben sie zugeklappt und der Kopf sagt nicht mehr "Ohne Konto" (R8, 13.11.2026)
+  const angemeldet = !!sitzung()?.access_token;
+  const codes = el('details', 'bl-fr-codes', `<summary>${esc(P(angemeldet ? 'codesKonto' : 'codes'))}</summary>`);
+  codes.open = !angemeldet;
   if (codes.open) s.dataset.ohneFenster = '1';
   let alt = null;
   try { alt = codeReiter({ app, jetzt }); codes.append(...alt.el.children); } catch (e) { alt = null; }

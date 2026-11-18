@@ -9,16 +9,27 @@
 //                    Wiederholung) und ein geschlagener letzter Bauer des Gegners zaehlen sofort als geschafft
 //   ziel             Flos Zuege bei bester Verteidigung, mit Stockfish nachgerechnet (Selbstspiel); beim Halten die Zahl
 //                    der Zuege, die man ueberstehen muss
+//   runden           Runde 2 und 3 (Ueben, Meisterprobe), [{ fen, ziel }]; siehe mattbilder.js rundenVon
+const R = (fen, ziel) => Object.freeze({ fen, ziel });
 export const ENDSPIELE = Object.freeze([
   Object.freeze({ id: 'koenig-sechste', art: 'umwandeln', stufe: 'leicht', fen: '4k3/8/4K3/4P3/8/8/8/8 w - - 0 1', ziel: 5 }),
-  Object.freeze({ id: 'erst-koenig', art: 'umwandeln', stufe: 'leicht', fen: '8/8/4k3/8/8/4K3/4P3/8 w - - 0 1', ziel: 10 }),
-  Object.freeze({ id: 'schluesselfelder', art: 'umwandeln', stufe: 'leicht', fen: '8/8/3k4/8/3K4/8/3P4/8 w - - 0 1', ziel: 9 }),
+  Object.freeze({ id: 'erst-koenig', art: 'umwandeln', stufe: 'leicht', fen: '8/8/4k3/8/8/4K3/4P3/8 w - - 0 1', ziel: 14,
+    runden: Object.freeze([R('8/8/1k6/8/8/1K6/1P6/8 w - - 0 1', 14), R('8/8/4k3/8/8/2K5/4P3/8 w - - 0 1', 14)]) }),
+  Object.freeze({ id: 'schluesselfelder', art: 'umwandeln', stufe: 'leicht', fen: '8/8/3k4/8/3K4/8/3P4/8 w - - 0 1', ziel: 9,
+    runden: Object.freeze([R('8/8/3k4/8/1K6/8/3P4/8 w - - 0 1', 11), R('3k4/8/8/8/3K4/8/3P4/8 w - - 0 1', 12)]) }),
   Object.freeze({ id: 'quadrat', art: 'halten', stufe: 'leicht', fen: '7k/8/8/p7/5K2/8/8/8 w - - 0 1', ziel: 8 }),
   Object.freeze({ id: 'randbauer', art: 'halten', stufe: 'leicht', fen: '8/8/8/8/7p/6k1/8/4K3 w - - 0 1', ziel: 10 }),
+  Object.freeze({ id: 'opposition', art: 'umwandeln', stufe: 'leicht', fen: '8/8/4k3/8/3K4/8/4P3/8 w - - 0 1', ziel: 10,
+    runden: Object.freeze([R('8/8/2k5/8/3K4/8/2P5/8 w - - 0 1', 10), R('8/8/6k1/8/5K2/8/6P1/8 w - - 0 1', 15)]) }),
+  Object.freeze({ id: 'patt-vermeiden', art: 'umwandeln', stufe: 'leicht', fen: '4k3/4P3/8/3K4/8/8/8/8 w - - 0 1', ziel: 3,
+    runden: Object.freeze([R('2k5/2P5/8/1K6/8/8/8/8 w - - 0 1', 3), R('1k6/1P6/8/2K5/8/8/8/8 w - - 0 1', 3)]) }),
   Object.freeze({ id: 'springer-bauer', art: 'halten', stufe: 'mittel', fen: '7k/8/8/2N5/8/p7/8/7K w - - 0 1', ziel: 10 }),
   Object.freeze({ id: 'durchbruch', art: 'umwandeln', stufe: 'mittel', fen: '6k1/ppp5/8/PPP5/8/8/8/6K1 w - - 0 1', ziel: 4 }),
   Object.freeze({ id: 'entfernter-freibauer', art: 'umwandeln', stufe: 'mittel', fen: '8/5kpp/8/8/P7/6P1/5PKP/8 w - - 0 1', ziel: 5 }),
-  Object.freeze({ id: 'lucena', art: 'gewinnen', stufe: 'mittel', fen: '3K4/3P1k2/8/8/8/8/2r5/4R3 w - - 0 1', ziel: 6 }),
-  Object.freeze({ id: 'philidor', art: 'halten', stufe: 'mittel', fen: '8/8/8/8/3pk3/R7/7r/3K4 w - - 0 1', ziel: 12 }),
-  Object.freeze({ id: 'dame-bauer', art: 'gewinnen', stufe: 'mittel', fen: '7K/Q7/8/8/8/8/3pk3/8 w - - 0 1', ziel: 22 }),
+  Object.freeze({ id: 'lucena', art: 'gewinnen', stufe: 'mittel', fen: '3K4/3P1k2/8/8/8/8/2r5/4R3 w - - 0 1', ziel: 6,
+    runden: Object.freeze([R('4K3/4P1k1/8/8/8/8/3r4/5R2 w - - 0 1', 8), R('3K4/3P1k2/8/8/4R3/8/2r5/8 w - - 0 1', 9)]) }),
+  Object.freeze({ id: 'philidor', art: 'halten', stufe: 'mittel', fen: '8/8/8/8/3pk3/R7/7r/3K4 w - - 0 1', ziel: 12,
+    runden: Object.freeze([R('8/8/8/6p1/4k3/R7/7r/3K4 w - - 0 1', 14), R('8/8/8/8/4k3/R2p4/7r/3K4 w - - 0 1', 16)]) }),
+  Object.freeze({ id: 'dame-bauer', art: 'gewinnen', stufe: 'mittel', fen: '7K/Q7/8/8/8/8/3pk3/8 w - - 0 1', ziel: 22,
+    runden: Object.freeze([R('7K/5Q2/8/8/8/8/3pk3/8 w - - 0 1', 22), R('1Q5K/8/8/8/8/8/3pk3/8 w - - 0 1', 22)]) }),
 ]);

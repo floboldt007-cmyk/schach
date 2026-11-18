@@ -1068,12 +1068,38 @@ function gleich(a, b) {
   const ab = registriereBot({ id: 'bergwirt', art: 'boss', archiv: true, name: 'Der Bergwirt', avatar: 'assets/avatare/06-professor-turm.svg',
     staerke: { ...botNachId('turm').staerke } });
   speichereLaufendePartie({ botId: 'bergwirt', spielerFarbe: 'w', zuege: ['e2e4'], modus: 'boss', boss: BOSS, seed: 7, tempo: { grund: 600, zuschlag: 5 },
-    zeiten: [30, 99], liga: null });
+    zeiten: [30, 99], liga: null, gestartet: new Date(Date.now() - 60000).toISOString() });
   const l = ladeLaufendePartie();
   pruefe('Laufend W0+a: angemeldeter Bot (Boss) wird geladen, mit seed, boss und tempo', l && l.botId === 'bergwirt' && l.seed === 7
     && l.boss && l.boss.stufe === 'meister' && l.tempo.grund === 600 && !('zeiten' in l), l);
   ab();
   pruefe('Laufend W0+a: Bot nicht mehr angemeldet -> keine laufende Partie', ladeLaufendePartie() === null);
+  // R19 Uhr (Kaltreview 64 Befund 2, Fix-Review 07): mit Bedenkzeit rechnet die Uhr beim Fortsetzen ab gestartet; fehlt es,
+  // ist es kaputt oder liegt es in der Zukunft, wird es ersetzt (nie in der Zukunft), statt die Partie still zu verwerfen.
+  // Mit gueltigem uhr.seit: uhr.seit minus die gebuchten Zeiten, damit der laufende Zug ab uhr.seit zaehlt
+  for (const [was, gestartet] of [['fehlt', undefined], ['kaputt', 'gestern'], ['in der Zukunft', new Date(Date.now() + 3600e3).toISOString()]]) {
+    const vor = Date.now();
+    speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: ['e2e4'], modus: 'normal', tempo: { grund: 180, zuschlag: 2 }, zeiten: [70],
+      ...(gestartet === undefined ? {} : { gestartet }) });
+    const ohneUhr = ladeLaufendePartie();
+    const g = Date.parse(ohneUhr?.gestartet);
+    pruefe(`Laufend R19 Uhr: mit tempo und gestartet ${was}, ohne uhr -> geladen, gestartet = jetzt`,
+      ohneUhr?.botId === 'rudi' && g >= vor - 1000 && g <= Date.now(), ohneUhr?.gestartet);
+    const seit = Date.now() - 20000;
+    speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: ['e2e4'], modus: 'normal', tempo: { grund: 180, zuschlag: 2 }, zeiten: [70],
+      uhr: { seit, verbraucht: 20000 }, ...(gestartet === undefined ? {} : { gestartet }) });
+    const mitUhr = ladeLaufendePartie();
+    pruefe(`Laufend R19 Uhr: mit tempo und gestartet ${was}, mit uhr.seit -> gestartet = uhr.seit - gebuchte Zeiten`,
+      Date.parse(mitUhr?.gestartet) === seit - 7000, mitUhr?.gestartet);
+  }
+  // Zu zweit rechnet seine eigene Uhr (js/ui/zuzweit.js): die Sperre und die Ersetzung gelten dort nicht
+  const zzZukunft = new Date(Date.now() + 3600e3).toISOString();
+  speichereLaufendePartie({ modus: 'zuzweit', zuzweit: { weiss: 'A', schwarz: 'B' }, botId: null, spielerFarbe: 'w', zuege: ['e2e4'],
+    zeiten: [70], tempo: { grund: 180, zuschlag: 2 }, gestartet: zzZukunft, uhr: { w: 1000, b: 2000, seit: Date.now() } });
+  const zz = ladeLaufendePartie();
+  pruefe('Laufend R19 Uhr: Zu zweit mit gestartet in der Zukunft bleibt unveraendert geladen', zz?.modus === 'zuzweit' && zz.gestartet === zzZukunft, zz);
+  speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: ['e2e4'], modus: 'normal' });
+  pruefe('Laufend R19 Uhr: ohne tempo braucht es kein gestartet', ladeLaufendePartie()?.botId === 'rudi');
   speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: [], modus: 'normal', boss: BOSS, seed: 1.5 });
   const l2 = ladeLaufendePartie();
   pruefe('Laufend W0+a: boss ausserhalb des Boss-Modus und ein krummer Seed fallen weg', l2 && !('boss' in l2) && !('seed' in l2), l2);

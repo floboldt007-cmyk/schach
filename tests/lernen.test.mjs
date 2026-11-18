@@ -20,7 +20,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8934);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -41,9 +41,9 @@ pruefe('Mattbilder: jede Stellung legal, Weiss am Zug, Schwarz nicht im Schach, 
 pruefe('Stufen laufen nie rueckwaerts (leicht zuerst), in jedem Bereich', BEREICHE.every((b) => b.lektionen.every((l, i) => i === 0
   || STUFEN.indexOf(l.stufe) >= STUFEN.indexOf(b.lektionen[i - 1].stufe) - 1)));
 const mitStellung = ALLE.filter((l) => l.art !== 'folge');
-pruefe('Bereiche: Mattbilder 20, Taktik 16, Endspiele 11, Eroeffnungen 11, alle ids eindeutig, Stellungen (ohne Zugfolgen) verschieden',
-  BEREICHE.map((b) => b.id).join() === 'matt,taktik,end,eroeffnung' && TAKTIK.length === 16 && ENDSPIELE.length === 11 && EROEFFNUNGEN.length === 11
-  && ALLE.length === 58 && new Set(ALLE.map((l) => l.id)).size === 58 && new Set(mitStellung.map((l) => l.fen)).size === mitStellung.length);
+pruefe('Bereiche: Mattbilder 20, Taktik 21, Endspiele 13, Eroeffnungen 11, alle ids eindeutig, Stellungen (ohne Zugfolgen) verschieden',
+  BEREICHE.map((b) => b.id).join() === 'matt,taktik,end,eroeffnung' && TAKTIK.length === 21 && ENDSPIELE.length === 13 && EROEFFNUNGEN.length === 11
+  && ALLE.length === 65 && new Set(ALLE.map((l) => l.id)).size === 65 && new Set(mitStellung.map((l) => l.fen)).size === mitStellung.length);
 // Taktik (31.10.2026): eigene Stellungen, mit Stockfish nachgeprueft; Ziel = Material nach dem Gegenzug
 pruefe('Taktik: Art taktik, gewinn 1 bis 9, ziel 2 oder 3, Opfer 0 bis 5, Stufen leicht bis schwer, Flo Weiss', TAKTIK.every((l) => l.art === 'taktik'
   && Number.isInteger(l.gewinn) && l.gewinn >= 1 && l.gewinn <= 9 && [2, 3].includes(l.ziel) && [0, 5].includes(l.opfer)
@@ -67,6 +67,19 @@ pruefe('Taktik Teil 2: das Opfer erlaubt nur den Turm, eine weitere verschenkte 
   taktikLauf('hinlenkung', ['Rf8+', 'Kxf8', 'Nc6', 'Qxc6', 'h3']) === ',,,,verloren');
 pruefe('Taktik: ein Zug ohne Gewinn ist noch nichts, eine verschenkte Dame ist gescheitert',
   taktikLauf('turm-spiess', ['h3', 'Kb4']) === ',' && taktikLauf('gabel-dame', ['Qd8+', 'Rxd8', 'h3']) === ',,verloren');
+// Feinschliff R5 (11.11.2026): sieben neue Lektionen, je einmal gestartet und mit der Loesung bis "geschafft" gespielt
+pruefe('Neu R5: Figur fangen, Zwischenzug, Verteidiger, Roentgen, Linie oeffnen sind mit der Loesung geschafft',
+  taktikLauf('figur-fangen', ['b3', 'Kf7', 'Kb2', 'Bxb3', 'cxb3', 'Ke6']) === ',,,,,geschafft'
+  && taktikLauf('zwischenzug', ['Rxd8', 'Bd5', 'h3']) === ',geschafft,'
+  && taktikLauf('verteidiger', ['Nxf7', 'Kxf7', 'Rxd5', 'Ke6']) === ',,,geschafft'
+  && taktikLauf('roentgen', ['Qxd5', 'Rxd5', 'Rxd5', 'Kf8']) === ',,,geschafft'
+  && taktikLauf('linie-oeffnen', ['e6', 'f6', 'Bxf6', 'g5', 'Qg7#']) === ',,,,geschafft');
+pruefe('Neu R5: Zwischenzug, sofort zurueckschlagen (gxf3 Txd1+) ist nie geschafft', !taktikLauf('zwischenzug', ['gxf3', 'Rxd1+', 'Kg2', 'Rd2']).includes('geschafft'));
+pruefe('Neu R5: Opposition und Patt vermeiden sind mit der Loesung geschafft (neue Dame steht nach dem Gegenzug)',
+  taktikLauf('opposition', ['Ke4', 'Kd6', 'Kf5', 'Ke7', 'Ke5', 'Kd7', 'Kf6', 'Kc6', 'e4', 'Kd7', 'e5', 'Ke8', 'Ke6', 'Kd8', 'Kf7', 'Kc7',
+    'e6', 'Kb6', 'e7', 'Kc5', 'e8=Q', 'Kd4']).endsWith(',geschafft')
+  && taktikLauf('patt-vermeiden', ['Kd6', 'Kf7', 'Kd7', 'Kf6', 'e8=Q', 'Kf5']) === ',,,,,geschafft');
+pruefe('Neu R5: Patt vermeiden, Ke6 ist sofort Patt', taktikLauf('patt-vermeiden', ['Ke6']) === 'patt');
 // Vollsuche (01.11.2026, Flo: "Doppeldrohung gibt keinen Sinn, in 2 Zuegen geht nicht"): jede Taktik ist gegen JEDE
 // Verteidigung in ziel Zuegen zu schaffen (Matt oder nach dem Gegenzug mindestens gewinn Punkte, wie pruefeZiel), jedes
 // Mattbild bis Matt in 3 ist genau so lang wie angegeben. Schach und Schlagzuege zuerst, damit die Suche schnell findet.
@@ -123,8 +136,8 @@ pruefe('Texte: alle Schluessel in beiden Sprachen, keine langen Gedankenstriche'
   const z = await import('../js/pakete/lernen/zugang.js');
   const { VORTEILE } = await import('../js/pakete/abo/trainer.js');
   const zahl = z.zahlen();
-  pruefe('Zugang: 23 leichte plus 4 Proben gratis, 31 im Trainer', zahl.gratis === 27 && zahl.abo === 31
-    && ALLE.filter((l) => l.stufe === 'leicht').length === 23, JSON.stringify(zahl));
+  pruefe('Zugang: 26 leichte plus 4 Proben gratis, 35 im Trainer', zahl.gratis === 30 && zahl.abo === 35
+    && ALLE.filter((l) => l.stufe === 'leicht').length === 26, JSON.stringify(zahl));
   pruefe('Zugang: je Bereich genau eine Probe, jede eine mittlere Lektion aus ihrem Bereich',
     BEREICHE.every((b) => b.lektionen.filter(z.istProbe).length === 1 && b.lektionen.some((l) => l.id === z.PROBE[b.id] && l.stufe === 'mittel')));
   pruefe('Zugang: ohne Konto offen ist genau, was gratis ist', ALLE.every((l) => z.istOffen(l) === z.istGratis(l)));
@@ -133,10 +146,10 @@ pruefe('Texte: alle Schluessel in beiden Sprachen, keine langen Gedankenstriche'
     z.inWillkommenswoche({ gesehen: '2026-11-07', heute: '2026-11-07' }) && z.inWillkommenswoche({ gesehen: '2026-11-01', heute: '2026-11-07' })
     && !z.inWillkommenswoche({ gesehen: '2026-10-31', heute: '2026-11-07' }) && !z.inWillkommenswoche({ gesehen: null, heute: '2026-11-07' })
     && !z.inWillkommenswoche({ gesehen: '2026-11-08', heute: '2026-11-07' }) && z.willkommenBis('2026-11-07') === '2026-11-13' && z.willkommenBis('kaputt') === null);
-  pruefe('Zugang: Marke „Trainer“ genau für die 31 Lektionen, die nicht gratis sind', ALLE.filter(z.istImTrainer).length === 31
+  pruefe('Zugang: Marke „Trainer“ genau für die 35 Lektionen, die nicht gratis sind', ALLE.filter(z.istImTrainer).length === 35
     && ALLE.every((l) => z.istImTrainer(l) === !z.istGratis(l)));
   const v = VORTEILE.find((x) => x.id === z.VORTEIL);
-  pruefe('Trainer-Blatt: Vorteil Meisterschule nennt die richtige Zahl (31)', !!v && v.text.includes(String(zahl.abo) + ' Lektionen'), v && v.text);
+  pruefe('Trainer-Blatt: Vorteil Meisterschule nennt die richtige Zahl (35)', !!v && v.text.includes(String(zahl.abo) + ' Lektionen'), v && v.text);
 }
 
 // Die Muster stimmen: die bekannten Mattfuehrungen enden in diesen Stellungen wirklich matt
@@ -179,8 +192,8 @@ pruefe('Speicher: kaputte Eintraege fallen still weg', JSON.stringify(stand({ le
 pruefe('Summe: Sterne, Hoechstzahl 60, geschafft', JSON.stringify(summe(merke(st, 'grundreihe', { sterne: 3, zuege: 1 }), 'matt'))
   === '{"sterne":5,"max":60,"geschafft":2}');
 const stE = merke(merke({}, 'quadrat', { sterne: 3, zuege: 5 }), 'grundreihe', { sterne: 2, zuege: 2 });
-pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 58 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":33,"geschafft":1}'
-  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":174,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
+pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 65 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":39,"geschafft":1}'
+  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":195,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
 
 // Ziel-Regeln (pruefeZiel): nach Flos Zug ('flo') und nach dem Gegenzug ('gegner')
 const zielVon = (id, fen, wann, zuege = 1) => pruefeZiel(lektion(id), bilanz(new Chess(lektion(id).fen)), new Chess(fen), { wann, zuege });
@@ -252,7 +265,7 @@ async function seite(browser, { erfinder = true, merker = true, groesse = { widt
   // feste Uhr: der App-Tag beginnt erst um 4:00 (js/tag.js), ein Lauf kurz nach Mitternacht darf nichts kippen
   if (uhr) await s.clock.setFixedTime(uhr);
   await s.goto(BASIS + hash);
-  await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 30000 });
+  await s.waitForFunction(() => !!window.__app && !!document.documentElement.dataset.screen, null, { timeout: 30000 });
   await warte(600);
   return { k, s, fehlerListe };
 }
@@ -264,6 +277,8 @@ async function warteLz(s, bedingung, ms = 10000) {
     return new Function('z', 'return ' + b)(z);
   }, bedingung, { timeout: ms }).catch(() => {});
 }
+// R8: das Ergebnisblatt der Lektion steht (es kommt kurz nach dem letzten Zug, damit man ihn noch sieht)
+const blattDa = (s) => s.waitForSelector('.ls-screen > .ergebnis-overlay:not([hidden]) .ergebnis-karte', { timeout: 8000 }).catch(() => {});
 async function ziehe(s, uci) {
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
     const b = await s.locator(`.ls-screen .brett-felder .feld[data-feld="${f}"]`).boundingBox();
@@ -286,8 +301,8 @@ async function erfinderTeil(browser) {
     const k = document.querySelector('.ms-karte');
     return k && { text: k.innerText, erste: document.querySelector('.training-gitter > *')?.classList.contains('ms-karte') };
   });
-  pruefe('Erfinder: Karte „Meisterschule · Mattbilder, Taktik, Endspiele, Eröffnungen“ im Training mit Labor-Schild, 0 von 174 Sternen, 58 Lektionen', !!karte
-    && /Mattbilder, Taktik, Endspiele, Eröffnungen/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 174 Sternen/.test(karte.text) && /58 Lektionen/.test(karte.text), karte);
+  pruefe('Erfinder: Karte „Meisterschule · Mattbilder, Taktik, Endspiele, Eröffnungen“ im Training mit Labor-Schild, 0 von 195 Sternen, 65 Lektionen', !!karte
+    && /Mattbilder, Taktik, Endspiele, Eröffnungen/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 195 Sternen/.test(karte.text) && /65 Lektionen/.test(karte.text), karte);
   await p.s.locator('.ms-karte .ms-oeffnen').click();
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const liste = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
@@ -337,16 +352,44 @@ async function erfinderTeil(browser) {
   await warteLz(p.s, "z.phase === 'ende'");
   z = await lz(p.s);
   pruefe('Grundreihe: Ta8 matt, ein Zug, drei Sterne', z.phase === 'ende' && z.zuege === 1 && z.sterne === 3 && !z.grund, z);
-  pruefe('Ergebnis: „Matt!“ mit drei leuchtenden Sternen und „Nächste Lektion“', await p.s.evaluate(() => {
-    const m = document.querySelector('.ls-meldung[data-art="geschafft"]');
-    return !!m && m.querySelectorAll('.ms-sterne > i.an').length === 3 && !!document.querySelector('.ls-aktionen [data-a="weiter"]');
-  }), await p.s.evaluate(() => document.querySelector('.ls-meldung')?.outerHTML.slice(0, 400) + ' | ' + document.querySelector('.ls-aktionen')?.innerHTML.slice(0, 300)));
+  // R8 (Gleichheit): das Ende ist das Ergebnisblatt der Bot-Partie (css/ergebnis.css), nicht mehr nur eine Meldung
+  await blattDa(p.s);
+  const lsBlatt = await p.s.evaluate(() => {
+    const o = document.querySelector('.ls-screen > .ergebnis-overlay:not([hidden])');
+    if (!o) return { da: false };
+    const k = o.querySelector('.ergebnis-karte');
+    return { da: true, sieg: o.classList.contains('sieg'), dialog: o.getAttribute('role') === 'dialog' && o.getAttribute('aria-modal') === 'true',
+      wort: (o.querySelector('.erg-wort')?.textContent || '').trim(), sterne: o.querySelectorAll('.erg-sterne .erg-stern.an').length,
+      haupt: [...o.querySelectorAll('.erg-knoepfe .knopf.primaer')].map((b) => b.dataset.a).join(),
+      neben: [...o.querySelectorAll('.erg-knoepfe .knopf:not(.primaer)')].map((b) => b.dataset.a).join(),
+      lobby: o.querySelector('.erg-lobby')?.dataset.a || null, fokus: !!k && k.contains(document.activeElement),
+      inert: [...document.querySelector('.ls-screen').children].filter((e) => e !== o).every((e) => e.inert),
+      breite: k ? Math.round(k.getBoundingClientRect().width) : 0,
+      // R8 Texte: Weg "Zur Meisterschule" mit dem Haus der Bot-Partie (icons.js haus), Zeile aus Zuegen und Hinweisen
+      lobbyText: (o.querySelector('.erg-lobby')?.textContent || '').trim(),
+      haus: /M4 11\.5 12 5l8 6\.5/.test(o.querySelector('.erg-lobby svg')?.innerHTML || ''),
+      zeile: (() => { const z = o.querySelector('.ls-erg-zeile'); if (!z) return null;
+        return { text: z.textContent.trim(), eineZeile: z.scrollWidth <= z.clientWidth + 1 && z.getClientRects().length === 1 }; })() };
+  });
+  pruefe('Ergebnisblatt wie in der Bot-Partie: „Matt!“, drei Sterne, Hauptknopf „Nächste Lektion“, „Nochmal“, Weg zur Übersicht',
+    lsBlatt.da && lsBlatt.sieg && lsBlatt.dialog && lsBlatt.wort === 'Matt!' && lsBlatt.sterne === 3 && lsBlatt.haupt === 'weiter'
+    && lsBlatt.neben === 'nochmal' && lsBlatt.lobby === 'uebersicht' && lsBlatt.fokus && lsBlatt.inert, lsBlatt);
+  pruefe('Ergebnisblatt: Weg „Zur Meisterschule“ mit dem Haus der Bot-Partie, unter den Sternen „In 1 Zug · ohne Hinweis“ in einer Zeile',
+    lsBlatt.lobbyText === 'Zur Meisterschule' && lsBlatt.haus && !!lsBlatt.zeile && lsBlatt.zeile.text === 'In 1 Zug · ohne Hinweis' && lsBlatt.zeile.eineZeile, lsBlatt);
+  // Auge zeigt das Brett, "Ergebnis" holt das Blatt zurueck (wie in der Bot-Partie)
+  await p.s.locator('.ls-screen > .ergebnis-overlay .erg-zu').click();
+  const brettSicht = await p.s.evaluate(() => ({ zu: document.querySelector('.ls-screen > .ergebnis-overlay')?.hidden === true,
+    knopf: !!document.querySelector('.ls-aktionen [data-a="ergebnis"]'), meldung: document.querySelector('.ls-meldung[data-art="geschafft"]')?.hidden === false }));
+  await p.s.locator('.ls-aktionen [data-a="ergebnis"]').click();
+  await blattDa(p.s);
+  pruefe('Ergebnisblatt: Auge zeigt das Brett mit Meldung, „Ergebnis“ holt das Blatt zurück', brettSicht.zu && brettSicht.knopf && brettSicht.meldung
+    && await p.s.locator('.ls-screen > .ergebnis-overlay:not([hidden])').count() === 1, brettSicht);
   const gespeichert = await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:lernen') || 'null'));
   pruefe('Speicher: Modul lernen hält 3 Sterne und 1 Zug', gespeichert && gespeichert.lek && gespeichert.lek.grundreihe
     && gespeichert.lek.grundreihe.s === 3 && gespeichert.lek.grundreihe.z === 1, gespeichert);
 
   // weiter zur naechsten Lektion, dann ueber die Uebersicht zur Dame
-  await p.s.locator('.ls-aktionen [data-a="weiter"]').click();
+  await p.s.locator('.ergebnis-overlay [data-a="weiter"]').click();
   await warteLz(p.s, `z.id === '${LEKTIONEN[1].id}' && z.phase === 'intro'`);
   pruefe('„Nächste Lektion“ öffnet die zweite Lektion', (await lz(p.s)).id === LEKTIONEN[1].id);
   await p.s.evaluate(() => window.__app.gehe('lernen'));
@@ -364,12 +407,12 @@ async function erfinderTeil(browser) {
   const endListe = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
   pruefe('Endspiele: Liste in der Reihenfolge der Daten, Art „Halten“ an der Quadratregel, eigene Sternzahl',
     endListe === ENDSPIELE.map((l) => l.id).join() && /Halten/.test(await p.s.locator('.ms-lektion[data-id="quadrat"]').innerText())
-    && /^0\s*\/\s*33$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), endListe);
+    && /^0\s*\/\s*39$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), endListe);
   await p.s.locator('.ms-lektion[data-id="quadrat"]').click();
   await warteLz(p.s, "z.id === 'quadrat' && z.phase === 'intro'");
   const status = await p.s.locator('.ls-status').innerText();
   pruefe('Endspiel-Lektion: Titel, Art und Ziel „Halte 8 Züge durch“, Nummer im Bereich', /Die Quadratregel/.test(status)
-    && /Halten/.test(status) && /Halte 8 Züge durch/.test(status) && /Lektion 4 von 11/.test(status), status);
+    && /Halten/.test(status) && /Halte 8 Züge durch/.test(status) && /Lektion 4 von 13/.test(status), status);
   await p.s.locator('.ls-aktionen [data-a="los"]').click();
   for (const [i, u] of ['f4e4', 'e4d4', 'd4c4', 'c4b5', 'b5a5'].entries()) {
     await warteLz(p.s, `z.phase === 'flo' && z.zuege === ${i}`);
@@ -379,7 +422,8 @@ async function erfinderTeil(browser) {
   z = await lz(p.s);
   pruefe('Quadratregel: Bauer geschlagen, „Gehalten!“ mit drei Sternen', z.phase === 'ende' && !z.grund && z.sterne === 3
     && /Gehalten!/.test(await p.s.locator('.ls-meldung').innerText()), z);
-  await p.s.locator('.ls-aktionen [data-a="uebersicht"]').click();
+  await blattDa(p.s);
+  await p.s.locator('.ergebnis-overlay [data-a="uebersicht"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="quadrat"][data-geschafft]', { timeout: 10000 }).catch(() => {});
   pruefe('Zur Übersicht: zurück im Bereich Endspiele, Quadratregel „Gehalten“',
     await p.s.locator('.ms-bkarte[aria-pressed="true"]').getAttribute('data-bereich') === 'end'
@@ -388,9 +432,9 @@ async function erfinderTeil(browser) {
   await p.s.locator('.ms-bkarte[data-bereich="taktik"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="gabel-springer"]', { timeout: 8000 }).catch(() => {});
   const taktikListe = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
-  pruefe('Taktik: Liste in der Reihenfolge der Daten, Art „Taktik“, 0 von 48 Sternen', taktikListe === TAKTIK.map((l) => l.id).join()
+  pruefe('Taktik: Liste in der Reihenfolge der Daten, Art „Taktik“, 0 von 63 Sternen', taktikListe === TAKTIK.map((l) => l.id).join()
     && /Taktik/.test(await p.s.locator('.ms-lektion[data-id="gabel-springer"]').innerText())
-    && /^0\s*\/\s*48$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), taktikListe);
+    && /^0\s*\/\s*63$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), taktikListe);
   await p.s.locator('.ms-lektion[data-id="gabel-springer"]').click();
   await warteLz(p.s, "z.id === 'gabel-springer' && z.phase === 'intro'");
   const tStatus = await p.s.locator('.ls-status').innerText();
@@ -503,9 +547,14 @@ async function erfinderTeil(browser) {
   }
   await warteLz(p.s, "z.phase === 'ende'");
   z = await lz(p.s);
+  await blattDa(p.s);
   pruefe('Zeig sie mir: geschafft mit einem Stern, „Züge gelernt!“, weiter mit „Ohne Hilfe spielen“', z.sterne === 1
-    && /Züge gelernt!/.test(await p.s.locator('.ls-meldung').innerText()) && /Ohne Hilfe spielen/.test(await p.s.locator('.ls-aktionen [data-a="los"].primaer').innerText()), z);
-  await p.s.locator('.ls-aktionen [data-a="los"]').click();
+    && /Züge gelernt!/.test(await p.s.locator('.ls-meldung').innerText()) && /Ohne Hilfe spielen/.test(await p.s.locator('.ergebnis-overlay [data-a="los"].primaer').innerText())
+    && await p.s.locator('.ergebnis-overlay .erg-stern.an').count() === 1, z);
+  // R8 Texte: bei Eroeffnungen zaehlen auch die Fehler (sterneFolge), deshalb stehen sie mit in der Zeile
+  const folgeZeile = (await p.s.locator('.ergebnis-overlay .ls-erg-zeile').textContent().catch(() => '')).trim();
+  pruefe('Zeig sie mir: Zeile unter dem Stern „In 4 Zügen · 1 Fehler · ohne Hinweis“', folgeZeile === 'In 4 Zügen · 1 Fehler · ohne Hinweis', { folgeZeile, z });
+  await p.s.locator('.ergebnis-overlay [data-a="los"]').click();
   await warteLz(p.s, "z.phase === 'flo' && z.modus === 'selbst'");
   pruefe('Ohne Hilfe: kein Pfeil, Hinweis-Knopf wieder da', await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() === 0
     && await p.s.locator('.ls-aktionen [data-a="hinweis"]').count() === 1);
@@ -555,7 +604,7 @@ async function gratisTeil(browser) {
   const p = await seite(browser, { erfinder: false });
   await p.s.waitForSelector('.ms-karte', { timeout: 15000 }).catch(() => {});
   const karte = await p.s.evaluate(() => document.querySelector('.ms-karte')?.innerText || '');
-  pruefe('Gratis: Meisterschule-Karte im Training, ohne Labor-Schild, „27 davon sind gratis“', /27 davon sind gratis/.test(karte) && !/Labor/i.test(karte), karte);
+  pruefe('Gratis: Meisterschule-Karte im Training, ohne Labor-Schild, „30 davon sind gratis“', /30 davon sind gratis/.test(karte) && !/Labor/i.test(karte), karte);
   await p.s.locator('.ms-karte .ms-oeffnen').click();
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const r = await p.s.evaluate(() => ({
@@ -569,8 +618,8 @@ async function gratisTeil(browser) {
   }));
   pruefe('Gratis: Mattbilder mit 13 Schlössern (20 minus 6 leicht minus Probe), Probe „Ersticktes Matt“ offen mit Marke',
     r.gesperrt.length === 13 && r.schloss === 13 && !r.gesperrt.includes('grundreihe') && r.probeOffen && /Gratis-Probe/.test(r.probe), r);
-  pruefe('Gratis: Kopf zeigt die Sterne der Meisterschule (0 / 174), vier Bereichskarten, Gruppen nach Stufe',
-    /0\s*\/\s*174/.test(r.kopf) && r.karten === 4 && /Leicht · gratis\|Mittel\|Schwer und Meister/.test(r.gruppen), r);
+  pruefe('Gratis: Kopf zeigt die Sterne der Meisterschule (0 / 195), vier Bereichskarten, Gruppen nach Stufe',
+    /0\s*\/\s*195/.test(r.kopf) && r.karten === 4 && /Leicht · gratis\|Mittel\|Schwer und Meister/.test(r.gruppen), r);
   await p.s.locator('.ms-lektion[data-id="anderssen"]').click();
   await p.s.waitForSelector('.ms-liste .premium-hinweis', { timeout: 5000 }).catch(() => {});
   pruefe('Gratis: Tipp aufs Schloss zeigt den Trainer-Hinweis unter der Zeile, keine Lektion',
@@ -590,10 +639,11 @@ async function gratisTeil(browser) {
     await ziehe(p.s, u);
   }
   await warteLz(p.s, "z.phase === 'ende'");
+  await blattDa(p.s);
   pruefe('Gratis: nach der letzten leichten Lektion „Weiter“ und „Nächste Lektion im Trainer“, kein Werbetext in der Meldung',
-    await p.s.locator('.ls-aktionen [data-a="weiter"]').count() === 1 && /Nächste Lektion im Trainer/.test(await p.s.locator('.ls-aktionen [data-a="trainer"]').innerText())
+    await p.s.locator('.ergebnis-overlay [data-a="weiter"]').count() === 1 && /Nächste Lektion im Trainer/.test(await p.s.locator('.ergebnis-overlay [data-a="trainer"]').innerText())
     && await p.s.locator('.ls-screen .premium-hinweis').count() === 0);
-  await p.s.locator('.ls-aktionen [data-a="weiter"]').click();
+  await p.s.locator('.ergebnis-overlay [data-a="weiter"]').click();
   await warteLz(p.s, "z.id === 'legal-falle'");
   pruefe('Gratis: „Weiter“ springt zur Gratis-Probe Legal-Falle', (await lz(p.s)).id === 'legal-falle');
   pruefe('Gratis: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
@@ -654,10 +704,123 @@ async function neuesGeraetTeil(browser) {
   await p.k.close();
 }
 
+// R6-Befund B9 (12.11.2026): auf dem iPhone SE lag "Los geht's" halb unter dem Rand (+45 px). Die Haupthandlung der
+// Idee-Phase steht in JEDER Lektion ganz im Bild, auf SE (375x667) und iPhone 13 (390x844), hell und dunkel, ohne Scrollen.
+async function kleinTeil(browser) {
+  for (const [geraet, groesse] of [['SE', { width: 375, height: 667 }], ['i13', { width: 390, height: 844 }]]) {
+    const p = await seite(browser, { groesse, hash: '#lernen' });
+    const schlecht = [];
+    let schlimmste = null;
+    for (const [i, l] of ALLE.entries()) {
+      if (i % 2 === 0) await p.s.evaluate((modus) => window.__app.setzeEinstellungen({ modus }), i % 4 === 0 ? 'hell' : 'dunkel');
+      await p.s.evaluate((id) => window.__app.gehe('lektion', { id }), l.id);
+      await warteLz(p.s, `z.id === '${l.id}' && z.phase === 'intro'`);
+      await p.s.waitForSelector('.ls-screen .ls-aktionen .knopf', { timeout: 10000 }).catch(() => {});
+      // gemessen wird der Ruhezustand: der Screen gleitet beim Oeffnen kurz herein
+      await p.s.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'
+        || a.effect?.getComputedTiming().iterations === Infinity), null, { timeout: 3000 }).catch(() => {});
+      const m = await p.s.evaluate(() => {
+        const k = [...document.querySelectorAll('.ls-screen .ls-aktionen .knopf')];
+        const los = document.querySelector('.ls-screen .ls-aktionen [data-a="los"]');
+        const r = los ? los.getBoundingClientRect() : null;
+        return { n: k.length, los: r ? { top: Math.round(r.top), bottom: Math.round(r.bottom) } : null, ih: innerHeight,
+          alle: k.every((x) => { const b = x.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight && b.height >= 44; }),
+          quer: document.documentElement.scrollWidth <= innerWidth + 1,
+          // R8 (13.11.2026): die stehende Leiste legt kein Band in Seitenfarbe ueber die Karte (sonst Kante und Farbsprung
+          // mitten in der weissen bzw. dunklen Karte, Bilder R8): weder eigener Grund noch Verlauf davor
+          band: (() => { const a = document.querySelector('.ls-screen .ls-aktionen'); if (!a) return 'fehlt';
+            const leer = (c) => c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c);
+            const vor = getComputedStyle(a, '::before');
+            return leer(getComputedStyle(a).backgroundColor) && getComputedStyle(a).backgroundImage === 'none'
+              && (vor.content === 'none' || vor.content === 'normal' || vor.backgroundImage === 'none') ? '' : 'band'; })(),
+          // R8 L4 (13.11.2026): die Leiste verdeckt nichts. Karte und Meldung enden ueber ihr, und die Flaeche rollt nicht
+          // (sonst laege Inhalt unter dem Rand oder hinter der Leiste)
+          verdeckt: (() => { const a = document.querySelector('.ls-screen .ls-aktionen'); const rumpf = document.querySelector('.ls-screen .ls-rumpf');
+            if (!a || !rumpf) return 'fehlt';
+            const oben = a.getBoundingClientRect().top;
+            const zu = [...document.querySelectorAll('.ls-screen .ls-seite > :not(.ls-aktionen)')].filter((e) => !e.hidden && e.getClientRects().length)
+              .filter((e) => e.getBoundingClientRect().bottom > oben + 1).map((e) => e.className.split(' ')[0]);
+            if (rumpf.scrollHeight > rumpf.clientHeight + 1) zu.push('rumpf-rollt:' + (rumpf.scrollHeight - rumpf.clientHeight));
+            return zu.join(','); })() };
+      });
+      const ueber = m.los ? m.los.bottom - m.ih : 999;
+      if (!schlimmste || ueber > schlimmste.ueber) schlimmste = { id: l.id, ueber };
+      if (!m.los || m.los.bottom > m.ih || m.los.top < 0 || !m.alle || !m.quer || m.band || m.verdeckt) schlecht.push(`${l.id}:${ueber}${m.band ? ':' + m.band : ''}${m.verdeckt ? ':' + m.verdeckt : ''}`);
+    }
+    pruefe(`${geraet}: „Los geht's“ (und jeder Knopf der Idee-Phase) in allen ${ALLE.length} Lektionen ganz im Bild, ohne Band, ohne verdeckten Inhalt (B9, R8)`, schlecht.length === 0,
+      { schlecht: schlecht.join(' '), schlimmste });
+    if (process.env.BILDER && schlimmste) {
+      for (const modus of ['hell', 'dunkel']) {
+        await p.s.evaluate((m) => window.__app.setzeEinstellungen({ modus: m }), modus);
+        await p.s.evaluate((id) => window.__app.gehe('lektion', { id }), schlimmste.id);
+        await warteLz(p.s, `z.id === '${schlimmste.id}' && z.phase === 'intro'`);
+        await warte(400);
+        await p.s.screenshot({ path: path.join(process.env.BILDER, `lektion-${geraet}-${modus}.png`) });
+      }
+    }
+    pruefe(`${geraet}: keine Seitenfehler (B9)`, p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+    await p.k.close();
+  }
+}
+
 const LEKTIONEN_IDS = LEKTIONEN.map((l) => l.id).join();
 
+// R9 (13.11.2026, Befund 1 der Gleichheits-Messung): das Lektions-Brett ist auf jeder Groesse mindestens so gross wie in
+// der Bot-Partie (gemessen wie tests/gleichheit-ansichten.test.mjs ueber tests/gleichheit-messung.mjs: Feldraster, Bot nach
+// dem Intro, Lektion nach "Los geht's"), und nichts laeuft ueber oder scrollt. Am PC 1280 x 800 waren es 686 gegen 718 px.
+const BRETT_GROESSEN = [['PC 1280x800', 1280, 800], ['PC 1440x900', 1440, 900], ['PC 1920x1080', 1920, 1080], ['iPad quer', 1180, 820],
+  ['PC 1280x720', 1280, 720], ['iPhone 13', 390, 664], ['iPhone SE', 375, 667]];
+async function brettGroesseTeil(browser) {
+  const { messeAnsicht, introWeg } = await import('./gleichheit-messung.mjs');
+  for (const [name, width, height] of BRETT_GROESSEN) {
+    const p = await seite(browser, { groesse: { width, height } });
+    await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno' }));
+    await p.s.waitForFunction(() => window.__partie?.bereit && document.querySelector('.brett-rahmen > .brett .feld'), null, { timeout: 30000 }).catch(() => {});
+    await introWeg(p.s); await warte(1200);
+    const bot = await messeAnsicht(p.s, '.screen.partie');
+    await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'grundreihe' }));
+    await warteLz(p.s, "z.id === 'grundreihe' && z.phase === 'intro'");
+    await p.s.locator('.ls-aktionen [data-a="los"]').click();
+    await warteLz(p.s, "z.phase === 'flo'");
+    await warte(600);
+    const ls = await messeAnsicht(p.s, '.ls-screen');
+    const platz = await p.s.evaluate(() => {
+      const r = document.querySelector('.ls-screen .ls-rumpf'), d = document.documentElement;
+      const unten = Math.max(...[...document.querySelectorAll('.ls-screen .ls-rahmen, .ls-screen .ls-seite')].map((e) => e.getBoundingClientRect().bottom));
+      return { rumpfRollt: r ? r.scrollHeight - r.clientHeight : null, seiteRollt: d.scrollHeight - innerHeight, quer: d.scrollWidth - innerWidth,
+        unten: Math.round(unten), hoehe: innerHeight };
+    });
+    pruefe(`Brettgröße ${name}: Lektion mindestens so groß wie die Bot-Partie (Feldraster), ohne Überlauf und ohne Scrollen`,
+      !bot.fehlt && !ls.fehlt && ls.brett >= bot.brett - 2 && platz.rumpfRollt <= 1 && platz.seiteRollt <= 1 && platz.quer <= 1 && platz.unten <= platz.hoehe + 1,
+      { lektion: ls.brett ?? ls.fehlt, bot: bot.brett ?? bot.fehlt, ...platz });
+    await p.k.close();
+  }
+}
+
+// R9-2 (Layout-Messung 13.11.2026): vor dem Start blieb unter "Los geht's" eine Leere bis zum Rand, iPhone 13 146 px,
+// iPad hoch 76 px. Wie in der Bot-Partie sitzen die Knoepfe unten fuer den Daumen; hoechstens 60 px bleiben frei.
+const LEERE_GROESSEN = [['iPhone 13', 390, 844], ['iPad hoch', 820, 1180], ['iPhone SE', 375, 667]];
+async function leereTeil(browser) {
+  for (const [name, width, height] of LEERE_GROESSEN) {
+    const p = await seite(browser, { groesse: { width, height } });
+    await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'grundreihe' }));
+    await warteLz(p.s, "z.id === 'grundreihe' && z.phase === 'intro'");
+    await warte(600);
+    const m = await p.s.evaluate(() => {
+      const los = document.querySelector('.ls-aktionen [data-a="los"]')?.getBoundingClientRect();
+      const brett = document.querySelector('.ls-screen .ls-rahmen')?.getBoundingClientRect();
+      const d = document.documentElement;
+      return { leere: los ? Math.round(innerHeight - los.bottom) : null, losOben: los ? Math.round(los.top) : null,
+        brett: brett ? Math.round(brett.width) : null, seiteRollt: d.scrollHeight - innerHeight, hoehe: innerHeight };
+    });
+    pruefe(`Leere ${name}: unter "Los geht's" höchstens 60 px bis zum Rand, Knopf ganz sichtbar, nichts scrollt`,
+      m.leere !== null && m.leere >= 0 && m.leere <= 60 && m.seiteRollt <= 1, m);
+    await p.k.close();
+  }
+}
+
 async function browserTeil() {
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser = null;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
@@ -666,6 +829,9 @@ async function browserTeil() {
     await gratisTeil(browser);
     await willkommenTeil(browser);
     await neuesGeraetTeil(browser);
+    await kleinTeil(browser);
+    await brettGroesseTeil(browser);
+    await leereTeil(browser);
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);
   } finally {

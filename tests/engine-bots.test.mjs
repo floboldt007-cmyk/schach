@@ -16,7 +16,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8821);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 
 function ladePlaywright() {
   const kandidaten = [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean);
@@ -57,7 +57,7 @@ const optionen = {
   anker: process.argv.includes('--anker') ? { partien: Number(argument('ankerpartien', 4)) } : null,
 };
 
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], {
+const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], {
   cwd: WURZEL, stdio: 'ignore',
 });
 let browser;

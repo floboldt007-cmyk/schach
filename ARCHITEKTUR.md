@@ -504,7 +504,7 @@ export function setzeFehlerMelder(fn)            // fn(ort, paket, fehler) bekom
 | `arena:karte-boss` | DOM | `arena.js` (U5), `.ort-karte-boss` am Zelt des Wochen-Boss auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | S1-6 Boss |
 | `arena:karte-event` | DOM | `arena.js` (U5), `.ort-karte-event` an der Fahne (Burgturm) auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | Events |
 | `partie:begruessung?` | Wahl | `partie.js` Start, vor der Begruessungs-Blase | `{ bot, farbe, modus, partienGegenBot }` -> `{ anlass, werte }` | 2B 10 |
-| `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel }` | 2A 5 · 1B 10 · 2B 20 |
+| `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel, boss, herausfordern }` (`herausfordern { text, teile() }` nur nach einem Sieg: teilt den Link zur Bot-Herausforderung; ein Paket, das es in seinen Knopf aufnimmt, markiert ihn mit `data-mit-freund`, dann entfaellt der eigene Knopf `.erg-freund`, R14-G2) | 2A 5 · 1B 10 · 2B 20 |
 | `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 · B2 Frag den Coach 30 |
 | `analyse:oben` | DOM | `analyse.js` `baue()`, oben in `.an-rechts` nach dem Banner | `{ app, partie, review }` | frei |
 | `verlauf:seite` | DOM | `verlauf.js` `baue()`, in `.vl-seite` zwischen Statistik und Schatzkiste | `{ app }` | 2A 10 · 2A 15 · 1C 30 · 2D 40 |
@@ -1909,7 +1909,8 @@ gegen Fremde kommt Etappe 1a (Edge Function `online-zug`, die jeden Zug nachrech
   Fehlversuche von vor mehr als 2 Tagen werden geloescht und, wenn `daten-schema.sql` eingespielt ist, Zaehler der
   Mengenbremse, die aelter als 48 Stunden sind (`daten_zaehler_aufraeumen`, dynamisch aufgerufen). `pg_cron` ist nicht
   eingerichtet: Ohne jede Aktivitaet auf dem Server raeumt niemand auf.
-- **Haengende Partien** (`online_haengt`): mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug, ohne Uhr 7 Tage ohne Zug
+- **Haengende Partien** (`online_haengt`): mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug (gewertete Partien nach
+  `ranked_haengt_s`, 30 s, aus `kronen_konstanten` in `zwei-ligen-schema.sql`), ohne Uhr 7 Tage ohne Zug
   (vorlaeufig, Flo entscheidet: `design/runde4/ENTSCHEIDUNGEN.md` Abschnitt 5 Nr. 16).
   Ab dem 2. Halbzug entscheidet bei Partien mit Uhr die Uhr. Geprueft auch in `online_uhr_pruefen` (Zug, Remis,
   Aufgabe, `online_pruefe_zeit`); ein verspaeteter Zug in einer haengenden Partie verfaellt.
@@ -1941,7 +1942,9 @@ die Knoepfe `[data-online="strittig"]` und `[data-online="aufgeben"]` bleiben be
 `ONLINE_PARTIE_BEENDET`), bleibt nur die Meldung des Servers, die Karte zeigt "nicht nachvollziehbar". Ein gemeldetes
 Ende (`matt`, `patt`, `material`, `wiederholung`, `50-zuege`) wird mit chess.js nachgeprueft; stimmt es nicht oder liegt
 ein Widerspruch vor, zeigt die Ergebniskarte "Ergebnis nicht nachvollziehbar" statt Sieg oder Niederlage. Mit Uhr vor dem
-2. Halbzug fragt die Oberflaeche nach 10 Minuten ohne Zug hoechstens einmal je Minute `pruefeZeit`.
+2. Halbzug fragt die Oberflaeche nach 10 Minuten ohne Zug hoechstens einmal je Minute `pruefeZeit`, bei gewerteten
+Partien nach 31 s (eine Sekunde nach `ranked_haengt_s`) und danach hoechstens alle 5 s (Vertrag:
+`tests/online-haengt-vertrag.test.mjs`).
 
 ## Anti-Cheat Etappe 1a, Teil 1 (Edge Function `online-zug`)
 
@@ -2129,7 +2132,7 @@ harte Grenze).
 **Ordner `native/`:** eigenes `package.json` mit `@capacitor/core`, `cli`, `ios` und `android` in einer festen Version
 (alle gleich, kein `^`), `capacitor.config.json` (`appId` Platzhalter `de.crownmate.app`, vor dem ersten Upload
 festlegen; `appName` Crownmate; `webDir` `www`), `kopiere-web.mjs` und eine Anleitung fuer Flo (`native/README.md`).
-`kopiere-web.mjs` kopiert die App-Ordner (`css`, `js`, `assets`, `vendor`, `daten`) und jede Datei aus `DATEIEN` in
+`kopiere-web.mjs` kopiert die App-Ordner (`css`, `js`, `assets`, `vendor`, `daten` ohne `daten/beispiel/`, R18) und jede Datei aus `DATEIEN` in
 `sw.js` nach `native/www` und bricht ab, wenn danach eine Datei der Liste fehlt; es weigert sich, das Repo selbst oder
 einen Ordner darueber zu leeren. `native/www` und `native/node_modules` stehen in `.gitignore`. Die Web-App selbst
 aendert sich nicht: Unter iOS (`capacitor://localhost`) gibt es keinen Service Worker und `registriereSW` faellt still

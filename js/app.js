@@ -68,7 +68,7 @@ import { SYMBOLE } from './symbole.js';
 import {
   ladeEinstellungen, speichereEinstellungen, ladeLaufendePartie, ladePartien, dauerhaftAnfragen, duenneAnalysenAus,
 } from './storage.js';
-import { icon } from './ui/icons.js';
+import { icon, spielSymbol } from './ui/icons.js';
 import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
@@ -78,9 +78,9 @@ import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
-import { brettWahl, klangWahl } from './labor.js';
+import { brettWahl, klangWahl, brettFlaeche } from './labor.js';
 import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderstuecke.js';
-import { sitzung, eigenerName, ladeProfil } from './konto.js';
+import { sitzung, eigenerName, ladeProfil, userId } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { pruefeUmzug } from './umzug.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
@@ -133,6 +133,8 @@ function wendeEinstellungenAn(e) {
   const html = document.documentElement;
   // Labor-Bretter nur fuer den Erfinder (js/labor.js); andere sehen still das Standardbrett
   html.dataset.brett = brettWahl(e.brett);
+  // Oberflaeche der seltenen Labor-Bretter (js/brett-flaechen.js, nur dann geladen)
+  brettFlaeche(html, html.dataset.brett);
   html.dataset.koordinaten = e.koordinaten ? 'an' : 'aus';
   html.dataset.balken = e.balken ? 'an' : 'aus';
   html.dataset.live = e.liveBewertung ? 'an' : 'aus';
@@ -334,7 +336,11 @@ function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art
       if (fertig) return;
       fertig = true;
       document.removeEventListener('keydown', taste, true);
+      // zuklappend: nicht mehr bedienbar und fuer Bildschirmleser weg (sonst zwei Dialoge, wenn gleich der naechste kommt);
+      // Klicks gehen per CSS (.dialog-ort.weg) schon durch aufs Brett
       ort.classList.add('weg');
+      ort.inert = true;
+      ort.setAttribute('aria-hidden', 'true');
       setTimeout(() => ort.remove(), 200);
       if (offenerDialog && offenerDialog.ort === ort) offenerDialog = null;
       // Fokus zurueck, wo er vorher war
@@ -382,7 +388,7 @@ function schliesseDialog() {
 // REITER (erweiterungen.js) sie nennt. Training und Verlauf sind keine Reiter mehr: Training erreicht man ueber die
 // Startseite, der Verlauf gehoert zu Ich. Der Name je Reiter ist die deutsche Quelle; gezeigt wird
 // t('rahmen.reiter.<reiter>') beim Bauen der Leiste.
-const REITER_ALLE = [['heim', 'Start', 'haus'], ['arena', 'Bots', 'pokal'], ['bestenliste', 'Liga', 'liga'], ['ich', 'Ich', 'person']];
+const REITER_ALLE = [['heim', 'Start', 'heim'], ['arena', 'Bots', 'bots'], ['bestenliste', 'Liga', 'liga'], ['ich', 'Ich', 'ich']];
 const REITER_FEST = new Set(['heim', 'arena']);
 // fruehere Reiter: im Testmodus (?reiter=training oder verlauf) schalten sie nur die Leiste ein, ohne eigenen Reiter
 const REITER_FRUEHER = new Set(['training', 'verlauf']);
@@ -435,7 +441,7 @@ function baueReiter(liste) {
   // die Marke zeigt nur die Seitenleiste (css/navigation.css), wie im Entwurf ipad-pc-v2
   nav.innerHTML = '<span class="reiter-marke" aria-hidden="true">Crownmate</span><span class="reiter-pille" aria-hidden="true"></span>'
     + REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, , ic]) =>
-    `<button type="button" class="reiter dr" data-reiter="${n}">${icon(ic)}<span>${t('rahmen.reiter.' + n)}</span></button>`).join('');
+    `<button type="button" class="reiter dr" data-reiter="${n}">${spielSymbol(ic)}<span>${t('rahmen.reiter.' + n)}</span></button>`).join('');
   nav.addEventListener('click', (e) => {
     const k = e.target.closest('[data-reiter]');
     if (!k) return;
@@ -932,11 +938,15 @@ function registriereSW() {
   let wechsel = false;
   // nur im Test: Ablauf des Versionswechsels fuer die Fehlermeldung von tests/e2e.test.mjs (Update)
   const swLog = (s) => { if (TEST) console.info('SW-Ablauf ' + s); };
-  sw.addEventListener('controllerchange', () => {
-    swLog('controllerchange wechsel=' + wechsel);
+  const neuLaden = (grund) => {
     if (!wechsel) return;
     wechsel = false;
+    swLog('neu laden: ' + grund);
     location.reload();
+  };
+  sw.addEventListener('controllerchange', () => {
+    swLog('controllerchange wechsel=' + wechsel);
+    neuLaden('controllerchange');
   });
   const aktiviere = (w) => {
     swLog('aktiviere von ' + String((new Error().stack || '').split('\n')[2] || '').trim().replace(/^.*\/js\//, ''));
@@ -944,8 +954,15 @@ function registriereSW() {
     try { sessionStorage.setItem(SW_MERKER, String(Date.now())); } catch (e) { /* egal */ }
     // laufende Partie sichern (verlasse speichert den Stand), dann uebernimmt die neue Version
     if (aktuell && aktuell.handle) { try { aktuell.handle.verlasse(); } catch (e) { /* egal */ } aktuell.handle = null; }
+    // Neu laden erst, wenn die neue Version wirklich uebernommen hat. Ein fester 4-s-Reload kam auf langsamen Geraeten zu
+    // frueh (b6, CI 13.11.2026): der alte Worker beantwortete die Seite noch aus dem alten Cache, die neue Version
+    // uebernahm danach ohne Neuladen, und die alte Seite lief mit dem neuen Service Worker.
+    w.addEventListener('statechange', () => {
+      if (w.state === 'activated' || w.state === 'redundant') neuLaden('statechange ' + w.state);
+    });
     w.postMessage('aktivieren');
-    setTimeout(() => location.reload(), 4000);   // falls controllerchange ausbleibt
+    if (w.state === 'activated' || w.state === 'redundant') neuLaden('schon ' + w.state);
+    setTimeout(() => neuLaden('Notbremse'), 30000);   // falls die neue Version haengt: die Seite ist schon verlassen
   };
   const kuerzlich = () => {
     try { return Date.now() - Number(sessionStorage.getItem(SW_MERKER) || 0) < 15000; } catch (e) { return true; }
@@ -1131,6 +1148,9 @@ function pruefeSonderstuecke() {
   const vorher = istErfinder();
   ladeSonderstuecke().then((ids) => {
     if (!ids) { sonderFehlerBis = Date.now() + 60000; return; }
+    // Labor-Brett und Figurensatz haengen am Erfinder-Status: neu anwenden (Feldfarben am html, schach:einstellungen),
+    // damit auch ein Spiel-Screen, der nicht neu gezeigt wird, den eigenen Skin bekommt (Befund 4 vom 11.11.2026)
+    if (istErfinder() !== vorher) wendeEinstellungenAn(ladeEinstellungen());
     // laedt gerade ein Screen, zeigt der schon den neuen Stand
     if (istErfinder() === vorher || !aktuell || SPIEL_SCREENS.has(aktuell.name) || ladeNr !== ladeFertig) return;
     zeigeScreen(aktuell.name, aktuell.params || {}, aktuell.hash);
@@ -1139,15 +1159,24 @@ function pruefeSonderstuecke() {
 
 // Eigener Benutzername (js/konto.js eigenerName): angemeldet und noch nicht gemerkt, einmal vom Server holen (Flo 01.11.2026:
 // ein Freund sah "Flo" als seinen Namen). Ohne Benutzernamen erst in 10 Minuten wieder fragen, nach einem Fehler in 1 Minute.
+// R19 (Flo 15.11.2026: "Der Benutzername ist nicht fest"): auch ein gemerkter Name wird einmal je Start und Konto mit dem
+// Server abgeglichen, sonst blieb ein auf einem anderen Geraet geaenderter Name hier fuer immer der alte.
 let nameLaeuft = false;
 let nameBis = 0;
+let nameFuer = null;   // Konto-ID, deren Name in diesem Start schon vom Server kam
 function pruefeName() {
+  let id;
   try {
-    if (nameLaeuft || Date.now() < nameBis || !sitzung() || eigenerName()) return;
+    id = userId(sitzung());
+    if (nameLaeuft || Date.now() < nameBis || !id || (nameFuer === id && eigenerName())) return;
   } catch (e) { return; }
   nameLaeuft = true;
+  const vorher = eigenerName();
   ladeProfil().then(() => {
+    if (userId(sitzung()) !== id) return;
+    nameFuer = id;
     if (!eigenerName()) { nameBis = Date.now() + 600000; return; }
+    if (eigenerName() === vorher) return;
     // die Profilkarte im Ich-Screen zeigt den Namen sofort (nicht mitten in eine Partie)
     if (!aktuell || aktuell.name !== 'ich' || ladeNr !== ladeFertig) return;
     zeigeScreen(aktuell.name, aktuell.params || {}, aktuell.hash);

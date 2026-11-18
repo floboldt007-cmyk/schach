@@ -91,8 +91,12 @@
 //   der Rufname da (rufnameVon), der volle Name im aria-label der Karte. .av der Karten sind die Ziele des Portraetflugs
 //   im Duell-Intro (U5). lage() meldet weiter 'hoch' | 'quer'.
 //   Uhr: .uhr in beiden Karten, versteckt ohne Bedenkzeit (z.tempo). fmtUhr(ms) (exportiert) formatiert, uhr.setze(wer,
-//   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). Die Logik (Laufen,
-//   Zuschlag, Zeitueberschreitung) bringt W0+b; bis dahin steht die Grundzeit still da.
+//   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). R19 Uhr: der Kern
+//   js/uhr.js laeuft ab dem Ende des Intros (duellBereit) fuer die Seite am Zug, auch waehrend der Bot denkt; jeder
+//   Zug traegt seine Zehntel in z.zeiten ein und bekommt den Zuschlag; Zeitende -> ende(..., 'zeit') mit zeitErgebnis
+//   (Remis ohne Mattmaterial des Gegners). Gewertete KI-Partie (z.kiRef) laeuft im Hintergrund weiter wie online und
+//   rechnet beim Fortsetzen die Wanduhr (laufend.uhr.seit); jede andere Partie haelt im Hintergrund an und setzt mit
+//   laufend.uhr.verbraucht fort. Der Bot-Zug kennt die Uhr nicht.
 //   Sprechblase: .blase-ort ist das letzte Kind der Gegner-Karte (quer eine Zeile in der Karte unter dem Namen, hoch
 //   legt sie sich neben dem Portraet ueber Name und Unterzeile, nie ueber die Figuren) und blendet nach BLASE_MS
 //   (3,5 s) aus; nur quer bleibt die Begruessung BEGRUESSUNG_MS stehen. Einstellung
@@ -121,7 +125,7 @@
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
-import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
+import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo, ANLASS_NACH_ERGEBNIS } from '../bots.js';
 import { zugZufall } from '../tag.js';
 import {
   bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, sanAnzeige, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
@@ -147,6 +151,7 @@ import { t, sprache } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/partie.js';
 import { meinName } from '../konto.js';
+import { neueUhr, restAusZeiten, laufAnteil, zeitErgebnis } from '../uhr.js';
 
 
 const SERIE = new Set(['bester', 'stark', 'brillant']);
@@ -157,6 +162,7 @@ const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
 // Grund des Spielendes -> Schluessel im Woerterbuch partie (Text erst beim Zeichnen)
 const GRUND_SCHLUESSEL = {
   matt: 'matt', aufgabe: 'aufgabe', patt: 'patt', wiederholung: 'wiederholung', '50-zuege': 'fuenfzig', material: 'material',
+  zeit: 'zeit',
 };
 function grundText(grund) {
   return Object.hasOwn(GRUND_SCHLUESSEL, grund) ? t('partie.grund.' + GRUND_SCHLUESSEL[grund]) : null;
@@ -354,6 +360,11 @@ export function zeige(root, params, app) {
   const startNummer = Number(z.chess.fen().split(' ')[5]) || 1;
   // Zuege ansehen (zeigeAnsicht): vor dem Nachspielen einer fortgesetzten Partie anlegen, merkeZug liest es
   const ansehen = { ply: null, el: null, brett: null };
+  // R19 Uhr: Kern aus js/uhr.js (nur mit z.tempo, angelegt bei den Uhren unten), uhrTakt zeichnet und prueft das Zeitende
+  let schachuhr = null;
+  let uhrTakt = null;
+  let uhrGestartet = false;
+  const uhrGewertet = z.ki && !!z.kiRef;
   if (laufend) {
     for (const u of laufend.zuege) {
       let m = null;
@@ -375,6 +386,15 @@ export function zeige(root, params, app) {
     z.liveKlassen.push(null);
     z.liveTrivial.push(false);
     z.live.push(null);
+    // R19 Uhr: beim Nachspielen einer fortgesetzten Partie gibt es die Uhr noch nicht (zeiten kommen aus dem Speicher);
+    // 864000 Zehntel (24 h) ist die Obergrenze, die pruefeZeiten (js/storage.js) noch annimmt
+    if (schachuhr) z.zeiten.push(Math.min(864000, Math.round(schachuhr.zug(Date.now()) / 100)));
+    // zieht der Bot, waehrend die Seite verdeckt ist, stand seine gewertete Uhr (laeuftVerdeckt); Flos Uhr laeuft ab
+    // seinem Zug sofort, auch verdeckt, sonst schenkte das Warten im Hintergrund Flo Zeit
+    if (schachuhr && uhrGestartet && document.hidden && z.phase !== 'ende' && !schachuhr.laeuft && laeuftVerdeckt()) {
+      schachuhr.starte(Date.now());
+      uhrTick();
+    }
   }
   const farbeVon = (i) => (i % 2 === 0 ? startFarbe : (startFarbe === 'w' ? 'b' : 'w'));
   const istFlo = (i) => farbeVon(i) === farbe;
@@ -441,7 +461,7 @@ export function zeige(root, params, app) {
   s.innerHTML = `
     <header class="kopf p-kopf">
       <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t(rueckZiel() === 'heim' ? 'partie.kopf.zurueckStart' : 'partie.kopf.zurueck'))}">${icon('zurueck')}</button>
-      <div class="titel"><h1>${esc(kopfTitel())}</h1><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
+      <div class="titel"><h1>${esc(kopfTitel())}</h1><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe && !z.ki
     ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">${esc(t('partie.kopf.stufe', { stufe: bot.stufe }))}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">${esc(t('partie.kopf.duSpielst'))}</span>${esc(farbeName(farbe))}</span></div></div>
       <div class="brettwahl" role="radiogroup" aria-label="${esc(t('partie.kopf.brettfarbe'))}">${brettwahl}</div>
       <button class="icon-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(t('partie.kopf.klang'))}">${icon('klang')}</button>
@@ -619,7 +639,11 @@ export function zeige(root, params, app) {
 
   function zeichneKopf() {
     let name = t('partie.kopf.eigeneStellung');
-    if (z.modus === 'boss') name = bot.regel ? t('partie.kopf.regel', { regel: bot.regel }) : t('partie.kopf.bossPartie');
+    // R19 online-weg: der KI-Ersatz der Gegnersuche ist eine Online-Partie (gewertet nur mit Beleg kiRef, js/pakete/liga)
+    if (z.ki) {
+      name = [t('partie.kopf.online'), z.kiRef && t('partie.kopf.gewertet'), z.tempo && `${Math.round(z.tempo.grund / 60)} + ${z.tempo.zuschlag}`]
+        .filter(Boolean).join(' · ');
+    } else if (z.modus === 'boss') name = bot.regel ? t('partie.kopf.regel', { regel: bot.regel }) : t('partie.kopf.bossPartie');
     else if (z.modus === 'uebung') name = t('partie.kopf.uebungAb', { nr: startNummer });
     else if (!startFen) {
       const er = eroeffnung(z.san);
@@ -1457,10 +1481,18 @@ export function zeige(root, params, app) {
     if (weg) return false;
     if (z.phase === 'bot' && app.einstellungen().vorzuege !== false) return merkeVorzug(von, nach, umwandlung);
     if (z.phase !== 'flo') return false;
+    if (zeitAus()) return false;
     let m = null;
     try { m = z.chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { m = null; }
     if (!m) return false;
     spieleEigenenZug(m, info && Number.isFinite(info.landung) ? info.landung : brett.gleitDauer());
+    return true;
+  }
+  // R19 Uhr: nur der 100-ms-Takt beendet die Partie bei Zeitende; haengt er (belegter Hauptfaden, gedrosselter
+  // Hintergrund), wird ein spaeter Zug nicht gebucht, sondern die Partie endet hier mit 'zeit'
+  function zeitAus() {
+    if (!schachuhr || z.phase === 'ende' || !schachuhr.abgelaufen(Date.now())) return false;
+    uhrTick();
     return true;
   }
 
@@ -1474,7 +1506,7 @@ export function zeige(root, params, app) {
   }
 
   function fuehreVorzugAus() {
-    if (!z.vorzuege.length || weg || z.phase === 'ende') return false;
+    if (!z.vorzuege.length || weg || z.phase === 'ende' || zeitAus()) return false;
     const v = z.vorzuege.shift();
     let m = null;
     try { m = z.chess.move({ from: v.von, to: v.nach, promotion: v.umwandlung || 'q' }); } catch (e) { m = null; }
@@ -1617,6 +1649,7 @@ export function zeige(root, params, app) {
   }
 
   function fuehreBotZugAus(uci) {
+    if (zeitAus()) return;
     let m = null;
     try { m = z.chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || undefined }); } catch (e) { m = null; }
     if (!m) { const n = notZug(); if (n && n.uci !== uci) fuehreBotZugAus(n.uci); return; }
@@ -1707,6 +1740,7 @@ export function zeige(root, params, app) {
       if (e && e.erledigt) e.erledigt();   // wartende Bot-Pause loesen; Marke ist damit veraltet
     }
     z.zuruecknahmen++;
+    if (schachuhr) setzeUhrNeu(Date.now());
     merkeSerie();
     sende('zug:zurueckgenommen', { laufId, bisPly: fp, plies: anzahl });
     if (z.zuruecknahmen === 1) app.meldung(t('partie.meldung.zurueckgenommen'));
@@ -1785,6 +1819,7 @@ export function zeige(root, params, app) {
       modus: z.modus, ziel: z.ziel, extra: z.extra, maxSerie: z.maxSerie,
       liveTrivial: z.zuege.map((_, i) => z.liveTrivial[i] === true),
       ...spielFelder(),
+      ...(schachuhr ? { uhr: uhrStand(Date.now()) } : {}),
     };
   }
   // W0+a: seed, boss, liga, tempo, zeiten (nur gesetzte; storage prueft sie)
@@ -1855,6 +1890,7 @@ export function zeige(root, params, app) {
     loescheVorzuege();
     pfeilTippWeg();
     z.phase = 'ende';
+    halteUhr();
     if (app.schliesseDialog) app.schliesseDialog();   // z. B. "Wirklich aufgeben?", wenn der Bot mattsetzt
     abbrechenBot();
     brett.erlaubeZuege(null);
@@ -1877,7 +1913,7 @@ export function zeige(root, params, app) {
       if (kompakt) coachEl.classList.add('kompakt');
     }
     klang.ende(ergebnis === 'sieg' ? true : ergebnis === 'niederlage' ? false : null);
-    zeigeBlase(ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis', 'ende', { dauer: 0, immer: true });
+    zeigeBlase(ANLASS_NACH_ERGEBNIS[ergebnis] || 'remis', 'ende', { dauer: 0, immer: true });
     melde({ typ: 'ende', ergebnis, grund });
     s.classList.add('ist-ende');
     if (grund !== 'aufgabe') balkenAktualisieren();
@@ -2066,6 +2102,7 @@ export function zeige(root, params, app) {
     let unter;
     if (grund === 'matt') unter = t(ergebnis === 'sieg' ? 'partie.erg.mattSieg' : 'partie.erg.mattNiederlage', { nr, name: bot.name });
     else if (grund === 'aufgabe') unter = t('partie.erg.aufgabe', { name: bot.name });
+    else if (grund === 'zeit') unter = t({ sieg: 'partie.erg.zeitSieg', niederlage: 'partie.erg.zeitNiederlage', remis: 'partie.erg.zeitRemis' }[ergebnis], { name: bot.name });
     else unter = t('partie.erg.grund', { grund: grundText(grund) || t('partie.grund.remis'), name: bot.name });
     // Nicht wertende Partie (Uebung, eigene Stellung): Chip "ÜBUNG" neben dem Kopfwort, keine Sterne. Kein Konfetti mehr.
     const wertend = z.gespeichert ? z.gespeichert.wertet !== false : wertetJetzt();
@@ -2087,9 +2124,12 @@ export function zeige(root, params, app) {
         <div class="erg-aktionen"><div class="erg-knoepfe"></div>
           <button class="erg-lobby" type="button" hidden>${icon('haus')}<span>${esc(t('partie.erg.lobby'))}</span></button></div>
       </div>`;
-    o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
+    o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ANLASS_NACH_ERGEBNIS[ergebnis] || 'remis') || '';
     // U7: Bot-Sprueche aus: auch kein Spruch im Ergebnis
     o.querySelector('.erg-bot').hidden = app.einstellungen().sprueche === 'aus';
+    // R7 (Befund B13): der Spruch zieht ins Blatt um und steht nur noch dort; die Blase am Brett war bis hierher sein
+    // Moment beim Matt und wuerde ihn sonst daneben wiederholen (am PC sichtbar in der Spalte neben dem Blatt)
+    versteckeBlase();
     const zeigeBrett = () => {
       o.hidden = true;
       s.classList.remove('mit-ergebnis');
@@ -2115,7 +2155,8 @@ export function zeige(root, params, app) {
     });
     // Sieg-Blatt (Flo 09.11., Variante C): Sterne und darunter der Level-Fortschritt; Punkte und Wertung
     // blendet css/ergebnis.css aus, ein Verweis fuehrt in die Liga. Nur bei wertenden Partien, sonst gibt es dort nichts.
-    if (ergebnis === 'sieg' && wertend) {
+    // Das Niederlage-Blatt verweist ebenso in die Liga, statt die Zahlen zu zeigen (R7 Ergebnis A, 13.11.2026).
+    if ((ergebnis === 'sieg' || ergebnis === 'niederlage') && wertend) {
       const verweis = document.createElement('button');
       verweis.type = 'button';
       verweis.className = 'erg-liga-verweis';
@@ -2193,13 +2234,29 @@ export function zeige(root, params, app) {
     // ---------- Ort ergebnis:karte (bei jedem fuelle neu) ----------
     const karteOrtEl = o.querySelector('.erg-karte-ort');
     let karteOrt = null;
+    // W3 R12: "Freund herausfordern" teilt nach einem Sieg den Link zur Bot-Herausforderung. R14-G2: der Ort bekommt die
+    // Handlung als herausfordern { text, teile }; ein Paket, das daraus mit dem Siegesbild EINEN Knopf "Teilen …" macht,
+    // markiert ihn mit data-mit-freund, dann entfaellt der eigene Knopf (fuelle unten)
+    const herausfordern = ergebnis === 'sieg' ? Object.freeze({
+      text: t('partie.erg.freundHerausfordern'),
+      teile() {
+        const url = new URL(location.href);
+        url.search = new URLSearchParams({ bot: bot.id }).toString();
+        url.hash = '';
+        const text = t('partie.erg.freundHerausfordern');
+        if (navigator.share) navigator.share({ title: 'Crownmate', text, url: url.href }).catch(() => {});
+        else navigator.clipboard?.writeText(url.href).catch(() => {});
+      },
+    }) : null;
     function fuelleKarte(erg, review, rechnet, nachtrag, wertet) {
       if (karteOrt) karteOrt.verlasse();
       karteOrt = fuelle('ergebnis:karte', karteOrtEl, {
         app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus: z.modus, ziel: z.ziel,
-        boss: z.boss ? Object.freeze({ ...z.boss }) : null,
+        boss: z.boss ? Object.freeze({ ...z.boss }) : null, herausfordern,
       });
       karteOrtEl.hidden = karteOrt.anzahl === 0;
+      // teilt ein Paket den Freund-Link schon mit (auch erst nach dem Nachtrag), steht er nicht doppelt im Blatt
+      if (karteOrtEl.querySelector('[data-mit-freund]')) o.querySelector('.erg-freund')?.remove();
       return karteOrt.anzahl;
     }
 
@@ -2218,7 +2275,14 @@ export function zeige(root, params, app) {
         const p = erg.partie;
         const wertet = erg.wertet !== false && wertend;
         zeigeFeier(p.id);
+        // der Nachtrag baut den Ort ergebnis:karte neu: stand der Fokus auf der Revanche (Folgeaktion statt "Nochmal",
+        // R7), wandert er auf den neuen Knopf, statt mit dem alten zu verschwinden
+        const revancheFokus = !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('.erg-karte-ort .gd-revanche'));
         const karten = fuelleKarte(erg, review, rechnet, nachtrag, wertet);
+        if (revancheFokus && !karteOrtEl.contains(document.activeElement)) {
+          const r = karteOrtEl.querySelector('.gd-revanche');
+          if (r) r.focus({ preventScroll: true });
+        }
         const sterne = p.sterne || [false, false, false];
         const neueSterne = erg.neueSterne || [false, false, false];
         const gen = p.genauigkeit;
@@ -2289,7 +2353,7 @@ export function zeige(root, params, app) {
         const neu = wertet ? erg.neuFreigeschaltet : null;
         if (neu && !nachtrag) {
           o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${themaBotFarbe(neu)}">
-            <span class="avatar"><img src="${esc(neu.avatar)}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
+            <span class="avatar"><img src="${esc(avatarVon(neu))}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
             <div><div class="ef-titel">${esc(t('partie.erg.freigeschaltet', { stufe: neu.stufe }))}</div><div class="ef-name">${esc(neu.name)} <span class="ef-elo zahl">${neu.elo}</span></div></div></div>`;
         }
         if (!nachtrag) {
@@ -2301,6 +2365,9 @@ export function zeige(root, params, app) {
           // R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner leuchtet "Nächster Gegner", die Analyse
           // steht klein darunter neben "Zu den Bots"; nach Niederlage und Remis bleibt die Analyse vorne
           const siegVorne = ergebnis === 'sieg' && !!naechster;
+          // R7 (Befund B13): zeigt ein Paket im Ort ergebnis:karte schon die Revanche (gleicher Bot, Farben getauscht, wie
+          // in der Online-Partie), entfaellt "Nochmal": ein Knopf fuer dasselbe statt zwei
+          const revanche = karteOrtEl.querySelector('.gd-revanche');
           o.querySelector('.erg-aktionen').classList.toggle('sieg-vorne', siegVorne);
           knoepfe.innerHTML = siegVorne
             ? `<button class="knopf primaer gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>
@@ -2308,7 +2375,10 @@ export function zeige(root, params, app) {
             : `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
           ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${esc(t(abHier ? 'partie.erg.abHier' : 'partie.erg.nochmal'))}</button>`
             : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>`
-              : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
+              : revanche ? ''
+                : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
+          // steht "Zur Analyse" allein in der zweispaltigen Reihe (neben der Revanche), nimmt es die ganze Breite
+          if (!siegVorne && knoepfe.children.length === 1) knoepfe.firstElementChild.style.gridColumn = '1 / -1';
           // aktuellErg: nach dem Nachtrag zaehlt auch ein neuer Stern 2
           knoepfe.querySelector('[data-ziel="analyse"]').addEventListener('click', () => app.gehe('analyse', {
             partieId: p.id, neuFreigeschaltet: neu ? neu.id : undefined, neueSterne: aktuellErg.neueSterne,
@@ -2330,25 +2400,22 @@ export function zeige(root, params, app) {
           // Flo 30.10. abends: "mich stoert, dass ich nicht von da aus direkt zur Lobby kann (Startseite)"
           const lobby = o.querySelector('.erg-lobby');
           if (lobby) { lobby.hidden = false; lobby.onclick = () => app.gehe('arena'); }
-          // W3 R12: "Freund herausfordern" – nach Sieg den Link zur Bot-Herausforderung teilen
-          if (ergebnis === 'sieg' && !o.querySelector('.erg-freund')) {
+          // W3 R12: "Freund herausfordern" als eigener Knopf nur, wenn kein Paket ihn in "Teilen …" mitfuehrt (R14-G2:
+          // ohne Siegesbild, etwa in der Uebung, bleibt es ein direkter Knopf)
+          if (herausfordern && !o.querySelector('.erg-freund') && !karteOrtEl.querySelector('[data-mit-freund]')) {
             const freundBtn = document.createElement('button');
             freundBtn.type = 'button';
             freundBtn.className = 'knopf erg-freund';
-            freundBtn.innerHTML = `${icon('teilen')} <span>${esc(t('partie.erg.freundHerausfordern'))}</span>`;
-            freundBtn.addEventListener('click', () => {
-              const url = new URL(location.href);
-              url.search = new URLSearchParams({ bot: bot.id }).toString();
-              url.hash = '';
-              const text = t('partie.erg.freundHerausfordern');
-              if (navigator.share) navigator.share({ title: 'Crownmate', text, url: url.href }).catch(() => {});
-              else navigator.clipboard?.writeText(url.href).catch(() => {});
-            });
+            freundBtn.innerHTML = `${icon('teilen')} <span>${esc(herausfordern.text)}</span>`;
+            freundBtn.addEventListener('click', () => herausfordern.teile());
             o.querySelector('.erg-aktionen').prepend(freundBtn);
           }
           // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.
           // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
-          const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]');
+          // Nach Niederlage und Remis ist das "Zur Analyse" (R12-W1); sonst traegt die Revanche einen orangen Fokusring
+          // neben dem orangen Analyse-Knopf (R16-Kritik E3, Auswahl a)
+          const folge = (ergebnis !== 'sieg' && knoepfe.querySelector('[data-ziel="analyse"]'))
+            || knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]') || revanche;
           if (folge) folge.focus({ preventScroll: true });
         }
         o.classList.add(rechnet ? 'vorlaeufig' : 'gefuellt');
@@ -2672,8 +2739,145 @@ export function zeige(root, params, app) {
   if (handyMq && handyMq.addEventListener) handyMq.addEventListener('change', layout);
   if (z.tempo) {
     uhr.zeige(true);
-    uhr.setze('bot', z.tempo.grund * 1000);
-    uhr.setze('flo', z.tempo.grund * 1000);
+    // R19 Uhr: Rest aus den gespeicherten zeiten und dem laufenden Zug. Ein unbekannter Eintrag (alter Stand ohne zeiten
+    // oder ungueltiger Wert, laufend.zeitenJe aus js/storage.js) bringt nie Zeit: Flos unbekannte Eintraege bekommen
+    // zusammen die Wanduhr seit dem Start bis zum laufenden Zug (ohne gueltiges uhr.seit bis jetzt minus verbraucht) minus
+    // alles gueltig Gebuchte, jeder mindestens den Zuschlag; die des Bots den Zuschlag (netto 0). Das gilt gewertet wie ungewertet (Vertrag, Entscheid Hauptfenster
+    // 16.11.2026, Fix-Review 07): lieber zu wenig Zeit als zu viel (Fix-Review f1); ungewertet kostet ein kaputter Eintrag
+    // damit auch die Pausen davor, ein alter Stand kann so auf Zeit verlieren.
+    // Ein verkleinerter, aber gueltiger Wert bleibt unerkannt; das Geraet ist keine Vertrauensgrenze, die Dauer der
+    // Partie gegen den Start der kiRef prueft der Server (eigener Auftrag)
+    const lauf = laufend && laufend.uhr && typeof laufend.uhr === 'object' ? laufend.uhr : null;
+    // uhr.seit gilt nur zwischen Start und jetzt: in der Zukunft kostete der laufende Zug nichts (Zeitgewinn) bzw.
+    // buchte Flo die Spanne bis dorthin (Fix-Review 64, Proben E/F); sonst wie ohne uhr die Wanduhr ab Start
+    // Untergrenze ist der Beginn des laufenden Zugs (Start plus alle gueltig gebuchten Zeiten), nicht der Start der Partie:
+    // ein uhr.seit dazwischen buchte die schon gebuchten Zuege ein zweites Mal (Fix-Review 64 c76e18e, Probe H)
+    const gebucht = z.zeiten && z.zeiten.length === z.zuege.length ? z.zeiten
+      : (laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : []);
+    const zugBeginn = Date.parse(z.gestartet) + gebucht.reduce((a, x) => a + (Number.isInteger(x) && x >= 0 ? x * 100 : 0), 0);
+    const seitGilt = !!lauf && Number.isFinite(lauf.seit) && lauf.seit <= Date.now() && !(lauf.seit < zugBeginn);
+    let wandSeit = null;
+    const verbraucht = lauf && Number.isFinite(lauf.verbraucht) && lauf.verbraucht >= 0 ? lauf.verbraucht : null;
+    if (!z.zeiten || z.zeiten.length !== z.zuege.length) {
+      const je = laufend && Array.isArray(laufend.zeitenJe) ? laufend.zeitenJe : [];
+      const bekannt = (i) => Number.isInteger(je[i]);
+      z.zeiten = z.zuege.map((_, i) => (bekannt(i) ? je[i] : 0));
+      const start = Date.parse(z.gestartet);
+      // ohne gueltiges uhr.seit reicht die Wanduhr der unbekannten Eintraege nur bis zum Beginn des laufenden Zugs (jetzt
+      // minus das gespeicherte verbraucht); der laufende Zug behaelt verbraucht. Frueher lief sie bis jetzt und der laufende
+      // Zug zaehlte 0: ging die Geraeteuhr zurueck, ersetzt js/storage.js gestartet durch jetzt, die Wanduhr gab 0 her und
+      // die ganze Denkzeit kam zurueck (Fix-Review c8, Probe 2:45 -> 3:02)
+      const ende = seitGilt ? lauf.seit : Date.now() - (verbraucht ?? 0);
+      let offen = Number.isFinite(start) ? Math.max(0, Math.round((ende - start) / 100) - z.zeiten.reduce((a, x) => a + x, 0)) : 0;
+      const vonFlo = (i) => (i % 2 === 0) === (startFarbe === farbe);
+      const floOffen = z.zuege.map((_, i) => i).filter((i) => !bekannt(i) && vonFlo(i));
+      for (const i of z.zuege.keys()) if (!bekannt(i) && !vonFlo(i)) z.zeiten[i] = z.tempo.zuschlag * 10;
+      // ohne gueltigen Start: den Zuschlag. Ein geladener Stand kommt so nicht an (js/storage.js ersetzt mit tempo einen
+      // ungueltigen gestartet), der Zweig faengt nur einen Aufrufer ohne storage ab
+      if (!Number.isFinite(start)) for (const i of floOffen) z.zeiten[i] = z.tempo.zuschlag * 10;
+      else {
+        // jeder unbekannte Eintrag von Flo kostet mindestens den Zuschlag (netto 0): seinen echten Wert kennt nach einem
+        // Rueckschritt der Geraeteuhr niemand, also kein Zeitgewinn und keine Strafe (Entscheid Hauptfenster 16.11.2026,
+        // rueckholbar)
+        floOffen.forEach((i, n) => {
+          const teil = Math.floor(offen / (floOffen.length - n));
+          z.zeiten[i] = Math.max(teil, z.tempo.zuschlag * 10); offen -= teil;
+        });
+        // bis jetzt laufen nur, wenn ein Eintrag von Flo die Wanduhr aufgenommen hat oder uhr.seit gilt; sonst wie mit
+        // gueltigen zeiten ab Start plus nur den gueltig gebuchten Eintraegen (ohne den ersetzten Bot-Zuschlag, Kaltreview 64)
+        wandSeit = floOffen.length || seitGilt
+          ? ende : start + z.zuege.reduce((a, _, i) => a + (bekannt(i) ? je[i] * 100 : 0), 0);
+      }
+    }
+    // Rest ohne den laufenden Zug; der laufende Zug geht als imZug in die Uhr, damit ihn der naechste Speicherstand und
+    // sein zeiten-Eintrag ganz enthalten (Fix-Review 07: sonst brachte zweimal zu und auf diesen Teil zurueck)
+    const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe });
+    let imZug = 0;
+    if (laufend) {
+      const wand = (seit) => laufAnteil({ laufSeit: seit, jetzt: Date.now() });
+      const abStart = () => Date.parse(z.gestartet) + z.zeiten.reduce((a, x) => a + x * 100, 0);
+      // der Bot kann bei geschlossener App nicht ziehen: er zahlt nie die Zeit, in der sie zu war, auch gewertet nicht
+      // (Fix-Review 07: sonst gewann Schliessen waehrend der Bot denkt die Partie auf Zeit)
+      if (r.amZug !== farbe) imZug = verbraucht ?? 0;
+      // gewertet laeuft Flos Uhr weiter wie online (Wanduhr); ohne gueltige uhr nicht "seit jetzt", sondern ab dem Start
+      // minus die gebuchten Zeiten, und nie weniger als das gespeicherte verbraucht (ungueltiges seit schenkt nichts)
+      else if (uhrGewertet) imZug = Math.max(wand(seitGilt ? lauf.seit : wandSeit != null ? wandSeit : abStart()), verbraucht ?? 0);
+      else if (verbraucht != null) imZug = verbraucht;
+      // ungewertet ohne gueltiges verbraucht (Altstand ohne uhr oder kaputter Wert): weiterspielen mit einem Ersatz ohne
+      // Zeitgewinn, die Wanduhr seit dem Beginn des laufenden Zugs. Lieber zu wenig Zeit; ein sehr alter Stand kann damit
+      // auf Zeit verlieren (e7 15.11.2026, Variante A, rueckholbar; Fix-Review 64 c76e18e, Proben I/J)
+      else imZug = wand(seitGilt ? lauf.seit : abStart());
+    }
+    schachuhr = neueUhr({ ...z.tempo, amZug: r.amZug, w: r.w, b: r.b, imZug });
+    zeigeUhr(Date.now());
+    duellBereit.then(() => {
+      if (weg || z.phase === 'ende') return;
+      uhrGestartet = true;
+      // im Hintergrund startet nur Flos gewertete Uhr; sonst erst beim Zurueckkommen (beiSichtbarkeit)
+      if (document.hidden && !laeuftVerdeckt()) return;
+      schachuhr.starte(Date.now());
+      uhrTick();
+    });
+    document.addEventListener('visibilitychange', beiSichtbarkeit);
+    window.addEventListener('pagehide', speichereLaufend);
+  }
+  function zeigeUhr(n) {
+    const lauf = schachuhr.laeuft && z.phase !== 'ende';
+    uhr.setze('flo', schachuhr.rest(farbe, n), { laeuft: lauf && schachuhr.amZug === farbe });
+    uhr.setze('bot', schachuhr.rest(botFarbe, n), { laeuft: lauf && schachuhr.amZug === botFarbe });
+  }
+  function uhrTick() {
+    clearTimeout(uhrTakt);
+    uhrTakt = null;
+    if (!schachuhr || weg || z.phase === 'ende') return;
+    const n = Date.now();
+    zeigeUhr(n);
+    const aus = schachuhr.abgelaufen(n);
+    if (aus) {
+      const r = zeitErgebnis(z.chess.fen(), aus);
+      ende(r === 'remis' ? 'remis' : r === farbe ? 'sieg' : 'niederlage', 'zeit');
+      return;
+    }
+    if (schachuhr.laeuft) uhrTakt = setTimeout(uhrTick, 100);
+  }
+  function halteUhr() {
+    if (!schachuhr) return;
+    clearTimeout(uhrTakt);
+    uhrTakt = null;
+    const n = Date.now();
+    schachuhr.halte(n);
+    zeigeUhr(n);
+  }
+  // verdeckt laeuft nur Flos Uhr in der gewerteten Partie weiter (Wanduhr wie online); die Seite des Bots und jede
+  // ungewertete Partie halten an (Fix-Review 07: der Bot zahlte sonst fuer die Zeit, in der Flo weg war)
+  function laeuftVerdeckt() {
+    return uhrGewertet && !!schachuhr && schachuhr.amZug === farbe;
+  }
+  // der Takt holt beim Zurueckkommen auf; weiter ist ein No-op, wenn die Uhr laeuft
+  function beiSichtbarkeit() {
+    if (!schachuhr || weg || z.phase === 'ende') return;
+    const n = Date.now();
+    if (document.hidden) {
+      if (!laeuftVerdeckt()) schachuhr.halte(n);
+      speichereLaufend();
+    } else {
+      if (uhrGestartet) schachuhr.weiter(n);
+      uhrTick();
+    }
+  }
+  // nach dem Zuruecknehmen (nur Test-Haken): Rest neu aus den verbliebenen zeiten
+  function setzeUhrNeu(n) {
+    z.zeiten.length = z.zuege.length;
+    const r = restAusZeiten(z.tempo, z.zeiten, { startFarbe });
+    const lief = schachuhr.laeuft;
+    schachuhr = neueUhr({ ...z.tempo, amZug: r.amZug, w: r.w, b: r.b });
+    if (lief) schachuhr.starte(n);
+    uhrTick();
+  }
+  // Speicherstand des laufenden Zugs: seit (Wanduhr, gewertete Partie) und verbraucht (angehaltene Partie)
+  function uhrStand(n) {
+    const v = Math.round(schachuhr.imZug(n));
+    return { seit: n - v, verbraucht: v };
   }
   const gegnerOrt = fuelle('partie:gegner-leiste', gegnerLeiste, {
     app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss, lage,
@@ -2795,9 +2999,23 @@ export function zeige(root, params, app) {
 
   layout();
 
+  // Figurensatz wirkt sofort (R3, 12.11.2026, dieselbe Luecke wie in js/ui/online.js vom 11.11.): kommt der Erfinder-Status
+  // erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt Flo einen anderen
+  // Satz, bekommen die stehenden Figuren den neuen Satz. Anders als online.js wird das Brett NICHT neu gebaut: Pakete halten
+  // buehne.brett, und Markierungen, Pfeile, Abzeichen und Vorzug-Nummern bleiben so stehen. Neue Figuren (Umwandlung) nimmt
+  // das Brett aus brett.figurenPfad; der Dateiname je Figur ist <code>.svg wie in Brett._bild (js/board.js).
+  function wendeFigurensatzAn(b, d) {
+    const pfad = figurenPfad(d);
+    if (!b || !pfad || pfad === b.figurenPfad) return;
+    b.figurenPfad = pfad;
+    for (const img of b.el.querySelectorAll('img.figur[data-figur]')) img.src = pfad + img.dataset.figur + '.svg';
+  }
+
   // Einstellungen wirken sofort (U7: alle Komfort-Schalter aus PLAN 4, ohne Neuladen)
   const beiEinstellungen = (e) => {
     const d = e.detail || {};
+    // ohne detail kein Satz-Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto
+    if (e.detail) { wendeFigurensatzAn(brett, d); wendeFigurensatzAn(ansehen.brett, d); }
     brett.koordinaten(!!d.koordinaten);
     const lageVorher = brett.koordLage();
     brett.setzeKoordLage(d.koordLage);
@@ -2868,6 +3086,9 @@ export function zeige(root, params, app) {
       if (engBewertung && laufendeAnalysen.size) { try { engBewertung.stop({ warteschlange: true }); } catch (e) { /* egal */ } }
       for (const u of uhren) clearTimeout(u);
       uhren.clear();
+      clearTimeout(uhrTakt);
+      document.removeEventListener('visibilitychange', beiSichtbarkeit);
+      window.removeEventListener('pagehide', speichereLaufend);
       clearTimeout(z.blaseUhr);
       clearTimeout(z.kompaktUhr);
       if (overlay) overlay.verlasse();

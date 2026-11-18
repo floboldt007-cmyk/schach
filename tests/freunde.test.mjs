@@ -113,7 +113,7 @@ pruefe('keine E-Mail in Anfragen', !calls.some((c) => String(c.body || '').inclu
 // ---------------------------------------------------------------------------
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8931);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -169,7 +169,7 @@ async function seiteMit(browser, { sitzung = null, server = {}, hash = '#bestenl
 
 async function browserTeil() {
   const pw = ladePlaywright();
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser;
   try {
     for (let i = 0; i < 60; i++) { try { const r = await fetch(`http://127.0.0.1:${PORT}/index.html`); await r.arrayBuffer(); if (r.ok) break; } catch (e) { /* noch nicht */ } await warte(150); }
@@ -180,6 +180,7 @@ async function browserTeil() {
     pruefe('abgemeldet: Satz und „Zum Konto“, Codes offen, keine Server-Anfrage', /Mit einem Konto/.test(text) && /Zum Konto/.test(text)
       && await p.s.locator('details.bl-fr-codes[open]').count() === 1 && !p.anfragen.some((a) => a.url.includes('/rpc/'))
       && await p.s.locator('.bl-steuer-fenster').isHidden(), text);
+    pruefe('abgemeldet: Codes-Kopf nennt „Ohne Konto“', (await p.s.locator('details.bl-fr-codes > summary').innerText()).trim() === 'Ohne Konto: Partie als Code teilen');
     pruefe('abgemeldet: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     await p.k.close();
 
@@ -191,6 +192,9 @@ async function browserTeil() {
       && z[1].du && z[1].av && /Flo \(du\)/.test(z[1].text) && /9 gewertete Partien/.test(z[1].text), z);
     pruefe('Hinweis „Anfragen an dich: 1“, Codes zu, Zeitfenster sichtbar', /Anfragen an dich: 1/.test(await p.s.locator('.bl-fr').innerText())
       && await p.s.locator('details.bl-fr-codes[open]').count() === 0 && await p.s.locator('.bl-steuer-fenster').isVisible());
+    // R8 (13.11.2026): angemeldet steht ueber den zugeklappten Codes kein "Ohne Konto: …" mehr, sondern ein passender Satz
+    const codesKopf = (await p.s.locator('details.bl-fr-codes > summary').innerText()).trim();
+    pruefe('angemeldet: Codes-Kopf ohne „Ohne Konto“, heisst „Partie als Code teilen“', codesKopf === 'Partie als Code teilen', codesKopf);
     const melden = p.anfragen.find((a) => a.url.includes('/rpc/wochenpunkte_melden'));
     const mb = melden && JSON.parse(melden.body);
     pruefe('Wochenwertung gemeldet: Montag dieser Woche, ganze Zahlen', !!mb && /^\d{4}-\d{2}-\d{2}$/.test(mb.woche) && new Date(mb.woche + 'T12:00:00Z').getUTCDay() === 1

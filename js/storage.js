@@ -191,7 +191,15 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
 // Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
 export const EINSTELLUNG_WERTE = Object.freeze({
   // dahinter die Bretter des Labors (js/labor.js, nur das Erfinder-Konto; app.js faellt fuer andere auf 'nacht')
-  brett: Object.freeze(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron', 'acker', 'moos', 'pflaster', 'brandung', 'tiefsee']),
+  brett: Object.freeze(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron', 'acker', 'moos', 'pflaster', 'brandung', 'tiefsee',
+    // 65 Bretter (Flo 14.11.2026), Katalog in js/labor.js
+    'ahorn', 'schiefer', 'turnier', 'elfenbein', 'ebenholz', 'kirsche', 'wiese', 'duene', 'birke', 'herbst', 'kirschbluete', 'lavendel', 'bambus',
+    'sonnenblume', 'gletscher', 'vulkan', 'topas', 'amethyst', 'perlmutt', 'jade', 'bernstein', 'smaragd', 'saphir', 'rubin', 'opal', 'onyx',
+    'scheune', 'heuboden', 'lichtung', 'koehlerglut', 'rathausuhr', 'bibliothek', 'leuchtturm', 'watt', 'leuchtqualle', 'schatzkammer', 'sternennacht', 'mondschein', 'daemmerung',
+    'nachtmarkt', 'geisterstunde', 'gewitter', 'neon', 'synthwave', 'cyber', 'nordlicht', 'sonnenkrone', 'drachenglut', 'sternenstaub', 'kronjuwel', 'phoenix', 'tiefenleuchten',
+    // 20 Motiv-Bretter Fassung 4 (Flo 14.11.2026), Katalog js/labor.js MOTIV_BRETTER
+    'kirchenfenster', 'seekarte', 'sternbilder', 'intarsie', 'orientteppich', 'goldthron', 'honigwabe', 'marmorsaal', 'jadepalast', 'eiskristall',
+    'lavafeld', 'urwald', 'zahnwerk', 'papyrus', 'kirschgarten', 'art-deco', 'unterwasser', 'galaxie', 'mosaik', 'buchleder']),
   klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall', 'juwel']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
@@ -557,6 +565,16 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function pruefeKiRef(r) {
   return typeof r === 'string' && UUID_RE.test(r) ? r : null;
 }
+// W-online-analyse (13.11.2026): Kennzeichen einer Online-Partie auf dem Geraet. Sie liegt als Partie zweier Menschen
+// (modus 'zuzweit': wertet nie, kein Bot, die Namen in zuzweit) und traegt online { gewertet }; die Analyse und
+// "Meine Partien" zeigen sie damit aus der eigenen Sicht (spielerFarbe) statt als "Zu zweit".
+export function pruefeOnline(o) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  return { gewertet: o.gewertet === true };
+}
+export function istOnline(p) {
+  return !!p && p.modus === 'zuzweit' && !!pruefeOnline(p.online);
+}
 // Felder setzen oder (falsch/leer) entfernen
 function setzeOderWeg(p, feld, wert) {
   if (wert == null) delete p[feld];
@@ -564,6 +582,7 @@ function setzeOderWeg(p, feld, wert) {
 }
 function normalisiereSpiel(p) {
   setzeOderWeg(p, 'zuzweit', p.modus === 'zuzweit' ? pruefeZuzweit(p.zuzweit) : null);
+  setzeOderWeg(p, 'online', p.modus === 'zuzweit' ? pruefeOnline(p.online) : null);
   setzeOderWeg(p, 'seed', pruefeSeed(p.seed));
   setzeOderWeg(p, 'tempo', pruefeTempo(p.tempo));
   setzeOderWeg(p, 'zeiten', pruefeZeiten(p.zeiten, Array.isArray(p.zuege) ? p.zuege.length : 2000));
@@ -903,7 +922,25 @@ export function ladeLaufendePartie() {
   const modus = MODI.includes(s.modus) ? s.modus : 'normal';
   const ziel = modus === 'uebung' ? pruefeZiel(s.ziel) : null;
   const extra = pruefeExtra(s.extra) || {};
-  return normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra });
+  // R19 Uhr: zeitenJe prueft jeden Eintrag einzeln (ungueltig oder fehlend: null), damit die Uhr beim Fortsetzen nicht
+  // alle Zeiten verliert, wenn einer kaputt ist; zeiten selbst verwirft pruefeZeiten weiter im Ganzen
+  const zeitenJe = zuege.map((_, i) => {
+    const x = Array.isArray(s.zeiten) ? s.zeiten[i] : undefined;
+    return Number.isInteger(x) && x >= 0 && x <= 864000 ? x : null;
+  });
+  const n = normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra, zeitenJe });
+  // R19 Uhr: mit Bedenkzeit rechnet die Uhr beim Fortsetzen ab gestartet (js/ui/partie.js); fehlt es, ist es kaputt oder
+  // liegt es in der Zukunft, braechte der Stand Zeit zurueck. Statt die Partie still zu verwerfen (Fix-Review 07), wird es
+  // ersetzt: mit gueltigem uhr.seit durch uhr.seit minus die gueltig gebuchten Zeiten (der laufende Zug zaehlt dann ab
+  // uhr.seit, wie gespeichert), sonst durch jetzt. Zu zweit rechnet seine eigene Uhr (js/ui/zuzweit.js) und bleibt, wie es ist
+  const jetzt = Date.now();
+  const start = Date.parse(n.gestartet);
+  if (n.tempo && s.modus !== 'zuzweit' && !(Number.isFinite(start) && start <= jetzt)) {
+    const seit = s.uhr && typeof s.uhr === 'object' && Number.isFinite(s.uhr.seit) && s.uhr.seit <= jetzt ? s.uhr.seit : null;
+    const gebucht = zeitenJe.reduce((a, x) => a + (x == null ? 0 : x * 100), 0);
+    n.gestartet = new Date(seit == null ? jetzt : Math.min(jetzt, seit - gebucht)).toISOString();
+  }
+  return n;
 }
 
 export function loescheLaufendePartie() {

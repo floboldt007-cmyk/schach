@@ -12,7 +12,7 @@ import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PORT || 8931);
+const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -89,7 +89,7 @@ const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 999
 
 // rpc(name, daten) beantwortet abgefangene Aufrufe von /rest/v1/rpc/<name> (Etappe B: Gegnersuche); jeder Aufruf
 // landet in aufrufe. botMs verkuerzt die Wartezeit bis zum KI-Gegner (window.__lobbyBotMs, sonst 10 s).
-async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'arena', rpc = null, botMs = null }) {
+async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'arena', rpc = null, botMs = null, sprache = null }) {
   const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, serviceWorkers: 'block', hasTouch: true });
   const s = await k.newPage();
   const fehlerListe = [];
@@ -107,7 +107,7 @@ async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'are
     return r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify(r.request().url().includes('sonderstuecke') && erfinder ? [{ stueck_id: 'erfinder-titel' }] : []) });
   });
-  await s.addInitScript(({ sitzung, uid, erfinder, botMs }) => {
+  await s.addInitScript(({ sitzung, uid, erfinder, botMs, sprache }) => {
     try {
       window.__lobbySuche = 300;
       if (botMs != null) window.__lobbyBotMs = botMs;
@@ -116,15 +116,16 @@ async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'are
       localStorage.clear();
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
       if (erfinder) localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: ['erfinder-titel'] }));
+      if (sprache) localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ sprache, spracheGewaehlt: true }));
     } catch (e) { /* egal */ }
-  }, { sitzung: SITZUNG, uid: UID, erfinder, botMs });
+  }, { sitzung: SITZUNG, uid: UID, erfinder, botMs, sprache });
   await s.goto(`${BASIS}#${hash}`);
   return { k, s, fehlerListe, aufrufe };
 }
 
 async function browserTeil() {
   const pw = ladePlaywright();
-  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
@@ -156,20 +157,25 @@ async function browserTeil() {
       });
       pruefe('Erfinder: Umschalter Welten | Online ueber der Karte, Welten aktiv, Online mit Labor-Schild, Knoepfe mindestens 38 px im 44-px-Band',
         leiste.aktiv === 'welten' && leiste.hoehe >= 44 && leiste.ueberKarte && leiste.labor && leiste.knoepfe.every((h) => h >= 38), leiste);
+      // R19 online-weg (15.11.2026): der Umschalter fuehrt zur echten Online-Seite; die Vorschau-Lobby nur noch ueber #lobby
       await p.s.locator('.lb-modus [data-modus="online"]').click();
+      await p.s.waitForSelector('.screen.online-screen', { timeout: 10000 });
+      pruefe('Erfinder: Umschalter Online fuehrt zur echten Online-Seite (#online)', await p.s.evaluate(() => location.hash) === '#online');
+      await p.s.evaluate(() => window.__app.gehe('lobby'));
       await p.s.waitForSelector('.screen.lobby .lb-spielen', { timeout: 10000 });
       await warte(700);
       const lobby = await p.s.evaluate(() => ({
         aktiv: document.querySelector('.screen.lobby .lb-modus')?.dataset.aktiv,
         zeiten: [...document.querySelectorAll('.lb-zeit')].map((b) => b.dataset.zeit + (b.getAttribute('aria-checked') === 'true' ? '*' : '')),
-        werte: [...document.querySelectorAll('.lb-wert')].map((w) => w.dataset.art + ':' + w.querySelector('b').textContent),
+        // R19 Lobby A: statt drei gleicher Zahlen ein Rang-Wappen mit der Zahl klein darunter
+        werte: document.querySelectorAll('.lb-wert, .lb-wertungen').length, rang: document.querySelector('.lb-rang small')?.textContent || '',
         liga: document.querySelectorAll('.lb-liga, .lb-tabelle li').length, beispiel: /Beispiel|Turmfalke/.test(document.querySelector('.screen.lobby').textContent), mehr: [...document.querySelectorAll('.lb-modus-karte')].map((b) => b.dataset.ziel + (b.disabled ? '-' : '+')),
         reiter: document.querySelector('.reiter-leiste .reiter[aria-current="page"], .reiter-leiste .reiter.aktiv')?.dataset.reiter || null,
-        hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1, zeitenZu: document.querySelector('.lb-zeiten').hidden,
-        klein: [...document.querySelectorAll('.lb-zeit, .lb-suchen, .lb-modus-karte')].filter((e) => e.getClientRects().length && e.getBoundingClientRect().height < 44).length,
+        hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1, zeitenZu: document.querySelector('.lb-aendern').hidden,
+        klein: [...document.querySelectorAll('.lb-zeit, .lb-art, .lb-suchen, .lb-modus-karte')].filter((e) => e.getClientRects().length && e.getBoundingClientRect().height < 44).length,
       }));
-      pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), keine Beispiel-Liga (Flo 08.11.2026)',
-        lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2*,5+0,10+0,15+10,30+0' && lobby.werte.join() === 'blitz:400,schnell:400,klassisch:400'
+      pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), Rang-Wappen mit 400 statt drei Wertungen, keine Beispiel-Liga (Flo 08.11.2026)',
+        lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2*,5+0,10+0,15+10,30+0' && lobby.werte === 0 && /^400 /.test(lobby.rang)
         && lobby.liga === 0 && !lobby.beispiel, lobby);
       // Punkt 40: Ranked (gewertet) hat die feste Zeit 5 + 3, die Wahl gibt es nur fuer Freundschaft
       pruefe('Lobby: gewertet ohne Bedenkzeit-Wahl (feste Zeit), Freundschaft zeigt sie', lobby.zeitenZu, lobby);
@@ -177,10 +183,10 @@ async function browserTeil() {
         lobby.mehr.join() === 'online+,turniere-,duell+' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
       // Etappe B Task 4: gewertet sucht jetzt echt auf dem Server; die Vorschau mit Bot bleibt bei Freundschaft
       await p.s.locator('.lb-spielen [data-wert="freundschaft"]').click();
-      await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
-      const zeile = await p.s.locator('.lb-zeile').innerText();
-      pruefe('Bedenkzeit 10 + 0 waehlen: Haken wandert, Zeile nennt Schnellschach', await p.s.locator('.lb-zeit[aria-checked="true"]').getAttribute('data-zeit') === '10+0'
-        && /Schnellschach/.test(zeile), zeile);
+      await p.s.locator('.lb-art[data-art="schnell"]').click();
+      const zeile = await p.s.locator('.lb-art[aria-checked="true"]').innerText();
+      pruefe('Spielart Schnell waehlen: Haken wandert auf 10 + 0, der Knopf nennt Schnell und die Zeit', await p.s.locator('.lb-zeit[aria-checked="true"]').getAttribute('data-zeit') === '10+0'
+        && /Schnell/.test(zeile) && /10\s*\+\s*0/.test(zeile), zeile);
       await p.s.locator('.lb-suchen').click();
       await p.s.waitForSelector('.lb-suche[data-phase="suche"]', { timeout: 3000 });
       pruefe('Gegner suchen: Radar und Abbrechen, deckt die Reiter-Leiste ab', await p.s.evaluate(() => {
@@ -203,13 +209,15 @@ async function browserTeil() {
       await p.s.waitForSelector('.lb-suche[data-phase="gefunden"]', { timeout: 3000 });
       await p.s.tap('.lb-abbrechen');
       await warte(250);
+      await p.s.tap('.lb-art[data-art="blitz"]');
+      await p.s.tap('.lb-aendern > summary');
       await p.s.tap('.lb-zeit[data-zeit="5+0"]');
       await warte(150);
       const nachZurueck = await p.s.evaluate(() => ({ suche: document.querySelectorAll('.lb-suche').length, zeit: document.querySelector('.lb-zeit[aria-checked="true"]')?.dataset.zeit,
         oben: (() => { const k = document.querySelector('.lb-suchen').getBoundingClientRect(); const e = document.elementFromPoint(k.left + k.width / 2, k.top + k.height / 2); return !!(e && e.closest('.lb-suchen')); })() }));
       pruefe('Getippt: Zurueck schliesst die Suche, danach reagiert die Lobby (Bedenkzeit 5 + 0, Gegner suchen wieder oben)',
         nachZurueck.suche === 0 && nachZurueck.zeit === '5+0' && nachZurueck.oben, nachZurueck);
-      await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
+      await p.s.locator('.lb-art[data-art="schnell"]').click();
       await p.s.tap('.lb-suchen');
       await p.s.waitForSelector('.lb-suche[data-phase="gefunden"]', { timeout: 3000 });
       await p.s.tap('.lb-spielen-bot');
@@ -284,6 +292,30 @@ async function browserTeil() {
           && !st.namen.includes('online_suche_ende'), st);
         await p.k.close();
       }
+      // Treffer schlaegt Bot: die Gegnerkarte nennt den Sondertitel vom Server wie das Duell-Intro (js/ui/online.js
+      // spielerDaten); ein unbekannter Titel bleibt ohne Zeile
+      for (const [titel, erwartet] of [['erfinder', { de: 'Der Erfinder', en: 'The Creator' }],
+        ['pionier-007', { de: 'Pionier Nr. 7', en: 'Pioneer No. 7' }], ['raetsel-titel', { de: null, en: null }]]) {
+        for (const sprache of ['de', 'en']) {
+          let start = 0;
+          const basis = antwort(() => start && Date.now() - start > 500);
+          const rpc = (name, daten) => name === 'karte_der_partie'
+            ? { w: { du: true, name: 'Ich', banner: 'start' }, s: { name: 'Rivale', titel, banner: 'start' } } : basis(name, daten);
+          const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc, sprache });
+          await zurLobby(p);
+          await p.s.evaluate(() => { window.__lobbyGefundenMs = 8000; });
+          start = Date.now();
+          await p.s.locator('.lb-suchen').click();
+          await p.s.waitForFunction(() => /Rivale/.test(document.querySelector('.lb-karte-gegner .vk-namenszeile')?.textContent || ''),
+            null, { timeout: 15000 }).catch(() => {});
+          const st = await p.s.evaluate(() => ({ name: document.querySelector('.lb-karte-gegner .vk-namenszeile')?.textContent.trim() || null,
+            titel: document.querySelector('.lb-karte-gegner .vk-titel')?.textContent.trim() ?? null }));
+          pruefe(`suche: Gegnerkarte zeigt Titel ${titel} (${sprache}) als ${erwartet[sprache] ?? 'keine Zeile'}`,
+            st.name === 'Rivale' && st.titel === erwartet[sprache], st);
+          pruefe(`suche: Gegnerkarte ${titel} (${sprache}) ohne Seitenfehler`, p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+          await p.k.close();
+        }
+      }
       // Abbruch
       {
         const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(null) });
@@ -318,11 +350,14 @@ async function browserTeil() {
       await p.s.waitForSelector('.screen.lobby .lb-spielen', { timeout: 30000 });
       await warte(700);
       const lage = await p.s.evaluate(() => {
+        // R19 Lobby A: ohne Wertungen-Kasten steht die Karte Spielen mittig, Mehr Spielarten darunter
         const a = document.querySelector('.lb-spielen').getBoundingClientRect();
-        const b = document.querySelector('.lb-wertungen').getBoundingClientRect();
-        return { nebeneinander: b.left >= a.right - 1 && Math.abs(a.top - b.top) < 4, breit: document.documentElement.scrollWidth <= innerWidth + 1 };
+        const r = document.querySelector('.lb-rumpf').getBoundingClientRect();
+        const m = document.querySelector('.lb-mehr').getBoundingClientRect();
+        return { mittig: Math.abs((a.left + a.right) / 2 - (r.left + r.right) / 2) < 4, darunter: m.top >= a.bottom - 1,
+          breit: document.documentElement.scrollWidth <= innerWidth + 1 };
       });
-      pruefe('iPad quer: Spielen links, Wertungen rechts daneben', lage.nebeneinander && lage.breit, lage);
+      pruefe('iPad quer: Spielen mittig, Mehr Spielarten darunter', lage.mittig && lage.darunter && lage.breit, lage);
       // am Rand gewischt rollt die Lobby (vorher nur die 1040-px-Spalte in der Mitte, Flo 01.11.2026 bei Premium und Lektionen)
       // seit der Seitenleiste (Etappe A) beginnt der Rand des Screens rechts neben ihr
       // seit die Beispiel-Liga weg ist (Flo 08.11.2026) passt die Lobby auf 820 px Hoehe: zum Rollen-Test niedriger machen

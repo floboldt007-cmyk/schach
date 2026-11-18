@@ -4,7 +4,9 @@
 -- und freier Zeit, ein Kronen-Topf). Bis dahin sind die Liga-Funktionen nicht nutzbar.
 --
 -- Was verloren geht: alles der Raetsel-Liga (Wochen-Gruppen, Plaetze, Belohnungen mit liga = 'raetsel', raetsel_stand
--- mit Stufe, Kronen und Raetsel-Elo). Die Online-Liga bleibt vollstaendig. Die Buchungen (kronen_buchungen) bleiben; die
+-- mit Stufe, Kronen und Raetsel-Elo) und der Tageszaehler der Live-Bewertung (live_bewertung_nutzung). Achtung: mit der
+-- alten Suche (60-s-Fenster) kann wieder eine zweite gewertete Partie derselben Konten entstehen (Befund 11.11.2026).
+-- Die Online-Liga bleibt vollstaendig. Die Buchungen (kronen_buchungen) bleiben; die
 -- Duell-Kronen seit dem Einspielen von zwei-ligen-schema.sql kommen dadurch NICHT nachtraeglich in den Online-Topf.
 -- Wiederholbar.
 
@@ -48,5 +50,27 @@ drop function if exists public.online_suche_warten(uuid);
 drop function if exists public.duell_suche_warten(uuid);
 -- hat hier einen Vorgabewert; kronen-schema.sql legt sie ohne an (das geht mit create or replace nicht)
 drop function if exists public.online_suche_start(text);
+-- Live-Bewertung (11.11.2026): Funktionen und Zaehler-Tabelle weg (nur Zaehlung je Tag, keine Partiedaten).
+-- online_suche_partie und duell_suche_duell bleiben; kronen-schema.sql und raetsel-duell-schema.sql stellen beim
+-- erneuten Einspielen die alten 60-s-Fassungen wieder her.
+drop function if exists public.online_live_bewertung_nutzen(uuid);
+drop function if exists public.online_live_bewertung_frei(uuid);
+drop function if exists public.live_bewertung_unbegrenzt(uuid);
+drop table if exists public.live_bewertung_nutzung;
 -- erst nach den Funktionen: raetsel_stand_sichern gibt den Zeilentyp der Tabelle zurueck
 drop table if exists public.raetsel_stand;
+
+-- Haengezeit (11.11.2026): alte Fassung aus online-schema.sql zurueck (10 Minuten fuer jede Partie mit Uhr).
+-- online-schema.sql steht nicht in der Liste oben, darum hier direkt.
+create or replace function public.online_haengt(p public.partien_online, bezug timestamptz)
+returns boolean
+language sql
+volatile
+set search_path = ''
+as $$
+  select p.status = 'laeuft' and p.letzter_zug_am is not null and (
+    (p.bedenkzeit_s is not null and position(' ' in p.zuege) = 0
+      and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp()) - interval '10 minutes')
+    or (p.bedenkzeit_s is null and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp()) - interval '7 days'));
+$$;
+revoke all on function public.online_haengt(public.partien_online, timestamptz) from anon, authenticated, public;
