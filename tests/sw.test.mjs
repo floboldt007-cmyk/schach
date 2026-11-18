@@ -224,6 +224,7 @@ function main() {
     ...alleDateien('assets/pieces/aegypten', /\.svg$/),
     ...alleDateien('assets/pieces/wikinger', /\.svg$/),
     ...alleDateien('assets/pieces/dinos', /\.svg$/),
+    ...alleDateien('assets/pieces/goldelfenbein', /\.svg$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
     // Wappen der Kronen-Liga (Wochen-Gruppen 07.11.2026, werkzeuge/liga-wappen.mjs): Startseite und Reiter Gruppe
