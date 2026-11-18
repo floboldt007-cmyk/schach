@@ -4,7 +4,7 @@
 // auch Sterne und Grenze. Nur offene Lektionen (js/pakete/lernen/zugang.js istOffen), sonst still zur Uebersicht.
 //
 //   zeige(root, params, app) -> { verlasse() }      params { id }  (unbekannte id: zur Uebersicht "lernen")
-//   zustand() -> { offen, id, phase, zuege, hinweise, sterne, grund, fen }   (Tests; mit ?test auch window.__lektion)
+//   zustand() -> { offen, id, phase, zuege, hinweise, sterne, grund, fen, runde, runden }   (Tests; mit ?test auch window.__lektion)
 //
 // Zugfolge (art 'folge', Eroeffnungen): Flo spielt seine Seite (l.farbe, Brett passend gedreht), der Computer antwortet mit
 // dem naechsten Zug der Folge, ohne Engine. Ein anderer Zug springt zurueck und wird gezaehlt (fehler); beim zweiten
@@ -20,6 +20,11 @@
 // als Pfeil (danach hoechstens 2 Sterne), "Neu
 // starten" stellt die Ausgangsstellung wieder her. Im Testmodus liefert window.__test.lektionZug(fen) -> uci die Zuege
 // der Engine (Verteidigung und Hinweis), damit Tests ohne Stockfish laufen.
+// Runden (R19, Flo 14.11.2026 "Lektionen zu schnell durch"; Daten l.runden, mattbilder.js rundenVon): die langen Lektionen
+// haben drei Runden, 1 Lernen (die Lektionsstellung), 2 Ueben, 3 Meisterprobe (kein Hinweis-Knopf, zaehlt nur mit hoechstens
+// ziel + ziel/4 Zuegen). Sterne = geschaffte Runden (1 gelernt, 2 sicher, 3 gemeistert), gespeichert wie bisher {s, z}.
+// Die Knoepfe .ls-runde (data-r) waehlen eine freigeschaltete Runde (geschafft + 1); vorgewaehlt ist die naechste offene.
+// Rueckholbar: ohne l.runden ist alles wie vorher (eine Stellung, Sterne nach Zuegen und Hinweisen).
 // DOM: section.screen.ls-screen > header.haupt-kopf, .ls-rumpf > .ls-inhalt (.ls-leiste.ls-oben > .spieler.gegner;
 // .ls-brettzone > .brett-rahmen.ls-rahmen > .ls-brett; .ls-leiste.ls-unten > .spieler.ich; .ls-seite > .ls-status,
 // .ls-meldung[data-art]; .ls-aktionen). Optik: css/pakete/lernen.css.
@@ -35,7 +40,7 @@ import { ladeEinstellungen, ladeModul, speichereModul } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { oeffneTrainer } from '../abo.js';
 import { t } from '../sprache.js';
-import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand } from '../pakete/lernen/mattbilder.js';
+import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand, rundenVon } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
 import { sterneHtml } from './lernen.js';
@@ -76,6 +81,12 @@ export function zeige(root, params, app) {
   const ber = bereichVon(l);
   const art = artVon(l);
   const nr = ber.lektionen.indexOf(l) + 1;
+  const rs = rundenVon(l);
+  const mitRunden = rs.length > 1;
+  const gemerkt = () => { try { return stand(ladeModul(PAKET, {})).lek[l.id]?.s || 0; } catch (e) { return 0; } };
+  const frei = () => (mitRunden ? Math.min(rs.length, gemerkt() + 1) : 1);
+  // die gerade gespielte Runde als Lektion (gleiche id, art, stufe; Stellung und Ziel der Runde)
+  const rundeVon = (n) => (mitRunden ? { ...l, fen: rs[n - 1].fen, ziel: rs[n - 1].ziel } : l);
   // "Weiter" fuehrt zur naechsten offenen Lektion (nach der leichten Stufe zur Gratis-Probe); ist die direkt folgende im
   // Trainer, steht dort zusaetzlich der Knopf "Naechste Lektion im Trainer" (Flo 07.11.2026: Knopf statt Werbung; der
   // Trainer-Hinweis kommt nur auf Tipp, js/abo.js OHNE_HINWEIS_SCREENS bleibt)
@@ -84,9 +95,12 @@ export function zeige(root, params, app) {
   const folgtImTrainer = ber.lektionen[nr] ? !istOffen(ber.lektionen[nr]) : !naechste && ber.lektionen.some((x) => !istOffen(x));
   const folge = art === 'folge';
   const flo = folge && l.farbe === 'b' ? 'b' : 'w';
-  const zielText = folge ? S('zielFolge', { n: l.ziel }) : art === 'umwandeln' ? S('zielUmwandeln', { n: l.ziel }) : art === 'gewinnen' ? S('zielGewinnen', { n: l.ziel })
-    : art === 'taktik' ? S('zielTaktik', { n: l.ziel, p: l.gewinn })
-    : art === 'halten' ? S('zielHalten', { n: l.ziel }) : l.ziel === 1 ? S('zielEins') : S('ziel', { n: l.ziel });
+  const zielVon = (z) => (folge ? S('zielFolge', { n: z }) : art === 'umwandeln' ? S('zielUmwandeln', { n: z }) : art === 'gewinnen' ? S('zielGewinnen', { n: z })
+    : art === 'taktik' ? S('zielTaktik', { n: z, p: l.gewinn })
+    : art === 'halten' ? S('zielHalten', { n: z }) : z === 1 ? S('zielEins') : S('ziel', { n: z }));
+  const ideeVon = (n) => (n > 1 ? S(`runde.${l.id}.${n}`) : S('idee.' + l.id));
+  const rundenHtml = !mitRunden ? '' : `<span class="ls-runden" role="group" aria-label="${esc(S('runden'))}">${rs.map((_, i) =>
+    `<button class="ls-runde" type="button" data-a="runde" data-r="${i + 1}" aria-label="${esc(S('rundeName.' + (i + 1)))}">${i + 1}</button>`).join('')}</span>`;
   const titel = S('titel.' + l.id);
   const einst = (() => { try { return typeof app.einstellungen === 'function' ? app.einstellungen() : ladeEinstellungen(); } catch (e) { return {}; } })();
   s.setAttribute('aria-label', titel);
@@ -112,10 +126,10 @@ export function zeige(root, params, app) {
           <div class="ls-status">
             <div class="ls-zeile"><span class="ms-marken"><span class="ms-stufe" data-stufe="${l.stufe}">${esc(S('stufe.' + l.stufe))}</span>${art !== 'matt'
               ? `<span class="ms-art" data-art="${art}">${esc(S('art.' + art))}</span>` : ''}</span>
-              <span class="ls-nr">${esc(S('lektionNr', { nr, gesamt: ber.lektionen.length }))}</span></div>
+              <span class="ls-nr">${esc(S('lektionNr', { nr, gesamt: ber.lektionen.length }))}</span>${rundenHtml}</div>
             <h2>${esc(titel)}</h2>
-            <p class="ls-idee">${esc(S('idee.' + l.id))}</p>
-            <div class="ls-zaehler"><b class="ls-zug zahl"></b><span>${esc(zielText)}</span></div>
+            <p class="ls-idee">${esc(ideeVon(1))}</p>
+            <div class="ls-zaehler"><b class="ls-zug zahl"></b><span class="ls-ziel">${esc(zielVon(l.ziel))}</span></div>
           </div>
           <div class="ls-meldung" role="status" hidden></div>
         </div>
@@ -135,9 +149,11 @@ export function zeige(root, params, app) {
     timer.add(id);
   };
   const st = { phase: 'intro', chess: new Chess(l.fen), zuege: 0, hinweise: 0, sterne: 0, grund: null, lauf: 0, start: null,
-    schritt: 0, fehler: 0, fehlerHier: 0, modus: 'selbst' };
+    schritt: 0, fehler: 0, fehlerHier: 0, modus: 'selbst', runde: frei() };
+  let lr = rundeVon(st.runde);
+  const meisterprobe = () => mitRunden && st.runde === rs.length;
   aktiv = () => ({ offen: true, id: l.id, phase: st.phase, zuege: st.zuege, hinweise: st.hinweise, sterne: st.sterne, grund: st.grund,
-    fen: st.chess.fen(), schritt: st.schritt, fehler: st.fehler, modus: st.modus });
+    fen: st.chess.fen(), schritt: st.schritt, fehler: st.fehler, modus: st.modus, runde: st.runde, runden: rs.length });
 
   const brett = new Brett($('.ls-brett'), {
     ausrichtung: flo, figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug,
@@ -236,8 +252,9 @@ export function zeige(root, params, app) {
     spaeter(() => { if (lauf === st.lauf && st.phase === 'ende') zeigeBlatt(true); }, tempo() > 0 ? 650 : 0);
   }
 
+  // Meisterprobe (Runde 3): ohne Hinweis
   const spielKnoepfe = () => knoepfe([
-    ...(st.modus === 'zeigen' ? [] : [{ a: 'hinweis', text: S('hinweis'), icon: 'hinweis', aus: st.phase !== 'flo' }]),
+    ...(st.modus === 'zeigen' || meisterprobe() ? [] : [{ a: 'hinweis', text: S('hinweis'), icon: 'hinweis', aus: st.phase !== 'flo' }]),
     { a: 'neu', text: S('neu'), icon: 'nochmal' },
   ]);
   // schon ein Stern fuer diese Lektion? Dann ist "Selbst spielen" vorgewaehlt, sonst "Zeig sie mir"
@@ -272,11 +289,29 @@ export function zeige(root, params, app) {
     return a && typeof a.bestmove === 'string' && UCI_RE.test(a.bestmove) ? a.bestmove : null;
   }
 
-  function starte({ intro = false, modus = 'selbst' } = {}) {
+  // Rundenknoepfe: gewaehlte Runde markiert, noch nicht freigeschaltete aus; Idee und Ziel der Runde
+  function zeigeRunde() {
+    if (!mitRunden) return;
+    const f = frei();
+    for (const b of s.querySelectorAll('.ls-runde')) {
+      const n = Number(b.dataset.r);
+      b.setAttribute('aria-pressed', String(n === st.runde));
+      b.disabled = n > f;
+      b.classList.toggle('geschafft', n <= gemerkt());
+    }
+    s.dataset.runde = String(st.runde);
+    $('.ls-idee').textContent = ideeVon(st.runde);
+    $('.ls-ziel').textContent = zielVon(lr.ziel);
+  }
+
+  function starte({ intro = false, modus = 'selbst', runde = st.runde } = {}) {
     st.lauf++;
     entferneBlatt();
     st.modus = folge && modus === 'zeigen' ? 'zeigen' : 'selbst';
-    st.chess = new Chess(l.fen);
+    st.runde = mitRunden ? Math.max(1, Math.min(frei(), runde)) : 1;
+    lr = rundeVon(st.runde);
+    zeigeRunde();
+    st.chess = new Chess(lr.fen);
     st.start = bilanz(st.chess);
     st.zuege = 0;
     st.hinweise = 0;
@@ -402,7 +437,7 @@ export function zeige(root, params, app) {
     zeichne(m);
     zugKlang(m);
     zaehler();
-    const r = pruefeZiel(l, st.start, st.chess, { wann: 'flo', zuege: st.zuege });
+    const r = pruefeZiel(lr, st.start, st.chess, { wann: 'flo', zuege: st.zuege });
     if (r === 'geschafft') { geschafft(); return; }
     if (r) { gescheitert(r); return; }
     st.phase = 'gegner';
@@ -431,7 +466,7 @@ export function zeige(root, params, app) {
     zeichne(m, tempo() > 0);
     zugKlang(m);
     leiseMeldung();
-    const r = pruefeZiel(l, st.start, st.chess, { wann: 'gegner', zuege: st.zuege });
+    const r = pruefeZiel(lr, st.start, st.chess, { wann: 'gegner', zuege: st.zuege });
     if (r === 'geschafft') { geschafft(); return; }
     if (r) { gescheitert(r); return; }
     st.phase = 'flo';
@@ -464,29 +499,43 @@ export function zeige(root, params, app) {
     s.dataset.phase = st.phase;
     // Halten: geschafft ist geschafft, Sterne nur nach Hinweisen
     const gezeigt = folge && st.modus === 'zeigen';
+    const guete = sterne({ ziel: lr.ziel, zuege: art === 'halten' ? Math.min(st.zuege, lr.ziel) : st.zuege, hinweise: st.hinweise });
+    // Runden: die Runde zaehlt (Meisterprobe nur mit drei Sternen Guete), Sterne = hoechste geschaffte Runde
+    const rundeDurch = mitRunden && (!meisterprobe() || guete === 3);
+    const vorher = gemerkt();
     st.sterne = gezeigt ? 1 : folge ? sterneFolge({ fehler: st.fehler, hinweise: st.hinweise })
-      : sterne({ ziel: l.ziel, zuege: art === 'halten' ? Math.min(st.zuege, l.ziel) : st.zuege, hinweise: st.hinweise });
+      : mitRunden ? Math.max(1, vorher, rundeDurch ? st.runde : st.runde - 1) : guete;
     erlaube();
     try { speichereModul(PAKET, merke(ladeModul(PAKET, {}), l.id, { sterne: st.sterne, zuege: st.zuege })); } catch (e) { console.error(e); }
+    zeigeRunde();
     try {
       sende('lektion:beendet', { id: ber.id + '-' + l.id, ringe: { gelernt: true, sicher: st.sterne >= 2, gemeistert: st.sterne >= 3 } });
     } catch (e) { console.error(e); }
     spielKlang('raetsel-richtig');
     const matt = st.chess.isCheckmate();
-    const kopfText = gezeigt ? S('geschafft.gezeigt') : folge ? S('geschafft.folge') : matt || art === 'matt' ? S('geschafft') : S('geschafft.' + art);
+    const kopfText = gezeigt ? S('geschafft.gezeigt') : folge ? S('geschafft.folge')
+      : mitRunden ? (!rundeDurch ? S('runde.fast') : meisterprobe() ? S('runde.gemeistert') : S('runde.geschafft', { n: st.runde }))
+        : matt || art === 'matt' ? S('geschafft') : S('geschafft.' + art);
     const text = gezeigt ? S('geschafftText.gezeigt') : folge ? (st.fehler === 0 ? S('geschafftText.folge0') : st.fehler === 1 ? S('geschafftText.folge1') : S('geschafftText.folge', { n: st.fehler }))
+      : mitRunden && !rundeDurch ? S('runde.fastText', { n: st.zuege, max: lr.ziel + Math.floor(lr.ziel / 4) })
       : art === 'halten' ? S('geschafftText.halten')
-      : !(matt || art === 'matt') ? S('geschafftText.' + art, { n: st.zuege, ziel: l.ziel })
-        : st.zuege === 1 ? S('geschafftEins') : S('geschafftText', { n: st.zuege, ziel: l.ziel });
+      : !(matt || art === 'matt') ? S('geschafftText.' + art, { n: st.zuege, ziel: lr.ziel })
+        : st.zuege === 1 ? S('geschafftEins') : S('geschafftText', { n: st.zuege, ziel: lr.ziel });
+    const weitereRunde = mitRunden && rundeDurch && st.runde < rs.length;
+    const nurNochmal = mitRunden && !rundeDurch;
     meldung('geschafft', kopfText, text, sterneHtml(st.sterne));
     if (tempo() > 0) staffel(meldungEl.querySelectorAll('.ms-sterne > i.an'), { d: 460, v: 120, abstand: 110, von: 'scale(0) rotate(-30deg)', k: 'hupf' });
     baueBlatt('sieg', { kopfText, text, sternZahl: st.sterne, zeile: zeileText(), liste: gezeigt ? [
       { a: 'los', text: S('folge.ohneHilfe'), primaer: true, vor: true },
       { a: 'zeigen', text: S('folge.nochmalZeigen'), icon: 'nochmal' },
       { a: 'uebersicht', text: S('uebersicht') },
+    ] : weitereRunde ? [
+      { a: 'runde-weiter', text: S('runde.weiter', { n: st.runde + 1 }), primaer: true, vor: true },
+      { a: 'nochmal', text: S('nochmal'), icon: 'nochmal' },
+      { a: 'uebersicht', text: S('uebersicht') },
     ] : [
-      ...(naechste ? [{ a: 'weiter', text: S('weiter'), primaer: true, vor: true }] : []),
-      { a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: !naechste },
+      ...(naechste && !nurNochmal ? [{ a: 'weiter', text: S('weiter'), primaer: true, vor: true }] : []),
+      { a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: !naechste || nurNochmal },
       ...(folgtImTrainer ? [{ a: 'trainer', text: S('naechsteImTrainer'), icon: 'schloss' }] : []),
       { a: 'uebersicht', text: S('uebersicht') },
     ] });
@@ -498,8 +547,8 @@ export function zeige(root, params, app) {
     s.dataset.phase = st.phase;
     erlaube();
     spielKlang('raetsel-falsch');
-    meldung('fehler', S('fehler.' + grund), S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }), `<span class="ls-symbol">${icon('kreuz')}</span>`);
-    baueBlatt('niederlage', { kopfText: S('fehler.' + grund), text: S('fehler.' + grund + 'Text', { n: grenze(l.ziel) }),
+    meldung('fehler', S('fehler.' + grund), S('fehler.' + grund + 'Text', { n: grenze(lr.ziel) }), `<span class="ls-symbol">${icon('kreuz')}</span>`);
+    baueBlatt('niederlage', { kopfText: S('fehler.' + grund), text: S('fehler.' + grund + 'Text', { n: grenze(lr.ziel) }),
       liste: [{ a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: true }, { a: 'uebersicht', text: S('uebersicht') }] });
   }
 
@@ -513,11 +562,14 @@ export function zeige(root, params, app) {
     else if (a === 'zeigen') starte({ modus: 'zeigen' });
     else if (a === 'hinweis') hinweis().catch((f) => console.error(f));
     else if (a === 'neu' || a === 'nochmal') starte({ modus: st.modus });
+    else if (a === 'runde') starte({ runde: Number(b.dataset.r) });
+    else if (a === 'runde-weiter') starte({ runde: st.runde + 1 });
     else if (a === 'weiter' && naechste) app.gehe('lektion', { id: naechste.id }, { ersetzen: true });
     else if (a === 'uebersicht') app.gehe('lernen', { bereich: ber.id }, { ersetzen: true });
     else if (a === 'trainer') oeffneTrainer({ app });
   }
   aktionenEl.addEventListener('click', klick);
+  if (mitRunden) $('.ls-runden').addEventListener('click', klick);
 
   starte({ intro: true });
   if (tempo() > 0) {

@@ -8,3 +8,8 @@ native/node_modules/
 
 # Supabase CLI: Zwischenstand und Projekt-Verknuepfung (supabase link), gehoert nie ins Repo
 supabase/.temp/
+
+# Code Guardian: Belege und Ledger der Arbeitssitzungen (lokale Pfade, Sitzungskennungen), gehoeren nie ins oeffentliche Repo
+# (Kaltreview 3f 17.11.2026). .code-guardian-rechtsbelege.md bleibt bewusst versioniert.
+.code-guardian-evidence/
+.code-guardian-propagation.md
