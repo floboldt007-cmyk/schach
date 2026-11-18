@@ -274,6 +274,9 @@ async function testeAnalyse(browser, d) {
   pruefe('Wischen nach rechts: ein Zug zurück', (await aktuellerPly(seite)) === -1);
 
   // --- Kurve antippen
+  // seit R19 "Analyse neu" stehen die Schluesselmomente ueber dem Verlauf (Flos Wunsch): erst hinscrollen, wie unten beim Finger
+  await seite.locator('.an-kurve-wrap').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await seite.waitForTimeout(300);
   const kb = await seite.locator('.an-kurve-wrap').boundingBox();
   await seite.mouse.click(kb.x + kb.width * (20 / 33), kb.y + kb.height / 2);
   pruefe('Kurve antippen: springt zu Ply 19', (await aktuellerPly(seite)) === 19, String(await aktuellerPly(seite)));
@@ -606,7 +609,8 @@ async function testeVerlauf(browser, d) {
   await oeffne(seite, 'screen=verlauf');
   const anzahl = await seite.evaluate(() => testseite.speicher.ladePartien().length);
   pruefe('Liste zeigt alle Partien', (await seite.locator('.vl-zeile').count()) === anzahl && anzahl >= 2, String(anzahl));
-  const erste = await seite.locator('.vl-zeile').first().textContent();
+  // R19 Verlauf: das Ergebnis in Worten steht im Knopf-Label (das Zeichen ist nur Bild), darum Label plus sichtbarer Text
+  const erste = `${await seite.locator('.vl-zeile .vl-oeffnen').first().getAttribute('aria-label')} ${await seite.locator('.vl-zeile').first().textContent()}`;
   pruefe('Zeile: Name, Ergebnis, Genauigkeit, Datum, Eröffnung, Züge',
     /Sieg|Niederlage|Remis/.test(erste) && /%/.test(erste) && /Züge/.test(erste) && /(Heute|Gestern|\d{4}),/.test(erste), erste.replace(/\s+/g, ' '));
   pruefe('Sterne je Partie', (await seite.locator('.vl-zeile').first().locator('.vl-sterne span').count()) === 3);

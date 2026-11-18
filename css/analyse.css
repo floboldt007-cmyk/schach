@@ -89,9 +89,16 @@
 .an-eb-wert[data-farbe="b"] { color: var(--balken-weiss); }
 
 /* ---------- Navigation ---------- */
-.an-navi { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; align-items: center; }
-.an-navi .knopf { padding: 0; min-height: 52px; }
-.an-stand { min-width: 84px; padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--text-2); white-space: nowrap; text-align: right; }
+/* R19 Analyse neu: Play/Pause zwischen den Pfeilen, das Tempo als Wort dahinter (reihum Normal, Ruhig, Zuegig) */
+.an-navi { flex: none; display: grid; grid-template-columns: repeat(5, minmax(44px, 1fr)) auto auto; gap: 6px; align-items: center; }
+.an-navi .knopf { padding: 0; min-height: 52px; min-width: 44px; }
+/* Abspielen ist die Hauptaktion der Leiste: gefuellt in der Textfarbe (hell dunkel, dunkel hell), laufend gold mit
+   dunklem Zeichen und Textfarben-Kante (design-beweis: Flaeche >= 3:1 gegen die Umgebung) */
+.an-navi .an-abspielen { background: var(--text); color: var(--flaeche); box-shadow: none; }
+.an-navi .an-abspielen.laeuft { background: var(--gold); color: #1C1B19; box-shadow: inset 0 0 0 2px var(--text); }
+.an-navi .an-tempo { padding: 0 12px; font-size: 13.5px; font-weight: 750; color: var(--text-2); }
+/* der Zugstand darf in schmalen Spalten zweizeilig stehen ("Zug 17 / 17"), damit die Knoepfe 44 px behalten */
+.an-stand { min-width: 0; padding: 0 2px; font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--text-2); text-align: right; }
 
 /* ---------- Coach-Karte ---------- */
 .an-coach { --kf: var(--k-bester); --kt: var(--text); position: relative; flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: center;
@@ -118,7 +125,7 @@
 @keyframes an-pop { 0% { transform: scale(0) rotate(-35deg); opacity: 0; } 55% { transform: scale(1.22) rotate(8deg); opacity: 1; }
   78% { transform: scale(.94) rotate(-2deg); } 100% { transform: none; } }
 .an-c-symbol { width: 46px; height: 46px; grid-row: span 2; align-self: start; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .18)); }
-.an-c-symbol svg { display: block; width: 100%; height: 100%; }
+.an-c-symbol svg, .an-c-symbol .an-sym { display: block; width: 100%; height: 100%; }
 .an-c-start { display: grid; place-items: center; border-radius: 50%; background: var(--flaeche-2); border: 1.5px solid var(--linie-2); color: var(--text); }
 .an-c-start svg { width: 26px; height: 26px; }
 .an-c-kopf { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; min-width: 0; }
@@ -171,8 +178,6 @@
 .an-seite { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .an-seite.an-re { flex-direction: row-reverse; text-align: right; }
 .an-seite-text { min-width: 0; }
-.an-genau .an-avatar { --g: 48px; border-radius: 14px; }
-.an-genau .an-avatar.an-ich { border-radius: 50%; }
 .an-g-kopf { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 26px; }
 .an-g-titel { font-size: 12.5px; font-weight: 650; color: var(--text-2); }
 .an-g-wert { font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -191,7 +196,15 @@
 .an-re .an-g-mess > i { transform-origin: right center; }
 .an-g-mess[data-band="stark"] > i { background: var(--k-bester); } .an-g-mess[data-band="mittel"] > i { background: var(--k-ungenau); }
 .an-g-mess[data-band="schwach"] > i { background: var(--k-patzer); }
-.an-genau { background: linear-gradient(180deg, color-mix(in srgb, var(--erg-f, var(--gold)) 10%, var(--flaeche)), var(--flaeche) 70%); }
+/* R19 Analyse neu (Massstab Premium-Seite): ruhige Karte mit feiner Gold-Kante, oben mittig ein Schein in der Farbe des
+   Ergebnisses, grosse runde Bilder mit Ring, das Ergebnis gross in der Display-Schrift */
+.an-genau { border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--linie));
+  background: radial-gradient(120% 95% at 50% 0%, color-mix(in srgb, var(--erg-f, var(--gold)) 16%, var(--flaeche)), var(--flaeche) 68%); }
+.an-genau .an-avatar { --g: 60px; border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 28%, transparent), var(--s1); }
+.an-avatar img[src$=".svg"] { width: 100%; height: 100%; image-rendering: auto; }
+.an-genau .an-g-wert { font-size: 40px; }
+.an-genau .an-g-wert.an-g-leer { font-size: 16px; }
+.an-genau .an-vs b { font-size: 30px; }
 .an-genau[data-ergebnis="sieg"] { --erg-f: var(--gold); } .an-genau[data-ergebnis="niederlage"] { --erg-f: var(--warn); }
 .an-genau[data-ergebnis="remis"] { --erg-f: var(--k-gut); }
 .an-g-label { font-size: 13px; font-weight: 800; color: var(--text); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -224,9 +237,7 @@
 .an-kurve-box { padding: 10px 12px 6px; }
 .an-kurve-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
 .an-k-titel { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 800; color: var(--text); }
-.an-k-tipp { flex: none; font-size: 12px; color: var(--text-2); white-space: nowrap; }
-.an-k-legende { font-variant-numeric: tabular-nums; }
-.an-kurve-wrap { position: relative; height: 120px; cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.an-kurve-wrap { position: relative; height: 140px; cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
 .an-kurve { display: block; width: 100%; height: 100%; border-radius: 10px; overflow: hidden; }
 .an-kurve:focus-visible { outline: var(--fokus); outline-offset: 3px; }
 /* Kurve hell (Entwurf "Analyse ruhig"): Weiss-Anteil in Balken-Weiss, Schwarz als warmes Grau statt Schiefer-Block,
@@ -245,9 +256,10 @@
 .an-kurve-wrap::after { content: ""; position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--linie); pointer-events: none; }
 .an-k-cursor { stroke: var(--akzent); stroke-width: 2; filter: none; }
 .an-k-punkte { position: absolute; inset: 0; pointer-events: none; }
-.an-k-punkte i { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--kf);
-  border: 1.5px solid var(--flaeche); opacity: .9; }
-.an-k-punkte i.du { width: 12px; height: 12px; margin: -6px 0 0 -6px; opacity: 1; }
+/* R19 Analyse neu: Fehler und starke Zuege als grosse Punkte (eigene 16 px mit heller Kante, die des Gegners 11 px) */
+.an-k-punkte i { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--kf);
+  border: 2px solid var(--flaeche); opacity: .85; }
+.an-k-punkte i.du { width: 16px; height: 16px; margin: -8px 0 0 -8px; opacity: 1; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
 .an-k-marke { position: absolute; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; border-radius: 50%; background: var(--flaeche);
   border: 3px solid var(--akzent); box-shadow: var(--s1); pointer-events: none; transition: left .15s ease, top .15s ease; }
 .an-phasen { position: relative; height: 20px; margin-top: 2px; }
@@ -255,18 +267,31 @@
   font-size: 12px; font-weight: 650; color: var(--text-2); text-align: center; }
 
 /* ---------- Schluesselmomente ---------- */
-.an-momente-titel { margin: 0 0 6px 2px; font-size: 15px; font-weight: 800; color: var(--text); }
-.an-momente { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px;
-  -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
-.an-momente::-webkit-scrollbar { display: none; }
-.an-momente::after { content: ""; flex: 0 0 28px; }
-.an-moment.knopf { flex: none; min-height: 44px; padding: 0 12px; font-size: 14px; gap: 6px; background: var(--flaeche); }
-.an-moment.knopf svg { width: 22px; height: 22px; }
-/* Schluesselmomente in der Farbe ihrer Klasse (Flo 30.10. abends: "sieht billig aus") */
-.an-moment.knopf { background: color-mix(in srgb, var(--kf) 12%, var(--flaeche)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kf) 40%, transparent); }
-.an-moment:not(.du) { color: var(--text-2); font-weight: 600; }
-.an-moment.an { box-shadow: inset 0 0 0 2px var(--kf), 0 0 0 3px color-mix(in srgb, var(--kf) 25%, transparent); background: color-mix(in srgb, var(--kf) 22%, var(--flaeche)); color: var(--text); }
-.an-momente-leer { font-size: 14px; color: var(--text-2); padding: 4px 2px; -webkit-mask-image: none; mask-image: none; }
+/* R19 Analyse neu (Flo 15.11.: "richtig haesslich", Leitlinie R19): jeder Moment eine grosse Karte im Stil der
+   Premium-Seite (ruhige dunkle Flaeche, Kante in der Klassenfarbe) mit deckendem Symbol, Fehlerart, Zug, besserem Zug
+   und dem Absturz der Bewertung. Breit ein Raster, am Handy eine Reihe zum Wischen. */
+.an-momente-titel { margin: 0 0 8px 2px; font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); letter-spacing: -.01em; color: var(--text); }
+.an-momente { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; padding: 2px; }
+.an-moment.knopf { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; justify-content: stretch; gap: 4px 12px;
+  min-height: 76px; height: auto; padding: 12px 14px; border-radius: 16px; text-align: left; white-space: normal;
+  font-size: 14px; font-weight: 650; color: var(--text); background: var(--flaeche);
+  border: 1.5px solid var(--kt); box-shadow: var(--s1); }
+/* Kante in der Klassen-Textfarbe (--kt-*, im Theme auf >= 4,5:1 gegen den Grund abgestimmt): als Knopf erkennbar
+   (design-beweis 3:1); die Momente des Gegners ruhiger auf der zweiten Flaeche */
+.an-moment.knopf:not(.du) { background: var(--flaeche-2); box-shadow: none; }
+.an-moment .an-sym { grid-row: span 2; align-self: start; width: 40px; height: 40px; }
+.an-moment .an-sym svg { display: block; width: 100%; height: 100%; }
+.an-m-text { display: grid; gap: 2px; min-width: 0; }
+.an-m-kopf { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.an-m-klasse { font-size: 13px; font-weight: 800; color: var(--kt); }
+.an-m-wer { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.an-m-zug { font-family: var(--display); font-size: 19px; font-weight: var(--gw-titel); letter-spacing: -.01em; line-height: 1.15; color: var(--text); }
+.an-m-besser { font-size: 13.5px; font-weight: 750; color: var(--kt-bester); }
+.an-m-eval { grid-column: 2; justify-self: start; padding: 2px 8px; border-radius: 8px; background: var(--flaeche-3); color: var(--text-2);
+  font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+.an-moment.an { box-shadow: 0 0 0 2px var(--kt), var(--s1); }
+@media (hover: hover) { .an-moment.knopf:hover { box-shadow: 0 0 0 1px var(--kt), var(--s1); } }
+.an-momente-leer { font-size: 14px; color: var(--text-2); padding: 4px 2px; }
 
 /* ---------- Klassen-Zaehler ---------- */
 .an-klassen { padding: 8px 16px 6px; }
@@ -293,7 +318,9 @@
 .an-n.nul { color: var(--text-3); }
 .an-kl-mitte { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 650; }
 .an-kl-mitte span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.an-kl-mitte svg { width: 28px; height: 28px; flex: none; }   /* Flo 30.10. abends: groesser */
+/* R19 Analyse neu (Flo 15.11.): Symbole gross und deckend in der Klassenfarbe (symbolDeckend in js/ui/analyse.js) */
+.an-kl-mitte .an-sym { flex: none; width: 34px; height: 34px; }
+.an-kl-mitte svg { display: block; width: 34px; height: 34px; flex: none; }
 .an-kl.null .an-kl-mitte > span { opacity: .45; }
 .an-kl-balken { position: relative; display: block; height: 8px; border-radius: var(--r-pille); background: var(--grund-2); overflow: hidden; }
 .an-kl-balken > i { position: absolute; top: 0; bottom: 0; border-radius: inherit; background: var(--kf); }
@@ -344,9 +371,9 @@
   .an-links, .an-rechts { display: contents; }
   /* Kundenblick 09.11. (Befund 10): das Brett direkt unter die Genauigkeit, Freischaltung, Teilen und Verlauf danach.
      Vorher stand es auf dem iPhone 13 nur zu 45 %, auf dem SE zu 16 % im Bild. */
-  .an-genau { order: 1; } .an-brettzone { order: 2; } .an-navi { order: 3; } .an-coach { order: 4; }
-  .an-banner, .an-ort-oben { order: 5; } .an-kurve-box { order: 6; }
-  .an-momente-box, .an-momente-leer { order: 7; } .an-klassen { order: 8; }
+  .an-genau { order: 1; } .an-brettzone { order: 2; } .an-navi { order: 3; } .an-momente-box, .an-momente-leer { order: 4; } .an-coach { order: 5; }
+  .an-banner, .an-ort-oben { order: 6; } .an-kurve-box { order: 7; }
+  .an-klassen { order: 8; }
   /* passeBrett() in js/ui/analyse.js: reicht der Platz ueber der Knopfleiste nicht, steht das Brett vor der Genauigkeit */
   .an-screen.brett-zuerst .an-brettzone, .an-screen.brett-zuerst .an-navi { order: 0; }
   .an-screen.ohne-balken { --an-brett: min(calc(100vw - 36px - 8px), 720px); }
@@ -362,19 +389,18 @@
   .an-brett-rahmen { width: calc(var(--an-brett) + 6px); padding: 3px; border-radius: 14px; }
   .an-brett-rahmen::after { inset: 2px; border-radius: 12px; }
   .an-brett-rahmen .brett { --brett-radius: 11px; }
-  .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .an-navi { grid-template-columns: repeat(5, minmax(44px, 1fr)) auto; }
   .an-stand { display: none; }
   .an-genau { padding: 12px; gap: 8px 6px; }
-  .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
+  .an-genau .an-avatar { --g: 44px; }
   .an-seite { gap: 8px; }
-  .an-g-wert { font-size: 27px; }
+  .an-genau .an-g-wert { font-size: 30px; }
   .an-g-label { font-size: 12px; }
   .an-vs { min-width: 52px; }
-  .an-vs b { font-size: 18px; }
+  .an-genau .an-vs b { font-size: 22px; }
   .an-vs-wort { font-size: 12px; }
   .an-vs-grund { font-size: 12px; max-width: 84px; }
-  .an-kurve-wrap { height: 64px; }
-  .an-k-legende { display: none; }
+  .an-kurve-wrap { height: 84px; }
   .an-c-fuss { flex-wrap: wrap; }
   .an-c-linie { flex-basis: 100%; }
   .an-coach { padding: 10px 12px; gap: 2px 10px; }
@@ -421,16 +447,15 @@
 }
 @container an-rechts (max-width: 400px) {
   .an-genau { padding: 12px; gap: 8px 6px; }
-  .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
+  .an-genau .an-avatar { --g: 44px; }
   .an-seite { gap: 8px; }
-  .an-g-wert { font-size: 27px; }
+  .an-genau .an-g-wert { font-size: 30px; }
   .an-g-label { font-size: 12px; }
   .an-vs { min-width: 52px; }
-  .an-vs b { font-size: 18px; }
+  .an-genau .an-vs b { font-size: 22px; }
   .an-vs-wort { font-size: 12px; }
   .an-vs-grund { font-size: 12px; max-width: 84px; }
-  .an-kurve-wrap { height: 64px; }
-  .an-k-legende { display: none; }
+  .an-kurve-wrap { height: 84px; }
   .an-klassen { padding: 6px 12px; }
   .an-kl-raster { display: flex; flex-direction: column; }
   .an-kl-kopf2, .an-kl-platz { display: none; }
@@ -438,7 +463,7 @@
 /* unter 330 px traegt die Zeile die Portraets nicht mehr, die Beschriftung nennt die Seiten */
 @container an-rechts (max-width: 330px) {
   .an-genau .an-avatar { display: none; }
-  .an-g-wert { font-size: 25px; }
+  .an-genau .an-g-wert { font-size: 26px; }
 }
 /* Texte in der schmalen Spalte umbrechen statt sie mit "..." zu kuerzen (bis 520 px: auch bei 800 x 600 passte
    "Deine Genauigkeit" nicht in eine Zeile) */
@@ -454,10 +479,12 @@
   .an-unter-zusatz, .an-unter-voll { display: none; }
   .an-unter-kurz { display: inline; }
 }
-/* Navigation unter einem kleinen Brett: vier Knoepfe ueber die volle Breite, der Zugstand entfaellt (wie am Handy) */
-@container an-links (max-width: 291px) {
+/* Navigation unter einem kleinen Brett: fuenf Knoepfe ueber die volle Breite, das Tempo in eigener Zeile, der Zugstand
+   entfaellt (wie am Handy) */
+@container an-links (max-width: 340px) {
   .an-stand { display: none; }
-  .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .an-navi { grid-template-columns: repeat(5, minmax(44px, 1fr)); }
+  .an-navi .an-tempo { grid-column: 1 / -1; min-height: 44px; }
 }
 
 /* ============================================================
@@ -507,4 +534,9 @@
   .an-eb-mitte { top: 0; bottom: 0; left: 50%; right: auto; width: 1px; height: auto; }
   .an-eb-wert, .an-eb-wert[data-seite="oben"] { top: 1px; bottom: auto; left: 6px; right: auto; text-align: left; }
   .an-eb-wert[data-seite="oben"] { left: auto; right: 6px; text-align: right; }
+  /* R19 Analyse neu: die Momente-Karten als Reihe zum Wischen, die naechste Karte schaut rechts herein */
+  .an-momente { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 10px; overscroll-behavior-x: contain;
+    scrollbar-width: none; margin-inline: -10px; padding: 2px 10px 4px; }
+  .an-momente::-webkit-scrollbar { display: none; }
+  .an-moment.knopf { flex: 0 0 min(250px, 76vw); scroll-snap-align: start; }
 }
