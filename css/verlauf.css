@@ -118,6 +118,11 @@
 .vl-screen .vl-muell { color: var(--text-2); }
 .vl-screen .vl-muell:hover, .vl-screen .vl-muell:focus-visible { color: var(--text); }
 .vl-screen .vl-muell:active { color: var(--kt-patzer); }
+/* R19 M6: Profil des Online-Gegners, leise wie der Muelleimer daneben (js/ui/gegner-profil.js) */
+.vl-screen .vl-gegner, .vl-screen .vl-gegner:hover, .vl-screen .vl-gegner:focus-visible, .vl-screen .vl-gegner:active {
+  background: transparent; border-color: transparent; box-shadow: none; }
+.vl-screen .vl-gegner { color: var(--text-2); }
+.vl-screen .vl-gegner:hover, .vl-screen .vl-gegner:focus-visible, .vl-screen .vl-gegner:active { color: var(--text); }
 
 /* R19: Partien ohne Zug als eine aufklappbare Zeile am Ende der Liste */
 .vl-ohne-gruppe { display: grid; gap: 10px; }
@@ -163,7 +168,7 @@
   .vl-z3 { font-size: 12px; }
   .vl-genau { font-size: 16px; }
   .vl-sterne { font-size: 13px; }
-  .vl-screen .vl-muell { --tap: 44px; }
+  .vl-screen .vl-muell, .vl-screen .vl-gegner { --tap: 44px; }
   .vl-schatz-liste { grid-template-columns: 1fr 1fr; }
   .vl-juwel { padding: 8px; gap: 8px; }
   .vl-juwel-symbol { width: 26px; height: 26px; }

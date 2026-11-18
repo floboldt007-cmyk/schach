@@ -262,6 +262,7 @@ const DATEIEN = [
   'js/ui/brett-einstellungen.js',
   'js/ui/duell.js',
   'js/ui/einstellungen.js',
+  'js/ui/gegner-profil.js',
   'js/ui/premium.js',
   'js/ui/icons.js',
   'js/ui/partie.js',
