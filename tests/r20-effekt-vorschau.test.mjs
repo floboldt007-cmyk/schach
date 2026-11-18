@@ -59,7 +59,8 @@ function bediener(z) {
     if (url.pathname === '/rest/v1/profile') return antwort([{ user_id: UID, benutzername: 'Mira' }]);
     if (url.pathname === '/rest/v1/sonderstuecke') return antwort([]);
     const rpc = url.pathname.split('/').at(-1);
-    z.aufrufe.push(rpc);
+    // spielstaende ist der Abgleich des Kontos im Hintergrund (js/konto.js, alle 30 Sekunden), keine Folge der Vorschau
+    if (rpc !== 'spielstaende') z.aufrufe.push(rpc);
     if (rpc === 'karte_melde_stufen' || rpc === 'karte_waehle') return antwort({ taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } });
     return antwort([]);
   };
@@ -105,8 +106,8 @@ async function tippe(s, id) {
   await s.waitForSelector('.sheet-karte .shf-effekt-ebene', { timeout: 10000 });
 }
 async function schliesse(s) {
-  await s.locator('.sheet-karte .sheet-knoepfe button', { hasText: 'Schließen' }).first().click();
-  await s.waitForSelector('.sheet-karte', { state: 'detached', timeout: 5000 }).catch(() => {});
+  await s.locator('.sheet-karte.shf-sheet .sheet-knoepfe button', { hasText: 'Schließen' }).first().click();
+  await s.waitForSelector('.sheet-karte.shf-sheet', { state: 'detached', timeout: 5000 }).catch(() => {});
   await warte(300);
 }
 
@@ -120,7 +121,7 @@ const messeLage = (s) => s.evaluate(() => {
   return { mitte: inFeldern(svg), breite: r.width / feld, hoehe: r.height / feld,
     funken: [...svg.querySelectorAll('circle')].map(inFeldern), fuss: svg.querySelector('ellipse') ? inFeldern(svg.querySelector('ellipse')) : null };
 });
-const masse = (s) => s.evaluate(() => ['.sheet-karte', '.sheet-karte .shf-vorschau-brett'].map((w) => {
+const masse = (s) => s.evaluate(() => ['.sheet-karte.shf-sheet', '.sheet-karte.shf-sheet .shf-vorschau-brett'].map((w) => {
   const r = document.querySelector(w).getBoundingClientRect();
   return [r.left, r.top, r.width, r.height].map((n) => Math.round(n));
 }).join('|'));
@@ -183,7 +184,7 @@ try {
       for (const id of stuecke) await pruefeEffekt(s, id, gruppe);
       pruefe(`${gruppe}: die Vorschau ruft nichts beim Server auf`, z.aufrufe.length === vor, z.aufrufe.slice(vor));
       await tippe(s, 'konfetti');
-      const knoepfe = await s.locator('.sheet-karte .sheet-knoepfe button').allTextContents();
+      const knoepfe = await s.locator('.sheet-karte.shf-sheet .sheet-knoepfe button').allTextContents();
       pruefe(`${gruppe}: im Blatt nur "Schließen", kein Kaufknopf`, JSON.stringify(knoepfe.map((x) => x.trim())) === '["Schließen"]', knoepfe);
       await schliesse(s);
       pruefe(`${gruppe}: Schliessen waehrend des Ablaufs raeumt auf`, await s.locator('.shf-effekt-ebene').count() === 0);

@@ -235,7 +235,7 @@ async function vorschau(s, art) {
 
 const IPHONE = ['iPhone 13', 390, 844], SE = ['iPhone SE', 375, 667], IPAD = ['iPad', 820, 1180], IPAD_QUER = ['iPad quer', 1180, 820], PC = ['PC', 1280, 720];
 const seitenfehler = [];
-const TITEL = { finisher: 'Mehr Finisher', klang: 'Mehr Klänge' };
+const TITEL = { finisher: 'Mehr Finisher', klang: 'Mehr Klänge', effekt: 'Effekte' };
 async function lauf(browser, [geraet, w, h], { farbe = 'hell', ruhig = false, gast = false } = {}) {
   const gruppe = `${geraet}${farbe === 'dunkel' ? ' dunkel' : ''}${ruhig ? ' ruhig' : ''}${gast ? ' gast' : ''}`;
   const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
@@ -267,8 +267,8 @@ async function lauf(browser, [geraet, w, h], { farbe = 'hell', ruhig = false, ga
       };
     });
     pruefe(`${gruppe}: die vier Plaetze bleiben`, bild.plaetze === 4, bild.plaetze);
-    pruefe(`${gruppe}: zwei Regale in fester Reihenfolge mit Titel, kein leeres Emote-Regal`, JSON.stringify(bild.arten) === '["finisher","klang"]'
-      && bild.titel.join() === [TITEL.finisher, TITEL.klang].join(), bild.titel);
+    pruefe(`${gruppe}: drei Regale in fester Reihenfolge mit Titel, kein leeres Emote-Regal`, JSON.stringify(bild.arten) === '["finisher","klang","effekt"]'
+      && bild.titel.join() === [TITEL.finisher, TITEL.klang, TITEL.effekt].join(), bild.titel);
     pruefe(`${gruppe}: Regale zeigen die Liste aus auslage.json`, REGALE.every((a) => JSON.stringify(bild.ids[a]) === JSON.stringify(R[a].map((x) => x.id))), bild.ids);
     pruefe(`${gruppe}: jede Regal-Karte mit Bild, Schloss und "Bald", kein Preis (auch nicht bei Server-Preis)`,
       bild.preise.length > 0 && bild.preise.every((x) => x === 'Bald') && bild.schloss && bild.mitBild && bild.euro === 0 && bild.label, bild.preise);
