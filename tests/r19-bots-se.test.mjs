@@ -1,17 +1,20 @@
 // R19 (Kritik R18 E2 und G1, 14.11.2026), im Browser gemessen:
 // Teil A Bots-Seite: Der klebende Knopf "Spielen gegen <Bot>" verdeckt kein Fokusziel (WCAG 2.4.11). Gemessen per Tab durch
 //   alle Bedienpunkte der Bots-Seite, je Ziel die Ueberdeckung mit .cta-platz in px. Ganz nach unten gerollt liegt nichts aus
-//   dem Panel unter dem Knopf. In Ruhe (nicht gerollt, kein Fokus) sieht die Seite aus wie mit dem CSS der Basis
-//   (origin/sammel-1114-r18, per Route ausgeliefert): Bild fuer Bild gleich.
+//   dem Panel unter dem Knopf. In Ruhe (nicht gerollt, kein Fokus) sieht die Seite aus wie ohne die Klebe-Regeln: Basis ist
+//   css/arena.css DESSELBEN Stands ohne jeden Regelblock mit scroll-padding (per Route ausgeliefert), Bild fuer Bild gleich.
+//   Bis 18.11.2026 war die Basis fest origin/sammel-1114-r18; jede spaetere gewollte Arena-Aenderung (Plakette, Handy-Karte,
+//   lebendige Welt) schlug dann an (Vorprobe sammel-1118-r19b 136/150), obwohl die Klebe-Regel nichts verschob.
 // Teil B Loeschseite: oben ein Sprunglink zu "Selbst loeschen", mindestens 44 px hoch, auf dem Handy im ersten Bild,
 //   Tippen landet am Abschnitt.
 //
 //   node tests/r19-bots-se.test.mjs
 //   PORT=9791 node tests/r19-bots-se.test.mjs    Port des Testservers (sonst: frei)
-//   BASIS_CSS=<datei> node tests/r19-bots-se.test.mjs    Vergleichs-CSS fuer Teil A (sonst: git show origin/sammel-1114-r18)
+//   BASIS_CSS=<datei> node tests/r19-bots-se.test.mjs    Vergleichs-CSS fuer Teil A (sonst: arena.css ohne Klebe-Regeln)
+//   ARENA_CSS=<datei> node tests/r19-bots-se.test.mjs    statt css/arena.css diese Datei ausliefern (Mutanten-Probe)
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
@@ -31,12 +34,15 @@ function pruefe(name, gut, detail = '') {
   console.log(`${gut ? 'ok    ' : 'FEHLER'} ${name}${!gut && d ? ' (' + d.slice(0, 600) + ')' : ''}`);
 }
 
-// CSS der Basis fuer den Bildvergleich in Ruhe; ohne git (CI mit flachem Klon) entfaellt nur dieser Vergleich
-let basisCss = null;
-try {
-  basisCss = process.env.BASIS_CSS ? readFileSync(process.env.BASIS_CSS, 'utf8')
-    : execFileSync('git', ['show', 'origin/sammel-1114-r18:css/arena.css'], { cwd: WURZEL, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-} catch (e) { basisCss = null; }
+// Das ausgelieferte arena.css (sonst die Datei des Stands) und die Basis fuer den Bildvergleich in Ruhe: dasselbe CSS ohne die
+// Klebe-Regeln. Entfernt wird jeder GANZE Regelblock, der scroll-padding traegt, nicht nur die Angabe: schiebt ein solcher
+// Block zusaetzlich etwas (padding, margin ...), weicht das Bild ab und der Vergleich wird rot. Kein Block gefunden = Fehler,
+// sonst verglichen sich zwei gleiche Dateien. Braucht kein git mehr, laeuft also auch in der CI.
+const arenaCss = process.env.ARENA_CSS ? readFileSync(process.env.ARENA_CSS, 'utf8') : null;
+const KLEBE_BLOCK = /[^{}]*\{[^{}]*scroll-padding[^{}]*\}/g;
+const eigenCss = arenaCss ?? readFileSync(path.join(WURZEL, 'css/arena.css'), 'utf8');
+const klebeBloecke = eigenCss.match(KLEBE_BLOCK) || [];
+const basisCss = process.env.BASIS_CSS ? readFileSync(process.env.BASIS_CSS, 'utf8') : eigenCss.replace(KLEBE_BLOCK, '');
 
 // Langes Panel (Kaltreview R19 B3): laufende Partie ("Fortsetzen" oben im Panel) und zwei besiegte Bots
 const LANG = {
@@ -125,12 +131,14 @@ try {
   for (let i = 0; i < 60; i++) { try { if ((await fetch(BASIS + 'index.html')).ok) break; } catch (e) { /* noch nicht */ } await warte(150); }
 
   // ---------- Teil A: Bots ----------
+  pruefe('Basis: arena.css traegt eine Klebe-Regel (scroll-padding), die Basis ist ohne sie', !!process.env.BASIS_CSS || (klebeBloecke.length >= 1 && basisCss !== eigenCss),
+    { bloecke: klebeBloecke.map((x) => x.trim().slice(-120)) });
   const GROESSEN = [[375, 667], [390, 844], [667, 375], [820, 1180], [1180, 820], [1000, 590], [1440, 900]];
   for (const schema of ['light', 'dark']) for (const [w, h] of GROESSEN) {
     const name = `Bots ${w}x${h} ${schema === 'dark' ? 'dunkel' : 'hell'}`;
     // Bild in Ruhe gegen die Basis
-    if (basisCss) {
-      const neu = await bots(browser, { w, h, schema });
+    {
+      const neu = await bots(browser, { w, h, schema, css: arenaCss });
       const alt = await bots(browser, { w, h, schema, css: basisCss });
       // Fingerabdruck statt Bildbytes: ein Bildvergleich zweier Seiten wich unter Suitenlast um wenige Bytes ab, auch auf
       // Groessen, auf denen die Aenderung gar nicht greift. Lage, Groesse und die sichtbaren Stilwerte jedes Elements der
@@ -151,7 +159,7 @@ try {
         { elemente: [an.length, aa.length], abw: abw.slice(0, 3) });
       await neu.k.close(); await alt.k.close();
     }
-    const { k, s, fehler } = await bots(browser, { w, h, schema });
+    const { k, s, fehler } = await bots(browser, { w, h, schema, css: arenaCss });
     const f = await fokusRunde(s);
     pruefe(`${name}: Tab erreicht Bedienpunkte der Seite`, f.ziele >= 3, f);
     pruefe(`${name}: kein Fokusziel liegt unter dem klebenden Spielen-Knopf (WCAG 2.4.11)`, f.funde.length === 0, f.funde);

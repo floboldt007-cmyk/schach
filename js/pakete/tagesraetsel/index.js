@@ -24,7 +24,7 @@ import { ladeModul, speichereModul } from '../../storage.js';
 import { ladeInhalt, registriereInhaltsart } from '../../inhalte.js';
 import { icon, registriereIcon } from '../../ui/icons.js';
 import { miniBrett } from '../../ui/bauteile.js';
-import { tagSchluessel } from '../../tag.js';
+import { tagSchluessel, addiereTage } from '../../tag.js';
 import { registriereRaetselQuelle } from '../../ui/raetsel.js';
 import { t } from '../../sprache.js';
 import * as L from './logik.js';
@@ -298,8 +298,22 @@ function heimZeile(app, tag, zeile) {
   if (!td || stand(td).fertig) return null;
   const a = td.aufgaben[L.ersteOffene(roh(), td)];
   const text = t('p-tagesraetsel.heute.text', { nummer: td.nummer, zuege: L.zuegeText(a) });
+  const woche = letzteTage(tag);
+  const geloest = woche.filter(Boolean).length;
   return zeile({ symbol: icon('tagesraetsel'), titel: t('p-tagesraetsel.name'), text,
-    label: `${t('p-tagesraetsel.name')} · ${text} · ${t('p-tagesraetsel.karte.loesen')}`, paket: L.PAKET, beiTipp: (ev) => oeffne(app, ev) });
+    label: `${t('p-tagesraetsel.name')} · ${text} · ${t('p-tagesraetsel.heute.woche', { n: geloest })} · ${t('p-tagesraetsel.karte.loesen')}`,
+    paket: L.PAKET, fortschritt: { art: 'schritte', n: woche.length, an: geloest }, beiTipp: (ev) => oeffne(app, ev) });
+}
+
+// R19: die letzten 7 Tage bis heute, je Tag geloest (alle Aufgaben des Tages richtig, wie stand(td).geloest) oder nicht.
+// Ein Tag ohne Daten zaehlt mit einer Aufgabe; was nicht im Modul steht, ist nicht geloest.
+function letzteTage(tag) {
+  const m = roh();
+  return Array.from({ length: 7 }, (_, i) => {
+    const t7 = addiereTage(tag, i - 6);
+    const td = daten ? L.tagDaten(daten, t7) : null;
+    return L.tagStand(m, t7, td ? td.aufgaben.length : 1).geloest;
+  });
 }
 
 // ---------- Einhaengen (defensiv) ----------

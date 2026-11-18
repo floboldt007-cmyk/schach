@@ -38,6 +38,8 @@ const SUITEN = [
   { name: 'apple-knopf', datei: 'apple-knopf.test.mjs', args: [], was: 'Anmeldeblatt: abgeschalteter Apple-Weg berechnet unsichtbar, Google und Code-Anmeldung sichtbar (Browser)' },
   { name: 'online', datei: 'online.test.mjs', args: [], was: 'Online gegen Freunde: Einladung, Zuege, Abfrage' },
   { name: 'online-haengt-vertrag', datei: 'online-haengt-vertrag.test.mjs', args: [], was: 'Haengende Online-Partie: Client wartet gewertet ranked_haengt_s + 1 s, sonst 10 Min (Vertrag mit zwei-ligen-schema.sql)' },
+  { name: 'serverzeit', datei: 'serverzeit.test.mjs', args: [], was: 'Serveruhr minus Geraeteuhr fuer Online-Uhr, Erstzug-Frist und Intro (R19)' },
+  { name: 'online-start', datei: 'online-start.test.mjs', args: [], was: 'Online-Start mit zwei Spielern: Intro sperrt nie, Erstzug-Frist auf beiden Seiten, Uhr trotz falscher Geraeteuhr (R19)' },
   { name: 'online-live-eigene', datei: 'online-live-eigene.test.mjs', args: [], was: 'Online-Live-Bewertung: nur eigene Zuege, kein bester Zug, Ranked nur mit Server-Kontingent' },
   { name: 'freunde', datei: 'freunde.test.mjs', args: [], was: 'Freunde: Anfrage, Antwort, Einladungslink (Server abgefangen)' },
   { name: 'online-ui', datei: 'online-ui.test.mjs', args: [], was: 'Online-Oberflaeche mit abgefangenen Server-Anfragen' },
@@ -88,6 +90,8 @@ const SUITEN = [
   { name: 'zuzweit-lektion-figurensatz', datei: 'zuzweit-lektion-figurensatz.test.mjs', args: [], was: 'Zu zweit und Meisterschule-Lektion: Figurensatz wechselt ohne Neuladen (spaeter Erfinder-Status, Wahl in den Einstellungen)' },
   { name: 'funktion-partie', datei: 'funktion-partie.test.mjs', args: [], was: 'Funktionsprobe Bot-Partie: Start, Zug, Hinweis, Sieg, Aufgeben, Ergebnisblatt (iPhone 13 + PC)' },
   { name: 'r19-lektionen-probe', datei: 'r19-lektionen-probe.mjs', args: [], was: 'Funktionsprobe Meisterschule: jede der 65 Lektionen Start, Zug per Klick, Ergebnisblatt (iPhone 13 + PC, hell + dunkel)' },
+  { name: 'r19-lektionen-besser', datei: 'r19-lektionen-besser.test.mjs', args: [], was: 'Feinschliff R19: 13 lange Lektionen mit drei Runden, jede Stellung, jedes Ziel und jede Textbehauptung mit Stockfish nachgerechnet (Node)' },
+  { name: 'r19-lektionen-runden', datei: 'r19-lektionen-runden.test.mjs', args: [], was: 'Feinschliff R19: Rundenknoepfe, Runde fuer Runde geschafft, Meisterprobe ohne Hinweis, alter Spielstand, iPhone SE (Browser)' },
   { name: 'ergebnis-einmal', datei: 'ergebnis-einmal.test.mjs', args: [], was: 'Ergebnisblatt der Bot-Partie: Spruch einmal, ein Nochmal-Knopf (Revanche), Knoepfe ab 44 px (iPhone 13 + PC)' },
   { name: 'r17-ende-feinschliff', datei: 'r17-ende-feinschliff.test.mjs', args: [], was: 'R17: Fokus nach Niederlage auf Zur Analyse, Namen auf der Duell-Ende-Karte, kein Streifen unter dem Profilbanner (Browser)' },
   { name: 'liga-kontrast', datei: 'liga-kontrast.test.mjs', args: [], was: 'Kritik R6: Marke "neu" als Chip, Code-Teilen als Knopf, Kontraste Bronze/Gold/Aufstieg/"!", Knoepfe hinter dem Ergebnis-Blatt gesperrt (Browser)' },
@@ -157,12 +161,19 @@ const SUITEN = [
   { name: 'r19-online-ruhig', datei: 'r19-online-ruhig.test.mjs', args: [], was: 'Feinschliff R19: Online ruhiger (Entwurf A einzig), eine Zahl (Server-Elo) oder Liga als Wort, Tuertexte sichtbar oder in Mehr, Leisten nur Name (Browser)' },
   { name: 'r19-welten-sehen', datei: 'r19-welten-sehen.test.mjs', args: [], was: 'Feinschliff R19: alle Bot-Welten zu sehen, noch nicht offene Welt ohne Schloss und nicht startbar, spielbar nach dem Endgegner davor (4 Geraete, hell/dunkel, Browser)' },
   { name: 'r19-avatar-modern', datei: 'r19-avatar-modern.test.mjs', args: [], was: 'Feinschliff R19: jeder Bot zeigt in jeder Ansicht das moderne Portraet (Zuordnung ueber avatarVon, Node)' },
+  { name: 'r19-uhr', datei: 'r19-uhr.test.mjs', args: [], was: 'Feinschliff R19: Schachuhr in Bot- und KI-Partie (Kern: Abzug, Zuschlag, Pause, Zeitende, Fortsetzen aus zeiten, Wanduhr gewertet, Remis ohne Mattmaterial)' },
+  { name: 'r19-arena-figur', datei: 'r19-arena-figur.test.mjs', args: [], was: 'Feinschliff R19: eigene Figur in der Bot-Welt bei jeder Stufe und fertiger Welt frei neben ihrer Station (iPhone 13, iPad, PC, Browser)' },
+  { name: 'r19-botwelt-leben', datei: 'r19-botwelt-leben.test.mjs', args: [], was: 'Bot-Welt lebendig: Handy B (ganze Welt, Gegner als Leiste), Weltname als Plakette mit Wappen, je Welt ein ruhiges Element (reduced-motion still)' },
+  { name: 'r19-arena-karte-klein', datei: 'r19-arena-karte-klein.test.mjs', args: [], was: 'Arena kleine Handys: Spielen-Knopf zu und offen ganz sichtbar (SE 320/375, iPhone 13), Groessenwechsel 1280/1024 -> 375 -> zurueck stellt die Lage richtig' },
   { name: 'r17-kopf', datei: 'r17-kopf.test.mjs', args: [], was: 'Feinschliff R17: Kopf-Knoepfe (Premium, rund) in Ruhe, Zeiger, Fokus, gedrueckt lesbar, Zeiger nur bei hover:hover, Handy ohne haengenden Zustand (Browser)' },
   { name: 'r18-hover-rest', datei: 'r18-hover-rest.test.mjs', args: [], was: 'Feinschliff R18: Einstellungen-Navigation und Kopf-Chips am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover (Browser)' },
   { name: 'r18-rd-hover', datei: 'r18-rd-hover.test.mjs', args: [], was: 'Feinschliff R18: Knoepfe des Raetsel-Duells (Start, Ende) am Handy nach dem Tippen wie in Ruhe, Zeiger nur bei hover:hover, Kontrast in vier Zustaenden mind. 4,5:1 (Browser)' },
   { name: 'r19-rand-handy', datei: 'r19-rand-handy.mjs', args: [], was: 'Feinschliff R19: Brett mit Koordinaten am Rand ragt auf 6 Geraeten nicht ueber Sockel oder Seite, auch nach Brettwechsel in der Partie (<= 0,5 px) (Browser)' },
   { name: 'r19-effekt-ebene', datei: 'r19-effekt-ebene.mjs', args: [], was: 'Feinschliff R19: mit jedem Motiv-Brett deckt sich die Effekt-Ebene auf 5 Geraeten (ecke/rand) auf 0,5 px mit dem Brett, nie breiter, kein Ueberlauf (Browser)' },
+  { name: 'r19-start-naechstes', datei: 'r19-start-naechstes.test.mjs', args: [], was: 'Feinschliff R19: Start "Als Naechstes" mit eigenem Gesicht je Zeile (Farbe, Bildstueck) und wahrem Fortschritt (Marsch, Raetsel-Tage, faellige Fehler, Liga-Wappen und Abstand), Hoehe SE und PC (Browser)' },
   { name: 'r19-benutzername', datei: 'r19-benutzername.test.mjs', args: [], was: 'Feinschliff R19: gemerkter Benutzername wird einmal je Start mit dem Server abgeglichen, ohne Server bleibt er (Browser)' },
+  { name: 'r19-analyse-neu', datei: 'r19-analyse-neu.test.mjs', args: [], was: 'Feinschliff R19: Analyse neu (Schluesselmomente als Karten oben, Symbole gross, Verlauf ohne Kleintext, Ergebnis-Karte, Tempo, Auto-Abspielen) (Browser)' },
+  { name: 'r19-verlauf-neu', datei: 'r19-verlauf-neu.test.mjs', args: [], was: 'Feinschliff R19: Verlauf neu (Partien ohne Zug als eine Zeile, Ergebniszeichen, Zu-zweit-Bild, leiser Muelleimer, eine Staerke-Zahl, Level-Karte im Rahmen)' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
@@ -177,7 +188,7 @@ const DAUERN = new Map([
   ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
-  ['r19-lektionen-probe', 360],
+  ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60],
 ]);
 
 function teile(suiten, anzahl) {

@@ -922,7 +922,25 @@ export function ladeLaufendePartie() {
   const modus = MODI.includes(s.modus) ? s.modus : 'normal';
   const ziel = modus === 'uebung' ? pruefeZiel(s.ziel) : null;
   const extra = pruefeExtra(s.extra) || {};
-  return normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra });
+  // R19 Uhr: zeitenJe prueft jeden Eintrag einzeln (ungueltig oder fehlend: null), damit die Uhr beim Fortsetzen nicht
+  // alle Zeiten verliert, wenn einer kaputt ist; zeiten selbst verwirft pruefeZeiten weiter im Ganzen
+  const zeitenJe = zuege.map((_, i) => {
+    const x = Array.isArray(s.zeiten) ? s.zeiten[i] : undefined;
+    return Number.isInteger(x) && x >= 0 && x <= 864000 ? x : null;
+  });
+  const n = normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra, zeitenJe });
+  // R19 Uhr: mit Bedenkzeit rechnet die Uhr beim Fortsetzen ab gestartet (js/ui/partie.js); fehlt es, ist es kaputt oder
+  // liegt es in der Zukunft, braechte der Stand Zeit zurueck. Statt die Partie still zu verwerfen (Fix-Review 07), wird es
+  // ersetzt: mit gueltigem uhr.seit durch uhr.seit minus die gueltig gebuchten Zeiten (der laufende Zug zaehlt dann ab
+  // uhr.seit, wie gespeichert), sonst durch jetzt. Zu zweit rechnet seine eigene Uhr (js/ui/zuzweit.js) und bleibt, wie es ist
+  const jetzt = Date.now();
+  const start = Date.parse(n.gestartet);
+  if (n.tempo && s.modus !== 'zuzweit' && !(Number.isFinite(start) && start <= jetzt)) {
+    const seit = s.uhr && typeof s.uhr === 'object' && Number.isFinite(s.uhr.seit) && s.uhr.seit <= jetzt ? s.uhr.seit : null;
+    const gebucht = zeitenJe.reduce((a, x) => a + (x == null ? 0 : x * 100), 0);
+    n.gestartet = new Date(seit == null ? jetzt : Math.min(jetzt, seit - gebucht)).toISOString();
+  }
+  return n;
 }
 
 export function loescheLaufendePartie() {

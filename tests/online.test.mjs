@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { setzeKontoFetch, sitzung, SITZUNG_SCHLUESSEL, SICHTBAR_SCHLUESSEL } from '../js/konto.js';
 import { SUPABASE_URL, SUPABASE_KEY, FUNKTION_REGION, mitRegion } from '../js/konto-config.js';
+import { versatz as szVersatz, sicher as szSicher, vergiss as szVergiss } from '../js/serverzeit.js';
 import {
   erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte, pruefeZeit, meldeStrittig,
   einladungsLink, codeAusLink, uebernimmEinladungsLink, gemerkteEinladung, vergissEinladung, meineFarbe, binAmZug,
@@ -85,6 +86,15 @@ anmelden();
 }
 
 // ---------- beitreten ----------
+// R19 Kaltreview F1: online_tritt_bei gibt fuer "schon am Brett" die alte Zeile ohne Schreibung zurueck
+// (supabase/online-schema.sql); ihr aktualisiert_am ist keine frische Probe der Serveruhr
+{
+  szVergiss();
+  antworten.push({ status: 200, body: { ...partie, status: 'laeuft', schwarz: 'u2', aktualisiert_am: new Date(Date.now() - 540000).toISOString() } });
+  await tritteBei('ABC234');
+  pruefe('tritteBei: alte Zeile (schon am Brett) ist keine frische Probe, kein Versatz', szVersatz() === 0 && !szSicher(), szVersatz());
+  szVergiss();
+}
 {
   antworten.push({ status: 200, body: { ...partie, status: 'laeuft', schwarz: 'u2' } });
   const p = await tritteBei(' ab-c2 34 ');
@@ -536,8 +546,10 @@ anmelden();
     && /const einladung = uebernimmEinladungsLink\(\);[\s\S]*?const ziel = einladung/.test(quelle('js/app.js'))
     && /const SCREENS = \[[^\]]*'online'/.test(quelle('js/app.js')) && /online: 'Online'/.test(quelle('js/app.js')));
   const eigene = quelle('js/online.js');
-  pruefe('online.js importiert nur Konfiguration, Konto und Sprache, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js,./sprache.js'
-    && [...eigene.matchAll(/import '([^']+)'/g)].map((x) => x[1]).join(',') === './sprachen/online.js');
+  // R19 (15.11.2026): dazu die Serveruhr (js/serverzeit.js), ein Blatt ohne eigene Importe
+  pruefe('online.js importiert nur Konfiguration, Konto, Sprache und Serveruhr, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js,./serverzeit.js,./sprache.js'
+    && [...eigene.matchAll(/import '([^']+)'/g)].map((x) => x[1]).join(',') === './sprachen/online.js'
+    && !/^\s*import\b/m.test(quelle('js/serverzeit.js')));
   pruefe('online.js: kein setInterval, keine Supabase-Bibliothek, kein geheimer Schluessel', !/setInterval|@supabase|service_role|eyJ[A-Za-z0-9_-]{20,}/.test(eigene));
   pruefe('online.js: Zuege nur ueber die Edge Function, rpc/online_zug kommt nicht mehr vor', !/['"`]online_zug['"`]/.test(eigene) && !/rpc\('online_zug'/.test(eigene)
     && /export const ZUG_PFAD = '\/functions\/v1\/online-zug';/.test(eigene));
