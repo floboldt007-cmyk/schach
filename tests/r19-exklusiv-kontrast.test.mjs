@@ -1,6 +1,7 @@
 // Kontrast der Seltenheits-Marke im Shop A (Feinschliff R19, Auftrag Hauptfenster 18.11.2026): die kleine Marke "Exklusiv"
 // (.shf-selten, 12 px, css/pakete/sammlung.css) hatte auf ihrer Karte nur 4,16:1. Text braucht mindestens 4,5:1 (WCAG 1.4.3).
-//   Jede Marke (Haeufig, Selten, Episch, Exklusiv) auf jeder Karte des Schaufensters, auch die ausgegraute Gast-Karte:
+//   Jede Marke (Haeufig, Selten, Episch, Exklusiv) auf jeder Karte des Schaufensters und der Regale (.shf-rk, Emotes und
+//   Finisher, Kaltreview 6b), auch die ausgegraute Gast-Karte:
 //   Schriftfarbe gegen den deckend zusammengesetzten Grund darunter, in Ruhe, mit dem Zeiger auf der Karte und mit dem
 //   Tastatur-Fokus auf der Karte; iPhone SE, iPhone 13 und PC, hell und dunkel. Die Marke bleibt golden (Farbton um 40 Grad).
 //   Keine Seitenfehler. Netz nur simuliert.
@@ -93,7 +94,7 @@ const messe = (s) => s.evaluate(() => {
     return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const ton = ([r, g, b]) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (!d) return null;
     const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return Math.round((h * 60 + 360) % 360); };
-  return [...document.querySelectorAll('.sa-blatt .shf-karte')].map((k) => {
+  return [...document.querySelectorAll('.sa-blatt :is(.shf-karte, .shf-rk)')].map((k) => {
     const m = k.querySelector('.shf-selten'); if (!m) return null;
     const schichten = []; let unbekannt = '';
     for (let e = m; e; e = e.parentElement) {
@@ -130,7 +131,7 @@ try {
         const ruhe = await messe(s);
         pruefe(`${gruppe}: Marke Exklusiv vorhanden`, ruhe.some((x) => x.selten === 'exklusiv'), ruhe.map((x) => x.selten));
         for (const zustand of ['Ruhe', 'Zeiger', 'Fokus']) {
-          const karten = s.locator('.sa-blatt .shf-karte');
+          const karten = s.locator('.sa-blatt :is(.shf-karte, .shf-rk)');
           const n = await karten.count();
           for (let i = 0; i < n; i++) {
             const karte = karten.nth(i);
