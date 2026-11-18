@@ -69,8 +69,8 @@
 .vl-genau { font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel); color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vl-genau.offen { font-size: 13px; font-weight: 700; color: var(--text-2); }
 .vl-sterne { font-size: 15px; letter-spacing: 1px; line-height: 1; }
-.vl-sterne .an { color: var(--gold); }
-.vl-sterne .aus { color: var(--linie-2); }
+.vl-sterne .an { color: var(--stern-an); }
+.vl-sterne .aus { color: var(--stern-aus); }
 .vl-muell { color: var(--text-2); background: var(--flaeche-2); box-shadow: none; }
 .vl-muell:active { color: var(--warn); }
 

@@ -206,8 +206,8 @@
 /* Sterne der Partie unter dem Ergebnis, neue leuchten auf */
 .an-vs-sterne { display: flex; gap: 2px; margin-top: 3px; font-size: 15px; line-height: 1; }
 .an-vs-sterne span { display: inline-block; }
-.an-vs-sterne .an { color: var(--gold); }
-.an-vs-sterne .aus { color: var(--linie-2); }
+.an-vs-sterne .an { color: var(--stern-an); }
+.an-vs-sterne .aus { color: var(--stern-aus); }
 .an-vs-sterne .neu { animation: an-stern-ein .55s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(.35s + var(--i, 0) * .3s); }
 @keyframes an-stern-ein { from { transform: scale(0) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .an-vs-sterne .neu { animation: none; } }
