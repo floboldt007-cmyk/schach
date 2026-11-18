@@ -373,8 +373,8 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .shf-text { display: grid; gap: 2px; min-width: 0; align-content: start; }
 .shf-selten { font-size: 12px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; color: color-mix(in srgb, var(--shf-farbe) 78%, var(--text)); }
 /* Gold ist heller als Gruen, Blau und Lila: mit 78 % blieb "Exklusiv" auf der hellen Karte bei 4,16:1 (Text braucht 4,5:1).
-   Mehr Textfarbe macht die Marke hell dunkler und dunkel heller, der Farbton bleibt Gold (R19 exklusiv-kontrast) */
-.shf-karte[data-seltenheit="exklusiv"] .shf-selten { color: color-mix(in srgb, var(--shf-farbe) 70%, var(--text)); }
+   Mehr Textfarbe macht die Marke hell dunkler und dunkel heller, der Farbton bleibt Gold (R19 exklusiv-kontrast); auch die Regal-Karten (.shf-rk, Kaltreview 6b) */
+:is(.shf-karte, .shf-rk)[data-seltenheit="exklusiv"] .shf-selten { color: color-mix(in srgb, var(--shf-farbe) 70%, var(--text)); }
 .shf-name { font-family: var(--display); font-weight: var(--gw-titel); font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
 .shf-unter { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .shf-preis { justify-self: start; padding: 4px 10px; border-radius: 99px; font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums;
