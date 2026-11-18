@@ -118,11 +118,11 @@ try {
               await s.evaluate((z) => window.__app.gehe(z), ziel);
               await s.waitForSelector('.screen .haupt-kopf', { state: 'visible' });
               await s.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-              bewerte(`${gruppe} ${ziel}`, 'gleich', await messe(s), w >= 1000);
+              bewerte(`${gruppe} ${ziel}`, 'gleich', await messe(s), w > 700);
               await s.evaluate(() => document.fonts.ready);
               await warte(schrift === 'spaet' ? 1800 : 300);
               await s.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-              bewerte(`${gruppe} ${ziel}`, 'mit Schrift', await messe(s), w >= 1000);
+              bewerte(`${gruppe} ${ziel}`, 'mit Schrift', await messe(s), w > 700);
             }
           } finally { await k.close(); }
         }
