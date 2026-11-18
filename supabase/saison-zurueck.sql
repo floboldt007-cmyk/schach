@@ -231,7 +231,7 @@ begin
   end if;
   -- Weltrangliste (weltrang-schema.sql, 14.11.2026): ob und seit wann du in der Weltrangliste gezeigt werden willst
   if to_regclass('public.weltrang_teilnahme') is not null then
-    execute 'select jsonb_build_object(''teilnahme'', t.user_id is not null, ''seit'', t.seit,
+    execute 'select jsonb_build_object(''teilnahme'', (to_jsonb(t) ->> ''alter_bestaetigt_am'') is not null, ''seit'', t.seit,
                ''alter_bestaetigt_am'', to_jsonb(t) -> ''alter_bestaetigt_am'')
              from (select 1) x left join public.weltrang_teilnahme t on t.user_id = $1'
       into raetsel using uid;

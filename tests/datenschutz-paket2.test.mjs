@@ -75,8 +75,8 @@ pruefe('de: Seasons nennt die bestaetigte Elo', teil(lies('datenschutz.html'), '
   && teil(lies('datenschutz.html'), '<h3>Seasons</h3>', '<h3>').includes('Außerdem muss deine Online-Elo insgesamt auf mindestens 15 gewerteten Online-Partien beruhen, bei selbst angegebener Start-Elo auf mindestens 30'));
 pruefe('en: Seasons nennt die bestaetigte Elo', teil(lies('datenschutz-en.html'), '<h3>Seasons</h3>', '<h3>').includes('at least 20 online games with crowns')
   && teil(lies('datenschutz-en.html'), '<h3>Seasons</h3>', '<h3>').includes('Your online Elo must also rest on at least 15 rated online games in total, or at least 30 if you set your starting Elo yourself'));
-pruefe('App de: season.hilfe nennt beide Bedingungen', ligaTexte.includes('20 Online-Partien mit Kronen in der Season und insgesamt 15 gewertete Online-Partien, mit selbst angegebener Start-Elo 30.'));
-pruefe('App en: season.hilfe nennt beide Bedingungen', ligaTexte.includes('20 online games with crowns in the season and 15 rated online games in total, or 30 if you set your starting Elo yourself.'));
+pruefe('App de: season.hilfe nennt beide Bedingungen', ligaTexte.includes('Für die Top-Titel: 20 Online-Partien mit Kronen und eine bestätigte Elo.'));
+pruefe('App en: season.hilfe nennt beide Bedingungen', ligaTexte.includes('Top titles need 20 online games with crowns and a confirmed Elo.'));
 pruefe('App: Bestaetigung auf Deutsch', ligaTexte.includes("'welt.alter': 'Ich bin mindestens 16 oder meine Eltern sind einverstanden.'"));
 pruefe('App: Bestaetigung auf Englisch', ligaTexte.includes("'welt.alter': 'I am at least 16, or my parents have agreed.'"));
 

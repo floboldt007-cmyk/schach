@@ -135,6 +135,8 @@ const namen = (l) => (l?.liste || []).map((z) => z.name).join(',');
   await db.exec(`insert into public.weltrang_teilnahme (user_id) values ('${U.dora}')`);
   const l = await liste(U.dora);
   pruefe('Altzeile ohne Zeitpunkt zaehlt nicht als Teilnahme', l?.teilnahme === false && l?.ich?.status === 'nicht_dabei' && !namen(l).includes('dora'), JSON.stringify(l));
+  const altAuskunft = await als(U.dora, 'select public.meine_daten() as d');
+  pruefe('Datenauskunft: Altzeile ohne Zeitpunkt zaehlt nicht als Teilnahme', altAuskunft?.d?.kronen?.weltrang?.teilnahme === false, JSON.stringify(altAuskunft?.d?.kronen?.weltrang || altAuskunft));
   const nach = await mitmachen(U.dora, true, true);
   pruefe('Altzeile: Haken holt die Bestaetigung nach', nach?.teilnahme === true && !!(await zeile())?.am, JSON.stringify(nach));
   await mitmachen(U.dora, false, false);

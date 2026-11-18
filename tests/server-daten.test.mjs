@@ -176,6 +176,10 @@ pruefe('anon darf meine_daten() nicht aufrufen', anonFehler !== null, anonFehler
 
 // ---------- Rueckweg: alte Funktion, danach wieder die neue ----------
 f = await lauf(db, 'daten-auskunft-zurueck.sql', lies('supabase/daten-auskunft-zurueck.sql'));
+pruefe('daten-auskunft-zurueck.sql bricht ab, solange die Weltrangliste eingespielt ist', /ZUERST supabase\/weltrang-zurueck\.sql/.test(f || ''), f);
+f = await lauf(db, 'weltrang-zurueck.sql', lies('supabase/weltrang-zurueck.sql'));
+pruefe('weltrang-zurueck.sql laeuft', f === null, f);
+f = await lauf(db, 'daten-auskunft-zurueck.sql', lies('supabase/daten-auskunft-zurueck.sql'));
 pruefe('daten-auskunft-zurueck.sql laeuft', f === null, f);
 d = await auskunft(A);
 pruefe('nach dem Rueckweg: alte Auskunft ohne die neuen Teile', d && !('coach' in d) && 'kronen' in d, Object.keys(d || {}).join());
