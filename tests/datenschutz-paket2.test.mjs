@@ -70,6 +70,13 @@ for (const datei of ['js/pakete/abo/trainer.js', 'js/pakete/abo/texte.js']) {
   pruefe(`${datei}: Trainer bleibt ab 18`, /ab 18/.test(code));
 }
 const ligaTexte = lies('js/pakete/liga/texte.js');
+// Top 10 und Top 100 (supabase/saison-schema.sql, saison_abrechnen): 20 Partien mit Kronen in der Season UND bestaetigte Elo (15, mit Start-Elo 30)
+pruefe('de: Seasons nennt die bestaetigte Elo', teil(lies('datenschutz.html'), '<h3>Seasons</h3>', '<h3>').includes('mindestens 20 Online-Partien mit Kronen')
+  && teil(lies('datenschutz.html'), '<h3>Seasons</h3>', '<h3>').includes('Außerdem muss deine Online-Elo insgesamt auf mindestens 15 gewerteten Online-Partien beruhen, bei selbst angegebener Start-Elo auf mindestens 30'));
+pruefe('en: Seasons nennt die bestaetigte Elo', teil(lies('datenschutz-en.html'), '<h3>Seasons</h3>', '<h3>').includes('at least 20 online games with crowns')
+  && teil(lies('datenschutz-en.html'), '<h3>Seasons</h3>', '<h3>').includes('Your online Elo must also rest on at least 15 rated online games in total, or at least 30 if you set your starting Elo yourself'));
+pruefe('App de: season.hilfe nennt beide Bedingungen', ligaTexte.includes('20 Online-Partien mit Kronen in der Season und insgesamt 15 gewertete Online-Partien, mit selbst angegebener Start-Elo 30.'));
+pruefe('App en: season.hilfe nennt beide Bedingungen', ligaTexte.includes('20 online games with crowns in the season and 15 rated online games in total, or 30 if you set your starting Elo yourself.'));
 pruefe('App: Bestaetigung auf Deutsch', ligaTexte.includes("'welt.alter': 'Ich bin mindestens 16 oder meine Eltern sind einverstanden.'"));
 pruefe('App: Bestaetigung auf Englisch', ligaTexte.includes("'welt.alter': 'I am at least 16, or my parents have agreed.'"));
 

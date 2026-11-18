@@ -90,7 +90,7 @@ export const DE = {
   'season.schalter.an': 'Abzeichen und Titel zeigen',
   'season.schalter.text': 'Dein Gegner in Online-Partien sieht dein bestes Season-Abzeichen und deinen gewählten Season-Titel.',
   'season.schalter.fehler': 'Das hat gerade nicht geklappt. Bitte noch einmal versuchen.',
-  'season.hilfe': 'Titel gibt es am Season-Ende: Crownmaster für Crownmate I, Top 10 und Top 100 nach Elo ab 20 Online-Partien mit Kronen.',
+  'season.hilfe': 'Titel gibt es am Season-Ende: Crownmaster für Crownmate I, Top 10 und Top 100 nach Elo. Für Top 10 und Top 100 brauchst du 20 Online-Partien mit Kronen in der Season und insgesamt 15 gewertete Online-Partien, mit selbst angegebener Start-Elo 30.',
   'season.vorschau': 'So sehen dich deine Gegner',
   'season.fehler': 'Das hat gerade nicht geklappt. Später noch einmal versuchen.',
   // "Alle Ligen" (saison.js zeigeLigen): je Liga ein wahrer Satz zum Aufsteigen, die Zahlen aus kronen.js
@@ -217,7 +217,7 @@ export const EN = {
   'season.schalter.an': 'Show badge and title',
   'season.schalter.text': 'Your opponent in online games sees your best season badge and your chosen season title.',
   'season.schalter.fehler': 'That did not work just now. Please try again.',
-  'season.hilfe': 'Titles come at the end of a season: Crownmaster for Crownmate I, Top 10 and Top 100 by Elo from 20 online games with crowns.',
+  'season.hilfe': 'Titles come at the end of a season: Crownmaster for Crownmate I, Top 10 and Top 100 by Elo. For Top 10 and Top 100 you need 20 online games with crowns in the season and 15 rated online games in total, or 30 if you set your starting Elo yourself.',
   'season.vorschau': 'How your opponents see you',
   'season.fehler': 'That did not work just now. Please try again later.',
   'season.ligen.titel': 'All leagues',
