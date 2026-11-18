@@ -1,6 +1,6 @@
 {
-  "stand": "2026-11-06",
-  "hinweis": "Nur Grafiken, noch nicht in die App eingebaut. Flo gibt jedes Stueck frei. Keine Preise: die stehen nur im Vault.",
+  "stand": "2026-11-18",
+  "hinweis": "Grafiken fuer den Shop, die App liest diese Liste (js/pakete/sammlung/shop-entwurf.js). Verkauft wird damit noch nichts. Flo gibt jedes Stueck frei. Keine Preise: die stehen nur im Vault.",
   "quelle": "werkzeuge/shop-vorrat.mjs",
   "seltenheiten": [
     "Häufig",
@@ -77,12 +77,13 @@
     {
       "id": "mitternacht",
       "art": "brett",
-      "name": "Mitternacht",
+      "name": "Nachtblau",
+      "name_en": "Night Blue",
       "seltenheit": "Selten",
-      "text": "Tiefblau mit winzigen Sternen.",
+      "text": "Kräftiges Blau mit winzigen Sternen.",
       "datei": "assets/shop/bretter/mitternacht.svg",
       "hell": "#C9CFE6",
-      "dunkel": "#2E3766",
+      "dunkel": "#46549B",
       "rand": "#12152B"
     },
     {
@@ -148,7 +149,7 @@
       "text": "Nordlicht zieht als Schleier um das Brett.",
       "datei": "assets/shop/bretter/aurora.svg",
       "hell": "#E8F1F7",
-      "dunkel": "#1E3050",
+      "dunkel": "#375994",
       "rand": "#0D1626"
     },
     {
@@ -156,10 +157,10 @@
       "art": "brett",
       "name": "Kronsaal",
       "seltenheit": "Exklusiv",
-      "text": "Sonder-Brett: Weinrot und Gold mit Kronen im Feld.",
+      "text": "Sonder-Brett: Karminrot und Gold mit Kronen im Feld.",
       "datei": "assets/shop/bretter/kronsaal.svg",
       "hell": "#F3E3B6",
-      "dunkel": "#7A1F2E",
+      "dunkel": "#A52A3E",
       "rand": "#B8862B"
     },
     {
