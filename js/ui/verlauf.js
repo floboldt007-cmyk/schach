@@ -26,6 +26,7 @@ import '../sprachen/allgemein.js';
 import '../sprachen/analyse.js';
 import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet, pruefeZuzweit, istOnline } from '../storage.js';
 import { fuelle } from '../orte.js';
+import { zeigeGegnerProfil, profilText } from './gegner-profil.js';
 import { botFarbe, avatarVon } from '../thema.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 
@@ -304,6 +305,7 @@ export function zeige(root, params = {}, app) {
                 : `<span class="chip uebung vl-uebung" data-modus="${esc(p.modus || 'normal')}" title="${esc(t('analyse.vl.zeile.zaehltNicht'))}">${esc(chipText(artVon(p)))}</span>`}
             </span>
           </button>
+          ${online ? `<button class="icon-knopf vl-gegner" type="button" data-aktion="gegner" aria-label="${esc(profilText('oeffnen', { name: gegner }))}">${icon('person')}</button>` : ''}
           <button class="icon-knopf vl-muell" type="button" data-aktion="loeschen" aria-label="${esc(t('analyse.vl.zeile.loeschen', { name }))}">${icon('muell')}</button>
         </div>
       </div>`;
@@ -335,6 +337,17 @@ export function zeige(root, params = {}, app) {
         app.gehe('analyse', { partieId: zeile.dataset.id });
         break;
       case 'juwel': app.gehe('analyse', { partieId: k.dataset.id, ply: Number(k.dataset.ply) }); break;
+      case 'gegner': {
+        // R19 M6: Profil des Gegners einer Online-Partie; die Ablage-ID ist 'on-' + Server-ID (js/ui/online.js analyseId),
+        // die Karte kommt wie in der Partie aus karte_der_partie, ohne Antwort bleibt der Name aus der Ablage
+        const p = ladePartie(zeile.dataset.id);
+        if (!p || !istOnline(p)) break;
+        const gegnerFarbe = p.spielerFarbe === 'b' ? 'w' : 's';
+        zeigeGegnerProfil({ name: pruefeZuzweit(p.zuzweit)[gegnerFarbe === 'w' ? 'weiss' : 'schwarz'],
+          laden: () => import('../karte.js').then(({ karteDerPartie }) => karteDerPartie(String(p.id).replace(/^on-/, '')))
+            .then((d) => (d ? d[gegnerFarbe] : null)) });
+        break;
+      }
       case 'ohne': {
         ohneOffen = k.getAttribute('aria-expanded') !== 'true';
         k.setAttribute('aria-expanded', String(ohneOffen));

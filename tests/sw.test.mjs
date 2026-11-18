@@ -349,6 +349,10 @@ function main() {
   }
   const apple = readFileSync(path.join(WURZEL, 'assets/icons/apple-touch-icon.png'));
   pruefe('apple-touch-icon: 180 px, ohne Alphakanal', apple.readUInt32BE(16) === 180 && apple.readUInt32BE(20) === 180 && apple[25] === 2, `Farbtyp ${apple[25]}`);
+  for (const n of ['icon-192.png', 'icon-512.png']) {
+    const b = readFileSync(path.join(WURZEL, 'assets/icons', n));
+    pruefe(`${n}: ohne Alphakanal (keine hellen Ecken)`, b[25] === 2, `Farbtyp ${b[25]}`);
+  }
 
   // Statische Imports, Avatare und Screen-Module
   const module = liste.filter((d) => d.endsWith('.js') && !d.startsWith('vendor/stockfish'));

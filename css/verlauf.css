@@ -39,7 +39,7 @@
   border-radius: 14px; background: var(--flaeche-2); }
 .vl-kachel b { font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; }
 .vl-kachel > span { font-size: 12px; font-weight: 600; color: var(--text-2); line-height: 1.2; }
-.vl-kachel b .stern { font-size: .85em; color: var(--gold); }
+.vl-kachel b .stern { font-size: .85em; color: var(--stern-an); }
 .vl-staerke { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 14px; background: var(--flaeche-2);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 50%, var(--linie)); }
 .vl-staerke-zahl { flex: none; display: flex; flex-direction: column; }
@@ -109,8 +109,8 @@
 .vl-genau { font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel); color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vl-genau.offen { font-size: 13px; font-weight: 700; color: var(--text-2); }
 .vl-sterne { font-size: 15px; letter-spacing: 1px; line-height: 1; }
-.vl-sterne .an { color: var(--gold); }
-.vl-sterne .aus { color: var(--linie-2); }
+.vl-sterne .an { color: var(--stern-an); }
+.vl-sterne .aus { color: var(--stern-aus); }
 /* R19: Muelleimer leise, ohne Flaeche in jedem Zustand (eine blasse Hover-Flaeche hob sich nur 1.1:1 ab); Zeiger und Fokus
    machen das Zeichen dunkler, der Fokusring kommt von der App; Loeschen weiter mit Rueckfrage */
 .vl-screen .vl-muell, .vl-screen .vl-muell:hover, .vl-screen .vl-muell:focus-visible, .vl-screen .vl-muell:active {
@@ -118,6 +118,11 @@
 .vl-screen .vl-muell { color: var(--text-2); }
 .vl-screen .vl-muell:hover, .vl-screen .vl-muell:focus-visible { color: var(--text); }
 .vl-screen .vl-muell:active { color: var(--kt-patzer); }
+/* R19 M6: Profil des Online-Gegners, leise wie der Muelleimer daneben (js/ui/gegner-profil.js) */
+.vl-screen .vl-gegner, .vl-screen .vl-gegner:hover, .vl-screen .vl-gegner:focus-visible, .vl-screen .vl-gegner:active {
+  background: transparent; border-color: transparent; box-shadow: none; }
+.vl-screen .vl-gegner { color: var(--text-2); }
+.vl-screen .vl-gegner:hover, .vl-screen .vl-gegner:focus-visible, .vl-screen .vl-gegner:active { color: var(--text); }
 
 /* R19: Partien ohne Zug als eine aufklappbare Zeile am Ende der Liste */
 .vl-ohne-gruppe { display: grid; gap: 10px; }
@@ -163,7 +168,7 @@
   .vl-z3 { font-size: 12px; }
   .vl-genau { font-size: 16px; }
   .vl-sterne { font-size: 13px; }
-  .vl-screen .vl-muell { --tap: 44px; }
+  .vl-screen .vl-muell, .vl-screen .vl-gegner { --tap: 44px; }
   .vl-schatz-liste { grid-template-columns: 1fr 1fr; }
   .vl-juwel { padding: 8px; gap: 8px; }
   .vl-juwel-symbol { width: 26px; height: 26px; }
