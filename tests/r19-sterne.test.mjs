@@ -56,11 +56,11 @@ const ORTE = [
   ['Lernen', '.ms-sterne > i', (e) => e.classList.contains('an')],
   ['Lernen-Zahl', ':is(.ms-sterne-zahl, .ms-gesamt, .ms-bk-sterne) .ico', () => true],
   ['Verlauf', '.vl-sterne > span', (e) => e.classList.contains('an')],
-  ['Verlauf-Kachel', '.vl-stat .stern, .kachel .stern', () => true],
+  ['Verlauf-Kachel', '.vl-stat .stern, .kachel .stern, .vl-kachel .stern', () => true],
   ['Analyse', '.an-vs-sterne > span', (e) => e.classList.contains('an')],
   ['Ergebnisblatt', '.erg-stern .e-stern', (e) => e.parentElement.classList.contains('an')],
 ];
-const PFLICHT = ['Arena-Karte', 'Steckbrief', 'Ziele', 'Lernen', 'Verlauf', 'Analyse', 'Ergebnisblatt'];
+const PFLICHT = ['Arena-Karte', 'Steckbrief', 'Ziele', 'Lernen', 'Verlauf', 'Analyse', 'Ergebnisblatt', 'Verlauf-Kachel'];
 
 // Kontrast aus zwei Bildern (mit und ohne Stern) im Browser: gemalte Pixel = Abweichung > 8; je Pixel Kontrast zwischen
 // den beiden Bildern; gemeldet wird das 90. Perzentil (Kantenglaettung druckt die Raender, der Kern zaehlt). Farbton aus
