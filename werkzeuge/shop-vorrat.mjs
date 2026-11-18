@@ -163,7 +163,7 @@ const BRETTER = [
     muster: () => je(HELL, (x, y) => `<circle cx="${x + 3}" cy="${y + 4}" r=".7"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".5"/>`).replace(/<circle/g, '<circle fill="rgba(120,80,40,.28)"')
       + je(DUNKEL, (x, y) => `<circle fill="rgba(80,40,10,.25)" cx="${x + 4}" cy="${y + 7}" r=".8"/>`) },
   // Kennung bleibt mitternacht; der sichtbare Name weicht der Edition "Mitternacht & Gold" aus (Freigabe 18.11.2026)
-  { id: 'mitternacht', name: 'Nachtblau', nameEn: 'Night Blue', seltenheit: 'Selten', hell: '#C9CFE6', dunkel: '#46549B', rand: '#12152B', text: 'Tiefblau mit winzigen Sternen.',
+  { id: 'mitternacht', name: 'Nachtblau', nameEn: 'Night Blue', seltenheit: 'Selten', hell: '#C9CFE6', dunkel: '#46549B', rand: '#12152B', text: 'Kräftiges Blau mit winzigen Sternen.',
     muster: () => je(DUNKEL, (x, y) => `<circle cx="${x + 3}" cy="${y + 3}" r=".55"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".4"/>`).replace(/<circle/g, '<circle fill="rgba(255,255,255,.7)"') },
   { id: 'kirschbluete', name: 'Kirschblüte', seltenheit: 'Selten', hell: '#FBE8EC', dunkel: '#D98AA0', rand: '#6B2E3E', text: 'Zartrosa mit kleinen Blueten.',
     muster: () => je(HELL, (x, y) => [0, 1, 2, 3, 4].map((i) => { const w = -Math.PI / 2 + (i * 2 * Math.PI) / 5; return `<circle fill="rgba(217,138,160,.4)" cx="${n(x + 5.5 + 1.5 * Math.cos(w))}" cy="${n(y + 5.5 + 1.5 * Math.sin(w))}" r="1"/>`; }).join('')) },
@@ -183,7 +183,7 @@ const BRETTER = [
     muster: () => '', defs: '<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3BE8B0"/><stop offset=".5" stop-color="#4C6EF5"/><stop offset="1" stop-color="#B565F0"/></linearGradient>',
     ueber: '<path d="M0 6a6 6 0 0 1 6-6h88a6 6 0 0 1 6 6v88a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6zM6 6v88h88V6z" fill="url(#a)" fill-rule="evenodd" opacity=".85"/>'
       + '<rect x="6" y="6" width="88" height="88" fill="none" stroke="url(#a)" stroke-width=".8"/>' },
-  { id: 'kronsaal', name: 'Kronsaal', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#A52A3E', rand: '#B8862B', text: 'Sonder-Brett: Weinrot und Gold mit Kronen im Feld.',
+  { id: 'kronsaal', name: 'Kronsaal', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#A52A3E', rand: '#B8862B', text: 'Sonder-Brett: Karminrot und Gold mit Kronen im Feld.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x + 3} ${y + 7.5}V${y + 4}l1.5 1.5 1-2 1 2 1.5-1.5v3.5z" fill="rgba(232,190,90,.5)"/>`),
     rahmen: () => '<rect x="3.2" y="3.2" width="93.6" height="93.6" rx="4" fill="none" stroke="#F3D27A" stroke-width=".9"/><rect x="6" y="6" width="88" height="88" fill="none" stroke="#5A3A08" stroke-width=".7"/>' },
 ];
