@@ -127,13 +127,28 @@ async function gegenzugEcht(s, fenVor, fenNach) {
   if (!m || stellung(m.after) !== stellung(fenNach)) return `gespielt ist nicht bestmove ${a.bestmove} (${fenVor} -> ${fenNach})`;
   return null;
 }
-async function engineZug(s, fen) {
-  return s.evaluate(async ({ fen, knoten }) => {
+// Flos Zug mit der Engine der App. Sie bekommt nur die Stellung (js/engine.js 'position fen', ohne Zugfolge) und sieht darum
+// keine Wiederholung: im roten Lauf von 3f (17.11.2026, opposition) pendelte Weiss e6f6 f6e6 e6f6 f6e6 bis zum Remis, im
+// Nachspiel zog Stockfish ohne Verlauf wieder in die schon gesehene Stellung, mit Verlauf nicht. Darum sucht sie wie bisher mit
+// EINER Linie (n = 1, volle Staerke); nur wenn der Aufrufer diesen Zug meiden will, fragt er die besten KANDIDATEN (MultiPV) ab,
+// je mit Bewertung aus Sicht der Seite am Zug (die App liefert sie aus Sicht von Weiss).
+const KANDIDATEN = 4;
+const ZWANG_ID = 'opposition'; // Lektion fuer den festen Fall Meiden erzwungen (unten)
+async function engineZuege(s, fen, n = 1) {
+  return s.evaluate(async ({ fen, knoten, n }) => {
     const e = await window.__app.engine('bewertung');
-    const a = await e.analyse(fen, { nodes: knoten, prioritaet: 'sofort' });
-    return a && typeof a.bestmove === 'string' ? a.bestmove : null;
-  }, { fen, knoten: ENGINE_KNOTEN });
+    const a = await e.analyse(fen, { nodes: knoten, multipv: n, prioritaet: 'sofort' });
+    if (!a) return [];
+    const vz = fen.split(' ')[1] === 'b' ? -1 : 1;
+    const zuege = (a.lines || []).filter(x => x && x.pv && typeof x.pv[0] === 'string')
+      .map(x => ({ u: x.pv[0], cp: x.eval?.cp != null ? vz * x.eval.cp : null, mate: x.eval?.mate != null ? vz * x.eval.mate : null }));
+    if (typeof a.bestmove === 'string' && !zuege.some(x => x.u === a.bestmove)) zuege.unshift({ u: a.bestmove, cp: null, mate: null });
+    return zuege;
+  }, { fen, knoten: ENGINE_KNOTEN, n });
 }
+// gleiches Urteil wie tests/lektion-engine.mjs gut(): haelt der Kandidat noch, was die Lektion verlangt?
+const haeltZiel = (x, art) => !!x && (art === 'halten' ? (x.mate != null ? x.mate > 0 : x.cp != null && x.cp >= -150)
+  : (x.mate != null ? x.mate > 0 : x.cp != null && x.cp >= 400));
 
 // ---------- Browser ----------
 async function klickFeld(s, f) {
@@ -144,8 +159,10 @@ const lz = s => s.evaluate(() => (window.__lektion ? window.__lektion.zustand() 
 const blattDa = s => s.evaluate(() => { const o = document.querySelector('.ls-screen > .ergebnis-overlay'); const k = o?.querySelector('.ergebnis-karte');
   return !!k && !o.hidden && k.getBoundingClientRect().height > 0; });
 
-async function probe(s, l, art) {
-  const r = { id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, start: false, handlung: false, ende: false, grund: null, zuege: 0, sterne: 0, fehler: [] };
+// zwang: der beste Zug gilt beim ersten Mal, wo ein anderer Kandidat das Ziel haelt, als schon gesehen; so laeuft der Weg
+// "Wiederholung meiden" sicher einmal (Nach-Review 3f 18.11.: in keinem gruenen Lauf belegt)
+async function probe(s, l, art, { zwang = false } = {}) {
+  const r = { id: l.id, gemieden: 0, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, start: false, handlung: false, ende: false, grund: null, zuege: 0, sterne: 0, fehler: [], zugfolge: [], endFen: null };
   await s.evaluate(m => window.__app.setzeEinstellungen({ modus: m, autoDame: true, klang: false }), art.modus);
   // echte Verteidigung: ohne Test-Haken zieht die App selbst mit Stockfish (js/ui/lektion.js engineZug)
   // Haken einmal sichern (zwei Engine-Lektionen nacheinander duerfen ihn nicht mit undefined ueberschreiben)
@@ -163,6 +180,7 @@ async function probe(s, l, art) {
   const frist = Date.now() + FRIST_MS;
   if (mitEngine(l)) await protokolliere(s);
   let offen = null; r.gegenzuege = 0; // nach Flos Zug: Stellung, auf die die Verteidigung antworten muss
+  const nachFlo = new Set(); // Stellungen nach Flos eigenen Engine-Zuegen (gegen Wiederholung, engineZuege oben)
   for (let runde = 0; runde < 300; runde++) { // Warte-Runden zaehlen mit: lange Matts brauchen bis grenze(ziel) = 56 Zuege
     const z = await lz(s);
     if (offen && ['flo', 'ende'].includes(z.phase)) {
@@ -184,7 +202,19 @@ async function probe(s, l, art) {
     if (artVon(l) === 'folge') { c.reset(); for (const san of l.folge.slice(0, z.schritt)) c.move(san); }
     let m;
     if (artVon(l) === 'folge') m = new Chess(c.fen()).move(l.folge[z.schritt]);
-    else if (mitEngine(l)) { const u = await engineZug(s, z.fen); try { m = u ? new Chess(z.fen).move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }) : null; } catch (e) { m = null; } }
+    else if (mitEngine(l)) {
+      const legal = (x) => { try { return Object.assign(new Chess(z.fen).move({ from: x.u.slice(0, 2), to: x.u.slice(2, 4), promotion: x.u[4] }), { wert: x }); } catch (e) { return null; } };
+      m = legal((await engineZuege(s, z.fen))[0] || { u: '' });
+      // fuehrt der beste Zug in eine Stellung, die nach einem eigenen Zug schon da war: der beste andere Kandidat, der das Ziel
+      // noch haelt (sonst bleibt es beim besten, das Remis ist dann ein echter Befund)
+      if (m && zwang && !r.gemieden) nachFlo.add(stellung(m.after));
+      if (m && nachFlo.has(stellung(m.after))) {
+        const art = artVon(l);
+        const alt = (await engineZuege(s, z.fen, KANDIDATEN)).map(legal)
+          .find(x => x && !nachFlo.has(stellung(x.after)) && haeltZiel(x.wert, art));
+        if (alt) { m = alt; r.gemieden++; }
+      }
+    }
     else m = floZug(l, c, startMat, z.zuege);
     if (!m) { r.fehler.push(`kein Zug fuer Flo in ${z.fen}`); break; }
     const vorher = z.zuege;
@@ -192,8 +222,9 @@ async function probe(s, l, art) {
     const weiter = await s.waitForFunction(v => { const x = window.__lektion.zustand(); return x.zuege > v || x.phase === 'ende'; }, vorher, { timeout: 8000 })
       .then(() => true, () => false);
     if (!weiter) { r.fehler.push(`Klick ${uci(m)} nicht angenommen (${JSON.stringify(await lz(s))})`); break; }
+    r.zugfolge.push(uci(m));
     if (vorher === 0) r.handlung = true;
-    if (mitEngine(l)) offen = m.after;
+    if (mitEngine(l)) { offen = m.after; nachFlo.add(stellung(m.after)); }
   }
   await s.waitForSelector('.ls-screen > .ergebnis-overlay:not([hidden]) .ergebnis-karte', { timeout: 8000 }).catch(() => {});
   // Blatt und Knoepfe gleiten gestaffelt herein: erst messen und fotografieren, wenn alles steht
@@ -205,7 +236,7 @@ async function probe(s, l, art) {
   r.knoepfe = await s.evaluate(() => [...document.querySelectorAll('.ls-screen > .ergebnis-overlay .ergebnis-karte button')]
     .filter(b => { const k = b.getBoundingClientRect(); return k.width > 0 && k.height > 0 && getComputedStyle(b).visibility !== 'hidden' && +getComputedStyle(b).opacity > 0.5; })
     .map(b => b.dataset.a || b.getAttribute('aria-label') || b.textContent.trim()));
-  Object.assign(r, { grund: z.grund || (z.phase === 'ende' ? 'geschafft' : null), zuege: z.zuege, sterne: z.sterne || 0 });
+  Object.assign(r, { grund: z.grund || (z.phase === 'ende' ? 'geschafft' : null), zuege: z.zuege, sterne: z.sterne || 0, endFen: z.fen || null });
   r.bild = `${l.id}-${art.name}.jpg`;
   await s.screenshot({ path: path.join(BILDER, r.bild), type: 'jpeg', quality: 60 }).catch(() => { r.bild = null; });
   return r;
@@ -239,20 +270,27 @@ try {
       window.__test.lektionZug = fen => { const m = new C(fen).moves({ verbose: true })[0]; return m ? m.from + m.to + (m.promotion || '') : null; };
     });
     pruefe(`${art.name}: App-Start ohne Konsolenfehler`, fehler.length === f0Start, fehler.slice(f0Start));
-    for (const l of liste) {
+    // fester Fall: Opposition mit erzwungenem Meiden muss trotzdem umwandeln (geschafft) und gemieden > 0 zeigen
+    const faelle = liste.flatMap(l => l.id === ZWANG_ID ? [[l, false], [l, true]] : [[l, false]]);
+    for (const [l, zwang] of faelle) {
       const f0 = fehler.length;
-      const r = await mitFrist(probe(s, l, art), FRIST_MS + 30000, `haengt laenger als ${FRIST_MS / 1000 + 30} s`).catch(e => ({ id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, fehler: ['Abbruch: ' + e.message] }));
+      const r = await mitFrist(probe(s, l, art, { zwang }), FRIST_MS + 30000, `haengt laenger als ${FRIST_MS / 1000 + 30} s`).catch(e => ({ id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, fehler: ['Abbruch: ' + e.message] }));
       r.konsole = fehler.slice(f0);
       r.geht = !!(r.start && r.handlung && r.ende && !r.fehler.length && !r.konsole.length && r.grund === 'geschafft'
-        && (!mitEngine(l) || r.gegenzuege > 0));
+        && (!mitEngine(l) || r.gegenzuege > 0) && (!zwang || r.gemieden > 0));
+      r.zwang = zwang;
       ergebnisse.push(r);
       await writeFile(path.join(BILDER, 'ergebnis.json'), JSON.stringify(ergebnisse, null, 1));
-      pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft${mitEngine(l) ? ' (Engine gegen echte Verteidigung)' : ''}`, r.geht,
-        { start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, gegenzuege: r.gegenzuege, fehler: r.fehler, konsole: r.konsole });
+      pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft${mitEngine(l) ? ` (Engine gegen echte Verteidigung, gemieden=${r.gemieden || 0})` : ''}${zwang ? ', Meiden erzwungen und trotzdem geschafft' : ''}`, r.geht,
+        { gemieden: r.gemieden, start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, gegenzuege: r.gegenzuege, fehler: r.fehler, konsole: r.konsole,
+          // R19 (17.11.2026, CI-Lauf 44163241625: dame-bauer "remis nach 8" in Node nicht nachstellbar): Zugfolge und Endstellung,
+          // damit ein rotes Ende seine Ursache selbst zeigt (Wiederholung, Dame getauscht, ...)
+          ...(r.geht ? {} : { zugfolge: r.zugfolge.join(' '), endFen: r.endFen }) });
     }
     await k.close();
   }
-  pruefe(`alle ${LEKTIONEN.length} Lektionen geprueft`, ergebnisse.length === LEKTIONEN.length, ergebnisse.length);
+  pruefe(`alle ${LEKTIONEN.length} Lektionen geprueft`, ergebnisse.filter(r => !r.zwang).length === LEKTIONEN.length, ergebnisse.length);
+  if (LEKTIONEN.some(l => l.id === ZWANG_ID)) pruefe(`Fall Meiden erzwungen lief`, ergebnisse.some(r => r.zwang), ergebnisse.length);
 } finally {
   // nach einem Absturz der Seite kann close() haengen: begrenzt warten, das Ergebnis steht schon auf der Platte
   await mitFrist(Promise.all([browser?.close(), new Promise(r => server.close(r))]), 20000, 'close').catch(() => {});

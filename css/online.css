@@ -128,6 +128,21 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-zug, .on-uhr-hinweis, .on-live { margin: 0; text-align: center; color: var(--text-2); font-size: var(--fs-klein); }
 .on-zug { font-weight: 700; color: var(--text); }
 .on-uhr-hinweis:empty { display: none; }
+/* R19 (15.11.2026): Erstzug-Frist vor dem 2. Halbzug in der Zug-Zeile: Koenig der Farbe am Zug, Zahl und darunter ein
+   schmaler Gold-Balken, der schrumpft (das eine lebendige Element, matt, ohne Schein). Der Balken liegt absolut unter
+   der Zeile und kostet keine Hoehe (Brettgroesse wie in der Bot-Partie). Letzte 10 s in der Warnfarbe; ohne Bewegung
+   springt er nur je Sekunde */
+.on-zug { position: relative; }
+/* inline statt inline-flex, ohne Umbruch: die Frist bleibt Teil der einen Textzeile und kostet keine Hoehe */
+.on-frist { margin-left: 8px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.on-frist[hidden] { display: none; }
+/* img ist global ein Block (Grundstil): ohne inline-block bricht die Zeile in drei (Brett 344 statt 376) */
+.on-frist-figur { display: inline-block; width: 1em; height: 1em; margin-right: 4px; vertical-align: -0.12em; }
+.on-frist-balken { position: absolute; left: 50%; bottom: -5px; width: min(140px, 50%); height: 2px; transform: translateX(-50%); border-radius: 1px; background: var(--linie); overflow: hidden; }
+.on-frist-balken i { display: block; height: 100%; background: var(--gold); transform-origin: left center; transition: transform .1s linear; }
+.on-frist.knapp { color: var(--warn); }
+.on-frist.knapp .on-frist-balken i { background: var(--warn); }
+@media (prefers-reduced-motion: reduce) { .on-frist-balken i { transition: none; } }
 .on-ergebnis { text-align: center; margin-bottom: 0; }
 .on-ergebnis .on-aktionen { display: flex; flex-wrap: wrap; gap: var(--a3); justify-content: center; }
 .on-ergebnis[hidden], .on-angebot[hidden], .on-neuer[hidden] { display: none; }

@@ -49,12 +49,24 @@ const ICON = {
   pfeil: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   buch: '<path d="M4.5 5.5A2 2 0 0 1 6.5 3.5H19v15H6.5a2 2 0 0 0-2 2zM4.5 20V5.5M8.5 7.5h6"/>',
   play: '<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>',
+  pause: '<path d="M8.5 5.5v13M15.5 5.5v13" stroke-width="3.2"/>',
   pokal: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5.2a3 3 0 0 0 3 4M16 6h2.8a3 3 0 0 1-3 4M12 13v4M8.5 20.5h7M10 17h4v3.5h-4z"/>',
   ziel: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
   brett: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 12h16M12 4v16"/>',
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
-const symbol = (k) => SYMBOLE[k] || '';
+// R19 Analyse neu (Flo 15.11.: Symbole "gross, hell und farbig" statt dunkel): dieselbe Kachel aus js/symbole.js, nur ist
+// ihr Grund (--flaeche) die Klassenfarbe und das Zeichen in --kg-* (Textfarbe auf der Klassenfarbe, je Klasse abgestimmt)
+const symbolDeckend = (k) => (SYMBOLE[k] ? `<span class="an-sym" style="--flaeche:var(--k-${k});--kt-${k}:var(--kg-${k})">${SYMBOLE[k]}</span>` : '');
+
+// Tempo fuer "Variante zeigen" und das Abspielen der Partie (Flo 15.11.: Variante "zu schnell", Tempo waehlbar), ms je Zug;
+// vorher 1000 ms. Gemerkt auf dem Geraet wie die Hinweis-Merker in js/ui/partie.js
+const TEMPO = { normal: 1600, ruhig: 2400, zuegig: 1000 };
+const TEMPO_REIHE = ['normal', 'ruhig', 'zuegig'];
+const TEMPO_MERKER = 'schach-arena:v1:analyse-tempo';
+function ladeTempo() {
+  try { const v = localStorage.getItem(TEMPO_MERKER); return TEMPO[v] ? v : 'normal'; } catch (e) { return 'normal'; }
+}
 
 // Klassenwort in der Coach-Karte und Satzzeichen an den Schluesselmomenten
 const WORT = KLASSEN_WORT;
@@ -213,7 +225,7 @@ export function zeige(root, params = {}, app) {
   const aufraeumen = [];
   const st = {
     partie: null, bot: null, review: null, sf: 'w', bf: 'b', zuege: [], fens: [], kurve: [], evals: [],
-    ply: -1, brett: null, variante: null, phasen: [],
+    ply: -1, brett: null, variante: null, phasen: [], auto: null, tempo: ladeTempo(),
   };
   const einst = (() => { try { return app.einstellungen(); } catch (e) { return {}; } })();
   const orte = { oben: null, coach: null };   // Fuellungen der Anzeige-Orte (verlasse vor dem Neuzeichnen)
@@ -268,6 +280,8 @@ export function zeige(root, params = {}, app) {
       case 'vor-zug': springe(st.ply + 1, { klang: true }); break;
       case 'ende': springe(st.zuege.length - 1); break;
       case 'variante': starteVariante(); break;
+      case 'abspielen': if (st.auto) stoppeAbspielen(); else starteAbspielen(); break;
+      case 'tempo': wechsleTempo(); break;
       case 'zur-partie': springe(st.ply); break;
       case 'moment': springe(Number(el.dataset.ply)); brettInSicht(); break;
       case 'klasse': springeZuKlasse(el.dataset.klasse); break;
@@ -482,18 +496,20 @@ export function zeige(root, params = {}, app) {
           <div class="an-navi">
             <button class="knopf" type="button" data-aktion="anfang" aria-label="${esc(t('analyse.an.navi.anfang'))}">${icon('anfang')}</button>
             <button class="knopf" type="button" data-aktion="zurueck-zug" aria-label="${esc(t('analyse.an.navi.zurueck'))}">${icon('zurueck')}</button>
+            <button class="knopf an-abspielen" type="button" data-aktion="abspielen" aria-pressed="false" aria-label="${esc(t('analyse.an.navi.abspielen'))}">${icon('play')}</button>
             <button class="knopf" type="button" data-aktion="vor-zug" aria-label="${esc(t('analyse.an.navi.vor'))}">${icon('vor')}</button>
             <button class="knopf" type="button" data-aktion="ende" aria-label="${esc(t('analyse.an.navi.ende'))}">${icon('ende')}</button>
+            <button class="knopf an-tempo" type="button" data-aktion="tempo"></button>
             <span class="an-stand zahl" aria-live="polite"></span>
           </div>
           <div class="an-coach" aria-live="polite"></div>
         </div>
         <div class="an-rechts">
           ${genauHtml()}
+          ${momenteHtml()}
           ${bannerHtml()}
           <div class="an-ort-oben" hidden></div>
           ${kurveHtml()}
-          ${momenteHtml()}
           ${klassenHtml()}
         </div>
       </div>`;
@@ -510,6 +526,7 @@ export function zeige(root, params = {}, app) {
     });
     st.brett.erlaubeZuege(null);
     sec.classList.toggle('ohne-balken', einst.balken === false);
+    zeigeTempo();
 
     // Hinweis "es geht weiter unten" in der rechten Spalte (Querformat)
     const rechts = koerper.querySelector('.an-rechts');
@@ -655,7 +672,7 @@ export function zeige(root, params = {}, app) {
     }).join('');
     return `
       <div class="an-kurve-box flaeche">
-        <div class="an-kurve-kopf"><span class="an-k-titel">${esc(t('analyse.an.kurve.titel'))}</span><span class="an-k-tipp">${esc(t('analyse.an.kurve.tippen'))}<span class="an-k-legende"> · ${esc(t('analyse.an.kurve.legende'))}</span></span></div>
+        <div class="an-kurve-kopf"><span class="an-k-titel">${esc(t('analyse.an.kurve.titel'))}</span></div>
         <div class="an-kurve-wrap">
           <svg class="an-kurve" viewBox="0 0 ${KW} ${KH}" preserveAspectRatio="none" role="slider" tabindex="0"
                aria-label="${esc(t('analyse.an.kurve.aria'))}" aria-valuemin="0" aria-valuemax="${st.zuege.length}" aria-valuenow="0">
@@ -691,14 +708,42 @@ export function zeige(root, params = {}, app) {
     if (!plies.length) {
       return `<div class="an-momente an-momente-leer"><span>${esc(t('analyse.an.momente.leer'))}</span></div>`;
     }
-    const chips = plies.map((p) => {
+    // R19 Analyse neu (Flo 15.11.: "was schlecht war, gehoert nach oben"): jeder Moment als grosse Karte mit Fehlerart,
+    // Zug, besserem Zug und dem Absturz der Bewertung aus Sicht der Seite, die gezogen hat (wie die Coach-Karte)
+    const karten = plies.map((p) => {
       const z = st.zuege[p];
       const du = z.farbe === st.sf;
-      return `<button class="knopf an-moment${du ? ' du' : ''}" type="button" data-aktion="moment" data-ply="${p}" style="--kf:var(--k-${esc(z.klasse)})"
-        aria-label="${esc(zugText(z))}, ${esc(KLASSEN_NAME[z.klasse])}${zuzweit() ? ', ' + esc(personenName(z.farbe)) : du ? '' : ', ' + esc(t('analyse.an.momente.gegner'))}">${symbol(z.klasse)}<span>${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
+      const sicht = z.farbe === 'b' ? 'b' : 'w';
+      const linie = Array.isArray(z.besteLinieSan) ? z.besteLinieSan : [];
+      const besser = z.besterZug && z.besterZug !== z.uci && linie.length ? sanDe(linie[0]) : '';
+      const wer = zuzweit() ? personenName(z.farbe) : du ? t('analyse.an.genau.du') : gegnerKurz();
+      const sturz = VERLUST_KLASSEN.has(z.klasse) && z.evalVorher && z.evalNachher
+        ? `${evalText(z.evalVorher, { sicht })} → ${/#$/.test(z.san) ? t('analyse.an.coach.matt') : evalText(z.evalNachher, { sicht })}` : '';
+      const besserText = besser ? t('analyse.an.momente.besser', { zug: besser }) : '';
+      return `<button class="knopf an-moment${du ? ' du' : ''}" type="button" data-aktion="moment" data-ply="${p}" data-klasse="${esc(z.klasse)}" style="--kf:var(--k-${esc(z.klasse)})"
+        aria-label="${esc(zugText(z))}, ${esc(KLASSEN_NAME[z.klasse])}, ${esc(wer)}${besserText ? ', ' + esc(besserText) : ''}">
+        ${symbolDeckend(z.klasse)}
+        <span class="an-m-text">
+          <span class="an-m-kopf"><span class="an-m-klasse">${esc(KLASSEN_NAME[z.klasse])}</span><span class="an-m-wer">${esc(wer)}</span></span>
+          <span class="an-m-zug">${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span>
+          ${besserText ? `<span class="an-m-besser">${esc(besserText)}</span>` : ''}
+        </span>
+        ${sturz ? `<span class="an-m-eval zahl">${esc(sturz)}</span>` : ''}
+      </button>`;
     }).join('');
     const titel = esc(t('analyse.an.momente.titel'));
-    return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}">${chips}</div></div>`;
+    // Kaltreview b4 16.11., Entscheidung A (e7): auf kurzen Hochformaten (iPhone SE) passen Brett und erste Karte nicht
+    // zugleich ins Bild; dort steht ueber dem Brett eine kompakte Zeile (Symbol und Zug), die Karten bleiben darunter.
+    // Sonst ist die Zeile display:none (css/analyse.css), also weder sichtbar noch fokussierbar.
+    // Fix-Review 16.11.: die Zeile ist eine Abkuerzung fuer den Finger; Vorleser und Tastatur bekommen die Momente nur einmal,
+    // ueber die Karten (aria-hidden, tabindex -1), sonst stuenden dieselben Knoepfe zweimal hintereinander
+    const zeile = plies.map((p) => {
+      const z = st.zuege[p];
+      return `<button class="knopf an-mz${z.farbe === st.sf ? ' du' : ''}" type="button" tabindex="-1" data-aktion="moment" data-ply="${p}" data-klasse="${esc(z.klasse)}">`
+        + `${symbolDeckend(z.klasse)}<span class="an-mz-zug">${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
+    }).join('');
+    return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}">${karten}</div></div>`
+      + `<div class="an-momente-zeile" aria-hidden="true">${zeile}</div>`;
   }
 
   function klassenHtml() {
@@ -715,7 +760,7 @@ export function zeige(root, params = {}, app) {
       const aktiv = a || (zuzweit() && b);
       return `<button class="an-kl${aktiv ? '' : ' leer'}${a || b ? '' : ' null'}" type="button" data-aktion="klasse" data-klasse="${k}" style="--kf:var(--k-${k});--a:${(a / hoechstens).toFixed(3)};--b:${(b / hoechstens).toFixed(3)}"
         aria-label="${esc(KLASSEN_NAME[k])}: ${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.du'))} ${a}, ${esc(kurz)} ${b}${aktiv ? ', ' + esc(t(zuzweit() ? 'analyse.an.klassen.springen' : 'analyse.an.klassen.springenDu')) : ''}"${aktiv ? '' : ' aria-disabled="true"'}>
-        <span class="an-n du${a ? '' : ' nul'}">${a}</span><span class="an-kl-balken links" aria-hidden="true"><i></i></span><span class="an-kl-mitte">${symbol(k)}<span>${esc(KLASSEN_NAME[k])}</span></span><span class="an-kl-balken rechts" aria-hidden="true"><i></i></span><span class="an-n${b ? '' : ' nul'}">${b}</span></button>`;
+        <span class="an-n du${a ? '' : ' nul'}">${a}</span><span class="an-kl-balken links" aria-hidden="true"><i></i></span><span class="an-kl-mitte">${symbolDeckend(k)}<span>${esc(KLASSEN_NAME[k])}</span></span><span class="an-kl-balken rechts" aria-hidden="true"><i></i></span><span class="an-n${b ? '' : ' nul'}">${b}</span></button>`;
     };
     const kopf = `<div class="an-kl-kopf"><span>${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.kopf'))}</span><span>${esc(kurz)}</span></div>`;
     const links = KLASSEN.slice(0, 6).map(zeile).join('');
@@ -735,9 +780,10 @@ export function zeige(root, params = {}, app) {
   }
 
   // ---------- Navigation ----------
-  function springe(ply, { klang: mitKlang = false, animieren } = {}) {
+  function springe(ply, { klang: mitKlang = false, animieren, auto = false } = {}) {
     if (!st.brett) return;
     stoppeVariante();
+    if (!auto) stoppeAbspielen();   // jede Handbedienung (Knopf, Taste, Kurve, Wischen, Moment) haelt das Abspielen an
     const n = st.zuege.length;
     const neu = Math.max(-1, Math.min(n - 1, Number.isFinite(ply) ? ply : -1));
     const schritt = neu - st.ply;
@@ -747,7 +793,8 @@ export function zeige(root, params = {}, app) {
     const fen = st.fens[neu + 1];
     const b = st.brett;
     b.setzeStellung(fen, {
-      animieren: animieren ?? Math.abs(schritt) === 1,
+      // reduzierte Bewegung: die Figuren stehen sofort (Standbild), auch beim Abspielen
+      animieren: animieren ?? (Math.abs(schritt) === 1 && !reduziert()),
       schach: z && /[+#]$/.test(z.san) ? true : null,
     });
     b.markiere(null);
@@ -813,6 +860,7 @@ export function zeige(root, params = {}, app) {
     setze('zurueck-zug', st.ply < 0);
     setze('vor-zug', st.ply >= n - 1);
     setze('ende', st.ply >= n - 1);
+    setze('abspielen', !n);
   }
 
   function zeigeBalken(ev, z) {
@@ -848,19 +896,20 @@ export function zeige(root, params = {}, app) {
   }
 
   function zeigeMomente() {
-    const box = koerper.querySelector('.an-momente');
-    if (!box) return;
-    let aktiv = null;
-    for (const k of box.querySelectorAll('.an-moment')) {
-      const an = Number(k.dataset.ply) === st.ply;
-      k.classList.toggle('an', an);
-      k.setAttribute('aria-pressed', an ? 'true' : 'false');
-      if (an) aktiv = k;
-    }
-    if (aktiv && box.scrollWidth > box.clientWidth) {
-      const l = aktiv.offsetLeft - box.offsetLeft;
-      if (l < box.scrollLeft || l + aktiv.offsetWidth > box.scrollLeft + box.clientWidth) {
-        box.scrollTo({ left: Math.max(0, l - 24), behavior: reduziert() ? 'auto' : 'smooth' });
+    // Karten und (auf kurzen Hochformaten) die kompakte Zeile ueber dem Brett
+    for (const box of koerper.querySelectorAll('.an-momente, .an-momente-zeile')) {
+      let aktiv = null;
+      for (const k of box.querySelectorAll('[data-aktion="moment"]')) {
+        const an = Number(k.dataset.ply) === st.ply;
+        k.classList.toggle('an', an);
+        k.setAttribute('aria-pressed', an ? 'true' : 'false');
+        if (an) aktiv = k;
+      }
+      if (aktiv && box.scrollWidth > box.clientWidth) {
+        const l = aktiv.offsetLeft - box.offsetLeft;
+        if (l < box.scrollLeft || l + aktiv.offsetWidth > box.scrollLeft + box.clientWidth) {
+          box.scrollTo({ left: Math.max(0, l - 24), behavior: reduziert() ? 'auto' : 'smooth' });
+        }
       }
     }
   }
@@ -915,7 +964,7 @@ export function zeige(root, params = {}, app) {
         </div>
       </div>` : '';
     el.innerHTML = `
-      <div class="an-c-symbol">${symbol(z.klasse)}</div>
+      <div class="an-c-symbol">${symbolDeckend(z.klasse)}</div>
       <div class="an-c-kopf"><span class="an-c-klasse">${esc(WORT[z.klasse] || KLASSEN_NAME[z.klasse])}</span><span class="an-c-zug">${esc(zugText(z))}</span>${zuzweit() ? `<span class="an-c-wer">${esc(personenName(z.farbe))}</span>` : du ? '' : `<span class="an-c-wer">${esc(kurz)}</span>`}</div>
       <span class="an-c-eval zahl" data-richtung="${VERLUST_KLASSEN.has(z.klasse) ? 'minus' : ''}">${evalHtml}</span>
       <p class="an-c-text">${esc(zuzweit() ? `${t('analyse.an.coach.spielt', { name: personenName(z.farbe), zug: sanDe(z.san) })}${andererZug && linie.length ? ' ' + t('analyse.an.coach.staerkerWar', { zug: sanDe(linie[0]) }) : ''}` : ohneDoppelteZahlen(coachKern(z.coach), z, du, kurz))}</p>
@@ -965,6 +1014,7 @@ export function zeige(root, params = {}, app) {
       schritte.push({ von: m.from, nach: m.to, farbe: m.color, fen: c.fen(), schach: c.inCheck(), san: m.san });
     }
     if (!schritte.length) return;
+    stoppeAbspielen();
     const v = { z, schritte, i: 0, timer: null };
     st.variante = v;
     const b = st.brett;
@@ -984,7 +1034,8 @@ export function zeige(root, params = {}, app) {
     }
     koerper.querySelector('.an-brettzone').classList.add('variante');
     etikett(t('analyse.an.variante'));
-    const takt = reduziert() ? 1300 : 1000;
+    // Takt je Schritt neu lesen: ein Tempowechsel gilt ab dem naechsten Schritt (wechsleTempo, Kaltreview b4 16.11.)
+    const takt = () => TEMPO[st.tempo];
     const weiter = () => {
       if (st.variante !== v) return;
       const s = v.schritte[v.i];
@@ -999,10 +1050,10 @@ export function zeige(root, params = {}, app) {
       for (const sp of coach.querySelectorAll('.an-c-zuege [data-i]')) sp.classList.toggle('an', Number(sp.dataset.i) === v.i - 1);
       etikett(t('analyse.an.variante.stand', { i: v.i, n: v.schritte.length }));
       if (s.farbe === z.farbe) spieleKlang({ san: s.san });
-      if (v.i < v.schritte.length) v.timer = nach(takt, weiter);
+      if (v.i < v.schritte.length) v.timer = nach(takt(), weiter);
       else etikett(t('analyse.an.variante.stand', { i: v.schritte.length, n: v.schritte.length }));
     };
-    v.timer = nach(Math.round(takt * 0.7), weiter);
+    v.timer = nach(Math.round(takt() * 0.7), weiter);
   }
 
   // Stand der Variante im Chip oben rechts in der Coach-Karte (statt der Bewertung)
@@ -1013,6 +1064,61 @@ export function zeige(root, params = {}, app) {
     e.classList.toggle('an-c-variante', !!text);
     if (text) e.textContent = text;
     else { e.innerHTML = e.dataset.original; delete e.dataset.original; }
+  }
+
+  // ---------- Partie abspielen (Wunsch eines Freundes von Flo: "jeder Zug muss einzeln geklickt werden") ----------
+  // Zug fuer Zug im gewaehlten Tempo; haelt an jedem Schluesselmoment (der Coach erklaert ihn) und am Ende
+  function starteAbspielen() {
+    const n = st.zuege.length;
+    if (!st.brett || !n) return;
+    if (st.ply >= n - 1) springe(-1, { animieren: false });
+    else stoppeVariante();
+    st.auto = { timer: null };
+    zeigeAbspielen();
+    st.auto.timer = nach(TEMPO[st.tempo], schrittAbspielen);
+  }
+
+  function schrittAbspielen() {
+    const a = st.auto;
+    if (!a) return;
+    a.timer = null;
+    springe(st.ply + 1, { klang: true, auto: true });
+    if ((st.review.schluesselmomente || []).includes(st.ply) || st.ply >= st.zuege.length - 1) stoppeAbspielen();
+    else a.timer = nach(TEMPO[st.tempo], schrittAbspielen);
+  }
+
+  function stoppeAbspielen() {
+    const a = st.auto;
+    if (!a) return;
+    if (a.timer) { clearTimeout(a.timer); timer.delete(a.timer); }
+    st.auto = null;
+    zeigeAbspielen();
+  }
+
+  function zeigeAbspielen() {
+    const k = koerper.querySelector('[data-aktion="abspielen"]');
+    if (!k) return;
+    const laeuft = !!st.auto;
+    k.innerHTML = icon(laeuft ? 'pause' : 'play');
+    k.setAttribute('aria-pressed', laeuft ? 'true' : 'false');
+    k.setAttribute('aria-label', t(laeuft ? 'analyse.an.navi.anhalten' : 'analyse.an.navi.abspielen'));
+    k.classList.toggle('laeuft', laeuft);
+  }
+
+  // Tempo reihum (Normal, Ruhig, Zuegig); gilt ab dem naechsten Schritt fuer Variante und Abspielen
+  function wechsleTempo() {
+    st.tempo = TEMPO_REIHE[(TEMPO_REIHE.indexOf(st.tempo) + 1) % TEMPO_REIHE.length];
+    try { localStorage.setItem(TEMPO_MERKER, st.tempo); } catch (e) { /* gilt dann nur fuer diese Analyse */ }
+    zeigeTempo();
+  }
+
+  function zeigeTempo() {
+    const k = koerper.querySelector('[data-aktion="tempo"]');
+    if (!k) return;
+    const stufe = t(`analyse.an.tempo.${st.tempo}`);
+    k.textContent = stufe;
+    k.dataset.tempo = st.tempo;
+    k.setAttribute('aria-label', t('analyse.an.tempo.aria', { stufe }));
   }
 
   function stoppeVariante() {
@@ -1101,6 +1207,11 @@ export function zeige(root, params = {}, app) {
     else if (e.key === 'Home') { e.preventDefault(); springe(-1); }
     else if (e.key === 'End') { e.preventDefault(); springe(n - 1); }
     else if (e.key === 'Escape' && st.variante) { e.preventDefault(); springe(st.ply); }
+    // Leertaste: Abspielen an/aus (auf einem Knopf loest sie dessen eigenen Klick aus)
+    else if (e.key === ' ' && !(t && t.closest && t.closest('button, summary, a, [role="slider"]'))) {
+      e.preventDefault();
+      if (st.auto) stoppeAbspielen(); else starteAbspielen();
+    }
   }
 
   lade();
@@ -1116,6 +1227,7 @@ export function zeige(root, params = {}, app) {
       for (const o of Object.values(orte)) if (o) o.verlasse();
       if (st.brett) { try { st.brett.zerstoere(); } catch (e) { /* egal */ } st.brett = null; }
       st.variante = null;
+      st.auto = null;
     },
   };
 }

@@ -52,6 +52,7 @@
 // Fehlerkennungen des Servers (ONLINE_...) werden hier in ganze Saetze uebersetzt (FEHLER_TEXTE).
 import { SUPABASE_URL, SUPABASE_KEY, mitRegion } from './konto-config.js';
 import { t } from './sprache.js';
+import { probe as zeitProbe, FRISCH_MS } from './serverzeit.js';
 import './sprachen/online.js';
 const O = (k, w) => t('online.' + k, w);
 import { sitzung, erneuereSitzung, aktiveSitzung as kontoSitzung, userId, kontoFreigeschaltet } from './konto.js';
@@ -130,8 +131,15 @@ async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
   if (daten !== undefined) kopf['Content-Type'] = 'application/json';
   if (token) kopf.Authorization = `Bearer ${token}`;
   let r;
+  const gesendet = Date.now();
   try { r = await fetchFn(SUPABASE_URL + pfad, { method: methode, headers: kopf, body: daten === undefined ? undefined : JSON.stringify(daten) }); }
   catch (e) { throw new Error(O('offline')); }
+  // R19 online-frist (18.11.): der HTTP-Date-Kopf ist die Serveruhr beim Antworten, auf die Sekunde ABGESCHNITTEN, also nie
+  // spaeter als die echte Zeit (untere Schranke wie aktualisiert_am); kam die Antwort schnell, ist er eine frische Probe,
+  // und zwar fuer Anzeige UND Reklamation (sicher() gilt danach; zu frueh nie, s. serverzeit.js).
+  // Supabase gibt ihn per access-control-expose-headers frei (gemessen 18.11.); ohne ihn bleibt es beim Alten
+  const datum = r?.headers?.get?.('date');
+  if (datum) { const empfang = Date.now(); zeitProbe(datum, empfang, empfang - gesendet <= FRISCH_MS); }
   let d = null;
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leere Antwort */ } }
   if (!r.ok) throw fehlerText(d, r.status);
@@ -170,6 +178,16 @@ function partieAus(d) {
   return p;
 }
 
+// R19 (15.11.2026): eine Zeile, die dieser Aufruf selbst geschrieben hat, ist eine frische Probe der Serveruhr
+// (js/serverzeit.js); ihr aktualisiert_am entstand nach dem Absenden
+async function schreibend(fn) {
+  const gesendet = Date.now();
+  const p = await fn();
+  const empfang = Date.now();
+  zeitProbe(p?.aktualisiert_am, empfang, empfang - gesendet <= FRISCH_MS);
+  return p;
+}
+
 export function normalisiereCode(code) { return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 
 export async function erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 } = {}) {
@@ -178,13 +196,17 @@ export async function erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, i
   const i = b == null ? null : Number(inkrement ?? 0);
   if (b != null && (!Number.isInteger(b) || b < 1 || b > 10800)) throw new Error(FEHLER_TEXTE.ONLINE_BEDENKZEIT);
   if (i != null && (!Number.isInteger(i) || i < 0 || i > 600)) throw new Error(FEHLER_TEXTE.ONLINE_BEDENKZEIT);
-  return partieAus(await rpc('online_erstelle', { farbe, bedenkzeit_s: b, inkrement_s: i }));
+  return schreibend(async () => partieAus(await rpc('online_erstelle', { farbe, bedenkzeit_s: b, inkrement_s: i })));
 }
 
 export async function tritteBei(code) {
   const c = normalisiereCode(code);
   if (!CODE_RE.test(c)) throw new Error(FEHLER_TEXTE.ONLINE_CODE_UNGUELTIG);
-  return partieAus(await rpc('online_tritt_bei', { code: c }));
+  // nicht schreibend(): fuer "schon am Brett" gibt online_tritt_bei die alte Zeile ohne Schreibung zurueck
+  // (supabase/online-schema.sql), ihr aktualisiert_am ist dann nur eine Schranke (Kaltreview R19)
+  const p = partieAus(await rpc('online_tritt_bei', { code: c }));
+  zeitProbe(p.aktualisiert_am, Date.now(), false);
+  return p;
 }
 
 function zeilenPfad(id, filter = '') {
@@ -195,6 +217,7 @@ export async function ladePartie(id) {
   const d = await anfrage(zeilenPfad(id), { token: s.access_token });
   const p = Array.isArray(d) ? d[0] : null;
   if (!p) throw new Error(FEHLER_TEXTE.ONLINE_PARTIE_UNBEKANNT);
+  zeitProbe(p.aktualisiert_am, Date.now(), false); // Alter unbekannt: nur eine Schranke
   return p;
 }
 
@@ -204,7 +227,7 @@ export async function sendeZug(id, { uci } = {}) {
   const zug = String(uci || '');
   if (!UCI_RE.test(zug)) throw new Error(FEHLER_TEXTE.ONLINE_ZUG_FORM);
   const s = await aktiveSitzung();
-  return partieAus(await anfrage(mitRegion(ZUG_PFAD), { methode: 'POST', token: s.access_token, daten: { partie: String(id || ''), zug } }));
+  return schreibend(async () => partieAus(await anfrage(mitRegion(ZUG_PFAD), { methode: 'POST', token: s.access_token, daten: { partie: String(id || ''), zug } })));
 }
 
 export async function gibAuf(id) { return partieAus(await rpc('online_gib_auf', { partie: id })); }
@@ -240,6 +263,7 @@ export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehle
   let fehlerFolge = 0;     // Fehler hintereinander: der Abstand waechst (2 s, 4 s, 8 s ... hoechstens 30 s)
   let erneuert = false;    // nach einem 401 genau einmal erneuern
   let sofort = false;      // nach erfolgreichem Erneuern gleich noch einmal fragen
+  let vorherGefragt = null; // Absendezeit der letzten beantworteten Abfrage: eine Aenderung danach ist frisch
   let endGrund = null;
   const versteckt = () => !!dokument?.hidden;
   const melde = (fn, wert) => { if (!aktiv) return; try { fn?.(wert); } catch (e) { try { console.error('Online-Beobachter:', e); } catch (x) { /* egal */ } } };
@@ -267,12 +291,17 @@ export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehle
       try { s = await aktiveSitzung(); } catch (e) { if (istAnmeldeFehler(e)) { abmelden(e); return; } throw e; }
       if (!aktiv) return;
       const filter = stand ? `&aktualisiert_am=gt.${encodeURIComponent(stand)}` : '';
+      const gefragt = Date.now();
       const d = await anfrage(zeilenPfad(id, filter), { token: s.access_token });
       if (!aktiv) return; // stop() waehrend der Anfrage: kein Hoerer mehr
       const p = Array.isArray(d) ? d[0] : null;
       fehlerFolge = 0; erneuert = false;
+      const davor = vorherGefragt; vorherGefragt = gefragt;
       if (p && p.aktualisiert_am !== stand) {
         letzterFehler = null;
+        // R19: neuer Stand seit der vorigen Abfrage, also nach deren Absenden geschrieben; ohne vorige nur eine Schranke
+        const empfang = Date.now();
+        zeitProbe(p.aktualisiert_am, empfang, stand != null && davor != null && empfang - davor <= FRISCH_MS);
         stand = p.aktualisiert_am;
         melde(beiAenderung, p);
         if (bisEnde && p.status === 'beendet') anhalten('beendet');

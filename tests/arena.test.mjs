@@ -265,6 +265,9 @@ const ueberlauf = (seite) => seite.evaluate(() => {
 const abgeschnitten = (seite) => seite.evaluate(() => [...document.querySelectorAll('.k-schild, .k-name, .k-meta, .spielen .sp-text, .fahne, .boss-krone, .detail h2, .detail .elo, .detail-ueber, '
   + '.merkmal, .m-label, .m-wert, .ziel-sterne > div, .fortsetzen .ft-text, .fortsetzen .ft-text > *, .farbwahl .seg')]
   .filter((el) => {
+    // Handy B (R19, Flo 14.11.2026): zu zeigt die Leiste nur den runden Knopf, sein Text ist bewusst nur optisch verborgen
+    // (fuer Vorleser da); das pruefen die Handy-Gruppen eigens, offen gilt die Regel hier wieder
+    if (el.matches('.arena.karte-leiste .detail:not(.offen) .spielen .sp-text')) return false;
     const cs = getComputedStyle(el);
     const schneidetY = cs.overflowY !== 'visible';
     return el.scrollWidth > el.clientWidth + 1 || (schneidetY && el.scrollHeight > el.clientHeight + 2) || cs.textOverflow === 'ellipsis' || cs.display === 'none' && el.matches('.k-name');
@@ -626,13 +629,22 @@ async function testeSpielenFrei(browser) {
     const m = await seite.evaluate(() => {
       const r = (q) => { const e = document.querySelector(q); if (!e) return null; const b = e.getBoundingClientRect(); return { t: Math.round(b.top), b: Math.round(b.bottom) }; };
       const zs = document.querySelector('.arena .ziel-sterne');
-      return { ih: innerHeight, spielen: r('.arena .spielen'), reiter: r('.reiter-leiste'), karte: r('.arena .karte'),
+      return { ih: innerHeight, spielen: r('.arena .spielen'), reiter: r('.reiter-leiste'), karte: r('.arena .karte'), leiste: !!document.querySelector('.arena.karte-leiste .detail:not(.offen)'),
         ziele: zs ? { n: zs.children.length, h: Math.round(zs.getBoundingClientRect().height), zeilen: new Set([...zs.children].map((c) => Math.round(c.getBoundingClientRect().top))).size } : null };
     });
     const frei = m.spielen && m.reiter && m.spielen.b <= m.reiter.t && m.spielen.t >= 0 && m.spielen.b <= m.ih;
     pruefe(`${w} × ${h}: Spielen-Knopf ganz ueber der Reiterleiste und im Fenster, ohne Scrollen`, frei, JSON.stringify(m));
-    // Auswahl W2 B (Flo 09.11.2026): die drei Sterne-Ziele stehen auch kompakt da, als eine Zeile
-    pruefe(`${w} × ${h}: Sterne-Ziele sichtbar als eine Zeile`, m.ziele && m.ziele.n === 3 && m.ziele.h > 0 && m.ziele.zeilen === 1, JSON.stringify(m.ziele));
+    // Auswahl W2 B (Flo 09.11.2026): die drei Sterne-Ziele stehen auch kompakt da, als eine Zeile. Handy B (Flo 14.11.2026)
+    // zeigt sie zu nicht (die Sterne je Station stehen auf der Karte); erreichbar sind sie ueber den Griff, dort als eine Zeile
+    if (m.leiste) {
+      pruefe(`${w} × ${h}: Gegner-Leiste zu zeigt keine Sterne-Ziele`, m.ziele && m.ziele.h === 0, JSON.stringify(m.ziele));
+      await seite.click('.arena .detail .karte-griff');
+      await seite.waitForSelector('.arena .detail.offen');
+      await warte(900);
+      const zo = await seite.evaluate(() => { const zs = document.querySelector('.arena .ziel-sterne');
+        return { n: zs.children.length, h: Math.round(zs.getBoundingClientRect().height), zeilen: new Set([...zs.children].map((c) => Math.round(c.getBoundingClientRect().top))).size }; });
+      pruefe(`${w} × ${h}: Gegner-Karte offen: Sterne-Ziele sichtbar als eine Zeile`, zo.n === 3 && zo.h > 0 && zo.zeilen === 1, JSON.stringify(zo));
+    } else pruefe(`${w} × ${h}: Sterne-Ziele sichtbar als eine Zeile`, m.ziele && m.ziele.n === 3 && m.ziele.h > 0 && m.ziele.zeilen === 1, JSON.stringify(m.ziele));
     if (w >= 375) pruefe(`${w} × ${h}: die Karte bleibt mindestens 250 px hoch`, m.karte && m.karte.b - m.karte.t >= 250, JSON.stringify(m.karte));
     pruefe(`${w} × ${h}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
     await kontext.close();
@@ -709,13 +721,22 @@ async function testeHochformate(browser) {
       const radius = parseFloat(getComputedStyle(karte).borderBottomLeftRadius) || 0;
       const schild = document.querySelector('.knoten.aktuell .k-schild')?.getBoundingClientRect();
       const flo = document.querySelector('.flo-figur').getBoundingClientRect();
-      return { kompakt: document.querySelector('.arena').classList.contains('karte-kompakt'), knoten: document.querySelectorAll('.knoten').length,
+      // Handy B (R19, Flo 14.11.2026, vorher .karte-kompakt): Gegner als Leiste unten ueber der Welt; keine Station und kein
+      // Schild liegt unter der zugeklappten Leiste, ihr Spruch erscheint erst nach dem Griff
+      const cl = document.querySelector('.arena').classList;
+      const leisteOben = document.querySelector('.arena .detail').getBoundingClientRect().top;
+      const unterLeiste = [...document.querySelectorAll('.knoten')].flatMap((kn) => [kn, kn.querySelector('.k-schild')].filter(Boolean))
+        .filter((t) => t.getBoundingClientRect().bottom > leisteOben + 1).length;
+      const blase = document.querySelector('.arena .detail .sprechblase');
+      return { leiste: cl.contains('karte-weg') && cl.contains('karte-leiste') && !document.querySelector('.arena .detail').classList.contains('offen'),
+        unterLeiste, spruchZu: !blase || getComputedStyle(blase).display === 'none', knoten: document.querySelectorAll('.knoten').length,
         scrollt: karte.scrollHeight > karte.clientHeight + 2, drin, hinweis: document.querySelectorAll('.karte-zieh-hinweis:not([hidden])').length,
         farbeVorKnopf: fw.bottom <= sp.top + 1, knopfDrin: sp.bottom <= inh.bottom + 1,
         schildAbstand: schild ? Math.round(kb.bottom - schild.bottom) : null, radius, floLinks: Math.round(flo.left - kb.left), floRechts: Math.round(kb.right - flo.right) };
     });
     pruefe('ganze Welt auf einen Blick: sechs Stationen samt Schild in der Karte, Karte scrollt nicht, kein Zieh-Hinweis',
-      k.kompakt && k.knoten === 6 && !k.scrollt && k.drin && k.hinweis === 0, JSON.stringify(k));
+      k.leiste && k.knoten === 6 && !k.scrollt && k.drin && k.hinweis === 0, JSON.stringify(k));
+    pruefe('Gegner-Leiste zu: keine Station und kein Schild darunter, Spruch erst nach dem Griff', k.leiste && k.unterLeiste === 0 && k.spruchZu, JSON.stringify(k));
     pruefe('Schild der aktuellen Station unten mindestens halben Eckenradius ueber dem Kartenrand (nicht abgeschnitten)',
       k.schildAbstand != null && k.schildAbstand >= k.radius / 2, JSON.stringify(k));
     pruefe('Flos Figur ganz in der Karte (links und rechts mindestens 4 px Rand)', k.floLinks >= 4 && k.floRechts >= 4, JSON.stringify(k));
@@ -736,14 +757,17 @@ async function testeHochformate(browser) {
         const k = document.querySelector('.karte');
         const kb = k.getBoundingClientRect();
         const a = document.querySelector('.knoten.aktuell .avatar').getBoundingClientRect();
+        const leisteOben = document.querySelector('.arena .detail').getBoundingClientRect().top;
         const sp = document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect();
         const nav = document.querySelector('.reiter-leiste');
         const nb = nav ? nav.getBoundingClientRect() : null;
         return { klasse: document.querySelector('.arena').className, scrollbar: k.scrollHeight > k.clientHeight + 20, scrollTop: k.scrollTop,
-          aktuellDrin: a.top >= kb.top && a.bottom <= kb.bottom, karteBreit: Math.abs(kb.width - (innerWidth - 32)) <= 1,
+          aktuellDrin: a.top >= kb.top && a.bottom <= Math.min(kb.bottom, leisteOben), karteBreit: Math.abs(kb.width - (innerWidth - 32)) <= 1,
           spielen: { t: sp.top, b: sp.bottom, l: sp.left, r: sp.right, h: sp.height }, leiste: nb ? { t: nb.top, b: nb.bottom } : null, reiter: document.documentElement.dataset.reiter || null, ih: innerHeight, iw: innerWidth };
       });
-      pruefe('Karte kompakt (ganze Welt, scrollt nicht), naechster Gegner sichtbar, volle Breite', /karte-hoch/.test(m.klasse) && /karte-kompakt/.test(m.klasse)
+      // Handy B (R19, vorher /karte-kompakt/): ganze Welt mit Gegner-Leiste; der naechste Gegner steht ueber der Leiste
+      pruefe('Karte mit Gegner-Leiste (ganze Welt, scrollt nicht), naechster Gegner ueber der Leiste sichtbar, volle Breite', /karte-hoch/.test(m.klasse)
+        && /karte-weg/.test(m.klasse) && /karte-leiste/.test(m.klasse)
         && !m.scrollbar && m.scrollTop === 0 && m.aktuellDrin && m.karteBreit, JSON.stringify(m));
       pruefe('Spielen-Knopf klebt sichtbar im Viewport, ueber der Reiter-Leiste, mindestens 56 px hoch', m.reiter === 'unten' && !!m.leiste && m.spielen.t >= 0 && m.spielen.b <= m.leiste.t && m.spielen.l >= 0 && m.spielen.r <= m.iw && m.spielen.h >= 56, JSON.stringify(m));
       // nach dem Scrollen des Panels bleibt der Knopf im Bild (sticky)
@@ -763,6 +787,21 @@ async function testeHochformate(browser) {
       pruefe('kein waagrechter Ueberlauf', u.seite <= 0 && u.screen <= 0 && u.karte <= 0, JSON.stringify(u));
       const ab = await abgeschnitten(seite);
       pruefe('kein Name und kein Schild abgeschnitten', ab.length === 0, ab.join(' | '));
+      // Handy B: zu liest ein Vorleser den Knopf als "Spielen gegen <Name>"; offen steht der Text sichtbar und ganz da
+      const vl = await seite.evaluate(() => { const sp = document.querySelector('.arena .detail [data-aktion="spielen"]');
+        return { zu: !!document.querySelector('.arena.karte-leiste .detail:not(.offen)'), text: sp.querySelector('.sp-text').textContent.trim(),
+          name: (sp.querySelector('.sp-name') || {}).textContent || '', h2: document.querySelector('.arena .detail h2').textContent }; });
+      if (vl.zu) {
+        pruefe('Gegner-Leiste zu: Knopftext fuer Vorleser da, mit dem Namen des Gegners', vl.text.length > 0 && vl.name.length > 0 && vl.h2.includes(vl.name), JSON.stringify(vl));
+        await seite.click('.arena .detail .karte-griff');
+        await seite.waitForSelector('.arena .detail.offen');
+        await warte(900);
+        const abOffen = await abgeschnitten(seite);
+        pruefe('Gegner-Karte offen: kein Name und kein Knopftext abgeschnitten', abOffen.length === 0, abOffen.join(' | '));
+        await seite.click('.arena .detail .karte-griff');
+        await seite.waitForFunction(() => !document.querySelector('.arena .detail.offen'));
+        await warte(600);
+      }
       const kl = await kartenLage(seite);
       pruefe('Beschriftungen innerhalb der Karte, keine ueberdeckt eine andere Station', kl.ueber.length === 0 && kl.raus.length === 0, JSON.stringify(kl));
       const klein = await kleineTippflaechen(seite);

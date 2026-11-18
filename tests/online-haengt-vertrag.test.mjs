@@ -46,14 +46,36 @@ pruefe('Client: Freundespartie bleibt beim Server-Wert (10 Minuten)', freundMs =
 pruefe('Client: Wartezeit haengt an p.gewertet',
   /const haengtNachMs = \(?p\)? => p\.gewertet \? HAENGT_RANKED_MS : HAENGT_MS;/.test(js));
 pruefe('Client: tick vergleicht mit haengtNachMs(p), nicht mit der festen Zahl',
-  /halbzuege < 2 && p\.letzter_zug_am && Date\.now\(\) - Date\.parse\(p\.letzter_zug_am\) >= haengtNachMs\(p\)/.test(js)
+  /halbzuege < 2 && p\.letzter_zug_am && ausloeserMs\(\) >= haengtNachMs\(p\)/.test(js)
     && !/>= HAENGT_MS\b/.test(js));
+// R19 (15.11.2026): die Frist vor dem 2. Halbzug rechnet nach der Serveruhr (js/serverzeit.js), nie allein nach dem
+// Geraet, und die angezeigte Frist ist genau die des Servers
+pruefe('Client: Erstzug-Frist nach Serveruhr, ohne frische Probe begrenzt durch die erste Sicht (serverzeit seit)',
+  /return zeitSeit\(s, ersteSicht\.am, SICHT_SPIEL_MS\);/.test(js));
+// Kaltreview F3 + Fix-Review 84 (16.11.): die Zeitpruefung (Uhr und Erstzug-Frist) loest am EIGENEN Zug mit der
+// Ansichts-Schranke aus (nie allein nach einer vorgehenden Geraeteuhr), ist der Gegner am Zug nach der Serveruhr (sonst
+// kommt sie nach Neuladen bis zu seiner ganzen Restzeit zu spaet). online-frist 18.11.: nach der Serveruhr der Proben, nie
+// mit dem gemerkten Versatz der Anzeige (anzeige: false)
+pruefe('Client: Ausloesung mit Schranke nur am eigenen Zug, sonst nach der Serveruhr (ohne gemerkten Anzeige-Versatz)',
+  /const geschuetzt = vorlaufMs\(\);\s*return p\.am_zug === online\.meineFarbe\(p\) \? geschuetzt : serverSeitMs\(\{ anzeige: false \}\);/.test(js));
+pruefe('Client: tick loest Uhr und Erstzug-Frist ueber ausloeserMs aus',
+  /halbzuege >= 2 && rest\(p\.am_zug, ausloeserMs\(\)\) === 0/.test(js) && /halbzuege < 2 && p\.letzter_zug_am && ausloeserMs\(\) >= haengtNachMs\(p\)/.test(js));
+// Pflicht-Probe e7 (16.11.): die wartende Seite reklamiert still (ohne aktion, also ohne busy) und hoechstens alle 30 s
+pruefe('Client: wartende Seite reklamiert still und gedrosselt (WARTEND_ABFRAGE_MS 30 s, pruefeLeise ohne aktion)',
+  /const WARTEND_ABFRAGE_MS = 30 \* 1000;/.test(js)
+    && /if \(eigen\) \{ zeitPruefung = Date\.now\(\) \+ pause; aktion\(\(\) => online\.pruefeZeit\(p\.id\)\); return; \}/.test(js)
+    && /fremdPruefung = Date\.now\(\) \+ Math\.max\(pause, WARTEND_ABFRAGE_MS\);\s*pruefeLeise\(\);/.test(js)
+    && !/function pruefeLeise\(\) \{[^}]*aktion\(/.test(js));
+pruefe('Client: angezeigte Erstzug-Frist nach der Serveruhr, ohne Schranke (wie beim Gegner)',
+  /r = Math\.max\(0, frist - serverSeitMs\(\)\)/.test(js));
+pruefe('Client: angezeigte Erstzug-Frist ist ranked_haengt_s bzw. 10 Minuten',
+  /const erstzugFristMs = p => p\.gewertet \? HAENGT_RANKED_MS - 1000 : HAENGT_MS;/.test(js) && rankedMs - 1000 === rankedS * 1000);
 // Steht der Server beim ersten Nachfragen noch nicht auf "haengt" (Uhren weichen ab), darf die gewertete Partie nicht
 // eine volle Minute festsitzen: die Wiederholung kommt nach hoechstens 5 s.
 const rankedAbfrage = konstante('HAENGT_RANKED_ABFRAGE_MS');
 pruefe('Client: gewertete Partie fragt bei Bedarf nach hoechstens 5 s erneut', rankedAbfrage > 0 && rankedAbfrage <= 5000, rankedAbfrage);
 pruefe('Client: Wiederholung haengt an p.gewertet',
-  /zeitPruefung = Date\.now\(\) \+ \(p\.gewertet \? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS\);/.test(js));
+  /ausloeserMs\(\) >= haengtNachMs\(p\)\) pause = p\.gewertet \? HAENGT_RANKED_ABFRAGE_MS : HAENGT_ABFRAGE_MS;/.test(js));
 
 console.log(`\n${ok}/${gesamt} bestanden`);
 if (ok !== gesamt) process.exit(1);
