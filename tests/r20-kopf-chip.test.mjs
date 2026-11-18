@@ -4,8 +4,10 @@
 // Flo 23.10.), am PC steht es.
 //   Je Haupt-Kopf (Lernen, Arena, Liga, Ich): ist die Chip-Leiste sichtbar, dann ist jeder sichtbare Chip ganz zu sehen
 //   (nicht vom Rand der Leiste angeschnitten) und mindestens 24 px breit; eine Leiste ohne sichtbaren Chip malt nichts.
-//   320, 375, 390, 430, 768 und 1280 px, hell und dunkel, Deutsch und Englisch; gemessen direkt nach dem Zeichnen und
+//   320, 375, 390, 430, 768, 1280 und 1440 px, hell und dunkel, Deutsch und Englisch; gemessen direkt nach dem Zeichnen und
 //   nachdem die Webschrift da ist, einmal normal und einmal mit verzoegerter Webschrift (der Titel wird erst spaeter breiter).
+//   Rechter Rand bei 320, 390 und 1440 px: kein sichtbarer Knopf im Kopf kommt dem Fensterrand naeher als das padding-right
+//   des Kopfs (css/navigation.css:12, var(--rand) aus css/tokens.css). Der Sollwert wird im Browser gelesen, nie hier festgelegt.
 //   Netz nur simuliert.
 //
 //   node tests/r20-kopf-chip.test.mjs
@@ -61,7 +63,10 @@ const messe = (s) => s.evaluate(() => {
     return sichtbar(k) && r.width > 0 && r.bottom > 0 && r.top < innerHeight; }).map((kopf) => {
     const leiste = kopf.querySelector('.kopf-chips');
     const titel = (kopf.querySelector('.titel, h1, h2')?.textContent || '').trim().slice(0, 30);
-    if (!leiste || !sichtbar(leiste)) return { titel, leiste: 'aus', chips: [] };
+    const rand = { soll: parseFloat(getComputedStyle(kopf).paddingRight), knoepfe: [...kopf.querySelectorAll('button, a[href], [role="button"]')]
+      .filter((b) => sichtbar(b) && b.offsetWidth > 0).map((b) => ({ name: b.getAttribute('aria-label') || b.textContent.trim().slice(0, 30),
+        rechts: Math.round(b.getBoundingClientRect().right * 10) / 10 })) };
+    if (!leiste || !sichtbar(leiste)) return { titel, leiste: 'aus', chips: [], rand };
     const lr = leiste.getBoundingClientRect();
     const chips = [...leiste.children].filter((c) => sichtbar(c) && c.offsetWidth > 0).map((c) => {
       const r = c.getBoundingClientRect();
@@ -70,7 +75,7 @@ const messe = (s) => s.evaluate(() => {
       return { text: c.textContent.replace(/\s+/g, ' ').trim().slice(0, 40), breite: Math.round(r.width * 10) / 10,
         zuSehen: Math.round(zuSehen * 10) / 10, vonSichtbar: !!von && sichtbar(von) };
     });
-    return { titel, leiste: 'an', leisteBreite: Math.round(lr.width * 10) / 10, chips, klassen: kopf.className };
+    return { titel, leiste: 'an', leisteBreite: Math.round(lr.width * 10) / 10, chips, klassen: kopf.className, rand };
   });
 });
 
@@ -91,7 +96,21 @@ function bewerte(gruppe, wann, koepfe, pc) {
   }
 }
 
-const GROESSEN = [[320, 568], [375, 667], [390, 844], [430, 932], [768, 1024], [1280, 720]];
+// w ist die eingestellte Fensterbreite: macht ein Knopf die Seite breiter, faellt er so trotzdem auf
+const randGemessen = new Map();
+function pruefeRand(gruppe, koepfe, w) {
+  for (const k of koepfe) {
+    const { soll, knoepfe } = k.rand;
+    if (!knoepfe.length) continue;
+    randGemessen.set(w, (randGemessen.get(w) || 0) + knoepfe.length);
+    const abstand = Math.round(Math.min(...knoepfe.map((b) => w - b.rechts)) * 10) / 10;
+    pruefe(`${gruppe} "${k.titel}": Knoepfe halten den rechten Rand (Abstand ${abstand} px, Soll ${soll} px)`,
+      soll > 0 && abstand >= soll - 0.5, { w, soll, abstand, knoepfe });
+  }
+}
+
+const GROESSEN = [[320, 568], [375, 667], [390, 844], [430, 932], [768, 1024], [1280, 720], [1440, 900]];
+const RAND_BREITEN = [320, 390, 1440];
 const SCREENS = ['lernen', 'arena', 'liga', 'ich'];
 const seitenfehler = [];
 const browser = await pw.chromium.launch({ headless: true });
@@ -122,13 +141,16 @@ try {
               await s.evaluate(() => document.fonts.ready);
               await warte(schrift === 'spaet' ? 1800 : 300);
               await s.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-              bewerte(`${gruppe} ${ziel}`, 'mit Schrift', await messe(s), w > 700);
+              const koepfe = await messe(s);
+              bewerte(`${gruppe} ${ziel}`, 'mit Schrift', koepfe, w > 700);
+              if (RAND_BREITEN.includes(w)) pruefeRand(`${gruppe} ${ziel}`, koepfe, w);
             }
           } finally { await k.close(); }
         }
       }
     }
   }
+  for (const w of RAND_BREITEN) pruefe(`${w} px: Knoepfe im Kopf wurden gemessen`, randGemessen.get(w) > 0, [...randGemessen]);
   pruefe('keine Seitenfehler', !seitenfehler.length, seitenfehler);
 } finally {
   await browser.close();
