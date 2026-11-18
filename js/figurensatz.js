@@ -15,7 +15,8 @@ const PFADE = Object.freeze({ cburnett: 'assets/pieces/', blaupause: 'assets/pie
   feuer: 'assets/pieces/feuer/', stein: 'assets/pieces/stein/', halloween: 'assets/pieces/halloween/', weihnachten: 'assets/pieces/weihnachten/',
   ostern: 'assets/pieces/ostern/', weltraum: 'assets/pieces/weltraum/', roboter: 'assets/pieces/roboter/', naschwerk: 'assets/pieces/naschwerk/',
   zombies: 'assets/pieces/zombies/', geister: 'assets/pieces/geister/', drachen: 'assets/pieces/drachen/', lavagolem: 'assets/pieces/lavagolem/',
-  piraten: 'assets/pieces/piraten/', aegypten: 'assets/pieces/aegypten/', wikinger: 'assets/pieces/wikinger/', dinos: 'assets/pieces/dinos/' });
+  piraten: 'assets/pieces/piraten/', aegypten: 'assets/pieces/aegypten/', wikinger: 'assets/pieces/wikinger/', dinos: 'assets/pieces/dinos/',
+  goldelfenbein: 'assets/pieces/goldelfenbein/' });
 
 export function figurenSatz(e = ladeEinstellungen()) {
   const satz = e && e.figuren;
