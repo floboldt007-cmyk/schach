@@ -115,6 +115,31 @@
 @keyframes es-stern { 0%, 60%, 100% { transform: rotate(0) scale(1); } 15% { transform: rotate(-14deg) scale(1.1); } 30% { transform: rotate(10deg) scale(1.06); } 45% { transform: rotate(0) scale(1); } }
 @keyframes es-funkel { 0%, 100% { opacity: .1; transform: scale(.35); } 45% { opacity: 1; transform: scale(1); } }
 @keyframes es-tropfen { 0%, 20% { opacity: 0; transform: translateY(-4px); } 35% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; transform: translateY(9px); } 100% { opacity: 0; transform: translateY(13px); } }
+/* Premium-Sticker (R19, js/emote-kunst.js EMOTE_PREMIUM): Strahlenkranz dreht langsam, Glanz faehrt darueber, das Motiv
+   hat seine eigene Bewegung; nur transform und opacity, damit am Handy nichts ruckelt */
+.emote-premium .ep-strahlen { animation: ep-drehen 14s linear infinite; }
+.emote-premium .ep-glanz { animation: ep-glanz 3.2s ease-in-out infinite; }
+.emote-premium .ep-funkel { animation: es-funkel 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.emote-premium .ep-spaet { animation-delay: .55s; }
+.emote-premium .ep-spaeter { animation-delay: 1.05s; }
+.emote-premium .ep-schweben { animation: ep-schweben 2.4s ease-in-out infinite; }
+.emote-premium .ep-flacker { animation: ep-flacker 1.1s ease-in-out infinite; }
+.emote-premium .ep-puls { animation: ep-puls 1.2s ease-in-out infinite; }
+.emote-premium .ep-sprung { animation: ep-sprung 1.8s cubic-bezier(.34, 1.36, .64, 1) infinite; }
+.emote-premium .ep-spur { animation: ep-spur 1.8s ease-in-out infinite; }
+.emote-premium .ep-zucken { animation: ep-zucken 1.6s ease-in-out infinite; }
+.emote-premium .ep-aufblitz { animation: ep-aufblitz 1.6s ease-in-out infinite; }
+.emote-premium .ep-kippen { animation: ep-kippen 2.6s ease-in-out infinite; }
+@keyframes ep-drehen { to { transform: rotate(360deg); } }
+@keyframes ep-glanz { 0%, 55% { transform: translateX(0); opacity: 0; } 60% { opacity: 1; } 90% { transform: translateX(110px); opacity: 1; } 100% { transform: translateX(110px); opacity: 0; } }
+@keyframes ep-schweben { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-3deg); } }
+@keyframes ep-flacker { 0%, 100% { transform: scale(1, 1); } 30% { transform: scale(.96, 1.06); } 60% { transform: scale(1.04, .97); } }
+@keyframes ep-puls { 0%, 40%, 100% { transform: scale(1); } 12% { transform: scale(1.12); } 24% { transform: scale(.97); } 32% { transform: scale(1.07); } }
+@keyframes ep-sprung { 0%, 60%, 100% { transform: translate(0, 0) rotate(0); } 25% { transform: translate(-2px, -8px) rotate(-8deg); } 45% { transform: translate(0, 0) rotate(2deg); } }
+@keyframes ep-spur { 0%, 15%, 100% { opacity: 0; transform: translateX(0); } 30%, 60% { opacity: 1; } 75% { opacity: 0; transform: translateX(4px); } }
+@keyframes ep-zucken { 0%, 50%, 100% { transform: scale(1) rotate(0); } 8% { transform: scale(1.1) rotate(-4deg); } 16% { transform: scale(.96) rotate(3deg); } 26% { transform: scale(1.03) rotate(0); } }
+@keyframes ep-aufblitz { 0%, 30%, 100% { opacity: 0; } 8%, 20% { opacity: 1; } }
+@keyframes ep-kippen { 0%, 100% { transform: rotate(0) scale(1); } 35% { transform: rotate(-6deg) scale(1.04); } 70% { transform: rotate(5deg) scale(1.02); } }
 @media (prefers-reduced-motion: reduce) { .emote-sticker, .emote-sticker * { animation: none !important; } }
 /* Groessen: im Rad gross und lebendig (jeder Sticker mit eigenem Takt, darum laufen sie nie gleich), in der Blase klein und nur solange sie spricht,
    in der Sammlung gross; gedaempft steht er still */

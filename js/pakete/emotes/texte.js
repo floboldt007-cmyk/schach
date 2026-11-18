@@ -30,6 +30,9 @@ export const DE = {
   begleiter: 'Emote-Kreatur', begleiterText: 'Zeigt Hallo, Staunen, Nachdenken und Respekt als kleine Kreatur. Nur du siehst sie, solange sie im Labor sind.',
   kreaturenHinweis: 'Die Kreaturen sieht im Labor nur dein Erfinder-Konto. Später schaltet jede Welt ihre Kreatur frei. Tipp eine an, dann zeigt dein Emote-Rad sie; ein zweiter Tipp nimmt sie wieder ab.',
   'gruppe.sticker': 'Sticker',
+  // Premium-Sticker (R19): nicht gratis, im Shop mit Schloss und "Bald", im Labor des Erfinders frei
+  'gruppe.premium': 'Premium', bald: 'Bald im Shop',
+  'emote.krone': 'Krone', 'emote.feuer': 'Feuer', 'emote.herz': 'Herz', 'emote.springer': 'Springer', 'emote.blitz': 'Blitz', 'emote.diamant': 'Diamant',
   'kreatur.karo': 'Karo', 'kreatur.stups': 'Stups', 'kreatur.zinni': 'Zinni', 'kreatur.klippa': 'Klippa', 'kreatur.glimm': 'Glimm', 'kreatur.kronli': 'Kronli',
 };
 
@@ -60,6 +63,8 @@ export const EN = {
   begleiter: 'Emote creature', begleiterText: 'Shows Hello, Surprised, Thinking and Respect as a little creature. Only you can see them while they are in the lab.',
   kreaturenHinweis: 'While they are in the lab, only your creator account can see the creatures. Later each world unlocks its creature. Tap one and your emote wheel shows it; tap again to take it off.',
   'gruppe.sticker': 'Stickers',
+  'gruppe.premium': 'Premium', bald: 'Soon in the shop',
+  'emote.krone': 'Crown', 'emote.feuer': 'On fire', 'emote.herz': 'Heart', 'emote.springer': 'Knight', 'emote.blitz': 'Lightning', 'emote.diamant': 'Diamond',
   'kreatur.karo': 'Karo', 'kreatur.stups': 'Stups', 'kreatur.zinni': 'Zinni', 'kreatur.klippa': 'Klippa', 'kreatur.glimm': 'Glimm', 'kreatur.kronli': 'Kronli',
 };
 

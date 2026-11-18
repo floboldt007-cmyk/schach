@@ -488,7 +488,8 @@ async function erfinderTeil(browser) {
   }, plaetze), plaetze.length);
   pruefe('Erfinder: alle Finisher frei (Labor, mit Schild), auch auf Level 1 (kein Schloss), mit Szenenbild und echten Figuren', await p.s.evaluate(() => {
     const t = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')];
-    return t.length === 5 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
+    // R19 emotes-finisher: fuenf bisherige und drei neue (Blitzschlag, Goldregen, Schockwelle)
+    return t.length === 8 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
       && t.filter((x) => x.querySelector('.sa-bild svg.sk-finisher image[href*="/assets/pieces/"]')).length >= 3;
   }));
   await p.s.locator('.er-figuren').click();
@@ -599,7 +600,8 @@ async function laborTeil(browser) {
   await ruesteAus(p.s, 'klang-holz');
   pruefe('Ausrüsten: Klangset per Tipp gewählt', await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').klangpaket) === 'holz');
   const klaenge = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="klaenge"] .sa-teil')].filter((x) => x.querySelector('.sa-labor')).map((x) => x.dataset.teil).join());
-  pruefe('Labor: Klangsets Juwel, Grusel und Kristall mit Schild', klaenge === 'klang-juwel,klang-grusel,klang-kristall', klaenge);
+  // R19: Polarlicht und Donner kommen als Labor-Sets dazu (tests/r19-emotes-finisher.test.mjs)
+  pruefe('Labor: Klangsets Juwel, Grusel, Kristall, Polarlicht und Donner mit Schild', klaenge === 'klang-juwel,klang-grusel,klang-kristall,klang-polarlicht,klang-donner', klaenge);
   await ruesteAus(p.s, 'klang-grusel');
   pruefe('Labor: Grusel per Tipp gewählt und aktiv', await p.s.evaluate(async () => {
     const { klang } = await import('./js/sounds.js');

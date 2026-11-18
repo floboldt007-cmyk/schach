@@ -8,6 +8,9 @@
 // Restzahl. Kein Versprechen ohne Kauf-Weg (Entscheid 16.11. 21:40, RUECKHOLBAR: so/R19-shop-a-standard, Laufzettel): es gibt
 // noch keinen echten Kauf, also kein Kaufen-Knopf, kein Preis und kein "Preis folgt", auch wenn der Server einen Preis
 // schickt, sondern Schloss und "Bald". Die Vorschau ruft nichts beim Server auf.
+// Regale (R19, Flo 15.11.2026: "mehr Emotes, Finisher und Klaenge"): unter den fuenf Plaetzen je ein Regal "Mehr Emotes",
+//   "Mehr Finisher", "Mehr Klaenge" (auslage.json "regale", ohne das Stueck, das schon auf dem Platz liegt), Karten wie die
+//   Plaetze (Schloss und "Bald", gleiche Vorschau). Ein Regal ohne bekanntes Stueck faellt weg.
 //
 //   shopStil() -> 'a' | null
 //   Editionen wie im alten Shop (supabase/ANLEITUNG.md): angemeldet nur, was edition_staende liefert (ab 18), sonst
@@ -94,9 +97,9 @@ function miniBrett({ hell, dunkel }) {
 // leerer Platz: gestrichelter Rahmen statt eines Bildes
 const LEER = '<svg viewBox="0 0 64 64" class="shf-leer" aria-hidden="true"><rect x="6" y="6" width="52" height="52" rx="12" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="7 6"/></svg>';
 
-function karte(art, s, beiWahl) {
+function karte(art, s, beiWahl, klasse = 'shf-karte') {
   const k = document.createElement(s && !s.gast ? 'button' : 'div');
-  k.className = 'shf-karte';
+  k.className = klasse;
   k.dataset.art = art;
   if (!s) {
     k.dataset.folgt = '';
@@ -168,6 +171,24 @@ async function vorschau(s, { bereich }) {
   if (bereich && bereich.isConnected) bereich.dispatchEvent(new CustomEvent('sa:oeffne', { bubbles: true }));
 }
 
+const REGALE = ['emote', 'finisher', 'klang'];
+function regal(art, eintraege, platzId, kontext, wahl) {
+  const stuecke = (Array.isArray(eintraege) ? eintraege : []).filter((e) => e && e.id !== platzId)
+    .map((e) => stueck(art, e, kontext)).filter(Boolean);
+  if (!stuecke.length) return null;
+  const r = document.createElement('section');
+  r.className = 'shf-regal';
+  r.dataset.art = art;
+  const titel = document.createElement('h3');
+  titel.className = 'shf-regal-titel';
+  titel.textContent = S('regal.' + art);
+  const reihe = document.createElement('div');
+  reihe.className = 'shf-regal-reihe';
+  reihe.append(...stuecke.map((s) => karte(art, s, wahl, 'shf-rk')));
+  r.append(titel, reihe);
+  return r;
+}
+
 export async function shopEntwurf({ stil, editionen = [], gast = false, katalog = {}, produktName = (id, n) => n || id, bereich = null }) {
   const [vorrat, auslage] = await Promise.all([ladeJson('assets/shop/vorrat.json', { stuecke: [] }), ladeJson('assets/shop/auslage.json', { plaetze: [] })]);
   const plaetze = Array.isArray(auslage?.plaetze) ? auslage.plaetze : [];
@@ -177,7 +198,9 @@ export async function shopEntwurf({ stil, editionen = [], gast = false, katalog 
   wurzel.dataset.shopStil = stil;
   const fuenf = document.createElement('div');
   fuenf.className = 'shf-fuenf';
-  fuenf.append(...ARTEN.map((art) => karte(art, stueck(art, plaetze.find((p) => p && p.art === art), { vorrat, katalog, editionen, gast, produktName }), wahl)));
-  wurzel.append(fuenf);
+  const kontext = { vorrat, katalog, editionen, gast, produktName };
+  fuenf.append(...ARTEN.map((art) => karte(art, stueck(art, plaetze.find((p) => p && p.art === art), kontext), wahl)));
+  const regale = auslage && typeof auslage.regale === 'object' && auslage.regale ? auslage.regale : {};
+  wurzel.append(fuenf, ...REGALE.map((art) => regal(art, regale[art], plaetze.find((p) => p && p.art === art)?.id, kontext, wahl)).filter(Boolean));
   return wurzel;
 }
