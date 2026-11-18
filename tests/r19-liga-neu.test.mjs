@@ -47,7 +47,7 @@ function weltAntwort(ichErster = false, ausserhalb = false) {
   // ausserhalb (Kaltreview df 15.11.): du auf Platz 150, die Liste traegt nur die besten 100; Name und Banner nur in ich
   if (ausserhalb) {
     const liste = Array.from({ length: 100 }, (_, i) => ({ rang: i + 1, name: 'Spieler ' + (i + 1), banner: 'start', elo: 2400 - i * 5, ich: false }));
-    return { ab: 15, ab_start: 30, teilnahme: true, liste, ich: { status: 'dabei', rang: 150, elo: 1900, name: 'flo', banner: 'saison-silber' } };
+    return { ab: 15, ab_start: 30, teilnahme: true, liste, ich: { status: 'dabei', rang: 150, elo: 1900, name: ausserhalb === 'ohne-name' ? '' : 'flo', banner: 'saison-silber' } };
   }
   const liste = NAMEN.map((name, i) => ({ rang: i + 1, name, banner: name === 'flo' ? 'saison-silber' : 'start', elo: 2210 - i * 37 - (i > 6 ? 18 : 0),
     ich: name === 'flo' }));
@@ -251,6 +251,14 @@ try {
     });
     pruefe('Welt ausserhalb der Liste: Name und eigenes Banner aus "ich"', !!w && /flo/.test(w.text) && /banner\/saison-silber\.svg/.test(w.banner), w);
     pruefe('Welt ausserhalb der Liste: kein Balken ohne den Platz direkt ueber dir', !!w && !w.balken && /#150/.test(w.text), w);
+    await k.close();
+  }
+  {
+    // Fix-Review 9f 16.11.: ohne Namen in "ich" (Server liefert '') bleibt das eigene Banner, nicht 'start'
+    const { k, s } = await seite(browser, { ausserhalb: 'ohne-name' });
+    await reiter(s, 'Welt', '.lg-welt[data-zustand="dabei"]');
+    const banner = await s.evaluate(() => document.querySelector('.lg-welt-platz .lg-welt-platz-banner')?.style.backgroundImage || '');
+    pruefe('Welt ausserhalb der Liste ohne Namen: eigenes Banner aus "ich"', /banner\/saison-silber\.svg/.test(banner), banner);
     await k.close();
   }
   {
