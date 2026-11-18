@@ -833,7 +833,7 @@ async function testeBrowser(browser) {
   pruefe('heim:naechstes: Zeile „Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen“ (als erste, ohne Klassen-Aufgabe)',
     (await seite.locator(SZ).innerText()).replace(/\s+/g, ' ').includes('Bauernmarsch Heute: 1 Partie oder 3 Rätsel spielen')
     && await seite.evaluate((s) => document.querySelector('.heim-liste').firstElementChild === document.querySelector(s), SZ)
-    && await seite.locator(SZ).getAttribute('aria-label') === 'Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen');
+    && await seite.locator(SZ).getAttribute('aria-label') === 'Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen · noch 6 Felder bis zur Umwandlung');
   await seite.locator(SZ).click();
   pruefe('Ohne Trainings-Karten öffnet die Zeile das Serien-Blatt', await seite.waitForSelector('.se-blatt-ort .se-blatt', { timeout: 3000 }).then(() => true, () => false));
   await seite.keyboard.press('Escape');

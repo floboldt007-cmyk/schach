@@ -337,7 +337,8 @@ async function testeNaechstes(browser, heute) {
     const r = await zeile(seite);
     pruefe('Server-Stand: eine Zeile "Warden II" / "Platz 9 von 30"', da && r.zeilen === 1 && r.stufe === 'Warden II' && r.text === 'Platz 9 von 30', JSON.stringify(r));
     pruefe('Balken zu 40 % (64 von 160 Kronen auf Platz 5)', r.balken === 40, String(r.balken));
-    pruefe('Beschriftung nennt Stufe, Platz und Kronen', r.aria === 'Warden II, Platz 9 von 30, 64 Kronen diese Woche', r.aria);
+    // R19 Start "Als Naechstes" (Freigabe a5 16.11.): der sichtbare Abstand zu Platz 5 (160 - 64) steht auch in der Beschriftung
+    pruefe('Beschriftung nennt Stufe, Platz, Kronen und Abstand zu Platz 5', r.aria === 'Warden II, Platz 9 von 30, 64 Kronen diese Woche, 96 Kronen hinter Platz 5', r.aria);
     pruefe('kein NaN, undefined oder null', ohneUnsinn(r), JSON.stringify(r));
     pruefe('Ruhe: kein Countdown, kein roter Punkt', await seite.evaluate(() => !document.querySelector('.heim-naechstes .punkt-neu, .heim-naechstes .badge, .heim-naechstes [data-countdown]')));
     const gemerkt = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:kronen') || 'null'));
@@ -364,6 +365,8 @@ async function testeNaechstes(browser, heute) {
     const r = await zeile(seite);
     pruefe('ohne Gruppe diese Woche: "Knight III" / "Spiel eine Partie für deine Gruppe", Balken leer',
       da && r.stufe === 'Knight III' && r.balken === 0 && ohneUnsinn(r), JSON.stringify(r));
+    // ohne Gruppe keine Zahl, die man nicht kennt: die Beschriftung bleibt ohne Abstand
+    pruefe('ohne Gruppe: Beschriftung ohne Abstand', r.aria === 'Knight III, Spiel eine Partie für deine Gruppe, 0 Kronen diese Woche', r.aria);
     await kontext.close();
   }
   gruppe = 'offline';
