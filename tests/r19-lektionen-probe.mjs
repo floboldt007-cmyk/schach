@@ -133,6 +133,7 @@ async function gegenzugEcht(s, fenVor, fenNach) {
 // EINER Linie (n = 1, volle Staerke); nur wenn der Aufrufer diesen Zug meiden will, fragt er die besten KANDIDATEN (MultiPV) ab,
 // je mit Bewertung aus Sicht der Seite am Zug (die App liefert sie aus Sicht von Weiss).
 const KANDIDATEN = 4;
+const ZWANG_ID = 'opposition'; // Lektion fuer den festen Fall Meiden erzwungen (unten)
 async function engineZuege(s, fen, n = 1) {
   return s.evaluate(async ({ fen, knoten, n }) => {
     const e = await window.__app.engine('bewertung');
@@ -158,8 +159,10 @@ const lz = s => s.evaluate(() => (window.__lektion ? window.__lektion.zustand() 
 const blattDa = s => s.evaluate(() => { const o = document.querySelector('.ls-screen > .ergebnis-overlay'); const k = o?.querySelector('.ergebnis-karte');
   return !!k && !o.hidden && k.getBoundingClientRect().height > 0; });
 
-async function probe(s, l, art) {
-  const r = { id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, start: false, handlung: false, ende: false, grund: null, zuege: 0, sterne: 0, fehler: [], zugfolge: [], endFen: null };
+// zwang: der beste Zug gilt beim ersten Mal, wo ein anderer Kandidat das Ziel haelt, als schon gesehen; so laeuft der Weg
+// "Wiederholung meiden" sicher einmal (Nach-Review 3f 18.11.: in keinem gruenen Lauf belegt)
+async function probe(s, l, art, { zwang = false } = {}) {
+  const r = { id: l.id, gemieden: 0, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, start: false, handlung: false, ende: false, grund: null, zuege: 0, sterne: 0, fehler: [], zugfolge: [], endFen: null };
   await s.evaluate(m => window.__app.setzeEinstellungen({ modus: m, autoDame: true, klang: false }), art.modus);
   // echte Verteidigung: ohne Test-Haken zieht die App selbst mit Stockfish (js/ui/lektion.js engineZug)
   // Haken einmal sichern (zwei Engine-Lektionen nacheinander duerfen ihn nicht mit undefined ueberschreiben)
@@ -204,11 +207,12 @@ async function probe(s, l, art) {
       m = legal((await engineZuege(s, z.fen))[0] || { u: '' });
       // fuehrt der beste Zug in eine Stellung, die nach einem eigenen Zug schon da war: der beste andere Kandidat, der das Ziel
       // noch haelt (sonst bleibt es beim besten, das Remis ist dann ein echter Befund)
+      if (m && zwang && !r.gemieden) nachFlo.add(stellung(m.after));
       if (m && nachFlo.has(stellung(m.after))) {
         const art = artVon(l);
         const alt = (await engineZuege(s, z.fen, KANDIDATEN)).map(legal)
           .find(x => x && !nachFlo.has(stellung(x.after)) && haeltZiel(x.wert, art));
-        if (alt) { m = alt; r.gemieden = (r.gemieden || 0) + 1; }
+        if (alt) { m = alt; r.gemieden++; }
       }
     }
     else m = floZug(l, c, startMat, z.zuege);
@@ -266,23 +270,27 @@ try {
       window.__test.lektionZug = fen => { const m = new C(fen).moves({ verbose: true })[0]; return m ? m.from + m.to + (m.promotion || '') : null; };
     });
     pruefe(`${art.name}: App-Start ohne Konsolenfehler`, fehler.length === f0Start, fehler.slice(f0Start));
-    for (const l of liste) {
+    // fester Fall: Opposition mit erzwungenem Meiden muss trotzdem umwandeln (geschafft) und gemieden > 0 zeigen
+    const faelle = liste.flatMap(l => l.id === ZWANG_ID ? [[l, false], [l, true]] : [[l, false]]);
+    for (const [l, zwang] of faelle) {
       const f0 = fehler.length;
-      const r = await mitFrist(probe(s, l, art), FRIST_MS + 30000, `haengt laenger als ${FRIST_MS / 1000 + 30} s`).catch(e => ({ id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, fehler: ['Abbruch: ' + e.message] }));
+      const r = await mitFrist(probe(s, l, art, { zwang }), FRIST_MS + 30000, `haengt laenger als ${FRIST_MS / 1000 + 30} s`).catch(e => ({ id: l.id, bereich: bereichVon(l).id, art: artVon(l), geraet: art.name, fehler: ['Abbruch: ' + e.message] }));
       r.konsole = fehler.slice(f0);
       r.geht = !!(r.start && r.handlung && r.ende && !r.fehler.length && !r.konsole.length && r.grund === 'geschafft'
-        && (!mitEngine(l) || r.gegenzuege > 0));
+        && (!mitEngine(l) || r.gegenzuege > 0) && (!zwang || r.gemieden > 0));
+      r.zwang = zwang;
       ergebnisse.push(r);
       await writeFile(path.join(BILDER, 'ergebnis.json'), JSON.stringify(ergebnisse, null, 1));
-      pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft${mitEngine(l) ? ' (Engine gegen echte Verteidigung)' : ''}`, r.geht,
-        { start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, gegenzuege: r.gegenzuege, fehler: r.fehler, konsole: r.konsole,
+      pruefe(`${l.id} (${r.art}, ${art.name}): Start, Zug per Klick, Ende mit Ergebnisblatt, geschafft${mitEngine(l) ? ` (Engine gegen echte Verteidigung, gemieden=${r.gemieden || 0})` : ''}${zwang ? ', Meiden erzwungen und trotzdem geschafft' : ''}`, r.geht,
+        { gemieden: r.gemieden, start: r.start, handlung: r.handlung, ende: r.ende, grund: r.grund, zuege: r.zuege, gegenzuege: r.gegenzuege, fehler: r.fehler, konsole: r.konsole,
           // R19 (17.11.2026, CI-Lauf 44163241625: dame-bauer "remis nach 8" in Node nicht nachstellbar): Zugfolge und Endstellung,
           // damit ein rotes Ende seine Ursache selbst zeigt (Wiederholung, Dame getauscht, ...)
           ...(r.geht ? {} : { zugfolge: r.zugfolge.join(' '), endFen: r.endFen }) });
     }
     await k.close();
   }
-  pruefe(`alle ${LEKTIONEN.length} Lektionen geprueft`, ergebnisse.length === LEKTIONEN.length, ergebnisse.length);
+  pruefe(`alle ${LEKTIONEN.length} Lektionen geprueft`, ergebnisse.filter(r => !r.zwang).length === LEKTIONEN.length, ergebnisse.length);
+  if (LEKTIONEN.some(l => l.id === ZWANG_ID)) pruefe(`Fall Meiden erzwungen lief`, ergebnisse.some(r => r.zwang), ergebnisse.length);
 } finally {
   // nach einem Absturz der Seite kann close() haengen: begrenzt warten, das Ergebnis steht schon auf der Platte
   await mitFrist(Promise.all([browser?.close(), new Promise(r => server.close(r))]), 20000, 'close').catch(() => {});
