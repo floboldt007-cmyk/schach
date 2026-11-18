@@ -131,7 +131,7 @@ try {
     await warte(150);
   }
   browser = await browserTyp(pw).launch({ headless: true });
-  for (const [breite, hoehe] of [[390, 844], [1440, 900]]) for (const modus of ['hell', 'dunkel']) {
+  for (const [breite, hoehe] of [[390, 844], [820, 1180], [1440, 900]]) for (const modus of ['hell', 'dunkel']) {
     const wer = `${breite}x${hoehe} ${modus}`;
     // Lobby
     {
