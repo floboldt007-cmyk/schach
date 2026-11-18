@@ -1,4 +1,4 @@
-BELEG: v1 werkzeug=beleg-lauf zeit=1794957658 stand=60db98a04603be194a2344fb73519142def239672ef626a9a17d20d127060ae0 head=501ae58b6cd383b827b6c4ea8aed408f34bc1492 kmd=a5afc4f6b12bb7b3b880287a361eefe0b62f67b8203a14daa914c1a34aad1af5 messung=4bcedc35378b9c30137f16dfb66e0a3d23106351fb2b5489c983154347f8d893 mac=b60d1e34e1147709259ea8f37b8814ef8de261517aaf34e7dad54e8e4d6e73e8
+BELEG: v1 werkzeug=beleg-lauf zeit=1794961808 stand=136d25590461ad8c7e700c5a3e7749e1b44e79112e736606d78bae253804a746 head=f4df5baf34293677ab6dd6a9aa750cb74bf9c224 kmd=a5afc4f6b12bb7b3b880287a361eefe0b62f67b8203a14daa914c1a34aad1af5 messung=4bcedc35378b9c30137f16dfb66e0a3d23106351fb2b5489c983154347f8d893 mac=5261e98414892c8cadfba51c306ce77cbcc68836d9fdcbff0c6a90ff0c5d241b
 kmd: 'C:/Program Files/Git/usr/bin/timeout.exe' 900 node tests/r19-exklusiv-kontrast.test.mjs
 ok   iPhone SE hell: Marke Exklusiv vorhanden
 ok   iPhone SE hell Ruhe: Marke "Exklusiv" (exklusiv, brett) mind. 4,5:1

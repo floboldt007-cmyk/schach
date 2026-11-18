@@ -35,7 +35,7 @@ Graph-Start: 2026-11-18T00:09:54+01:00
 <!-- belegt setzt nur `aufgabe.py beleg` (geprueft); behauptet zaehlt beim Abschluss wie offen -->
 - plan: entfaellt · Auftrag mit Ziel und Dateizaun vom Hauptfenster claude-code-6f (18.11.)
 - preflight: belegt · datei C:\Users\Flo\Documents\KI\schach-R19-exklusiv-kontrast\.code-guardian-evidence\2026-11-18--r19-exklusiv-kontrast\preflight-3f.log
-- edit: belegt · sha 501ae58
+- edit: belegt · sha fe37580
 - audit: belegt · datei C:\Users\Flo\Documents\KI\schach-R19-exklusiv-kontrast\.code-guardian-evidence\2026-11-18--r19-exklusiv-kontrast\audit.log
 - kaltreview: offen
 - suite: belegt · datei C:\Users\Flo\Documents\KI\schach-R19-exklusiv-kontrast\.code-guardian-evidence\2026-11-18--r19-exklusiv-kontrast\k2.log
@@ -48,6 +48,7 @@ Graph-Start: 2026-11-18T00:09:54+01:00
 - Verbraucher der Regel (preflight-3f.log): .shf-selten nur in shop-entwurf.js:115 (Shop A); data-seltenheit="exklusiv" nur auf .shf-karte. Auf c03c590 traegt EINE Karte (Brett) Exklusiv; der Auftrag nannte vier (Stand im Zweig emotes-finisher), der Selektor gilt fuer jede.
 - Pixel (RGB, Schwelle 8): nur der kleine Kasten der Marke in hell (iPhone 13 1536 px, SE 555, PC 76), dunkel unter der Schwelle; Rauschen zweier Laeufe auf der Basis 0.
 - design-beweis: hell 4 Text-Befunde Exklusiv weg (ruhe/hover/focus/active), sonst nichts neu oder weg; dunkel identisch.
+- Kaltreview 6b (1 Warnung): die Regel griff nur bei .shf-karte; die Regal-Karten aus emotes (.shf-rk, shop-entwurf.js:170) tragen dieselbe .shf-selten und blieben hell 4,18:1. Nachweis auf einer Wegwerf-Kopie von ec965f9 (Shop c03c590 und Emotes ec965f9 haben vier Konflikte in fremden Dateien, die loest das Hauptfenster im Sammel): rot-rk.log 336/357, genau 21 Fehler alle Regal-Finisher hell 4,18; gruen-rk.log 357/357 mit :is(.shf-karte, .shf-rk), Regal hell 4,81 / dunkel 7,52. Eigener Zweig k1.log 91/91 (fe37580). Nach dem Sammel einmal auf dem Sammelstand nachfahren (Auftrag Hauptfenster).
 
 ## Fertig-wenn
 Fertig-Kommando: node tests/r19-exklusiv-kontrast.test.mjs (alle Marken >= 4,5:1), K1-K4 belegt, Kaltreview angefragt
