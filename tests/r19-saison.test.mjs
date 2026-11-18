@@ -141,6 +141,10 @@ async function neueSeite(browser, { stand, konto = true, titelAbsage = false } =
       if (stand && stand.__status) return r.fulfill({ status: stand.__status, contentType: 'application/json', body: JSON.stringify({ message: 'nein' }) });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stand) });
     }
+    if (url.includes('/rpc/saison_sichtbar_setzen')) {
+      gesendet.push('saison_sichtbar_setzen:' + r.request().postData());
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sichtbar: JSON.parse(r.request().postData()).an }) });
+    }
     if (url.includes('/rpc/saison_titel_waehle')) {
       gesendet.push('saison_titel_waehle:' + r.request().postData());
       if (titelAbsage) return r.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'SAISON_TITEL' }) });
@@ -239,6 +243,36 @@ try {
     if (!opt.konto && opt.konto !== undefined) pruefe('ohne Konto: kein Aufruf saison_mein_stand', !gesendet.includes('saison_mein_stand'), gesendet);
     pruefe(`${name}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
     await kontext.close();
+  }
+  { // Schalter in den Einstellungen (Flo 18.11.2026): Vorgabe sichtbar, aus geht an den Server; altes SQL zeigt keinen Schalter
+    const { kontext, seite, gesendet } = await neueSeite(browser, { stand: { ...LAUF, sichtbar: true } });
+    await warteLeiste(seite);
+    const s = await seite.evaluate(async () => {
+      const { fuelleSaisonSchalter } = await import('/js/pakete/liga/saison.js');
+      const el = document.createElement('section');
+      el.hidden = true;
+      document.body.append(el);
+      await fuelleSaisonSchalter(el);
+      const k = el.querySelector('.ss-sichtbar');
+      const vorher = k?.getAttribute('aria-checked');
+      k?.click();
+      for (let i = 0; i < 40 && k?.getAttribute('aria-checked') !== 'false'; i++) await new Promise((r) => setTimeout(r, 50));
+      return { sichtbar: !el.hidden, rolle: k?.getAttribute('role'), vorher, nachher: k?.getAttribute('aria-checked') };
+    });
+    pruefe('Schalter: sichtbar, Vorgabe an, Klick schaltet aus', s.sichtbar && s.rolle === 'switch' && s.vorher === 'true' && s.nachher === 'false', s);
+    pruefe('Schalter: geht an den Server', gesendet.includes('saison_sichtbar_setzen:{"an":false}'), gesendet);
+    await kontext.close();
+    const alt = await neueSeite(browser, { stand: LAUF });
+    await warteLeiste(alt.seite);
+    const leer = await alt.seite.evaluate(async () => {
+      const { fuelleSaisonSchalter } = await import('/js/pakete/liga/saison.js');
+      const el = document.createElement('section');
+      el.hidden = true;
+      await fuelleSaisonSchalter(el);
+      return { versteckt: el.hidden, knopf: !!el.querySelector('.ss-sichtbar') };
+    });
+    pruefe('Schalter: altes SQL ohne das Feld zeigt keinen Schalter', leer.versteckt && !leer.knopf, leer);
+    await alt.kontext.close();
   }
   { // englisch: dieselbe Leiste in der App-Sprache
     const { kontext, seite } = await neueSeite(browser, { stand: { ...LAUF, abzeichen: [], titel: [] } });

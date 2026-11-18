@@ -6,13 +6,15 @@
 //   saisonLeiste() -> section.ss-leiste[hidden bis zur Antwort]
 //   fuelleSaison(el)  zeichnet in eine vorhandene Leiste (js/pakete/liga/index.js laedt diese Datei erst beim Oeffnen von
 //     "Ich" nach: sheet und Visitenkarte ziehen Thema, Profil und Konto mit, das Paket selbst bleibt davon frei)
+//   fuelleSaisonSchalter(el)  Gruppe "Season" der Einstellungen: zeigt der Gegner Abzeichen und Titel? Bleibt ohne Konto,
+//     offline oder mit altem SQL verborgen; der Schalter zeigt immer die Antwort des Servers
 //   saisonDatum(iso) -> '20. Juni 2027' (Sprache der App)
 //   zeigeLigen(aktuell) oeffnet "Alle Ligen": 18 Stufen mit Symbol, die aktuelle markiert, dazu die Season-Regel
 //     (Flo 15.11.2026: "man muss auch irgendwo die Ligen nachschlagen koennen"); auch aus der Liga (gruppe.js)
 import { t, locale } from '../../sprache.js';
 import { sheet } from '../../ui/bauteile.js';
 import { sitzung, userId } from '../../konto.js';
-import { angemeldet, holeSaison, waehleSaisonTitel } from '../../kronen.js';
+import { angemeldet, holeSaison, waehleSaisonTitel, setzeSaisonSichtbar } from '../../kronen.js';
 import { saisonText, saisonTitelText, ligaSymbolUrl, visitenkarte, eigeneKarte } from '../../ui/visitenkarte.js';
 import { LIGEN, STUFEN_JE_LIGA, AUFSTIEG_PLAETZE, ABSTIEG_PLAETZE } from './kronen.js';
 import { stufenName } from './texte.js';
@@ -140,6 +142,36 @@ export async function fuelleSaison(el) {
   zeichne(el, st);
   el.hidden = false;
   zeigeEnde(st);
+}
+
+export async function fuelleSaisonSchalter(el) {
+  if (!angemeldet()) return;
+  const st = await holeSaison();
+  if (!st || st.sichtbar === null) return;
+  el.setAttribute('aria-labelledby', 'es-g-season');
+  el.innerHTML = `<h3 class="es-titel" id="es-g-season">${esc(T('schalter.titel'))}</h3>
+    <div class="es-zeile">
+      <div class="es-text"><b id="es-l-season">${esc(T('schalter.an'))}</b><span id="es-t-season">${esc(T('schalter.text'))}</span></div>
+      <button class="es-schalter ss-sichtbar" type="button" role="switch" aria-labelledby="es-l-season" aria-describedby="es-t-season"
+        aria-checked="${st.sichtbar}"><i></i></button>
+    </div>
+    <p class="es-hilfe ss-sichtbar-fehler" role="alert" hidden></p>`;
+  const k = el.querySelector('.ss-sichtbar');
+  const fehler = el.querySelector('.ss-sichtbar-fehler');
+  k.addEventListener('click', async () => {
+    const an = k.getAttribute('aria-checked') !== 'true';
+    k.disabled = true;
+    fehler.hidden = true;
+    try {
+      const d = await setzeSaisonSichtbar(an);
+      k.setAttribute('aria-checked', String(d?.sichtbar === true));
+    } catch (e) {
+      fehler.textContent = T('schalter.fehler');
+      fehler.hidden = false;
+    }
+    k.disabled = false;
+  });
+  el.hidden = false;
 }
 
 export function saisonLeiste() {

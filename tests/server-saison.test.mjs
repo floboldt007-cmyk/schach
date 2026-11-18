@@ -289,6 +289,27 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
     const an = await als(db, null, `select public.saison_karte_der_partie('${pid}') k`);
     pruefe('anon: abgewiesen', !!an?.fehler, JSON.stringify(an));
   }
+  // Schalter in den Einstellungen (Flo 18.11.2026): aus = der Gegner bekommt weder Abzeichen noch Titel
+  {
+    const karte = async () => (await als(db, T(1), `select public.saison_karte_der_partie('${pid}') k`))?.k;
+    const stand = async () => (await als(db, U2, 'select public.saison_mein_stand() s'))?.s;
+    pruefe('Schalter: Vorgabe sichtbar', (await stand())?.sichtbar === true);
+    const aus = await als(db, U2, 'select public.saison_sichtbar_setzen(false) r');
+    pruefe('Schalter aus: Antwort und eigener Stand', aus?.r?.sichtbar === false && (await stand())?.sichtbar === false, JSON.stringify(aus));
+    const k = await karte();
+    pruefe('Schalter aus: Gegner sieht weder Abzeichen noch Titel', k?.w?.abzeichen === null && k?.w?.titel === null, JSON.stringify(k?.w));
+    pruefe('Schalter aus: dieselben Felder wie sonst', JSON.stringify(Object.keys(k?.w || {}).sort()) === '["abzeichen","du","titel"]', JSON.stringify(k?.w));
+    await als(db, U2, `select public.saison_titel_waehle('crownmaster-s1') r`);
+    pruefe('Titelwahl aendert den Schalter nicht', (await stand())?.sichtbar === false);
+    const d = (await als(db, U2, 'select public.meine_daten() d'))?.d;
+    pruefe('Datenauskunft nennt den Schalter', d?.saison?.sichtbar === false, JSON.stringify(d?.saison));
+    const anon = await als(db, null, 'select public.saison_sichtbar_setzen(true) r');
+    pruefe('anon: Schalter abgewiesen', !!anon?.fehler, JSON.stringify(anon));
+    await als(db, U2, 'select public.saison_sichtbar_setzen(true) r');
+    const wieder = await karte();
+    pruefe('Schalter wieder an: Gegner sieht Abzeichen und Titel', wieder?.w?.abzeichen?.stufe === 17 && wieder?.w?.titel === 'crownmaster-s1', JSON.stringify(wieder?.w));
+  }
+
   // Titel, der nicht mehr im Besitz ist, zeigt nichts
   await db.exec(`delete from public.saison_titel where user_id = '${U2}'`);
   {
@@ -325,7 +346,7 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
   pruefe('saison-zurueck.sql laeuft', !z, z);
   const weg = await wert(db, `select to_regclass('public.saison_abzeichen') a, to_regclass('public.saison_titel') b,
     to_regclass('public.saison_wahl') c, to_regclass('public.saison_abrechnungen') d, to_regprocedure('public.saison_abrechnen()') e,
-    to_regprocedure('public.saison_karte_der_partie(uuid)') f`);
+    to_regprocedure('public.saison_karte_der_partie(uuid)') f, to_regprocedure('public.saison_sichtbar_setzen(boolean)') g`);
   pruefe('Rueckweg: Tabellen und Funktionen weg', Object.values(weg).every((v) => v === null), JSON.stringify(weg));
   const lz = (await db.query(`select prosrc from pg_proc where proname = 'liga_abrechnen'`)).rows[0]?.prosrc || '';
   pruefe('Rueckweg: liga_abrechnen wieder die live Fassung ohne Haken', !lz.includes('saison_abrechnen') && lz.includes("g.liga = 'raetsel'"));

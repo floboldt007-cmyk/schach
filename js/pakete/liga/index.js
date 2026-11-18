@@ -144,6 +144,14 @@ if (typeof document !== 'undefined') {
     import('./saison.js').then((m) => m.fuelleSaison(el)).catch(() => {});
     return el;
   }), { reihenfolge: 12, paket: MODUL });
+  // Schalter fuer Season-Abzeichen und -Titel (Flo 18.11.2026): saison.js wie oben erst hier nachladen
+  anbieten('einstellungen:gruppen', sicher(() => {
+    const el = document.createElement('section');
+    el.className = 'es-gruppe flaeche ss-einstellungen';
+    el.hidden = true;
+    import('./saison.js').then((m) => m.fuelleSaisonSchalter(el)).catch(() => {});
+    return el;
+  }), { reihenfolge: 9, paket: MODUL });
   // Wochen-Gruppe der Kronen-Liga (07.11.2026): erster Reiter der Bestenliste, Freunde (Paket punkte, 8) gleich dahinter
   anbieten('bestenliste:reiter', sicher((k) => (k && k.reiter === 'gruppe' ? reiterGruppe(k) : { el: huelleGruppe(), verlasse() {} })),
     { reihenfolge: 5, paket: MODUL });

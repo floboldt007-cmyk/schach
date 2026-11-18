@@ -27,7 +27,10 @@ const FAELLE = [
     karteMuss: 'Machst du in der Weltrangliste mit, sehen alle angemeldeten Spieler dort deinen Benutzernamen, dein Banner und deine Online-Elo',
     ligaMuss: 'Machst du selbst in der Weltrangliste mit, sehen alle angemeldeten Spieler dort deine Online-Elo',
     dauerMuss: 'Seasons, Weltrangliste', kinderMuss: 'Weltrangliste', rechteMuss: '„Nicht mehr zeigen“',
-    loeschenMuss: ['Season-Abzeichen', 'Season-Titel', 'Teilnahme an der Weltrangliste'] },
+    loeschenMuss: ['Season-Abzeichen', 'Season-Titel', 'Teilnahme an der Weltrangliste'],
+    hakenMuss: ['mindestens 16 Jahre alt bist oder deine Eltern einverstanden sind', 'Zeitpunkt dieser Bestätigung'],
+    kinderHaken: 'Vor dem Mitmachen bestätigst du das', seasons: '<h3>Seasons</h3>',
+    schalterMuss: 'In den Einstellungen kannst du unter „Season“ ausschalten', karteSchalter: 'sofern du sie in den Einstellungen nicht ausgeblendet hast' },
   { sprache: 'en', datei: 'datenschutz-en.html', loeschen: 'konto-loeschen-en.html',
     welt: '<h3>World ranking</h3>', karte: '<h3>Player card, achievements and thalers</h3>', liga: '<h3>League with crowns and weekly groups</h3>',
     dauer: '<h3>Legal basis and retention</h3>', kinder: '<h2>12. ', rechte: '<h2>13. ',
@@ -35,7 +38,10 @@ const FAELLE = [
     karteMuss: 'If you join the world ranking, every signed-in player also sees your username, your banner and your online Elo there',
     ligaMuss: 'If you join the world ranking yourself, every signed-in player sees your online Elo there',
     dauerMuss: 'seasons, world ranking', kinderMuss: 'world ranking', rechteMuss: 'Stop showing me',
-    loeschenMuss: ['season badges', 'season titles', 'participation in the world ranking'] },
+    loeschenMuss: ['season badges', 'season titles', 'participation in the world ranking'],
+    hakenMuss: ['you are at least 16 or that your parents have agreed', 'time of this confirmation'],
+    kinderHaken: 'You confirm this before joining', seasons: '<h3>Seasons</h3>',
+    schalterMuss: 'In the settings, under "Season", you can turn off', karteSchalter: 'unless you have hidden them in the settings' },
 ];
 
 for (const f of FAELLE) {
@@ -50,7 +56,22 @@ for (const f of FAELLE) {
   pruefe(`${f.sprache}: Widerruf nennt den Knopf der Weltrangliste`, teil(html, f.rechte, '<h2>').includes(f.rechteMuss));
   const seite = ohneTags(lies(f.loeschen));
   for (const m of f.loeschenMuss) pruefe(`${f.sprache}: Loeschseite nennt ${m}`, seite.includes(m));
+  // Flos Entscheidungen vom 18.11.2026: Bestaetigung vor dem Mitmachen, Schalter fuer das Season-Abzeichen
+  for (const m of f.hakenMuss) pruefe(`${f.sprache}: Weltrangliste nennt die Bestaetigung: ${m}`, welt.includes(m), welt.slice(0, 500));
+  pruefe(`${f.sprache}: Kinder-Abschnitt nennt die Bestaetigung`, teil(html, f.kinder, '<h2>').includes(f.kinderHaken));
+  pruefe(`${f.sprache}: Seasons nennt den Schalter`, teil(html, f.seasons, '<h3>').includes(f.schalterMuss));
+  pruefe(`${f.sprache}: Visitenkarte nennt den Schalter`, teil(html, f.karte, '<h3>').includes(f.karteSchalter));
 }
+
+// Konto ab 13 (Flo 18.11.2026): kein Text der App nennt mehr 16 als Altersgrenze fuers Spielen
+for (const datei of ['js/pakete/abo/trainer.js', 'js/pakete/abo/texte.js']) {
+  const code = lies(datei);
+  pruefe(`${datei}: Spielen und Lernen ohne Grenze 16`, !/bleiben ab 16 frei|from age 16|Crownmate ist ab 16/.test(code));
+  pruefe(`${datei}: Trainer bleibt ab 18`, /ab 18/.test(code));
+}
+const ligaTexte = lies('js/pakete/liga/texte.js');
+pruefe('App: Bestaetigung auf Deutsch', ligaTexte.includes("'welt.alter': 'Ich bin mindestens 16 oder meine Eltern sind einverstanden.'"));
+pruefe('App: Bestaetigung auf Englisch', ligaTexte.includes("'welt.alter': 'I am at least 16, or my parents have agreed.'"));
 
 console.log(`\n${ok}/${gesamt} Pruefungen bestanden`);
 process.exit(ok === gesamt ? 0 : 1);

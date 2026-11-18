@@ -83,7 +83,8 @@ export function saisonTitel(id) {
   return m ? { id, art: m[1], saison: Number(m[2]) } : null;
 }
 
-// saison_mein_stand: { saison (0 = Vorsaison), start, woche, wochen, ende, bisher, stufe, abzeichen[], titel[], gewaehlt }
+// saison_mein_stand: { saison (0 = Vorsaison), start, woche, wochen, ende, bisher, stufe, abzeichen[], titel[], gewaehlt, sichtbar }
+// sichtbar: null, wenn das SQL das Feld noch nicht kennt (dann gibt es keinen Schalter)
 export function saisonStand(d) {
   if (!d || typeof d !== 'object' || !ganz(d.saison, 0, 9999) || typeof d.start !== 'string' || !DATUM_RE.test(d.start)) return null;
   const laeuft = d.saison > 0;
@@ -95,6 +96,7 @@ export function saisonStand(d) {
     saison: d.saison, start: d.start, woche: laeuft ? d.woche : null, wochen: laeuft ? d.wochen : null, ende: laeuft ? d.ende : null,
     bisher: ganz(d.bisher, 0, MAX_INDEX) ? d.bisher : null, stufe: ganz(d.stufe, 0, MAX_INDEX) ? d.stufe : null,
     abzeichen, titel, gewaehlt: gewaehlt && titel.some((x) => x.id === gewaehlt.id) ? gewaehlt.id : null,
+    sichtbar: typeof d.sichtbar === 'boolean' ? d.sichtbar : null,
   };
 }
 

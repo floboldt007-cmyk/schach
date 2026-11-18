@@ -1,7 +1,8 @@
 // Reiter "Welt" der Bestenliste (Ort bestenliste:reiter, Host js/ui/bestenliste.js; G-006 AC-11, 14.11.2026): die
 // Weltrangliste nach Online-Elo. Der Server entscheidet (weltrang_liste und weltrang_mitmachen in
 // supabase/weltrang-schema.sql), dieser Reiter zeigt nur an. Flos Regeln: nur wer selbst zustimmt (Vorgabe aus), nur
-// bestaetigte Elo ab 15 gewerteten Online-Partien, nur mit Benutzername, ein Banner nur im Besitz.
+// bestaetigte Elo ab 15 gewerteten Online-Partien, nur mit Benutzername, ein Banner nur im Besitz. Mitmachen nur mit dem
+// Haken .lg-welt-alter (Flo 18.11.2026); der Server prueft ihn selbst (WELTRANG_ALTER), der gesperrte Knopf ist nur Hilfe.
 //
 //   reiterWelt() -> { el, verlasse() }   section.bl-reiter.lg-welt[data-reiter="welt"][data-ohne-fenster]
 //   huelleWelt() -> section (leer, hidden)      fuer den Host, solange ein anderer Reiter gewaehlt ist
@@ -107,6 +108,7 @@ export function reiterWelt() {
   let weg = false;
   let rpc = null;
   let beschaeftigt = false;
+  let haken = false;
 
   const karte = (zustand, text, link) => {
     s.innerHTML = `<article class="lg-gr-karte" data-zustand="${zustand}"><span class="lg-gr-karte-symbol" aria-hidden="true">${icon('krone')}</span>
@@ -119,7 +121,8 @@ export function reiterWelt() {
     const stand = standText(lage);
     const knopf = lage.teilnahme
       ? `<button class="knopf lg-welt-austreten" type="button">${esc(T('austreten'))}</button>`
-      : `<button class="knopf primaer lg-welt-mitmachen" type="button">${esc(T('mitmachen'))}</button>`;
+      : `<label class="lg-welt-alter"><input type="checkbox"${haken ? ' checked' : ''}><span>${esc(T('alter'))}</span></label>
+        <button class="knopf primaer lg-welt-mitmachen" type="button"${haken ? '' : ' disabled'}>${esc(T('mitmachen'))}</button>`;
     const oben = lage.teilnahme
       ? (lage.ich.status === 'dabei' ? platzKarte(lage, stand)
         : `${stand ? `<p class="lg-welt-stand" data-status="${lage.ich.status}">${esc(stand)}</p>` : ''}`)
@@ -134,19 +137,26 @@ export function reiterWelt() {
   }
 
   let lage = null;
+  s.addEventListener('change', (e) => {
+    if (!e.target.matches('.lg-welt-alter input')) return;
+    haken = e.target.checked;
+    const k = s.querySelector('.lg-welt-mitmachen');
+    if (k) k.disabled = !haken;
+  });
   s.addEventListener('click', (e) => {
     const k = e.target.closest('.lg-welt-mitmachen, .lg-welt-austreten');
     if (!k || !rpc || beschaeftigt) return;
     beschaeftigt = true;
     k.disabled = true;
     const an = k.classList.contains('lg-welt-mitmachen');
-    rpc('weltrang_mitmachen', { an }).then((d) => {
+    rpc('weltrang_mitmachen', an ? { an, alter_bestaetigt: true } : { an }).then((d) => {
       const neu = weltLage(Array.isArray(d) ? d[0] : d);
       if (!neu) throw new Error('Weltrangliste unbrauchbar');
       if (weg) return;
       lage = neu;
+      haken = false;
       zeichne(lage);
-      s.querySelector(an ? '.lg-welt-austreten' : '.lg-welt-mitmachen')?.focus();
+      s.querySelector(an ? '.lg-welt-austreten' : '.lg-welt-alter input')?.focus();
     }).catch(() => {
       if (weg || !lage) return;
       zeichne(lage, T('fehlerAktion'));

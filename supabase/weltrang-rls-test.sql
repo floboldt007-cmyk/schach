@@ -3,7 +3,7 @@
 -- Lauf mit ROLLBACK.
 -- Abschnitte: 1 ohne Zustimmung niemand; 2 nur ab 15 Partien und mit Name, fremdes Banner als 'start';
 -- 2b Start-Elo selbst gesetzt erst ab 30 Partien (D 29 nicht, E 30 drin, F 15 ohne Startwert drin);
--- 3 keine Tabellenrechte, anon darf nichts; 4 Zuruecknehmen wirkt sofort.
+-- 3 keine Tabellenrechte, anon darf nichts; 4 Zuruecknehmen wirkt sofort; 5 Altersbestaetigung.
 begin;
 
 insert into auth.users (id, email)
@@ -49,7 +49,7 @@ $$;
 -- ---------- 2. Zustimmung: A (15 Partien) erscheint, B (14) nicht, C (ohne Name) nicht ----------
 do $$
 declare
-  l jsonb := public.weltrang_mitmachen(true);
+  l jsonb := public.weltrang_mitmachen(true, true);
   z jsonb;
 begin
   select x into z from jsonb_array_elements(l->'liste') x where x->>'name' = 'weltrang_probe_a';
@@ -65,7 +65,7 @@ $$;
 select set_config('request.jwt.claims', '{"sub":"b2b2b2b2-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
 do $$
 declare
-  l jsonb := public.weltrang_mitmachen(true);
+  l jsonb := public.weltrang_mitmachen(true, true);
 begin
   if l->'ich'->>'status' <> 'zaehlt_noch' or (l->'ich'->>'fehlen')::int <> 1
      or exists (select 1 from jsonb_array_elements(l->'liste') z where z->>'name' = 'weltrang_probe_b') then
@@ -76,7 +76,7 @@ $$;
 select set_config('request.jwt.claims', '{"sub":"c3c3c3c3-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
 do $$
 declare
-  l jsonb := public.weltrang_mitmachen(true);
+  l jsonb := public.weltrang_mitmachen(true, true);
 begin
   if l->'ich'->>'status' <> 'ohne_name' or jsonb_array_length(l->'liste') > 100 then
     raise exception 'FEHLER: C ohne Name falsch (%)', l;
@@ -88,7 +88,7 @@ $$;
 select set_config('request.jwt.claims', '{"sub":"d4d4d4d4-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
 do $$
 declare
-  l jsonb := public.weltrang_mitmachen(true);
+  l jsonb := public.weltrang_mitmachen(true, true);
 begin
   if (l->>'ab_start')::int <> 30 or l->'ich'->>'status' <> 'zaehlt_noch' or (l->'ich'->>'fehlen')::int <> 1
      or exists (select 1 from jsonb_array_elements(l->'liste') z where z->>'name' = 'weltrang_probe_d') then
@@ -99,7 +99,7 @@ $$;
 select set_config('request.jwt.claims', '{"sub":"e5e5e5e5-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
 do $$
 declare
-  l jsonb := public.weltrang_mitmachen(true);
+  l jsonb := public.weltrang_mitmachen(true, true);
 begin
   if l->'ich'->>'status' <> 'dabei'
      or not exists (select 1 from jsonb_array_elements(l->'liste') z where z->>'name' = 'weltrang_probe_e') then
@@ -110,7 +110,7 @@ $$;
 select set_config('request.jwt.claims', '{"sub":"f6f6f6f6-ffff-4fff-8fff-ffffffffffff","role":"authenticated"}', true);
 do $$
 declare
-  l jsonb := public.weltrang_mitmachen(true);
+  l jsonb := public.weltrang_mitmachen(true, true);
 begin
   if l->'ich'->>'status' <> 'dabei'
      or not exists (select 1 from jsonb_array_elements(l->'liste') z where z->>'name' = 'weltrang_probe_f') then
@@ -150,7 +150,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 do $$
 declare
-  l jsonb := public.weltrang_mitmachen(false);
+  l jsonb := public.weltrang_mitmachen(false, false);
 begin
   if (l->>'teilnahme')::boolean or l->'ich'->>'status' <> 'nicht_dabei'
      or exists (select 1 from jsonb_array_elements(l->'liste') z where z->>'name' = 'weltrang_probe_a') then
@@ -163,6 +163,27 @@ do $$
 begin
   if exists (select 1 from public.weltrang_teilnahme where user_id = 'a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
     raise exception 'FEHLER: Zuruecknehmen hat die Zeile nicht geloescht';
+  end if;
+end;
+$$;
+
+-- ---------- 5. Ohne Altersbestaetigung lehnt der Server ab, mit ihr speichert er den Zeitpunkt ----------
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+begin
+  perform public.weltrang_mitmachen(true, false);
+  raise exception 'FEHLER: Mitmachen ohne Bestaetigung ging durch';
+exception when others then
+  if sqlerrm not like '%WELTRANG_ALTER%' then raise; end if;
+end;
+$$;
+do $$ begin perform public.weltrang_mitmachen(true, true); end; $$;
+reset role;
+do $$
+begin
+  if not exists (select 1 from public.weltrang_teilnahme where user_id = 'a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and alter_bestaetigt_am is not null) then
+    raise exception 'FEHLER: Zeitpunkt der Bestaetigung fehlt';
   end if;
 end;
 $$;

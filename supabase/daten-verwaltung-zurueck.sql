@@ -28,7 +28,7 @@ declare
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
   duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
-  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null);
+  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null, 'sichtbar', true);
   raetsel jsonb;
 begin
   if uid is null then
@@ -155,7 +155,8 @@ begin
   end if;
   -- Weltrangliste (weltrang-schema.sql, 14.11.2026): ob und seit wann du in der Weltrangliste gezeigt werden willst
   if to_regclass('public.weltrang_teilnahme') is not null then
-    execute 'select jsonb_build_object(''teilnahme'', t.user_id is not null, ''seit'', t.seit)
+    execute 'select jsonb_build_object(''teilnahme'', t.user_id is not null, ''seit'', t.seit,
+               ''alter_bestaetigt_am'', to_jsonb(t) -> ''alter_bestaetigt_am'')
              from (select 1) x left join public.weltrang_teilnahme t on t.user_id = $1'
       into raetsel using uid;
     kronen := kronen || jsonb_build_object('weltrang', raetsel);
@@ -180,7 +181,8 @@ begin
                  from public.saison_abzeichen a where a.user_id = $1), ''[]''::jsonb),
                ''titel'', coalesce((select jsonb_agg(jsonb_build_object(''saison'', t.saison, ''art'', t.art) order by t.saison, t.art)
                  from public.saison_titel t where t.user_id = $1), ''[]''::jsonb),
-               ''gewaehlt'', (select w.titel from public.saison_wahl w where w.user_id = $1))'
+               ''gewaehlt'', (select w.titel from public.saison_wahl w where w.user_id = $1),
+               ''sichtbar'', coalesce((select (to_jsonb(w) ->> ''sichtbar'')::boolean from public.saison_wahl w where w.user_id = $1), true))'
       into saison using uid;
   end if;
   -- Raetsel-Duell (raetsel-duell-schema.sql): die eigenen Duelle mit dem eigenen Stand darin und die laufende Suche.

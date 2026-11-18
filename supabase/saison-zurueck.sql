@@ -68,6 +68,7 @@ revoke all on function public.liga_abrechnen() from public, anon, authenticated;
 
 drop function if exists public.saison_karte_der_partie(uuid);
 drop function if exists public.saison_karte_von(uuid);
+drop function if exists public.saison_sichtbar_setzen(boolean);
 drop function if exists public.saison_titel_waehle(text);
 drop function if exists public.saison_mein_stand();
 drop function if exists public.saison_abrechnen();
@@ -230,7 +231,8 @@ begin
   end if;
   -- Weltrangliste (weltrang-schema.sql, 14.11.2026): ob und seit wann du in der Weltrangliste gezeigt werden willst
   if to_regclass('public.weltrang_teilnahme') is not null then
-    execute 'select jsonb_build_object(''teilnahme'', t.user_id is not null, ''seit'', t.seit)
+    execute 'select jsonb_build_object(''teilnahme'', t.user_id is not null, ''seit'', t.seit,
+               ''alter_bestaetigt_am'', to_jsonb(t) -> ''alter_bestaetigt_am'')
              from (select 1) x left join public.weltrang_teilnahme t on t.user_id = $1'
       into raetsel using uid;
     kronen := kronen || jsonb_build_object('weltrang', raetsel);
