@@ -12,6 +12,14 @@ export function stelleAusStapel(stapel, meldung = '') {
   return stelle.replace(/https?:\/\/[^/]+/, '');
 }
 
+// WebKit meldet einen beim Neuladen abgebrochenen Abruf als "[Vorsatz] <Adresse> due to access control checks." (CI 31.10.2026,
+// PR #120). Still nur, wenn GENAU das Adress-Wort vor "due to" mit der eigenen Herkunft `eigen` beginnt; irgendwo in der
+// Meldung genuegt nicht (fc-18:11 Zusatz 8: fremde Adresse mit der eigenen im Abfrage-Teil).
+export function eigenerZugriffsAbbruch(meldung, eigen) {
+  const t = String(meldung).match(/(\S+) due to access control checks\.?$/);
+  return !!t && t[1].startsWith(eigen);
+}
+
 // Worker-Wechsel: endet der alte Service Worker, waehrend die Testanfrage durch ihn laeuft, meldet WebKit (CI, Linux) das
 // dreimal: requestfailed "Service Worker context closed" mit Adresse, dazu pageerror und Konsole ohne Adresse. Nur die
 // Testanfrage (`istTestAnfrage(url)`, der Test baut sie selbst) zaehlt dann wie ein Abbruch beim Neuladen; jede andere Datei,

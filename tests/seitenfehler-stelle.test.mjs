@@ -1,7 +1,7 @@
 // Stellen-Suche fuer Seitenfehler (tests/seitenfehler-stelle.mjs): aus dem Stapel eines pageerror die erste Code-Stelle,
 // damit ein Seitenfehler im CI-Protokoll sagt, ob er aus der App oder aus einem Skript des Tests kommt (Diagnose M-14:30).
 // Stapel in beiden Schreibweisen: Chromium ("    at f (url:z:s)") und WebKit ("f@url:z:s"). Reiner Node-Test, kein Browser.
-import { stelleAusStapel, swWechselFilter } from './seitenfehler-stelle.mjs';
+import { stelleAusStapel, swWechselFilter, eigenerZugriffsAbbruch } from './seitenfehler-stelle.mjs';
 
 const ergebnisse = [];
 function pruefe(name, ok, detail = '') {
@@ -140,6 +140,21 @@ const TESTANFRAGE = (u) => u.startsWith(EIGEN) && /\/__langsam\?/.test(u);
   f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
   f.melde('konsole', 'Failed to load resource: ' + ZU, 'https://fremd.example/y', 'Failed to load resource: ' + ZU + ' @ https://fremd.example/y', fehler);
   pruefe('Gegenprobe: Konsolenmeldung mit fremder Adresse bleibt rot', fehler.length === 1, fehler);
+}
+
+// WebKit: abgebrochener Abruf beim Neuladen als "<Adresse> due to access control checks." (fc-18:11 Zusatz 8: frueher
+// genuegte, dass die eigene Adresse IRGENDWO in der Meldung stand)
+{
+  const EIGEN = 'http://127.0.0.1:4321/';
+  const fall = (name, meldung, soll) => pruefe(name, eigenerZugriffsAbbruch(meldung, EIGEN) === soll, { meldung, soll });
+  fall('eigene Adresse vor "due to": still', 'http://127.0.0.1:4321/schach/klaenge/zug.mp3 due to access control checks.', true);
+  fall('mit WebKit-Vorsatz "Fetch API cannot load": still', 'Fetch API cannot load http://127.0.0.1:4321/schach/a.mp3 due to access control checks.', true);
+  fall('Gegenprobe: fremde Adresse mit der eigenen im Abfrage-Teil bleibt rot',
+    'https://boese.example/x?zurueck=http://127.0.0.1:4321/ due to access control checks.', false);
+  fall('Gegenprobe: anderer Port bleibt rot', 'http://127.0.0.1:43210/schach/a.mp3 due to access control checks.', false);
+  fall('Gegenprobe: eigene Adresse vorn, fremde vor "due to" bleibt rot',
+    'Fetch API cannot load http://127.0.0.1:4321/ -> https://fremd.example/a.js due to access control checks.', false);
+  fall('Gegenprobe: anderer Fehler mit eigener Adresse bleibt rot', 'http://127.0.0.1:4321/schach/a.mp3 not found', false);
 }
 
 const gut = ergebnisse.filter((e) => e.ok).length;

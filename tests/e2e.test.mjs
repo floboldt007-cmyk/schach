@@ -22,7 +22,7 @@ import { readFileSync, statSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { leseSw } from './sw.test.mjs';
 import { browserTyp } from './browser.mjs';
-import { stelleAusStapel, swWechselFilter } from './seitenfehler-stelle.mjs';
+import { stelleAusStapel, swWechselFilter, eigenerZugriffsAbbruch } from './seitenfehler-stelle.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -141,8 +141,8 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
       // WebKit meldet einen beim Neuladen abgebrochenen Abruf der eigenen Seite (z. B. ein Klang, der gerade laedt, waehrend
       // die neue Version uebernimmt) als "<Adresse> due to access control checks." statt "Load request cancelled" (CI
       // 31.10.2026, PR #120, zweimal mit verschiedenen Klaengen). Wie unten bei requestfailed kein Fehler; Abrufe anderer
-      // Adressen bleiben einer.
-      if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
+      // Adressen bleiben einer (Adress-Wort vor "due to" beginnt mit der eigenen Herkunft, nicht nur irgendwo enthalten).
+      if (eigenerZugriffsAbbruch(e.message, `http://127.0.0.1:${PORT}/`)) return;
       // die erste Stelle aus dem Stapel: kommt der Fehler aus der App oder aus einem Skript des Tests?
       const stelle = stelleAusStapel(e.stack, e.message);
       swWechsel.melde('seite', e.message, '', 'Seitenfehler: ' + e.message + (stelle ? ' [' + stelle + ']' : ''), fehler);
