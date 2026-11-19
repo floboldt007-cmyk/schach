@@ -159,6 +159,14 @@ const TESTANFRAGE = (u) => u.startsWith(EIGEN) && /\/__langsam\?/.test(u);
   fall('Gegenprobe: eigene Adresse vorn, fremde vor "due to" bleibt rot',
     'Fetch API cannot load http://127.0.0.1:4321/ -> https://fremd.example/a.js due to access control checks.', false);
   fall('Gegenprobe: anderer Fehler mit eigener Adresse bleibt rot', 'http://127.0.0.1:4321/schach/a.mp3 not found', false);
+  // Nachpruefung 3 (19.11.): B1 nur http(s)/ws(s) gilt als Schema; B2 Port-Grenze unabhaengig vom Schraegstrich in `eigen`
+  fall('Gegenprobe B1: fremdes "boese:" vor der eigenen Adresse bleibt rot', 'boese:127.0.0.1:4321/a.mp3 due to access control checks.', false);
+  fall('Gegenprobe B1: fremder Rechner "boese.example:" davor bleibt rot', 'boese.example:127.0.0.1:4321/a.mp3 due to access control checks.', false);
+  const ohneStrich = (meldung) => eigenerZugriffsAbbruch(meldung, 'http://127.0.0.1:4321');
+  pruefe('Gegenprobe B2: Port 43210 gegen eigen ohne Schraegstrich bleibt rot',
+    ohneStrich('/127.0.0.1:43210/a.mp3 due to access control checks.') === false);
+  pruefe('B2: eigen ohne Schraegstrich, eigene Adresse still', ohneStrich('/127.0.0.1:4321/a.mp3 due to access control checks.') === true);
+  pruefe('B2: Adresse endet direkt nach dem Port: still', ohneStrich('http://127.0.0.1:4321 due to access control checks.') === true);
 }
 
 const gut = ergebnisse.filter((e) => e.ok).length;

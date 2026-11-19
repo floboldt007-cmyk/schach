@@ -16,10 +16,14 @@ export function stelleAusStapel(stapel, meldung = '') {
 // PR #120). Still nur, wenn GENAU das Adress-Wort vor "due to" mit der eigenen Herkunft `eigen` beginnt; irgendwo in der
 // Meldung genuegt nicht (fc-18:11 Zusatz 8: fremde Adresse mit der eigenen im Abfrage-Teil). Playwright-WebKit schreibt die
 // Adresse ohne Schema ("/127.0.0.1:PORT/..."), darum zaehlen Rechner und Port ab dem Anfang, Schema und Schraegstriche nicht.
+// Nachpruefung 3: als Schema gilt nur http(s)/ws(s) (sonst waere "boese:127.0.0.1:PORT/" die eigene), und hinter dem Port muss
+// "/" oder das Ende kommen, auch wenn `eigen` ohne Schraegstrich endet (sonst zaehlte Port 43210 als 4321).
 export function eigenerZugriffsAbbruch(meldung, eigen) {
   const t = String(meldung).match(/(\S+) due to access control checks\.?$/);
-  const rechner = (u) => u.replace(/^[a-z][a-z0-9+.-]*:/i, '').replace(/^\/+/, '');
-  return !!t && rechner(t[1]).startsWith(rechner(eigen));
+  const rechner = (u) => u.replace(/^(?:https?|wss?):/i, '').replace(/^\/+/, '');
+  if (!t) return false;
+  const adresse = rechner(t[1]), herkunft = rechner(eigen).replace(/\/+$/, '');
+  return adresse.startsWith(herkunft) && /^(\/|$)/.test(adresse.slice(herkunft.length));
 }
 
 // Worker-Wechsel: endet der alte Service Worker, waehrend die Testanfrage durch ihn laeuft, meldet WebKit (CI, Linux) das
