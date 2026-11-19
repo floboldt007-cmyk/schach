@@ -1,6 +1,7 @@
-// R19 Schalter "Paket 2" (Weltrangliste und Seasons): beides geht erst nach der Rechtspruefung live, die SQL dazu ist nicht
-// eingespielt. Vorgabe aus: kein Welt-Reiter, kein Season-Bereich, kein Season-Abzeichen, kein Aufruf der Server-Funktionen.
-// An nur im Testbetrieb auf dem eigenen Rechner (127.0.0.1 oder localhost, ?test und &paket2). Ohne Browser.
+// R19 Schalter "Paket 2" (Weltrangliste und Seasons), Stand R20: an, auf jeder Adresse und ohne &paket2 (Flos Weg ohne
+// Kanzlei, 19.11.2026: nur ab 16, Anzeige fuer den Gegner anfangs aus; das pruefen der Server und tests/r19-saison.test.mjs).
+// Live erst nach Flos SQL (supabase/ANLEITUNG.md). Welt-Reiter, Season-Bereich und Server-Aufrufe sind da. Ohne Browser:
+//   PAKET2_OHNE_BROWSER=1 node tests/r19-paket2-schalter.test.mjs
 //   node tests/r19-paket2-schalter.test.mjs
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,34 +20,23 @@ function pruefe(name, bedingung, info) {
 let paket2Frei = null;
 try { ({ paket2Frei } = await import(pathToFileURL(path.join(WURZEL, 'js/freigaben.js')).href)); } catch (e) { /* unten rot */ }
 pruefe('js/freigaben.js bietet paket2Frei an', typeof paket2Frei === 'function');
-if (paket2Frei) {
-  for (const [ort, soll, was] of [
-    [{ hostname: '127.0.0.1', search: '?test&paket2' }, true, 'Testbetrieb auf 127.0.0.1'],
-    [{ hostname: 'localhost', search: '?paket2&test' }, true, 'Testbetrieb auf localhost'],
-    [{ hostname: '127.0.0.1', search: '?test' }, false, 'nur ?test'],
-    [{ hostname: '127.0.0.1', search: '?paket2' }, false, 'nur &paket2'],
-    [{ hostname: '127.0.0.1', search: '?testen&paket2' }, false, 'aehnlicher Name statt ?test'],
-    [{ hostname: '127.0.0.1', search: '?test&paket22' }, false, 'aehnlicher Name statt paket2'],
-    [{ hostname: 'crownmate.de', search: '?test&paket2' }, false, 'echte Domain'],
-    [{ hostname: 'floboldt007-cmyk.github.io', search: '?test&paket2' }, false, 'GitHub Pages'],
-    [{ hostname: '127.0.0.1.crownmate.de', search: '?test&paket2' }, false, 'Domain, die mit 127.0.0.1 beginnt'],
-    [{ hostname: '', search: '' }, false, 'leere Adresse'],
-  ]) pruefe(`Schalter ${soll ? 'an' : 'aus'}: ${was}`, paket2Frei(ort) === soll);
-  pruefe('Schalter aus: ohne Adresse (Node, kein location)', paket2Frei() === false);
-}
+pruefe('Schalter an: ohne Adresse (Node, kein location)', paket2Frei?.() === true);
+// an auf jeder Adresse: der Code (ohne Kommentare) liest keine Adresse mehr, also auch crownmate.de und GitHub Pages
+pruefe('Schalter haengt an keiner Adresse', !/location|hostname|URLSearchParams|search/.test(lies('js/freigaben.js').replace(/\/\/.*$/gm, '')));
 
-// 2) Vorgabe aus: der Client ruft die Server-Funktionen nicht auf
+// 2) An: der Client ruft die Server-Funktionen auf
 const aufrufe = [];
 globalThis.fetch = async (url) => { aufrufe.push(String(url)); return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }); };
 const speicher = new Map([['schach-arena:konto:sitzung', JSON.stringify({ access_token: 'a.e30.x', refresh_token: 'r', expires_at: 9999999999, user: { id: 'u1' } })]]);
 globalThis.localStorage = { getItem: (k) => speicher.get(k) ?? null, setItem: (k, v) => speicher.set(k, String(v)), removeItem: (k) => speicher.delete(k) };
 const kronen = await import(pathToFileURL(path.join(WURZEL, 'js/kronen.js')).href);
 const karte = await import(pathToFileURL(path.join(WURZEL, 'js/karte.js')).href);
-pruefe('Aus: holeSaison liefert null', await kronen.holeSaison() === null);
-const titel = await kronen.waehleSaisonTitel('crownmaster-s1').then(() => 'angenommen', () => 'abgelehnt');
-pruefe('Aus: waehleSaisonTitel lehnt ab', titel === 'abgelehnt', titel);
+await kronen.holeSaison();
+await kronen.waehleSaisonTitel('crownmaster-s1').catch(() => {});
 await karte.karteDerPartie('partie-1', { frist: 200 });
-pruefe('Aus: kein Aufruf von saison_mein_stand, saison_titel_waehle, saison_karte_der_partie', !aufrufe.some((u) => /\/rpc\/saison_/.test(u)), aufrufe);
+for (const f of ['saison_mein_stand', 'saison_titel_waehle', 'saison_karte_der_partie']) {
+  pruefe(`An: Aufruf von ${f}`, aufrufe.some((u) => u.includes('/rpc/' + f)), aufrufe);
+}
 
 // 3) Die Stellen in der App haengen am Schalter
 const index = lies('js/pakete/liga/index.js');
@@ -133,40 +123,34 @@ if (!process.env.PAKET2_OHNE_BROWSER) {
       const alleLigen = (s) => s.evaluate(() => { import('/js/pakete/liga/saison.js').then((m) => { m.zeigeLigen(16); }); })
         .then(() => s.waitForSelector('.ss-ligen-blatt .ss-ligen-liga', { timeout: 15000 }));
 
+      // ohne &paket2: genau die Adresse der echten Seite (nur ?test fuer den Testbetrieb)
       const liga = await seite('', '#bestenliste');
       await liga.s.waitForSelector('.bl-steuer-reiter', { timeout: 20000 });
       const reiter = await liga.s.locator('.bl-steuer-reiter .seg').evaluateAll((l) => l.map((e) => e.dataset.wert));
-      pruefe(`Browser ${sprache}: kein Welt-Reiter`, reiter.length > 0 && !reiter.includes('welt'), reiter);
-      let text = await sichtbar(liga.s);
-      pruefe(`Browser ${sprache}: Liga ohne Season-Woerter`, !VERBOTEN.test(text), text.match(VERBOTEN)?.[0]);
+      pruefe(`Browser ${sprache}: Welt-Reiter ist da, als letzter`, reiter.at(-1) === 'welt', reiter);
+      await liga.s.locator('.bl-steuer-reiter .seg[data-wert="welt"]').click();
+      await liga.s.waitForTimeout(1500);
+      pruefe(`Browser ${sprache}: Welt-Reiter fragt die Weltrangliste ab`, liga.server2.some((u) => u.includes('/rpc/weltrang_liste')), liga.server2);
+      pruefe(`Browser ${sprache}: Welt-Reiter ruft mitmachen nicht von selbst`, !liga.server2.some((u) => u.includes('/rpc/weltrang_mitmachen')), liga.server2);
       await alleLigen(liga.s);
-      text = await sichtbar(liga.s);
-      pruefe(`Browser ${sprache}: Alle Ligen ohne Season-Woerter`, !VERBOTEN.test(text), text.match(VERBOTEN)?.[0]);
-      pruefe(`Browser ${sprache}: Alle Ligen zeigt weiter alle sechs Ligen mit Satz`,
-        await liga.s.locator('.ss-ligen-blatt .ss-ligen-satz').evaluateAll((l) => l.length === 6 && l.every((e) => e.textContent.trim().length > 20)));
-      pruefe(`Browser ${sprache}: Liga ruft keine Season- und Welt-Funktion`, liga.server2.length === 0, liga.server2);
+      const text = await sichtbar(liga.s);
+      pruefe(`Browser ${sprache}: Alle Ligen nennt den Crownmaster und die Season-Regel`,
+        /Crownmaster/.test(text) && await liga.s.locator('.ss-ligen-blatt .ss-ligen-regel').count() === 1);
       await liga.kontext.close();
 
       const profil = await seite('', '#ich');
       await profil.s.waitForSelector('.pr-karte', { timeout: 20000 });
-      text = await sichtbar(profil.s);
-      pruefe(`Browser ${sprache}: Profil ohne Season-Woerter`, !VERBOTEN.test(text), text.match(VERBOTEN)?.[0]);
-      pruefe(`Browser ${sprache}: Profil ohne Season-Leiste und ohne Aufruf`, await profil.s.locator('.ss-leiste').count() === 0 && profil.server2.length === 0, profil.server2);
+      pruefe(`Browser ${sprache}: Profil fragt den eigenen Season-Stand ab`, profil.server2.some((u) => u.includes('/rpc/saison_mein_stand')), profil.server2);
       await profil.kontext.close();
 
       const einstellungen = await seite('', '#start');
       await einstellungen.s.evaluate(() => window.__app.gehe('einstellungen'));
       await einstellungen.s.waitForSelector('.es-screen:not([hidden])', { timeout: 20000 });
       await einstellungen.s.waitForTimeout(800);
-      text = await sichtbar(einstellungen.s);
-      pruefe(`Browser ${sprache}: Einstellungen ohne Season-Woerter`, text.length > 100 && !VERBOTEN.test(text), text.match(VERBOTEN)?.[0]);
+      pruefe(`Browser ${sprache}: Einstellungen fragen den Season-Stand ab, schalten aber nichts`,
+        einstellungen.server2.some((u) => u.includes('/rpc/saison_mein_stand')) && !einstellungen.server2.some((u) => u.includes('/rpc/saison_sichtbar_setzen')),
+        einstellungen.server2);
       await einstellungen.kontext.close();
-
-      // Gegenprobe: mit Schalter ist der Satz da, die Suche oben ist also nicht blind
-      const an = await seite('&paket2', '#bestenliste');
-      await alleLigen(an.s);
-      pruefe(`Browser ${sprache}: mit Schalter nennt Alle Ligen den Crownmaster`, /Crownmaster/.test(await sichtbar(an.s)));
-      await an.kontext.close();
     }
   } finally {
     await browser.close();
