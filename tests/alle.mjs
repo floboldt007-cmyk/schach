@@ -169,6 +169,8 @@ const SUITEN = [
   { name: 'app', datei: 'app.test.mjs', args: SCHNELL ? ['--schnell'] : [], was: 'Arena, Partie, Ergebnis' },
   { name: 'screens', datei: 'screens.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Analyse, Verlauf, Einstellungen' },
   { name: 'e2e', datei: 'e2e.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], exklusiv: 'Browser-Zeitfenster unter CPU-Last', was: 'Ganzer Ablauf, offline, Update' },
+  // ersetzt tests/webkit.test.mjs (fc-18:11 Zusatz 12): dieselbe Partie wie e2e auf dem iPhone 13, in CI auch unter WebKit
+  { name: 'e2e-iphone', datei: 'e2e.test.mjs', args: ['--iphone', '--ohne-bilder'], exklusiv: 'Browser-Zeitfenster unter CPU-Last', was: 'Sieg gegen Lukas, Analyse, Verlauf, Einstellungen auf dem iPhone 390' },
   { name: 'notfall', datei: 'notfall.test.mjs', args: [], exklusiv: 'Zeitgrenzen 3 s und 15 s', was: 'Notfall-Wächter: Reparieren, wenn die App nicht startet' },
   { name: 'bericht', datei: 'bericht.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster unter CPU-Last', was: 'Tester-Bericht: Fehlerprotokoll (nur lokal), Bericht ansehen, kopieren, teilen' },
   { name: 'native', datei: 'native.test.mjs', args: [], was: 'App-Store-Huelle (Capacitor): Konfiguration, Kopie der Web-App' },
@@ -218,7 +220,7 @@ const DAUERN = new Map([
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
   ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['bot-grenze', 8],
-  ['heim', 60], ['brettgroesse', 49],
+  ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24],
 ]);
 
 function teile(suiten, anzahl) {

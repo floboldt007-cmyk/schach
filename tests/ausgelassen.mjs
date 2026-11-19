@@ -4,6 +4,6 @@
 export const AUSGELASSEN = [
   { datei: 'r17-ende-pc.test.mjs', grund: 'lokal gruen 92/92, braucht aber Git-Geschichte (git show BASIS_REF dbe3c55); die CI holt nur den letzten Commit' },
   { datei: 'dialog-zuklappen.test.mjs', grund: 'ROT seit mind. 19.11.2026: findet .zz-brett .feld[data-feld="f2"] nicht (Timeout 15 s), Ursache offen' },
-  { datei: 'webkit.test.mjs', grund: 'ROT und veraltet: wartet auf .screen.arena [data-aktion="verlauf"], den die Arena nicht mehr hat; WebKit deckt e2e ab' },
+  { datei: 'webkit.test.mjs', grund: 'ersetzt durch e2e-iphone (e2e.test.mjs --iphone); war rot: suchte den Verlauf im Arena-Kopf, auf dem Handy liegt er bei Ich' },
   { datei: 'rundgang.test.mjs', grund: 'kein Test: Bild-Rundgang fuer den Look "Modern und klar" ohne eine einzige Pruefung, legt nur Bilder ab' },
 ];

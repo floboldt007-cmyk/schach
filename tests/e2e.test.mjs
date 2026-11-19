@@ -12,6 +12,8 @@
 //   node tests/e2e.test.mjs
 //   node tests/e2e.test.mjs --ohne-bilder       ohne die Schluss-Bilder
 //   node tests/e2e.test.mjs --bilder=/pfad      Bilder woanders hin
+//   node tests/e2e.test.mjs --iphone            nur Sieg gegen Lukas, Analyse, Verlauf, Einstellungen auf dem iPhone 13
+//                                               (390x844, 3-fach, Touch; ersetzt tests/webkit.test.mjs, Suite e2e-iphone)
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
 import http from 'node:http';
@@ -32,9 +34,11 @@ const APP = START + '?test&sw';
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots');
 const OHNE_BILDER = process.argv.includes('--ohne-bilder');
+const IPHONE = process.argv.includes('--iphone');
 mkdirSync(BILDER, { recursive: true });
 
 const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
 // Schaefermatt aus der Grundstellung (wertende Partie): Flo zieht SCHAEFER_ZUEGE, der Bot antwortet nach Plan.
 // Seit Runde 4 wertet eine Partie aus einer eigenen Stellung nicht mehr (keine Sterne, keine Freischaltung),
 // deshalb gewinnt der Ablauf nicht mehr mit einem Matt in 1 aus einer Stellung.
@@ -115,10 +119,10 @@ function pruefe(name, ok, detail = '') {
 }
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
-  const kontext = await browser.newContext({
-    viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: false, userAgent: IPAD_UA,
-  });
+async function neuerKontext(browser, { w = 1180, h = 820, iphone = false } = {}) {
+  const kontext = await browser.newContext(iphone
+    ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true, userAgent: IPHONE_UA }
+    : { viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: false, userAgent: IPAD_UA });
   kontext.setDefaultTimeout(30000);
   kontext.setDefaultNavigationTimeout(30000);
   const fehler = [];
@@ -475,7 +479,15 @@ async function testeSieg(seite, h, fehler) {
 // ---------- 3. Verlauf und Einstellungen ----------
 async function testeVerlaufEinstellungen(seite, h, fehler, id) {
   gruppe = 'Verlauf';
-  await h.tippe('.screen.arena [data-aktion="verlauf"]');
+  // auf dem Handy steht der Verlauf nicht im Kopf der Arena, sondern im Kopf von "Ich" (js/ui/ich.js, css/navigation.css)
+  if (IPHONE) {
+    pruefe('iPhone: kein Verlauf-Knopf im Kopf der Arena', !(await seite.locator('.screen.arena [data-aktion="verlauf"]').isVisible()));
+    await h.tippe('.reiter-leiste [data-reiter="ich"]');
+    await h.screen('ich');
+    await h.tippe('.sa-screen .haupt-kopf [data-aktion="verlauf"]');
+  } else {
+    await h.tippe('.screen.arena [data-aktion="verlauf"]');
+  }
   await h.screen('verlauf');
   pruefe('Hash #verlauf', (await h.hash()) === '#verlauf');
   pruefe('Eine Partie in der Liste', await seite.locator('.vl-zeile').count() === 1);
@@ -490,6 +502,11 @@ async function testeVerlaufEinstellungen(seite, h, fehler, id) {
   await h.screen('verlauf');
   pruefe('Zurück: wieder im Verlauf', (await h.hash()) === '#verlauf');
   await h.tippe('.screen [data-aktion="zurueck"]');
+  if (IPHONE) {
+    await h.screen('ich');
+    pruefe('Zurück: Ich', (await h.hash()) === '#ich');
+    await h.tippe('.reiter-leiste [data-reiter="arena"]');
+  }
   await h.screen('arena');
   pruefe('Zurück: Arena', (await h.hash()) === '#arena');
 
@@ -497,6 +514,13 @@ async function testeVerlaufEinstellungen(seite, h, fehler, id) {
   await h.tippe('.screen.arena [data-aktion="einstellungen"]');
   await h.screen('einstellungen');
   pruefe('Hash #einstellungen', (await h.hash()) === '#einstellungen');
+  // auf dem Handy sind die Einstellungen eine Liste, ein Bereich oeffnet sich erst per Tipp als eigene Seite (js/ui/einstellungen.js)
+  const bereich = async (name) => {
+    if (!IPHONE) return;
+    if (!(await seite.locator('.es-screen.es-liste').count())) await h.tippe('.es-screen .kopf [data-aktion="liste"]');
+    await h.tippe(`.es-nav-punkt[data-seite="${name}"]`);
+  };
+  await bereich('anzeige');
   // Brett, Figuren und Klaenge waehlt man seit 31.10.2026 nur in der Sammlung (Flo: nichts doppelt); die Zeile fuehrt hin
   await h.tippe('.es-zur-sammlung');
   await h.screen('ich');
@@ -507,13 +531,16 @@ async function testeVerlaufEinstellungen(seite, h, fehler, id) {
   await seite.goBack();
   await h.screen('einstellungen');
   pruefe('Kein Brett mehr in den Einstellungen', await seite.locator('.es-brett').count() === 0);
+  await bereich('klang');
   await h.tippe('.es-schalter[data-key="klang"]');
   pruefe('Klang aus', await seite.locator('.es-schalter[data-key="klang"][aria-checked="false"]').count() === 1);
   await seite.reload();
   await h.screen('einstellungen');
   pruefe('Neuladen: Einstellungen bleiben (Holz, Klang aus)', (await seite.evaluate(() => document.documentElement.dataset.brett)) === 'holz'
     && await seite.locator('.es-schalter[data-key="klang"][aria-checked="false"]').count() === 1);
-  await seite.goBack();
+  if (IPHONE) {
+    for (let i = 0; i < 6 && (await h.hash()) !== '#arena'; i++) await seite.goBack();
+  } else await seite.goBack();
   await h.screen('arena');
   pruefe('Zurück-Wisch: Arena', (await h.hash()) === '#arena');
   pruefe('Arena zeigt Paula frei', await seite.locator('.knoten[data-bot="paula"]:not(.gesperrt)').count() === 1
@@ -954,8 +981,22 @@ const t0 = Date.now();
 try {
   await abschnitt('Serverstart', () => new Promise((resolve, reject) => { server.once('error', reject); server.listen(PORT, '127.0.0.1', resolve); }), 10000);
   browser = await abschnitt('Browserstart', () => browserTyp(ladePlaywright()).launch(), 45000);
-  const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
+  const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser, { iphone: IPHONE });
   const h = hilfen(seite);
+  if (IPHONE) {
+    // iPhone-Durchgang (fc-18:11 Zusatz 12): dieselbe Partie wie auf dem iPad, ohne Cache-, Offline- und Update-Teil
+    gruppe = 'iPhone';
+    await seite.goto(APP + '#arena');
+    await h.screen('arena');
+    const masse = await seite.evaluate(() => ({ breit: innerWidth, rumpf: document.documentElement.scrollWidth }));
+    pruefe('iPhone 390: Seite 390 px breit, kein Querscrollen', masse.breit === 390 && masse.rumpf <= 390, JSON.stringify(masse));
+    const id = await abschnitt('Sieg und Analyse', () => testeSieg(seite, h, fehler));
+    await abschnitt('Verlauf und Einstellungen', () => testeVerlaufEinstellungen(seite, h, fehler, id));
+    gruppe = 'Gesamt';
+    pruefe('Keine 404 im ganzen Ablauf', server404.length === 0, server404.join(', '));
+    pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));
+    await kontext.close();
+  } else {
   await abschnitt('Start, Cache und Engines', () => testeStart(seite, h, fehler, fehlgeschlagen));
   const id = await abschnitt('Sieg und Analyse', () => testeSieg(seite, h, fehler));
   await abschnitt('Verlauf und Einstellungen', () => testeVerlaufEinstellungen(seite, h, fehler, id));
@@ -973,6 +1014,7 @@ try {
   const lang = (JSON.parse(speicher['schach-arena:v1:partien'] || '[]').find((p) => p.botId === 'paula') || {}).id;
   await kontext.close();
   if (!OHNE_BILDER) await abschnitt('Schlussbilder', () => bilder(browser, lang || id), 300000);
+  }
   const schlecht = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - schlecht.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of schlecht) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + f.detail + ')' : ''));
