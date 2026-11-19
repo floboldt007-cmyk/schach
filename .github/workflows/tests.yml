@@ -84,6 +84,8 @@ jobs:
         run: node tests/server-ranked-haengezeit.test.mjs
       - name: Weltrangliste-SQL ausfuehren (vorbereitet, nicht eingespielt; Zustimmung, 15 Partien, Rueckweg)
         run: node tests/server-weltrang.test.mjs
+      - name: Loeschkette Paket 2 pruefen (konto_loeschen nimmt Season-Daten und Weltrang-Eintrag mit, Gegenprobe)
+        run: node tests/server-paket2-loeschen.test.mjs
       - name: Eigene Online-Elo pruefen (vorbereitet, nicht eingespielt; nur die eigene, null ohne Elo, Rueckweg, Gegenprobe)
         run: node tests/server-online-elo.test.mjs
 

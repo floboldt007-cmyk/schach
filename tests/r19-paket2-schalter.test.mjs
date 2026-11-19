@@ -59,14 +59,15 @@ pruefe('Welt: ruft den Server nur mit Schalter', /paket2Frei\(\)/.test(welt));
 const saison = lies('js/pakete/liga/saison.js');
 pruefe('Alle Ligen: Season-Regel nur mit Schalter', /paket2Frei\(\)[^\n]*\n?[^\n]*ss-ligen-regel/.test(saison));
 
-// 4) Datenschutz: die ungeprueften Abschnitte stehen nicht im Live-Stand
-for (const [datei, verboten] of [
-  ['datenschutz.html', ['<h3>Seasons</h3>', '<h3>Weltrangliste</h3>', 'Season-Abzeichen', 'Season-Titel']],
-  ['datenschutz-en.html', ['<h3>Seasons</h3>', '<h3>World ranking</h3>', 'season badge', 'season title']],
+// 4) Datenschutz: auf so/R19-paket2-ab16 stehen die Abschnitte wieder drin (Auftrag M-08:03:14, nur ab 16, Vorgabe aus);
+// ihr Inhalt prueft tests/datenschutz-paket2.test.mjs. Auf so/R19-live-d galt das Gegenteil (keine Abschnitte).
+for (const [datei, noetig] of [
+  ['datenschutz.html', ['<h3>Seasons</h3>', '<h3>Weltrangliste</h3>']],
+  ['datenschutz-en.html', ['<h3>Seasons</h3>', '<h3>World ranking</h3>']],
 ]) {
   const html = lies(datei);
-  const da = verboten.filter((x) => html.includes(x));
-  pruefe(`${datei}: keine Abschnitte zu Seasons und Weltrangliste`, da.length === 0, da);
+  const fehlt = noetig.filter((x) => !html.includes(x));
+  pruefe(`${datei}: Abschnitte zu Seasons und Weltrangliste vorhanden`, fehlt.length === 0, fehlt);
 }
 
 // 5) Keine sichtbaren Woerter: Texte, die auch mit Schalter aus erscheinen, und die echten Seiten in beiden Sprachen

@@ -3,8 +3,8 @@
 -- Funktion. Ausfuehren im Supabase SQL Editor, danach: notify pgrst, 'reload schema';
 -- Reihenfolge (R19, 14.11.2026): Diese Fassung kennt die Saison nicht. Solange saison-schema.sql eingespielt ist, bricht
 -- sie ab, damit Abzeichen und Titel nicht still aus der Datenauskunft fallen: zuerst supabase/saison-zurueck.sql.
--- Dasselbe gilt fuer die Zustimmung zur Weltrangliste: solange weltrang-schema.sql eingespielt ist, zuerst
--- supabase/weltrang-zurueck.sql.
+-- Dasselbe gilt fuer die Weltrangliste (18.11.2026): Solange weltrang_teilnahme besteht, zuerst supabase/weltrang-zurueck.sql
+-- (entfernt die Tabelle samt den Zustimmungen), sonst fiele die Zustimmung still aus der Datenauskunft.
 do $$
 begin
   if pg_catalog.to_regclass('public.saison_abzeichen') is not null then
