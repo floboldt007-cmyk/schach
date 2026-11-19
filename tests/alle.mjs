@@ -85,6 +85,7 @@ const SUITEN = [
   { name: 'liga', datei: 'liga.test.mjs', args: [], was: 'Arena-Wertung, Spielklassen, Saison und Vereinsmeisterschaft' },
   { name: 'sicherung', datei: 'sicherung.test.mjs', args: [], was: 'Export, Import und Sicherungshinweis' },
   { name: 'review', datei: 'review.test.mjs', args: SCHNELL ? ['--nur-node'] : [], was: 'Zug-Klassen, Genauigkeit, Coach' },
+  { name: 'r20-analyse-matt', datei: 'r20-analyse-matt.test.mjs', args: [], was: 'Matt-Angaben der Analyse: 50-Zuege-Zaehler im Vorrat, Perspektive, ungenuegendes Material, Patt (Node, echter Stockfish)' },
   { name: 'analyse-start', datei: 'analyse-start.test.mjs', args: [], was: 'Analyse: Satz der Start-Karte und Zug beim Oeffnen (kurze Partie)' },
   { name: 'online-analyse', datei: 'online-analyse.test.mjs', args: [], was: 'Analyse der Online-Partie: Kennzeichen online, Du gegen Gegner, Ende ohne Ergebnis ehrlich' },
   { name: 'ereignisse', datei: 'ereignisse.test.mjs', args: [], was: 'Ereignis-Bus, Anzeige-Orte, Feier-Budget' },
@@ -193,6 +194,7 @@ const SUITEN = [
   { name: 'r19-verlauf-neu', datei: 'r19-verlauf-neu.test.mjs', args: [], was: 'Feinschliff R19: Verlauf neu (Partien ohne Zug als eine Zeile, Ergebniszeichen, Zu-zweit-Bild, leiser Muelleimer, eine Staerke-Zahl, Level-Karte im Rahmen)' },
   { name: 'r20-kopf-chip', datei: 'r20-kopf-chip.test.mjs', args: [], was: 'Feinschliff R20 B3: Kopf-Chips ganz da oder ganz weg, nie ein Stummel; / max nur am PC' },
   { name: 'r20-blatt-fokus', datei: 'r20-blatt-fokus.test.mjs', args: [], was: 'Feinschliff R20 B7: Blatt per Tipp ohne Fokusring, per Tastatur mit; Rueckfrage fokussiert den sicheren Knopf' },
+  { name: 'r20-effekt-vorschau', datei: 'r20-effekt-vorschau.test.mjs', args: [], was: 'Feinschliff R20: Regal Effekte im Shop, Vorschau einmal auf dem echten Brett an der richtigen Stelle, Standbild bei weniger Bewegung' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten

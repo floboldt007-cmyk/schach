@@ -970,6 +970,13 @@ function runde(x, stellen) {
   return Math.round(x * f) / f;
 }
 
+// Schluessel fuer wiederverwendete Analysen (app.vorab, Live-Bewertung): wie stellungsSchluessel, dazu der Zaehler der
+// 50-Zuege-Regel. Dieselbe Stellung mit hohem Zaehler ist oft remis statt Matt (Stockfish: Zaehler 98 cp 0, Zaehler 0
+// mate 2); ohne ihn zeigte die Analyse ein altes "Matt in 2", obwohl die Partie vorher endet (tests/r20-analyse-matt).
+export function analyseSchluessel(fen) {
+  return String(fen || '').trim().split(/\s+/).slice(0, 5).join(' ');
+}
+
 // Abgebrochene (engine.stop) oder leere Suchen beenden die Bewertung mit Fehler.abgebrochen = true
 function pruefeAnalyse(a, fen) {
   if (!a || a.abgebrochen || !Array.isArray(a.lines) || !a.lines.length || !a.lines[0].eval) {
@@ -994,7 +1001,7 @@ export async function bewerteZug(engine, fenVorher, zug, opts = {}) {
   const fenNachher = c.fen();
   // schon gerechnete Analysen (z. B. aus der Live-Warteschlange) wiederverwenden
   const passt = (a, fen, n) => a && !a.abgebrochen && a.lines && a.lines.length >= n
-    && stellungsSchluessel(a.fen || fen) === stellungsSchluessel(fen);
+    && analyseSchluessel(a.fen || fen) === analyseSchluessel(fen);
   const aV = pruefeAnalyse(passt(analyseVorher, fenVorher, Math.min(multipv, anzahl)) ? analyseVorher
     : await engine.analyse(fenVorher, { depth: tiefe, multipv }), fenVorher);
   const anzahlNachher = c.moves().length;
@@ -1012,10 +1019,10 @@ export async function bewerteZug(engine, fenVorher, zug, opts = {}) {
 // ---------------------------------------------------------------------------
 
 // Schon gerechnete Analyse (z. B. aus der Live-Bewertung) wiederverwenden.
-// vorab: Map oder Objekt, Schluessel = stellungsSchluessel(fen), Wert = Analyse.
+// vorab: Map oder Objekt, Schluessel = analyseSchluessel(fen), Wert = Analyse.
 function ausVorab(vorab, fen, multipv, minTiefe) {
   if (!vorab) return null;
-  const s = stellungsSchluessel(fen);
+  const s = analyseSchluessel(fen);
   const a = typeof vorab.get === 'function' ? vorab.get(s) : vorab[s];
   if (!a || a.abgebrochen || !Array.isArray(a.lines) || !a.lines.length || !a.lines[0].eval) return null;
   const c = neuesBrett(fen);
@@ -1030,7 +1037,7 @@ const STUECK_ZUEGE = 10;
 // zuege: UCI-Liste (SAN oder {from,to,promotion} gehen auch)
 // opts: { tiefe = 16, multipv = 2, beiFortschritt(fertig, gesamt), startFen,
 //         spielerFarbe ('w'|'b': Du-Form nur fuer diese Seite), elo: { w, b }, signal,
-//         vorab (Map stellungsSchluessel -> Analyse, z. B. aus der Live-Bewertung), vorabMinTiefe = 1,
+//         vorab (Map analyseSchluessel -> Analyse, z. B. aus der Live-Bewertung), vorabMinTiefe = 1,
 //         vorabMerken (true: neu gerechnete Analysen auch in vorab ablegen, fuer einen Abbruch mit Neustart),
 //         stueckeln (true: beim Nachspielen und Einordnen der Zuege den Hauptthread regelmaessig per
 //         setTimeout freigeben, fuer das stille Nachholen; das Ergebnis ist dasselbe) }
@@ -1082,7 +1089,7 @@ export async function analysierePartie(engine, zuege, opts = {}) {
       const a = alt || await engine.analyse(fens[k], { depth: tiefe, multipv });
       if (signal && signal.aborted) throw abbruch();
       analysen.push(pruefeAnalyse(a, fens[k]));
-      if (!alt && opts.vorabMerken && opts.vorab && typeof opts.vorab.set === 'function') opts.vorab.set(stellungsSchluessel(fens[k]), a);
+      if (!alt && opts.vorabMerken && opts.vorab && typeof opts.vorab.set === 'function') opts.vorab.set(analyseSchluessel(fens[k]), a);
       melde(k + 1);
     }
   } finally {

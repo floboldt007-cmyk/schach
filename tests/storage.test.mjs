@@ -11,7 +11,7 @@ import {
 } from '../js/storage.js';
 import { registriereBot, botNachId } from '../js/bots.js';
 import { hoere, zuruecksetzen as busZuruecksetzen } from '../js/ereignisse.js';
-import { analysierePartie, kompaktReview, ergaenzeReviewFelder } from '../js/review.js';
+import { analysierePartie, kompaktReview, ergaenzeReviewFelder, analyseSchluessel } from '../js/review.js';
 import { Chess } from '../vendor/chess/chess.js';
 
 let ok = 0;
@@ -942,8 +942,8 @@ function gleich(a, b) {
   // die Stellung nach 1.e4 liegt schon tief genug vor, die Grundstellung nur flach (Zeitlimit): wird neu gerechnet
   const START = new Chess().fen();
   const NACH_E4 = (() => { const c = new Chess(); c.move('e4'); return c.fen(); })();
-  vorab.set(stellungsSchluessel(NACH_E4), { fen: NACH_E4, depth: 12, lines: [{ multipv: 1, depth: 12, eval: { cp: 20, mate: null }, pv: ['e7e5'] }, { multipv: 2, depth: 12, eval: { cp: 25, mate: null }, pv: ['c7c5'] }] });
-  vorab.set(stellungsSchluessel(START), { fen: START, depth: 5, lines: [{ multipv: 1, depth: 5, eval: { cp: 20, mate: null }, pv: ['e2e4'] }, { multipv: 2, depth: 5, eval: { cp: 20, mate: null }, pv: ['d2d4'] }] });
+  vorab.set(analyseSchluessel(NACH_E4), { fen: NACH_E4, depth: 12, lines: [{ multipv: 1, depth: 12, eval: { cp: 20, mate: null }, pv: ['e7e5'] }, { multipv: 2, depth: 12, eval: { cp: 25, mate: null }, pv: ['c7c5'] }] });
+  vorab.set(analyseSchluessel(START), { fen: START, depth: 5, lines: [{ multipv: 1, depth: 5, eval: { cp: 20, mate: null }, pv: ['e2e4'] }, { multipv: 2, depth: 5, eval: { cp: 20, mate: null }, pv: ['d2d4'] }] });
   const app = { engine: async () => fake, einstellungen: () => ({ tiefe: 12 }), vorab };
   const gezeichnet = [];
   const lauf = starteNachholen(app, { max: 4, beiPartie: (x) => gezeichnet.push(x.partie.id) });
