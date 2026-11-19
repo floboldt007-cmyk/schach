@@ -5,39 +5,44 @@
 // solange sie nicht selbst wie eine endet (Kaltreview 19.11., B1-B3).
 export function stelleAusStapel(stapel, meldung = '') {
   let rest = String(stapel || '');
+  // abgeschnitten wird nur, wenn der Stapel mit der Meldung beginnt ("Name: Meldung" in der ersten Zeile, Nachpruefung B3)
   const i = meldung ? rest.indexOf(meldung) : -1;
-  if (i >= 0) rest = rest.slice(i + meldung.length);
+  if (i >= 0 && !rest.slice(0, i).includes('\n')) rest = rest.slice(i + meldung.length);
   const stelle = rest.split('\n').map((z) => z.trim()).find((z) => /^at .*:\d+:\d+\)?$/.test(z) || /@.*:\d+:\d+$/.test(z)) || '';
   return stelle.replace(/https?:\/\/[^/]+/, '');
 }
 
-// Worker-Wechsel: endet der alte Service Worker, waehrend eine Anfrage der EIGENEN Seite durch ihn laeuft, meldet WebKit
-// (CI, Linux) das dreimal: requestfailed "Service Worker context closed" mit Adresse, dazu pageerror und Konsole ohne
-// Adresse. Die Anfrage zaehlt dann wie ein Abbruch beim Neuladen; je solcher Anfrage wird hoechstens EINE Meldung jeder Art
-// still, in beliebiger Reihenfolge (eine schon eingetragene wird wieder entfernt). Fremde Adressen, andere Gruende und
-// Meldungen ohne passende Anfrage bleiben Fehler.
+// Worker-Wechsel: endet der alte Service Worker, waehrend die Testanfrage durch ihn laeuft, meldet WebKit (CI, Linux) das
+// dreimal: requestfailed "Service Worker context closed" mit Adresse, dazu pageerror und Konsole ohne Adresse. Nur die
+// Testanfrage (`istTestAnfrage(url)`, der Test baut sie selbst) zaehlt dann wie ein Abbruch beim Neuladen; jede andere Datei,
+// auch unter derselben Adresse, bleibt ein Fehler (Nachpruefung 19.11. B1). Je solcher Anfrage wird hoechstens EINE Meldung
+// jeder Art still, und nur innerhalb von `frist` ms davor oder danach (B2: die Testanfrage ist per .catch abgefangen, oft
+// kommt keine Meldung; ein spaeterer Fehler gleichen Textes darf das nicht erben). Eine schon eingetragene wird entfernt.
 const ZU = 'Service Worker context closed';
 const ZU_TEXT = { seite: new RegExp(`^${ZU}$`), konsole: new RegExp(`^Failed to load resource: ${ZU}$`) };
-export function swWechselFilter(eigen) {
-  const guthaben = { seite: 0, konsole: 0 };
-  const offen = { seite: [], konsole: [] };
+export function swWechselFilter(istTestAnfrage, { uhr = Date.now, frist = 2000 } = {}) {
+  const guthaben = { seite: [], konsole: [] };   // Zeitpunkte der Anfragen, deren Meldung noch aussteht
+  const offen = { seite: [], konsole: [] };      // { eintrag, zeit } schon eingetragener Meldungen ohne Anfrage
+  const frisch = (liste) => { while (liste.length && uhr() - (liste[0].zeit ?? liste[0]) > frist) liste.shift(); };
   return {
-    // true: Anfrage der eigenen Seite beim Worker-Wechsel abgebrochen, kein Fehler
+    // true: die Testanfrage ist beim Worker-Wechsel abgebrochen, kein Fehler
     anfrage(grund, url, fehler) {
-      if (grund !== ZU || !String(url).startsWith(eigen)) return false;
+      if (grund !== ZU || !istTestAnfrage(String(url))) return false;
       for (const art of ['seite', 'konsole']) {
-        const eintrag = offen[art].shift();
-        const i = eintrag === undefined ? -1 : fehler.lastIndexOf(eintrag);
-        if (i >= 0) fehler.splice(i, 1); else guthaben[art]++;
+        frisch(offen[art]);
+        const alt = offen[art].shift();
+        const i = alt ? fehler.lastIndexOf(alt.eintrag) : -1;
+        if (i >= 0) fehler.splice(i, 1); else guthaben[art].push(uhr());
       }
       return true;
     },
     // traegt `eintrag` in `fehler` ein, ausser die Meldung gehoert zu einer solchen Anfrage; `url`: Adresse der Meldung, wenn bekannt
     melde(art, text, url, eintrag, fehler) {
-      const passt = ZU_TEXT[art].test(text) && (!url || String(url).startsWith(eigen));
-      if (passt && guthaben[art] > 0) { guthaben[art]--; return; }
+      const passt = ZU_TEXT[art].test(text) && (!url || istTestAnfrage(String(url)));
+      frisch(guthaben[art]);
+      if (passt && guthaben[art].length) { guthaben[art].shift(); return; }
       fehler.push(eintrag);
-      if (passt) offen[art].push(eintrag);
+      if (passt) offen[art].push({ eintrag, zeit: uhr() });
     },
   };
 }

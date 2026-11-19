@@ -124,7 +124,8 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
   kontext.setDefaultNavigationTimeout(30000);
   const fehler = [];
   const fehlgeschlagen = [];
-  const swWechsel = swWechselFilter(`http://127.0.0.1:${PORT}/`);
+  // nur die Testanfrage __langsam (Update b4b baut sie selbst), keine App-Datei
+  const swWechsel = swWechselFilter((u) => u.startsWith(`http://127.0.0.1:${PORT}${PRAEFIX}__langsam?`));
   const beobachte = (seite) => {
     const auswerten = seite.evaluate.bind(seite);
     seite.evaluate = (...args) => begrenzt(`${gruppe}: Browserauswertung`, () => auswerten(...args));
