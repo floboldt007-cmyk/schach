@@ -12,7 +12,7 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
 
@@ -42,6 +42,21 @@ function pruefe(name, gut, detail = '') {
   const ge = flach((readme.match(/- \*\*Figuren\*\* „Gold und Elfenbein“[\s\S]*?(?=\n- \*\*)/) || [''])[0]);
   pruefe('README: Gold und Elfenbein bearbeitet aus cburnett (Colin M.L. Burnett), GPLv2 oder neuer',
     /cburnett/.test(ge) && /Burnett/.test(ge) && /bearbeitet/.test(ge) && /GPLv2 oder neuer/.test(ge), ge || 'Zeile fehlt');
+}
+
+// ---------- Teil 1b: jeder Figurensatz hat eine Herkunftszeile (R19, 19.11.2026) ----------
+// Crownmate will Sammelstuecke verkaufen: fuer jeden Ordner unter assets/pieces/ steht in assets/LIZENZ-KUNST.md eine
+// Tabellenzeile | `assets/pieces/<satz>/` ... | Herkunft | Lizenz | Beleg | mit vier gefuellten Spalten. Ein neuer Satz ohne
+// Zeile macht diese Pruefung rot.
+{
+  const kunst = lies('assets/LIZENZ-KUNST.md').split('\n');
+  const saetze = readdirSync(path.join(WURZEL, 'assets/pieces'), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+  const ohne = saetze.filter((s) => !kunst.some((z) => {
+    const spalten = z.split('|').slice(1, -1).map((x) => x.trim());
+    return z.startsWith(`| \`assets/pieces/${s}/\``) && spalten.length === 4 && spalten.every(Boolean);
+  }));
+  pruefe(`LIZENZ-KUNST.md: alle ${saetze.length} Figurensätze unter assets/pieces/ mit Herkunft, Lizenz und Beleg`,
+    saetze.length >= 30 && !ohne.length, `ohne Zeile: ${ohne.join(', ')}`);
 }
 
 // ---------- Teil 2: Info-Seite je Sprache ----------
