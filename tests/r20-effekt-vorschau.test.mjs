@@ -186,6 +186,16 @@ try {
       await tippe(s, 'konfetti');
       const knoepfe = await s.locator('.sheet-karte.shf-sheet .sheet-knoepfe button').allTextContents();
       pruefe(`${gruppe}: im Blatt nur "Schließen", kein Kaufknopf`, JSON.stringify(knoepfe.map((x) => x.trim())) === '["Schließen"]', knoepfe);
+      // der eine Knopf fuellt die Leiste wie im Sammlungsblatt (.sa-blatt): volle Breite, mittig, mindestens 44 px hoch.
+      // Vorher stand er ab 441 px Breite in der linken von zwei Spalten (css/bauteile.css .sheet-knoepfe)
+      const zu = await s.evaluate(() => {
+        const l = document.querySelector('.sheet-karte.shf-sheet .sheet-knoepfe').getBoundingClientRect();
+        const b = document.querySelector('.sheet-karte.shf-sheet .sheet-knoepfe button').getBoundingClientRect();
+        return { leiste: Math.round(l.width), breite: Math.round(b.width), hoehe: Math.round(b.height),
+          mitte: Math.round((b.left + b.width / 2) - (l.left + l.width / 2)) };
+      });
+      pruefe(`${gruppe}: "Schließen" volle Breite der Leiste, mittig, mindestens 44 px hoch`,
+        Math.abs(zu.breite - zu.leiste) <= 1 && Math.abs(zu.mitte) <= 1 && zu.hoehe >= 44, zu);
       await schliesse(s);
       pruefe(`${gruppe}: Schliessen waehrend des Ablaufs raeumt auf`, await s.locator('.shf-effekt-ebene').count() === 0);
     } catch (e) {

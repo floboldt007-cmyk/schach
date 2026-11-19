@@ -12,6 +12,7 @@
 //   node tests/funktion-shop-skin.test.mjs --bilder=<ordner>    je Ansicht ein Bild (<ansicht>.png)
 //   BILDER=<ordner> node tests/funktion-shop-skin.test.mjs      dasselbe ueber die Umgebung (wie die Funktionsprobe)
 //   PORT=9631 node tests/funktion-shop-skin.test.mjs            eigener Port (Standard: frei)
+//   PROBE_GROESSE=390x844 PROBE_FARBE=dark ...                 Fenstergroesse und Farbschema (Standard 1180x820, hell)
 //
 // Je Ansicht zwei Pruefungen: der gewaehlte Satz steht im Brett, und ein Wechsel bei offener Ansicht wirkt sofort (spaeter
 // Erfinder-Status, R3/R4); im Raetsel-Duell zusaetzlich Koordinaten und Auto-Dame (F-duell2). Seit den Reparaturen
@@ -46,6 +47,8 @@ const server = http.createServer((req, res) => {
   catch (e) { res.writeHead(404); res.end(); }
 });
 const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
+const [BREITE, HOEHE] = (/^(\d+)x(\d+)$/.exec(process.env.PROBE_GROESSE || '') || [0, 1180, 820]).slice(1).map(Number);
+const FARBE = process.env.PROBE_FARBE === 'dark' ? 'dark' : 'light';
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 
 const UID = 'u1';
@@ -197,7 +200,7 @@ const AUFBAU_MS = 45000;
 let browser;
 try {
   browser = await browserTyp(pw).launch({ headless: true });
-  const kontext = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, serviceWorkers: 'block', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  const kontext = await browser.newContext({ viewport: { width: BREITE, height: HOEHE }, colorScheme: FARBE, hasTouch: true, serviceWorkers: 'block', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
   await kontext.route('**/*.supabase.co/**', bediene);
   await kontext.addInitScript(({ s, uid, stuecke }) => {
     // nur beim ersten Laden: danach gilt, was die Oberflaeche gespeichert hat (die Wahl im Shop)
