@@ -111,11 +111,21 @@ const BANNER = [
       inhalt: TEXTUR.streifen() + '<circle cx="300" cy="150" r="180" fill="url(#gl)"/>' + lorbeer(300, 160, 112, '#B8860B', '#3A2804')
         + '<path d="M-40 70V-40h-10v-40h22v16h16v-16h24v16h16v-16h22v40H40V70h16v20H-56V70z" transform="translate(300 140)" fill="url(#m)" stroke="#3A2804" stroke-width="4" stroke-linejoin="round"/>' }) },
 
-  { id: 'start', art: 'start', name: 'Erster Zug', seltenheit: 'Start', kaeuflich: false, text: 'Start-Banner, das jeder neue Spieler sofort bekommt.', bg: ['#2E6A8E', '#132C42'],
-    motiv: () => ({ defs: '<radialGradient id="so"><stop offset="0" stop-color="#FFF3C4"/><stop offset=".6" stop-color="#FFC857"/><stop offset="1" stop-color="#FF9F43" stop-opacity="0"/></radialGradient>', akzent: '#FFC857',
-      inhalt: '<circle cx="320" cy="190" r="170" fill="url(#so)"/>'
-        + '<g fill="rgba(255,255,255,.1)">' + Array.from({ length: 12 }, (_, i) => `<path d="M${i * 110 - 30} 300l${40} -70h55l-40 70z"/>`).join('') + '</g>'
-        + '<path d="M-40 70c0-22 14-34 26-42-10-6-16-16-16-28 0-19 14-32 30-32s30 13 30 32c0 12-6 22-16 28 12 8 26 20 26 42z" transform="translate(320 148)" fill="#F7F2E8" stroke="#132C42" stroke-width="5" stroke-linejoin="round"/>' }) },
+  // R19 Profil Ich (Flo 15.11.2026: "richtig haesslich"): statt Sonne und Streifen ein mattes Nachtblau mit einem
+  // Brettmuster, das nach rechts ausblendet, ein goldener Bauer auf seinem Feld e2 und eine goldene Zuglinie nach e4
+  { id: 'start', art: 'start', name: 'Erster Zug', seltenheit: 'Start', kaeuflich: false, text: 'Start-Banner, das jeder neue Spieler sofort bekommt.', bg: ['#1A2433', '#0C1017'],
+    motiv: () => ({ defs: '<pattern id="br" width="80" height="80" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="#FFFFFF" fill-opacity=".05"/><rect x="40" y="40" width="40" height="40" fill="#FFFFFF" fill-opacity=".05"/></pattern>'
+      + '<radialGradient id="aus" cx="320" cy="160" r="420" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#000000"/></radialGradient>'
+      + '<mask id="ma"><rect width="1200" height="300" fill="url(#aus)"/></mask>'
+      + '<radialGradient id="hof" cx="320" cy="170" r="150" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E0A22B" stop-opacity=".28"/><stop offset="1" stop-color="#E0A22B" stop-opacity="0"/></radialGradient>'
+      + metall('m', '#F5D27A', '#A8741A'), akzent: '#E0A22B',
+      inhalt: '<rect width="1200" height="300" fill="url(#br)" mask="url(#ma)"/>'
+        + '<circle cx="320" cy="170" r="150" fill="url(#hof)"/>'
+        + '<path d="M392 120H520" stroke="#E0A22B" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 14" opacity=".8"/>'
+        + '<path d="M512 108l16 12-16 12" fill="none" stroke="#E0A22B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>'
+        + '<ellipse cx="320" cy="236" rx="74" ry="12" fill="#000000" opacity=".35"/>'
+        + '<path d="M-40 70c0-22 14-34 26-42-10-6-16-16-16-28 0-19 14-32 30-32s30 13 30 32c0 12-6 22-16 28 12 8 26 20 26 42z" transform="translate(320 158)" fill="url(#m)" stroke="#3A2804" stroke-width="4" stroke-linejoin="round"/>'
+        + '<rect y="294" width="1200" height="6" fill="#E0A22B" opacity=".85"/>' }) },
 
   { id: 'shop-abendrot', art: 'shop', name: 'Abendrot', seltenheit: 'Selten', kaeuflich: true, text: 'Sonne sinkt hinter weichen Huegeln.', bg: ['#E8743A', '#2A1238'],
     motiv: () => ({ defs: glut('gl', '#FFD27A'), akzent: '#FFB86B', inhalt: '<circle cx="330" cy="160" r="200" fill="url(#gl)"/><circle cx="330" cy="168" r="70" fill="#FFD27A"/>'

@@ -20,6 +20,11 @@ Darum ebenfalls eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in de
 synthetisiert (Sinus- und Glastöne, gefiltertes Rauschen, eigener Hall), ohne Aufnahme und ohne fremdes Material. Ebenfalls
 eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena.
 
+**Labor-Klangsets „Polarlicht“ und „Donner“** (`polarlicht/`, `donner/`, je 40 Dateien, nur im Erfinder-Konto, im Shop mit
+Schloss): mit `werkzeuge/klang-sets-r19.mjs` aus den selbst synthetisierten Juwel-Klängen abgeleitet (Polarlicht eine Quinte
+höher mit Oktav-Schimmer und hellem Hall, Donner eine Quarte tiefer mit tiefem Rumms und dunklem Hall), ohne Aufnahme und ohne
+fremdes Material. Ebenfalls eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena.
+
 Es steckt keine fremde Aufnahme, kein Sample und kein Klang aus einer anderen App darin (weder chess.com
 noch lichess noch eine Klangbibliothek). Rechte Dritter an den Klängen gibt es deshalb nicht.
 

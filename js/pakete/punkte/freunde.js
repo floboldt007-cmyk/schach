@@ -17,7 +17,7 @@ import { wochenSchluessel } from '../../tag.js';
 import { floAvatar } from '../../thema.js';
 import * as S from './stand.js';
 import * as T from './tafel.js';
-import { huelle, reiterFreunde as codeReiter } from './liste.js';
+import { huelle, reiterFreunde as codeReiter, MEDAILLE } from './liste.js';
 import { zahlText } from './ansicht.js';
 import { t } from '../../sprache.js';
 import './texte.js';
@@ -63,12 +63,14 @@ function el(tag, klasse, html = '') {
 }
 
 // Bild in der Zeile: du mit deinem Profilbild, Freunde mit ihrem Anfangsbuchstaben (Profile vom Server kommen spaeter)
+// R19 Liga neu: jeder Freund bekommt aus seinem Namen einen festen Farbton, damit die Liste nicht grau in grau ist
+const ton = (name) => [...String(name || '?')].reduce((h, c) => (h * 31 + c.codePointAt(0)) % 360, 7);
 const bild = (z) => (z.ich ? `<span class="bl-fr-av ich" aria-hidden="true">${floAvatar('w')}</span>`
-  : `<span class="bl-fr-av" aria-hidden="true">${esc((z.name || '?')[0].toUpperCase())}</span>`);
+  : `<span class="bl-fr-av" aria-hidden="true" style="--fr-ton:${ton(z.name)}">${esc((z.name || '?')[0].toUpperCase())}</span>`);
 
 function zeilenHtml(liste, fenster) {
   return `<ol class="bl-fr-liste">${liste.map((z, i) => `<li class="bl-fr-zeile${z.ich ? ' du' : ''}">
-      <span class="bl-fr-platz zahl">${i + 1}</span>${bild(z)}
+      <span class="bl-fr-platz zahl"${MEDAILLE[i + 1] ? ` data-medaille="${MEDAILLE[i + 1]}"` : ''}>${i + 1}</span>${bild(z)}
       <span class="bl-fr-text"><b>${esc(z.ich ? P('du', { name: z.name || '' }) : z.name)}</b><small>${esc(z.partien
         ? P('partien', { n: z.partien }) : P(fenster === 'woche' ? 'nochNichtWoche' : 'nochNicht'))}</small></span>
       <b class="bl-fr-punkte zahl">${zahlText(z.punkte)}</b></li>`).join('')}</ol>`;

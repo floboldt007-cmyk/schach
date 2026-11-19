@@ -22,9 +22,18 @@ Neue eigene Klänge und Bilder kommen erst in diese Tabelle, wenn Flo das für d
 ## Was nicht darunter fällt
 
 - Alles, was im README unter „Lizenzen“ mit einer anderen Lizenz steht, behält diese Lizenz: Stockfish
-  (GPL-3.0), chess.js (BSD-2-Clause), die Figuren „cburnett“ und die daraus abgeleitete „Blaupause“ (GPLv2 oder neuer), die eigenen Figurensätze „Elfenbein“, „Holz“, „Marmor“, „Gold“, „Glas“, „Neon“, „Frost“, „Kürbis“, „Moosgeister“, „Tiefsee“ (gedrechselte Formen, die letzten beiden mit Gesichtern, `werkzeuge/figuren-3d.mjs`), die Themen „Feuer“, „Stein“, „Halloween“, „Weihnachten“, „Ostern“, „Weltraum“, „Roboter“, „Naschwerk“, „Zombies“, „Geister“, „Drachen“, „Lava-Golem“, „Piraten“, „Ägypten“, „Wikinger“, „Dinos“ (`werkzeuge/figuren-themen.mjs`), „Pixel“ und „Geo“ (`werkzeuge/figuren-stile.mjs`; alle GPL-3.0 wie der Code), die Schriften Manrope und
+  (GPL-3.0), chess.js (BSD-2-Clause), die Figuren „cburnett“ und die daraus abgeleiteten Sätze „Blaupause“ und „Gold und Elfenbein“ (GPLv2 oder neuer), die eigenen Figurensätze „Elfenbein“, „Holz“, „Marmor“, „Gold“, „Glas“, „Neon“, „Frost“, „Kürbis“, „Moosgeister“, „Tiefsee“ (gedrechselte Formen, die letzten beiden mit Gesichtern, `werkzeuge/figuren-3d.mjs`), die Themen „Feuer“, „Stein“, „Halloween“, „Weihnachten“, „Ostern“, „Weltraum“, „Roboter“, „Naschwerk“, „Zombies“, „Geister“, „Drachen“, „Lava-Golem“, „Piraten“, „Ägypten“, „Wikinger“, „Dinos“ (`werkzeuge/figuren-themen.mjs`), „Pixel“ und „Geo“ (`werkzeuge/figuren-stile.mjs`; alle GPL-3.0 wie der Code), die Schriften Manrope und
   Bricolage Grotesque (SIL OFL 1.1) sowie Avatare, Zug-Symbole, App-Icon und Design, die schon unter der
   GPL-3.0 veröffentlicht sind.
+
+## Herkunft der Figurensätze im Shop-Vorrat (belegt, 18.11.2026)
+
+Nur Tatsachen aus dem Repo, keine Festlegung im Namen von Flo; an der Lizenz oben ändert dieser Abschnitt nichts.
+
+| Pfad | Herkunft | Lizenz | Beleg |
+|---|---|---|---|
+| `assets/pieces/goldelfenbein/` („Gold und Elfenbein“, 12 Dateien) | Bearbeitung von „cburnett“ (Colin M.L. Burnett). Die Umrisse bleiben unverändert, neu ist das Material: Verlauf, Glanz, Spiegelstreif, Schatten und Umriss mit Verlauf | GPLv2 oder neuer | `node werkzeuge/figuren-material.mjs --app` erzeugt alle 12 Dateien byte-gleich neu |
+| `assets/shop/figuren/lampion/`, `sternwarte/`, `uhrwerk/`, `kristall/`, `origami/`, `kronjuwel/` (je 12 Dateien) | erzeugt von `werkzeuge/shop-vorrat.mjs`; der Kopf des Werkzeugs sagt, dass Claude die Shop-Inhalte als SVG zeichnet und die Formen eigene sind | **offen:** Der Kopf des Werkzeugs nennt GPL-3.0, eine Bestätigung durch den Inhaber steht aus | `node werkzeuge/shop-vorrat.mjs` erzeugt alle 72 Dateien byte-gleich neu |
 
 ## Herkunft der Avatare und Bot-Daten (belegt, 14.11.2026)
 

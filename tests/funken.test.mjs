@@ -126,7 +126,7 @@ gruppe = 'Titel und Belohnungen';
   // Nur was die App heute zeigen kann, gilt als nutzbar: Titel, Namensschild, die Finisher und die Grund-Emotes.
   // Zugspur, Rahmen, Banner, Wahl-Stuecke, Wappen und Brief zeigt erst die Werkstatt (sonst feiert die App "Neu: Zugspur Bleistift").
   const nutzbareIds = L.alleStuecke().filter(L.nutzbar).map((s) => s.id);
-  pruefe('Nutzbar sind nur Titel, Namensschild, Finisher und Grund-Emotes', nutzbareIds.length > 0 && nutzbareIds.every((id) => /^titel-|^finisher-/.test(id)
+  pruefe('Nutzbar sind nur Titel, Namensschild, Finisher, Grund-Emotes und die sechs erspielbaren Sticker', nutzbareIds.length > 0 && nutzbareIds.every((id) => /^titel-|^finisher-|^emote-(krone|feuer|herz|springer|blitz|diamant)$/.test(id)
     || id === 'namensschild' || id === 'emotes-grund') && L.belohnungen(60).every((s) => s.art === 'titel' || !L.nutzbar(s)), nutzbareIds);
   pruefe('Stücke ohne Anzeige: werkstatt (Zugspur Level 2, Kartenrahmen Level 3, Wahl Level 10, Brief Level 50)',
     ['zugspur-bleistift', 'kartenrahmen-fichte', 'wahl-figuren-1', 'brief-stockfisch'].every((id) => L.alleStuecke().find((s) => s.id === id)?.kommt === 'werkstatt'));
@@ -149,8 +149,12 @@ gruppe = 'Belohnungen gegen Pakete';
   pruefe('Emotes: Level 1 nennt die Grund-Emotes des Rads (alle frei, ohne Level), das Rad hat Emotes', EMOTES.length > 0
     && emotes.filter((s) => s.level === 1).map((s) => s.id).join() === 'emotes-grund' && L.nutzbar(emotes.find((s) => s.id === 'emotes-grund'))
     && !/\d/.test(emotes.find((s) => s.id === 'emotes-grund').name));
-  pruefe('Emotes: kein Emote über Level 1 wird als nutzbar versprochen, solange das Rad keine Freischaltung kennt (kommt: emote-rad)',
-    emotes.filter((s) => s.level > 1).length > 0 && emotes.filter((s) => s.level > 1).every((s) => s.kommt === 'emote-rad' && !L.nutzbar(s)));
+  // Die sechs Sticker aus EMOTE_PREMIUM (R19, Variante C) kennt das Rad, alle anderen Emotes ueber Level 1 noch nicht
+  const { EMOTE_PREMIUM } = await import('../js/emote-kunst.js');
+  const imRad = (s) => EMOTE_PREMIUM.some((id) => s.id === 'emote-' + id);
+  pruefe('Emotes: die sechs erspielbaren Sticker sind nutzbar', emotes.filter(imRad).length === 6 && emotes.filter(imRad).every((s) => L.nutzbar(s)));
+  pruefe('Emotes: kein anderes Emote über Level 1 wird als nutzbar versprochen, solange das Rad keine Freischaltung kennt (kommt: emote-rad)',
+    emotes.filter((s) => s.level > 1 && !imRad(s)).length > 0 && emotes.filter((s) => s.level > 1 && !imRad(s)).every((s) => s.kommt === 'emote-rad' && !L.nutzbar(s)));
   const st = S.lade(ort(2026, 10, 22, 20));
   const auf = S.schliesseLevel((st.gesamt = L.funkenBis(8), st), 7, ort(2026, 10, 22, 20));
   pruefe('Ein kommendes Emote wird trotzdem gutgeschrieben (freigeschaltet), Level 8 bringt sonst nichts Nutzbares',

@@ -242,4 +242,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   rmSync(tmp, { recursive: true, force: true });
   console.log(`${summe} Klaenge geschrieben: assets/klang/juwel/`);
 }
-export { SAETZE };
+// Bausteine auch fuer werkzeuge/klang-sets-r19.mjs (Polarlicht, Donner); die Juwel-Dateien bleiben unveraendert
+export { SAETZE, SR, N, mische, puffer, ton, glocke, rumms, rauschen, funkeln, fertig, wav };

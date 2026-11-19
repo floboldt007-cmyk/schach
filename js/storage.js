@@ -68,7 +68,7 @@
 //
 // Daten-Fundament (DSGVO, 22.10.2026): datenfreigabe 'aus' | 'an' (Standard aus): angemeldete Spieler teilen fertige
 //   Partien und anonyme Nutzung nur mit dieser ausdruecklichen Freigabe (js/daten.js). Falscher Wert -> 'aus'.
-import { BOTS, botNachId } from './bots.js';
+import { BOTS, botNachId, endgegnerDerWelt } from './bots.js';
 import { sende } from './ereignisse.js';
 import { kompaktReview, ergaenzeReviewFelder, begrenzeLeistung } from './review.js';
 
@@ -152,7 +152,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   funkenlinie: false,    // Funkenlinie am Brett waehrend der Partie
   lebensleiste: true,    // Boss-Partien: Lebensleiste statt Bewertungsbalken
   // Premium-Umbau (PLAN 4): Klang
-  klangpaket: '',        // '' (Standard der Ansicht, modern: Arcade, D6) | 'holz' | 'arcade' | Labor: 'grusel' | 'kristall' | 'juwel'
+  klangpaket: '',        // '' (Standard der Ansicht, modern: Arcade, D6) | 'holz' | 'arcade' | Labor: 'grusel' | 'kristall' | 'juwel' | 'polarlicht' | 'donner'
   lautstaerke: 0.8,      // 0..1 in Schritten von 0,05 (Master = Wert hoch 2)
   musik: false,          // ruhige Menue-Musik (bewusst standardmaessig aus)
   musikLautstaerke: 0.35,// getrennt von Zugklaengen
@@ -200,7 +200,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
     // 20 Motiv-Bretter Fassung 4 (Flo 14.11.2026), Katalog js/labor.js MOTIV_BRETTER
     'kirchenfenster', 'seekarte', 'sternbilder', 'intarsie', 'orientteppich', 'goldthron', 'honigwabe', 'marmorsaal', 'jadepalast', 'eiskristall',
     'lavafeld', 'urwald', 'zahnwerk', 'papyrus', 'kirschgarten', 'art-deco', 'unterwasser', 'galaxie', 'mosaik', 'buchleder']),
-  klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall', 'juwel']),
+  klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall', 'juwel', 'polarlicht', 'donner']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
   zugBestaetigen: Object.freeze(['aus', 'ohneUhr', 'immer']),
@@ -209,9 +209,9 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   modus: Object.freeze(['system', 'hell', 'dunkel']),
   koordLage: Object.freeze(['ecke', 'rand']),
   duellIntro: Object.freeze(['immer', 'besondere', 'aus']),
-  // blaupause nur mit Sonderstueck, kuerbis/frost/gold nur fuer den Erfinder (Labor, js/labor.js; beides js/figurensatz.js)
+  // blaupause nur mit Sonderstueck, Labor-Saetze (kuerbis bis goldelfenbein) nur fuer den Erfinder (Labor, js/labor.js; beides js/figurensatz.js)
   figuren: Object.freeze(['cburnett', 'blaupause', 'kuerbis', 'frost', 'gold', 'neon', 'glas', 'holz', 'pixel', 'geo', 'elfenbein', 'marmor', 'moosgeister', 'tiefsee',
-    'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'zombies', 'geister', 'drachen', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos']),
+    'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'zombies', 'geister', 'drachen', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos', 'goldelfenbein']),
   coachStil: Object.freeze(['ausfuehrlich', 'knapp']),
   sprueche: Object.freeze(['an', 'wenig', 'aus']),
   datenfreigabe: Object.freeze(['aus', 'an']),
@@ -424,6 +424,14 @@ export function istWeltFrei(nr, f = ladeFortschritt()) {
 export function hatWeltsiegel(nr, f = ladeFortschritt()) {
   const bots = BOTS.filter((x) => x.welt === nr);
   return bots.length > 0 && bots.every((x) => f.bots[x.id] && f.bots[x.id].sterne.every(Boolean));
+}
+// Erspielbare Stuecke (R19, Variante C): Endgegner einer Welt besiegt; jeder Bot aller Welten mindestens einmal besiegt
+export function endgegnerBesiegt(nr, f = ladeFortschritt()) {
+  const b = endgegnerDerWelt(nr);
+  return !!(b && f.bots[b.id] && f.bots[b.id].sterne[0]);
+}
+export function alleBotsBesiegt(f = ladeFortschritt()) {
+  return BOTS.every((b) => f.bots[b.id] && f.bots[b.id].sterne[0]);
 }
 
 // Hoechste Stufe auf dem normalen Weg (ohne die direkt herausforderbaren Endgegner): Massstab fuer Empfehlungen

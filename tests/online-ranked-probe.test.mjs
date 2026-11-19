@@ -179,6 +179,8 @@ async function bediene(route) {
     const karte = (u) => ({ name: NAMEN[u] || 'Gegner', banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du: u === uid });
     return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
   }
+  // R19 Season: js/karte.js fragt parallel zu karte_der_partie (wie tests/online-ui.test.mjs), hier ohne Abzeichen und Titel
+  if (rpc === 'saison_karte_der_partie') return antwort({ w: { abzeichen: null, titel: null }, s: { abzeichen: null, titel: null } });
   unerwartet.push(`${uid} ${req.method()} ${url.pathname}`); return antwort([]);
 }
 

@@ -68,6 +68,36 @@ export function stufeInfo(i) {
   return { index: s, liga: LIGEN[l], farbe: FARBEN[l], rang: STUFEN_JE_LIGA - (s % STUFEN_JE_LIGA) };
 }
 
+// R19 Season (supabase/saison-schema.sql, Vorschlag): Antworten des Servers mit denselben Grenzen wie dort pruefen.
+// Was nicht passt, wird null bzw. weggelassen, nie eine geratene Zahl.
+const SAISON_TITEL_RE = /^(crownmaster|top10|top100)-s([1-9][0-9]{0,3})$/;
+const ganz = (v, von, bis) => Number.isInteger(v) && v >= von && v <= bis;
+const DATUM_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function saisonAbzeichen(x) {
+  return x && typeof x === 'object' && ganz(x.saison, 1, 9999) && ganz(x.stufe, 0, MAX_INDEX) ? { saison: x.saison, stufe: x.stufe } : null;
+}
+
+export function saisonTitel(id) {
+  const m = typeof id === 'string' ? SAISON_TITEL_RE.exec(id) : null;
+  return m ? { id, art: m[1], saison: Number(m[2]) } : null;
+}
+
+// saison_mein_stand: { saison (0 = Vorsaison), start, woche, wochen, ende, bisher, stufe, abzeichen[], titel[], gewaehlt }
+export function saisonStand(d) {
+  if (!d || typeof d !== 'object' || !ganz(d.saison, 0, 9999) || typeof d.start !== 'string' || !DATUM_RE.test(d.start)) return null;
+  const laeuft = d.saison > 0;
+  if (laeuft && (!ganz(d.wochen, 1, 52) || !ganz(d.woche, 1, d.wochen) || typeof d.ende !== 'string' || !DATUM_RE.test(d.ende))) return null;
+  const abzeichen = (Array.isArray(d.abzeichen) ? d.abzeichen : []).map(saisonAbzeichen).filter(Boolean);
+  const titel = (Array.isArray(d.titel) ? d.titel : []).map(saisonTitel).filter(Boolean);
+  const gewaehlt = saisonTitel(d.gewaehlt);
+  return {
+    saison: d.saison, start: d.start, woche: laeuft ? d.woche : null, wochen: laeuft ? d.wochen : null, ende: laeuft ? d.ende : null,
+    bisher: ganz(d.bisher, 0, MAX_INDEX) ? d.bisher : null, stufe: ganz(d.stufe, 0, MAX_INDEX) ? d.stufe : null,
+    abzeichen, titel, gewaehlt: gewaehlt && titel.some((x) => x.id === gewaehlt.id) ? gewaehlt.id : null,
+  };
+}
+
 export const naechsteStufe = (i) => (index(i) < MAX_INDEX ? index(i) + 1 : null);
 export const vorigeStufe = (i) => (index(i) > 0 ? index(i) - 1 : null);
 

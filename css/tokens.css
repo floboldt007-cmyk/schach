@@ -406,7 +406,7 @@ html[data-brett="tiefenleuchten"] {
 
 /* Spiel-Symbole (js/ui/icons.js spielSymbol, R19 Lobby-Farbe): eine Akzentfarbe je Spielart, fest in hell und dunkel.
    --sp-<art> ist die Mitte (traegt auf dunklem Grund mind. 3:1), --sp-<art>-rand der dunkle Rand (traegt auf hellem
-   Grund), --sp-<art>-hell das Licht oben; --sp-grau-* die nicht aktiven Reiter. tests/r19-lobby-farbe.test.mjs rechnet nach. */
+   Grund), --sp-<art>-hell das Licht oben. tests/r19-lobby-farbe.test.mjs rechnet nach. */
 :root {
   --sp-blitz-hell: #FFE45C; --sp-blitz: #FF7A1A; --sp-blitz-rand: #9A3412;
   --sp-schnell-hell: #8AF5E8; --sp-schnell: #14B8A6; --sp-schnell-rand: #0F5F58;
@@ -415,7 +415,6 @@ html[data-brett="tiefenleuchten"] {
   --sp-turniere-hell: #FFF4A8; --sp-turniere: #F5B800; --sp-turniere-rand: #8A5300;
   --sp-raetsel-hell: #B5D3FF; --sp-raetsel: #3D86FF; --sp-raetsel-rand: #1E3A8A;
   --sp-heim-hell: #FFC39E; --sp-heim-rand: #7A250B;
-  --sp-grau-hell: #DADDE3; --sp-grau: #8D939E; --sp-grau-rand: #4B505A;
 }
 
 /* ---------- Bruecke: alte Variablen auf die neuen Tokens ----------

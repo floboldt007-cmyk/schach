@@ -343,7 +343,7 @@ const EDITION = { produkt_id: 'brett-mitternacht', name: 'Mitternacht & Gold', a
   verkauf_ab: '2026-11-28T10:00:00Z' };
 
 // Shop mit gefaelschtem Server: edition_staende liefert [] ohne Altersangabe (wie supabase/werkstatt-schema.sql)
-async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop', vorher = {} } = {}) {
+async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop', vorher = {}, kennung = '' } = {}) {
   const k = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
   const s = await k.newPage();
   const srv = { ab18: false, editionen: [EDITION], sonder: [], ...server };
@@ -368,7 +368,7 @@ async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop
       for (const [k, v] of Object.entries(vorher)) localStorage.setItem(k, v);
     } catch (e) { /* egal */ }
   }, { sitzung, vorher });
-  await s.goto(BASIS + '#ich');
+  await s.goto(BASIS + kennung + '#ich');
   await s.waitForSelector('.sa-screen', { timeout: 30000 });
   // Etappe 4b: beim Start gebuchte Stufen zeigt "Ich" als Freischalt-Moment; wegtippen, wie ein Spieler es tut
   await warte(400);
@@ -379,9 +379,12 @@ async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop
   return { k, s, srv, anfragen, fehlerListe, moment };
 }
 
+// Der alte Shop (Anmelden, Altersfrage, Anprobe) kommt seit Shop A fuer alle (16.11.) nur noch mit ?shopStil=alt;
+// Shop A selbst prueft tests/r19-shop-fortnite.test.mjs
+const ALT = '&shopStil=alt';
 async function shopTeil(browser) {
   // abgemeldet: ein Satz und der Weg zum Konto, keine Anfrage an den Server
-  let p = await shopSeite(browser);
+  let p = await shopSeite(browser, { kennung: ALT });
   let text = await p.s.locator('.sh-bereich').innerText();
   pruefe('Shop abgemeldet: Hinweis ab 18 und Weg zum Konto, keine Editionen-Anfrage', /ab 18 Jahren/.test(text) && /Zum Konto/.test(text)
     && !p.anfragen.some((a) => a.url.includes('edition_staende')), text);
@@ -410,7 +413,7 @@ async function shopTeil(browser) {
   await p.k.close();
 
   // angemeldet ohne Altersangabe: einmal fragen, danach die Edition
-  p = await shopSeite(browser, { sitzung: SITZUNG });
+  p = await shopSeite(browser, { sitzung: SITZUNG, kennung: ALT });
   await p.s.waitForSelector('.sh-bereich .knopf', { timeout: 15000 });
   text = await p.s.locator('.sh-bereich').innerText();
   pruefe('Shop ohne Altersangabe: Frage und Knopf „Ich bin 18 oder älter“, noch keine Karte', /18 oder älter/.test(text)
@@ -444,7 +447,7 @@ async function shopTeil(browser) {
   await p.k.close();
 
   // angemeldet mit Altersangabe, aber nur unbekannte Produkte: ruhiger Satz statt leerer Karte
-  p = await shopSeite(browser, { sitzung: SITZUNG, server: { ab18: true, editionen: [{ ...EDITION, produkt_id: 'figuren-unbekannt' }] } });
+  p = await shopSeite(browser, { sitzung: SITZUNG, server: { ab18: true, editionen: [{ ...EDITION, produkt_id: 'figuren-unbekannt' }] }, kennung: ALT });
   await p.s.waitForFunction(() => /Vorbereitung/.test(document.querySelector('.sh-bereich')?.innerText || ''), null, { timeout: 15000 }).catch(() => {});
   text = await p.s.locator('.sh-bereich').innerText();
   pruefe('Shop: unbekanntes Produkt zeigt „in Vorbereitung“, keine Altersfrage', /in Vorbereitung/.test(text) && !/18 oder älter/.test(text), text);
@@ -485,7 +488,8 @@ async function erfinderTeil(browser) {
   }, plaetze), plaetze.length);
   pruefe('Erfinder: alle Finisher frei (Labor, mit Schild), auch auf Level 1 (kein Schloss), mit Szenenbild und echten Figuren', await p.s.evaluate(() => {
     const t = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')];
-    return t.length === 5 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
+    // R19 emotes-finisher: fuenf bisherige und drei neue (Blitzschlag, Goldregen, Schockwelle)
+    return t.length === 8 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
       && t.filter((x) => x.querySelector('.sa-bild svg.sk-finisher image[href*="/assets/pieces/"]')).length >= 3;
   }));
   await p.s.locator('.er-figuren').click();
@@ -549,8 +553,11 @@ async function erfinderTeil(browser) {
   await p.s.evaluate(() => window.__app.gehe('ich', { bereich: 'finisher' }));
   await p.s.waitForSelector('.sa-screen', { timeout: 15000 }).catch(() => {});
   await warte(500);
-  // Flo 01.11.2026: "Finisher ins Labor, nur ich soll die sehen, die kommen in den Shop"
-  pruefe('Ohne Sonderstücke: kein Finisher-Bereich (Labor, später Shop)', await p.s.locator('.sa-bereich[data-bereich="finisher"], .sa-platz[data-bereich="finisher"]').count() === 0);
+  // R19, Variante C: den Bereich sehen alle, jeder Finisher nennt seinen Weg; die Signatur bleibt ohne Sonderstueck unsichtbar
+  pruefe('Ohne Sonderstücke: Finisher-Bereich mit sieben gesperrten Stücken, ohne Schild Labor', await p.s.evaluate(() => {
+    const t = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')];
+    return t.length === 7 && t.every((x) => x.dataset.zustand === 'zu' && !x.querySelector('.sa-labor'));
+  }));
   await p.k.close();
 }
 
@@ -590,13 +597,14 @@ async function laborTeil(browser) {
     && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));
   await waehle(p.s, 'figuren');
   const saetze = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="figuren"] .sa-teil')].map((x) => x.dataset.teil).join());
-  pruefe('Labor: Figurensätze Klassisch, Blaupause, dann Drachen, Zombies, Geister, Lava-Golem, Piraten, Ägypten, Wikinger, Dinos, Feuer, Stein, Halloween, Weihnachten, Ostern, Weltraum, Roboter, Naschwerk, Moosgeister, Tiefsee und die Materialien', saetze === 'figuren-cburnett,figuren-blaupause,figuren-drachen,figuren-zombies,figuren-geister,figuren-lavagolem,figuren-piraten,figuren-aegypten,figuren-wikinger,figuren-dinos,figuren-feuer,figuren-stein,figuren-halloween,figuren-weihnachten,figuren-ostern,figuren-weltraum,figuren-roboter,figuren-naschwerk,figuren-moosgeister,figuren-tiefsee,figuren-elfenbein,figuren-holz,figuren-marmor,figuren-gold,figuren-glas,figuren-neon,figuren-frost,figuren-kuerbis,figuren-pixel,figuren-geo', saetze);
+  pruefe('Labor: Figurensätze Klassisch, Blaupause, Gold und Elfenbein, dann Drachen, Zombies, Geister, Lava-Golem, Piraten, Ägypten, Wikinger, Dinos, Feuer, Stein, Halloween, Weihnachten, Ostern, Weltraum, Roboter, Naschwerk, Moosgeister, Tiefsee und die Materialien', saetze === 'figuren-cburnett,figuren-blaupause,figuren-goldelfenbein,figuren-drachen,figuren-zombies,figuren-geister,figuren-lavagolem,figuren-piraten,figuren-aegypten,figuren-wikinger,figuren-dinos,figuren-feuer,figuren-stein,figuren-halloween,figuren-weihnachten,figuren-ostern,figuren-weltraum,figuren-roboter,figuren-naschwerk,figuren-moosgeister,figuren-tiefsee,figuren-elfenbein,figuren-holz,figuren-marmor,figuren-gold,figuren-glas,figuren-neon,figuren-frost,figuren-kuerbis,figuren-pixel,figuren-geo', saetze);
   await ruesteAus(p.s, 'figuren-kuerbis');
   await waehle(p.s, 'klaenge');
   await ruesteAus(p.s, 'klang-holz');
   pruefe('Ausrüsten: Klangset per Tipp gewählt', await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').klangpaket) === 'holz');
   const klaenge = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="klaenge"] .sa-teil')].filter((x) => x.querySelector('.sa-labor')).map((x) => x.dataset.teil).join());
-  pruefe('Labor: Klangsets Juwel, Grusel und Kristall mit Schild', klaenge === 'klang-juwel,klang-grusel,klang-kristall', klaenge);
+  // R19: Polarlicht und Donner kommen als Labor-Sets dazu (tests/r19-emotes-finisher.test.mjs)
+  pruefe('Labor: Klangsets Juwel, Grusel, Kristall, Polarlicht und Donner mit Schild', klaenge === 'klang-juwel,klang-grusel,klang-kristall,klang-polarlicht,klang-donner', klaenge);
   await ruesteAus(p.s, 'klang-grusel');
   pruefe('Labor: Grusel per Tipp gewählt und aktiv', await p.s.evaluate(async () => {
     const { klang } = await import('./js/sounds.js');
@@ -782,8 +790,8 @@ async function browserTeil() {
       await s.waitForSelector('.sa-screen', { timeout: 15000 });
       await warte(700);
       const bereiche = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich')].map((x) => x.dataset.bereich).join());
-      // ohne Erfinder-Konto keine Finisher (Labor, Flo 01.11.2026)
-      pruefe(`${name}: acht Bereiche (Emotes, Titel, Banner, Rahmen, Bretter, Klänge, Erfolge, Shop), keine Finisher`, bereiche === 'emotes,titel,banner,rahmen,bretter,klaenge,erfolge,shop', bereiche);
+      // Finisher sehen seit R19 alle (Variante C, gesperrte Stuecke nennen ihren Weg)
+      pruefe(`${name}: neun Bereiche (Finisher, Emotes, Titel, Banner, Rahmen, Bretter, Klänge, Erfolge, Shop)`, bereiche === 'finisher,emotes,titel,banner,rahmen,bretter,klaenge,erfolge,shop', bereiche);
       // R4a (Kritik 09.11., pc-ich.jpg): am PC war die Liste "So sehen dich andere" 704 px, die Profilkarte 884 px breit;
       // eine leere Vitrine (neuer Spieler) war drei grosse Kaesten; die Banner-Vorschau zeigte nur den leeren Teil des Banners
       const ich = await s.evaluate(() => {
