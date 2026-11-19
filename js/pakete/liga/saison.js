@@ -92,7 +92,7 @@ export function zeigeLigen(aktuell = null, wochen = SAISON_WOCHEN) {
     const stufen = [2, 1, 0].map((r) => l * STUFEN_JE_LIGA + r);
     return `<section class="ss-ligen-liga" data-liga="${esc(liga)}"${stufen.includes(ist) ? ' data-hier=""' : ''}>
       <div class="ss-ligen-kopf">${symbol(l * STUFEN_JE_LIGA, 40)}<div><h4>${esc(t('p-liga.kliga.' + liga))}</h4>
-        <p class="ss-ligen-satz">${esc(T('ligen.satz.' + liga, w))}</p></div></div>
+        <p class="ss-ligen-satz">${esc(T('ligen.satz.' + liga, w) + (liga === 'koenig' && paket2Frei() ? ' ' + T('ligen.crownmaster') : ''))}</p></div></div>
       <ol class="ss-ligen-stufen">${stufen.map((i) => `<li class="ss-ligen-stufe"${i === ist ? ' aria-current="true"' : ''}>
         <span class="ss-ligen-name">${esc(stufenName(i))}</span>${i === ist ? `<span class="ss-ligen-du">${esc(T('ligen.du'))}</span>` : ''}</li>`).join('')}</ol>
     </section>`;
