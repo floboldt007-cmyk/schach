@@ -6,6 +6,10 @@ on:
 
 jobs:
   chromium:
+    # Zeitgrenzen (19.11.2026, Auftrag fc-18:11): 1,5x die laengste Dauer aus den letzten 15 gruenen Laeufen
+    # (chromium 50 min, webkit 25 min, sql 2 min; Playwright installieren hoechstens 17 min). Ohne Grenze hing
+    # webkit in Lauf 44531912225 ueber 3 Stunden an apt; die Vorgabe von GitHub waere 360 min.
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -17,6 +21,7 @@ jobs:
         with:
           node-version: 22
       - name: Playwright installieren
+        timeout-minutes: 30
         run: |
           # Feste Version (Luecken-Check 7): ein Update kommt nur bewusst, nie still ueber Nacht
           npm install --no-save playwright@1.64.1
@@ -45,6 +50,7 @@ jobs:
     # Fuehrt die Kronen-SQL wirklich aus (PGlite = Postgres als WebAssembly, ohne Netz zu einer Datenbank).
     # Ersetzt nicht den einmaligen Lauf von supabase/kronen-rls-test.sql im Supabase SQL Editor vor dem Einspielen.
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,12 +97,14 @@ jobs:
     # Fest auf 24.04: Mit dem Wechsel von ubuntu-latest auf 26.04 (29.10.2026) kam die Figur im Brett-Test
     # (setzeDauer 400) unter WebKit nicht mehr nach 520 ms an (gleiche Playwright-WebKit v2370, aber deren Build fuer 26.04). Offen: Ursache klaeren.
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Playwright installieren
+        timeout-minutes: 30
         run: |
           # Feste Version (Luecken-Check 7): ein Update kommt nur bewusst, nie still ueber Nacht
           npm install --no-save playwright@1.64.1

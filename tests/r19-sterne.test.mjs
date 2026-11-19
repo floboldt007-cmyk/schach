@@ -123,13 +123,25 @@ async function messeOrte(s, gruppe, gesehen) {
       const an = await el.evaluate(verdient);
       const clip = { x: Math.max(0, box.x - 2), y: Math.max(0, box.y - 2), width: Math.min(vp.width - Math.max(0, box.x - 2), box.width + 4),
         height: Math.min(vp.height - Math.max(0, box.y - 2), box.height + 4) };
-      const mit = await s.screenshot({ clip, animations: 'disabled' });
-      await el.evaluate((e) => e.style.setProperty('visibility', 'hidden', 'important'));
-      const ohne = await s.screenshot({ clip, animations: 'disabled' });
-      await el.evaluate((e) => e.style.removeProperty('visibility'));
-      const x = await bildVergleich(s, mit, ohne);
+      const messe = async () => {
+        const mit = await s.screenshot({ clip, animations: 'disabled' });
+        await el.evaluate((e) => e.style.setProperty('visibility', 'hidden', 'important'));
+        const ohne = await s.screenshot({ clip, animations: 'disabled' });
+        await el.evaluate((e) => e.style.removeProperty('visibility'));
+        return bildVergleich(s, mit, ohne);
+      };
+      const passt = (m) => !m.fehler && m.kontrast >= 3 && (an ? m.ton !== null && m.ton >= 30 && m.ton <= 55 : m.hohl);
+      let x = await messe();
       gesehen.add(ort);
       const name = `${gruppe} ${ort} #${i + 1} ${an ? 'verdient' : 'nicht verdient'}`;
+      // ein Ausreisser wird einmal nachgemessen (CI 44530528156: ein Umriss-Stern einmal als gefuellt gemessen, lokal mit
+      // demselben Zustand 24/24 hohl); ein echter Darstellungsfehler faellt auch beim zweiten Mal durch und bleibt rot
+      if (!passt(x)) {
+        const erst = x;
+        await warte(300);
+        x = await messe();
+        console.log(`     zweite Messung ${name}: erst ${JSON.stringify(erst)}, dann ${JSON.stringify(x)}`);
+      }
       if (x.fehler) { pruefe(`${name}: messbar`, false, x); continue; }
       if (an && !gesehen.has(ort + ':an')) { gesehen.add(ort + ':an'); console.log(`     Messwert ${name}: ${x.kontrast}:1, Farbton ${x.ton}, rgb(${x.farbe})`); }
       if (!an && !gesehen.has(ort + ':aus')) { gesehen.add(ort + ':aus'); console.log(`     Messwert ${name}: ${x.kontrast}:1, hohl ${x.hohl}, rgb(${x.farbe})`); }
@@ -214,6 +226,14 @@ try {
         await s.waitForSelector('.vl-sterne', { timeout: 20000 });
         await warte(500);
         await messeOrte(s, gruppe + ' Verlauf', gesehen);
+        // fest: jeder Verlauf-Stern einmal verdient und einmal nicht, unabhaengig vom Partieausgang (Stockfish, nicht fest:
+        // "alle drei aus" kam vorher nur bei einer Partie mit 0 Sternen vor). Gemessen wird dieselbe CSS-Regel
+        // (css/app.css :is(.an-vs-sterne, .vl-sterne) > .aus, css/verlauf.css .vl-sterne .an), die Klassen wie js/ui/verlauf.js:286
+        for (const zustand of ['an', 'aus']) {
+          await s.evaluate((z) => document.querySelectorAll('.vl-sterne > span').forEach((e) => { e.className = z; }), zustand);
+          await warte(300);
+          await messeOrte(s, `${gruppe} Verlauf fest ${zustand}`, gesehen);
+        }
         await s.goto(`http://127.0.0.1:${PORT}/tests/screens.html?screen=analyse&partieId=${id}&neueSterne=1,0,0`);
         await s.waitForFunction(() => window.testseiteBereit === true, null, { timeout: 30000 });
         await s.evaluate((m) => { document.documentElement.dataset.modus = m; }, farbe);

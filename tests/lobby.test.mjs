@@ -362,10 +362,16 @@ async function browserTeil() {
       // seit der Seitenleiste (Etappe A) beginnt der Rand des Screens rechts neben ihr
       // seit die Beispiel-Liga weg ist (Flo 08.11.2026) passt die Lobby auf 820 px Hoehe: zum Rollen-Test niedriger machen
       await p.s.setViewportSize({ width: 1180, height: 520 });
-      await warte(300);
+      // CI-WebKit (44530092435, 44518125542) mass zweimal st 135 bei max 206, lokal nie: das Rad kam, bevor das Layout nach
+      // dem Verkleinern stand, oder WebKit rollte nach 500 ms noch. Darum: erst warten, bis die Rollhoehe 300 ms gleich bleibt,
+      // nach dem Rad bis zu 3 s auf das Ende. Rollt die Lobby am Rand nicht bis unten, bleibt die Pruefung rot.
+      await p.s.waitForFunction(() => { const r = document.querySelector('.lb-rumpf'); const m = r.scrollHeight - r.clientHeight;
+        const w = window.__lbRoll; const jetzt = performance.now();
+        if (!w || w.m !== m) { window.__lbRoll = { m, seit: jetzt }; return false; } return jetzt - w.seit >= 300; }, null, { timeout: 5000, polling: 50 });
       await p.s.mouse.move(await p.s.evaluate(() => (document.querySelector('.reiter-leiste[data-lage="seite"]')?.getBoundingClientRect().right ?? 0) + 20), 400);
       await p.s.mouse.wheel(0, 4000);
-      await warte(500);
+      await p.s.waitForFunction(() => { const r = document.querySelector('.lb-rumpf'); return r.scrollTop >= r.scrollHeight - r.clientHeight - 1; },
+        null, { timeout: 3000, polling: 50 }).catch(() => {});
       const rollen = await p.s.evaluate(() => { const r = document.querySelector('.lb-rumpf'); return { st: Math.round(r.scrollTop), max: r.scrollHeight - r.clientHeight }; });
       pruefe('iPad quer: am Rand gewischt rollt die Lobby bis ganz unten', rollen.max > 0 && rollen.st >= rollen.max - 1, rollen);
       await p.s.locator('.screen.lobby .lb-modus [data-modus="welten"]').click();
