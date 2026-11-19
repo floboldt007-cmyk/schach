@@ -126,7 +126,7 @@ const SUITEN = [
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
-  { name: 'seitenfehler-stelle', datei: 'seitenfehler-stelle.test.mjs', args: [], was: 'Seitenfehler nennen die erste Code-Stelle (Chromium und WebKit)' },
+  { name: 'seitenfehler-stelle', datei: 'seitenfehler-stelle.test.mjs', args: [], was: 'Seitenfehler nennen die erste Code-Stelle; Worker-Wechsel-Abbruch nur fuer die eigene Adresse still' },
   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
   { name: 'info-lizenzen', datei: 'info-lizenzen.test.mjs', args: [], was: 'Info und Lizenzen: jede Fremdlizenz und der eigene Quellcode in DE und EN, Herkunft Kuerbis/Frost/Gold, Gold und Elfenbein als bearbeitetes cburnett (Browser)' },
   { name: 'r19-figuren-gold', datei: 'r19-figuren-gold.test.mjs', args: [], was: 'Labor-Figuren Gold und Elfenbein: 12 eigene Dateien mit fester Pruefsumme, Eintraege und Herkunft, auf jedem Brett Kante ab 3:1 und Weiss/Schwarz ab 25 L* (Browser)' },

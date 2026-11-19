@@ -1,7 +1,7 @@
 // Stellen-Suche fuer Seitenfehler (tests/seitenfehler-stelle.mjs): aus dem Stapel eines pageerror die erste Code-Stelle,
 // damit ein Seitenfehler im CI-Protokoll sagt, ob er aus der App oder aus einem Skript des Tests kommt (Diagnose M-14:30).
 // Stapel in beiden Schreibweisen: Chromium ("    at f (url:z:s)") und WebKit ("f@url:z:s"). Reiner Node-Test, kein Browser.
-import { stelleAusStapel } from './seitenfehler-stelle.mjs';
+import { stelleAusStapel, swWechselFilter } from './seitenfehler-stelle.mjs';
 
 const ergebnisse = [];
 function pruefe(name, ok, detail = '') {
@@ -55,6 +55,57 @@ gleich('B3 mehrzeilige Meldung mit Folgezeile "at ..." zaehlt nicht',
   stelleAusStapel(`Error: ${b3}\n    at echt (http://127.0.0.1:4321/js/y.js:3:4)`, b3), 'at echt (/js/y.js:3:4)');
 gleich('Meldung, die im Stapel fehlt, aendert nichts',
   stelleAusStapel('zeige@http://127.0.0.1:4321/js/ui/verlauf.js:12:5', 'andere Meldung'), 'zeige@/js/ui/verlauf.js:12:5');
+
+// Worker-Wechsel (WebKit in der CI, Laeufe 44538473111, 44530007843, 44519489369): die eigene 7-s-Anfrage __langsam laeuft
+// durch den alten Worker, der beim Uebernehmen der neuen Fassung endet. WebKit meldet das dreimal: requestfailed mit Adresse,
+// pageerror und Konsole ohne Adresse. Still wird es nur fuer die eigene Adresse, und eine Meldung nur mit passender Anfrage.
+const EIGEN = 'http://127.0.0.1:4321/';
+const ZU = 'Service Worker context closed';
+{
+  const f = swWechselFilter(EIGEN), fehler = [];
+  const ab = f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  f.melde('konsole', 'Failed to load resource: ' + ZU, '', 'Failed to load resource: ' + ZU, fehler);
+  pruefe('Wechsel: eigene Anfrage zuerst, danach Seite und Konsole: alles still', ab && fehler.length === 0, { ab, fehler });
+}
+{
+  const f = swWechselFilter(EIGEN), fehler = [];
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  f.melde('konsole', 'Failed to load resource: ' + ZU, '', 'Failed to load resource: ' + ZU, fehler);
+  const vorher = fehler.length;
+  const ab = f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  pruefe('Wechsel: Meldungen vor der Anfrage werden mit ihr wieder still', vorher === 2 && ab && fehler.length === 0, { vorher, ab, fehler });
+}
+{
+  const f = swWechselFilter(EIGEN), fehler = [];
+  const ab = f.anfrage(ZU, 'https://fremd.example/x.js', fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  pruefe('Gegenprobe: dieselbe Meldung fuer eine fremde Adresse bleibt rot', !ab && fehler.length === 1, { ab, fehler });
+}
+{
+  const f = swWechselFilter(EIGEN), fehler = [];
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  pruefe('Gegenprobe: Meldung ohne passende Anfrage bleibt rot', fehler.length === 1, fehler);
+}
+{
+  const f = swWechselFilter(EIGEN), fehler = [];
+  f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  pruefe('Gegenprobe: je Anfrage nur eine Meldung jeder Art still', fehler.length === 1, fehler);
+}
+{
+  const f = swWechselFilter(EIGEN), fehler = [];
+  const ab = f.anfrage('Load failed', EIGEN + 'schach/a.js', fehler);
+  f.melde('seite', 'Service Worker context closed bei x', '', 'Seitenfehler: Service Worker context closed bei x', fehler);
+  pruefe('Gegenprobe: anderer Grund und andere Meldung bleiben Fehler', !ab && fehler.length === 1, { ab, fehler });
+}
+{
+  const f = swWechselFilter(EIGEN), fehler = [];
+  f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  f.melde('konsole', 'Failed to load resource: ' + ZU, 'https://fremd.example/y', 'Failed to load resource: ' + ZU + ' @ https://fremd.example/y', fehler);
+  pruefe('Gegenprobe: Konsolenmeldung mit fremder Adresse bleibt rot', fehler.length === 1, fehler);
+}
 
 const gut = ergebnisse.filter((e) => e.ok).length;
 console.log(`\n${gut}/${ergebnisse.length} bestanden`);

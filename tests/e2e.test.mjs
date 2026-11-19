@@ -22,7 +22,7 @@ import { readFileSync, statSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { leseSw } from './sw.test.mjs';
 import { browserTyp } from './browser.mjs';
-import { stelleAusStapel } from './seitenfehler-stelle.mjs';
+import { stelleAusStapel, swWechselFilter } from './seitenfehler-stelle.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -124,6 +124,7 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
   kontext.setDefaultNavigationTimeout(30000);
   const fehler = [];
   const fehlgeschlagen = [];
+  const swWechsel = swWechselFilter(`http://127.0.0.1:${PORT}/`);
   const beobachte = (seite) => {
     const auswerten = seite.evaluate.bind(seite);
     seite.evaluate = (...args) => begrenzt(`${gruppe}: Browserauswertung`, () => auswerten(...args));
@@ -133,7 +134,7 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
       if (m.type() === 'info' && /^SW-Ablauf/.test(m.text())) merke(m.text());
       if (m.type() !== 'error') return;
       const url = (m.location() && m.location().url) || '';
-      fehler.push(m.text() + (url ? ' @ ' + url : ''));
+      swWechsel.melde('konsole', m.text(), url, m.text() + (url ? ' @ ' + url : ''), fehler);
     });
     seite.on('pageerror', (e) => {
       // WebKit meldet einen beim Neuladen abgebrochenen Abruf der eigenen Seite (z. B. ein Klang, der gerade laedt, waehrend
@@ -143,12 +144,14 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
       if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
       // die erste Stelle aus dem Stapel: kommt der Fehler aus der App oder aus einem Skript des Tests?
       const stelle = stelleAusStapel(e.stack, e.message);
-      fehler.push('Seitenfehler: ' + e.message + (stelle ? ' [' + stelle + ']' : ''));
+      swWechsel.melde('seite', e.message, '', 'Seitenfehler: ' + e.message + (stelle ? ' [' + stelle + ']' : ''), fehler);
     });
     seite.on('requestfailed', (r) => {
       const grund = r.failure() ? r.failure().errorText : '?';
       // beim Neuladen abgebrochen: kein Fehler (Chromium ERR_ABORTED, WebKit: Load request cancelled, Firefox NS_BINDING_ABORTED)
       if (/ERR_ABORTED|Load request cancelled|NS_BINDING_ABORTED/.test(grund)) return;
+      // WebKit (CI): eigene Anfrage im alten Worker, der beim Uebernehmen endet (Update b4b, __langsam): wie oben ein Abbruch
+      if (swWechsel.anfrage(grund, r.url(), fehler)) return;
       fehlgeschlagen.push(`${grund} ${r.url()}`);
     });
     seite.on('response', (r) => { if (r.status() >= 400) fehlgeschlagen.push(`${r.status()} ${r.url()}`); });
