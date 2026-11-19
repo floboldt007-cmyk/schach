@@ -90,11 +90,19 @@ async function bildVergleich(s, a, b) {
     const mittel = ['r', 'g', 'b'].map((c) => stark.reduce((s, p) => s + p[c], 0) / stark.length);
     const [r, g, bl] = mittel, mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), dd = mx - mn;
     const ton = dd < 12 ? null : Math.round(((mx === r ? ((g - bl) / dd) % 6 : mx === g ? (bl - r) / dd + 2 : (r - g) / dd + 4) * 60 + 360) % 360);
-    // Mitte des Sterns: der Schwerpunkt liegt beim Stern etwas unter der Mitte des Rahmens (Spitze oben)
-    const cx = Math.round((x0 + x1) / 2), cy = Math.round(y0 + (y1 - y0) * 0.55);
-    let hohl = true;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (gemalt(((cy + dy) * m.w + cx + dx) * 4)) hohl = false;
-    return { kontrast: Math.round(kontrast * 100) / 100, ton, farbe: mittel.map(Math.round), hohl, n: px.length, groesse: [x1 - x0 + 1, y1 - y0 + 1] };
+    // hohl = der Umriss schliesst ungemalte Pixel ein, die vom Bildrand aus nicht erreichbar sind (Flutung ueber ungemalte
+    // Pixel). Bis 19.11. pruefte ein 3x3-Fleck bei 55 % der Hoehe: das Loch eines 13-px-Sterns ist auf dem iPhone nur wenige
+    // Bildpixel breit, in der CI (Linux, Stern #3 einen Unterpixel versetzt) traf der Fleck den Rand (CI 44591682763, Bilder).
+    const frei = new Uint8Array(m.w * m.h), stapel = [];
+    const rein = (x, y) => { const k = y * m.w + x; if (frei[k] || gemalt(k * 4)) return; frei[k] = 1; stapel.push(k); };
+    for (let x = 0; x < m.w; x++) { rein(x, 0); rein(x, m.h - 1); }
+    for (let y = 0; y < m.h; y++) { rein(0, y); rein(m.w - 1, y); }
+    while (stapel.length) { const k = stapel.pop(), x = k % m.w, y = (k - x) / m.w;
+      if (x > 0) rein(x - 1, y); if (x < m.w - 1) rein(x + 1, y); if (y > 0) rein(x, y - 1); if (y < m.h - 1) rein(x, y + 1); }
+    let loch = 0;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const k = y * m.w + x; if (!frei[k] && !gemalt(k * 4)) loch++; }
+    const hohl = loch >= 3;
+    return { kontrast: Math.round(kontrast * 100) / 100, ton, farbe: mittel.map(Math.round), hohl, loch, n: px.length, groesse: [x1 - x0 + 1, y1 - y0 + 1] };
   }, [a.toString('base64'), b.toString('base64')]);
 }
 
@@ -161,6 +169,8 @@ async function messeOrte(s, gruppe, gesehen) {
       if (!an && !gesehen.has(ort + ':aus')) { gesehen.add(ort + ':aus'); console.log(`     Messwert ${name}: ${x.kontrast}:1, hohl ${x.hohl}, rgb(${x.farbe})`); }
       pruefe(`${name}: mind. 3:1 gegen den Grund`, x.kontrast >= 3, x);
       if (an) pruefe(`${name}: golden (Farbton 30 bis 55 Grad)`, x.ton !== null && x.ton >= 30 && x.ton <= 55, x);
+      // Gegenprobe zur Loch-Messung: ein gefuellter Stern schliesst nichts ein
+      if (an) pruefe(`${name}: gefuellt (kein eingeschlossenes Loch)`, !x.hohl, x);
       else pruefe(`${name}: als Umriss (Mitte bleibt Grund)`, x.hohl, x);
     }
   }
