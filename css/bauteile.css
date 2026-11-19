@@ -73,6 +73,9 @@
 .sheet-karte p { margin: 8px 0 0; color: var(--text-2); font-weight: 600; }
 .sheet-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
 .sheet-knoepfe .knopf { width: 100%; }
+/* nur ein Knopf: ueber die ganze Breite statt in der linken von zwei Spalten (wie schon .sa-blatt, Auftrag M-12:55,
+   Probe tests/sheet-knoepfe.test.mjs). Ohne :has bleibt es beim alten Bild */
+.sheet-knoepfe:has(> :only-child) { grid-template-columns: 1fr; }
 .sheet-ort.weg { pointer-events: none; }
 @media (max-width: 440px) {
   .sheet-knoepfe { grid-template-columns: 1fr; }
