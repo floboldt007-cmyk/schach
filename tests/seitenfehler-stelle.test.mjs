@@ -2,6 +2,7 @@
 // damit ein Seitenfehler im CI-Protokoll sagt, ob er aus der App oder aus einem Skript des Tests kommt (Diagnose M-14:30).
 // Stapel in beiden Schreibweisen: Chromium ("    at f (url:z:s)") und WebKit ("f@url:z:s"). Reiner Node-Test, kein Browser.
 import { stelleAusStapel, swWechselFilter, eigenerZugriffsAbbruch } from './seitenfehler-stelle.mjs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 const ergebnisse = [];
 function pruefe(name, ok, detail = '') {
@@ -167,6 +168,15 @@ const TESTANFRAGE = (u) => u.startsWith(EIGEN) && /\/__langsam\?/.test(u);
     ohneStrich('/127.0.0.1:43210/a.mp3 due to access control checks.') === false);
   pruefe('B2: eigen ohne Schraegstrich, eigene Adresse still', ohneStrich('/127.0.0.1:4321/a.mp3 due to access control checks.') === true);
   pruefe('B2: Adresse endet direkt nach dem Port: still', ohneStrich('http://127.0.0.1:4321 due to access control checks.') === true);
+}
+// fc-18:11 Zusatz 10: keine Testdatei prueft diese Ausnahme noch selbst per includes (heim.test.mjs hatte zwei Stellen);
+// jede Ausnahme fuer "due to access control checks" geht ueber eigenerZugriffsAbbruch()
+{
+  const ordner = new URL('./', import.meta.url);
+  const alt = readdirSync(ordner).filter((d) => /\.m?js$/.test(d)).flatMap((d) => readFileSync(new URL(d, ordner), 'utf8').split('\n')
+    .map((z, i) => ({ d, i: i + 1, z })).filter(({ z }) => /due to access control checks/.test(z) && /\.includes\(/.test(z)))
+    .map(({ d, i }) => `${d}:${i}`);
+  pruefe('keine Testdatei filtert "due to access control checks" per includes', alt.length === 0, alt);
 }
 
 const gut = ergebnisse.filter((e) => e.ok).length;
