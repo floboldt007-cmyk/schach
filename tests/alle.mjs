@@ -35,6 +35,7 @@ const SUITEN = [
   { name: 'testserver', datei: 'testserver.test.mjs', args: [], was: 'Gemeinsamer Test-Server der Browser-Suiten: MIME-Typen, 404/301/304, Last ohne Verweigerung' },
   { name: 'konto', datei: 'konto.test.mjs', args: [], was: 'Konto, Anmeldung und Cloud-Spielstand' },
   { name: 'konto-link', datei: 'konto-link.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster (Dialoge, Uhr)', was: 'Anmelde-Link: Rückkehr, Abgleich-Riegel, zwei Tabs (Browser)' },
+  { name: 'dialog-zuklappen', datei: 'dialog-zuklappen.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster (Dialoge, Uhr)', was: 'Rueckfrage-Dialog: Tipp auf den Schleier loest nichts darunter aus, Klick 50 ms nach dem Schliessen kommt an (iPhone 13, SE, PC)' },
   { name: 'apple-knopf', datei: 'apple-knopf.test.mjs', args: [], was: 'Anmeldeblatt: abgeschalteter Apple-Weg berechnet unsichtbar, Google und Code-Anmeldung sichtbar (Browser)' },
   { name: 'online', datei: 'online.test.mjs', args: [], was: 'Online gegen Freunde: Einladung, Zuege, Abfrage' },
   { name: 'online-haengt-vertrag', datei: 'online-haengt-vertrag.test.mjs', args: [], was: 'Haengende Online-Partie: Client wartet gewertet ranked_haengt_s + 1 s, sonst 10 Min (Vertrag mit zwei-ligen-schema.sql)' },
