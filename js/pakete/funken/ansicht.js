@@ -162,6 +162,7 @@ function postenListe(e, botName) {
     if (e.th) p.push([tx('abr.theorie'), e.th]);
     if (e.e) p.push([e.hilfe ? tx('abr.halbiert', { name: ergebnisName(e.erg) }) : ergebnisName(e.erg), e.e]);
     // ohne Ergebnis-Funken sagt die Zeile, warum (auch wenn die Zuege Funken brachten, z. B. ein Schaefermatt)
+    // INTENTIONAL-SPECIAL-CASE: 'kurz' ist der gespeicherte Grund (stand.js gr); ohne Sieg ist die ganze Partie 0, eigener Satz
     else if (e.gr === 'kurz' && e.erg !== 'sieg') p.push([tx('abr.kurzOhneSieg'), null]);
     else if (e.gr === 'kurz' || e.erg === 'sieg' || e.erg === 'remis') p.push([tx('abr.kurz'), null]);
     else if (e.erg === 'niederlage') p.push([tx('abr.kampfgeist', { n: R.KAMPFGEIST_ZUEGE }), null]);
