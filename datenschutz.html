@@ -253,7 +253,7 @@
 
   <!-- R19 (Seasons, supabase/saison-schema.sql), Stand 14.11.2026: Pruefung durch eine fachkundige Person steht aus -->
   <h3>Seasons</h3>
-  <p>Die Online-Liga läuft in Seasons zu je 8 Wochen, die erste beginnt am 4. Januar 2027. Am Ende einer Season rechnet die
+  <p id="seasons">Die Online-Liga läuft in Seasons zu je 8 Wochen, die erste beginnt am 4. Januar 2027. Am Ende einer Season rechnet die
   Datenbank selbst ab und speichert für jedes Konto, das in ihr gespielt hat:</p>
   <ul>
     <li>ein Abzeichen mit der Nummer der Season und der besten Liga-Stufe, die du in ihr erreicht hast,</li>
@@ -279,13 +279,15 @@
   „Wo und durch wen“). Du kannst die Einwilligung jederzeit widerrufen, indem du den Schalter wieder ausschaltest (Art. 7
   Abs. 3 DSGVO); der Server gibt Abzeichen und Titel dann sofort nicht mehr weiter und löscht den Zeitpunkt der
   Bestätigung. Die Rechtmäßigkeit der Anzeige bis zum Widerruf bleibt davon unberührt. Die Angabe wird mit deinem Konto
-  gelöscht und ist in „Meine Daten herunterladen“ enthalten.</p>
+  gelöscht und ist in „Meine Daten herunterladen“ enthalten. Ohne die Anzeige bleibt alles andere gleich: Liga, Seasons
+  und Online-Partien funktionieren genauso, dein Gegner sieht dann nur kein Abzeichen und keinen Season-Titel.</p>
 
   <!-- R19 (Weltrangliste, supabase/weltrang-schema.sql), Stand 14.11.2026: Pruefung durch eine fachkundige Person steht aus -->
   <h3>Weltrangliste</h3>
-  <p>Im Reiter „Welt“ der Liga gibt es eine Weltrangliste nach Online-Elo. Du erscheinst darin nur, wenn du selbst
+  <p id="weltrangliste">Im Reiter „Welt“ der Liga gibt es eine Weltrangliste nach Online-Elo. Du erscheinst darin nur, wenn du selbst
   mitmachst (Knopf „Mitmachen“); ohne deine Zustimmung steht dort nichts über dich, die Voreinstellung ist also aus
-  (Art. 25 Abs. 2 DSGVO). Mitmachen ist freiwillig. Einwilligen kannst du erst ab 16 Jahren (Art. 8 Abs. 1 DSGVO): Vor dem
+  (Art. 25 Abs. 2 DSGVO). Mitmachen ist freiwillig. Ohne Mitmachen kannst du Crownmate genauso nutzen, auch die Liga und
+  Online-Partien; nur dein Eintrag in der Weltrangliste fehlt. Einwilligen kannst du erst ab 16 Jahren (Art. 8 Abs. 1 DSGVO): Vor dem
   Mitmachen bestätigst du mit einem Haken, dass du mindestens 16 Jahre alt bist; ohne diese Bestätigung nimmt der Server
   dich nicht auf. Machst du mit, sehen alle angemeldeten
   Spieler deinen Benutzernamen, dein Banner, deine Online-Elo und deinen Platz. Die Liste zeigt die besten 100. Weitere Angaben wie deine Mail, deine
@@ -472,6 +474,8 @@
     handeln nur nach unserer Weisung. Für Abo und Shop erhält Stripe die für die Zahlung nötigen Daten und nutzt sie zum
     Teil auch in eigener Verantwortung (Abschnitt 7).</li>
     <li>Keine Profile über dich für andere Unternehmen.</li>
+    <li>Keine automatisierte Entscheidung mit rechtlicher oder ähnlich erheblicher Wirkung für dich (Art. 22 DSGVO).
+    Elo, Liga-Stufe, Platz und Season-Titel berechnet die App automatisch; sie bestimmen nur, was im Spiel angezeigt wird.</li>
   </ul>
 
   <h2>12. Kinder und Eltern</h2>
@@ -498,7 +502,8 @@
     <li><b>Einschränkung</b> (Art. 18) und <b>Widerspruch</b> (Art. 21): per E-Mail an die oben genannte Adresse.</li>
     <li><b>Widerruf der Einwilligung</b> (Art. 7 Abs. 3): Schalter „Partien und Nutzung teilen“ ausschalten; bereits
     Geteiltes wird dabei auf dem Server gelöscht. Für die Weltrangliste: in der Liga im Reiter „Welt“ auf „Nicht mehr
-    zeigen“ tippen; dein Eintrag wird dabei sofort gelöscht.</li>
+    zeigen“ tippen; dein Eintrag wird dabei sofort gelöscht. Für die Season-Anzeige: in den Einstellungen unter „Season“ den
+    Schalter ausschalten; der Zeitpunkt deiner Bestätigung wird dabei gelöscht.</li>
     <li><b>Beschwerde</b> (Art. 77): bei einer Datenschutz-Aufsichtsbehörde, zum Beispiel
     der Landesbeauftragten für Datenschutz und Informationsfreiheit Nordrhein-Westfalen (LDI NRW),
     Kavalleriestraße 2-4, 40213 Düsseldorf.</li>

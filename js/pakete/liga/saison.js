@@ -153,7 +153,7 @@ export async function fuelleSaisonSchalter(el) {
   el.setAttribute('aria-labelledby', 'es-g-season');
   el.innerHTML = `<h3 class="es-titel" id="es-g-season">${esc(T('schalter.titel'))}</h3>
     <div class="ss-einwilligung"${st.sichtbar ? ' hidden' : ''}>
-      <p class="es-hilfe">${esc(T('schalter.einwilligung'))} <a href="${sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'}"
+      <p class="es-hilfe">${esc(T('schalter.einwilligung'))} <a href="${sprache() === 'en' ? 'datenschutz-en.html#seasons' : 'datenschutz.html#seasons'}"
         target="_blank" rel="noopener">${esc(T('schalter.datenschutz'))}</a></p>
       <label class="ss-alter"><input type="checkbox"><span>${esc(T('schalter.alter'))}</span></label>
     </div>

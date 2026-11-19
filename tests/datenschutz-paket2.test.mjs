@@ -115,5 +115,34 @@ pruefe('en: Seasons nennt die bestaetigte Elo', teil(lies('datenschutz-en.html')
 pruefe('App de: season.hilfe nennt beide Bedingungen', ligaTexte.includes('Für die Top-Titel: 20 Online-Partien mit Kronen und eine bestätigte Elo.'));
 pruefe('App en: season.hilfe nennt beide Bedingungen', ligaTexte.includes('Top titles need 20 online games with crowns and a confirmed Elo.'));
 
+// Kaltpruefung 19.11.2026 (R19-Kritik/paket2-ab16-kaltpruefung.md): P10 Freiwilligkeit, P11 Art. 22, H1 Verantwortlicher am
+// Haken, H7 Anker statt ganzer Seite, W1 Widerruf des Season-Schalters in "Deine Rechte"
+const KALT = [
+  { datei: 'datenschutz.html', welt: '<h3>Weltrangliste</h3>', seasons: '<h3>Seasons</h3>', nie: '<h2>11. ', rechte: '<h2>13. ',
+    weltFrei: 'Ohne Mitmachen kannst du Crownmate genauso nutzen', seasonFrei: 'Ohne die Anzeige bleibt alles andere gleich',
+    art22: 'Art. 22 DSGVO', widerruf: 'Für die Season-Anzeige: in den Einstellungen unter „Season“ den Schalter ausschalten' },
+  { datei: 'datenschutz-en.html', welt: '<h3>World ranking</h3>', seasons: '<h3>Seasons</h3>', nie: '<h2>11. ', rechte: '<h2>13. ',
+    weltFrei: 'If you do not join, you can use Crownmate just the same', seasonFrei: 'Without the display everything else stays the same',
+    art22: 'Art. 22 DSGVO', widerruf: 'For the season display: turn off the switch in the settings under "Season"' },
+];
+for (const k of KALT) {
+  const html = lies(k.datei);
+  pruefe(`${k.datei}: P10 Weltrangliste nennt, dass ohne Mitmachen alles nutzbar bleibt`, teil(html, k.welt, '<h3>').includes(k.weltFrei));
+  pruefe(`${k.datei}: P10 Season-Anzeige nennt, dass ohne sie alles gleich bleibt`, teil(html, k.seasons, '<h3>').includes(k.seasonFrei));
+  pruefe(`${k.datei}: P11 Abschnitt 11 nennt Art. 22`, teil(html, k.nie, '<h2>').includes(k.art22));
+  pruefe(`${k.datei}: W1 Widerruf nennt den Season-Schalter`, teil(html, k.rechte, '<h2>').includes(k.widerruf));
+  // der Anker sitzt auf dem ersten Absatz unter der Ueberschrift (wie #botschutz); die <h3>-Zeilen bleiben unveraendert
+  for (const [kopf, anker] of [[k.welt, 'weltrangliste'], [k.seasons, 'seasons']]) {
+    const ab = html.indexOf(kopf);
+    pruefe(`${k.datei}: H7 Anker #${anker} direkt unter ${kopf}`, ab >= 0 && html.slice(ab + kopf.length).trimStart().startsWith(`<p id="${anker}">`));
+  }
+}
+const verantwortlich = /'(welt\.einwilligung|season\.schalter\.einwilligung)': '[^']*Verantwortlich: Florian Boldt, kontakt@crownmate\.de\.'/g;
+const responsible = /'(welt\.einwilligung|season\.schalter\.einwilligung)': '[^']*Responsible: Florian Boldt, kontakt@crownmate\.de\.'/g;
+pruefe('App: H1 beide Hinweise nennen den Verantwortlichen (de)', (ligaTexte.match(verantwortlich) || []).length === 2);
+pruefe('App: H1 beide Hinweise nennen den Verantwortlichen (en)', (ligaTexte.match(responsible) || []).length === 2);
+pruefe('App: H7 Weltrangliste verlinkt #weltrangliste', lies('js/pakete/liga/welt.js').includes("'datenschutz-en.html#weltrangliste' : 'datenschutz.html#weltrangliste'"));
+pruefe('App: H7 Season-Schalter verlinkt #seasons', lies('js/pakete/liga/saison.js').includes("'datenschutz-en.html#seasons' : 'datenschutz.html#seasons'"));
+
 console.log(`\n${ok}/${gesamt} Pruefungen bestanden`);
 process.exit(ok === gesamt ? 0 : 1);

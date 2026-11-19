@@ -124,7 +124,7 @@ export function reiterWelt() {
     const knopf = lage.teilnahme
       ? `<button class="knopf lg-welt-austreten" type="button">${esc(T('austreten'))}</button>`
       // Hinweis VOR dem Haken: wofuer, wer was sieht, Widerruf, Link (Nachtrag M-08:03:14); der Haken ist nie vorab gesetzt
-      : `<p class="lg-welt-einwilligung">${esc(T('einwilligung'))} <a href="${sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'}"
+      : `<p class="lg-welt-einwilligung">${esc(T('einwilligung'))} <a href="${sprache() === 'en' ? 'datenschutz-en.html#weltrangliste' : 'datenschutz.html#weltrangliste'}"
         target="_blank" rel="noopener">${esc(T('datenschutz'))}</a></p>
         <label class="lg-welt-alter"><input type="checkbox"${haken ? ' checked' : ''}><span>${esc(T('alter'))}</span></label>
         <button class="knopf primaer lg-welt-mitmachen" type="button"${haken ? '' : ' disabled'}>${esc(T('mitmachen'))}</button>`;
