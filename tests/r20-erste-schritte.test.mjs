@@ -189,12 +189,14 @@ pruefe('es-patt: der naheliegende Damenzug Qg6 ergibt Patt (die Falle)', !!patt 
 }
 
 // ---------- claude-code-60 19.11.: im Kurs vor dem ersten Zug kein "Zug 0", Meisterschule unveraendert ----------
-pruefe('zeigeZug: Kurs bei 0 Zuegen aus, ab 1 an; Meisterschule immer an', typeof M.zeigeZug === 'function'
-  && M.zeigeZug(kurs, 0) === false && M.zeigeZug(kurs, 1) === true && M.zeigeZug(M.BEREICHE[0], 0) === true);
+pruefe('zaehlerSichtbar: Kurs bei 0 Zuegen aus, ab 1 an; Meisterschule immer an', typeof M.zaehlerSichtbar === 'function'
+  && M.zaehlerSichtbar(kurs, 0) === false && M.zaehlerSichtbar(kurs, 1) === true && M.zaehlerSichtbar(M.BEREICHE[0], 0) === true);
 {
   const { readFileSync } = await import('node:fs');
   const quelle = readFileSync(new URL('../js/ui/lektion.js', import.meta.url), 'utf8');
-  pruefe('lektion.js: der Zug-Zaehler fragt zeigeZug', /const zaehler = \(\) => \{[^}]*zeigeZug\(ber, st\.zuege\)/.test(quelle));
+  pruefe('lektion.js: der Zug-Zaehler fragt zaehlerSichtbar', /const zaehler = \(\) => \{[^}]*zaehlerSichtbar\(ber, st\.zuege\)/.test(quelle));
+  // 19.11.: die Regel hiess erst zeigeZug und wurde von der lokalen Funktion zeigeZug ("Zeig sie mir") verdeckt, der Zaehler blieb leer
+  pruefe('lektion.js: keine lokale Funktion oder Variable verdeckt zaehlerSichtbar', !/(function|const|let|var)\s+zaehlerSichtbar\b/.test(quelle));
 }
 
 // ---------- N-13:10: Kopf im Kurs, Vorschaubild der Sammel-Aufgaben ----------
@@ -282,7 +284,7 @@ async function browserTeil() {
           sterneMini: document.querySelectorAll('.ms-lektion[data-id="es-turm"] .mini.mini-gross i.s').length }));
         pruefe(`${lage}: N-13:10 Kopf "Erste Schritte" statt "Meisterschule", Vorschaubild es-turm gross mit 3 Sternen`,
           ue.kopf === 'Erste Schritte' && !/Meisterschule/.test(ue.ueber) && ue.sterneMini === 3, ue);
-        pruefe(`${lage}: Uebersicht Kurs-Karte vorn und gewaehlt, fuenf Karten, ohne "gratis", Kapitel 1 und 5, 9 Aufgaben offen, kein Querscrollen`,
+        pruefe(`${lage}: Uebersicht Kurs-Karte vorn und gewaehlt, fuenf Karten, ohne "gratis", Kapitel 1 bis 5, alle Aufgaben offen, kein Querscrollen`,
           ue.karte1 === 'erste' && ue.gewaehlt === 'erste' && ue.karten === 5 && ue.gratis === 0 && ue.kapitel === [1, 2, 3, 4, 5].map((k) => DE['kapitel.' + k]).join('|')
           && ue.ids === kurs.lektionen.map((l) => l.id).join() && ue.schloss === 0 && !ue.quer && !ue.bald, ue);
         await bild(s, `uebersicht-${geraet}-${farbe}`);

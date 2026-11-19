@@ -467,7 +467,8 @@ async function erfinderTeil(browser) {
   z = await lz(p.s);
   pruefe('Dame: nach Flos Zug antwortet die Verteidigung, dann ist Flo wieder dran', z.phase === 'flo' && z.zuege === 1
     && new Chess(z.fen).turn() === 'w', z);
-  pruefe('Zähler zeigt „Zug 1“', /Zug 1/.test(await p.s.locator('.ls-zug').innerText()));
+  const zugText = await p.s.locator('.ls-zug').innerText();
+  pruefe('Zähler zeigt „Zug 1“', /Zug 1/.test(zugText), { zugText, zaehler: await p.s.locator('.ls-zaehler').innerText() });
   await p.s.locator('.ls-aktionen [data-a="neu"]').click();
   await warteLz(p.s, "z.phase === 'flo' && z.zuege === 0 && z.hinweise === 0");
   z = await lz(p.s);

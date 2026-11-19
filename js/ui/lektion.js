@@ -41,7 +41,7 @@ import { sende } from '../ereignisse.js';
 import { oeffneTrainer } from '../abo.js';
 import { t } from '../sprache.js';
 import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand, rundenVon,
-  ladeSammeln, weissWieder, sternGeschafft, sterneSammeln, zeigeZug } from '../pakete/lernen/mattbilder.js';
+  ladeSammeln, weissWieder, sternGeschafft, sterneSammeln, zaehlerSichtbar } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
 import { sterneHtml } from './lernen.js';
@@ -180,7 +180,7 @@ export function zeige(root, params, app) {
   const schach = () => (st.chess.inCheck() ? true : null);
   const zeichne = (m, animieren = false) => brett.setzeStellung(st.chess.fen(), { animieren, letzterZug: m ? [m.from, m.to] : null, schach: schach() });
   const erlaube = () => brett.erlaubeZuege(st.phase === 'flo' ? zielKarte(st.chess) : null);
-  const zaehler = () => { zugEl.textContent = zeigeZug(ber, st.zuege) ? S('zug', { n: st.zuege }) : ''; };
+  const zaehler = () => { zugEl.textContent = zaehlerSichtbar(ber, st.zuege) ? S('zug', { n: st.zuege }) : ''; };
 
   function knoepfe(liste) {
     aktionenEl.innerHTML = liste.map((k) => `<button class="knopf dr${k.primaer ? ' primaer' : ''}" type="button" data-a="${k.a}"${k.aus ? ' disabled' : ''}>`

@@ -73,7 +73,7 @@ export const LEKTIONEN = Object.freeze([
 ]);
 export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik', 'sammeln', 'schach']);
 // Zug-Zaehler: im Kurs vor dem ersten Zug nur der Ziel-Text, kein "Zug 0" (claude-code-60 19.11.); Meisterschule immer
-export const zeigeZug = (bereich, zuege) => !(bereich && bereich.kurs && zuege === 0);
+export const zaehlerSichtbar = (bereich, zuege) => !(bereich && bereich.kurs && zuege === 0);
 export const BEREICHE = Object.freeze([
   Object.freeze({ id: 'matt', lektionen: LEKTIONEN }),
   Object.freeze({ id: 'taktik', lektionen: TAKTIK }),
