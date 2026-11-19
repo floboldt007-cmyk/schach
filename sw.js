@@ -226,6 +226,7 @@ const DATEIEN = [
   'js/botschutz.js',
   'js/konto.js',
   'js/umzug.js',
+  'js/sw-wechsel.js',
   'js/profil.js', 'js/rahmen-kunst.js', 'js/sammlung-kunst.js', 'js/kreaturen-kunst.js', 'js/emote-kunst.js', 'js/titel-kunst.js',
   'js/sonderstuecke.js', 'js/labor.js', 'js/brett-flaechen.js', 'js/brett-motive.js', 'js/brett-motive-v4.js',
   'js/figurensatz.js',

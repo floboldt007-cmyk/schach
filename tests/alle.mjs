@@ -122,6 +122,7 @@ const SUITEN = [
   { name: 'r15-ich-lektion', datei: 'r15-ich-lektion.test.mjs', args: [], was: 'Feinschliff R15: Vitrine im Banner am PC, Spielerleisten in der Lektion, Zu-zweit-Brett wie die Bot-Partie (Browser)' },
   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
   { name: 'sw-update', datei: 'sw-update.test.mjs', args: [], was: 'SW-Update laedt nur geaenderte Dateien (ETag/304)' },
+  { name: 'sw-wechsel', datei: 'sw-wechsel.test.mjs', args: [], was: 'Wechsel des Service Workers: hoechstens einmal neu laden, nie im Spiel' },
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
