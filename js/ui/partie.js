@@ -129,8 +129,9 @@ import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo, ANLASS_NACH_ERGEBNIS 
 import { zugZufall } from '../tag.js';
 import {
   bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, sanAnzeige, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
+  analyseSchluessel,
 } from '../review.js';
-import { eroeffnung, stellungsSchluessel, eroeffnungsAnzeige } from '../openings.js';
+import { eroeffnung, eroeffnungsAnzeige } from '../openings.js';
 import { klang, klassenKlang } from '../sounds.js';
 import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
@@ -1192,7 +1193,7 @@ export function zeige(root, params, app) {
   // alle anderen geholt (engine.vorziehen), sonst eine neue vorne eingereiht. Nie zwei Suchen derselben
   // Stellung (im Stau waere das doppelte Engine-Arbeit).
   function analysiere(fen, { vorne = false } = {}) {
-    const key = stellungsSchluessel(fen);
+    const key = analyseSchluessel(fen);
     const fertig = app.vorab.get(key);
     if (fertig) return Promise.resolve(fertig);
     const da = laufendeAnalysen.get(key);
@@ -1230,8 +1231,8 @@ export function zeige(root, params, app) {
   // Analyse der aktuellen Stellung: Balken und Ereignis stellung:analysiert (je Stellung einmal)
   function beiAnalyse(fen, a) {
     if (weg) return;
-    const key = stellungsSchluessel(fen);
-    if (key !== stellungsSchluessel(z.chess.fen())) return;
+    const key = analyseSchluessel(fen);
+    if (key !== analyseSchluessel(z.chess.fen())) return;
     setzeBalken(a);
     const marke = z.zuege.length + '|' + key;
     if (z.analyseGesendet === marke || !a || !Array.isArray(a.lines) || !a.lines.length) return;
@@ -1242,7 +1243,7 @@ export function zeige(root, params, app) {
     });
   }
   function balkenAktualisieren() {
-    const a = app.vorab.get(stellungsSchluessel(z.chess.fen()));
+    const a = app.vorab.get(analyseSchluessel(z.chess.fen()));
     if (a) beiAnalyse(z.chess.fen(), a);
     else analysiere(z.chess.fen()).catch(() => {});
   }
@@ -1287,8 +1288,8 @@ export function zeige(root, params, app) {
         tiefe: tiefe(), multipv: 2, analyseVorher: aV, analyseNachher: aN, buch: b.buch, eroeffnung: b.name,
         gegnerKlasse, vorigerZug, vorigerSchlag, du: true, ply,
       });
-      app.vorab.set(stellungsSchluessel(fenVorher), erg.analyseVorher);
-      app.vorab.set(stellungsSchluessel(erg.fenNachher), erg.analyseNachher);
+      app.vorab.set(analyseSchluessel(fenVorher), erg.analyseVorher);
+      app.vorab.set(analyseSchluessel(erg.fenNachher), erg.analyseNachher);
       beiAnalyse(erg.fenNachher, erg.analyseNachher);
       if (veraltet()) return;
       eintrag.status = 'fertig';
