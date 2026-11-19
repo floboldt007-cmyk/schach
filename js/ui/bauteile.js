@@ -374,7 +374,9 @@ export function toastLeeren() {
 
 // ---------- Mini-Brett ----------
 const FIGUR = /^[prnbqkPRNBQK]$/;
-export function miniBrett(fen, { zuletzt = [], klasse = '' } = {}) {
+// sterne: Felder mit goldenem Stern (Kurs Erste Schritte, Art sammeln, 19.11.2026); gross: die Figuren als grosses Bild
+// (2,6 Felder), am Brettrand verankert, damit nichts abgeschnitten wird (gedacht fuer Stellungen mit einer Figur)
+export function miniBrett(fen, { zuletzt = [], klasse = '', sterne = [], gross = false } = {}) {
   const reihen = String(fen || '').trim().split(/\s+/)[0].split('/');
   const felder = [];
   for (let r = 0; r < 8; r++) {
@@ -388,6 +390,8 @@ export function miniBrett(fen, { zuletzt = [], klasse = '' } = {}) {
     while (f < 8) { felder.push(null); f++; }
   }
   const markiert = new Set((Array.isArray(zuletzt) ? zuletzt : []).map((x) => String(x).toLowerCase()));
+  const stern = new Set((Array.isArray(sterne) ? sterne : []).map((x) => String(x).toLowerCase()));
+  const anker = (r, c) => `${c === 0 ? 'left' : c === 7 ? 'right' : 'center'} ${r === 0 ? 'top' : r === 7 ? 'bottom' : 'center'}`;
   let html = '';
   for (let i = 0; i < 64; i++) {
     const r = Math.floor(i / 8);
@@ -395,9 +399,10 @@ export function miniBrett(fen, { zuletzt = [], klasse = '' } = {}) {
     const name = 'abcdefgh'[c] + (8 - r);
     const dunkel = (r + c) % 2 === 1;
     const fig = felder[i];
-    html += `<i class="${dunkel ? 'd' : 'h'}${markiert.has(name) ? ' z' : ''}">${fig ? `<img src="${PIECES}${fig}.svg" alt="" loading="lazy" draggable="false">` : ''}</i>`;
+    const bild = fig ? `<img${gross ? ` class="g" style="transform-origin: ${anker(r, c)}"` : ''} src="${PIECES}${fig}.svg" alt="" loading="lazy" draggable="false">` : '';
+    html += `<i class="${dunkel ? 'd' : 'h'}${markiert.has(name) ? ' z' : ''}${stern.has(name) ? ' s' : ''}">${bild}</i>`;
   }
-  return `<div class="mini${klasse ? ' ' + esc(klasse) : ''}" aria-hidden="true">${html}</div>`;
+  return `<div class="mini${gross ? ' mini-gross' : ''}${klasse ? ' ' + esc(klasse) : ''}" aria-hidden="true">${html}</div>`;
 }
 
 // ---------- Wischleiste: weiche Kanten dort, wo es weitergeht ----------

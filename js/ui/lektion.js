@@ -117,7 +117,9 @@ export function zeige(root, params, app) {
   const gegner = flo === 'w' ? 'b' : 'w';
   const farbwort = (f) => t(f === 'w' ? 'allgemein.weiss' : 'allgemein.schwarz');
   const leisteName = t('rahmen.titel.lektion');
-  s.innerHTML = `${hauptKopf({ titel: S('name'), unter: S('bereich.' + ber.id), zurueck: true, chips: '', marke: false })}
+  // im Kurs (N-13:10): oben "Erste Schritte", darunter das Kapitel; sonst "Meisterschule" und der Bereich
+  s.innerHTML = `${hauptKopf({ titel: ber.kurs ? S('bereich.' + ber.id) : S('name'), unter: ber.kurs ? S('kapitel.' + l.kapitel) : S('bereich.' + ber.id),
+    zurueck: true, chips: '', marke: false })}
     <div class="ls-rumpf">
       <div class="ls-inhalt">
         <div class="partie ls-leiste ls-oben"><div class="spieler gegner" role="group" aria-label="${esc(leisteName)}">

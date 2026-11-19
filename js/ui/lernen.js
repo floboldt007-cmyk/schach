@@ -39,14 +39,15 @@ const kopfChip = (sum) => `<span class="chip zahl chip-sterne ms-kopf-sterne" ti
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen ms-screen';
-  s.setAttribute('aria-label', S('name'));
   root.append(s);
   ladeLernenCss();
   const st = stand(ladeModul(PAKET, {}));
   // Kurs Erste Schritte (19.11.2026) steht als Karte vorn; geoeffnet wird er gezielt (params { bereich: 'erste' }, Start
   // "Kennst du die Schachregeln?" Nein), ohne Angabe bleibt es wie bisher bei den Mattbildern
   let bereich = ANSICHT.find((b) => b.id === (params && params.bereich)) || BEREICHE[0];
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: S('name'), chips: kopfChip(summe(st)) })}
+  const kopfName = () => (bereich.kurs ? S('bereich.' + bereich.id) : S('name'));
+  s.setAttribute('aria-label', kopfName());
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: kopfName(), chips: kopfChip(summe(st)) })}
     <div class="ms-rumpf">
       <div class="ms-bereiche" role="group" aria-label="${esc(S('bereichWahl'))}"></div>
       <div class="ms-bereich"></div>
@@ -90,7 +91,7 @@ export function zeige(root, params, app) {
       : istProbe(l) && l.stufe !== 'leicht' ? `<span class="ms-marke" data-marke="probe">${esc(S('gratisProbe'))}</span>` : '';
     return `<li><button class="ms-lektion" type="button" data-id="${l.id}"${e ? ' data-geschafft' : ''}${offen ? '' : ' data-gesperrt'}${istProbe(l) ? ' data-probe' : ''}
         ${offen ? '' : `aria-label="${esc(S('titel.' + l.id) + ', ' + S('gesperrt'))}"`}>
-      ${miniBrett(l.fen, { klasse: 'ms-mini' })}
+      ${miniBrett(l.fen, art === 'sammeln' ? { klasse: 'ms-mini', sterne: l.sterne, gross: true } : { klasse: 'ms-mini' })}
       <span class="ms-nr zahl">${i + 1}</span>
       <span class="ms-text"><b>${esc(S('titel.' + l.id))}</b>
         <span class="ms-zeile">${mitStufe ? `<span class="ms-stufe" data-stufe="${l.stufe}">${esc(S('stufe.' + l.stufe))}</span>` : ''}
@@ -114,7 +115,12 @@ export function zeige(root, params, app) {
     // "Bald in der Meisterschule ..." gehoert nicht unter den Kurs Erste Schritte
     const bald = s.querySelector('.ms-bald');
     if (bald) bald.hidden = !!bereich.kurs;
-    inhalt.innerHTML = `${seitenKopf({ ueber: S('name'), titel: S('bereich.' + bereich.id), text: S('text.' + bereich.id) })}
+    // Kopf im Kurs: "Erste Schritte" statt "Meisterschule" (N-13:10), beim Wechsel der Karte mit
+    const name = kopfName();
+    const seite = s.querySelector('.kopf-seite');
+    if (seite) seite.textContent = name;
+    s.setAttribute('aria-label', name);
+    inhalt.innerHTML = `${seitenKopf({ ueber: bereich.kurs ? S('kursUeber') : S('name'), titel: S('bereich.' + bereich.id), text: S('text.' + bereich.id) })}
       ${weiterHtml()}
       ${bereich.kurs ? [...new Set(bereich.lektionen.map((l) => l.kapitel))].map((k) => {
         const liste = bereich.lektionen.filter((l) => l.kapitel === k);
