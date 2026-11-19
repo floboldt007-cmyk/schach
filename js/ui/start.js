@@ -17,7 +17,7 @@
 //   Das Willkommen gilt als gesehen, sobald es einmal da war (Modul start, gesehen), auch wenn Flo die App gleich schliesst.
 // DOM: section.screen.st-screen[data-seite] > header.haupt-kopf (mit button.st-raus, ggf. .kopf-zurueck), .st-rumpf >
 //   .st-buehne (.st-bild, .st-text mit .ueberzeile, h1.st-titel, p, .st-chips, .st-wahl, .st-knoepfe), nav.st-punkte (w1
-//   bis w3). Stapel der Seite einstufung: .st-stapel > .st-stapel-ort (Lage, Drehung) > .st-stapel-karte (gleitet ein).
+//   bis einstufung). Stapel der Seite einstufung: .st-stapel > .st-stapel-ort (Lage, Drehung) > .st-stapel-karte (gleitet ein).
 //   Knoepfe tragen data-st (weiter, ueberspringen, punkt, ja, nein, einstufung-start, probe, leiter, spielen, benno,
 //   einstufung-seite, wiederholen, arena, raus).
 // Optik: css/pakete/start.css (link[data-paket="start"], vom Paket oder hier eingehaengt). Nur Tokens.
@@ -41,7 +41,10 @@ import '../sprachen/einstellungen.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const SEITEN = Object.freeze(['w1', 'w2', 'w3', 'frage', 'einstufung', 'empfehlung', 'nach-regeln']);
-const INTRO = ['w1', 'w2', 'w3'];
+// Punkte unten (fc-23:00, Allround-Check 19.11.2026 Nr. 1): alle Schritte mit demselben Weiter zaehlen, auch Regelfrage und
+// Einstufung; vorher sagten drei Punkte "Seite 3 von 3", und danach kamen noch zwei Seiten. Empfehlung und nach-regeln
+// sind Ergebnisse (dort keine Punkte).
+const INTRO = ['w1', 'w2', 'w3', 'frage', 'einstufung'];
 // w1: eine ruhige Eroeffnung (Italienisch), der letzte Zug bekommt die Marke "Praezise"
 const FEN_WILLKOMMEN = 'r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4';
 const FEN_GRUND = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -315,7 +318,7 @@ export function zeige(root, params, app) {
       if (em) spiele(em.bot.id, em.probe);
     }
   });
-  // Pfeiltasten blaettern durch die drei ersten Seiten
+  // Pfeiltasten blaettern durch die Seiten mit Punkten
   s.addEventListener('keydown', (ev) => {
     const i = INTRO.indexOf(jetzt);
     if (i < 0 || ev.defaultPrevented || ev.altKey || ev.ctrlKey || ev.metaKey) return;

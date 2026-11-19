@@ -570,7 +570,9 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-weg .detail .elo, .arena.karte-weg .detail .mini-sterne { display: inline-flex; vertical-align: middle; }
 .arena.karte-weg .detail .mini-sterne { margin-left: 8px; }
 .arena.karte-weg .detail-welt { display: none; }
-.arena.karte-weg .detail:not(.offen) :is(.sprechblase, .ziel-sterne, .wahl-farbe, .ort-tempo) { display: none; }
+.arena.karte-weg .detail:not(.offen) :is(.sprechblase, .ziel-sterne, .wahl-farbe, .ort-tempo, .ort-gesperrt) { display: none; }
+/* .ort-gesperrt (fc-23:00, Weg zur Einstufung) nur offen: zu hat die Karte die feste Hoehe WEG_KARTE_ZU (js/ui/arena.js), sonst
+   deckt sie die Stationen darueber zu */
 .arena.karte-weg .cta-platz { position: static; margin: 0 -16px; padding: 4px 16px 14px; border-radius: 0 0 24px 24px; }
 /* offen klebt der Spielen-Platz unten in der Karte wie im Panel (.arena .cta-platz): auf dem kleinsten SE (320 x 568) ist die
    offene Karte hoeher als ihr Platz und scrollt, der Knopf lag sonst 94 px tief unter der Reiterleiste (R19 arena-karte-klein) */
