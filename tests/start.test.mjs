@@ -32,7 +32,8 @@ import { browserTyp } from './browser.mjs';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
-const ERW = 'pakete/start/index';
+// lernen dazu (19.11.2026): "Nein" oeffnet den Kurs Erste Schritte im Screen lernen
+const ERW = 'pakete/start/index,pakete/lernen/index';
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=${ERW}`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const OHNE_BILDER = process.argv.includes('--ohne-bilder');
@@ -584,29 +585,38 @@ async function browserTeil(browser) {
     await warteSeite(seite, naechste);
   }
 
-  // ---------- Regel-Hilfe ----------
-  gruppe = 'Regel-Hilfe';
+  // ---------- Nein: Kurs Erste Schritte (19.11.2026) ----------
+  gruppe = 'Kurs Erste Schritte';
+  const kursOffen = async () => seite.waitForFunction(() => !!document.querySelector('.ms-screen .ms-bkarte[data-bereich="erste"][aria-pressed="true"]')
+    && !!document.querySelector('.ms-screen .ms-lektion[data-id="es-turm"]'), null, { timeout: 20000 });
   await seite.locator('[data-st="nein"]').click();
-  await warteRaetsel(seite, 'z.offen && z.quelle === "start-regeln" && z.phase === "flo"');
+  await kursOffen();
+  const kurs = await seite.evaluate(() => ({ hash: location.hash, frage: document.querySelector('.st-buehne[data-seite="frage"]') ? 1 : 0,
+    karte1: document.querySelector('.ms-bkarte')?.dataset.bereich, kapitel: [...document.querySelectorAll('.ms-gruppe > h2')].map((h) => h.textContent).join('|') }));
+  pruefe('Nein: Lernen mit dem Kurs Erste Schritte (Karte vorn, gewaehlt), Kapitel 1 bis 6', kurs.hash === '#lernen' && kurs.karte1 === 'erste'
+    && kurs.kapitel === 'Kapitel 1: Brett und Figuren|Kapitel 2: Schlagen und Schützen|Kapitel 3: Schach und Matt|Kapitel 4: Sonderregeln|Kapitel 5: Gut anfangen|Kapitel 6: Deine erste Partie', kurs);
+  // Zurueck aus dem Kurs: zurueck zur Frage
+  await seite.locator('.ms-screen .kopf-zurueck').click();
+  await warteSeite(seite, 'frage');
+  pruefe('Zurueck aus dem Kurs: wieder die Frage (nicht Seite 1)', (await sz(seite)).seite === 'frage');
+  // auch nach einem Neuladen im Kurs (die Seite steht im Verlauf)
+  await seite.locator('[data-st="nein"]').click();
+  await kursOffen();
+  await seite.reload();
+  await kursOffen();
+  await seite.locator('.ms-screen .kopf-zurueck').click();
+  await warteSeite(seite, 'frage');
+  pruefe('Neuladen im Kurs, dann Zurueck: wieder die Frage', (await sz(seite)).seite === 'frage');
+
+  // ---------- Regel-Hilfe (bleibt, bis der Kurs alle Kapitel hat; Einstellungen, Gruppe Erste Schritte oeffnet sie so) ----------
+  gruppe = 'Regel-Hilfe';
+  await seite.evaluate(() => window.__app.gehe('raetsel', { quelle: 'start-regeln' }));
+  await warteRaetsel(seite, 'z.offen && z.quelle === "start-regeln" && z.phase === "flo" && z.index === 0');
   let z = await raetselZustand(seite);
   const kopfR = await seite.evaluate(() => ({ titel: document.querySelector('.rs-screen .marke-titel').textContent, h2: document.querySelector('.rs-status h2').textContent,
     p: document.querySelector('.rs-status p').textContent, hash: location.hash }));
-  pruefe('Nein: Regel-Hilfe im Raetsel-Bildschirm, 7 Aufgaben, die erste ist der Turm', z.gesamt === 7 && z.aufgabe === 'regel-turm' && kopfR.titel === 'Die Figuren'
+  pruefe('Regel-Hilfe weiter erreichbar: Raetsel-Bildschirm, 7 Aufgaben, die erste ist der Turm', z.gesamt === 7 && z.aufgabe === 'regel-turm' && kopfR.titel === 'Die Figuren'
     && kopfR.h2 === 'Der Turm' && /Tippe ihn an/.test(kopfR.p) && kopfR.hash === '#raetsel', JSON.stringify({ z, kopfR }));
-  // Zurueck mitten in der Regel-Hilfe: zurueck zur Frage
-  await seite.locator('.rs-screen .kopf-zurueck').click();
-  await warteSeite(seite, 'frage');
-  pruefe('Zurueck aus der Regel-Hilfe: wieder die Frage (nicht Seite 1)', (await sz(seite)).seite === 'frage');
-  // auch nach einem Neuladen im Raetsel-Bildschirm (der gemerkte Rueckweg ist dann weg, die Seite steht im Verlauf)
-  await seite.locator('[data-st="nein"]').click();
-  await warteRaetsel(seite, 'z.offen && z.quelle === "start-regeln" && z.phase === "flo"');
-  await seite.reload();
-  await warteRaetsel(seite, 'z.offen && z.quelle === "start-regeln" && z.phase === "flo" && z.index === 0', null, 20000);
-  await seite.locator('.rs-screen .kopf-zurueck').click();
-  await warteSeite(seite, 'frage');
-  pruefe('Neuladen in der Regel-Hilfe, dann Zurueck: wieder die Frage', (await sz(seite)).seite === 'frage');
-  await seite.locator('[data-st="nein"]').click();
-  await warteRaetsel(seite, 'z.offen && z.quelle === "start-regeln" && z.phase === "flo" && z.index === 0');
   await bild(seite, 'regel-turm-ipad');
   // interaktiv: Antippen zeigt, wohin die Figur ziehen kann
   await tippe(seite, 'd2');
@@ -1142,7 +1152,7 @@ async function browserTeil(browser) {
   gruppe = 'PAKETE';
   const pr = await neueSeite(browser);
   await pr.seite.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
-    body: `export const PAKETE = Object.freeze(['sicherung', '${ERW}']);\nexport const REITER = Object.freeze([]);\n` }));
+    body: `export const PAKETE = Object.freeze(['sicherung', ${ERW.split(',').map((p) => `'${p}'`).join(', ')}]);\nexport const REITER = Object.freeze([]);\n` }));
   await pr.seite.goto(`http://127.0.0.1:${PORT}/index.html`);
   await pr.seite.waitForSelector('.st-screen .st-titel', { timeout: 20000 });
   const prod = await pr.seite.evaluate(() => ({ hash: location.hash, css: !!document.querySelector('link[data-paket="start"]'), test: !!window.__start }));

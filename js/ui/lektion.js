@@ -40,10 +40,12 @@ import { ladeEinstellungen, ladeModul, speichereModul } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { oeffneTrainer } from '../abo.js';
 import { t } from '../sprache.js';
-import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand, rundenVon } from '../pakete/lernen/mattbilder.js';
+import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand, rundenVon,
+  ladeSammeln, weissWieder, sternGeschafft, sterneSammeln, zaehlerSichtbar } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
-import { sterneHtml } from './lernen.js';
+import { sterneHtml, kursPartieAbgleich } from './lernen.js';
+import { BOTS } from '../bots.js';
 import { meinName } from '../konto.js';
 import { floAvatar } from '../thema.js';
 import '../sprachen/allgemein.js';
@@ -66,6 +68,30 @@ export function zustand() {
 }
 if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '')) window.__lektion = { zustand };
 
+// Kurs Kapitel 6 (art 'partie', fc-20:01): kein Brett hier, sondern eine Seite mit Knopf "Partie starten". Die Partie laeuft
+// frei (modus 'frei': storage.js wertet() ist false, also keine Elo, Liga, Bestenliste, Leiter-Sterne) gegen den ersten Bot
+// der Leiter; die Sterne traegt kursPartieAbgleich (js/ui/lernen.js) beim naechsten Oeffnen ein.
+// DOM: .ls-rumpf > .ls-partie > h2, p, p.ls-partie-hinweis, .ms-sterne, button[data-a="partie"]
+function zeigeKursPartie(s, l, ber, app) {
+  kursPartieAbgleich();
+  const e = (() => { try { return stand(ladeModul(PAKET, {})).lek[l.id] || null; } catch (x) { return null; } })();
+  s.dataset.art = 'partie';
+  s.setAttribute('aria-label', S('titel.' + l.id));
+  s.innerHTML = `${hauptKopf({ titel: S('bereich.' + ber.id), unter: S('kapitel.' + l.kapitel), zurueck: true, chips: '', marke: false })}
+    <div class="ls-rumpf"><div class="ls-partie">
+      <h2>${esc(S('titel.' + l.id))}</h2>
+      <p>${esc(S('idee.' + l.id))}</p>
+      <p class="ls-partie-hinweis">${esc(S('partieText'))}</p>
+      ${sterneHtml(e ? e.s : 0)}
+      <button class="knopf primaer dr" type="button" data-a="partie">${esc(S('partieKnopf'))}${icon('vor')}</button>
+    </div></div>`;
+  const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  s.querySelector('[data-a="partie"]').addEventListener('click', () => {
+    if (BOTS[0]) app.gehe('partie', { botId: BOTS[0].id, farbe: 'w', modus: 'frei' });
+  });
+  return { verlasse() { try { kopf.verlasse(); } catch (x) { /* egal */ } } };
+}
+
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen ls-screen';
@@ -80,6 +106,7 @@ export function zeige(root, params, app) {
   ladeLernenCss();
   const ber = bereichVon(l);
   const art = artVon(l);
+  if (art === 'partie') return zeigeKursPartie(s, l, ber, app);
   const nr = ber.lektionen.indexOf(l) + 1;
   const rs = rundenVon(l);
   const mitRunden = rs.length > 1;
@@ -94,8 +121,13 @@ export function zeige(root, params, app) {
   // (auch nach der letzten offenen Lektion eines Bereichs, in dem noch etwas gesperrt ist, z. B. der Probe am Ende)
   const folgtImTrainer = ber.lektionen[nr] ? !istOffen(ber.lektionen[nr]) : !naechste && ber.lektionen.some((x) => !istOffen(x));
   const folge = art === 'folge';
+  // Sammeln (Kurs Erste Schritte, Kapitel 1): nur Flos Figur, Sterne als Marken (mark-stern), kein Gegner, keine Engine
+  const sammeln = art === 'sammeln';
+  const neuesSpiel = (fen) => (sammeln ? ladeSammeln(fen) : new Chess(fen));
   const flo = folge && l.farbe === 'b' ? 'b' : 'w';
-  const zielVon = (z) => (folge ? S('zielFolge', { n: z }) : art === 'umwandeln' ? S('zielUmwandeln', { n: z }) : art === 'gewinnen' ? S('zielGewinnen', { n: z })
+  // Kurs-Folgen ausserhalb von Kapitel 5 sind Regel-Aufgaben (ein Zug nach dem Vorzug), keine Eroeffnung
+  const zielVon = (z) => (folge ? (ber.kurs && l.kapitel !== 5 ? S('zielRegel') : S('zielFolge', { n: z }))
+    : sammeln ? S('zielSammeln', { n: z }) : art === 'schach' ? S('zielSchach') : art === 'umwandeln' ? S('zielUmwandeln', { n: z }) : art === 'gewinnen' ? S('zielGewinnen', { n: z })
     : art === 'taktik' ? S('zielTaktik', { n: z, p: l.gewinn })
     : art === 'halten' ? S('zielHalten', { n: z }) : z === 1 ? S('zielEins') : S('ziel', { n: z }));
   const ideeVon = (n) => (n > 1 ? S(`runde.${l.id}.${n}`) : S('idee.' + l.id));
@@ -104,6 +136,7 @@ export function zeige(root, params, app) {
   const titel = S('titel.' + l.id);
   const einst = (() => { try { return typeof app.einstellungen === 'function' ? app.einstellungen() : ladeEinstellungen(); } catch (e) { return {}; } })();
   s.setAttribute('aria-label', titel);
+  s.dataset.art = art;
   // R15 (R6-Leisten B, Flo 13.11.2026): Spielerleisten wie in der Bot-Partie, oben "Lektion" (die Gegenseite, Koenig ihrer
   // Farbe), unten der eigene Name (ohne Konto "Du") mit dem eigenen Bild. Aufbau und Optik der Karten .spieler.gegner/.ich
   // aus js/ui/partie.js und css/partie.css (wie js/ui/zuzweit.js); css/partie.css gilt nur unter .partie, darum steht jede
@@ -112,7 +145,9 @@ export function zeige(root, params, app) {
   const gegner = flo === 'w' ? 'b' : 'w';
   const farbwort = (f) => t(f === 'w' ? 'allgemein.weiss' : 'allgemein.schwarz');
   const leisteName = t('rahmen.titel.lektion');
-  s.innerHTML = `${hauptKopf({ titel: S('name'), unter: S('bereich.' + ber.id), zurueck: true, chips: '', marke: false })}
+  // im Kurs (N-13:10): oben "Erste Schritte", darunter das Kapitel; sonst "Meisterschule" und der Bereich
+  s.innerHTML = `${hauptKopf({ titel: ber.kurs ? S('bereich.' + ber.id) : S('name'), unter: ber.kurs ? S('kapitel.' + l.kapitel) : S('bereich.' + ber.id),
+    zurueck: true, chips: '', marke: false })}
     <div class="ls-rumpf">
       <div class="ls-inhalt">
         <div class="partie ls-leiste ls-oben"><div class="spieler gegner" role="group" aria-label="${esc(leisteName)}">
@@ -148,12 +183,13 @@ export function zeige(root, params, app) {
     const id = setTimeout(() => { timer.delete(id); if (!weg) fn(); }, Math.max(0, ms));
     timer.add(id);
   };
-  const st = { phase: 'intro', chess: new Chess(l.fen), zuege: 0, hinweise: 0, sterne: 0, grund: null, lauf: 0, start: null,
-    schritt: 0, fehler: 0, fehlerHier: 0, modus: 'selbst', runde: frei() };
+  const st = { phase: 'intro', chess: neuesSpiel(l.fen), zuege: 0, hinweise: 0, sterne: 0, grund: null, lauf: 0, start: null,
+    schritt: 0, fehler: 0, fehlerHier: 0, modus: 'selbst', runde: frei(), rest: sammeln ? [...l.sterne] : null };
   let lr = rundeVon(st.runde);
   const meisterprobe = () => mitRunden && st.runde === rs.length;
   aktiv = () => ({ offen: true, id: l.id, phase: st.phase, zuege: st.zuege, hinweise: st.hinweise, sterne: st.sterne, grund: st.grund,
-    fen: st.chess.fen(), schritt: st.schritt, fehler: st.fehler, modus: st.modus, runde: st.runde, runden: rs.length });
+    fen: st.chess.fen(), schritt: st.schritt, fehler: st.fehler, modus: st.modus, runde: st.runde, runden: rs.length,
+    ...(sammeln ? { rest: [...st.rest] } : {}) });
 
   const brett = new Brett($('.ls-brett'), {
     ausrichtung: flo, figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug,
@@ -170,7 +206,7 @@ export function zeige(root, params, app) {
   const schach = () => (st.chess.inCheck() ? true : null);
   const zeichne = (m, animieren = false) => brett.setzeStellung(st.chess.fen(), { animieren, letzterZug: m ? [m.from, m.to] : null, schach: schach() });
   const erlaube = () => brett.erlaubeZuege(st.phase === 'flo' ? zielKarte(st.chess) : null);
-  const zaehler = () => { zugEl.textContent = S('zug', { n: st.zuege }); };
+  const zaehler = () => { zugEl.textContent = zaehlerSichtbar(ber, st.zuege) ? S('zug', { n: st.zuege }) : ''; };
 
   function knoepfe(liste) {
     aktionenEl.innerHTML = liste.map((k) => `<button class="knopf dr${k.primaer ? ' primaer' : ''}" type="button" data-a="${k.a}"${k.aus ? ' disabled' : ''}>`
@@ -254,7 +290,7 @@ export function zeige(root, params, app) {
 
   // Meisterprobe (Runde 3): ohne Hinweis
   const spielKnoepfe = () => knoepfe([
-    ...(st.modus === 'zeigen' || meisterprobe() ? [] : [{ a: 'hinweis', text: S('hinweis'), icon: 'hinweis', aus: st.phase !== 'flo' }]),
+    ...(st.modus === 'zeigen' || meisterprobe() || sammeln ? [] : [{ a: 'hinweis', text: S('hinweis'), icon: 'hinweis', aus: st.phase !== 'flo' }]),
     { a: 'neu', text: S('neu'), icon: 'nochmal' },
   ]);
   // schon ein Stern fuer diese Lektion? Dann ist "Selbst spielen" vorgewaehlt, sonst "Zeig sie mir"
@@ -311,8 +347,9 @@ export function zeige(root, params, app) {
     st.runde = mitRunden ? Math.max(1, Math.min(frei(), runde)) : 1;
     lr = rundeVon(st.runde);
     zeigeRunde();
-    st.chess = new Chess(lr.fen);
-    st.start = bilanz(st.chess);
+    st.chess = neuesSpiel(lr.fen);
+    st.start = sammeln ? null : bilanz(st.chess);
+    if (sammeln) st.rest = [...l.sterne];
     st.zuege = 0;
     st.hinweise = 0;
     st.sterne = 0;
@@ -324,6 +361,7 @@ export function zeige(root, params, app) {
     s.dataset.phase = st.phase;
     brett.pfeile([]);
     brett.markiere(null);
+    if (sammeln) brett.markiere(st.rest, 'stern');
     zeichne(null);
     zaehler();
     leiseMeldung();
@@ -423,12 +461,38 @@ export function zeige(root, params, app) {
   function beiZug(von, nach, umw) {
     if (weg || st.phase !== 'flo') return false;
     if (folge) return folgeFloZug(von, nach, umw);
+    if (sammeln) return sammelZug(von, nach);
     let m = null;
     try { m = st.chess.move({ from: von, to: nach, promotion: umw || 'q' }); } catch (e) { m = null; }
     if (!m) return false;
     st.zuege++;
     st.phase = 'gezogen';
     spaeter(() => nachFloZug(m), 0);
+    return true;
+  }
+
+  // ---------- Sammeln (Kurs, Kapitel 1) ----------
+  // ohne Gegner: Weiss bleibt am Zug, der Stern auf dem Zielfeld verschwindet; geschafft, wenn keiner mehr liegt
+  function sammelZug(von, nach) {
+    let m = null;
+    try { m = st.chess.move({ from: von, to: nach, promotion: 'q' }); } catch (e) { m = null; }
+    if (!m) return false;
+    weissWieder(st.chess);
+    st.zuege++;
+    st.rest = sternGeschafft(st.rest, m.to);
+    st.phase = 'gezogen';
+    spaeter(() => {
+      zeichne(m);
+      zugKlang(m);
+      brett.markiere(st.rest, 'stern');
+      zaehler();
+      const r = pruefeZiel(lr, null, st.chess, { wann: 'flo', zuege: st.zuege, rest: st.rest });
+      if (r === 'geschafft') { geschafft(); return; }
+      if (r) { gescheitert(r); return; }
+      st.phase = 'flo';
+      s.dataset.phase = st.phase;
+      erlaube();
+    }, 0);
     return true;
   }
 
@@ -504,6 +568,7 @@ export function zeige(root, params, app) {
     const rundeDurch = mitRunden && (!meisterprobe() || guete === 3);
     const vorher = gemerkt();
     st.sterne = gezeigt ? 1 : folge ? sterneFolge({ fehler: st.fehler, hinweise: st.hinweise })
+      : sammeln ? sterneSammeln({ ziel: lr.ziel, zuege: st.zuege })
       : mitRunden ? Math.max(1, vorher, rundeDurch ? st.runde : st.runde - 1) : guete;
     erlaube();
     try { speichereModul(PAKET, merke(ladeModul(PAKET, {}), l.id, { sterne: st.sterne, zuege: st.zuege })); } catch (e) { console.error(e); }
@@ -578,7 +643,7 @@ export function zeige(root, params, app) {
     staffel(s.querySelectorAll('.ls-leiste, .ls-seite > *:not([hidden]), .ls-aktionen'), { d: 560, v: 90, abstand: 60 });
   }
   // Engine schon jetzt starten, damit der erste Gegenzug nicht auf den Start wartet (Zugfolge braucht keine)
-  if (!folge && !(app.test && typeof window !== 'undefined' && window.__test && window.__test.lektionZug)) {
+  if (!folge && !sammeln && !(app.test && typeof window !== 'undefined' && window.__test && window.__test.lektionZug)) {
     try { app.engine('bewertung').catch(() => {}); } catch (e) { /* egal */ }
   }
 
