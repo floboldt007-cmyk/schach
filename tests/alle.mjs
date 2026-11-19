@@ -128,7 +128,10 @@ const SUITEN = [
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
-  { name: 'alle-auswahl', datei: 'alle-auswahl.test.mjs', args: [], was: 'alle.mjs: unbekannter Name in --nur bricht ab, "kommt noch" sichtbar' },
+  { name: 'alle-auswahl', datei: 'alle-auswahl.test.mjs', args: [], was: 'alle.mjs: unbekannter Name in --nur bricht ab, "kommt noch" sichtbar, keine verwaiste Testdatei' },
+  // bis 19.11.2026 verwaist (lief in keiner Suite, Inventur fc-18:11 Zusatz 11)
+  { name: 'heim', datei: 'heim.test.mjs', args: [], was: 'Startseite heim: Buehne, Als Naechstes, drei Wege, ohne Scrollen auf dem iPad, hell und dunkel (Browser)' },
+  { name: 'brettgroesse', datei: 'brettgroesse.test.mjs', args: [], was: 'Brettbreite in Analyse und Partie ueber festen Untergrenzen (Browser)' },
   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
   { name: 'info-lizenzen', datei: 'info-lizenzen.test.mjs', args: [], was: 'Info und Lizenzen: jede Fremdlizenz und der eigene Quellcode in DE und EN, Herkunft Kuerbis/Frost/Gold, jeder Figurensatz mit Herkunftszeile (Teil 1b), Gold und Elfenbein als bearbeitetes cburnett (Browser)' },
   // kommtMit: die Datei kommt erst mit diesem Zweig; bis dahin steht die Suite sichtbar als "kommt noch" da (fc-18:11, Punkt 4)
@@ -215,6 +218,7 @@ const DAUERN = new Map([
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
   ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['bot-grenze', 8],
+  ['heim', 60], ['brettgroesse', 49],
 ]);
 
 function teile(suiten, anzahl) {

@@ -2,9 +2,10 @@
 // still uebergangen zu werden ("--nur=bot-grenze,spiel" meldete "1/1"); eine Suite, deren Datei erst mit einem anderen Zweig
 // kommt (kommtMit), steht sichtbar als "kommt noch" da und laeuft, sobald die Datei existiert. Reiner Node-Test.
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { AUSGELASSEN } from './ausgelassen.mjs';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const alle = (...args) => {
@@ -39,6 +40,25 @@ function pruefe(name, ok, detail = '') {
     pruefe('bot-grenze: Datei fehlt noch, sichtbar als "kommt noch" mit Zweig, nicht als bestanden gezaehlt',
       r.code === 0 && /kommt noch.*so\/R19-bot-grenze/.test(r.text) && /0\/0 Suiten bestanden, 1 kommt noch/.test(r.text), r);
   }
+}
+
+// Verwaiste Tests (fc-18:11 Zusatz 11): bot-grenze und heim liefen wochenlang nirgends. Jede tests/*.test.mjs steht in
+// alle.mjs (datei:), wird in .github/workflows/tests.yml aufgerufen oder steht mit Grund in tests/ausgelassen.mjs.
+{
+  const alleText = readFileSync(path.join(WURZEL, 'tests', 'alle.mjs'), 'utf8');
+  const ymlText = readFileSync(path.join(WURZEL, '.github', 'workflows', 'tests.yml'), 'utf8');
+  const inSuite = new Set([...alleText.matchAll(/datei: '([^']+)'/g)].map((m) => m[1]));
+  const inYml = new Set([...ymlText.matchAll(/tests\/([A-Za-z0-9_.-]+\.m?js)/g)].map((m) => m[1]));
+  const ausnahme = new Map(AUSGELASSEN.map((a) => [a.datei, a.grund]));
+  const dateien = readdirSync(path.join(WURZEL, 'tests')).filter((d) => d.endsWith('.test.mjs'));
+  const verwaist = dateien.filter((d) => !inSuite.has(d) && !inYml.has(d) && !ausnahme.has(d));
+  pruefe('jede tests/*.test.mjs laeuft in alle.mjs oder tests.yml oder steht mit Grund in ausgelassen.mjs', verwaist.length === 0, verwaist);
+  pruefe('Gegenprobe Zaehlung: mindestens 100 Testdateien und 100 Suiten gefunden', dateien.length >= 100 && inSuite.size >= 100,
+    { dateien: dateien.length, suiten: inSuite.size });
+  const ohneGrund = AUSGELASSEN.filter((a) => !a.grund || a.grund.trim().length < 15).map((a) => a.datei);
+  pruefe('jede Ausnahme nennt einen Grund (mind. 15 Zeichen)', ohneGrund.length === 0, ohneGrund);
+  const veraltet = AUSGELASSEN.filter((a) => !dateien.includes(a.datei) || inSuite.has(a.datei) || inYml.has(a.datei)).map((a) => a.datei);
+  pruefe('keine veraltete Ausnahme (Datei fehlt oder laeuft inzwischen doch)', veraltet.length === 0, veraltet);
 }
 
 const gut = ergebnisse.filter((e) => e.ok).length;
