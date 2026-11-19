@@ -296,6 +296,9 @@
   box-shadow: var(--kante); }
 .lg-welt-teilnahme p { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.45; color: var(--text-2); }
 .lg-welt-teilnahme .lg-welt-stand { color: var(--text); }
+.lg-welt-alter, .ss-alter { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 15px; font-weight: 600; line-height: 1.45;
+  color: var(--text); cursor: pointer; }
+.lg-welt-alter input, .ss-alter input { flex: none; width: 22px; height: 22px; margin: 1px 0 0; }
 .lg-welt-meldung { margin: 0; font-size: 14px; font-weight: 600; color: var(--warn); }
 .lg-welt-leer { margin: 0; padding: 16px; font-size: 15px; font-weight: 600; color: var(--text-2); }
 .lg-welt-fussnote { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
