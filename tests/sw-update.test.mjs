@@ -47,16 +47,19 @@ const TYPEN = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
   '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.md': 'text/plain' };
 const VERSION = Number(readFileSync(path.join(WURZEL, 'sw.js'), 'utf8').match(/const VERSION = (\d+);/)[1]);
 
-let neueFassung = false;
+// 0 = Ausgangsfassung, 1 und 2 = die naechsten Fassungen; heim.js sagt der laufenden Seite, aus welcher Fassung ihr Code kommt
+let fassung = 0;
 let zaehler = { voll: 0, nicht: 0, volleDateien: [] };
 async function inhalt(p) {
   let d = await readFile(path.join(WURZEL, p));
-  if (neueFassung && p === '/sw.js') d = Buffer.from(d.toString('utf8').replace(`const VERSION = ${VERSION};`, `const VERSION = ${VERSION + 1};`));
-  if (neueFassung && p === '/js/ui/heim.js') d = Buffer.concat([d, Buffer.from('\n' + PROBE + '\n')]);
+  if (fassung && p === '/sw.js') d = Buffer.from(d.toString('utf8').replace(`const VERSION = ${VERSION};`, `const VERSION = ${VERSION + fassung};`));
+  if (fassung && p === '/js/ui/heim.js') d = Buffer.concat([d, Buffer.from(`\n${PROBE}\nglobalThis.__swFassung = ${fassung};\n`)]);
   return d;
 }
 const server = http.createServer(async (q, r) => {
   let p = decodeURIComponent(new URL(q.url, 'http://x').pathname);
+  // eine Anfrage, die nicht im Cache liegt, bleibt so lange offen und laeuft dabei durch den alten Worker (Runde 2)
+  if (p === '/__halten') { const ms = Number(new URL(q.url, 'http://x').searchParams.get('ms')) || 0; await warte(ms); r.writeHead(200, { 'Content-Type': 'text/plain' }); return r.end('ok'); }
   if (p.endsWith('/')) p += 'index.html';
   let d;
   try { d = await inhalt(p); } catch (e) { r.writeHead(404); return r.end(); }
@@ -128,7 +131,17 @@ async function main() {
   const s = await k.newPage();
   const fehler = [];
   s.on('pageerror', (e) => fehler.push(e.message));
-  s.on('console', (m) => { if (m.type() === 'info' && /^SW-Ablauf/.test(m.text())) merke(m.text()); });
+  // offene Anfragen der Seite: haengt eine davon im alten Service Worker, wartet die neue Fassung nach skipWaiting
+  const offen = new Map();
+  s.on('request', (q) => offen.set(q, Date.now()));
+  s.on('requestfinished', (q) => offen.delete(q));
+  s.on('requestfailed', (q) => offen.delete(q));
+  const offeneListe = () => [...offen].map(([q, t]) => `${q.url().replace(/^https?:\/\/[^/]+/, '')} seit ${Date.now() - t} ms`).join(', ') || 'keine';
+  s.on('console', (m) => {
+    if (m.type() !== 'info' || !/^SW-Ablauf/.test(m.text())) return;
+    merke(m.text());
+    if (/^SW-Ablauf (aktiviere|neu laden: Notbremse)/.test(m.text())) merke('offene Anfragen: ' + offeneListe());
+  });
   let adresse = basis;
   try {
     schritt('Erstbesuch');
@@ -139,7 +152,7 @@ async function main() {
 
     // die neue Fassung liegt online; der Besucher kommt spaeter wieder (SW_MERKER "kuerzlich" = 15 s abwarten)
     schritt('Update: neue Fassung installieren');
-    neueFassung = true; zaehler = { voll: 0, nicht: 0, volleDateien: [] };
+    fassung = 1; zaehler = { voll: 0, nicht: 0, volleDateien: [] };
     await warte(16000);
     await s.reload(); await startBereit(s);
     const hinweis = await s.waitForSelector('.update-hinweis', { timeout: 60000 }).then(() => true).catch(() => false);
@@ -161,6 +174,33 @@ async function main() {
     const probe = await werte(s, (x) => fetch('js/ui/heim.js').then((r) => r.text()).then((t) => t.includes(x)), PROBE);
     pruefe('Übernahme: die geänderte Datei kommt in der neuen Fassung aus dem Cache (keine alte Datei im neuen Cache)', probe);
     pruefe('Übernahme: die App läuft (Start sichtbar), keine Seitenfehler', await werte(s, () => document.querySelectorAll('#app > .screen').length) > 0 && fehler.length === 0, fehler.join(' | '));
+
+    // Runde 2 (CI 44472043484 und 44367424082): Nach skipWaiting uebernimmt die neue Fassung erst, wenn der alte Worker
+    // keine Anfrage mehr offen hat. Haengt eine, laedt die Notbremse neu (im Test nach 3 s statt 30 s, ?swnot). Danach muss
+    // die neue Fassung die Seite trotzdem uebernehmen, ohne Neuladen-Schleife, und die Seite laeuft mit ihrem Code.
+    schritt('Runde 2: dritte Fassung installieren');
+    // gleich neu laden, solange der letzte Wechsel "kuerzlich" ist: die dritte Fassung installiert nur und wartet
+    fassung = 2;
+    await s.reload(); await startBereit(s);
+    pruefe('Runde 2: die dritte Fassung ist installiert, der Hinweis "Neu laden" erscheint',
+      await s.waitForSelector('.update-hinweis', { timeout: 60000 }).then(() => true).catch(() => false));
+    schritt('Runde 2: Uebernahme mit haengender Anfrage');
+    await k.addInitScript(() => {
+      if (sessionStorage.getItem('sw-halten')) return;
+      sessionStorage.setItem('sw-halten', '1');
+      fetch('__halten?ms=12000').catch(() => {});
+    });
+    await warte(16000);
+    let ladungen = 0;
+    s.on('load', () => { ladungen++; });
+    await s.goto(basis.replace('?test&sw', '?test&sw&swnot=3000')); await startBereit(s);
+    const da = await warteAufVersion(s, VERSION + 2);
+    schritt('Runde 2: Endzustand pruefen');
+    pruefe(`Runde 2: Version ${VERSION + 2} steuert die Seite, nur ihr Cache bleibt`, da, JSON.stringify(await swVersion(s)));
+    pruefe('Runde 2: die Seite läuft mit dem Code der neuen Fassung (nicht alter Code unter neuem Worker)',
+      await werte(s, () => globalThis.__swFassung) === 2, String(await werte(s, () => globalThis.__swFassung)));
+    pruefe('Runde 2: höchstens dreimal geladen (Aufruf, Notbremse, Wechsel), keine Schleife', ladungen <= 3, `${ladungen} Ladungen`);
+    pruefe('Runde 2: keine Seitenfehler', fehler.length === 0, fehler.join(' | '));
   } catch (e) {
     pruefe('Ablauf ohne Abbruch', false, e.message.split('\n')[0]);
   } finally {
@@ -169,7 +209,7 @@ async function main() {
     server.close();
   }
   const gut = ergebnisse.filter((e) => e.ok).length;
-  if (gut !== ergebnisse.length) console.log(`\nLetzter Schritt: ${letzterSchritt}\nSeite: ${adresse}\nSpuren:\n${spuren.join('\n')}`);
+  if (gut !== ergebnisse.length || process.env.SW_SPUREN) console.log(`\nLetzter Schritt: ${letzterSchritt}\nSeite: ${adresse}\nSpuren:\n${spuren.join('\n')}`);
   console.log(`\n${gut}/${ergebnisse.length} bestanden`);
   process.exit(gut === ergebnisse.length ? 0 : 1);
 }
