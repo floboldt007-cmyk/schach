@@ -134,6 +134,21 @@ pruefe('Texte DE und EN fuer Kurs, Kapitel, Art sammeln und jede Aufgabe (je Fol
 const verboten = /Season|Saison|Weltrangliste|Crownmaster/i;
 pruefe('keine Texte mit Season/Saison/Weltrangliste/Crownmaster', schluessel.every((k) => !verboten.test(DE[k] || '') && !verboten.test(EN[k] || '')));
 
+// ---------- N-13:10: Kopf im Kurs, Vorschaubild der Sammel-Aufgaben ----------
+pruefe('Text "kursUeber" (Zeile ueber dem Kurs-Titel statt "Meisterschule") in DE und EN',
+  typeof DE.kursUeber === 'string' && !!DE.kursUeber && typeof EN.kursUeber === 'string' && !!EN.kursUeber && !/Meisterschule|Master/i.test(DE.kursUeber + EN.kursUeber),
+  { de: DE.kursUeber, en: EN.kursUeber });
+const B = await import('../js/ui/bauteile.js').catch((e) => ({ fehler: e.message }));
+const vorschau = B.miniBrett ? B.miniBrett('8/8/8/8/8/8/8/R7 w - - 0 1', { sterne: ['a8', 'h8', 'h1'], gross: true }) : '';
+const zellen = vorschau.match(/<i class="[^"]*"/g) || [];
+const zelle = (feld) => zellen['abcdefgh'.indexOf(feld[0]) + (8 - Number(feld[1])) * 8] || '';
+pruefe('miniBrett mit Sternen: die drei Sternfelder tragen die Klasse s, sonst keines', ['a8', 'h8', 'h1'].every((f) => / s[ "]/.test(zelle(f)))
+  && zellen.filter((z) => / s[ "]/.test(z)).length === 3, { fehler: B.fehler, a8: zelle('a8') });
+pruefe('miniBrett gross: Wurzel mit Klasse mini-gross, die Figur als grosses Bild am Rand verankert (nicht abgeschnitten)',
+  /class="mini mini-gross/.test(vorschau) && /<img class="g"[^>]*transform-origin:\s*left bottom/.test(vorschau), vorschau.slice(0, 200));
+const ohne = B.miniBrett ? B.miniBrett('8/8/8/8/8/8/8/R7 w - - 0 1') : '';
+pruefe('miniBrett ohne Optionen bleibt wie bisher (kein s, kein mini-gross, kein g)', !!ohne && !/ s[ "]|mini-gross|class="g"/.test(ohne));
+
 // ---------------------------------------------------------------------------
 // Browser-Teil: Uebersicht mit Kurs-Karte vorn, es-turm ganz gespielt (Sterne verschwinden einzeln), Folge es-mitte;
 // iPhone 390 und PC 1440, hell und dunkel. BILDER=<ordner> legt je Lage vier Bilder ab.
@@ -199,7 +214,11 @@ async function browserTeil() {
           kapitel: [...document.querySelectorAll('.ms-gruppe > h2')].map((x) => x.textContent).join('|'),
           ids: [...document.querySelectorAll('.ms-lektion')].map((x) => x.dataset.id).join(),
           schloss: document.querySelectorAll('.ms-lektion[data-gesperrt]').length,
-          quer: document.documentElement.scrollWidth > window.innerWidth + 1, bald: !!document.querySelector('.ms-bald')?.offsetParent }));
+          quer: document.documentElement.scrollWidth > window.innerWidth + 1, bald: !!document.querySelector('.ms-bald')?.offsetParent,
+          kopf: document.querySelector('.ms-screen .kopf-seite')?.textContent || '', ueber: document.querySelector('.ms-screen .ms-bereich .ueber, .ms-screen .ms-bereich [class*="ueber"]')?.textContent || '',
+          sterneMini: document.querySelectorAll('.ms-lektion[data-id="es-turm"] .mini.mini-gross i.s').length }));
+        pruefe(`${lage}: N-13:10 Kopf "Erste Schritte" statt "Meisterschule", Vorschaubild es-turm gross mit 3 Sternen`,
+          ue.kopf === 'Erste Schritte' && !/Meisterschule/.test(ue.ueber) && ue.sterneMini === 3, ue);
         pruefe(`${lage}: Uebersicht Kurs-Karte vorn und gewaehlt, fuenf Karten, ohne "gratis", Kapitel 1 und 5, 9 Aufgaben offen, kein Querscrollen`,
           ue.karte1 === 'erste' && ue.gewaehlt === 'erste' && ue.karten === 5 && ue.gratis === 0 && ue.kapitel === 'Kapitel 1: Brett und Figuren|Kapitel 5: Gut anfangen'
           && ue.ids === kurs.lektionen.map((l) => l.id).join() && ue.schloss === 0 && !ue.quer && !ue.bald, ue);
@@ -211,7 +230,10 @@ async function browserTeil() {
         await s.locator('.ls-aktionen [data-a="los"]').click();
         await warteLz(s, 'z.phase === "flo"');
         const vorher = await s.evaluate(() => ({ marken: document.querySelectorAll('.ls-screen .lage.mark-stern').length,
-          oben: getComputedStyle(document.querySelector('.ls-screen .ls-oben')).visibility, hinweis: document.querySelectorAll('.ls-aktionen [data-a="hinweis"]').length }));
+          oben: getComputedStyle(document.querySelector('.ls-screen .ls-oben')).visibility, hinweis: document.querySelectorAll('.ls-aktionen [data-a="hinweis"]').length,
+          titel: document.querySelector('.ls-screen .marke-titel')?.textContent || '', unter: document.querySelector('.ls-screen .logo-unter')?.textContent || '' }));
+        pruefe(`${lage}: N-13:10 Aufgabe zeigt oben "Erste Schritte", darunter das Kapitel`,
+          vorher.titel === 'Erste Schritte' && vorher.unter === 'Kapitel 1: Brett und Figuren', vorher);
         pruefe(`${lage}: es-turm startet mit 3 Stern-Marken, ohne Gegner-Leiste und ohne Hinweis-Knopf`, vorher.marken === 3 && vorher.oben === 'hidden' && vorher.hinweis === 0, vorher);
         const reste = [];
         for (const zug of ['a1a8', 'a8h8', 'h8h1']) {
