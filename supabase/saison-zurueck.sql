@@ -68,6 +68,7 @@ revoke all on function public.liga_abrechnen() from public, anon, authenticated;
 
 drop function if exists public.saison_karte_der_partie(uuid);
 drop function if exists public.saison_karte_von(uuid);
+drop function if exists public.saison_sichtbar_setzen(boolean, boolean);
 drop function if exists public.saison_sichtbar_setzen(boolean);
 drop function if exists public.saison_titel_waehle(text);
 drop function if exists public.saison_mein_stand();

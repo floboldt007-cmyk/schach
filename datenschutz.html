@@ -208,7 +208,7 @@
   bei Supabase in Frankfurt.</p>
   <p>Deine Visitenkarte sieht nur, wer mit dir in derselben Online-Partie sitzt (eingeladen oder über die Gegnersuche):
   dein Benutzername, Titel, Banner, Profilbild, deine Liga-Stufe mit ihrem Symbol, die ausgestellten Erfolge, dein bestes
-  Season-Abzeichen und ein Season-Titel, falls du einen ausgewählt hast, beide nur, sofern du sie in den Einstellungen nicht ausgeblendet hast (siehe „Seasons“), und in gewerteten Partien deine
+  Season-Abzeichen und ein Season-Titel, falls du einen ausgewählt hast, beide nur, wenn du sie in den Einstellungen eingeschaltet hast (siehe „Seasons“), und in gewerteten Partien deine
   Online-Elo. Freundespartien bleiben ohne Elo. Besondere Titel wie „Erfinder“ oder „Pionier“ (mit Nummer) sieht nur dein
   Gegner in einer gemeinsamen Online-Partie, und nur, wenn der Server bestätigt, dass du sie besitzt; sonst zeigt die App
   sie nur auf deiner eigenen Karte. Deine Wochen-Gruppe in der
@@ -261,29 +261,43 @@
     die Plätze nach Online-Elo unter allen Konten mit mindestens 20 Online-Partien mit Kronen in dieser Season (das sind
     gewertete Partien mit mindestens 4 Halbzügen, höchstens 3 je Gegner und Tag). Außerdem muss deine Online-Elo insgesamt auf
     mindestens 15 gewerteten Online-Partien beruhen, bei selbst angegebener Start-Elo auf mindestens 30,</li>
-    <li>welchen deiner Season-Titel du zeigen möchtest; ohne Auswahl wird keiner gezeigt, und ob dein Gegner Abzeichen und Titel sehen darf (Vorgabe: ja).</li>
+    <li>welchen deiner Season-Titel du zeigen möchtest; ohne Auswahl wird keiner gezeigt.</li>
   </ul>
   <p>Zu Beginn der neuen Season sinkt deine Liga-Stufe um 3 Stufen (höchstens bis Squire III). Die Plätze nach Elo dienen
   hier nur der Vergabe der Titel; eine Liste mit Namen gibt es nur in der Weltrangliste, und dort nur, wenn du selbst
-  mitmachst (siehe „Weltrangliste“). Dein bestes Abzeichen und deinen
-  ausgewählten Titel sieht nur, wer mit dir in derselben Online-Partie sitzt (siehe „Visitenkarte“); deine eigenen
-  Abzeichen und Titel siehst nur du im Profil. In den Einstellungen kannst du unter „Season“ ausschalten, dass dein Gegner Abzeichen und Titel sieht; der Server gibt sie dann nicht mehr an ihn weiter. Diese Daten sind für die Liga erforderlich (Art. 6 Abs. 1 lit. b DSGVO),
-  liegen wie dein Konto bei Supabase in Frankfurt und bleiben gespeichert, bis du dein Konto löschst; dann werden sie
-  automatisch mitgelöscht. Unter „Meine Daten herunterladen“ erhältst du sie mit.</p>
+  mitmachst (siehe „Weltrangliste“). Deine eigenen Abzeichen und Titel siehst du immer im Profil, und nur du. Diese Daten
+  sind für die Liga erforderlich (Art. 6 Abs. 1 lit. b DSGVO), liegen wie dein Konto bei Supabase in Frankfurt und bleiben
+  gespeichert, bis du dein Konto löschst; dann werden sie automatisch mitgelöscht. Unter „Meine Daten herunterladen“
+  erhältst du sie mit.</p>
+  <p><b>Anzeige für deinen Gegner:</b> Dein bestes Abzeichen und deinen ausgewählten Titel sieht dein Gegner in einer
+  gemeinsamen Online-Partie (siehe „Visitenkarte“) nur, wenn du das in den Einstellungen unter „Season“ selbst einschaltest.
+  Die Voreinstellung ist aus (Art. 25 Abs. 2 DSGVO). Das Einschalten ist freiwillig; Rechtsgrundlage ist deine Einwilligung
+  (Art. 6 Abs. 1 lit. a DSGVO). Einwilligen kannst du erst ab 16 Jahren (Art. 8 Abs. 1 DSGVO): Vor dem Einschalten
+  bestätigst du mit einem Haken, dass du mindestens 16 Jahre alt bist; ohne diese Bestätigung schaltet der Server die
+  Anzeige nicht ein. Gespeichert werden dafür, dass die Anzeige an ist, und der Zeitpunkt dieser Bestätigung. Empfänger ist
+  nur der Gegner der jeweiligen Online-Partie; die Angaben liegen bei Supabase in Frankfurt als Auftragsverarbeiter (siehe
+  „Wo und durch wen“). Du kannst die Einwilligung jederzeit widerrufen, indem du den Schalter wieder ausschaltest (Art. 7
+  Abs. 3 DSGVO); der Server gibt Abzeichen und Titel dann sofort nicht mehr weiter und löscht den Zeitpunkt der
+  Bestätigung. Die Rechtmäßigkeit der Anzeige bis zum Widerruf bleibt davon unberührt. Die Angabe wird mit deinem Konto
+  gelöscht und ist in „Meine Daten herunterladen“ enthalten.</p>
 
   <!-- R19 (Weltrangliste, supabase/weltrang-schema.sql), Stand 14.11.2026: Pruefung durch eine fachkundige Person steht aus -->
   <h3>Weltrangliste</h3>
   <p>Im Reiter „Welt“ der Liga gibt es eine Weltrangliste nach Online-Elo. Du erscheinst darin nur, wenn du selbst
-  mitmachst (Knopf „Mitmachen“); ohne deine Zustimmung steht dort nichts über dich. Vor dem Mitmachen bestätigst du mit einem Haken, dass du mindestens 16 Jahre alt bist oder deine Eltern einverstanden sind; ohne diese Bestätigung nimmt der Server dich nicht auf. Machst du mit, sehen alle angemeldeten
+  mitmachst (Knopf „Mitmachen“); ohne deine Zustimmung steht dort nichts über dich, die Voreinstellung ist also aus
+  (Art. 25 Abs. 2 DSGVO). Mitmachen ist freiwillig. Einwilligen kannst du erst ab 16 Jahren (Art. 8 Abs. 1 DSGVO): Vor dem
+  Mitmachen bestätigst du mit einem Haken, dass du mindestens 16 Jahre alt bist; ohne diese Bestätigung nimmt der Server
+  dich nicht auf. Machst du mit, sehen alle angemeldeten
   Spieler deinen Benutzernamen, dein Banner, deine Online-Elo und deinen Platz. Die Liste zeigt die besten 100. Weitere Angaben wie deine Mail, deine
   Kennung, dein Profilbild, deine Liga-Stufe oder deine Titel stehen nicht in der Liste. Gezeigt wirst du erst, wenn deine Elo auf
   genügend gewerteten Online-Partien beruht: ab 15 Partien, und ab 30 Partien, wenn du deine Start-Elo selbst angegeben
   hast. Ohne Benutzernamen erscheinst du nicht. Besucher ohne Konto sehen die Weltrangliste nicht.</p>
   <p>Gespeichert wird dafür nur, dass und seit wann du mitmachst, sowie der Zeitpunkt dieser Bestätigung; die Elo kommt aus der Liga (siehe „Liga mit Kronen und Wochen-Gruppen“).
-  Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Du kannst sie jederzeit mit „Nicht mehr zeigen“
-  widerrufen; dann wird der Eintrag mit diesem Zeitpunkt sofort gelöscht und du verschwindest aus der Liste. Die Rechtmäßigkeit der Anzeige
-  bis zum Widerruf bleibt davon unberührt. Die Angabe liegt wie dein Konto bei Supabase in Frankfurt, wird mit deinem
-  Konto gelöscht und ist in „Meine Daten herunterladen“ enthalten.</p>
+  Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Empfänger sind die angemeldeten Spieler, die die
+  Liste öffnen. Du kannst die Einwilligung jederzeit mit „Nicht mehr zeigen“ widerrufen (Art. 7 Abs. 3 DSGVO); dann wird
+  der Eintrag mit diesem Zeitpunkt sofort gelöscht und du verschwindest aus der Liste. Die Rechtmäßigkeit der Anzeige
+  bis zum Widerruf bleibt davon unberührt. Die Angabe liegt wie dein Konto bei Supabase in Frankfurt als Auftragsverarbeiter
+  (siehe „Wo und durch wen“), wird mit deinem Konto gelöscht und ist in „Meine Daten herunterladen“ enthalten.</p>
 
   <!-- Etappe B (Raetsel-Duell), Stand 14.11.2026: Pruefung durch eine fachkundige Person steht aus -->
   <h3>Rätsel-Duell</h3>
@@ -465,8 +479,10 @@
   du ab 13 Jahren anlegen. Bist du jünger als 16, frag deine Eltern oder Erziehungsberechtigten, bevor du ein Konto
   anlegst. Einwilligungen, zum Beispiel in das Teilen von Partien und Nutzungsdaten (Abschnitt 6), kannst du erst ab
   16 Jahren selbst geben, vorher nur mit Zustimmung deiner Eltern (Art. 8 Abs. 1 DSGVO); der Schalter ist deshalb
-  standardmäßig aus, und die App weist direkt daneben darauf hin. Auch in die Teilnahme an der Weltrangliste kannst du
-  erst ab 16 Jahren selbst einwilligen. Vor dem Mitmachen bestätigst du das mit einem Haken: Du bist mindestens 16, oder deine Eltern sind einverstanden. Editionen im Shop gibt es erst ab 18 Jahren (Abschnitt
+  standardmäßig aus, und die App weist direkt daneben darauf hin. In die Teilnahme an der Weltrangliste und in die
+  Anzeige deines Season-Abzeichens und -Titels für deinen Gegner kannst du erst ab 16 Jahren einwilligen; einen Weg über
+  die Zustimmung der Eltern gibt es dafür nicht. Vor dem Mitmachen bestätigst du das mit einem Haken: Du bist mindestens
+  16 Jahre alt. Dasselbe gilt vor dem Einschalten der Anzeige unter „Season“. Editionen im Shop gibt es erst ab 18 Jahren (Abschnitt
   „Shop: Editionen“). Eltern können über <a href="mailto:kontakt@crownmate.de">kontakt@crownmate.de</a> Auskunft
   über ein Konto oder seine Löschung verlangen.</p>
 

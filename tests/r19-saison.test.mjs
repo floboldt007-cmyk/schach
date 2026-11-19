@@ -247,8 +247,9 @@ try {
     pruefe(`${name}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
-  { // Schalter in den Einstellungen (Flo 18.11.2026): Vorgabe sichtbar, aus geht an den Server; altes SQL zeigt keinen Schalter
-    const { kontext, seite, gesendet } = await neueSeite(browser, { stand: { ...LAUF, sichtbar: true } });
+  { // Schalter in den Einstellungen: anfangs aus (Flo 19.11.2026, Art. 25 Abs. 2 DSGVO), an und wieder aus gehen an den Server;
+    // altes SQL zeigt keinen Schalter
+    const { kontext, seite, gesendet } = await neueSeite(browser, { stand: { ...LAUF, sichtbar: false } });
     await warteLeiste(seite);
     const s = await seite.evaluate(async () => {
       const { fuelleSaisonSchalter } = await import('/js/pakete/liga/saison.js');
@@ -257,13 +258,40 @@ try {
       document.body.append(el);
       await fuelleSaisonSchalter(el);
       const k = el.querySelector('.ss-sichtbar');
-      const vorher = k?.getAttribute('aria-checked');
+      const haken = el.querySelector('.ss-alter input');
+      const block = el.querySelector('.ss-einwilligung');
+      const warte = async (w) => { for (let i = 0; i < 40 && k?.getAttribute('aria-checked') !== w; i++) await new Promise((r) => setTimeout(r, 50)); };
+      const vorher = { an: k?.getAttribute('aria-checked'), gesperrt: !!k?.disabled, haken: haken?.checked, block: !!block && !block.hidden,
+        hinweisVorHaken: !!block && block.textContent.indexOf('Gegner') >= 0 && block.textContent.indexOf('Gegner') < block.textContent.indexOf('mindestens 16'),
+        hakenVorSchalter: !!haken && !!(haken.compareDocumentPosition(k) & Node.DOCUMENT_POSITION_FOLLOWING),
+        link: block?.querySelector('a')?.getAttribute('href'), haken_text: el.querySelector('.ss-alter')?.textContent.trim() };
       k?.click();
-      for (let i = 0; i < 40 && k?.getAttribute('aria-checked') !== 'false'; i++) await new Promise((r) => setTimeout(r, 50));
-      return { sichtbar: !el.hidden, rolle: k?.getAttribute('role'), vorher, nachher: k?.getAttribute('aria-checked') };
+      await new Promise((r) => setTimeout(r, 200));
+      const ohneHaken = k?.getAttribute('aria-checked');
+      haken.checked = true;
+      haken.dispatchEvent(new Event('change', { bubbles: true }));
+      const freigegeben = !k.disabled;
+      k.click();
+      await warte('true');
+      const an = { an: k.getAttribute('aria-checked'), block: !block.hidden };
+      k.click();
+      await warte('false');
+      return { sichtbar: !el.hidden, rolle: k.getAttribute('role'), vorher, ohneHaken, freigegeben, an,
+        aus: { an: k.getAttribute('aria-checked'), block: !block.hidden, haken: haken.checked, gesperrt: k.disabled },
+        text: el.querySelector('#es-t-season')?.textContent };
     });
-    pruefe('Schalter: sichtbar, Vorgabe an, Klick schaltet aus', s.sichtbar && s.rolle === 'switch' && s.vorher === 'true' && s.nachher === 'false', s);
-    pruefe('Schalter: geht an den Server', gesendet.includes('saison_sichtbar_setzen:{"an":false}'), gesendet);
+    pruefe('Schalter: Vorgabe aus, gesperrt, Haken nie vorab gesetzt, Hinweis sichtbar',
+      s.sichtbar && s.rolle === 'switch' && s.vorher.an === 'false' && s.vorher.gesperrt && s.vorher.haken === false && s.vorher.block, s.vorher);
+    pruefe('Schalter: Hinweis (wer sieht was) vor dem Haken, Haken vor dem Schalter, Link zur Datenschutzerklaerung',
+      s.vorher.hinweisVorHaken && s.vorher.hakenVorSchalter && s.vorher.link === 'datenschutz.html', s.vorher);
+    pruefe('Schalter: Haken "Ich bin mindestens 16 Jahre alt."', s.vorher.haken_text === 'Ich bin mindestens 16 Jahre alt.', s.vorher.haken_text);
+    pruefe('Schalter: ohne Haken geht er nicht an', s.ohneHaken === 'false', s.ohneHaken);
+    pruefe('Schalter: mit Haken an, Hinweis weg; Ausschalten wirkt sofort, Haken wieder leer, Schalter wieder gesperrt',
+      s.freigegeben && s.an.an === 'true' && !s.an.block && s.aus.an === 'false' && s.aus.block && s.aus.haken === false && s.aus.gesperrt, s);
+    pruefe('Schalter: an (mit Bestaetigung) und aus gehen an den Server, in dieser Reihenfolge',
+      gesendet.filter((g) => g.startsWith('saison_sichtbar_setzen:')).join()
+        === 'saison_sichtbar_setzen:{"an":true,"alter_bestaetigt":true},saison_sichtbar_setzen:{"an":false}', gesendet);
+    pruefe('Schalter: Text sagt, dass er anfangs aus ist', /Anfangs aus\.$/.test(s.text || ''), s.text);
     await kontext.close();
     const alt = await neueSeite(browser, { stand: LAUF });
     await warteLeiste(alt.seite);

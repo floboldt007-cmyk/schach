@@ -50,9 +50,10 @@ export async function waehleSaisonTitel(titel) {
   return rpc('saison_titel_waehle', { titel: titel || null });
 }
 
-// Schalter in den Einstellungen: an = der Gegner sieht Abzeichen und Titel; Absage oder offline: Fehler an den Aufrufer
+// Schalter in den Einstellungen: an = der Gegner sieht Abzeichen und Titel; Absage oder offline: Fehler an den Aufrufer.
+// Einschalten nur nach dem Haken "mindestens 16" (saison.js); der Server prueft die Bestaetigung selbst (SAISON_ALTER).
 export async function setzeSaisonSichtbar(an) {
-  return rpc('saison_sichtbar_setzen', { an });
+  return rpc('saison_sichtbar_setzen', an ? { an, alter_bestaetigt: true } : { an });
 }
 
 export async function holeGruppe() {

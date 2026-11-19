@@ -5,7 +5,7 @@
 --                             2800 und 15 Niederlagen stehen noch bei 2200 und waeren sonst Platz 1
 --   nur mit Benutzername      ohne Zeile in profile kein Eintrag
 --   Banner nur im Besitz      sonst 'start', dieselbe Regel wie karte_von (karte-schema.sql)
---   Altersbestaetigung        (Flo 18.11.2026) Mitmachen nur mit Haken "mindestens 16 oder Eltern einverstanden"; der Server
+--   Altersbestaetigung        (Flo 18.11.2026) Mitmachen nur ab 16, mit Haken "mindestens 16 Jahre alt" (Flo 19.11.2026); der Server
 --                             prueft ihn und speichert den Zeitpunkt, eine Zeile ohne Zeitpunkt zaehlt nicht als Teilnahme
 -- Gezeigt werden Rang, Name, Banner und Elo. Keine Kennung, keine Mail, keine Liga-Stufe, kein Titel.
 -- Voraussetzung: schema.sql, kronen-schema.sql und karte-schema.sql sind eingespielt. Diese Datei bringt meine_daten()
@@ -154,7 +154,7 @@ declare
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
   duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
-  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null, 'sichtbar', true);
+  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null, 'sichtbar', false, 'alter_bestaetigt_am', null);
   raetsel jsonb;
   verwaltung jsonb := jsonb_build_object('verwalter', null, 'protokoll', '[]'::jsonb); -- [verwaltung]
 begin
@@ -309,7 +309,9 @@ begin
                ''titel'', coalesce((select jsonb_agg(jsonb_build_object(''saison'', t.saison, ''art'', t.art) order by t.saison, t.art)
                  from public.saison_titel t where t.user_id = $1), ''[]''::jsonb),
                ''gewaehlt'', (select w.titel from public.saison_wahl w where w.user_id = $1),
-               ''sichtbar'', coalesce((select (to_jsonb(w) ->> ''sichtbar'')::boolean from public.saison_wahl w where w.user_id = $1), true))'
+               ''sichtbar'', coalesce((select (to_jsonb(w) ->> ''sichtbar'')::boolean and (to_jsonb(w) ->> ''alter_bestaetigt_am'') is not null
+                 from public.saison_wahl w where w.user_id = $1), false),
+               ''alter_bestaetigt_am'', (select to_jsonb(w) -> ''alter_bestaetigt_am'' from public.saison_wahl w where w.user_id = $1))'
       into saison using uid;
   end if;
   -- Raetsel-Duell (raetsel-duell-schema.sql): die eigenen Duelle mit dem eigenen Stand darin und die laufende Suche.

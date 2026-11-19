@@ -526,10 +526,19 @@ Bis Schritt 1 eingespielt ist, zeigt der Reiter „Die Weltrangliste ist gerade 
 **Rückweg:** `supabase/weltrang-zurueck.sql` entfernt beide Funktionen und die Tabelle der Zustimmungen (die
 Zustimmungen gehen dabei verloren, Elo und Liga bleiben). Danach `notify pgrst, 'reload schema';`.
 
-## Saison, Weltrangliste und Online-Elo (Stand 18.11.2026, vorbereitet, noch nicht eingespielt)
+## Saison, Weltrangliste und Online-Elo (Stand 19.11.2026, vorbereitet, noch nicht eingespielt)
 
 Diese drei Teile gehören zu Paket 2. Voraussetzung sind die live eingespielten Dateien `kronen-schema.sql`,
-`zwei-ligen-schema.sql` und `karte-schema.sql`. Jede Datei lässt sich gefahrlos zweimal einspielen.
+`zwei-ligen-schema.sql` und `karte-schema.sql`. Jede Datei lässt sich gefahrlos zweimal einspielen; bestehende
+Zustimmungen bleiben dabei erhalten (`tests/server-saison.test.mjs`, `tests/server-weltrang.test.mjs`).
+
+**Einwilligung ab 16 (Flo 19.11.2026):** Weltrangliste und die Anzeige von Season-Abzeichen und -Titel für den Gegner
+sind beide eine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) und nur ab 16 möglich, ohne Weg über die Eltern. Der Server
+lehnt ohne den Haken „Ich bin mindestens 16 Jahre alt.“ ab (`WELTRANG_ALTER`, `SAISON_ALTER`) und speichert den
+Zeitpunkt (`weltrang_teilnahme.alter_bestaetigt_am`, `saison_wahl.alter_bestaetigt_am`). Die Anzeige für den Gegner ist
+anfangs aus (`saison_wahl.sichtbar` mit Vorgabe `false`, Art. 25 Abs. 2 DSGVO); eine Zeile ohne Zeitpunkt zählt nicht.
+Ausschalten löscht den Zeitpunkt und wirkt sofort. Die eigenen Abzeichen und Titel im Profil bleiben immer sichtbar,
+nur für einen selbst.
 
 | Nr. | Was | Datei | Prüfen (Erwartung) |
 | --- | --- | --- | --- |
@@ -537,6 +546,19 @@ Diese drei Teile gehören zu Paket 2. Voraussetzung sind die live eingespielten 
 | 2 | Weltrangliste | `weltrang-schema.sql` | `weltrang-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK` |
 | 3 | Eigene Online-Elo auf der Online-Seite | `online-elo-schema.sql` | `online-elo-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK` |
 | 4 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
+| 5 | Endprobe | Abfrage unten | eine Zeile, alle Felder `true` |
+
+```sql
+select
+  to_regprocedure('public.saison_sichtbar_setzen(boolean, boolean)') is not null as saison_schalter_mit_haken,
+  to_regprocedure('public.saison_sichtbar_setzen(boolean)') is null as alter_schalter_weg,
+  (select column_default from information_schema.columns where table_schema = 'public' and table_name = 'saison_wahl'
+    and column_name = 'sichtbar') = 'false' as abzeichen_anfangs_aus,
+  to_regprocedure('public.weltrang_mitmachen(boolean, boolean)') is not null as weltrang_mit_haken,
+  to_regprocedure('public.weltrang_mitmachen(boolean)') is null as alter_weltrang_weg;
+```
+
+Erst danach kommt der Schalter in `js/freigaben.js` in einem eigenen kleinen Commit an.
 
 **Titel „Top 10“ und „Top 100“:** Es zählen Konten mit mindestens 20 Online-Partien mit Kronen in der Saison und einer
 bestätigten Elo, also ab 15 gewerteten Partien, mit selbst angegebener Start-Elo ab 30. Das ist dieselbe Schwelle wie
@@ -548,8 +570,9 @@ Online-Seite wieder die Liga statt der Elo.
 **Rückweg, in dieser Reihenfolge:**
 
 1. `online-elo-zurueck.sql` nimmt das Feld `elo` wieder heraus. Daten gehen keine verloren.
-2. `weltrang-zurueck.sql` entfernt die Weltrangliste. Die Zustimmungen gehen dabei verloren.
-3. `saison-zurueck.sql` entfernt die Saison. Abzeichen, Titel und Wahl gehen dabei verloren. Ein schon angewandter
+2. `weltrang-zurueck.sql` entfernt die Weltrangliste. Die Zustimmungen samt Zeitpunkt gehen dabei verloren.
+3. `saison-zurueck.sql` entfernt die Saison. Abzeichen, Titel, Wahl und die Einwilligung zur Anzeige samt Zeitpunkt
+   gehen dabei verloren. Beide Fassungen des Schalters (alt und neu) werden entfernt. Ein schon angewandter
    Reset der Liga-Stufen wird nicht zurückgebucht.
 4. `notify pgrst, 'reload schema';`
 

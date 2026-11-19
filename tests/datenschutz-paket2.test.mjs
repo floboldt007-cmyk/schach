@@ -28,9 +28,10 @@ const FAELLE = [
     ligaMuss: 'Machst du selbst in der Weltrangliste mit, sehen alle angemeldeten Spieler dort deine Online-Elo',
     dauerMuss: 'Seasons, Weltrangliste', kinderMuss: 'Weltrangliste', rechteMuss: '„Nicht mehr zeigen“',
     loeschenMuss: ['Season-Abzeichen', 'Season-Titel', 'Teilnahme an der Weltrangliste'],
-    hakenMuss: ['mindestens 16 Jahre alt bist oder deine Eltern einverstanden sind', 'Zeitpunkt dieser Bestätigung'],
+    hakenMuss: ['dass du mindestens 16 Jahre alt bist', 'Zeitpunkt dieser Bestätigung'],
     kinderHaken: 'Vor dem Mitmachen bestätigst du das', seasons: '<h3>Seasons</h3>',
-    schalterMuss: 'In den Einstellungen kannst du unter „Season“ ausschalten', karteSchalter: 'sofern du sie in den Einstellungen nicht ausgeblendet hast' },
+    schalterMuss: 'nur, wenn du das in den Einstellungen unter „Season“ selbst einschaltest', karteSchalter: 'beide nur, wenn du sie in den Einstellungen eingeschaltet hast',
+    vorgabeAlt: /Vorgabe: ja|ausgeblendet hast|kannst du unter „Season“ ausschalten/ },
   { sprache: 'en', datei: 'datenschutz-en.html', loeschen: 'konto-loeschen-en.html',
     welt: '<h3>World ranking</h3>', karte: '<h3>Player card, achievements and thalers</h3>', liga: '<h3>League with crowns and weekly groups</h3>',
     dauer: '<h3>Legal basis and retention</h3>', kinder: '<h2>12. ', rechte: '<h2>13. ',
@@ -39,9 +40,10 @@ const FAELLE = [
     ligaMuss: 'If you join the world ranking yourself, every signed-in player sees your online Elo there',
     dauerMuss: 'seasons, world ranking', kinderMuss: 'world ranking', rechteMuss: 'Stop showing me',
     loeschenMuss: ['season badges', 'season titles', 'participation in the world ranking'],
-    hakenMuss: ['you are at least 16 or that your parents have agreed', 'time of this confirmation'],
+    hakenMuss: ['that you are at least 16 years old', 'time of this confirmation'],
     kinderHaken: 'You confirm this before joining', seasons: '<h3>Seasons</h3>',
-    schalterMuss: 'In the settings, under "Season", you can turn off', karteSchalter: 'unless you have hidden them in the settings' },
+    schalterMuss: 'only if you turn this on yourself in the settings under "Season"', karteSchalter: 'both only if you have turned them on in the settings',
+    vorgabeAlt: /default: yes|unless you have hidden them|you can turn off that your opponent/ },
 ];
 
 for (const f of FAELLE) {
@@ -61,6 +63,41 @@ for (const f of FAELLE) {
   pruefe(`${f.sprache}: Kinder-Abschnitt nennt die Bestaetigung`, teil(html, f.kinder, '<h2>').includes(f.kinderHaken));
   pruefe(`${f.sprache}: Seasons nennt den Schalter`, teil(html, f.seasons, '<h3>').includes(f.schalterMuss));
   pruefe(`${f.sprache}: Visitenkarte nennt den Schalter`, teil(html, f.karte, '<h3>').includes(f.karteSchalter));
+  // Flo 19.11.2026: Weltrangliste nur ab 16 (kein Weg ueber die Eltern), Season-Abzeichen anfangs aus (Art. 25 Abs. 2 DSGVO)
+  const text = ohneTags(html);
+  pruefe(`${f.sprache}: kein Weg ueber die Eltern fuer die Weltrangliste`, !/Eltern (sind )?einverstanden|parents have agreed/.test(text),
+    text.match(/.{80}(Eltern (sind )?einverstanden|parents have agreed).{20}/)?.[0]);
+  pruefe(`${f.sprache}: keine alte Vorgabe "sichtbar"`, !f.vorgabeAlt.test(text), text.match(f.vorgabeAlt)?.[0]);
+}
+
+// Haken nur ab 16 und Abzeichen anfangs aus, auch in App und SQL (Flo 19.11.2026)
+{
+  const T = lies('js/pakete/liga/texte.js');
+  pruefe('App de: Haken "Ich bin mindestens 16 Jahre alt."', T.includes("'welt.alter': 'Ich bin mindestens 16 Jahre alt.'"));
+  pruefe('App en: Haken "I am at least 16 years old."', T.includes("'welt.alter': 'I am at least 16 years old.'"));
+  pruefe('App de/en: Season-Schalter sagt, dass er anfangs aus ist', /'season\.schalter\.text': '[^']*Anfangs aus\.'/.test(T) && /'season\.schalter\.text': '[^']*Off at first\.'/.test(T));
+  for (const d of ['js/pakete/liga/texte.js', 'js/pakete/liga/welt.js', 'supabase/weltrang-schema.sql', 'supabase/weltrang-zurueck.sql', 'supabase/weltrang-rls-test.sql',
+    'supabase/ANLEITUNG.md', 'tests/server-weltrang.test.mjs', 'tests/liga.test.mjs']) {
+    pruefe(`${d}: kein "oder Eltern einverstanden"`, !/Eltern (sind )?einverstanden|parents have agreed/i.test(lies(d)));
+  }
+  const S = lies('supabase/saison-schema.sql');
+  pruefe('saison-schema.sql: Spalte sichtbar mit Vorgabe aus, auch beim erneuten Einspielen',
+    /add column if not exists sichtbar boolean not null default false;/.test(S) && /alter column sichtbar set default false;/.test(S));
+  pruefe('saison-schema.sql: ohne Zeile gilt aus (kein coalesce auf true)', !/sichtbar[^\n]*,\s*true\)/.test(S) && (S.match(/sichtbar[^\n]*,\s*false\)/g) || []).length >= 2,
+    S.match(/sichtbar[^\n]*,\s*(true|false)\)/g));
+  pruefe("saison-schema.sql: Datenauskunft ohne Zeile meldet 'sichtbar', false", /'sichtbar', false, 'alter_bestaetigt_am', null\)/.test(S));
+  // Nachtrag M-08:03:14: auch die Abzeichen-Anzeige ist eine Einwilligung ab 16, mit Hinweis vor dem Haken
+  pruefe('saison-schema.sql: Einschalten nur mit Altersbestaetigung (SAISON_ALTER, Zeitpunkt)',
+    /raise exception 'SAISON_ALTER'/.test(S) && /add column if not exists alter_bestaetigt_am timestamptz/.test(S));
+  for (const [k, de, en] of [
+    ['welt.einwilligung', /alle angemeldeten Spieler[\s\S]*jederzeit[\s\S]*„Nicht mehr zeigen“/, /every signed-in player[\s\S]*any time[\s\S]*"Stop showing me"/],
+    ['season.schalter.einwilligung', /Gegner[\s\S]*Abzeichen[\s\S]*Titel[\s\S]*jederzeit/, /opponent[\s\S]*badge[\s\S]*title[\s\S]*any time/],
+  ]) {
+    const werte = [...T.matchAll(new RegExp(`'${k.replace(/\./g, '\\.')}': '([^']*)'`, 'g'))].map((m) => m[1]);
+    pruefe(`App: ${k} auf Deutsch und Englisch (wofuer, wer sieht was, Widerruf)`, werte.length === 2 && de.test(werte[0]) && en.test(werte[1]), werte);
+  }
+  pruefe('App: Haken am Season-Schalter wie bei der Weltrangliste',
+    T.includes("'season.schalter.alter': 'Ich bin mindestens 16 Jahre alt.'") && T.includes("'season.schalter.alter': 'I am at least 16 years old.'"));
 }
 
 // Konto ab 13 (Flo 18.11.2026): kein Text der App nennt mehr 16 als Altersgrenze fuers Spielen
@@ -77,8 +114,6 @@ pruefe('en: Seasons nennt die bestaetigte Elo', teil(lies('datenschutz-en.html')
   && teil(lies('datenschutz-en.html'), '<h3>Seasons</h3>', '<h3>').includes('Your online Elo must also rest on at least 15 rated online games in total, or at least 30 if you set your starting Elo yourself'));
 pruefe('App de: season.hilfe nennt beide Bedingungen', ligaTexte.includes('Für die Top-Titel: 20 Online-Partien mit Kronen und eine bestätigte Elo.'));
 pruefe('App en: season.hilfe nennt beide Bedingungen', ligaTexte.includes('Top titles need 20 online games with crowns and a confirmed Elo.'));
-pruefe('App: Bestaetigung auf Deutsch', ligaTexte.includes("'welt.alter': 'Ich bin mindestens 16 oder meine Eltern sind einverstanden.'"));
-pruefe('App: Bestaetigung auf Englisch', ligaTexte.includes("'welt.alter': 'I am at least 16, or my parents have agreed.'"));
 
 console.log(`\n${ok}/${gesamt} Pruefungen bestanden`);
 process.exit(ok === gesamt ? 0 : 1);

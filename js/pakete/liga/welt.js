@@ -14,7 +14,7 @@
 // im Reiter Gruppe. Nie Platzhalterzahlen: was der Server nicht liefert, wird nicht gezeigt.
 // Ohne eingespieltes SQL (Funktion fehlt) gilt die Liste als "gerade nicht erreichbar".
 import { icon } from '../../ui/icons.js';
-import { t, zahl } from '../../sprache.js';
+import { t, zahl, sprache } from '../../sprache.js';
 import { paket2Frei } from '../../freigaben.js';
 
 let B = null;
@@ -123,7 +123,10 @@ export function reiterWelt() {
     const stand = standText(lage);
     const knopf = lage.teilnahme
       ? `<button class="knopf lg-welt-austreten" type="button">${esc(T('austreten'))}</button>`
-      : `<label class="lg-welt-alter"><input type="checkbox"${haken ? ' checked' : ''}><span>${esc(T('alter'))}</span></label>
+      // Hinweis VOR dem Haken: wofuer, wer was sieht, Widerruf, Link (Nachtrag M-08:03:14); der Haken ist nie vorab gesetzt
+      : `<p class="lg-welt-einwilligung">${esc(T('einwilligung'))} <a href="${sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'}"
+        target="_blank" rel="noopener">${esc(T('datenschutz'))}</a></p>
+        <label class="lg-welt-alter"><input type="checkbox"${haken ? ' checked' : ''}><span>${esc(T('alter'))}</span></label>
         <button class="knopf primaer lg-welt-mitmachen" type="button"${haken ? '' : ' disabled'}>${esc(T('mitmachen'))}</button>`;
     const oben = lage.teilnahme
       ? (lage.ich.status === 'dabei' ? platzKarte(lage, stand)

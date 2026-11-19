@@ -908,7 +908,13 @@ async function weltTeil(browser, start) {
         assert.equal(await page.locator('.lg-welt-zeile.ich').count(), 0);
       });
       await browserPruefe('Welt: ohne Haken bleibt "Mitmachen" gesperrt, der Satz zum Alter steht daneben', async () => {
-        assert.equal(await page.locator('.lg-welt-alter').innerText(), 'Ich bin mindestens 16 oder meine Eltern sind einverstanden.');
+        assert.equal(await page.locator('.lg-welt-alter').innerText(), 'Ich bin mindestens 16 Jahre alt.');
+        // Hinweis VOR dem Haken: wofuer, wer was sieht, Widerruf, Link zur Datenschutzerklaerung (Nachtrag M-08:03:14)
+        const hinweis = page.locator('.lg-welt-einwilligung');
+        assert.match(await hinweis.innerText(), /alle angemeldeten Spieler.*Benutzernamen.*Banner.*Online-Elo.*Platz.*jederzeit.*„Nicht mehr zeigen“/s);
+        assert.equal(await hinweis.locator('a').getAttribute('href'), 'datenschutz.html');
+        assert.equal(await page.evaluate(() => !!(document.querySelector('.lg-welt-einwilligung').compareDocumentPosition(document.querySelector('.lg-welt-alter'))
+          & Node.DOCUMENT_POSITION_FOLLOWING)), true);
         assert.equal(await page.locator('.lg-welt-alter input').isChecked(), false);
         assert.equal(await page.locator('.lg-welt-mitmachen').isDisabled(), true);
         assert.equal(welt.aufrufe.filter((a) => a.name === 'weltrang_mitmachen').length, 0);

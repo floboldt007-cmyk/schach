@@ -204,7 +204,7 @@
   Frankfurt, just like your account.</p>
   <p>Your player card is visible only to the person playing the same online game with you (invited or via matchmaking):
   your username, title, banner, profile picture, league tier with its symbol, the achievements on show, your best season
-  badge and a season title if you have chosen one, both unless you have hidden them in the settings (see "Seasons") and, in rated games, your online
+  badge and a season title if you have chosen one, both only if you have turned them on in the settings (see "Seasons") and, in rated games, your online
   Elo. Games with friends remain without Elo. Special titles such as "Creator" or "Pioneer" (with a number) are seen only
   by your opponent in a shared online game, and only if the server confirms that you own them; otherwise the app shows
   them only on your own card. Your weekly league group and
@@ -256,29 +256,40 @@
     online Elo among all accounts with at least 20 online games with crowns in that season (rated games with at least 4
     half-moves, at most 3 per opponent and day). Your online Elo must also rest on at least 15 rated online games in total,
     or at least 30 if you set your starting Elo yourself,</li>
-    <li>which of your season titles you want to show; without a choice none is shown, and whether your opponent may see your badge and title (default: yes).</li>
+    <li>which of your season titles you want to show; without a choice none is shown.</li>
   </ul>
   <p>When the new season begins, your league tier drops by 3 tiers (at most down to Squire III). Here the places by Elo are
   only used to award the titles; a list with names exists only in the world ranking, and only if you join it yourself (see
-  "World ranking"). Your best badge and your chosen title are seen only by
-  the person playing the same online game with you (see "Player card"); only you see your own badges and titles in your
-  profile. In the settings, under "Season", you can turn off that your opponent sees your badge and title; the server then no longer passes them on. This data is necessary for the league (Art. 6 Abs. 1 lit. b DSGVO, GDPR), is stored with Supabase in Frankfurt
-  just like your account and remains stored until you delete your account; it is then deleted automatically. Download my
-  data includes it.</p>
+  "World ranking"). You always see your own badges and titles in your profile, and only you do. This data is necessary
+  for the league (Art. 6 Abs. 1 lit. b DSGVO, GDPR), is stored with Supabase in Frankfurt just like your account and
+  remains stored until you delete your account; it is then deleted automatically. Download my data includes it.</p>
+  <p><b>Display to your opponent:</b> Your opponent in a shared online game (see "Player card") sees your best badge and
+  your chosen title only if you turn this on yourself in the settings under "Season". It is off by default (Art. 25 Abs. 2
+  DSGVO, GDPR). Turning it on is voluntary; the legal basis is your consent (Art. 6 Abs. 1 lit. a DSGVO, GDPR). You can
+  consent only from the age of 16 (Art. 8 Abs. 1 DSGVO, GDPR): before turning it on you confirm with a tick that you are
+  at least 16 years old; without this confirmation the server does not turn the display on. For this we store that the
+  display is on and the time of this confirmation. The only recipient is the opponent in the respective online game; the
+  data is stored with Supabase in Frankfurt as a processor (see "Where and by whom"). You can withdraw your consent at any
+  time by turning the switch off again (Art. 7 Abs. 3 DSGVO, GDPR); the server then immediately stops passing on your
+  badge and title and deletes the time of the confirmation. This does not affect the lawfulness of the display up to the
+  withdrawal. The entry is deleted with your account and is included in Download my data.</p>
 
   <!-- R19 (world ranking, supabase/weltrang-schema.sql), as of 14.11.2026: review by a qualified person is still pending -->
   <h3>World ranking</h3>
   <p>The "World" tab of the league shows a world ranking by online Elo. You appear in it only if you join it yourself
-  ("Join" button); without your consent it contains nothing about you. Before joining you confirm with a tick that you are at least 16 or that your parents have agreed; without this confirmation the server does not add you. If you join, every signed-in player sees your
+  ("Join" button); without your consent it contains nothing about you, so it is off by default (Art. 25 Abs. 2 DSGVO,
+  GDPR). Joining is voluntary. You can consent only from the age of 16 (Art. 8 Abs. 1 DSGVO, GDPR): before joining you
+  confirm with a tick that you are at least 16 years old; without this confirmation the server does not add you. If you join, every signed-in player sees your
   username, your banner, your online Elo and your place. The list shows the top 100. Other details such as your email, your ID, your profile picture, your league tier or
   your titles are not in the list. You are only shown once your Elo rests on enough rated online games: from 15 games, and
   from 30 games if you set your starting Elo yourself. Without a username you do not appear. Visitors without an account
   cannot see the world ranking.</p>
   <p>For this we only store that you join, since when, and the time of this confirmation; the Elo comes from the league (see "League with crowns and weekly groups"). The
-  legal basis is your consent (Art. 6 Abs. 1 lit. a DSGVO, GDPR). You can withdraw it at any time with "Stop showing me";
-  the entry is then deleted immediately together with that time and you disappear from the list. This does not affect the lawfulness of the
-  display up to the withdrawal. The entry is stored with Supabase in Frankfurt just like your account, is deleted with
-  your account and is included in Download my data.</p>
+  legal basis is your consent (Art. 6 Abs. 1 lit. a DSGVO, GDPR). The recipients are the signed-in players who open the
+  list. You can withdraw your consent at any time with "Stop showing me" (Art. 7 Abs. 3 DSGVO, GDPR); the entry is then
+  deleted immediately together with that time and you disappear from the list. This does not affect the lawfulness of the
+  display up to the withdrawal. The entry is stored with Supabase in Frankfurt as a processor (see "Where and by whom"),
+  is deleted with your account and is included in Download my data.</p>
 
   <!-- stage B (puzzle duel), as of 14.11.2026: review by a qualified person is still pending -->
   <h3>Puzzle duel</h3>
@@ -446,7 +457,10 @@
   account from the age of 13. If you are under 16, ask your parents or legal guardians before creating an account. You
   can give consent yourself, for example to sharing games and usage data (section 6), only from the age of 16; before
   that, only with your parents' approval (Art. 8(1) DSGVO, GDPR). The switch is therefore off by default, and the app
-  explains this right beside it. You can likewise consent to joining the world ranking yourself only from the age of 16. You confirm this before joining with a tick: you are at least 16, or your parents have agreed.
+  explains this right beside it. You can consent to joining the world ranking and to showing your season badge and title
+  to your opponent only from the age of 16; there is no way to do this with your parents' approval instead. You confirm
+  this before joining with a tick: you are at least 16 years old. The same applies before you turn on the display under
+  "Season".
   Editions in the shop are available only from 18 (section "Shop: editions"). Parents can
   request information about an account or its deletion at
   <a href="mailto:kontakt@crownmate.de">kontakt@crownmate.de</a>.</p>
