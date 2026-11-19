@@ -39,6 +39,7 @@ import './texte.js';
 const A = (k, w) => t('p-abo.' + k, w);
 import { anim, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
+// INTENTIONAL-SLOP[D6]: Importpfad, steht in jeder importierenden Datei woertlich
 import { schluckeFolgeKlick } from '../../ui/bauteile.js';
 import { kontoFreigeschaltet } from '../../konto.js';
 import {
