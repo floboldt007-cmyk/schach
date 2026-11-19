@@ -834,7 +834,8 @@ self.addEventListener('install', (e) => {
     await Promise.all(DATEIEN.map(async (datei) => {
       const antwort = await holeFrisch(datei, alt);
       if (!antwort.ok) throw new Error(`Vorladen fehlgeschlagen: ${datei} (${antwort.status})`);
-      await cache.put(datei, ohneFrische(await mitTyp(datei, antwort)));
+      const fertig = await mitTyp(datei, antwort);
+      await cache.put(datei, WEBKIT ? ohneFrische(fertig, await fertig.blob()) : fertig);
     }));
   })());
 });
@@ -866,14 +867,19 @@ self.addEventListener('fetch', (e) => {
 // des Servers (GitHub Pages: 600 s) im eigenen Speicher und laedt Module beim Neuladen nach einem Versionswechsel von dort,
 // ohne den Worker zu fragen. Die Seite lief dann mit altem Code unter dem neuen Worker (tests/sw-update.test.mjs unter
 // WebKit, 19.11.2026: nach dem Wechsel auf Fassung 1 lief heim.js aus Fassung 0, ohne Anfrage an den Worker).
-// Der Kopf wird beim Ablegen gesetzt, nicht bei jeder Antwort: umgebaut je Anfrage hielt ein Strom den Abruf im alten
-// Worker offen (Chromium wechselte einmal erst nach 30 s), ganz gelesen schloss WebKit den alten Worker mitten im Lesen
-// ("Service Worker context closed", 2 von 3 Laeufen). Grenze: Eintraege, die eine aeltere Fassung abgelegt hat, tragen den
-// Kopf noch nicht; das gilt fuer den ersten Wechsel nach dieser Aenderung.
-function ohneFrische(antwort) {
+// Der Kopf wird beim Ablegen gesetzt, nicht bei jeder Antwort: umgebaut je Anfrage schloss WebKit den alten Worker mitten
+// im Lesen ("Service Worker context closed", 2 von 3 Laeufen). Nur WebKit (Safari und jeder Browser auf iPhone und iPad,
+// auch Chrome dort: "CriOS" ohne "Chrome/"): Chromium laedt nie alten Code (sw-update 15 von 15), mit no-cache fragt es aber
+// jede Datei neu beim Worker an und wartete beim Wechsel dann ab und zu 30 s bis zur Notbremse (3 von 24 Laeufen, ohne den
+// Kopf 0 von 15). Grenze: Eintraege, die eine aeltere Fassung abgelegt hat, tragen den Kopf noch nicht; das gilt fuer den
+// ersten Wechsel nach dieser Aenderung.
+const KENNUNG = (self.navigator && self.navigator.userAgent) || '';
+const WEBKIT = /AppleWebKit\//.test(KENNUNG) && !/(Chrome|Chromium)\//.test(KENNUNG);
+function ohneFrische(antwort, inhalt = antwort.body) {
+  if (!WEBKIT) return antwort;
   const kopf = new Headers(antwort.headers);
   kopf.set('Cache-Control', 'no-cache');
-  return new Response(antwort.body, { status: antwort.status, statusText: antwort.statusText, headers: kopf });
+  return new Response(inhalt, { status: antwort.status, statusText: antwort.statusText, headers: kopf });
 }
 
 async function antworte(req, url) {
