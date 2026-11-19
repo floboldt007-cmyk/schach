@@ -19,6 +19,17 @@
       { "id": "donner", "seltenheit": "Episch" },
       { "id": "juwel", "seltenheit": "Selten" },
       { "id": "grusel", "seltenheit": "Selten" }
+    ],
+    "effekt": [
+      { "id": "wellenring" },
+      { "id": "funkenspur" },
+      { "id": "blattwirbel" },
+      { "id": "pixelstaub" },
+      { "id": "konfetti" },
+      { "id": "lichtsaeule" },
+      { "id": "sternschnuppe" },
+      { "id": "kronenregen" },
+      { "id": "goldkranz" }
     ]
   }
 }
