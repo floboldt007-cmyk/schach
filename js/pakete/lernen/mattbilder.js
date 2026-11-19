@@ -71,7 +71,7 @@ export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 24,
     runden: Object.freeze([R('8/3B2K1/8/8/8/k2N4/8/8 w - - 0 1', 26), R('8/8/8/7K/8/8/1N6/1B2k3 w - - 0 1', 31)]) }),
 ]);
-export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik', 'sammeln']);
+export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik', 'sammeln', 'schach']);
 export const BEREICHE = Object.freeze([
   Object.freeze({ id: 'matt', lektionen: LEKTIONEN }),
   Object.freeze({ id: 'taktik', lektionen: TAKTIK }),
@@ -133,6 +133,8 @@ export function pruefeZiel(l, start, chess, { wann = 'flo', zuege = 0, rest = nu
   const halten = art === 'halten';
   if (wann === 'flo') {
     if (chess.isCheckmate()) return 'geschafft';
+    // Schach geben (Kurs, Kapitel 3): geschafft, sobald der Gegner im Schach steht; sonst wie matt weiter
+    if (art === 'schach' && chess.inCheck()) return 'geschafft';
     if (chess.isStalemate()) return halten ? 'geschafft' : 'patt';
     if (chess.isDraw()) return halten ? 'geschafft' : 'remis';
     if (art !== 'matt') {
@@ -185,7 +187,8 @@ export function pruefeLektion(l, Chess) {
   if (artVon(l) === 'sammeln') return f.concat(pruefeSammeln(l));
   let c = null;
   try { c = new Chess(l.fen); } catch (e) { f.push(`${l.id}: FEN ${e.message}`); return f; }
-  if (c.turn() !== 'w') f.push(`${l.id}: Weiss muss am Zug sein`);
+  // Zugfolgen duerfen mit Schwarz am Zug beginnen (Gegner-Vorzug, Kurs Erste Schritte: Schach geben, d7-d5 vor en passant)
+  if (c.turn() !== 'w' && artVon(l) !== 'folge') f.push(`${l.id}: Weiss muss am Zug sein`);
   if (c.isGameOver()) f.push(`${l.id}: Stellung ist schon vorbei`);
   const teile = l.fen.split(' ');
   teile[1] = 'b'; teile[3] = '-';
@@ -206,7 +209,8 @@ export function pruefeLektion(l, Chess) {
       if (m.san !== san) f.push(`${l.id}: ${san} heisst bei chess.js ${m.san}`);
       if (dran === l.farbe) eigene++;
     }
-    if (folge.length && (folge.length - 1) % 2 !== (l.farbe === 'w' ? 0 : 1)) f.push(`${l.id}: der letzte Zug gehoert nicht Flo`);
+    // vom Anzieher der Stellung aus gezaehlt: der letzte Zug gehoert dem, der bei gerader Laenge-1 anfaengt
+    if (folge.length && (folge.length - 1) % 2 !== (c.turn() === l.farbe ? 0 : 1)) f.push(`${l.id}: der letzte Zug gehoert nicht Flo`);
     if (eigene !== l.ziel) f.push(`${l.id}: ziel ${l.ziel}, aber ${eigene} eigene Zuege`);
   }
   return f;

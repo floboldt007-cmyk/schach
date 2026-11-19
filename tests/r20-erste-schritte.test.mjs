@@ -61,7 +61,8 @@ function fenMit(typ, feld) {
 }
 function abstand(typ, a, b) {
   const q = [[a, 0]]; const ges = new Set([a]);
-  while (q.length) { const [f, d] = q.shift(); if (f === b) return d; for (const t of zuegeVon(fenMit(typ, f))) if (!ges.has(t)) { ges.add(t); q.push([t, d + 1]); } }
+  // ein Bauer auf Reihe 8 ist eine Sackgasse (dort stuerzt chess.js ohne Koenige ab, siehe Umwandlungs-Falle unten)
+  while (q.length) { const [f, d] = q.shift(); if (f === b) return d; if (typ === 'P' && f[1] === '8') continue; for (const t of zuegeVon(fenMit(typ, f))) if (!ges.has(t)) { ges.add(t); q.push([t, d + 1]); } }
   return Infinity;
 }
 const perm = (a) => (a.length < 2 ? [a] : a.flatMap((x, i) => perm([...a.slice(0, i), ...a.slice(i + 1)]).map((p) => [x, ...p])));

@@ -99,7 +99,9 @@ export function zeige(root, params, app) {
   const sammeln = art === 'sammeln';
   const neuesSpiel = (fen) => (sammeln ? ladeSammeln(fen) : new Chess(fen));
   const flo = folge && l.farbe === 'b' ? 'b' : 'w';
-  const zielVon = (z) => (folge ? S('zielFolge', { n: z }) : sammeln ? S('zielSammeln', { n: z }) : art === 'umwandeln' ? S('zielUmwandeln', { n: z }) : art === 'gewinnen' ? S('zielGewinnen', { n: z })
+  // Kurs-Folgen ausserhalb von Kapitel 5 sind Regel-Aufgaben (ein Zug nach dem Vorzug), keine Eroeffnung
+  const zielVon = (z) => (folge ? (ber.kurs && l.kapitel !== 5 ? S('zielRegel') : S('zielFolge', { n: z }))
+    : sammeln ? S('zielSammeln', { n: z }) : art === 'schach' ? S('zielSchach') : art === 'umwandeln' ? S('zielUmwandeln', { n: z }) : art === 'gewinnen' ? S('zielGewinnen', { n: z })
     : art === 'taktik' ? S('zielTaktik', { n: z, p: l.gewinn })
     : art === 'halten' ? S('zielHalten', { n: z }) : z === 1 ? S('zielEins') : S('ziel', { n: z }));
   const ideeVon = (n) => (n > 1 ? S(`runde.${l.id}.${n}`) : S('idee.' + l.id));
