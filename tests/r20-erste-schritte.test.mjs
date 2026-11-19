@@ -174,6 +174,7 @@ async function browserTeil() {
       await warte(90);
     }
   }
+  // geschafft heisst phase 'ende' ohne grund (grund traegt nur das Scheitern, js/ui/lektion.js gescheitert)
   const bild = async (s, name) => { if (process.env.BILDER) await s.screenshot({ path: path.join(process.env.BILDER, name + '.png') }); };
   try {
     for (const [w, h, geraet] of [[390, 844, 'iphone'], [1440, 900, 'pc']]) {
@@ -198,10 +199,10 @@ async function browserTeil() {
           kapitel: [...document.querySelectorAll('.ms-gruppe > h2')].map((x) => x.textContent).join('|'),
           ids: [...document.querySelectorAll('.ms-lektion')].map((x) => x.dataset.id).join(),
           schloss: document.querySelectorAll('.ms-lektion[data-gesperrt]').length,
-          quer: document.documentElement.scrollWidth > window.innerWidth + 1 }));
+          quer: document.documentElement.scrollWidth > window.innerWidth + 1, bald: !!document.querySelector('.ms-bald')?.offsetParent }));
         pruefe(`${lage}: Uebersicht Kurs-Karte vorn und gewaehlt, fuenf Karten, ohne "gratis", Kapitel 1 und 5, 9 Aufgaben offen, kein Querscrollen`,
           ue.karte1 === 'erste' && ue.gewaehlt === 'erste' && ue.karten === 5 && ue.gratis === 0 && ue.kapitel === 'Kapitel 1: Brett und Figuren|Kapitel 5: Gut anfangen'
-          && ue.ids === kurs.lektionen.map((l) => l.id).join() && ue.schloss === 0 && !ue.quer, ue);
+          && ue.ids === kurs.lektionen.map((l) => l.id).join() && ue.schloss === 0 && !ue.quer && !ue.bald, ue);
         await bild(s, `uebersicht-${geraet}-${farbe}`);
 
         // es-turm: a1 -> a8 -> h8 -> h1, jeder Stern verschwindet einzeln, 3 Zuege = 3 Sterne
@@ -224,7 +225,7 @@ async function browserTeil() {
         const ende = await lz(s);
         pruefe(`${lage}: Sterne verschwinden einzeln (h8,h1 / h1 / leer), am Ende geschafft mit 3 Sternen`,
           reste[0].rest === 'h8,h1' && reste[0].marken === 2 && reste[1].rest === 'h1' && reste[1].marken === 1 && reste[2].marken === 0
-          && ende.phase === 'ende' && ende.grund === 'geschafft' && ende.sterne === 3, { reste, ende });
+          && ende.phase === 'ende' && ende.grund === null && ende.sterne === 3, { reste, ende });
         await bild(s, `turm-geschafft-${geraet}-${farbe}`);
 
         // Folge es-mitte: e4 (Antwort e5) d4
@@ -238,7 +239,7 @@ async function browserTeil() {
         await ziehe(s, 'd2d4');
         await warteLz(s, 'z.phase === "ende"', 15000);
         const f = await lz(s);
-        pruefe(`${lage}: Folge es-mitte (e4 e5 d4) geschafft, 3 Sterne`, f.id === 'es-mitte' && f.grund === 'geschafft' && f.sterne === 3, f);
+        pruefe(`${lage}: Folge es-mitte (e4 e5 d4) geschafft, 3 Sterne`, f.id === 'es-mitte' && f.phase === 'ende' && f.grund === null && f.sterne === 3, f);
         pruefe(`${lage}: keine Seitenfehler`, fehlerListe.length === 0, fehlerListe);
         await k.close();
       }

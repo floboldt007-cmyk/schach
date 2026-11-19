@@ -1152,7 +1152,7 @@ async function browserTeil(browser) {
   gruppe = 'PAKETE';
   const pr = await neueSeite(browser);
   await pr.seite.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
-    body: `export const PAKETE = Object.freeze(['sicherung', '${ERW}']);\nexport const REITER = Object.freeze([]);\n` }));
+    body: `export const PAKETE = Object.freeze(['sicherung', ${ERW.split(',').map((p) => `'${p}'`).join(', ')}]);\nexport const REITER = Object.freeze([]);\n` }));
   await pr.seite.goto(`http://127.0.0.1:${PORT}/index.html`);
   await pr.seite.waitForSelector('.st-screen .st-titel', { timeout: 20000 });
   const prod = await pr.seite.evaluate(() => ({ hash: location.hash, css: !!document.querySelector('link[data-paket="start"]'), test: !!window.__start }));

@@ -111,6 +111,9 @@ export function zeige(root, params, app) {
 
   function zeichne(erstes) {
     const nr = (l) => bereich.lektionen.indexOf(l);
+    // "Bald in der Meisterschule ..." gehoert nicht unter den Kurs Erste Schritte
+    const bald = s.querySelector('.ms-bald');
+    if (bald) bald.hidden = !!bereich.kurs;
     inhalt.innerHTML = `${seitenKopf({ ueber: S('name'), titel: S('bereich.' + bereich.id), text: S('text.' + bereich.id) })}
       ${weiterHtml()}
       ${bereich.kurs ? [...new Set(bereich.lektionen.map((l) => l.kapitel))].map((k) => {
