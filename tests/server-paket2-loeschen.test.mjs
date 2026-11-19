@@ -5,7 +5,7 @@
 // Kontos, ein zweites Konto bleibt unberuehrt, und eine Gegenprobe ohne Kaskade bei saison_wahl wird erkannt.
 // Lokal nur mit PGlite in node_modules (npm install --no-save --ignore-scripts @electric-sql/pglite@0.5.11).
 //   node tests/server-paket2-loeschen.test.mjs
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -46,6 +46,12 @@ alter default privileges in schema public grant all on functions to anon, authen
 const BISHER = ['supabase/schema.sql', 'supabase/abo-schema.sql', 'supabase/online-schema.sql', 'supabase/kronen-schema.sql',
   'supabase/raetsel-duell-schema.sql', 'supabase/raetsel-duell-daten.sql', 'supabase/karte-schema.sql',
   'supabase/liga-bild-schema.sql', 'supabase/daten-schema.sql', 'supabase/zwei-ligen-schema.sql', 'supabase/daten-schema.sql'];
+// Weitere Schemas mit user_id (Nachpruefung N1 19.11.2026: ohne sie blieb eine ungedeckte Tabelle dort unbemerkt, 26/26)
+const ZUSATZ = ['supabase/freunde-schema.sql', 'supabase/werkstatt-schema.sql', 'supabase/verwaltung-schema.sql',
+  'supabase/coach-schema.sql', 'supabase/schule-schema.sql'];
+const GELADEN = [...BISHER, 'supabase/saison-schema.sql', 'supabase/weltrang-schema.sql', ...ZUSATZ];
+// Name der Gegenproben-Tabelle: darf nie eine echte Tabelle sein (sonst "already exists" statt einer Meldung)
+const PROBE = 'kr_probe_tabelle';
 
 const A = 'c0000000-0000-4000-8000-000000000001';
 const B = 'c0000000-0000-4000-8000-000000000002';
@@ -68,6 +74,7 @@ async function neueDb(saison = lies('supabase/saison-schema.sql')) {
   for (const d of BISHER) f = f || await lauf(db, d, lies(d));
   f = f || await lauf(db, 'saison-schema.sql', saison);
   f = f || await lauf(db, 'weltrang-schema.sql', lies('supabase/weltrang-schema.sql'));
+  for (const d of ZUSATZ) f = f || await lauf(db, d, lies(d));
   // meine_daten zuletzt aus daten-schema.sql (wie server-weltrang.test.mjs)
   f = f || await lauf(db, 'daten-schema.sql (zuletzt)', lies('supabase/daten-schema.sql'));
   return { db, fehler: f };
@@ -103,24 +110,30 @@ async function loesche(db, uid) {
 // konto_loeschen() sie ausdruecklich leert (delete from ... im Funktionstext) oder ein Fremdschluessel ueber user_id mit
 // on delete cascade auf auth.users zeigt oder auf eine Tabelle, die selbst gedeckt ist (z. B. public.profile). Auf
 // auth.users zaehlt auch on delete set null: die Zeile bleibt pseudonym ohne Konto (gewollt, daten-schema.sql
-// "Zustimmungen und Sonderstuecke bleiben pseudonym"; so bei stripe_ereignisse in abo-schema.sql).
+// "Zustimmungen und Sonderstuecke bleiben pseudonym"; so bei stripe_ereignisse in abo-schema.sql), aber nur, wenn user_id
+// null sein darf (sonst scheitert das Loeschen an not null, Nachpruefung N3).
+// Der delete-Weg zaehlt nur ohne Kommentare und Zeichenketten und nur mit "where user_id = uid" (N2). Grenze: ein toter
+// Zweig (if false then ... end if) bleibt fuer diese Textpruefung unsichtbar; den deckt nur ein echter Lauf wie M5.
+const ohneKommentare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ').replace(/'(?:[^']|'')*'/g, "''");
 async function ungedeckt(db) {
   const tabellen = (await db.query(`select cl.relname as t from pg_class cl join pg_namespace n on n.oid = cl.relnamespace
     join pg_attribute a on a.attrelid = cl.oid and a.attname = 'user_id' and not a.attisdropped
     where n.nspname = 'public' and cl.relkind in ('r', 'p') order by 1`)).rows.map((r) => r.t);
-  const fks = (await db.query(`select cl.relname as t, zn.nspname as zs, ziel.relname as z, c.confdeltype as art
+  const fks = (await db.query(`select cl.relname as t, zn.nspname as zs, ziel.relname as z, c.confdeltype as art,
+      a.attnotnull as pflicht
     from pg_constraint c join pg_class cl on cl.oid = c.conrelid join pg_namespace n on n.oid = cl.relnamespace
     join pg_class ziel on ziel.oid = c.confrelid join pg_namespace zn on zn.oid = ziel.relnamespace
     join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey) and a.attname = 'user_id'
     where c.contype = 'f' and n.nspname = 'public'`)).rows;
-  const text = (await db.query(`select prosrc from pg_proc where proname = 'konto_loeschen'
-    and pronamespace = 'public'::regnamespace`)).rows.map((r) => r.prosrc).join('\n');
-  const gedeckt = new Set(tabellen.filter((t) => new RegExp(`delete\\s+from\\s+(public\\.)?"?${t}"?\\s`, 'i').test(text)));
+  const text = ohneKommentare((await db.query(`select prosrc from pg_proc where proname = 'konto_loeschen'
+    and pronamespace = 'public'::regnamespace`)).rows.map((r) => r.prosrc).join('\n'));
+  const gedeckt = new Set(tabellen.filter((t) =>
+    new RegExp(`delete\\s+from\\s+(public\\.)?"?${t}"?\\s+where\\s+user_id\\s*=\\s*uid\\b`, 'i').test(text)));
   for (let neu = true; neu;) {
     neu = false;
     for (const t of tabellen) {
       if (gedeckt.has(t)) continue;
-      if (fks.some((f) => f.t === t && ((['c', 'n'].includes(f.art) && f.zs === 'auth' && f.z === 'users')
+      if (fks.some((f) => f.t === t && (((f.art === 'c' || (f.art === 'n' && !f.pflicht)) && f.zs === 'auth' && f.z === 'users')
         || (f.art === 'c' && f.zs === 'public' && gedeckt.has(f.z))))) {
         gedeckt.add(t);
         neu = true;
@@ -133,8 +146,14 @@ async function ungedeckt(db) {
 // ---------- echter Stand ----------
 {
   const { db, fehler } = await neueDb();
-  pruefe('Schemas laufen (bisher, saison, weltrang, daten)', !fehler, fehler);
+  pruefe('Schemas laufen (bisher, saison, weltrang, zusatz, daten)', !fehler, fehler);
   if (fehler) { console.log(`\n${ok}/${gesamt} bestanden`); process.exit(1); }
+
+  // N1 statisch: jede Schema-Datei mit einer user_id-Spalte wird hier geladen (eine neue Datei faellt sonst nie auf)
+  const mitUserDateien = readdirSync(path.join(WURZEL, 'supabase')).filter((d) => d.endsWith('.sql')
+    && !/-(rls-test|zurueck)\.sql$/.test(d) && /\buser_id\s+uuid\b/i.test(lies('supabase/' + d))).map((d) => 'supabase/' + d);
+  const fehlt = mitUserDateien.filter((d) => !GELADEN.includes(d));
+  pruefe(`alle ${mitUserDateien.length} Schema-Dateien mit user_id werden geladen`, mitUserDateien.length >= 10 && !fehlt.length, fehlt.join(', '));
 
   // Name aus pg_class + pg_namespace: regclass::text laesst "public." weg, solange public im search_path steht
   const k = (await db.query(`select cl.relname as t, c.confdeltype as art from pg_constraint c
@@ -150,20 +169,21 @@ async function ungedeckt(db) {
   const g = await ungedeckt(db);
   pruefe(`alle ${g.tabellen.length} Tabellen mit user_id: Kaskade oder delete in konto_loeschen()`,
     g.tabellen.length >= 4 && !g.offen.length, g.offen.join(', '));
-  // Gegenproben: neue Tabelle ohne Fremdschluessel (M1), mit Fremdschluessel ohne Kaskade (M2) muss auffallen,
-  // mit Kaskade (M3) oder set null (M4) nicht
+  // Gegenproben: neue Tabelle ohne Fremdschluessel (M1), mit Fremdschluessel ohne Kaskade (M2), set null auf einer
+  // Pflichtspalte (M6) muss auffallen, mit Kaskade (M3) oder set null auf einer freien Spalte (M4) nicht
   const proben = [
     ['M4 Fremdschluessel mit set null', 'user_id uuid references auth.users (id) on delete set null, rang int', false],
     ['M1 ohne Fremdschluessel', 'user_id uuid not null, rang int', true],
     ['M2 Fremdschluessel ohne Kaskade', 'user_id uuid not null references auth.users (id), rang int', true],
     ['M3 Fremdschluessel mit Kaskade', 'user_id uuid not null references auth.users (id) on delete cascade, rang int', false],
+    ['M6 set null auf not null', 'user_id uuid not null references auth.users (id) on delete set null, rang int', true],
   ];
   for (const [name, spalten, rot] of proben) {
-    await db.exec(`create table public.weltrang_verlauf (${spalten});`);
+    await db.exec(`create table public.${PROBE} (${spalten});`);
     const p = await ungedeckt(db);
-    await db.exec('drop table public.weltrang_verlauf;');
-    pruefe(`Gegenprobe ${name}: weltrang_verlauf ${rot ? 'faellt auf' : 'gilt als gedeckt'}`,
-      p.offen.includes('weltrang_verlauf') === rot && p.offen.length === (rot ? 1 : 0), p.offen.join(', '));
+    await db.exec(`drop table public.${PROBE};`);
+    pruefe(`Gegenprobe ${name}: ${PROBE} ${rot ? 'faellt auf' : 'gilt als gedeckt'}`,
+      p.offen.includes(PROBE) === rot && p.offen.length === (rot ? 1 : 0), p.offen.join(', '));
   }
 
   const x = await lauf(db, 'Lage', LAGE);
@@ -218,18 +238,31 @@ async function ungedeckt(db) {
 // (heute haengen alle Tabellen per Fremdschluessel, darum hier den zweiten Weg von ungedeckt() einmal wirklich fahren)
 {
   const { db, fehler } = await neueDb();
-  await db.exec('create table public.weltrang_verlauf (user_id uuid not null, rang int);');
+  await db.exec(`create table public.${PROBE} (user_id uuid not null, rang int);`);
   const vorher = await ungedeckt(db);
   const def = (await db.query(`select pg_get_functiondef('public.konto_loeschen()'::regprocedure) as d`)).rows[0].d;
   const anker = 'delete from public.nutzung where user_id = uid;';
+  // N2: Zeilen, die nichts loeschen, duerfen nicht als gedeckt zaehlen
+  const taeuschung = [
+    ['auskommentiert', `-- delete from public.${PROBE} where user_id = uid;`],
+    ['Blockkommentar', `/* delete from public.${PROBE} where user_id = uid; */`],
+    ['where false', `delete from public.${PROBE} where false;`],
+    ['Zeichenkette', `perform 'delete from public.${PROBE} where user_id = uid ';`],
+  ];
+  for (const [name, zeile] of taeuschung) {
+    const ft = !fehler && def.includes(anker) && await lauf(db, 'konto_loeschen ' + name, def.replace(anker, anker + '\n  ' + zeile));
+    const t = await ungedeckt(db);
+    pruefe(`Gegenprobe N2 ${name}: ${PROBE} faellt trotzdem auf`, !fehler && def.includes(anker) && !ft && t.offen.includes(PROBE),
+      fehler || ft || t.offen.join(', '));
+  }
   const f = !fehler && def.includes(anker)
-    && await lauf(db, 'konto_loeschen mit weltrang_verlauf', def.replace(anker, anker + '\n  delete from public.weltrang_verlauf where user_id = uid;'));
+    && await lauf(db, 'konto_loeschen mit ' + PROBE, def.replace(anker, anker + `\n  delete from public.${PROBE} where user_id = uid;`));
   const nachher = await ungedeckt(db);
-  const x = f || await lauf(db, 'Lage M5', LAGE + `\n  insert into public.weltrang_verlauf values ('${A}', 3), ('${B}', 5);`);
+  const x = f || await lauf(db, 'Lage M5', LAGE + `\n  insert into public.${PROBE} values ('${A}', 3), ('${B}', 5);`);
   const e = !x && await loesche(db, A);
-  const zeilen = !x && (await db.query('select user_id::text as u from public.weltrang_verlauf')).rows.map((r) => r.u);
-  pruefe('Gegenprobe M5: ohne delete faellt weltrang_verlauf auf, mit delete in konto_loeschen() gilt sie als gedeckt',
-    !fehler && def.includes(anker) && !f && vorher.offen.includes('weltrang_verlauf') && !nachher.offen.length,
+  const zeilen = !x && (await db.query(`select user_id::text as u from public.${PROBE}`)).rows.map((r) => r.u);
+  pruefe(`Gegenprobe M5: ohne delete faellt ${PROBE} auf, mit delete in konto_loeschen() gilt sie als gedeckt`,
+    !fehler && def.includes(anker) && !f && vorher.offen.includes(PROBE) && !nachher.offen.length,
     fehler || f || `vorher=${vorher.offen} nachher=${nachher.offen}`);
   pruefe('Gegenprobe M5: konto_loeschen() leert die Zeile von A, die von B bleibt',
     !x && !e && zeilen.length === 1 && zeilen[0] === B, x || e || JSON.stringify(zeilen));
