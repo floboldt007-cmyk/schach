@@ -72,6 +72,8 @@ export const LEKTIONEN = Object.freeze([
     runden: Object.freeze([R('8/3B2K1/8/8/8/k2N4/8/8 w - - 0 1', 26), R('8/8/8/7K/8/8/1N6/1B2k3 w - - 0 1', 31)]) }),
 ]);
 export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik', 'sammeln', 'schach']);
+// Zug-Zaehler: im Kurs vor dem ersten Zug nur der Ziel-Text, kein "Zug 0" (claude-code-60 19.11.); Meisterschule immer
+export const zeigeZug = (bereich, zuege) => !(bereich && bereich.kurs && zuege === 0);
 export const BEREICHE = Object.freeze([
   Object.freeze({ id: 'matt', lektionen: LEKTIONEN }),
   Object.freeze({ id: 'taktik', lektionen: TAKTIK }),

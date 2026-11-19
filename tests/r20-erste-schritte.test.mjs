@@ -188,6 +188,15 @@ pruefe('es-patt: der naheliegende Damenzug Qg6 ergibt Patt (die Falle)', !!patt 
   sf.ende();
 }
 
+// ---------- claude-code-60 19.11.: im Kurs vor dem ersten Zug kein "Zug 0", Meisterschule unveraendert ----------
+pruefe('zeigeZug: Kurs bei 0 Zuegen aus, ab 1 an; Meisterschule immer an', typeof M.zeigeZug === 'function'
+  && M.zeigeZug(kurs, 0) === false && M.zeigeZug(kurs, 1) === true && M.zeigeZug(M.BEREICHE[0], 0) === true);
+{
+  const { readFileSync } = await import('node:fs');
+  const quelle = readFileSync(new URL('../js/ui/lektion.js', import.meta.url), 'utf8');
+  pruefe('lektion.js: der Zug-Zaehler fragt zeigeZug', /const zaehler = \(\) => \{[^}]*zeigeZug\(ber, st\.zuege\)/.test(quelle));
+}
+
 // ---------- N-13:10: Kopf im Kurs, Vorschaubild der Sammel-Aufgaben ----------
 pruefe('Text "kursUeber" (Zeile ueber dem Kurs-Titel statt "Meisterschule") in DE und EN',
   typeof DE.kursUeber === 'string' && !!DE.kursUeber && typeof EN.kursUeber === 'string' && !!EN.kursUeber && !/Meisterschule|Master/i.test(DE.kursUeber + EN.kursUeber),
