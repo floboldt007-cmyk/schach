@@ -129,5 +129,25 @@ end;
 $$;
 reset role;
 
+-- ---------- 5. Schalter: A blendet Abzeichen und Titel aus, B sieht beides nicht mehr ----------
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+begin
+  if (public.saison_sichtbar_setzen(false) ->> 'sichtbar')::boolean then raise exception 'FEHLER: Schalter bleibt an'; end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"b1b1b1b1-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$
+declare
+  k jsonb := public.saison_karte_der_partie((select id from saison_test_partie));
+begin
+  if k -> 'w' -> 'abzeichen' <> 'null'::jsonb or k -> 'w' -> 'titel' <> 'null'::jsonb then
+    raise exception 'FEHLER: Gegner sieht trotz Schalter aus %', k;
+  end if;
+end;
+$$;
+reset role;
+
 do $$ begin raise notice 'Saison-RLS-Test erfolgreich'; end; $$;
 rollback;

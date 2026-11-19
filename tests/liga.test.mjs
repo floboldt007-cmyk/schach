@@ -891,7 +891,8 @@ async function weltTeil(browser, start) {
         assert.match(await page.locator('.lg-welt-erklaerung').innerText(), /Benutzernamen, dein Banner und deine Online-Elo/);
         assert.equal(await page.locator('.lg-welt-mitmachen').innerText(), 'Mitmachen');
         assert.equal(await page.locator('.lg-welt-zeile.ich').count(), 0);
-        assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('lg-welt-mitmachen')), true);
+        assert.equal(await page.locator('.lg-welt-alter input').isChecked(), false);
+        assert.equal(await page.evaluate(() => document.activeElement?.matches('.lg-welt-alter input')), true);
       });
       await browserPruefe('Welt: ohne Seitenfehler', async () => assert.deepEqual(fehler, []));
     } finally { await kontext.close(); }
@@ -906,10 +907,17 @@ async function weltTeil(browser, start) {
         assert.match(await page.locator('.lg-welt-erklaerung').innerText(), /Start-Elo selbst angegeben, zählst du erst ab 30 Partien mit\.$/);
         assert.equal(await page.locator('.lg-welt-zeile.ich').count(), 0);
       });
+      await browserPruefe('Welt: ohne Haken bleibt "Mitmachen" gesperrt, der Satz zum Alter steht daneben', async () => {
+        assert.equal(await page.locator('.lg-welt-alter').innerText(), 'Ich bin mindestens 16 oder meine Eltern sind einverstanden.');
+        assert.equal(await page.locator('.lg-welt-alter input').isChecked(), false);
+        assert.equal(await page.locator('.lg-welt-mitmachen').isDisabled(), true);
+        assert.equal(welt.aufrufe.filter((a) => a.name === 'weltrang_mitmachen').length, 0);
+      });
       await browserPruefe('Welt: "Mitmachen" mit 12 Partien zeigt "Noch 3 gewertete Online-Partien"', async () => {
+        await page.locator('.lg-welt-alter input').check();
         await page.locator('.lg-welt-mitmachen').click();
         await page.waitForSelector('.lg-welt[data-zustand="dabei"]');
-        assert.deepEqual(welt.aufrufe.at(-1), { name: 'weltrang_mitmachen', daten: { an: true } });
+        assert.deepEqual(welt.aufrufe.at(-1), { name: 'weltrang_mitmachen', daten: { an: true, alter_bestaetigt: true } });
         assert.equal(await page.locator('.lg-welt-stand').innerText(), 'Noch 3 gewertete Online-Partien, dann zählst du mit.');
         assert.equal(await page.locator('.lg-welt-austreten').innerText(), 'Nicht mehr zeigen');
       });

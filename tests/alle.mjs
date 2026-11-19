@@ -106,6 +106,7 @@ const SUITEN = [
   { name: 'r19-mail-datenschutz', datei: 'r19-mail-datenschutz.test.mjs', args: [], was: 'Kontakt kontakt@crownmate.de überall, kein Entwurfs-Kasten, Löschliste mit Abo, Coach und Klassen der Leitung (DE/EN), Sprunglink Löschseite EN' },
   { name: 'datenschutz-karte', datei: 'datenschutz-karte.test.mjs', args: [], was: 'Datenschutz Visitenkarte: Online-Elo nur in gewerteten Partien, Erfinder/Pionier nur auf der eigenen Karte' },
   { name: 'datenschutz-verwaltung', datei: 'datenschutz-verwaltung.test.mjs', args: [], was: 'Datenschutz Verwaltung durch den Betreiber: Daten, Aenderungen, Protokoll, lit. b/f, Auskunft, Loeschung' },
+  { name: 'datenschutz-paket2', datei: 'datenschutz-paket2.test.mjs', args: [], was: 'Datenschutz Paket 2: Weltrangliste, Seasons, Altersbestaetigung, Season-Schalter, Konto ab 13' },
   { name: 'partie-hoehe', datei: 'partie-hoehe.test.mjs', args: [], was: 'Bot-Partie ohne Seitenueberlauf und Sieg-Blatt ohne Innen-Scrollen, Brett nicht kleiner (7 Geraete, R7 B8/B10)' },
   { name: 'layout-r8', datei: 'layout-r8.test.mjs', args: [], was: 'Kritik R8: Liga-Platzzahl deckend ueber dem Banner, Sieg-Blatt SE/PC ohne Innen-Scrollen, Fertig im Bereichs-Blatt volle Breite (Browser)' },
   { name: 'funktion-shop-skin', datei: 'funktion-shop-skin.test.mjs', args: [], was: 'Funktionsprobe Shop: Figurensatz waehlen und in jeder Partie-Ansicht pruefen, auch Wechsel bei offener Ansicht' },

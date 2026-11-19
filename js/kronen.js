@@ -50,6 +50,11 @@ export async function waehleSaisonTitel(titel) {
   return rpc('saison_titel_waehle', { titel: titel || null });
 }
 
+// Schalter in den Einstellungen: an = der Gegner sieht Abzeichen und Titel; Absage oder offline: Fehler an den Aufrufer
+export async function setzeSaisonSichtbar(an) {
+  return rpc('saison_sichtbar_setzen', { an });
+}
+
 export async function holeGruppe() {
   return rpc('liga_meine_gruppe', {});
 }

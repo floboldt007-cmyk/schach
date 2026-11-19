@@ -116,8 +116,33 @@ async function als(uid, sql) {
   }
 }
 const liste = async (uid, grenze) => (await als(uid, `select public.weltrang_liste(${grenze === undefined ? '' : grenze}) as l`))?.l;
-const mitmachen = async (uid, an) => (await als(uid, `select public.weltrang_mitmachen(${an}) as m`))?.m;
+const mitmachen = async (uid, an, haken = an) => (await als(uid, `select public.weltrang_mitmachen(${an}, ${haken}) as m`))?.m;
 const namen = (l) => (l?.liste || []).map((z) => z.name).join(',');
+
+// ---------- Altersbestaetigung (Flo 18.11.2026): der Server lehnt Mitmachen ohne Haken ab und merkt sich den Zeitpunkt ----------
+{
+  const zeile = async () => (await db.query(`select alter_bestaetigt_am as am from public.weltrang_teilnahme where user_id = '${U.dora}'`)).rows[0];
+  const ohne = await als(U.dora, 'select public.weltrang_mitmachen(true, false) as m');
+  pruefe('ohne Haken: WELTRANG_ALTER, keine Zeile', /WELTRANG_ALTER/.test(ohne?.fehler || '') && !(await zeile()), JSON.stringify(ohne));
+  const alt = await als(U.dora, 'select public.weltrang_mitmachen(true) as m');
+  pruefe('Aufruf ohne zweiten Wert gilt als ohne Haken', /WELTRANG_ALTER/.test(alt?.fehler || '') && !(await zeile()), JSON.stringify(alt));
+  const mit = await mitmachen(U.dora, true, true);
+  pruefe('mit Haken: dabei, Zeitpunkt gespeichert', mit?.teilnahme === true && !!(await zeile())?.am, JSON.stringify(mit));
+  const d = await als(U.dora, 'select public.meine_daten() as d');
+  pruefe('Datenauskunft nennt den Zeitpunkt der Bestaetigung', !!d?.d?.kronen?.weltrang?.alter_bestaetigt_am, JSON.stringify(d?.d?.kronen?.weltrang));
+  const weg = await mitmachen(U.dora, false, false);
+  pruefe('Widerruf geht ohne Haken und loescht die Zeile samt Zeitpunkt', weg?.teilnahme === false && !(await zeile()), JSON.stringify(weg));
+  await db.exec(`insert into public.weltrang_teilnahme (user_id) values ('${U.dora}')`);
+  const l = await liste(U.dora);
+  pruefe('Altzeile ohne Zeitpunkt zaehlt nicht als Teilnahme', l?.teilnahme === false && l?.ich?.status === 'nicht_dabei' && !namen(l).includes('dora'), JSON.stringify(l));
+  const altAuskunft = await als(U.dora, 'select public.meine_daten() as d');
+  pruefe('Datenauskunft: Altzeile ohne Zeitpunkt zaehlt nicht als Teilnahme', altAuskunft?.d?.kronen?.weltrang?.teilnahme === false, JSON.stringify(altAuskunft?.d?.kronen?.weltrang || altAuskunft));
+  const nach = await mitmachen(U.dora, true, true);
+  pruefe('Altzeile: Haken holt die Bestaetigung nach', nach?.teilnahme === true && !!(await zeile())?.am, JSON.stringify(nach));
+  await mitmachen(U.dora, false, false);
+  const sig = (await db.query(`select to_regprocedure('public.weltrang_mitmachen(boolean)') is null as weg`)).rows[0];
+  pruefe('alte Signatur ohne Haken ist entfernt', sig.weg === true, JSON.stringify(sig));
+}
 
 // ---------- Ohne Zustimmung erscheint niemand ----------
 {
@@ -190,9 +215,9 @@ for (const n of ['anna', 'bert', 'carl', 'emil', 'fritz']) {
 {
   const r = await db.query(`select
     has_function_privilege('anon', 'public.weltrang_liste(integer)', 'execute') as anon_l,
-    has_function_privilege('anon', 'public.weltrang_mitmachen(boolean)', 'execute') as anon_m,
+    has_function_privilege('anon', 'public.weltrang_mitmachen(boolean, boolean)', 'execute') as anon_m,
     has_function_privilege('authenticated', 'public.weltrang_liste(integer)', 'execute') as auth_l,
-    has_function_privilege('authenticated', 'public.weltrang_mitmachen(boolean)', 'execute') as auth_m`);
+    has_function_privilege('authenticated', 'public.weltrang_mitmachen(boolean, boolean)', 'execute') as auth_m`);
   const x = r.rows[0];
   pruefe('Rechte: anon nein, authenticated ja', !x.anon_l && !x.anon_m && x.auth_l && x.auth_m, JSON.stringify(x));
 }
@@ -211,7 +236,7 @@ for (const n of ['anna', 'bert', 'carl', 'emil', 'fritz']) {
   pruefe('niemand loescht in der Tabelle direkt', !!d?.fehler, JSON.stringify(d));
 }
 {
-  const r = await als(null, 'select public.weltrang_mitmachen(true) as m');
+  const r = await als(null, 'select public.weltrang_mitmachen(true, true) as m');
   pruefe('ohne Nutzerkennung (auth.uid() null) kein Eintrag', !!r?.fehler && /WELTRANG_OHNE_KONTO/.test(r.fehler), JSON.stringify(r));
   const l = await als(null, 'select public.weltrang_liste() as l');
   pruefe('ohne Nutzerkennung keine Liste', !!l?.fehler && /WELTRANG_OHNE_KONTO/.test(l.fehler), JSON.stringify(l));
@@ -287,7 +312,7 @@ for (const n of ['anna', 'bert', 'carl', 'emil', 'fritz']) {
   const x = await lauf(db, 'weltrang-zurueck.sql', lies('supabase/weltrang-zurueck.sql'));
   pruefe('Rueckweg laeuft', !x, x);
   const r = (await db.query(`select to_regclass('public.weltrang_teilnahme') is null as t,
-    to_regprocedure('public.weltrang_liste(integer)') is null as l, to_regprocedure('public.weltrang_mitmachen(boolean)') is null as m`)).rows[0];
+    to_regprocedure('public.weltrang_liste(integer)') is null as l, to_regprocedure('public.weltrang_mitmachen(boolean, boolean)') is null as m`)).rows[0];
   pruefe('nach dem Rueckweg: Tabelle und Funktionen weg', r.t && r.l && r.m, JSON.stringify(r));
   const d = await als(U.bert, 'select public.meine_daten() as d');
   pruefe('Datenauskunft laeuft nach dem Rueckweg, ohne weltrang', d?.d?.kronen && !('weltrang' in d.d.kronen), JSON.stringify(d?.d?.kronen || d));
@@ -315,7 +340,7 @@ for (const n of ['anna', 'bert', 'carl', 'emil', 'fritz']) {
       await live.exec(ALS(U.anna) + 'set role authenticated;');
       try { return (await live.query(sql)).rows[0]; } catch (e) { return { fehler: e.message }; } finally { await live.exec('reset role;'); }
     };
-    await mit('select public.weltrang_mitmachen(true) as m');
+    await mit('select public.weltrang_mitmachen(true, true) as m');
     const d = await mit('select public.meine_daten() as d');
     pruefe('Live-Stand nach weltrang-schema.sql: Datenauskunft nennt die Zustimmung', d?.d?.kronen?.weltrang?.teilnahme === true, JSON.stringify(d?.d?.kronen?.weltrang || d));
   }
