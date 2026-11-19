@@ -25,11 +25,16 @@ export const DE = {
   'antwort.geduld.0': 'Lass dir Zeit.', 'antwort.geduld.1': 'Nur keine Eile.', 'antwort.geduld.2': 'Ich warte gern.',
   'antwort.spannend.0': 'Eine spannende Partie!', 'antwort.spannend.1': 'Spannend, oder?', 'antwort.spannend.2': 'Da ist was los!',
   'antwort.zusage.0': 'Gern, jederzeit!', 'antwort.zusage.1': 'Ich bin dabei!', 'antwort.zusage.2': 'Sehr gern, noch eine!',
-  // Emote-Kreaturen (js/kreaturen-kunst.js), erst im Labor des Erfinder-Kontos
+  // Emote-Kreaturen (js/kreaturen-kunst.js): jede Welt schaltet ihre Kreatur frei
   kreaturen: 'Kreaturen', labor: 'Labor', keine: 'Keine', maskottchen: 'Maskottchen',
-  begleiter: 'Emote-Kreatur', begleiterText: 'Zeigt Hallo, Staunen, Nachdenken und Respekt als kleine Kreatur. Nur du siehst sie, solange sie im Labor sind.',
-  kreaturenHinweis: 'Die Kreaturen sieht im Labor nur dein Erfinder-Konto. Später schaltet jede Welt ihre Kreatur frei. Tipp eine an, dann zeigt dein Emote-Rad sie; ein zweiter Tipp nimmt sie wieder ab.',
+  begleiter: 'Emote-Kreatur', begleiterText: 'Zeigt Hallo, Staunen, Nachdenken und Respekt als kleine Kreatur.',
+  kreaturenHinweis: 'Besiege den Endgegner einer Welt, dann gehört dir ihre Kreatur. Tipp eine an, dann zeigt dein Emote-Rad sie; ein zweiter Tipp nimmt sie wieder ab.',
   'gruppe.sticker': 'Sticker',
+  // Erspielbare Sticker (R19, Variante C): frei ab ihrem Funken-Level, im Labor des Erfinders immer
+  'gruppe.premium': 'Erspielbar',
+  // So bekommt man ein gesperrtes Stueck
+  'weg.endgegner': 'Besiege {name}', 'weg.level': 'Ab Level {level}', 'weg.alleWelten': 'Besiege alle Bots aller Welten',
+  'emote.krone': 'Krone', 'emote.feuer': 'Feuer', 'emote.herz': 'Herz', 'emote.springer': 'Springer', 'emote.blitz': 'Blitz', 'emote.diamant': 'Diamant',
   'kreatur.karo': 'Karo', 'kreatur.stups': 'Stups', 'kreatur.zinni': 'Zinni', 'kreatur.klippa': 'Klippa', 'kreatur.glimm': 'Glimm', 'kreatur.kronli': 'Kronli',
 };
 
@@ -57,9 +62,12 @@ export const EN = {
   'antwort.spannend.0': 'An exciting game!', 'antwort.spannend.1': 'Exciting, isn’t it?', 'antwort.spannend.2': 'Lots going on!',
   'antwort.zusage.0': 'Sure, anytime!', 'antwort.zusage.1': 'Count me in!', 'antwort.zusage.2': 'Gladly, one more!',
   kreaturen: 'Creatures', labor: 'Lab', keine: 'None', maskottchen: 'Mascot',
-  begleiter: 'Emote creature', begleiterText: 'Shows Hello, Surprised, Thinking and Respect as a little creature. Only you can see them while they are in the lab.',
-  kreaturenHinweis: 'While they are in the lab, only your creator account can see the creatures. Later each world unlocks its creature. Tap one and your emote wheel shows it; tap again to take it off.',
+  begleiter: 'Emote creature', begleiterText: 'Shows Hello, Surprised, Thinking and Respect as a little creature.',
+  kreaturenHinweis: 'Beat the boss of a world and its creature is yours. Tap one and your emote wheel shows it; tap again to take it off.',
   'gruppe.sticker': 'Stickers',
+  'gruppe.premium': 'Earnable',
+  'weg.endgegner': 'Beat {name}', 'weg.level': 'From level {level}', 'weg.alleWelten': 'Beat every bot in every world',
+  'emote.krone': 'Crown', 'emote.feuer': 'On fire', 'emote.herz': 'Heart', 'emote.springer': 'Knight', 'emote.blitz': 'Lightning', 'emote.diamant': 'Diamond',
   'kreatur.karo': 'Karo', 'kreatur.stups': 'Stups', 'kreatur.zinni': 'Zinni', 'kreatur.klippa': 'Klippa', 'kreatur.glimm': 'Glimm', 'kreatur.kronli': 'Kronli',
 };
 

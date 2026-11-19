@@ -235,6 +235,7 @@ export function zeige(root, params = {}, app) {
             <li><b>chess.js 1.4.0</b><span>${E('info.chessjs')}</span>
               <details class="es-lizenztext"><summary>${E('info.lizenztext')}</summary><div data-lizenztext="chess.js">${CHESSJS_LIZENZ.map((a) => `<p>${esc(a)}</p>`).join('')}</div></details></li>
             <li><b>${E('info.figuren')}</b><span>${E('info.figurenText')}</span></li>
+            <li><b>${E('info.figurenGold')}</b><span>${E('info.figurenGoldText')}</span></li>
             <li><b>${E('info.schriften')}</b><span>SIL Open Font License 1.1: <a href="${esc(pfad('assets/schriften/OFL-Manrope.txt'))}" target="_blank" rel="noopener">Manrope</a>, <a href="${esc(pfad('assets/schriften/OFL-Bricolage-Grotesque.txt'))}" target="_blank" rel="noopener">Bricolage Grotesque</a></span></li>
             <li><b>${E('info.tagesraetsel')}</b><span>${E('info.tagesraetselText')}</span></li>
             <li><b>${E('info.klaenge')}</b><span>${E('info.klaengeText')}</span></li>

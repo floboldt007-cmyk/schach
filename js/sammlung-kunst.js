@@ -6,7 +6,8 @@
 //
 //   klangKunst(id) -> string | null          ganzes <svg> fuer ein Klangset (PAKETE_KLANG in js/sounds.js)
 //   brettKunst(hell, dunkel, rand, figuren?) -> string  ganzes <svg> fuer ein Brett-Design (figuren: Ordner des Satzes)
-//   finisherKunst(id, figuren?) -> string | null  ganzes <svg> fuer einen Finisher ('krone', 'welle', 'koenig', 'kronensturz', 'signatur')
+//   finisherKunst(id, figuren?) -> string | null  ganzes <svg> fuer einen Finisher ('krone', 'welle', 'koenig', 'kronensturz',
+//                                                 'blitzschlag', 'goldregen', 'schockwelle', 'signatur')
 //   erfolgKunst(id) -> string | null         ganzes <svg> fuer einen Erfolg ('erster-sieg', 'welt-3', 'liga-6', ...)
 //   erfolgSeltenheit(id) -> string           'frei' | 'selten' | 'episch' | 'legende'
 //   ligaWappen(stufe) -> string              ganzes <svg> fuer die Liga-Stufe 0 (Holz) bis 6 (Meister)
@@ -84,6 +85,27 @@ const KLANG = {
       + '<path d="M40 40l8-10h10l-6 12z" fill="#fff" opacity=".55"/></g>'
       + [[14, 3.6, 0.85], [22, 3, 0.55]].map(([r, w, o]) => `<path class="rk rk-atmen" d="M${96} ${56 - r * 0.7}a${r} ${r} 0 0 1 0 ${(r * 1.4).toFixed(1)}" fill="none" stroke="#FF5FB8" stroke-width="${w}" stroke-linecap="round" opacity="${o}"/>`).join('')
       + funke(24, 30, 0.9, 0.2) + funke(90, 24, 0.7, 0.7) + funke(20, 78, 0.6, 1.1);
+  },
+  // R19 (Labor, im Shop mit Schloss): Polarlicht, ein Lichtband ueber dunklem Himmel mit hellen Glastoenen
+  polarlicht: () => {
+    const g = id('pl'); const h = id('pl');
+    return `<defs>${verlauf(g, ['#7AF5D0', '#3EC9F2', '#B07AFF'], 1, 0)}<radialGradient id="${h}" cx=".5" cy=".35" r=".75"><stop offset="0" stop-color="#1A2A5C"/><stop offset="1" stop-color="#070B1E"/></radialGradient></defs>`
+      + `<circle cx="60" cy="60" r="48" fill="url(#${h})"/><circle cx="60" cy="60" r="48" fill="none" stroke="#F2BE4A" stroke-width="2.4"/>`
+      + `<g class="rk rk-atmen"><path d="M16 66C30 40 44 58 60 42s34-8 44-22" fill="none" stroke="url(#${g})" stroke-width="10" stroke-linecap="round" opacity=".85"/>`
+      + `<path d="M18 78C34 56 48 72 62 58s30-6 40-18" fill="none" stroke="url(#${g})" stroke-width="5" stroke-linecap="round" opacity=".5"/></g>`
+      + '<path d="M28 96h64" stroke="#0E1A3A" stroke-width="10" stroke-linecap="round"/>'
+      + '<path d="M70 50v26a6 5 0 1 1-3-4.4V56l14-4v18a6 5 0 1 1-3-4.4V50z" fill="#FFF1C1" stroke="#9C6B12" stroke-width="1.2" stroke-linejoin="round"/>'
+      + funke(30, 30, 0.8, 0.2, '#FFF1C1') + funke(92, 74, 0.7, 0.9, '#7AF5D0') + funke(42, 22, 0.5, 1.4, '#fff');
+  },
+  // R19 (Labor, im Shop mit Schloss): Donner, Gewitterwolke mit goldenem Blitz, tiefe Schallbogen
+  donner: () => {
+    const g = id('dn'); const w = id('dn');
+    return `<defs>${verlauf(g, ['#FFF3B0', '#F2BE4A', '#C98A12'], 0, 1)}${verlauf(w, ['#5A6380', '#2A3150'], 0, 1)}</defs>`
+      + '<circle cx="60" cy="60" r="48" fill="#141A30"/><circle cx="60" cy="60" r="48" fill="none" stroke="#F2BE4A" stroke-width="2.4"/>'
+      + `<path d="M30 58a14 14 0 0 1 12-20 18 18 0 0 1 34-2 14 14 0 0 1 14 22z" fill="url(#${w})" stroke="#0E1326" stroke-width="2"/>`
+      + `<path class="rk rk-atmen" d="M62 56L50 78h10l-6 22 18-28H62l6-16z" fill="url(#${g})" stroke="#9C6B12" stroke-width="1.4" stroke-linejoin="round"/>`
+      + [[12, 3.4, 0.85], [20, 2.6, 0.5]].map(([r, ws, o], i) => `<path class="rk rk-atmen" style="animation-delay:${(i * 0.35).toFixed(2)}s" d="M${88 + i * 2} ${80 - r * 0.7}a${r} ${r} 0 0 1 0 ${(r * 1.4).toFixed(1)}" fill="none" stroke="#F2BE4A" stroke-width="${ws}" stroke-linecap="round" opacity="${o}"/>`).join('')
+      + funke(26, 84, 0.8, 0.4, '#FFE08A') + funke(94, 30, 0.7, 1.0, '#FFF1C1');
   },
 };
 
@@ -208,6 +230,34 @@ const FINISHER = {
       + '<rect x="-2" y="22" width="40" height="4.5" rx="2" fill="#7A2A12"/><circle cx="18" cy="0" r="2.6" fill="#FFE08A"/></g>'
       + `<ellipse cx="${kx.toFixed(1)}" cy="${(ky + 2).toFixed(1)}" rx="14" ry="2.6" fill="#000" opacity=".2"/>`
       + funke(kx + 14, ky - 26, 0.8, 0.4, '#F2BE4A');
+  },
+  // R19 (nicht gratis, krasser als das Erspielte): goldenes Licht hinter der Szene, Gold statt Akzentfarbe
+  // Blitzschlag: ein goldener Blitz faehrt in den mattgesetzten Koenig, darunter ein Lichtring
+  blitzschlag: (figuren) => {
+    const b = boden(2, 3, 76, 112, 80, 118); const g = id('bs'); const [x, y] = b.mitte(0, 1);
+    return `<defs>${verlauf(g, GOLD, 0, 1)}</defs>${halo('#F2BE4A', 56, 0.45)}${buehne(b, 2, 3)}`
+      + `<ellipse cx="${x.toFixed(1)}" cy="${(y + 4).toFixed(1)}" rx="26" ry="7" fill="none" stroke="#FFE08A" stroke-width="2" opacity=".8"/>`
+      + stein(figuren, 'bK', x, y + 5, 48)
+      + `<path class="rk rk-atmen" d="M${(x + 10).toFixed(1)} 2L${(x - 6).toFixed(1)} 34h11L${(x - 4).toFixed(1)} ${(y - 30).toFixed(1)}L${(x + 18).toFixed(1)} 26H${(x + 7).toFixed(1)}z" fill="url(#${g})" stroke="#9C6B12" stroke-width="1.4" stroke-linejoin="round"/>`
+      + funke(x + 30, 30, 1.1, 0.2, '#FFF1C1') + funke(x - 32, 48, 0.8, 0.9, '#FFE08A');
+  },
+  // Goldregen: Muenzen und Funken fallen auf das Brett und den siegreichen Koenig
+  goldregen: (figuren) => {
+    const b = boden(2, 3, 76, 112, 80, 118); const g = id('gr'); const [x, y] = b.mitte(0, 1);
+    const muenzen = [[22, 18, 5], [44, 8, 4], [78, 14, 5.5], [98, 30, 4], [30, 44, 4.5], [88, 52, 4], [58, 26, 3.5]];
+    return `<defs><radialGradient id="${g}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#FFF3B0"/><stop offset=".55" stop-color="#F2BE4A"/><stop offset="1" stop-color="#9C6B12"/></radialGradient></defs>`
+      + `${halo('#F2BE4A', 56, 0.4)}${buehne(b, 2, 3)}${stein(figuren, 'wK', x, y + 5, 48)}`
+      + muenzen.map(([mx, my, r], i) => `<ellipse class="rk rk-schweben" style="animation-delay:${(i * 0.25).toFixed(2)}s" cx="${mx}" cy="${my}" rx="${r}" ry="${(r * 0.8).toFixed(1)}" fill="url(#${g})" stroke="#9C6B12" stroke-width=".9"/>`).join('')
+      + `<g fill="#F2BE4A" opacity=".85"><ellipse cx="${(x - 22).toFixed(1)}" cy="${(y + 8).toFixed(1)}" rx="5" ry="2"/><ellipse cx="${(x + 24).toFixed(1)}" cy="${(y + 10).toFixed(1)}" rx="5" ry="2"/></g>`
+      + funke(108, 20, 0.9, 0.3, '#FFF1C1') + funke(12, 30, 0.7, 1.1, '#FFF1C1');
+  },
+  // Schockwelle: vom Mattfeld laufen goldene Ringe ueber das Brett
+  schockwelle: (figuren) => {
+    const R = 3; const C = 5; const b = boden(R, C, 58, 112, 86, 120); const [x, y] = b.mitte(1, 2);
+    return `${halo('#F2BE4A', 56, 0.38)}${buehne(b, R, C)}`
+      + [16, 30, 46].map((rx, i) => `<ellipse class="rk rk-atmen" style="animation-delay:${(i * 0.35).toFixed(2)}s" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${rx * 1.4}" ry="${(rx * 0.48).toFixed(1)}" fill="none" stroke="${['#FFF1C1', '#FFE08A', '#F2BE4A'][i]}" stroke-width="${2.6 - i * 0.6}" opacity="${0.95 - i * 0.25}"/>`).join('')
+      + stein(figuren, 'wQ', x, y + 4, 48)
+      + funke(x + 40, y - 30, 0.9, 0.2, '#FFE08A') + funke(x - 40, y - 26, 0.7, 0.8, '#FFF1C1');
   },
   // Signatur (Erfinder, Nr. 0): goldener Namenszug wie im Spiel, Linie, Nummer, Licht und Funken
   signatur: () => {

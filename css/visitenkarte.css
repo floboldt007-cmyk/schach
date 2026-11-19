@@ -13,7 +13,10 @@
 .vk { position: relative; display: grid; min-width: 0; overflow: hidden; border-radius: var(--r-l, 18px); background: var(--flaeche);
   border: 1px solid var(--linie); color: var(--text); box-shadow: var(--s1, none); }
 .vk-banner { display: block; background-color: #14161C; background-size: cover; background-position: 30% center; background-repeat: no-repeat; }
-.vk > .vk-banner { position: absolute; inset: 0 0 auto 0; height: 100px; }
+/* Banner und Kopf teilen sich die erste Zeile: das Banner waechst mit dem Kopf (mindestens 100 px), auch wenn Season-Abzeichen
+   und Titel ihn hoeher machen (R19, vorher feste 100 px, der Titel-Chip lag dann halb unter der Bannerkante) */
+.vk > .vk-banner { position: relative; grid-area: 1 / 1; }
+.vk > .vk-kopf { grid-area: 1 / 1; }
 /* G-001: gemeinsame Regel fuer alle Banner-Flaechen mit Text links (Profilkopf "Ich", Visitenkarte, Spielerzeile online).
    Alle Banner tragen ihr Motiv bei gut einem Viertel der Breite (x 300 bis 330 von 1200); mit "cover" lag es je nach Breite unter
    Name und Titel-Schild. Darum feste Hoehe --banner-h (4:1, Vorgabe 120 px, also 480 px breit), so verschoben, dass das Motiv
@@ -40,6 +43,24 @@
 .vk-titel svg, .vk-titel .vk-wappen { width: 20px; height: 20px; flex: none; }
 .vk-krone { font-size: 12.5px; font-weight: 600; opacity: .92; }
 .vk-krone.leer { opacity: .75; font-weight: 500; }
+/* R19 Season: Rang-Symbol der Liga, bestes Season-Abzeichen und gewaehlter Season-Titel (auf dem dunklen Banner) */
+.vk-liga-symbol { display: inline-block; width: 14px; height: 16px; margin-right: 5px; vertical-align: -3px; }
+.vk-season { display: flex; flex-wrap: wrap; gap: 4px 6px; min-width: 0; margin-top: 2px; }
+.vk-season-abz, .vk-season-titel { display: inline-flex; align-items: center; min-height: 26px; padding: 0 8px; border-radius: 7px;
+  font-size: 13px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; text-shadow: none; }
+/* R19 (Flo 15.11.: "hat ja Bedeutung"): das Abzeichen traegt das Wappen seiner Liga, gut lesbar auf dem Banner */
+.vk-season-abz { gap: 5px; padding-left: 5px; color: #FFF; background: rgba(0, 0, 0, .42); border: 1px solid rgba(255, 212, 122, .6); }
+.vk-season-symbol { flex: none; width: 18px; height: auto; }
+.vk-season-titel { color: #2A1A00; background: #FFD47A; }
+/* Season-Gold: dasselbe Gold wie der Titel auf der Karte auch an den Season-Teilen des Pakets liga (js/pakete/liga/saison.js),
+   deren css/pakete/liga.css bei Theme-Tokens ohne eigene Bewegung bleibt: Titel-Chips und Haken, die eigene Stufe in
+   "Alle Ligen", und der kurze Auftritt des Abzeichens im Fenster am Season-Ende (bei reduzierter Bewegung ein Standbild) */
+.ss-chip, .ss-ligen-stufe[aria-current="true"], .ss-titel[aria-pressed="true"] .ss-haken { color: #2A1A00; background: #FFD47A; box-shadow: none; }
+.ss-ende-held { animation: ss-auftritt .9s cubic-bezier(.2, .8, .2, 1) both, ss-schweben 4s ease-in-out .9s infinite alternate; }
+@keyframes ss-auftritt { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes ss-schweben { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .ss-ende-held { animation: none; } }
+html[data-bewegung="aus"] .ss-ende-held { animation: none; }
 .vk-ki { flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 20px; padding: 0 6px; border-radius: 6px; font-size: 11.5px; font-weight: 800;
   letter-spacing: .06em; color: #0D1B2A; background: #7FE3FF; text-shadow: none; }
 .vk-orden { list-style: none; margin: 0; padding: 10px 12px 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -135,3 +156,12 @@
 .st-moment.ruhig { animation: st-ein 200ms ease-out both; }
 @keyframes st-ein { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .st-moment.ruhig { animation: none; } }
+
+/* R19 Liga neu (15.11.2026): Freunde in der Liga mit festem Farbton aus dem Namen (freunde.js setzt --fr-ton); die Schrift
+   bleibt weiss, die Helligkeit ist fuer jeden Farbton gleich (oklch), damit der Buchstabe immer lesbar bleibt */
+.bl-fr-av[style*="--fr-ton"] { background: oklch(46% .13 var(--fr-ton)); color: #fff; }
+/* das Lebendige: der aufgeklappte Preis in der Liga schwebt sanft, einmal hin und zurueck je vier Sekunden */
+.lg-gr-preis:not([hidden]) .lg-gr-preis-bild > * { animation: lg-preis-schweben 4s ease-in-out infinite alternate; }
+@keyframes lg-preis-schweben { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .lg-gr-preis:not([hidden]) .lg-gr-preis-bild > * { animation: none; } }
+html[data-bewegung="aus"] .lg-gr-preis:not([hidden]) .lg-gr-preis-bild > * { animation: none; }

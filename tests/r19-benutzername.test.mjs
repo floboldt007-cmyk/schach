@@ -125,7 +125,7 @@ async function browserTeil() {
 
     // 4) Monats-Sperre laeuft (supabase/benutzername-sperre-schema.sql eingespielt): Konto zeigt das Datum, Feld nur lesbar
     const gestern = new Date(Date.now() - 86400000);
-    const ab = new Date(gestern.getTime() + 30 * 86400000).toLocaleDateString('de-DE');
+    const ab = new Date(gestern.getTime() + 30 * 86400000).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' });
     p = await seite(browser, { profil: [{ user_id: ID, benutzername: 'alt_name', name_geaendert_am: gestern.toISOString() }], ziel: '#einstellungen' });
     let kn = await konto(p.s);
     pruefe(`Sperre: Konto zeigt "Nächste Änderung ab ${ab}", Feld nur lesbar`, kn.sperre === `Nächste Änderung ab ${ab}` && kn.nurLesen && kn.wert === 'alt_name', kn);

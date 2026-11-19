@@ -21,7 +21,7 @@
 //
 // Ereignis: window 'schach:thema' { thema, modus, aufgeloest } nach jedem Wechsel und wenn das System den
 // Modus wechselt (nur bei modus 'system').
-import { profilWahl, RAHMEN, KREATUR_MOTIVE, MOTIVE, GRUENDE, STANDARD_FIGUR } from './profil.js';
+import { profilWahl, RAHMEN, KREATUR_MOTIVE, MOTIVE, GRUENDE, STANDARD_FIGUR, BOT_MOTIV } from './profil.js';
 import { rahmenKunst } from './rahmen-kunst.js';
 import { profilGrund } from './sammlung-kunst.js';
 import { kreaturSvg } from './kreaturen-kunst.js';
@@ -120,6 +120,9 @@ export function standardKlangpaket(themaId = aktuell.thema) {
   return (t.klang && t.klang.standard) || MODERN.klang.standard;
 }
 
+// R19 Profil Ich: die Bots mit Portraet, fuer die Wahl des Profilbilds (js/pakete/sammlung/profil.js)
+export const BOT_PORTRAETS = MODERN.portraets;
+
 export function avatarVon(bot) {
   if (!bot) return '';
   const t = themaVon(aktuell.thema) || MODERN;
@@ -134,6 +137,7 @@ export function botFarbe(bot) {
 }
 
 // Profil (js/profil.js, Flo 30.10.2026): gewaehlte Figur und Rahmen; ohne Wahl wie bisher der Koenig ohne Ring
+let portraetNr = 0; // Ausschnitt-Kennungen der Portraets (profilAvatar), eine je Aufruf
 export function floAvatar(farbe = 'w') {
   return profilAvatar(profilWahl(), farbe);
 }
@@ -143,7 +147,11 @@ export function floAvatar(farbe = 'w') {
 export function profilAvatar(wahl = {}, farbe = 'w') {
   const w = farbe !== 'b';
   const t = themaVon(aktuell.thema) || MODERN;
-  const p = { figur: MOTIVE.includes(wahl.figur) ? wahl.figur : STANDARD_FIGUR, grund: GRUENDE.includes(wahl.grund) ? wahl.grund : 'standard',
+  // R19: Bot-Portraet als Motiv ('bot-<id>', js/profil.js BOT_MOTIV), nur aus der festen Liste MODERN.portraets und dem
+  // festen Ordner; jeder andere Wert faellt wie bisher auf den Standard
+  const botId = (BOT_MOTIV.exec(typeof wahl.figur === 'string' ? wahl.figur : '') || [])[1];
+  const portraet = botId && MODERN.portraets.includes(botId) ? new URL(`${MODERN.avatare}${botId}.svg`, new URL('../', import.meta.url)).href : null;
+  const p = { figur: portraet ? `bot-${botId}` : MOTIVE.includes(wahl.figur) ? wahl.figur : STANDARD_FIGUR, grund: GRUENDE.includes(wahl.grund) ? wahl.grund : 'standard',
     rahmen: Object.prototype.hasOwnProperty.call(RAHMEN, wahl.rahmen) ? wahl.rahmen : 'ohne' };
   const r = RAHMEN[p.rahmen] || RAHMEN.ohne;
   // Pfad vom Projekt aus, damit das Bild auch auf Seiten unter tests/ und in Unterordnern laedt
@@ -158,7 +166,10 @@ export function profilAvatar(wahl = {}, farbe = 'w') {
   const grund = profilGrund(p.grund) || `<rect width="120" height="120" fill="${w ? '#2C3038' : '#E9E3D8'}"/>`
     + `<circle cx="60" cy="64" r="42" fill="${w ? '#3A3F48' : '#F7F3EC'}"/>`;
   // Kreatur als Motiv (Flo 31.10.2026): still, ohne die Bewegungen der Emotes (im Spiel soll nichts zappeln)
-  const motiv = KREATUR_MOTIVE.includes(p.figur)
+  // eigene Ausschnitt-Kennung je Aufruf (wie js/rahmen-kunst.js): Karte und Auswahl-Blatt zeigen dasselbe Portraet im selben Dokument
+  const clip = portraet ? `pa-${botId}-${++portraetNr}` : '';
+  const motiv = portraet ? `<clipPath id="${clip}"><circle cx="60" cy="64" r="42"/></clipPath><image href="${portraet}" x="18" y="22" width="84" height="84" clip-path="url(#${clip})"/>`
+    : KREATUR_MOTIVE.includes(p.figur)
     ? kreaturSvg(p.figur, 'normal').replace(/ class="[^"]*"/g, '').replace('<svg ', '<svg x="14" y="17" width="92" height="92" ')
     : `<image href="${datei}" x="21" y="22" width="78" height="78"/>`;
   return `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" data-figur="${p.figur}" data-grund="${p.grund}" data-rahmen="${p.rahmen}">`

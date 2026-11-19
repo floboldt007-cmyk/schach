@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 356;
-const STAND = 'f7f1bc5ba794';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 361;
+const STAND = '39b7d566eff7';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -18,6 +18,7 @@ const DATEIEN = [
   'js/pakete/sammlung/taten.js',
   // Etappe 4b: Visitenkarte, Erfolgs-Stufen, Taler; Banner ohne Shop (der kommt spaeter)
   'js/besitz.js',
+  'js/freigaben.js',
   'js/karte.js',
   'js/ui/visitenkarte.js',
   'css/visitenkarte.css',
@@ -127,6 +128,8 @@ const DATEIEN = [
   'js/pakete/liga/wertung.js',
   'js/pakete/liga/kronen.js',
   'js/pakete/liga/gruppe.js',
+  'js/pakete/liga/saison.js',
+  'js/pakete/liga/welt.js',
   'assets/liga/bauer.svg',
   'assets/liga/springer.svg',
   'assets/liga/laeufer.svg',
@@ -338,6 +341,18 @@ const DATEIEN = [
   'assets/pieces/gold/wP.svg',
   'assets/pieces/gold/wQ.svg',
   'assets/pieces/gold/wR.svg',
+  'assets/pieces/goldelfenbein/bB.svg',
+  'assets/pieces/goldelfenbein/bK.svg',
+  'assets/pieces/goldelfenbein/bN.svg',
+  'assets/pieces/goldelfenbein/bP.svg',
+  'assets/pieces/goldelfenbein/bQ.svg',
+  'assets/pieces/goldelfenbein/bR.svg',
+  'assets/pieces/goldelfenbein/wB.svg',
+  'assets/pieces/goldelfenbein/wK.svg',
+  'assets/pieces/goldelfenbein/wN.svg',
+  'assets/pieces/goldelfenbein/wP.svg',
+  'assets/pieces/goldelfenbein/wQ.svg',
+  'assets/pieces/goldelfenbein/wR.svg',
   'assets/pieces/neon/bB.svg',
   'assets/pieces/neon/bK.svg',
   'assets/pieces/neon/bN.svg',

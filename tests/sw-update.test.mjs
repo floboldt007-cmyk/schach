@@ -15,6 +15,7 @@ import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { begrenzt } from './zeitwaechter.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,6 +28,12 @@ function pruefe(name, ok, detail = '') {
   ergebnisse.push({ name, ok: !!ok, detail });
   console.log(`${ok ? 'ok  ' : 'FEHLER'} ${name}${!ok && detail ? ' (' + detail + ')' : ''}`);
 }
+
+// Spuren fuer die Fehlermeldung: die Zeilen "SW-Ablauf" der App (js/app.js registriereSW) und die Schritte des Tests
+const spuren = [];
+let letzterSchritt = 'Start';
+const merke = (t) => { spuren.push(new Date().toISOString().slice(11, 23) + ' ' + t); if (spuren.length > 200) spuren.shift(); };
+const schritt = (t) => { letzterSchritt = t; merke('Schritt: ' + t); };
 
 function ladePlaywright() {
   for (const k of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
@@ -63,9 +70,14 @@ const server = http.createServer(async (q, r) => {
 // Wechselt der Service Worker, laedt die App von selbst neu (js/app.js registriereSW). Eine Auswertung, die genau
 // dann laeuft, bricht mit "Execution context was destroyed" ab: auf die neue Seite warten und wiederholen.
 const KONTEXT_WEG = /Execution context was destroyed|Cannot find context|frame was detached|navigation/i;
+// page.evaluate hat keine eigene Frist: Antwortete die Seite nicht, hing der Test bis zum Suite-Zeitlimit von 20 Minuten
+// (CI 44375911031, 44367424082, 44220110183). Abgelaufen heisst rot, ohne Wiederholung, damit kein App-Fehler verdeckt wird.
+const AUSWERTUNG_MS = 20000;
+const auswerten = (s, fn, arg) => begrenzt('Seitenauswertung', () => s.evaluate(fn, arg), AUSWERTUNG_MS);
+const fristAbgelaufen = (e) => e.message.startsWith('Zeitlimit: Seitenauswertung');
 async function werte(s, fn, arg) {
   for (let versuch = 0; ; versuch++) {
-    try { return await s.evaluate(fn, arg); } catch (e) {
+    try { return await auswerten(s, fn, arg); } catch (e) {
       if (versuch >= 3 || !KONTEXT_WEG.test(e.message)) throw e;
       await s.waitForLoadState('load').catch(() => {});
       await warte(200);
@@ -92,13 +104,13 @@ async function warteAufVersion(s, version, ms = 60000) {
     let jetzt = null;
     try {
       const v = await swVersion(s);
-      const lage = await s.evaluate(async () => {
+      const lage = await auswerten(s, async () => {
         const r = await navigator.serviceWorker.getRegistration();
         return { seite: document.readyState === 'complete' ? performance.timeOrigin : null, caches: await caches.keys(),
           ruhig: !!r && !r.waiting && !r.installing && !!r.active && r.active.state === 'activated' };
       });
       if (v === version && lage.seite && lage.ruhig && JSON.stringify(lage.caches) === soll) jetzt = lage.seite;
-    } catch (e) { /* die Seite laedt gerade neu */ }
+    } catch (e) { if (fristAbgelaufen(e)) throw e; /* sonst: die Seite laedt gerade neu */ }
     if (jetzt && jetzt === zuletzt) { await startBereit(s).catch(() => {}); return true; }
     zuletzt = jetzt;
     await warte(600);
@@ -116,13 +128,17 @@ async function main() {
   const s = await k.newPage();
   const fehler = [];
   s.on('pageerror', (e) => fehler.push(e.message));
+  s.on('console', (m) => { if (m.type() === 'info' && /^SW-Ablauf/.test(m.text())) merke(m.text()); });
+  let adresse = basis;
   try {
+    schritt('Erstbesuch');
     await s.goto(basis); await startBereit(s);
-    await s.evaluate(() => navigator.serviceWorker.ready);
+    await auswerten(s, () => navigator.serviceWorker.ready);
     await s.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 30000 });
     pruefe(`Erstbesuch: Version ${VERSION} installiert und steuert die Seite`, await swVersion(s) === VERSION);
 
     // die neue Fassung liegt online; der Besucher kommt spaeter wieder (SW_MERKER "kuerzlich" = 15 s abwarten)
+    schritt('Update: neue Fassung installieren');
     neueFassung = true; zaehler = { voll: 0, nicht: 0, volleDateien: [] };
     await warte(16000);
     await s.reload(); await startBereit(s);
@@ -133,22 +149,27 @@ async function main() {
       JSON.stringify(voll) === JSON.stringify(['/js/ui/heim.js', '/sw.js']) && zaehler.nicht > 500, JSON.stringify({ voll: voll.slice(0, 12), anzahl: voll.length, nicht: zaehler.nicht }));
 
     // naechster Besuch: die wartende Fassung uebernimmt von selbst
+    schritt('Uebernahme: auf die neue Fassung warten');
     await warte(16000);
     await s.reload(); await startBereit(s);
     await warteAufVersion(s, VERSION + 1);
+    schritt('Uebernahme: Endzustand pruefen');
     const lage = await werte(s, () => navigator.serviceWorker.getRegistration().then(async (r) => ({ caches: await caches.keys(),
       wartet: !!r.waiting, aktiv: r.active && r.active.state, merker: sessionStorage.getItem('schach-arena:sw-wechsel') })));
     pruefe(`Übernahme: Version ${VERSION + 1} steuert die Seite, nur ihr Cache bleibt`, await swVersion(s) === VERSION + 1
       && JSON.stringify(lage.caches) === JSON.stringify([`schach-arena-v${VERSION + 1}`]), JSON.stringify(lage));
     const probe = await werte(s, (x) => fetch('js/ui/heim.js').then((r) => r.text()).then((t) => t.includes(x)), PROBE);
     pruefe('Übernahme: die geänderte Datei kommt in der neuen Fassung aus dem Cache (keine alte Datei im neuen Cache)', probe);
-    pruefe('Übernahme: die App läuft (Start sichtbar), keine Seitenfehler', await s.locator('#app > .screen').count() > 0 && fehler.length === 0, fehler.join(' | '));
+    pruefe('Übernahme: die App läuft (Start sichtbar), keine Seitenfehler', await werte(s, () => document.querySelectorAll('#app > .screen').length) > 0 && fehler.length === 0, fehler.join(' | '));
   } catch (e) {
     pruefe('Ablauf ohne Abbruch', false, e.message.split('\n')[0]);
   } finally {
-    await browser.close(); server.close();
+    adresse = s.url();
+    await begrenzt('Browser schliessen', () => browser.close(), AUSWERTUNG_MS).catch((e) => console.log(e.message));
+    server.close();
   }
   const gut = ergebnisse.filter((e) => e.ok).length;
+  if (gut !== ergebnisse.length) console.log(`\nLetzter Schritt: ${letzterSchritt}\nSeite: ${adresse}\nSpuren:\n${spuren.join('\n')}`);
   console.log(`\n${gut}/${ergebnisse.length} bestanden`);
   process.exit(gut === ergebnisse.length ? 0 : 1);
 }

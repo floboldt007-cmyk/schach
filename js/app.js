@@ -1116,6 +1116,15 @@ function starte() {
   starteDruck();
   setzeSichtbar();
   document.addEventListener('visibilitychange', () => sende('app:sichtbar', { sichtbar: setzeSichtbar() }));
+  // Weiche Trennstellen (U+00AD, z. B. in den Orden-Namen der Vitrine) gehoeren nur zur Darstellung: beim Kopieren fallen
+  // sie weg, sonst findet eine Suche nach dem kopierten Wort es nicht (Kaltreview 9b, 17.11.2026). Die Trennstellen bleiben
+  // in den Texten, weil sie je Sprache dort stehen, wo der Name steht; hyphens: auto ist nicht auf jedem Geraet verlaesslich
+  document.addEventListener('copy', (ev) => {
+    const text = String(document.getSelection() || '');
+    if (!ev.clipboardData || !text.includes('\u00AD')) return;
+    ev.clipboardData.setData('text/plain', text.replace(/\u00AD/g, ''));
+    ev.preventDefault();
+  });
   // Klang: der AudioContext darf auf iOS erst nach der ersten Beruehrung starten
   const entsperren = () => {
     klang.aktivieren();

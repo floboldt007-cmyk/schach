@@ -74,9 +74,11 @@ const s = (art, id, name, kommt = MIT_ANZEIGE.has(art) ? null : WERKSTATT) =>
   Object.freeze(kommt ? { art, id, name, kommt } : { art, id, name });
 // Jedes Stueck: art (titel | zugspur | kartenrahmen | banner | brettrahmen | emote | finisher | figuren | oberflaeche
 // | wappen | wahl | brief | sonst), id (nur [a-z0-9-]), name (Anzeige), kommt (nur wenn die Anzeige erst spaeter kommt).
-// Alles nur Schmuck und Titel. Finisher stehen seit 01.11.2026 nicht mehr in der Leiter (Flo: "Finisher ins Labor, die
-// kommen in den Shop"); Emotes ueber Level 1 gibt es im Rad noch nicht (kommt: 'emote-rad'), alles ohne Anzeige
-// bekommt kommt: 'werkstatt' (MIT_ANZEIGE oben). Das prueft tests/funken.test.mjs gegen die Pakete.
+// Alles nur Schmuck und Titel. Finisher stehen seit 01.11.2026 nicht mehr in der Leiter (sie kommen ueber die Welt-Endgegner
+// oder spaeter aus dem Shop). Die sechs Sticker emote-krone bis emote-diamant (R19, Variante C vom 18.11.2026) sind sofort
+// im Rad nutzbar (js/pakete/emotes/index.js liest ihr Level hier); die uebrigen Emotes ueber Level 1 gibt es im Rad noch
+// nicht (kommt: 'emote-rad'), alles ohne Anzeige bekommt kommt: 'werkstatt' (MIT_ANZEIGE oben). Das prueft
+// tests/funken.test.mjs gegen die Pakete.
 const RAD = 'emote-rad';
 export const BELOHNUNGEN = Object.freeze({
   1: [s('titel', 'titel-funke', 'Titel Funke'), s('sonst', 'namensschild', 'Namensschild'), s('emote', 'emotes-grund', 'Grund-Emotes im Emote-Rad')],
@@ -90,37 +92,37 @@ export const BELOHNUNGEN = Object.freeze({
   9: [s('kartenrahmen', 'kartenrahmen-leder', 'Kartenrahmen Leder')],
   10: [s('titel', 'titel-fackeltraeger', 'Titel Fackelträger'), s('wahl', 'wahl-figuren-1', 'Wahl: Figurensatz Chessnut, Merida oder Celtic')],
   11: [s('banner', 'banner-wolle', 'Banner-Stoff Wolle')],
-  12: [s('zugspur', 'zugspur-federkiel', 'Zugspur Federkiel')],
+  12: [s('zugspur', 'zugspur-federkiel', 'Zugspur Federkiel'), s('emote', 'emote-krone', 'Sticker „Krone“')],
   13: [s('brettrahmen', 'brettrahmen-ahorn', 'Brett-Rahmen Ahorn')],
   14: [s('banner', 'banner-zweifarbig', 'Banner zweifarbig (Teilung)')],
   15: [s('titel', 'titel-lagerfeuer', 'Titel Lagerfeuer'), s('kartenrahmen', 'kartenrahmen-kupfer', 'Kartenrahmen Kupfer')],
   16: [s('emote', 'emote-lupe', 'Emote „Lupe“', RAD)],
   17: [s('banner', 'banner-samt', 'Banner-Stoff Samt')],
-  18: [s('zugspur', 'zugspur-pinsel', 'Zugspur Pinsel')],
+  18: [s('zugspur', 'zugspur-pinsel', 'Zugspur Pinsel'), s('emote', 'emote-feuer', 'Sticker „Feuer“')],
   19: [s('brettrahmen', 'brettrahmen-schiefer', 'Brett-Rahmen Schiefer')],
   20: [s('titel', 'titel-fackel', 'Titel Fackel'), s('wahl', 'wahl-oberflaeche-1', 'Wahl: Brett-Oberfläche Maserung, Filz oder Papier')],
   21: [s('kartenrahmen', 'kartenrahmen-nussbaum', 'Kartenrahmen Nussbaum')],
   22: [s('emote', 'emote-notizbuch', 'Emote „Notizbuch“', RAD)],
   23: [s('banner', 'banner-wimpel', 'Banner-Form Wimpel')],
-  24: [s('zugspur', 'zugspur-kohle', 'Zugspur Kohle')],
+  24: [s('zugspur', 'zugspur-kohle', 'Zugspur Kohle'), s('emote', 'emote-herz', 'Sticker „Herz“')],
   25: [s('titel', 'titel-kaminfeuer', 'Titel Kaminfeuer'), s('brettrahmen', 'brettrahmen-kirsche', 'Brett-Rahmen Kirsche')],
   26: [s('oberflaeche', 'wahl-oberflaeche-2', 'Zweite Brett-Oberfläche (aus der Wahl von Level 20)')],
   27: [s('kartenrahmen', 'kartenrahmen-zinn', 'Kartenrahmen Zinn')],
   28: [s('emote', 'emote-kerze', 'Emote „Kerze“', RAD)],
   29: [s('banner', 'banner-seide', 'Banner-Stoff Seide')],
-  30: [s('titel', 'titel-esse', 'Titel Esse'), s('wahl', 'wahl-zugspur-1', 'Wahl: Zugspur Silberstift, Goldfaden oder Tintenlinie')],
+  30: [s('titel', 'titel-esse', 'Titel Esse'), s('wahl', 'wahl-zugspur-1', 'Wahl: Zugspur Silberstift, Goldfaden oder Tintenlinie'), s('emote', 'emote-springer', 'Sticker „Springer“')],
   31: [s('brettrahmen', 'brettrahmen-ebenholz', 'Brett-Rahmen Ebenholz')],
   32: [s('banner', 'banner-fahne', 'Banner-Form Fahne')],
   33: [s('kartenrahmen', 'kartenrahmen-messing', 'Kartenrahmen Messing')],
   34: [s('emote', 'emote-kompass', 'Emote „Kompass“', RAD)],
   35: [s('titel', 'titel-leuchtfeuer', 'Titel Leuchtfeuer'), s('figuren', 'wahl-figuren-2', 'Zweiter Figurensatz (aus der Wahl von Level 10)')],
-  36: [s('zugspur', 'wahl-zugspur-2', 'Zweite Zugspur (aus der Wahl von Level 30)')],
+  36: [s('zugspur', 'wahl-zugspur-2', 'Zweite Zugspur (aus der Wahl von Level 30)'), s('emote', 'emote-blitz', 'Sticker „Blitz“')],
   37: [s('brettrahmen', 'brettrahmen-intarsie', 'Brett-Rahmen Intarsie')],
   38: [s('oberflaeche', 'wahl-oberflaeche-3', 'Dritte Brett-Oberfläche (aus der Wahl von Level 20)')],
   39: [s('kartenrahmen', 'kartenrahmen-silber', 'Kartenrahmen Silber')],
   40: [s('titel', 'titel-sonnwendfeuer', 'Titel Sonnwendfeuer'), s('wahl', 'wahl-wappen-1', 'Wahl: Wappenfeld Schild, Raute oder Kreis')],
   41: [s('banner', 'banner-brokat', 'Banner-Stoff Brokat')],
-  42: [s('zugspur', 'wahl-zugspur-3', 'Dritte Zugspur (aus der Wahl von Level 30)')],
+  42: [s('zugspur', 'wahl-zugspur-3', 'Dritte Zugspur (aus der Wahl von Level 30)'), s('emote', 'emote-diamant', 'Sticker „Diamant“')],
   43: [s('brettrahmen', 'brettrahmen-marmorkante', 'Brett-Rahmen Marmorkante')],
   44: [s('emote', 'emote-fernrohr', 'Emote „Fernrohr“', RAD)],
   45: [s('titel', 'titel-leuchtturm', 'Titel Leuchtturm'), s('figuren', 'wahl-figuren-3', 'Dritter Figurensatz (aus der Wahl von Level 10)')],
