@@ -7,14 +7,15 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 363;
-const STAND = '00811389664d';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 365;
+const STAND = '92e19a08cfa9';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  'js/pakete/sammlung/effekt-vorschau.js',
   'js/pakete/sammlung/taten.js',
   // Etappe 4b: Visitenkarte, Erfolgs-Stufen, Taler; Banner ohne Shop (der kommt spaeter)
   'js/besitz.js',
@@ -224,6 +225,7 @@ const DATEIEN = [
   'js/botschutz.js',
   'js/konto.js',
   'js/umzug.js',
+  'js/sw-wechsel.js',
   'js/profil.js', 'js/rahmen-kunst.js', 'js/sammlung-kunst.js', 'js/kreaturen-kunst.js', 'js/emote-kunst.js', 'js/titel-kunst.js',
   'js/sonderstuecke.js', 'js/labor.js', 'js/brett-flaechen.js', 'js/brett-motive.js', 'js/brett-motive-v4.js',
   'js/figurensatz.js',
