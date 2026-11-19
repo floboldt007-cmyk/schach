@@ -139,7 +139,7 @@ try {
     const cb = posten(/cburnett/);
     pruefe(`${sp}: Figuren cburnett mit Urheber und GPLv2+`, /Colin M\. ?L\. Burnett/.test(cb) && /GPLv2\+/.test(cb), cb);
     // R19: der Labor-Satz Gold und Elfenbein ist eine Bearbeitung von cburnett: Quelle, Lizenz und "bearbeitet" stehen da
-    const ge = posten(sp === 'de' ? /Gold und Elfenbein/ : /Gold and ivory/);
+    const ge = posten(sp === 'de' ? /Gold und Elfenbein/ : /Gold and Ivory/);
     pruefe(`${sp}: Figuren Gold und Elfenbein mit Quelle cburnett, Urheber, GPLv2+ und bearbeitet`,
       /cburnett/.test(ge) && /Colin M\. ?L\. Burnett/.test(ge) && /GPLv2\+/.test(ge)
       && (sp === 'de' ? /bearbeitet \(Material Gold\/Elfenbein\)/ : /modified \(gold\/ivory material\)/).test(ge), ge || 'Eintrag fehlt');

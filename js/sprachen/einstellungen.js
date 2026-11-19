@@ -571,7 +571,7 @@ registriereTexte('einstellungen', {
     'info.lichessDb': 'Lichess puzzle database',
     'info.figuren': 'Pieces “cburnett”',
     'info.figurenText': 'by Colin M. L. Burnett, GPLv2+',
-    'info.figurenGold': 'Pieces “Gold and ivory”',
+    'info.figurenGold': 'Pieces “Gold and Ivory”',
     'info.figurenGoldText': 'from “cburnett” by Colin M. L. Burnett, modified (gold/ivory material), GPLv2+',
     'info.schriften': 'Fonts Manrope and Bricolage Grotesque',
     'info.tagesraetsel': 'Daily puzzle',
