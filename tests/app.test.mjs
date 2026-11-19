@@ -337,8 +337,10 @@ async function testeArena(seite, h) {
   await seite.waitForSelector('.detail .sp-gesperrt', { timeout: 5000 }).catch(() => {});
   const sperre = await seite.evaluate(() => ({ h2: document.querySelector('.detail h2').textContent, hinweis: (document.querySelector('.detail .sp-gesperrt') || {}).textContent || '',
     spielen: document.querySelectorAll('.detail [data-aktion="spielen"]').length, einstufung: !!document.querySelector('.detail .st-sperre-knopf') }));
-  pruefe('Gesperrter Bot: Karte mit "Besiege erst Vogelscheuche Willi.", kein Spielen, Weg zur Einstufung', /Bauer Lukas/.test(sperre.h2)
-    && sperre.hinweis === 'Besiege erst Vogelscheuche Willi.' && sperre.spielen === 0 && sperre.einstufung, JSON.stringify(sperre));
+  // ?test&kern laeuft ohne Paket start: dann kein Knopf zur Einstufung (Ort arena:gesperrt bleibt leer); mit Paket prueft es
+  // tests/r20-start-befunde.test.mjs
+  pruefe('Gesperrter Bot: Karte mit "Besiege erst Vogelscheuche Willi.", kein Spielen, ohne Paket start kein Einstufungs-Knopf', /Bauer Lukas/.test(sperre.h2)
+    && sperre.hinweis === 'Besiege erst Vogelscheuche Willi.' && sperre.spielen === 0 && !sperre.einstufung, JSON.stringify(sperre));
   await h.tippe('.knoten[data-bot="fridolin"]');
   await seite.waitForSelector('.farbwahl [data-farbe="w"]', { timeout: 5000 }).catch(() => {});
   pruefe('zurueck zu Willi: wieder Spielen', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()) && await seite.locator('.detail [data-aktion="spielen"]').count() === 1);
