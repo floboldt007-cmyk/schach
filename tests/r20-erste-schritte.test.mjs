@@ -323,6 +323,7 @@ async function browserTeil() {
           await s.waitForSelector('.ls-aktionen [data-a="los"]', { timeout: 15000 }).catch(() => {});
           await s.locator('.ls-aktionen [data-a="los"]').click();
           await warteLz(s, `z.id === "${id}" && z.phase === "flo"`, 15000);
+          if (process.env.BILDER) await s.waitForTimeout(800); // Einblenden der Ansicht abwarten, sonst ist das Bild blass
           await bild(s, `${bildName}-${geraet}-${farbe}`);
           await ziehe(s, zug);
           await warteLz(s, 'z.phase === "ende"', 15000);
