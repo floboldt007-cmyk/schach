@@ -39,6 +39,23 @@ gleich('Skript des Tests (page.evaluate) wird genannt',
   stelleAusStapel('Error: x\n    at eval (eval at evaluate (:291:30), <anonymous>:1:7)'),
   'at eval (eval at evaluate (:291:30), <anonymous>:1:7)');
 
+// Kaltreview 19.11. (B1-B3): eingebaute Rahmen ohne Zeile:Spalte sind keine Stelle, und die Meldung (auch mehrzeilig)
+// wird vorn abgeschnitten, wenn sie mitgegeben ist. Playwright liefert auch in WebKit die Meldungszeile vorn (Probe 19.11.)
+gleich('B1 Chromium: eingebauter Rahmen (JSON.parse) wird uebersprungen',
+  stelleAusStapel('SyntaxError: Unexpected token\n    at JSON.parse (<anonymous>)\n    at lade (http://127.0.0.1:4321/js/z.js:5:6)'),
+  'at lade (/js/z.js:5:6)');
+gleich('B1 Chromium: eingebauter Rahmen (new Promise) wird uebersprungen',
+  stelleAusStapel('Error: x\n    at new Promise (<anonymous>)\n    at warte (http://127.0.0.1:4321/js/z.js:8:1)'),
+  'at warte (/js/z.js:8:1)');
+const b2 = 'Modul fehlt: lade@http://127.0.0.1:4321/js/z.js:5:6';
+gleich('B2 Meldung, die wie eine WebKit-Stelle endet, zaehlt nicht',
+  stelleAusStapel(`Error: ${b2}\n    at start (http://127.0.0.1:4321/js/a.js:1:2)`, b2), 'at start (/js/a.js:1:2)');
+const b3 = 'Zeile eins\nat zwei (http://127.0.0.1:4321/js/x.js:1:1)';
+gleich('B3 mehrzeilige Meldung mit Folgezeile "at ..." zaehlt nicht',
+  stelleAusStapel(`Error: ${b3}\n    at echt (http://127.0.0.1:4321/js/y.js:3:4)`, b3), 'at echt (/js/y.js:3:4)');
+gleich('Meldung, die im Stapel fehlt, aendert nichts',
+  stelleAusStapel('zeige@http://127.0.0.1:4321/js/ui/verlauf.js:12:5', 'andere Meldung'), 'zeige@/js/ui/verlauf.js:12:5');
+
 const gut = ergebnisse.filter((e) => e.ok).length;
 console.log(`\n${gut}/${ergebnisse.length} bestanden`);
 process.exit(gut === ergebnisse.length ? 0 : 1);

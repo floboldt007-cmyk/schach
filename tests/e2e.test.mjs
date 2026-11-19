@@ -142,7 +142,7 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
       // Adressen bleiben einer.
       if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
       // die erste Stelle aus dem Stapel: kommt der Fehler aus der App oder aus einem Skript des Tests?
-      const stelle = stelleAusStapel(e.stack);
+      const stelle = stelleAusStapel(e.stack, e.message);
       fehler.push('Seitenfehler: ' + e.message + (stelle ? ' [' + stelle + ']' : ''));
     });
     seite.on('requestfailed', (r) => {
