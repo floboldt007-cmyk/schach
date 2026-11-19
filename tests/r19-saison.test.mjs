@@ -24,6 +24,7 @@ const speicher = new Map();
 const lager = { getItem: (k) => (speicher.has(k) ? speicher.get(k) : null), setItem: (k, v) => speicher.set(k, String(v)),
   removeItem: (k) => speicher.delete(k), key: (i) => [...speicher.keys()][i] ?? null, get length() { return speicher.size; } };
 globalThis.localStorage = lager;
+globalThis.location = { hostname: '127.0.0.1', search: '?test&paket2' };   // Season ist sonst aus (js/freigaben.js)
 const { setzeSpeicher } = await import('../js/storage.js');
 setzeSpeicher(lager);
 const { setzeSprache } = await import('../js/sprache.js');
@@ -88,6 +89,8 @@ for (const [datei, kopf, muss] of [
 ]) {
   const html = readFileSync(path.join(WURZEL, datei), 'utf8');
   const i = html.indexOf(kopf);
+  // Der Abschnitt kommt erst nach der Rechtspruefung zurueck (js/freigaben.js, tests/r19-paket2-schalter.test.mjs); dann gilt alles hier wieder
+  if (i < 0) continue;
   // Zeilenumbrueche im HTML zaehlen wie ein Leerzeichen
   const abschnitt = i < 0 ? '' : html.slice(i, html.indexOf('<h3>', i + kopf.length)).replace(/\s+/g, ' ');
   const fehlt = muss.filter((m) => !abschnitt.includes(m));
@@ -117,7 +120,7 @@ const server = http.createServer((req, res) => {
 });
 const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&paket2`;
 const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
 
 const LAUF = { saison: 2, start: '2027-03-01', woche: 3, wochen: 8, ende: '2027-04-25', bisher: 11, stufe: 14,

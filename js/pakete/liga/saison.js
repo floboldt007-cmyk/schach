@@ -16,6 +16,7 @@ import { angemeldet, holeSaison, waehleSaisonTitel } from '../../kronen.js';
 import { saisonText, saisonTitelText, ligaSymbolUrl, visitenkarte, eigeneKarte } from '../../ui/visitenkarte.js';
 import { LIGEN, STUFEN_JE_LIGA, AUFSTIEG_PLAETZE, ABSTIEG_PLAETZE } from './kronen.js';
 import { stufenName } from './texte.js';
+import { paket2Frei } from '../../freigaben.js';
 
 const T = (k, w) => t('p-liga.season.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -95,8 +96,8 @@ export function zeigeLigen(aktuell = null, wochen = SAISON_WOCHEN) {
       <ol class="ss-ligen-stufen">${stufen.map((i) => `<li class="ss-ligen-stufe"${i === ist ? ' aria-current="true"' : ''}>
         <span class="ss-ligen-name">${esc(stufenName(i))}</span>${i === ist ? `<span class="ss-ligen-du">${esc(T('ligen.du'))}</span>` : ''}</li>`).join('')}</ol>
     </section>`;
-  }).join('') + `<p class="ss-ligen-regel">${esc(T('ligen.regel', { wochen: Number.isInteger(wochen) ? wochen : SAISON_WOCHEN,
-    zurueck: SAISON_ZURUECK, boden: stufenName(0) }))}</p>`;
+  }).join('') + (!paket2Frei() ? '' : `<p class="ss-ligen-regel">${esc(T('ligen.regel', { wochen: Number.isInteger(wochen) ? wochen : SAISON_WOCHEN,
+    zurueck: SAISON_ZURUECK, boden: stufenName(0) }))}</p>`);
   return sheet({ titel: T('ligen.titel'), inhalt, klasse: 'ss-ligen-blatt', abbrechen: 'ok',
     knoepfe: [{ text: T('ligen.zu'), wert: 'ok', art: 'primaer' }] }).catch(() => {});
 }

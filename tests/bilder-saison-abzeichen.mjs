@@ -52,7 +52,7 @@ async function seiteFuer(browser, w, h, schema, gesehen) {
     if (gesehen) localStorage.setItem('schach-arena:v1:season-gesehen', JSON.stringify({ [uid]: 1 }));
     else localStorage.removeItem('schach-arena:v1:season-gesehen');
   }, { sitzung: SITZUNG, uid: UID, gesehen });
-  await s.goto(`http://127.0.0.1:${PORT}/index.html?test#ich`);
+  await s.goto(`http://127.0.0.1:${PORT}/index.html?test&paket2#ich`);
   await s.waitForFunction(() => !!window.__app, null, { timeout: 20000 });
   await s.waitForFunction(() => { const el = document.querySelector('.ss-leiste'); return el && !el.hidden; }, null, { timeout: 8000 }).catch(() => {});
   return { kontext, s };

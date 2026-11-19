@@ -14,6 +14,7 @@
 // Ohne eingespieltes SQL (Funktion fehlt) gilt die Liste als "gerade nicht erreichbar".
 import { icon } from '../../ui/icons.js';
 import { t, zahl } from '../../sprache.js';
+import { paket2Frei } from '../../freigaben.js';
 
 let B = null;
 const ladeBild = () => import('../../ui/visitenkarte.js').then((v) => { B = { bannerUrl: v.bannerUrl, MENSCHEN_BANNER: v.MENSCHEN_BANNER }; });
@@ -154,6 +155,7 @@ export function reiterWelt() {
     }).finally(() => { beschaeftigt = false; });
   });
 
+  if (!paket2Frei()) return { el: s, verlasse() { weg = true; } };
   karte('laedt', '', false);
   Promise.all([import('../../kronen.js'), ladeBild()]).then(([k]) => {
     if (weg) return;

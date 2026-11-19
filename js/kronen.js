@@ -25,6 +25,7 @@ import { sitzung } from './konto.js';
 import { ladeModul, speichereModul } from './storage.js';
 import { normalisiereStand } from './pakete/liga/wertung.js';
 import { kronenSpeicher, saisonStand } from './pakete/liga/kronen.js';
+import { paket2Frei } from './freigaben.js';
 
 export const BOT_ERSATZ_MS = 10000; // entschieden 06.11.2026: nach 10 s ohne Mensch ein KI-Gegner (gilt mit altem SQL)
 // Ranked Online hat eine feste Bedenkzeit (Konzept "Zwei Ligen", ranked_zeit); der Server nennt sie auch in der Antwort
@@ -39,12 +40,13 @@ export async function holeStand() {
 // R19 Season (supabase/saison-schema.sql, Vorschlag): eigener Stand fuer das Profil, geprueft (saisonStand); ohne Konto,
 // offline oder mit altem SQL null, nie Platzhalterzahlen
 export async function holeSaison() {
-  if (!angemeldet()) return null;
+  if (!paket2Frei() || !angemeldet()) return null;
   try { return saisonStand(await rpc('saison_mein_stand', {})); } catch (e) { return null; }
 }
 
 // titel null nimmt den Titel ab; Absage des Servers (SAISON_TITEL) oder offline: Fehler an den Aufrufer
 export async function waehleSaisonTitel(titel) {
+  if (!paket2Frei()) throw new Error('SAISON_AUS');
   return rpc('saison_titel_waehle', { titel: titel || null });
 }
 

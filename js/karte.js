@@ -18,6 +18,7 @@ import { profilWahl } from './profil.js';
 import { ladeBesitz, merkeServer } from './besitz.js';
 import { FAMILIEN, familieVonAlt } from './pakete/sammlung/stufen.js';
 import { istErfinder, pionierNummer, sonderstueckeBekannt, ladeSonderstuecke } from './sonderstuecke.js';
+import { paket2Frei } from './freigaben.js';
 
 export const KARTE_FRIST_MS = 1200;
 // feste Liste wie karte_konstanten() -> motive (Koenig und Kronli nur fuer den Erfinder, nie auf der Server-Karte)
@@ -132,7 +133,7 @@ export async function karteDerPartie(partieId, { frist = KARTE_FRIST_MS } = {}) 
     .then((d) => (d && typeof d === 'object' && d.w && d.s ? d : null), () => null);
   // R19 Season (supabase/saison-schema.sql, Vorschlag): bestes Abzeichen und gewaehlter Titel kommen parallel und mit
   // derselben Frist; altes SQL, Absage oder zu spaet: die Karte wie bisher, ohne Season
-  const saison = rpc('saison_karte_der_partie', { partie: partieId })
+  const saison = !paket2Frei() ? Promise.resolve(null) : rpc('saison_karte_der_partie', { partie: partieId })
     .then((d) => (d && typeof d === 'object' ? d : null), () => null);
   try {
     const [k, s] = await Promise.all([Promise.race([frage, zeit]), Promise.race([saison, zeit])]);

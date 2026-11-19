@@ -163,11 +163,11 @@ try {
       s.on('request', (r) => offen.add(r.url()));
       for (const ende of ['requestfinished', 'requestfailed']) s.on(ende, (r) => offen.delete(r.url()));
       try {
-        await s.goto(`http://127.0.0.1:${PORT}/index.html?test#start`);
+        await s.goto(`http://127.0.0.1:${PORT}/index.html?test&paket2#start`);
         await s.waitForSelector('.screen', { timeout: 30000 });
         await s.waitForFunction(() => !!window.__punkte, null, { timeout: 15000 });
         await befuelle(s);
-        await s.goto(`http://127.0.0.1:${PORT}/index.html?test#bestenliste`);
+        await s.goto(`http://127.0.0.1:${PORT}/index.html?test&paket2#bestenliste`);
         // erst neu laden, wenn der Verlaufseintrag umgestellt ist: beim Laden gilt history.state vor dem Hash (js/app.js
         // ausVerlauf), ein zu fruehes reload() landete wieder auf #start (seltener Haenger bis 15.11.2026)
         await s.waitForFunction(() => history.state && history.state.name === 'bestenliste', null, { timeout: 15000 });

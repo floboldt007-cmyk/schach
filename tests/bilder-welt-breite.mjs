@@ -106,7 +106,7 @@ try {
         const s = await k.newPage(); s.setDefaultTimeout(15000);
         s.on('pageerror', (e) => seitenfehler.push(`${gruppeName}: ${e.message}`));
         try {
-          await s.goto(`http://127.0.0.1:${PORT}/index.html?test#bestenliste`);
+          await s.goto(`http://127.0.0.1:${PORT}/index.html?test&paket2#bestenliste`);
           await s.waitForSelector('.bl-steuer-reiter', { timeout: 30000 });
           await s.locator('.bl-steuer-reiter :is([role="radio"], button)', { hasText: 'Welt' }).click();
           await s.waitForSelector('.lg-welt[data-zustand]:not([data-zustand="laedt"])', { timeout: 15000 });

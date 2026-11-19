@@ -623,7 +623,7 @@ async function gruppeSeite(browser, start, { antwort, ligen = null, welt = null,
     localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ modus, sprache, spracheGewaehlt: true, bewegung: 'aus', klang: false,
       duellIntro: 'aus' }));
   }, { sitzung: konto ? GR_SITZUNG : null, modus, sprache });
-  await page.goto(start + '?test#bestenliste');
+  await page.goto(start + '?test&paket2#bestenliste');
   await page.waitForSelector('.lg-gr[data-zustand]:not([data-zustand="laedt"])', { timeout: 15000 });
   return { kontext, page, fehler, rpc };
 }

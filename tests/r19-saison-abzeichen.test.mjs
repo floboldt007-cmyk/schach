@@ -39,7 +39,7 @@ const server = http.createServer((req, res) => {
 });
 const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&paket2`;
 const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
 const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
 const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID })).toString('base64url') + '.x', refresh_token: 'r1',

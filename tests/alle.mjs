@@ -70,6 +70,7 @@ const SUITEN = [
   { name: 'r19-saison', datei: 'r19-saison.test.mjs', args: [], was: 'R19 Season: Leiste im Profil, Titelwahl, Blatt am Season-Ende einmal, Karte, Datenschutz' },
   { name: 'r19-saison-abzeichen', datei: 'r19-saison-abzeichen.test.mjs', args: [], was: 'R19 Season-Abzeichen: grosse Wappen, Alle Ligen (18 Stufen, Tastatur), Balken, Titel-Vorschau, Ende-Fenster, Vitrine nur eigen' },
   { name: 'r19-ligen-satz', datei: 'r19-ligen-satz.test.mjs', args: [], was: 'R19 Alle Ligen: Satz je Liga nennt Auf- und Abstieg wie zoneVon (Abstieg ueberall ausser Squire III), DE/EN' },
+  { name: 'r19-paket2-schalter', datei: 'r19-paket2-schalter.test.mjs', args: [], was: 'R19 Schalter Paket 2: Weltrangliste und Seasons aus, keine Server-Aufrufe, Datenschutz ohne die ungeprueften Abschnitte' },
   { name: 'r19-weltrang', datei: 'r19-weltrang.test.mjs', args: [], was: 'R19 Weltrangliste: Texte DE/EN, Satz unter der Liste, ab_start nie erfunden, Datenschutz DE/EN' },
   { name: 'r19-titel-erfolge', datei: 'r19-titel-erfolge.test.mjs', args: [], was: 'R19: Taten-Titel und lokale Erfolgs-Familien (ohne Taler, ohne Server)' },
   { name: 'r19-profil-ich', datei: 'r19-profil-ich.test.mjs', args: [], was: 'Profil Ich: Vitrine mit grossen Orden und sanftem Glanz, Liga-Symbol an der Stufe, Figuren gross, Banner Erster Zug neu, Banner bleiben in ihrer Kachel, DE/EN (Browser)' },

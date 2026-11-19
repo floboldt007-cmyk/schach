@@ -91,7 +91,7 @@ async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', ichEr
   }, { sitzung: SITZUNG, sprache });
   const s = await k.newPage(); s.setDefaultTimeout(15000);
   s.on('pageerror', (e) => seitenfehler.push(e.message));
-  await s.goto(`http://127.0.0.1:${PORT}/index.html?test#start`);
+  await s.goto(`http://127.0.0.1:${PORT}/index.html?test&paket2#start`);
   await s.waitForFunction(() => !!window.__punkte, null, { timeout: 30000 });
   // Spielstand: sechs Partien gegen die ersten Bots, je ein Eintrag auf der Tafel (wie tests/bilder-liga-neu.mjs)
   await s.evaluate(async () => {
@@ -111,7 +111,7 @@ async function seite(browser, { breite = 390, hoehe = 844, sprache = 'de', ichEr
       });
     window.__punkte.speichere({ ...window.__punkte.stand(), tafeln, umzug: true });
   });
-  await s.goto(`http://127.0.0.1:${PORT}/index.html?test#bestenliste`);
+  await s.goto(`http://127.0.0.1:${PORT}/index.html?test&paket2#bestenliste`);
   // erst neu laden, wenn der Verlaufseintrag umgestellt ist (history.state gilt beim Laden vor dem Hash, js/app.js ausVerlauf)
   await s.waitForFunction(() => history.state && history.state.name === 'bestenliste', null, { timeout: 15000 });
   await s.reload();
