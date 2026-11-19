@@ -140,7 +140,9 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
       // 31.10.2026, PR #120, zweimal mit verschiedenen Klaengen). Wie unten bei requestfailed kein Fehler; Abrufe anderer
       // Adressen bleiben einer.
       if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
-      fehler.push('Seitenfehler: ' + e.message);
+      // die erste Stelle aus dem Stapel: kommt der Fehler aus der App oder aus einem Skript des Tests?
+      const stelle = String(e.stack || '').split('\n').map((z) => z.trim()).find((z) => /\.m?js|@|at /.test(z) && !z.startsWith(e.message)) || '';
+      fehler.push('Seitenfehler: ' + e.message + (stelle ? ' [' + stelle.replace(/https?:\/\/[^/]+/, '') + ']' : ''));
     });
     seite.on('requestfailed', (r) => {
       const grund = r.failure() ? r.failure().errorText : '?';
