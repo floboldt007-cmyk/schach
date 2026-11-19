@@ -830,8 +830,9 @@ async function testeBrowser(browser) {
   const SZ = '.heim-naechstes:not([hidden]) [data-paket="serie"]';
   await seite.goto(MIT() + '#heim');
   await seite.waitForSelector(SZ, { timeout: 10000 });
-  pruefe('heim:naechstes: Zeile „Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen“ (als erste, ohne Klassen-Aufgabe)',
-    (await seite.locator(SZ).innerText()).replace(/\s+/g, ' ').includes('Bauernmarsch Heute: 1 Partie oder 3 Rätsel spielen')
+  // sichtbar die Kurzform (einzeilig, passt aufs iPhone SE), der ganze Satz im Label (fable-check 19.11. Nr 9)
+  pruefe('heim:naechstes: Zeile „Bauernmarsch · Heute: Partie/3 Rätsel“ (als erste, ohne Klassen-Aufgabe), Label mit dem ganzen Satz',
+    (await seite.locator(SZ).innerText()).replace(/\s+/g, ' ').includes('Bauernmarsch Heute: Partie/3 Rätsel')
     && await seite.evaluate((s) => document.querySelector('.heim-liste').firstElementChild === document.querySelector(s), SZ)
     && await seite.locator(SZ).getAttribute('aria-label') === 'Bauernmarsch · Heute: 1 Partie oder 3 Rätsel spielen · noch 6 Felder bis zur Umwandlung');
   await seite.locator(SZ).click();

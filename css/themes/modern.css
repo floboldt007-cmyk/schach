@@ -48,6 +48,8 @@
   --flo-grund: #23262C;
   --sockel: #FFFFFF;
   --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
+  /* Rand des Bewertungsbalkens: hell traegt er den Weiss-Anteil, der im Grund sonst verschwindet (1,1:1; fable-check 19.11. Nr 11) */
+  --balken-rand: var(--text-3);
   --meta-farbe: #F4F1EC;
 
   /* Zugklassen: Fuellung (in hell und dunkel gleich), Zeichen auf der Fuellung, Textfassung (>= 4,5:1).
@@ -161,7 +163,7 @@
   --schalter-an: #F3F1EC; --knauf-an: #15171B;
   --flo-grund: #2C3038;
   --sockel: #2A2E36;
-  --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
+  --balken-weiss: #FFFFFF; --balken-schwarz: #34363C; --balken-rand: var(--linie-2);
   --meta-farbe: #15171B;
   --k-brillant: #7C3AED; --kg-brillant: #FFFFFF; --kt-brillant: #C4B5FD;
   --k-stark: #B98A1E; --kg-stark: #1C1B19; --kt-stark: #E3BC5C;
@@ -236,7 +238,7 @@
     --schalter-an: #F3F1EC; --knauf-an: #15171B;
     --flo-grund: #2C3038;
     --sockel: #2A2E36;
-    --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
+    --balken-weiss: #FFFFFF; --balken-schwarz: #34363C; --balken-rand: var(--linie-2);
     --meta-farbe: #15171B;
     --k-brillant: #7C3AED; --kg-brillant: #FFFFFF; --kt-brillant: #C4B5FD;
     --k-stark: #B98A1E; --kg-stark: #1C1B19; --kt-stark: #E3BC5C;

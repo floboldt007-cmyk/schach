@@ -24,7 +24,7 @@ import { eroeffnung, eroeffnungsAnzeige } from '../openings.js';
 import { t, sprache, locale } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/analyse.js';
-import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet, pruefeZuzweit, istOnline } from '../storage.js';
+import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet, pruefeZuzweit, zuzweitName, istOnline } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { zeigeGegnerProfil, profilText } from './gegner-profil.js';
 import { botFarbe, avatarVon } from '../thema.js';
@@ -267,11 +267,11 @@ export function zeige(root, params = {}, app) {
     // Online: Name des Gegners (die andere Farbe), Ergebnis aus der eigenen Sicht wie bei einer Bot-Partie
     const online = istOnline(p), zuZweit = p.modus === 'zuzweit' && !online, namen = pruefeZuzweit(p.zuzweit);
     const gegner = namen[p.spielerFarbe === 'b' ? 'weiss' : 'schwarz'];
-    const name = zuZweit ? t('analyse.vl.zeile.zuzweit', { weiss: namen.weiss, schwarz: namen.schwarz }) : online ? gegner : bot ? bot.name : t('analyse.vl.zeile.unbekannt');
+    const name = zuZweit ? t('analyse.vl.zeile.zuzweit', { weiss: zuzweitName(namen.weiss), schwarz: zuzweitName(namen.schwarz) }) : online ? gegner : bot ? bot.name : t('analyse.vl.zeile.unbekannt');
     const ohneErgebnis = online && !ERGEBNIS.has(p.ergebnis);
     const art = ERGEBNIS.has(p.ergebnis) ? p.ergebnis : 'remis';
     const erg = ohneErgebnis ? t('analyse.ergebnis.ohneErgebnis')
-      : zuZweit && p.ergebnis !== 'remis' ? t('analyse.ergebnis.gewinnt', { name: p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz }) : t(`allgemein.${art}`);
+      : zuZweit && p.ergebnis !== 'remis' ? t('analyse.ergebnis.gewinnt', { name: zuzweitName(p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz) }) : t(`allgemein.${art}`);
     // Zeichen am Bild: aus eigener Sicht; Zu zweit die Farbe des Siegers (Krone), Remis wie sonst
     const zeichenArt = ohneErgebnis ? 'offen' : zuZweit && art !== 'remis' ? (art === 'sieg' ? 'weiss' : 'schwarz') : art;
     // nur Bild: das Ergebnis in Worten traegt das aria-label des Knopfs (label unten), ein Vorlese-Text im Zeichen waere doppelt
