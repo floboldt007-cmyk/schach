@@ -22,6 +22,7 @@ import { readFileSync, statSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { leseSw } from './sw.test.mjs';
 import { browserTyp } from './browser.mjs';
+import { stelleAusStapel } from './seitenfehler-stelle.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -141,8 +142,8 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
       // Adressen bleiben einer.
       if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
       // die erste Stelle aus dem Stapel: kommt der Fehler aus der App oder aus einem Skript des Tests?
-      const stelle = String(e.stack || '').split('\n').map((z) => z.trim()).find((z) => /\.m?js|@|at /.test(z) && !z.startsWith(e.message)) || '';
-      fehler.push('Seitenfehler: ' + e.message + (stelle ? ' [' + stelle.replace(/https?:\/\/[^/]+/, '') + ']' : ''));
+      const stelle = stelleAusStapel(e.stack);
+      fehler.push('Seitenfehler: ' + e.message + (stelle ? ' [' + stelle + ']' : ''));
     });
     seite.on('requestfailed', (r) => {
       const grund = r.failure() ? r.failure().errorText : '?';
