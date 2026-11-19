@@ -16,10 +16,12 @@ import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { miniBrett } from './bauteile.js';
 import { icon } from './icons.js';
 import { staffel, tempo } from '../bewegung.js';
-import { ladeModul } from '../storage.js';
+import { ladeModul, speichereModul, ladePartien } from '../storage.js';
+import { sende } from '../ereignisse.js';
+import { BOTS } from '../bots.js';
 import { t, datum } from '../sprache.js';
 import { istPremium, premiumHinweis } from '../abo.js';
-import { BEREICHE, artVon, stand, summe } from '../pakete/lernen/mattbilder.js';
+import { BEREICHE, ANSICHT, artVon, stand, summe, merke, kursPartieSterne } from '../pakete/lernen/mattbilder.js';
 import { istOffen, istGratis, istProbe, istImTrainer, inWillkommenswoche, willkommenBis } from '../pakete/lernen/zugang.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import '../sprachen/allgemein.js';
@@ -36,15 +38,33 @@ export const sterneHtml = (n) => `<span class="ms-sterne" data-sterne="${n}" rol
 const kopfChip = (sum) => `<span class="chip zahl chip-sterne ms-kopf-sterne" title="${esc(S('sterne', { n: sum.sterne, max: sum.max }))}">${icon('stern', 'stern')}`
   + `<span class="sr">${esc(S('sterne', { n: sum.sterne, max: sum.max }))}</span> ${sum.sterne}<span class="von"> / ${sum.max}</span></span>`;
 
+// Kurs Kapitel 6 (fc-20:01): die freie Partie gegen den ersten Bot der Leiter traegt erst die Uebersicht bzw. die Aufgabe ein
+// (beim Oeffnen, aus den gespeicherten Partien), nicht die Partie selbst: sie zaehlt nicht fuer die Wertung. Neue oder bessere
+// Sterne: merke + lektion:beendet; das Paket funken bucht die 10 Kurs-Funken nur beim ersten Abschluss (rechnung.js lektionFunken)
+export function kursPartieAbgleich() {
+  try {
+    const roh = ladeModul(PAKET, {});
+    const r = kursPartieSterne(ladePartien(), BOTS[0] && BOTS[0].id);
+    const alt = stand(roh).lek['es-partie'];
+    if (!r || (alt && alt.s >= r.sterne)) return;
+    speichereModul(PAKET, merke(roh, 'es-partie', r));
+    sende('lektion:beendet', { id: 'erste-es-partie', ringe: { gelernt: true, sicher: r.sterne >= 2, gemeistert: false } });
+  } catch (e) { console.error(e); }
+}
+
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen ms-screen';
-  s.setAttribute('aria-label', S('name'));
   root.append(s);
   ladeLernenCss();
+  kursPartieAbgleich();
   const st = stand(ladeModul(PAKET, {}));
-  let bereich = BEREICHE.find((b) => b.id === (params && params.bereich)) || BEREICHE[0];
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: S('name'), chips: kopfChip(summe(st)) })}
+  // Kurs Erste Schritte (19.11.2026) steht als Karte vorn; geoeffnet wird er gezielt (params { bereich: 'erste' }, Start
+  // "Kennst du die Schachregeln?" Nein), ohne Angabe bleibt es wie bisher bei den Mattbildern
+  let bereich = ANSICHT.find((b) => b.id === (params && params.bereich)) || BEREICHE[0];
+  const kopfName = () => (bereich.kurs ? S('bereich.' + bereich.id) : S('name'));
+  s.setAttribute('aria-label', kopfName());
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: kopfName(), chips: kopfChip(summe(st)) })}
     <div class="ms-rumpf">
       <div class="ms-bereiche" role="group" aria-label="${esc(S('bereichWahl'))}"></div>
       <div class="ms-bereich"></div>
@@ -64,14 +84,15 @@ export function zeige(root, params, app) {
   const inhalt = s.querySelector('.ms-bereich');
 
   function zeichneKarten() {
-    karten.innerHTML = BEREICHE.map((b) => {
+    karten.innerHTML = ANSICHT.map((b) => {
       const sum = summe(st, b.id);
       const anteil = sum.max ? Math.round((sum.sterne / sum.max) * 100) : 0;
       const gratis = b.lektionen.filter(istGratis).length;
-      return `<button class="ms-bkarte dr" type="button" data-bereich="${b.id}" aria-pressed="${b === bereich}">
+      // der Kurs ist ganz frei: keine Zeile "n gratis"
+      return `<button class="ms-bkarte dr" type="button" data-bereich="${b.id}" aria-pressed="${b === bereich}"${b.kurs ? ' data-kurs' : ''}>
         <b>${esc(S('bereich.' + b.id))}</b>
         <span class="ms-bk-zeile"><span class="ms-bk-sterne zahl">${icon('stern')}${sum.sterne}<span class="von"> / ${sum.max}</span></span>
-          <span class="ms-bk-gratis">${esc(S('gratisZahl', { n: gratis }))}</span></span>
+          ${b.kurs ? '' : `<span class="ms-bk-gratis">${esc(S('gratisZahl', { n: gratis }))}</span>`}</span>
         <span class="ms-bk-balken" aria-hidden="true"><i style="width:${anteil}%"></i></span></button>`;
     }).join('');
   }
@@ -81,13 +102,13 @@ export function zeige(root, params, app) {
     const e = st.lek[l.id];
     const art = artVon(l);
     const offen = istOffen(l);
-    const bestes = !e ? '' : art === 'halten' ? S('gehalten') : e.z === 1 ? S('bestesEins') : S('bestes', { n: e.z });
+    const bestes = !e ? '' : art === 'halten' ? S('gehalten') : art === 'partie' ? S(e.s >= 2 ? 'partieGewonnen' : 'partieGespielt') : e.z === 1 ? S('bestesEins') : S('bestes', { n: e.z });
     // "Trainer" auch in der Willkommenswoche: man soll wissen, was man gerade geschenkt bekommt
     const marke = istImTrainer(l) && (!offen || woche) ? `<span class="ms-marke" data-marke="trainer">${esc(S('trainer'))}</span>`
       : istProbe(l) && l.stufe !== 'leicht' ? `<span class="ms-marke" data-marke="probe">${esc(S('gratisProbe'))}</span>` : '';
     return `<li><button class="ms-lektion" type="button" data-id="${l.id}"${e ? ' data-geschafft' : ''}${offen ? '' : ' data-gesperrt'}${istProbe(l) ? ' data-probe' : ''}
         ${offen ? '' : `aria-label="${esc(S('titel.' + l.id) + ', ' + S('gesperrt'))}"`}>
-      ${miniBrett(l.fen, { klasse: 'ms-mini' })}
+      ${miniBrett(l.fen, art === 'sammeln' ? { klasse: 'ms-mini', sterne: l.sterne, gross: true } : { klasse: 'ms-mini' })}
       <span class="ms-nr zahl">${i + 1}</span>
       <span class="ms-text"><b>${esc(S('titel.' + l.id))}</b>
         <span class="ms-zeile">${mitStufe ? `<span class="ms-stufe" data-stufe="${l.stufe}">${esc(S('stufe.' + l.stufe))}</span>` : ''}
@@ -108,9 +129,21 @@ export function zeige(root, params, app) {
 
   function zeichne(erstes) {
     const nr = (l) => bereich.lektionen.indexOf(l);
-    inhalt.innerHTML = `${seitenKopf({ ueber: S('name'), titel: S('bereich.' + bereich.id), text: S('text.' + bereich.id) })}
+    // "Bald in der Meisterschule ..." gehoert nicht unter den Kurs Erste Schritte
+    const bald = s.querySelector('.ms-bald');
+    if (bald) bald.hidden = !!bereich.kurs;
+    // Kopf im Kurs: "Erste Schritte" statt "Meisterschule" (N-13:10), beim Wechsel der Karte mit
+    const name = kopfName();
+    const seite = s.querySelector('.kopf-seite');
+    if (seite) seite.textContent = name;
+    s.setAttribute('aria-label', name);
+    inhalt.innerHTML = `${seitenKopf({ ueber: bereich.kurs ? S('kursUeber') : S('name'), titel: S('bereich.' + bereich.id), text: S('text.' + bereich.id) })}
       ${weiterHtml()}
-      ${GRUPPEN.map(([id, stufen]) => {
+      ${bereich.kurs ? [...new Set(bereich.lektionen.map((l) => l.kapitel))].map((k) => {
+        const liste = bereich.lektionen.filter((l) => l.kapitel === k);
+        return `<section class="ms-gruppe" data-kapitel="${k}"><h2>${esc(S('kapitel.' + k))}</h2>
+          <ol class="ms-liste">${liste.map((l) => zeile(l, nr(l), false)).join('')}</ol></section>`;
+      }).join('') : GRUPPEN.map(([id, stufen]) => {
         const liste = bereich.lektionen.filter((l) => stufen.includes(l.stufe));
         if (!liste.length) return '';
         return `<section class="ms-gruppe" data-stufe="${id}"><h2>${esc(S('gruppe.' + id))}</h2>
@@ -123,7 +156,7 @@ export function zeige(root, params, app) {
   }
 
   function waehle(id) {
-    const neu = BEREICHE.find((b) => b.id === id);
+    const neu = ANSICHT.find((b) => b.id === id);
     if (!neu || neu === bereich) return;
     bereich = neu;
     for (const k of karten.querySelectorAll('.ms-bkarte')) k.setAttribute('aria-pressed', String(k.dataset.bereich === id));
