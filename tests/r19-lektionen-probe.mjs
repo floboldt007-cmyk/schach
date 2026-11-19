@@ -108,19 +108,13 @@ const ENGINE_KNOTEN = 400000; // Flos Zug: feste Knotenzahl statt Zeit, damit de
 // Jede Analyse der Engine 'bewertung' wird in der Seite mitgeschrieben (Kaltreview 14.11.: ohne das blieb die Probe gruen,
 // wenn die echte Verteidigung ausfiel und gegnerZieht() einen Zufallszug machte). Ein neu gestarteter, nicht umhuellter
 // Engine-Prozess schreibt nichts mit, dann wird die Probe rot: so soll es sein.
-// Fest (fc-18:11 Zusatz 6, CI 44577166270): die Verteidigung fragt mit movetime 450 ms, wie tief sie dabei kommt, haengt vom
-// Rechner ab; drei gleichzeitige Laeufe opposition zogen dreimal anders (rot-lektion.log), einer in der CI ins Remis. Die Huelle
-// merkt sich die Frage der App (movetime) wie bisher, rechnen laesst sie mit KNOTEN_GEGNER Knoten: gleich auf jedem Rechner.
-const KNOTEN_GEGNER = 300000;
-const protokolliere = s => s.evaluate(async ({ zeit, knoten }) => {
+const protokolliere = s => s.evaluate(async () => {
   const e = await window.__app.engine('bewertung');
   if (e.__probeLog) return;
   const an = e.analyse.bind(e);
   e.__probeLog = window.__engineLog = [];
-  e.analyse = async (fen, opt = {}) => {
-    const fest = opt.movetime === zeit ? { ...opt, movetime: undefined, nodes: knoten } : opt;
-    const a = await an(fen, fest); window.__engineLog.push({ fen, movetime: opt.movetime ?? null, bestmove: a && a.bestmove }); return a; };
-}, { zeit: ZEIT_GEGNER, knoten: KNOTEN_GEGNER });
+  e.analyse = async (fen, opt = {}) => { const a = await an(fen, opt); window.__engineLog.push({ fen, movetime: opt.movetime ?? null, bestmove: a && a.bestmove }); return a; };
+});
 const stellung = fen => fen.split(' ').slice(0, 4).join(' ');
 // Gegenzug von fenVor nach fenNach: kam er von der echten Verteidigung (Analyse mit ZEIT_GEGNER, ihr bestmove, kein Test-Haken)?
 async function gegenzugEcht(s, fenVor, fenNach) {
