@@ -871,8 +871,9 @@ self.addEventListener('fetch', (e) => {
 // im Lesen ("Service Worker context closed", 2 von 3 Laeufen). Nur WebKit (Safari und jeder Browser auf iPhone und iPad,
 // auch Chrome dort: "CriOS" ohne "Chrome/"): Chromium laedt nie alten Code (sw-update 15 von 15), mit no-cache fragt es aber
 // jede Datei neu beim Worker an und wartete beim Wechsel dann ab und zu 30 s bis zur Notbremse (3 von 24 Laeufen, ohne den
-// Kopf 0 von 15). Grenze: Eintraege, die eine aeltere Fassung abgelegt hat, tragen den Kopf noch nicht; das gilt fuer den
-// ersten Wechsel nach dieser Aenderung.
+// Kopf 0 von 15). Die Installation legt jede Datei neu ab, auch die per 304 aus dem alten Cache uebernommenen (holeFrisch),
+// der neue Cache traegt den Kopf also ganz. Grenze: was eine Fassung OHNE diesen Kopf schon ausgeliefert hat, liegt bei
+// Safari noch mit max-age im Speicher; nur der erste Wechsel weg von einer solchen Fassung kann noch alten Code laden.
 const KENNUNG = (self.navigator && self.navigator.userAgent) || '';
 const WEBKIT = /AppleWebKit\//.test(KENNUNG) && !/(Chrome|Chromium)\//.test(KENNUNG);
 function ohneFrische(antwort, inhalt = antwort.body) {

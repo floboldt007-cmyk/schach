@@ -132,10 +132,17 @@ async function main() {
   const fehler = [];
   // wie tests/e2e.test.mjs: WebKit meldet einen beim Neuladen abgebrochenen Abruf der eigenen Seite (ein Klang, der gerade
   // laedt) als "<Adresse> due to access control checks."; hier gemessen 19.11.2026 in 8 von 10 WebKit-Laeufen, mit und ohne
-  // sw.js ohneFrische, nur in den Teilen mit Neuladen. Abrufe anderer Adressen bleiben ein Fehler.
-  const eigene = () => `127.0.0.1:${server.address().port}/`;
+  // sw.js ohneFrische, nur in den Teilen mit Neuladen. Abrufe anderer Adressen bleiben ein Fehler: die eigene Adresse muss
+  // am ANFANG stehen (WebKit schreibt "/127.0.0.1:<port>/..." bzw. mit http:), nicht irgendwo, etwa im Abfrage-Teil.
+  const eigenerAbbruch = (m) => new RegExp(`^(https?:/)?/127\\.0\\.0\\.1:${server.address().port}/\\S* due to access control checks\\.?$`).test(m);
+  const port = server.address().port;
+  pruefe('Ausnahme "access control checks" nur fuer die eigene Adresse am Anfang (fremde Adresse mit der eigenen im Abfrage-Teil bleibt ein Fehler)',
+    eigenerAbbruch(`/127.0.0.1:${port}/assets/klang/arcade/combo.mp3 due to access control checks.`)
+    && eigenerAbbruch(`http://127.0.0.1:${port}/assets/klang/arcade/combo.mp3 due to access control checks.`)
+    && !eigenerAbbruch(`https://fremd.example/x.mp3?von=127.0.0.1:${port}/ due to access control checks.`)
+    && !eigenerAbbruch(`/127.0.0.1:${port + 1}/x.mp3 due to access control checks.`));
   s.on('pageerror', (e) => {
-    if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(eigene())) return;
+    if (eigenerAbbruch(e.message)) return;
     fehler.push(e.message);
   });
   // offene Anfragen der Seite: haengt eine davon im alten Service Worker, wartet die neue Fassung nach skipWaiting
