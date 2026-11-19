@@ -146,9 +146,12 @@ for (const [name, w, h] of [['iPhone 13', 390, 844], ['iPhone SE', 375, 667]]) {
   await k.close();
 }
 
-// ---------- 11: Balken ueber dem Brett, hell: Rand mindestens 3:1 gegen den Grund ----------
-for (const schema of ['light', 'dark']) {
-  const { k, s } = await seite({ schema, speicher: { [P + 'laufend']: laufend({ botId: 'fridolin', modus: 'normal' }) } });
+// ---------- 11: Balken ueber dem Brett: Rand mindestens 3:1 gegen den Grund, in allen drei Lagen ----------
+// (hell; dunkel 1 = Einstellung "dunkel", data-modus="dunkel"; dunkel 2 = System dunkel, data-modus="system").
+// Der Rand zieht die Grenze des Balkens: dunkel ging das dunkle Segment mit 1,6:1 im Grund unter (fc-00:35 a, WCAG 1.4.11)
+for (const [lage, schema, modus] of [['hell', 'light', 'system'], ['dunkel 1', 'light', 'dunkel'], ['dunkel 2', 'dark', 'system']]) {
+  const { k, s } = await seite({ schema, speicher: { [P + 'laufend']: laufend({ botId: 'fridolin', modus: 'normal' }),
+    [P + 'einstellungen']: { modus } } });
   await s.goto(HOST + '?test#heim');
   await s.locator('[data-aktion="heim-weiter"]').click({ timeout: 15000 }).catch(() => {});
   await s.waitForSelector('.partie .evalbalken', { timeout: 15000 }).catch(() => {});
@@ -157,12 +160,17 @@ for (const schema of ['light', 'dark']) {
     const b = document.querySelector('.partie .evalbalken'); if (!b) return null;
     let grund = null; for (let e = b.parentElement; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c && c !== 'rgba(0, 0, 0, 0)') { grund = c; break; } }
     const schatten = getComputedStyle(b).boxShadow; const rand = (schatten.match(/rgba?\([^)]*\)/) || [''])[0];
-    return { grund, rand, weiss: getComputedStyle(b.querySelector('.weiss')).backgroundColor, hoehe: b.getBoundingClientRect().height };
+    return { grund, rand, weiss: getComputedStyle(b.querySelector('.weiss')).backgroundColor, schwarz: getComputedStyle(b).backgroundColor,
+      hoehe: b.getBoundingClientRect().height, modus: document.documentElement.dataset.modus,
+      dunkel: getComputedStyle(document.body).backgroundColor };
   });
   const k1 = m && m.rand ? kontrast(ueber(m.rand, m.grund), rgb(m.grund)) : 0;
   const k2 = m ? kontrast(rgb(m.weiss), rgb(m.grund)) : 0;
-  pruefe(`11 Partie iPhone 13 ${schema === 'light' ? 'hell' : 'dunkel'}: Weiss-Anteil sichtbar (Fuellung oder Rand >= 3:1 gegen den Grund)`,
-    !!m && Math.max(k1, k2) >= 3, { ...m, randKontrast: Math.round(k1 * 100) / 100, weissKontrast: Math.round(k2 * 100) / 100 });
+  const k3 = m ? kontrast(rgb(m.schwarz), rgb(m.grund)) : 0;
+  // die Lage muss echt anliegen: dunkel 1 ueber die Einstellung, dunkel 2 ueber das System (dunkler Grund)
+  const lageEcht = !!m && m.modus === modus && (lage === 'hell' ? lum(rgb(m.grund)) > 0.5 : lum(rgb(m.grund)) < 0.1);
+  pruefe(`11 Partie iPhone 13 ${lage}: Rand des Balkens >= 3:1 gegen den Grund`, lageEcht && k1 >= 3,
+    { ...m, randKontrast: Math.round(k1 * 100) / 100, weissKontrast: Math.round(k2 * 100) / 100, schwarzKontrast: Math.round(k3 * 100) / 100 });
   await k.close();
 }
 
