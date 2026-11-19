@@ -12,6 +12,7 @@
 // Regale (R19, Flo 15.11.2026: "mehr Emotes, Finisher und Klaenge"): unter den vier Plaetzen je ein Regal "Mehr Emotes",
 //   "Mehr Finisher", "Mehr Klaenge" (auslage.json "regale", ohne das Stueck, das schon auf dem Platz liegt), Karten wie die
 //   Plaetze (Schloss und "Bald", gleiche Vorschau). Ein Regal ohne bekanntes Stueck faellt weg.
+// Regal "Effekte" (R20): die Effekte aus vorrat.json, die Vorschau spielt sie einmal auf dem echten Brett (effekt-vorschau.js).
 //
 //   shopStil() -> 'a' | null
 //   Editionen wie im alten Shop (supabase/ANLEITUNG.md): angemeldet nur, was edition_staende liefert (ab 18), sonst
@@ -26,6 +27,7 @@ import { PAKETE_KLANG, PAKETE_LABOR, klang } from '../../sounds.js';
 import { klangKunst, finisherKunst } from '../../sammlung-kunst.js';
 import { emoteSvg } from '../../emote-kunst.js';
 import { icon } from '../../ui/icons.js';
+import { effektStandbild, spieleEffekt } from './effekt-vorschau.js';
 import '../emotes/texte.js';
 import '../finisher/texte.js';
 import './texte.js';
@@ -75,6 +77,10 @@ function stueck(art, eintrag, { vorrat, katalog, editionen, gast, produktName })
   if (art === 'emote') {
     return emoteSvg(id) ? { id, art, name: t('p-emotes.emote.' + id), seltenheit, unter: S('entwurf.art.emote') } : null;
   }
+  if (art === 'effekt') {
+    const v = ausVorrat('effekt');
+    return v ? { id, art, name: vorratName(v), seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.effekt'), datei: v.datei, anlass: v.anlass } : null;
+  }
   // "Signatur" ist Flos Erfinder-Stueck (Nr. 0, 1 von 1) und wird nie verkauft
   if (art === 'finisher' && id !== 'signatur' && finisherKunst(id)) {
     return { id, art, name: t('p-finisher.' + id), seltenheit, unter: S('entwurf.art.finisher') };
@@ -90,6 +96,8 @@ function bildHtml(s) {
   // je Aufruf frisch: die Kunst traegt eindeutige Verlaufs-Ids (rahmen-kunst.js), Karte und Vorschau teilen sich keine
   if (s.art === 'klang') return klangKunst(s.id);
   if (s.art === 'emote') return emoteSvg(s.id, { klasse: 'shf-kunst' });
+  // das Standbild kommt aus der Datei und ersetzt den Platzhalter (shopEntwurf)
+  if (s.art === 'effekt') return LEER;
   return finisherKunst(s.id, figurenUrl());
 }
 function miniBrett({ hell, dunkel }) {
@@ -116,6 +124,7 @@ function karte(art, s, beiWahl, klasse = 'shf-karte') {
 function stueckInhalt(k, s, preis) {
   k.dataset.id = s.id;
   if (s.seltenheit) k.dataset.seltenheit = s.seltenheit;
+  if (s.datei) k.dataset.datei = s.datei;
   const selten = s.seltenheit ? S('entwurf.selten.' + s.seltenheit) : '';
   k.innerHTML = `<span class="shf-bild">${bildHtml(s)}</span>
     <span class="shf-text">${selten ? `<span class="shf-selten">${esc(selten)}</span>` : ''}<span class="shf-name"></span><span class="shf-unter"></span></span>
@@ -140,18 +149,26 @@ function gastKarte(k, s) {
   return k;
 }
 
-// Vorschau je Art: Brett und Figur auf dem echten Brett (js/board.js), Klang zum Anhoeren, Emote gross, Finisher still
+// Vorschau je Art: Brett, Figur und Effekt auf dem echten Brett (js/board.js), Klang zum Anhoeren, Emote gross, Finisher still
 async function vorschau(s, { bereich }) {
   const ort = document.createElement('div');
   ort.className = 'shf-vorschau';
   let brett = null;
-  if (s.art === 'brett' || s.art === 'figur') {
+  let ebene = null;
+  if (s.art === 'brett' || s.art === 'figur' || s.art === 'effekt') {
     if (s.brett) { ort.style.setProperty('--feld-hell', s.brett.hell); ort.style.setProperty('--feld-dunkel', s.brett.dunkel); }
     const brettEl = document.createElement('div');
     brettEl.className = 'shf-vorschau-brett';
-    ort.append(brettEl);
+    if (s.art === 'effekt') {
+      const buehne = document.createElement('div');
+      buehne.className = 'shf-effekt-buehne';
+      ebene = document.createElement('div');
+      ebene.className = 'shf-effekt-ebene';
+      buehne.append(brettEl, ebene);
+      ort.append(buehne);
+    } else ort.append(brettEl);
     brett = new Brett(brettEl, { figurenPfad: s.figuren ? s.figuren + '/' : figurenPfad(), koordinaten: false });
-    brett.setzeStellung('start', { animieren: false });
+    if (s.art !== 'effekt') brett.setzeStellung('start', { animieren: false });
   } else {
     const gross = document.createElement('div');
     gross.className = 'shf-gross' + (s.art === 'finisher' ? ' shf-still' : '');
@@ -167,14 +184,17 @@ async function vorschau(s, { bereich }) {
     }
   }
   // ohne Kauf-Weg nur "Schliessen" (kein Kaufen-Knopf, Kopf der Datei)
-  await sheet({ titel: s.name, text: S('entwurf.vorschau.' + s.art), inhalt: ort, klasse: 'shf-sheet',
+  const zu = sheet({ titel: s.name, text: S('entwurf.vorschau.' + s.art), inhalt: ort, klasse: 'shf-sheet',
     knoepfe: [{ text: t('allgemein.schliessen'), wert: false }], abbrechen: false }).catch(() => false);
+  const effekt = ebene ? spieleEffekt({ ebene, brett, stueck: s }) : null;
+  await zu;
+  effekt?.stoppe();
   // das Blatt ist zu: Brett abbauen (Hoerer am Fenster, Eintrag in der Brett-Liste), wie js/ui/lektion.js
   try { brett?.zerstoere(); } catch (e) { /* egal */ }
   if (bereich && bereich.isConnected) bereich.dispatchEvent(new CustomEvent('sa:oeffne', { bubbles: true }));
 }
 
-const REGALE = ['emote', 'finisher', 'klang'];
+const REGALE = ['emote', 'finisher', 'klang', 'effekt'];
 function regal(art, eintraege, platzId, kontext, wahl) {
   const stuecke = (Array.isArray(eintraege) ? eintraege : []).filter((e) => e && e.id !== platzId)
     .map((e) => stueck(art, e, kontext)).filter(Boolean);
@@ -205,5 +225,9 @@ export async function shopEntwurf({ stil, editionen = [], gast = false, katalog 
   schaufenster.append(...ARTEN.map((art) => karte(art, stueck(art, plaetze.find((p) => p && p.art === art), kontext), wahl)));
   const regale = auslage && typeof auslage.regale === 'object' && auslage.regale ? auslage.regale : {};
   wurzel.append(schaufenster, ...REGALE.map((art) => regal(art, regale[art], plaetze.find((p) => p && p.art === art)?.id, kontext, wahl)).filter(Boolean));
+  await Promise.all([...wurzel.querySelectorAll('.shf-rk[data-art="effekt"]')].map(async (k) => {
+    const svg = await effektStandbild(k.dataset.datei);
+    if (svg) k.querySelector('.shf-bild').replaceChildren(svg);
+  }));
   return wurzel;
 }

@@ -400,6 +400,11 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; padding: 2px 2px 8px; scrollbar-width: thin; }
 .shf-rk { scroll-snap-align: start; }
 @media (prefers-reduced-motion: reduce) { .shf-gross *, .shf-bild * { animation: none !important; } }
+/* Effekt-Vorschau (R20, effekt-vorschau.js): liegt ueber dem Brett, nimmt keinen Platz und faengt keine Tipps ab */
+.shf-effekt-buehne { position: relative; width: 100%; }
+.shf-effekt-ebene { position: absolute; inset: 0; z-index: 5; overflow: hidden; pointer-events: none; transition: opacity .24s ease-out; }
+.shf-effekt-ebene.endet { opacity: 0; }
+.shf-effekt-ebene svg { position: absolute; display: block; overflow: visible; }
 
 /* ---------- R19 Profil Ich (Flo 15.11.2026, Leitlinie R19-Design-Leitlinie.md) ----------
    Vitrine: "herzlos, kleine Symbole" -> grosse Orden auf einer dunklen Scheibe mit Ring in der Stufenfarbe und EIN sanfter
