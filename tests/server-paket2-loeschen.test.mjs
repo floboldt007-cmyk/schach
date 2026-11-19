@@ -321,12 +321,15 @@ async function ungedeckt(db) {
   const vorher = await ungedeckt(db);
   const def = (await db.query(`select pg_get_functiondef('public.konto_loeschen()'::regprocedure) as d`)).rows[0].d;
   const anker = 'delete from public.nutzung where user_id = uid;';
+  // INTENTIONAL-SLOP[G5]: SQL nur aus festen Testwerten (PROBE, A, B) fuer PGlite im Speicher, kein Eingang von aussen
   const f = !fehler && def.includes(anker)
     && await lauf(db, 'konto_loeschen mit spieler', def.replace(anker, anker + `\n  delete from public.${PROBE} where spieler = uid;`));
   const nachher = await ungedeckt(db);
+  // INTENTIONAL-SLOP[G5]: wie oben, feste Testwerte
   const x = f || await lauf(db, 'Lage P8', LAGE + `\n  insert into public.${PROBE} values ('${A}', 3), ('${B}', 5);`);
   const e = !x && await loesche(db, A);
   const zeilen = !x && (await db.query(`select spieler::text as u from public.${PROBE}`)).rows.map((r) => r.u);
+  // INTENTIONAL-SLOP[G5]: nur der Pruefname, kein SQL
   pruefe(`Gegenprobe P8: ohne delete faellt ${PROBE}.spieler auf, mit "delete ... where spieler = uid" gilt sie als gedeckt`,
     !fehler && def.includes(anker) && !f && vorher.offeneSpalten.includes(`${PROBE}.spieler`) && !nachher.offeneSpalten.length,
     fehler || f || `vorher=${vorher.offeneSpalten} nachher=${nachher.offeneSpalten}`);
