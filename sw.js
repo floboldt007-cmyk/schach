@@ -862,6 +862,16 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(antworte(req, url));
 });
 
+// Was der Worker ausliefert, ist fuer den Browser nie "frisch": WebKit (Safari) haelt Antworten sonst mit der max-age des
+// Servers (GitHub Pages: 600 s) im eigenen Speicher und laedt Module beim Neuladen nach einem Versionswechsel von dort,
+// ohne den Worker zu fragen. Die Seite lief dann mit altem Code unter dem neuen Worker (tests/sw-update.test.mjs unter
+// WebKit, 19.11.2026: nach dem Wechsel auf Fassung 1 lief heim.js aus Fassung 0, ohne Anfrage an den Worker).
+function ohneFrische(antwort) {
+  const kopf = new Headers(antwort.headers);
+  kopf.set('Cache-Control', 'no-cache');
+  return new Response(antwort.body, { status: antwort.status, statusText: antwort.statusText, headers: kopf });
+}
+
 async function antworte(req, url) {
   // Nie caches.open vor dem Treffer: das legt einen fehlenden Cache an. Bis clients.claim() der neuen Fassung beantwortet
   // die alte noch Anfragen, ihr Cache ist da aber schon geloescht und kaeme so wieder (tests/sw-cache.test.mjs, CI 09.11.2026).
@@ -870,13 +880,14 @@ async function antworte(req, url) {
   const start = url.pathname === BASIS || url.pathname === BASIS + 'index.html';
   const treffer = start ? await caches.match(BASIS + 'index.html', { cacheName: CACHE })
     : await caches.match(req, { cacheName: CACHE, ignoreSearch: navigation });
-  if (treffer) return treffer;
+  if (treffer) return ohneFrische(treffer);
   // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen, aber nur, solange der eigene Cache noch besteht
   const antwort = await fetch(req);
   if (antwort.status === 200 && antwort.type === 'basic') {
     const kopie = antwort.clone();
     caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, kopie))
       .catch(() => { /* Speicher voll o. ae.: egal */ });
+    return ohneFrische(antwort);
   }
   return antwort;
 }
