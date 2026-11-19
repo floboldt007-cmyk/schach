@@ -11,7 +11,7 @@
 //   node tests/r19-sterne.test.mjs
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { BOTS } from '../js/bots.js';
@@ -123,11 +123,13 @@ async function messeOrte(s, gruppe, gesehen) {
       const an = await el.evaluate(verdient);
       const clip = { x: Math.max(0, box.x - 2), y: Math.max(0, box.y - 2), width: Math.min(vp.width - Math.max(0, box.x - 2), box.width + 4),
         height: Math.min(vp.height - Math.max(0, box.y - 2), box.height + 4) };
+      let bilder = null;
       const messe = async () => {
         const mit = await s.screenshot({ clip, animations: 'disabled' });
         await el.evaluate((e) => e.style.setProperty('visibility', 'hidden', 'important'));
         const ohne = await s.screenshot({ clip, animations: 'disabled' });
         await el.evaluate((e) => e.style.removeProperty('visibility'));
+        bilder = { mit, ohne };
         return bildVergleich(s, mit, ohne);
       };
       const passt = (m) => !m.fehler && m.kontrast >= 3 && (an ? m.ton !== null && m.ton >= 30 && m.ton <= 55 : m.hohl);
@@ -141,6 +143,18 @@ async function messeOrte(s, gruppe, gesehen) {
         await warte(300);
         x = await messe();
         console.log(`     zweite Messung ${name}: erst ${JSON.stringify(erst)}, dann ${JSON.stringify(x)}`);
+        // faellt auch die zweite durch: beide Aufnahmen und der Rahmen ins CI-Artefakt (BILDER setzt tests.yml), damit man sieht, was gemalt wurde
+        if (!passt(x) && process.env.BILDER) {
+          const datei = name.replace(/[^A-Za-z0-9#-]+/g, '_').replace('#', 'n');
+          mkdirSync(process.env.BILDER, { recursive: true });
+          writeFileSync(path.join(process.env.BILDER, `${datei}-mit.png`), bilder.mit);
+          writeFileSync(path.join(process.env.BILDER, `${datei}-ohne.png`), bilder.ohne);
+          const rahmen = await el.evaluate((e) => { const r = e.getBoundingClientRect(), st = getComputedStyle(e);
+            return { box: [r.x, r.y, r.width, r.height].map(Math.round), schrift: st.fontFamily, groesse: st.fontSize, text: e.textContent,
+              nach: e.nextSibling ? (e.nextSibling.outerHTML || e.nextSibling.textContent || '').slice(0, 120) : null,
+              zeile: e.parentElement.parentElement.outerHTML.slice(0, 400) }; });
+          console.log(`     Bilder ${datei}-mit/ohne.png, Rahmen ${JSON.stringify(rahmen)}`);
+        }
       }
       if (x.fehler) { pruefe(`${name}: messbar`, false, x); continue; }
       if (an && !gesehen.has(ort + ':an')) { gesehen.add(ort + ':an'); console.log(`     Messwert ${name}: ${x.kontrast}:1, Farbton ${x.ton}, rgb(${x.farbe})`); }
