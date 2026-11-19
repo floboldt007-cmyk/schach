@@ -267,3 +267,10 @@
 .ms-art { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: var(--r-pille); font-size: 12px;
   font-weight: 750; background: var(--flaeche-2); color: var(--text-2); box-shadow: var(--kante); }
 .ms-art[data-art="halten"] { background: var(--tinte); color: var(--auf-tinte); box-shadow: none; }
+/* Kurs Kapitel 6 (fc-20:01): Seite "Deine erste Partie" vor der freien Partie, eine Spalte, mittig */
+.ls-partie { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; max-width: 520px; margin: 0 auto;
+  padding: 24px var(--rand) calc(28px + env(safe-area-inset-bottom, 0px)); }
+.ls-partie h2 { margin: 0; font-size: 24px; font-weight: 800; }
+.ls-partie p { margin: 0; line-height: 1.5; }
+.ls-partie .ls-partie-hinweis { color: var(--text-2); font-size: 14px; font-weight: 600; }
+.ls-partie [data-a="partie"] { align-self: stretch; margin-top: 8px; }

@@ -22,10 +22,10 @@ const versuche = (fn) => { try { return fn(); } catch (e) { return { fehler: e.m
 
 // ---------- Aufbau ----------
 const kurs = M.KURS;
-// Stufe B (N-13:10): Kapitel 2 bis 4 dazu, 23 Aufgaben, Reihenfolge nach Kapitel
-pruefe('KURS: Bereich erste mit 23 Aufgaben (Kapitel 1 bis 5 in Reihenfolge), Ids mit es-, eindeutig, alle leicht',
-  !!kurs && kurs.id === 'erste' && kurs.lektionen.length === 23 && kurs.lektionen.every((l) => /^es-[a-z0-9-]+$/.test(l.id) && l.stufe === 'leicht')
-  && new Set(kurs.lektionen.map((l) => l.id)).size === 23 && kurs.lektionen.every((l, i, a) => i === 0 || a[i - 1].kapitel <= l.kapitel),
+// Stufe B (N-13:10): Kapitel 2 bis 4 dazu; fc-20:01: Kapitel 6 (die erste Partie), 24 Aufgaben, Reihenfolge nach Kapitel
+pruefe('KURS: Bereich erste mit 24 Aufgaben (Kapitel 1 bis 6 in Reihenfolge), Ids mit es-, eindeutig, alle leicht',
+  !!kurs && kurs.id === 'erste' && kurs.lektionen.length === 24 && kurs.lektionen.every((l) => /^es-[a-z0-9-]+$/.test(l.id) && l.stufe === 'leicht')
+  && new Set(kurs.lektionen.map((l) => l.id)).size === 24 && kurs.lektionen.every((l, i, a) => i === 0 || a[i - 1].kapitel <= l.kapitel),
   kurs && kurs.lektionen && kurs.lektionen.map((l) => l.id));
 pruefe('ANSICHT: Kurs vorn, dann die vier Meisterschul-Bereiche', Array.isArray(M.ANSICHT)
   && M.ANSICHT.map((b) => b.id).join() === 'erste,matt,taktik,end,eroeffnung');
@@ -45,6 +45,16 @@ pruefe('Kapitel 3 Schach und Matt: es-schach (schach), drei Wege aus dem Schach 
 pruefe('Kapitel 4 Sonderregeln: es-bauer (sammeln), es-umwandeln, es-rochade-regel, es-en-passant (folge), es-patt (matt)',
   ids(4) === 'es-bauer:sammeln,es-umwandeln:umwandeln,es-rochade-regel:folge,es-en-passant:folge,es-patt:matt', ids(4));
 pruefe('ARTEN kennt schach', M.ARTEN.includes('schach'));
+// fc-20:01 (Flo 19.11.: die Partie am Kapitelende zaehlt NICHT fuer die Wertung): Kapitel 6 = eine Aufgabe art 'partie'
+pruefe('Kapitel 6 Deine erste Partie: genau es-partie (art partie, Grundstellung), ARTEN kennt partie', ids(6) === 'es-partie:partie'
+  && M.ARTEN.includes('partie') && kap(6)[0].fen === 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', ids(6));
+// Sterne aus den gespeicherten Partien: nur beendete FREIE Partien (modus 'frei') gegen den Kurs-Gegner; 1 zu Ende, 2 gewonnen
+const kp = (modus, botId, ergebnis, n = 7) => ({ id: 'p' + n, modus, botId, ergebnis, zuege: Array.from({ length: n }, () => 'e2e4') });
+const kps = (liste) => versuche(() => (M.kursPartieSterne ? M.kursPartieSterne(liste, 'fridolin') : 'fehlt'));
+pruefe('kursPartieSterne: frei gegen den Gegner 1 bei Remis/Niederlage, 2 bei Sieg (Zuege = Flos Zuege); normal, anderer Bot, ohne Ergebnis zaehlt nicht',
+  kps([]) === null && kps([kp('frei', 'fridolin', 'niederlage')])?.sterne === 1
+  && kps([kp('frei', 'fridolin', 'remis'), kp('frei', 'fridolin', 'sieg')])?.sterne === 2 && kps([kp('frei', 'fridolin', 'sieg')])?.zuege === 4
+  && kps([kp('normal', 'fridolin', 'sieg'), kp('frei', 'benno', 'sieg'), kp('frei', 'fridolin', null), null]) === null, kps([kp('frei', 'fridolin', 'sieg')]));
 pruefe('lektion() und bereichVon() finden Kurs-Aufgaben', !!M.lektion('es-turm') && M.bereichVon(M.lektion('es-turm')).id === 'erste'
   && M.bereichVon(M.lektion('grundreihe')).id === 'matt');
 
@@ -124,7 +134,7 @@ pruefe('Sterne sammeln (sterneSammeln, eigene Regel; sterne() der Mattbilder ble
 let st = M.merke({}, 'es-turm', { sterne: 3, zuege: 3 });
 st = M.merke(st, 'grundreihe', { sterne: 2, zuege: 1 });
 pruefe('Kurs-Sterne werden gespeichert, zaehlen in summe(st, "erste"), aber nicht in der Meisterschul-Summe',
-  M.stand(st).lek['es-turm'] && M.summe(st, 'erste').sterne === 3 && M.summe(st, 'erste').max === 69 && M.summe(st).sterne === 2
+  M.stand(st).lek['es-turm'] && M.summe(st, 'erste').sterne === 3 && M.summe(st, 'erste').max === 72 && M.summe(st).sterne === 2
   && M.summe(st).max === 65 * 3, { erste: M.summe(st, 'erste'), schule: M.summe(st) });
 
 // ---------- Funken ----------
@@ -137,7 +147,7 @@ pruefe('Funken: Kurs-Aufgabe 10 einmal (keine Ring-Boni), Meisterschule weiter 4
 // ---------- Texte ----------
 const schluessel = ['bereich.erste', 'text.erste', 'kurz.erste', 'art.sammeln', 'kapitel.1', 'kapitel.5', 'zielSammeln', 'geschafft.sammeln',
   'art.schach', 'kapitel.2', 'kapitel.3', 'kapitel.4', 'zielSchach', 'geschafft.schach', 'geschafftText.schach',
-  'geschafftText.sammeln', ...(kurs ? kurs.lektionen.flatMap((l) => ['titel.' + l.id, 'idee.' + l.id,
+  'geschafftText.sammeln', 'kapitel.6', 'art.partie', 'partieKnopf', 'partieText', 'partieGespielt', 'partieGewonnen', ...(kurs ? kurs.lektionen.flatMap((l) => ['titel.' + l.id, 'idee.' + l.id,
     ...(l.art === 'folge' ? Array.from({ length: l.ziel }, (_, k) => `zug.${l.id}.${k}`) : [])]) : [])];
 const fehltDE = schluessel.filter((k) => typeof DE[k] !== 'string' || !DE[k]);
 const fehltEN = schluessel.filter((k) => typeof EN[k] !== 'string' || !EN[k]);
@@ -284,8 +294,8 @@ async function browserTeil() {
           sterneMini: document.querySelectorAll('.ms-lektion[data-id="es-turm"] .mini.mini-gross i.s').length }));
         pruefe(`${lage}: N-13:10 Kopf "Erste Schritte" statt "Meisterschule", Vorschaubild es-turm gross mit 3 Sternen`,
           ue.kopf === 'Erste Schritte' && !/Meisterschule/.test(ue.ueber) && ue.sterneMini === 3, ue);
-        pruefe(`${lage}: Uebersicht Kurs-Karte vorn und gewaehlt, fuenf Karten, ohne "gratis", Kapitel 1 bis 5, alle Aufgaben offen, kein Querscrollen`,
-          ue.karte1 === 'erste' && ue.gewaehlt === 'erste' && ue.karten === 5 && ue.gratis === 0 && ue.kapitel === [1, 2, 3, 4, 5].map((k) => DE['kapitel.' + k]).join('|')
+        pruefe(`${lage}: Uebersicht Kurs-Karte vorn und gewaehlt, fuenf Karten, ohne "gratis", Kapitel 1 bis 6, alle Aufgaben offen, kein Querscrollen`,
+          ue.karte1 === 'erste' && ue.gewaehlt === 'erste' && ue.karten === 5 && ue.gratis === 0 && ue.kapitel === [1, 2, 3, 4, 5, 6].map((k) => DE['kapitel.' + k]).join('|')
           && ue.ids === kurs.lektionen.map((l) => l.id).join() && ue.schloss === 0 && !ue.quer && !ue.bald, ue);
         await bild(s, `uebersicht-${geraet}-${farbe}`);
 
@@ -341,6 +351,53 @@ async function browserTeil() {
           const z = await lz(s);
           pruefe(`${lage}: ${id} mit ${zug} geschafft, 3 Sterne`, z.id === id && z.phase === 'ende' && z.grund === null && z.sterne === 3, z);
         }
+        // fc-20:01 Kapitel 6: freie Partie gegen den ersten Bot der Leiter (Schaefermatt per Testplan). Sie zaehlt nicht fuer die
+        // Wertung (Leiter-Sterne und Statistik fortschritt, Elo/Liga, Bestenlisten punkte.tafeln, Kronen/Abzeichen besitz, Feier);
+        // danach traegt die Uebersicht 2 Sterne ein und bucht die 10 Kurs-Funken genau einmal
+        const speicher = () => s.evaluate(() => { const j = (x) => { try { return JSON.parse(localStorage.getItem('schach-arena:v1:' + x)); } catch (e) { return null; } };
+          return { wertung: JSON.stringify([j('fortschritt'), j('modul:liga'), (j('modul:punkte') || {}).tafeln || {}, j('modul:besitz'), j('modul:feier')]),
+            funken: (j('modul:funken') || {}).gesamt || 0 }; });
+        await s.evaluate(() => window.__app.gehe('lektion', { id: 'es-partie' }));
+        await s.waitForSelector('.ls-partie [data-a="partie"]', { timeout: 15000 }).catch(() => {});
+        if (process.env.BILDER) await s.waitForTimeout(800);
+        await bild(s, `partie-start-${geraet}-${farbe}`);
+        const vorP = await speicher();
+        await s.evaluate(() => { const plan = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };
+          window.__test = { ...(window.__test || {}), botZug: () => { const v = window.__partie.chess().history({ verbose: true }); return plan[v[v.length - 1].lan] || null; } }; });
+        await s.locator('.ls-partie [data-a="partie"]').click({ timeout: 5000 }).catch(() => {});
+        await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.phase() === 'flo', null, { timeout: 30000 }).catch(() => {});
+        const PS = '.screen.partie:not(.online-screen)';
+        for (const uci of ['e2e4', 'f1c4', 'd1h5', 'h5f7']) {
+          await s.waitForFunction(() => window.__partie && window.__partie.phase() === 'flo', null, { timeout: 30000 }).catch(() => {});
+          for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) await s.locator(`${PS} .brett-felder .feld[data-feld="${f}"]`).click({ timeout: 5000 }).catch(() => {});
+          if (await s.locator(`${PS} .brett .lage.vorschau`).count()) await s.locator(`${PS} .brett-felder .feld[data-feld="${uci.slice(2, 4)}"]`).click({ timeout: 5000 }).catch(() => {});
+        }
+        const siegDa = await s.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 }).then(() => true).catch(() => false);
+        await warte(2500);
+        await bild(s, `partie-ende-${geraet}-${farbe}`);
+        // das Ergebnisblatt einer nicht wertenden Partie traegt den Modus als Chip (js/ui/partie.js chipText)
+        const chip = await s.evaluate(() => document.querySelector('.ergebnis-overlay .erg-kopf .chip[data-modus]')?.textContent || '');
+        const nachP = await speicher();
+        const gespeichert = await s.evaluate(() => { try { const l = JSON.parse(localStorage.getItem('schach-arena:v1:partien')) || [];
+          const p = l.find((x) => x && x.modus === 'frei') || l[0]; return p ? { modus: p.modus, botId: p.botId, ergebnis: p.ergebnis, n: l.length } : null; } catch (e) { return null; } });
+        pruefe(`${lage}: Kapitel 6 startet eine FREIE Partie gegen den ersten Bot der Leiter, Chip FREI, Sieg`, siegDa && gespeichert?.modus === 'frei'
+          && gespeichert?.botId === 'fridolin' && gespeichert?.ergebnis === 'sieg' && chip === 'FREI', { siegDa, gespeichert, chip });
+        pruefe(`${lage}: Kapitel-6-Partie zaehlt nicht fuer die Wertung (Leiter, Liga, Bestenlisten, Kronen, Feier unveraendert), keine Partie-Funken`,
+          siegDa && vorP.wertung === nachP.wertung && nachP.funken === vorP.funken, { gleich: vorP.wertung === nachP.wertung, vor: vorP.funken, nach: nachP.funken });
+        await s.evaluate(() => window.__app.gehe('lernen', { bereich: 'erste' }));
+        await s.waitForSelector('.ms-lektion[data-id="es-partie"][data-geschafft]', { timeout: 10000 }).catch(() => {});
+        await warte(600);
+        const ueP = async () => ({ sterne: await s.evaluate(() => document.querySelector('.ms-lektion[data-id="es-partie"] .ms-sterne')?.dataset.sterne || ''),
+          ...(await speicher()) });
+        const nach1 = await ueP();
+        await bild(s, `partie-uebersicht-${geraet}-${farbe}`);
+        await s.evaluate(() => window.__app.gehe('lektion', { id: 'es-partie' }));
+        await s.waitForSelector('.ls-partie [data-a="partie"]', { timeout: 15000 }).catch(() => {});
+        await s.evaluate(() => window.__app.gehe('lernen', { bereich: 'erste' }));
+        await warte(800);
+        const nach2 = await ueP();
+        pruefe(`${lage}: danach es-partie mit 2 Sternen (gewonnen), +10 Kurs-Funken genau einmal, Wertung weiter unveraendert`,
+          nach1.sterne === '2' && nach1.funken === vorP.funken + 10 && nach2.funken === nach1.funken && nach2.wertung === vorP.wertung, { vor: vorP.funken, nach1, nach2: nach2.funken });
         pruefe(`${lage}: keine Seitenfehler`, fehlerListe.length === 0, fehlerListe);
         await k.close();
       }

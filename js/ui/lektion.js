@@ -44,7 +44,8 @@ import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz
   ladeSammeln, weissWieder, sternGeschafft, sterneSammeln, zaehlerSichtbar } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
-import { sterneHtml } from './lernen.js';
+import { sterneHtml, kursPartieAbgleich } from './lernen.js';
+import { BOTS } from '../bots.js';
 import { meinName } from '../konto.js';
 import { floAvatar } from '../thema.js';
 import '../sprachen/allgemein.js';
@@ -67,6 +68,30 @@ export function zustand() {
 }
 if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '')) window.__lektion = { zustand };
 
+// Kurs Kapitel 6 (art 'partie', fc-20:01): kein Brett hier, sondern eine Seite mit Knopf "Partie starten". Die Partie laeuft
+// frei (modus 'frei': storage.js wertet() ist false, also keine Elo, Liga, Bestenliste, Leiter-Sterne) gegen den ersten Bot
+// der Leiter; die Sterne traegt kursPartieAbgleich (js/ui/lernen.js) beim naechsten Oeffnen ein.
+// DOM: .ls-rumpf > .ls-partie > h2, p, p.ls-partie-hinweis, .ms-sterne, button[data-a="partie"]
+function zeigeKursPartie(s, l, ber, app) {
+  kursPartieAbgleich();
+  const e = (() => { try { return stand(ladeModul(PAKET, {})).lek[l.id] || null; } catch (x) { return null; } })();
+  s.dataset.art = 'partie';
+  s.setAttribute('aria-label', S('titel.' + l.id));
+  s.innerHTML = `${hauptKopf({ titel: S('bereich.' + ber.id), unter: S('kapitel.' + l.kapitel), zurueck: true, chips: '', marke: false })}
+    <div class="ls-rumpf"><div class="ls-partie">
+      <h2>${esc(S('titel.' + l.id))}</h2>
+      <p>${esc(S('idee.' + l.id))}</p>
+      <p class="ls-partie-hinweis">${esc(S('partieText'))}</p>
+      ${sterneHtml(e ? e.s : 0)}
+      <button class="knopf primaer dr" type="button" data-a="partie">${esc(S('partieKnopf'))}${icon('vor')}</button>
+    </div></div>`;
+  const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  s.querySelector('[data-a="partie"]').addEventListener('click', () => {
+    if (BOTS[0]) app.gehe('partie', { botId: BOTS[0].id, farbe: 'w', modus: 'frei' });
+  });
+  return { verlasse() { try { kopf.verlasse(); } catch (x) { /* egal */ } } };
+}
+
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen ls-screen';
@@ -81,6 +106,7 @@ export function zeige(root, params, app) {
   ladeLernenCss();
   const ber = bereichVon(l);
   const art = artVon(l);
+  if (art === 'partie') return zeigeKursPartie(s, l, ber, app);
   const nr = ber.lektionen.indexOf(l) + 1;
   const rs = rundenVon(l);
   const mitRunden = rs.length > 1;

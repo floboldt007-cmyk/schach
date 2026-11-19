@@ -593,8 +593,8 @@ async function browserTeil(browser) {
   await kursOffen();
   const kurs = await seite.evaluate(() => ({ hash: location.hash, frage: document.querySelector('.st-buehne[data-seite="frage"]') ? 1 : 0,
     karte1: document.querySelector('.ms-bkarte')?.dataset.bereich, kapitel: [...document.querySelectorAll('.ms-gruppe > h2')].map((h) => h.textContent).join('|') }));
-  pruefe('Nein: Lernen mit dem Kurs Erste Schritte (Karte vorn, gewaehlt), Kapitel 1 bis 5', kurs.hash === '#lernen' && kurs.karte1 === 'erste'
-    && kurs.kapitel === 'Kapitel 1: Brett und Figuren|Kapitel 2: Schlagen und Schützen|Kapitel 3: Schach und Matt|Kapitel 4: Sonderregeln|Kapitel 5: Gut anfangen', kurs);
+  pruefe('Nein: Lernen mit dem Kurs Erste Schritte (Karte vorn, gewaehlt), Kapitel 1 bis 6', kurs.hash === '#lernen' && kurs.karte1 === 'erste'
+    && kurs.kapitel === 'Kapitel 1: Brett und Figuren|Kapitel 2: Schlagen und Schützen|Kapitel 3: Schach und Matt|Kapitel 4: Sonderregeln|Kapitel 5: Gut anfangen|Kapitel 6: Deine erste Partie', kurs);
   // Zurueck aus dem Kurs: zurueck zur Frage
   await seite.locator('.ms-screen .kopf-zurueck').click();
   await warteSeite(seite, 'frage');

@@ -16,10 +16,12 @@ import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { miniBrett } from './bauteile.js';
 import { icon } from './icons.js';
 import { staffel, tempo } from '../bewegung.js';
-import { ladeModul } from '../storage.js';
+import { ladeModul, speichereModul, ladePartien } from '../storage.js';
+import { sende } from '../ereignisse.js';
+import { BOTS } from '../bots.js';
 import { t, datum } from '../sprache.js';
 import { istPremium, premiumHinweis } from '../abo.js';
-import { BEREICHE, ANSICHT, artVon, stand, summe } from '../pakete/lernen/mattbilder.js';
+import { BEREICHE, ANSICHT, artVon, stand, summe, merke, kursPartieSterne } from '../pakete/lernen/mattbilder.js';
 import { istOffen, istGratis, istProbe, istImTrainer, inWillkommenswoche, willkommenBis } from '../pakete/lernen/zugang.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import '../sprachen/allgemein.js';
@@ -36,11 +38,26 @@ export const sterneHtml = (n) => `<span class="ms-sterne" data-sterne="${n}" rol
 const kopfChip = (sum) => `<span class="chip zahl chip-sterne ms-kopf-sterne" title="${esc(S('sterne', { n: sum.sterne, max: sum.max }))}">${icon('stern', 'stern')}`
   + `<span class="sr">${esc(S('sterne', { n: sum.sterne, max: sum.max }))}</span> ${sum.sterne}<span class="von"> / ${sum.max}</span></span>`;
 
+// Kurs Kapitel 6 (fc-20:01): die freie Partie gegen den ersten Bot der Leiter traegt erst die Uebersicht bzw. die Aufgabe ein
+// (beim Oeffnen, aus den gespeicherten Partien), nicht die Partie selbst: sie zaehlt nicht fuer die Wertung. Neue oder bessere
+// Sterne: merke + lektion:beendet; das Paket funken bucht die 10 Kurs-Funken nur beim ersten Abschluss (rechnung.js lektionFunken)
+export function kursPartieAbgleich() {
+  try {
+    const roh = ladeModul(PAKET, {});
+    const r = kursPartieSterne(ladePartien(), BOTS[0] && BOTS[0].id);
+    const alt = stand(roh).lek['es-partie'];
+    if (!r || (alt && alt.s >= r.sterne)) return;
+    speichereModul(PAKET, merke(roh, 'es-partie', r));
+    sende('lektion:beendet', { id: 'erste-es-partie', ringe: { gelernt: true, sicher: r.sterne >= 2, gemeistert: false } });
+  } catch (e) { console.error(e); }
+}
+
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen ms-screen';
   root.append(s);
   ladeLernenCss();
+  kursPartieAbgleich();
   const st = stand(ladeModul(PAKET, {}));
   // Kurs Erste Schritte (19.11.2026) steht als Karte vorn; geoeffnet wird er gezielt (params { bereich: 'erste' }, Start
   // "Kennst du die Schachregeln?" Nein), ohne Angabe bleibt es wie bisher bei den Mattbildern
@@ -85,7 +102,7 @@ export function zeige(root, params, app) {
     const e = st.lek[l.id];
     const art = artVon(l);
     const offen = istOffen(l);
-    const bestes = !e ? '' : art === 'halten' ? S('gehalten') : e.z === 1 ? S('bestesEins') : S('bestes', { n: e.z });
+    const bestes = !e ? '' : art === 'halten' ? S('gehalten') : art === 'partie' ? S(e.s >= 2 ? 'partieGewonnen' : 'partieGespielt') : e.z === 1 ? S('bestesEins') : S('bestes', { n: e.z });
     // "Trainer" auch in der Willkommenswoche: man soll wissen, was man gerade geschenkt bekommt
     const marke = istImTrainer(l) && (!offen || woche) ? `<span class="ms-marke" data-marke="trainer">${esc(S('trainer'))}</span>`
       : istProbe(l) && l.stufe !== 'leicht' ? `<span class="ms-marke" data-marke="probe">${esc(S('gratisProbe'))}</span>` : '';

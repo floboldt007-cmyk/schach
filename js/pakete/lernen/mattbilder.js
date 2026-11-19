@@ -71,7 +71,7 @@ export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 24,
     runden: Object.freeze([R('8/3B2K1/8/8/8/k2N4/8/8 w - - 0 1', 26), R('8/8/8/7K/8/8/1N6/1B2k3 w - - 0 1', 31)]) }),
 ]);
-export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik', 'sammeln', 'schach']);
+export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik', 'sammeln', 'schach', 'partie']);
 // Zug-Zaehler: im Kurs vor dem ersten Zug nur der Ziel-Text, kein "Zug 0" (claude-code-60 19.11.); Meisterschule immer
 export const zaehlerSichtbar = (bereich, zuege) => !(bereich && bereich.kurs && zuege === 0);
 export const BEREICHE = Object.freeze([
@@ -216,6 +216,20 @@ export function pruefeLektion(l, Chess) {
     if (eigene !== l.ziel) f.push(`${l.id}: ziel ${l.ziel}, aber ${eigene} eigene Zuege`);
   }
   return f;
+}
+
+// Kurs Kapitel 6 (art 'partie', fc-20:01): Sterne aus den gespeicherten Partien (storage ladePartien). Es zaehlt jede beendete
+// FREIE Partie (modus 'frei', ohne Wertung) gegen botId; frei startet nur der Kurs. 1 = zu Ende gespielt, 2 = gewonnen,
+// zuege = Flos Zuege der besten (fuer merke). Keine Partie: null.
+export function kursPartieSterne(partien, botId) {
+  let best = null;
+  for (const p of Array.isArray(partien) ? partien : []) {
+    if (!p || p.modus !== 'frei' || p.botId !== botId || !['sieg', 'remis', 'niederlage'].includes(p.ergebnis)) continue;
+    const s = p.ergebnis === 'sieg' ? 2 : 1;
+    const z = Math.max(1, Math.min(999, Math.ceil((Array.isArray(p.zuege) ? p.zuege.length : 1) / 2)));
+    if (!best || s > best.sterne || (s === best.sterne && z < best.zuege)) best = { sterne: s, zuege: z };
+  }
+  return best;
 }
 
 // Sammeln: genau eine weisse Figur, kein Koenig noetig, 1 bis 6 Sterne auf freien gueltigen Feldern. Falle (in Node belegt,

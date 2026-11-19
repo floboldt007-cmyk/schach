@@ -2,7 +2,7 @@
 // fuer ganz frische Anfaenger, vor der Meisterschule. Reine Daten, Regeln und Speicher in ./mattbilder.js (KURS, ANSICHT),
 // Texte in ./texte.js (titel, idee, je Folgezug zug.<id>.<k>). Ids mit es-, weil turm und dame schon Mattbild-Lektionen sind.
 // Stufe A: Kapitel 1 und 5. Stufe B: Kapitel 2 bis 4 (Stellungen mit Stockfish belegt, tests/r20-erste-schritte). Kapitel 6
-// folgt.
+// (fc-20:01): die erste ganze Partie.
 //
 //   art 'sammeln' (Kapitel 1, 4): nur Flos Figur auf dem Brett, ohne Koenige (chess.js mit skipValidation), Sterne auf den
 //                 Feldern sterne; kein Gegner. ziel = kleinste Zugzahl ueber alle Reihenfolgen (tests/r20-erste-schritte
@@ -11,6 +11,9 @@
 //                 Schwarz am Zug, spielt der Computer zuerst (Gegner-Vorzug: Schach geben, d7-d5 vor en passant).
 //   art 'schach'  (Kapitel 3): geschafft, sobald Flos Zug Schach gibt.
 //   taktik, halten, matt, umwandeln wie in der Meisterschule (Engine verteidigt).
+//   art 'partie'  (Kapitel 6): eine ganze Partie gegen den ersten Bot der Leiter, modus 'frei', also ohne Wertung (Flo
+//                 19.11.2026). Gestartet wird sie in js/ui/lektion.js, die Sterne traegt js/ui/lernen.js kursPartieAbgleich
+//                 aus den gespeicherten Partien ein (mattbilder.js kursPartieSterne: 1 zu Ende, 2 gewonnen).
 //   kapitel       Nummer des Kapitels (Gruppen der Uebersicht js/ui/lernen.js)
 import { GRUNDSTELLUNG } from './eroeffnungen.js';
 
@@ -55,4 +58,6 @@ export const ERSTE_SCHRITTE = Object.freeze([
   f('es-rochade', 'w', 'e4 e5 Nf3 Nc6 Bc4 Bc5 O-O', 4),
   // Dame nicht zu frueh: dieselbe Folge wie die Eroeffnung schaefer-abwehr, hier aus Sicht des Anfaengers erklaert
   f('es-dame-frueh', 'b', 'e4 e5 Bc4 Nc6 Qh5 g6 Qf3 Nf6', 4),
+  // Kapitel 6: Deine erste Partie
+  a('es-partie', 'partie', 6, GRUNDSTELLUNG, 1),
 ]);
