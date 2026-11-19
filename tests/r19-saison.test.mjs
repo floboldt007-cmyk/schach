@@ -283,7 +283,7 @@ try {
     pruefe('Schalter: Vorgabe aus, gesperrt, Haken nie vorab gesetzt, Hinweis sichtbar',
       s.sichtbar && s.rolle === 'switch' && s.vorher.an === 'false' && s.vorher.gesperrt && s.vorher.haken === false && s.vorher.block, s.vorher);
     pruefe('Schalter: Hinweis (wer sieht was) vor dem Haken, Haken vor dem Schalter, Link zur Datenschutzerklaerung',
-      s.vorher.hinweisVorHaken && s.vorher.hakenVorSchalter && s.vorher.link === 'datenschutz.html', s.vorher);
+      s.vorher.hinweisVorHaken && s.vorher.hakenVorSchalter && s.vorher.link === 'datenschutz.html#seasons', s.vorher);
     pruefe('Schalter: Haken "Ich bin mindestens 16 Jahre alt."', s.vorher.haken_text === 'Ich bin mindestens 16 Jahre alt.', s.vorher.haken_text);
     pruefe('Schalter: ohne Haken geht er nicht an', s.ohneHaken === 'false', s.ohneHaken);
     pruefe('Schalter: mit Haken an, Hinweis weg; Ausschalten wirkt sofort, Haken wieder leer, Schalter wieder gesperrt',

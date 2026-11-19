@@ -912,7 +912,7 @@ async function weltTeil(browser, start) {
         // Hinweis VOR dem Haken: wofuer, wer was sieht, Widerruf, Link zur Datenschutzerklaerung (Nachtrag M-08:03:14)
         const hinweis = page.locator('.lg-welt-einwilligung');
         assert.match(await hinweis.innerText(), /alle angemeldeten Spieler.*Benutzernamen.*Banner.*Online-Elo.*Platz.*jederzeit.*„Nicht mehr zeigen“/s);
-        assert.equal(await hinweis.locator('a').getAttribute('href'), 'datenschutz.html');
+        assert.equal(await hinweis.locator('a').getAttribute('href'), 'datenschutz.html#weltrangliste');
         assert.equal(await page.evaluate(() => !!(document.querySelector('.lg-welt-einwilligung').compareDocumentPosition(document.querySelector('.lg-welt-alter'))
           & Node.DOCUMENT_POSITION_FOLLOWING)), true);
         assert.equal(await page.locator('.lg-welt-alter input').isChecked(), false);
