@@ -148,6 +148,10 @@ const TESTANFRAGE = (u) => u.startsWith(EIGEN) && /\/__langsam\?/.test(u);
   const EIGEN = 'http://127.0.0.1:4321/';
   const fall = (name, meldung, soll) => pruefe(name, eigenerZugriffsAbbruch(meldung, EIGEN) === soll, { meldung, soll });
   fall('eigene Adresse vor "due to": still', 'http://127.0.0.1:4321/schach/klaenge/zug.mp3 due to access control checks.', true);
+  // echte Meldung aus Playwright-WebKit (suite5.log 19.11.): ohne "http:", mit einem Schraegstrich vorn
+  fall('echte WebKit-Form "/127.0.0.1:PORT/..." ohne Schema: still', '/127.0.0.1:4321/schach/assets/klang/arcade/zug.mp3 due to access control checks.', true);
+  fall('Gegenprobe: echte WebKit-Form mit anderem Port bleibt rot', '/127.0.0.1:43210/schach/a.mp3 due to access control checks.', false);
+  fall('Gegenprobe: echte WebKit-Form mit fremdem Rechner bleibt rot', '/boese.example/127.0.0.1:4321/a.mp3 due to access control checks.', false);
   fall('mit WebKit-Vorsatz "Fetch API cannot load": still', 'Fetch API cannot load http://127.0.0.1:4321/schach/a.mp3 due to access control checks.', true);
   fall('Gegenprobe: fremde Adresse mit der eigenen im Abfrage-Teil bleibt rot',
     'https://boese.example/x?zurueck=http://127.0.0.1:4321/ due to access control checks.', false);

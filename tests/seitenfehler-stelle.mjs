@@ -14,10 +14,12 @@ export function stelleAusStapel(stapel, meldung = '') {
 
 // WebKit meldet einen beim Neuladen abgebrochenen Abruf als "[Vorsatz] <Adresse> due to access control checks." (CI 31.10.2026,
 // PR #120). Still nur, wenn GENAU das Adress-Wort vor "due to" mit der eigenen Herkunft `eigen` beginnt; irgendwo in der
-// Meldung genuegt nicht (fc-18:11 Zusatz 8: fremde Adresse mit der eigenen im Abfrage-Teil).
+// Meldung genuegt nicht (fc-18:11 Zusatz 8: fremde Adresse mit der eigenen im Abfrage-Teil). Playwright-WebKit schreibt die
+// Adresse ohne Schema ("/127.0.0.1:PORT/..."), darum zaehlen Rechner und Port ab dem Anfang, Schema und Schraegstriche nicht.
 export function eigenerZugriffsAbbruch(meldung, eigen) {
   const t = String(meldung).match(/(\S+) due to access control checks\.?$/);
-  return !!t && t[1].startsWith(eigen);
+  const rechner = (u) => u.replace(/^[a-z][a-z0-9+.-]*:/i, '').replace(/^\/+/, '');
+  return !!t && rechner(t[1]).startsWith(rechner(eigen));
 }
 
 // Worker-Wechsel: endet der alte Service Worker, waehrend die Testanfrage durch ihn laeuft, meldet WebKit (CI, Linux) das
