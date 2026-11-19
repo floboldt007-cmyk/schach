@@ -22,9 +22,11 @@ const versuche = (fn) => { try { return fn(); } catch (e) { return { fehler: e.m
 
 // ---------- Aufbau ----------
 const kurs = M.KURS;
-pruefe('KURS: Bereich erste mit 9 Aufgaben, Ids mit es-, eindeutig, alle leicht',
-  !!kurs && kurs.id === 'erste' && kurs.lektionen.length === 9 && kurs.lektionen.every((l) => /^es-[a-z-]+$/.test(l.id) && l.stufe === 'leicht')
-  && new Set(kurs.lektionen.map((l) => l.id)).size === 9, kurs && kurs.lektionen && kurs.lektionen.map((l) => l.id));
+// Stufe B (N-13:10): Kapitel 2 bis 4 dazu, 23 Aufgaben, Reihenfolge nach Kapitel
+pruefe('KURS: Bereich erste mit 23 Aufgaben (Kapitel 1 bis 5 in Reihenfolge), Ids mit es-, eindeutig, alle leicht',
+  !!kurs && kurs.id === 'erste' && kurs.lektionen.length === 23 && kurs.lektionen.every((l) => /^es-[a-z0-9-]+$/.test(l.id) && l.stufe === 'leicht')
+  && new Set(kurs.lektionen.map((l) => l.id)).size === 23 && kurs.lektionen.every((l, i, a) => i === 0 || a[i - 1].kapitel <= l.kapitel),
+  kurs && kurs.lektionen && kurs.lektionen.map((l) => l.id));
 pruefe('ANSICHT: Kurs vorn, dann die vier Meisterschul-Bereiche', Array.isArray(M.ANSICHT)
   && M.ANSICHT.map((b) => b.id).join() === 'erste,matt,taktik,end,eroeffnung');
 pruefe('Meisterschule unberuehrt: BEREICHE 4, ALLE 65, keine Kurs-Id darin', M.BEREICHE.length === 4 && M.ALLE.length === 65
@@ -35,6 +37,14 @@ pruefe('Kapitel 1 = 5 Sammel-Aufgaben (Turm, Laeufer, Springer, Dame, Koenig), K
   kap(1).map((l) => l.id).join() === 'es-turm,es-laeufer,es-springer,es-dame,es-koenig' && kap(1).every((l) => l.art === 'sammeln')
   && kap(5).map((l) => l.id).join() === 'es-mitte,es-figuren,es-rochade,es-dame-frueh' && kap(5).every((l) => l.art === 'folge'));
 pruefe('ARTEN kennt sammeln', M.ARTEN.includes('sammeln'));
+const ids = (n) => kap(n).map((l) => `${l.id}:${l.art}`).join();
+pruefe('Kapitel 2 Schlagen und Schuetzen: es-schlagen, es-tausch (taktik), es-weglaufen, es-schuetzen (halten)',
+  ids(2) === 'es-schlagen:taktik,es-tausch:taktik,es-weglaufen:halten,es-schuetzen:halten', ids(2));
+pruefe('Kapitel 3 Schach und Matt: es-schach (schach), drei Wege aus dem Schach (folge), es-matt1 (matt)',
+  ids(3) === 'es-schach:schach,es-raus-weg:folge,es-raus-dazwischen:folge,es-raus-schlagen:folge,es-matt1:matt', ids(3));
+pruefe('Kapitel 4 Sonderregeln: es-bauer (sammeln), es-umwandeln, es-rochade-regel, es-en-passant (folge), es-patt (matt)',
+  ids(4) === 'es-bauer:sammeln,es-umwandeln:umwandeln,es-rochade-regel:folge,es-en-passant:folge,es-patt:matt', ids(4));
+pruefe('ARTEN kennt schach', M.ARTEN.includes('schach'));
 pruefe('lektion() und bereichVon() finden Kurs-Aufgaben', !!M.lektion('es-turm') && M.bereichVon(M.lektion('es-turm')).id === 'erste'
   && M.bereichVon(M.lektion('grundreihe')).id === 'matt');
 
@@ -61,7 +71,7 @@ function kleinste(l) {
   const typ = fig.type.toUpperCase();
   return Math.min(...perm([...l.sterne]).map((p) => { let f = fig.square; let s = 0; for (const z of p) { s += abstand(typ, f, z); f = z; } return s; }));
 }
-for (const l of kap(1)) pruefe(`${l.id}: ziel ${l.ziel} ist die kleinste Zugzahl (gerechnet)`, kleinste(l) === l.ziel, { gerechnet: kleinste(l) });
+for (const l of kurs ? kurs.lektionen.filter((x) => x.art === 'sammeln') : []) pruefe(`${l.id}: ziel ${l.ziel} ist die kleinste Zugzahl (gerechnet)`, kleinste(l) === l.ziel, { gerechnet: kleinste(l) });
 
 // ---------- Umwandlungs-Falle ----------
 const falle = versuche(() => new Chess('4P3/8/8/8/8/8/8/8 w - - 0 1', { skipValidation: true }).moves({ verbose: true }).length);
@@ -113,7 +123,7 @@ pruefe('Sterne sammeln (sterneSammeln, eigene Regel; sterne() der Mattbilder ble
 let st = M.merke({}, 'es-turm', { sterne: 3, zuege: 3 });
 st = M.merke(st, 'grundreihe', { sterne: 2, zuege: 1 });
 pruefe('Kurs-Sterne werden gespeichert, zaehlen in summe(st, "erste"), aber nicht in der Meisterschul-Summe',
-  M.stand(st).lek['es-turm'] && M.summe(st, 'erste').sterne === 3 && M.summe(st, 'erste').max === 27 && M.summe(st).sterne === 2
+  M.stand(st).lek['es-turm'] && M.summe(st, 'erste').sterne === 3 && M.summe(st, 'erste').max === 69 && M.summe(st).sterne === 2
   && M.summe(st).max === 65 * 3, { erste: M.summe(st, 'erste'), schule: M.summe(st) });
 
 // ---------- Funken ----------
@@ -125,6 +135,7 @@ pruefe('Funken: Kurs-Aufgabe 10 einmal (keine Ring-Boni), Meisterschule weiter 4
 
 // ---------- Texte ----------
 const schluessel = ['bereich.erste', 'text.erste', 'kurz.erste', 'art.sammeln', 'kapitel.1', 'kapitel.5', 'zielSammeln', 'geschafft.sammeln',
+  'art.schach', 'kapitel.2', 'kapitel.3', 'kapitel.4', 'zielSchach', 'geschafft.schach', 'geschafftText.schach',
   'geschafftText.sammeln', ...(kurs ? kurs.lektionen.flatMap((l) => ['titel.' + l.id, 'idee.' + l.id,
     ...(l.art === 'folge' ? Array.from({ length: l.ziel }, (_, k) => `zug.${l.id}.${k}`) : [])]) : [])];
 const fehltDE = schluessel.filter((k) => typeof DE[k] !== 'string' || !DE[k]);
@@ -133,6 +144,48 @@ pruefe('Texte DE und EN fuer Kurs, Kapitel, Art sammeln und jede Aufgabe (je Fol
   { fehltDE, fehltEN });
 const verboten = /Season|Saison|Weltrangliste|Crownmaster/i;
 pruefe('keine Texte mit Season/Saison/Weltrangliste/Crownmaster', schluessel.every((k) => !verboten.test(DE[k] || '') && !verboten.test(EN[k] || '')));
+
+// ---------- Stufe B (N-13:10): Art schach, Folge mit Gegner-Vorzug, Stockfish-Belege ----------
+const schachL = M.lektion('es-schach');
+const nach = (fen, san) => { const c = new Chess(fen); c.move(san); return c; };
+pruefe('pruefeZiel schach: ein Schachzug ist geschafft, ein ruhiger Zug noch nicht',
+  !!schachL && M.pruefeZiel(schachL, M.bilanz(new Chess(schachL.fen)), nach(schachL.fen, 'Rd8+'), { wann: 'flo', zuege: 1 }) === 'geschafft'
+  && M.pruefeZiel(schachL, M.bilanz(new Chess(schachL.fen)), nach(schachL.fen, 'Rd2'), { wann: 'flo', zuege: 1 }) === null);
+const ep = M.lektion('es-en-passant');
+const falschRum = ep ? M.pruefeLektion({ ...ep, id: 'probe-ep', folge: ['d5', 'exd6', 'Nf6'], ziel: 1 }, Chess) : ['fehlt'];
+pruefe('pruefeLektion folge: Start mit Schwarz am Zug ist gueltig (en passant), eine Folge mit Gegnerzug am Ende nicht',
+  !!ep && M.pruefeLektion(ep, Chess).length === 0 && falschRum.some((x) => /letzte Zug/.test(x)), falschRum);
+// drei Wege aus dem Schach: nach dem Vorzug steht Weiss im Schach, und jede legale Antwort ist vom geuebten Typ
+const antworten = (l) => { const c = new Chess(l.fen); c.move(l.folge[0]); return { schach: c.inCheck(), z: c.moves({ verbose: true }) }; };
+const typ = {
+  'es-raus-weg': (m) => m.piece === 'k',
+  'es-raus-dazwischen': (m) => m.piece !== 'k' && !m.captured,
+  'es-raus-schlagen': (m) => !!m.captured,
+};
+for (const [id, passt] of Object.entries(typ)) {
+  const l = M.lektion(id);
+  const a = l ? antworten(l) : { schach: false, z: [] };
+  pruefe(`${id}: nach dem Vorzug steht Weiss im Schach, jede legale Antwort ist vom geuebten Typ, die Loesung ist dabei`,
+    a.schach && a.z.length > 0 && a.z.every(passt) && a.z.some((m) => m.san === l.folge[1]), a.z.map((m) => m.san));
+}
+const patt = M.lektion('es-patt');
+pruefe('es-patt: der naheliegende Damenzug Qg6 ergibt Patt (die Falle)', !!patt && nach(patt.fen, 'Qg6').isStalemate());
+// Stockfish wie tests/r19-lektionen-besser.test.mjs: feste Knoten, beide Seiten Engine, gewertet wie die App
+{
+  const E = await import('./lektion-engine.mjs');
+  const sf = E.stockfish();
+  await sf.init();
+  for (const l of (kurs ? kurs.lektionen : []).filter((x) => ['taktik', 'halten', 'schach', 'matt', 'umwandeln'].includes(x.art))) {
+    const r = await E.spiele(sf, l, l.fen, { go: 'nodes 150000', goGegner: 'nodes 400000' }).catch((e) => ({ ende: e.message }));
+    pruefe(`${l.id}: Stockfish gegen Stockfish endet geschafft in ${l.ziel} Zug/Zuegen`, r.ende === 'geschafft' && r.zuege <= l.ziel, r);
+  }
+  for (const id of ['es-matt1', 'es-patt']) {
+    const l = M.lektion(id);
+    const n = l ? await E.mattIn(sf, l.fen, 'nodes 3000000') : null;
+    pruefe(`${id}: Mattsuche findet Matt in ${l && l.ziel} (= ziel)`, !!l && n === l.ziel, { n });
+  }
+  sf.ende();
+}
 
 // ---------- N-13:10: Kopf im Kurs, Vorschaubild der Sammel-Aufgaben ----------
 pruefe('Text "kursUeber" (Zeile ueber dem Kurs-Titel statt "Meisterschule") in DE und EN',
@@ -220,7 +273,7 @@ async function browserTeil() {
         pruefe(`${lage}: N-13:10 Kopf "Erste Schritte" statt "Meisterschule", Vorschaubild es-turm gross mit 3 Sternen`,
           ue.kopf === 'Erste Schritte' && !/Meisterschule/.test(ue.ueber) && ue.sterneMini === 3, ue);
         pruefe(`${lage}: Uebersicht Kurs-Karte vorn und gewaehlt, fuenf Karten, ohne "gratis", Kapitel 1 und 5, 9 Aufgaben offen, kein Querscrollen`,
-          ue.karte1 === 'erste' && ue.gewaehlt === 'erste' && ue.karten === 5 && ue.gratis === 0 && ue.kapitel === 'Kapitel 1: Brett und Figuren|Kapitel 5: Gut anfangen'
+          ue.karte1 === 'erste' && ue.gewaehlt === 'erste' && ue.karten === 5 && ue.gratis === 0 && ue.kapitel === [1, 2, 3, 4, 5].map((k) => DE['kapitel.' + k]).join('|')
           && ue.ids === kurs.lektionen.map((l) => l.id).join() && ue.schloss === 0 && !ue.quer && !ue.bald, ue);
         await bild(s, `uebersicht-${geraet}-${farbe}`);
 
@@ -262,6 +315,19 @@ async function browserTeil() {
         await warteLz(s, 'z.phase === "ende"', 15000);
         const f = await lz(s);
         pruefe(`${lage}: Folge es-mitte (e4 e5 d4) geschafft, 3 Sterne`, f.id === 'es-mitte' && f.phase === 'ende' && f.grund === null && f.sterne === 3, f);
+
+        // Stufe B: en passant (der Computer zieht zuerst d7-d5, Flo schlaegt e5xd6) und Schach geben (Td1-d8+)
+        for (const [id, zug, bildName] of [['es-en-passant', 'e5d6', 'en-passant'], ['es-schach', 'd1d8', 'schach']]) {
+          await s.evaluate((x) => window.__app.gehe('lektion', { id: x }), id);
+          await s.waitForSelector('.ls-aktionen [data-a="los"]', { timeout: 15000 }).catch(() => {});
+          await s.locator('.ls-aktionen [data-a="los"]').click();
+          await warteLz(s, `z.id === "${id}" && z.phase === "flo"`, 15000);
+          await bild(s, `${bildName}-${geraet}-${farbe}`);
+          await ziehe(s, zug);
+          await warteLz(s, 'z.phase === "ende"', 15000);
+          const z = await lz(s);
+          pruefe(`${lage}: ${id} mit ${zug} geschafft, 3 Sterne`, z.id === id && z.phase === 'ende' && z.grund === null && z.sterne === 3, z);
+        }
         pruefe(`${lage}: keine Seitenfehler`, fehlerListe.length === 0, fehlerListe);
         await k.close();
       }
