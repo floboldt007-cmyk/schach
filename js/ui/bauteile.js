@@ -374,8 +374,8 @@ export function toastLeeren() {
 
 // ---------- Mini-Brett ----------
 const FIGUR = /^[prnbqkPRNBQK]$/;
-// sterne: Felder mit goldenem Stern (Kurs Erste Schritte, Art sammeln, 19.11.2026); gross: die Figuren als grosses Bild
-// (2,6 Felder), am Brettrand verankert, damit nichts abgeschnitten wird (gedacht fuer Stellungen mit einer Figur)
+// sterne: Felder mit goldenem Stern (Kurs Erste Schritte, Art sammeln, 19.11.2026), liegen ueber der Figur; gross: die
+// Figuren als grosses Bild (3,4 Felder), am Brettrand verankert, damit nichts abgeschnitten wird (fuer eine Figur gedacht)
 export function miniBrett(fen, { zuletzt = [], klasse = '', sterne = [], gross = false } = {}) {
   const reihen = String(fen || '').trim().split(/\s+/)[0].split('/');
   const felder = [];
@@ -400,7 +400,10 @@ export function miniBrett(fen, { zuletzt = [], klasse = '', sterne = [], gross =
     const dunkel = (r + c) % 2 === 1;
     const fig = felder[i];
     const bild = fig ? `<img${gross ? ` class="g" style="transform-origin: ${anker(r, c)}"` : ''} src="${PIECES}${fig}.svg" alt="" loading="lazy" draggable="false">` : '';
-    html += `<i class="${dunkel ? 'd' : 'h'}${markiert.has(name) ? ' z' : ''}${stern.has(name) ? ' s' : ''}">${bild}</i>`;
+    // ein Stern am Rand rueckt nach innen (--sx/--sy), sonst schnitte der Brettrand ihn ab
+    const rand = stern.has(name) && (c % 7 === 0 || r % 7 === 0)
+      ? ` style="--sx: ${c === 0 ? '28%' : c === 7 ? '-28%' : '0%'}; --sy: ${r === 0 ? '28%' : r === 7 ? '-28%' : '0%'}"` : '';
+    html += `<i class="${dunkel ? 'd' : 'h'}${markiert.has(name) ? ' z' : ''}${stern.has(name) ? ' s' : ''}"${rand}>${bild}</i>`;
   }
   return `<div class="mini${gross ? ' mini-gross' : ''}${klasse ? ' ' + esc(klasse) : ''}" aria-hidden="true">${html}</div>`;
 }
