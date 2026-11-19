@@ -185,14 +185,14 @@ export const BOTS = [
     staerke: {
       grenze: 300, tiefe: 6, kurzTiefe: 3, kurzChance: 0.36, breite: 30, intuition: 3, blick: 3,
       rauschen: 55, patzer: 0.02, mattInEins: 1, gier: 1,
-      vorlieben: { schach: 250, opfer: 55 }, zeit: [700, 1400],
+      vorlieben: { schach: 250, opfer: 55 }, zeit: [700, 1400], maxZeit: 700,
     },
   },
   {
     id: 'ottilie', stufe: 17, welt: 3, elo: 1700,
     avatar: 'assets/avatare/modern/ottilie.svg', farbe: '#567931',
     merkmale: { figur: 'B' },
-    staerke: { grenze: 300, tiefe: 7, kurzTiefe: 4, kurzChance: 0.32, breite: 25, intuition: 3, blick: 2, rauschen: 82, patzer: 0.045, mattInEins: 1, gier: 1, vorlieben: { ruhig: 12 }, zeit: [800, 1500] },
+    staerke: { grenze: 300, tiefe: 7, kurzTiefe: 4, kurzChance: 0.32, breite: 25, intuition: 3, blick: 2, rauschen: 70, patzer: 0.045, mattInEins: 1, gier: 1, vorlieben: { ruhig: 12 }, zeit: [800, 1500], maxZeit: 800 },
   },
   {
     id: 'koenig', stufe: 18, welt: 3, endgegner: true, elo: 1800,
@@ -201,20 +201,20 @@ export const BOTS = [
       grenze: 300, tiefe: 8, kurzTiefe: 4, kurzChance: 0.36, breite: 20, intuition: 3, blick: 2,
       rauschen: 90, patzer: 0.045, mattInEins: 1, gier: 1,
       endspiel: { rauschenFaktor: 0.5, tiefePlus: 3 },
-      vorlieben: { koenigEndspiel: 15 }, zeit: [800, 1500],
+      vorlieben: { koenigEndspiel: 15 }, zeit: [800, 1500], maxZeit: 800,
     },
   },
   {
     id: 'lasse', stufe: 19, welt: 4, elo: 1900,
     avatar: 'assets/avatare/modern/lasse.svg', farbe: '#058894',
     merkmale: { figur: 'Q' },
-    staerke: { grenze: 200, tiefe: 8, kurzTiefe: 4, kurzChance: 0.34, breite: 18, intuition: 3, blick: 2, rauschen: 76, patzer: 0.032, mattInEins: 1, gier: 1, vorlieben: { schach: 25, vorwaerts: 15 }, zeit: [800, 1500], maxZeit: 2500 },
+    staerke: { grenze: 200, tiefe: 8, kurzTiefe: 4, kurzChance: 0.34, breite: 18, intuition: 3, blick: 2, rauschen: 76, patzer: 0.032, mattInEins: 1, gier: 1, vorlieben: { schach: 25, vorwaerts: 15 }, zeit: [800, 1500], maxZeit: 800 },
   },
   {
     id: 'wiebke', stufe: 20, welt: 4, elo: 2000,
     avatar: 'assets/avatare/modern/wiebke.svg', farbe: '#2772B0',
     merkmale: { figur: 'N' },
-    staerke: { grenze: 200, tiefe: 9, kurzTiefe: 5, kurzChance: 0.32, breite: 14, intuition: 3, blick: 2, rauschen: 92, patzer: 0.028, mattInEins: 1, gier: 1, vorlieben: { ruhig: 10 }, zeit: [800, 1500], maxZeit: 2500 },
+    staerke: { grenze: 200, tiefe: 9, kurzTiefe: 5, kurzChance: 0.32, breite: 14, intuition: 3, blick: 2, rauschen: 92, patzer: 0.028, mattInEins: 1, gier: 1, vorlieben: { ruhig: 10 }, zeit: [800, 1500], maxZeit: 800 },
   },
   {
     id: 'greta', stufe: 21, welt: 4, elo: 2100,
@@ -222,7 +222,7 @@ export const BOTS = [
     staerke: {
       grenze: 200, tiefe: 9, kurzTiefe: 5, kurzChance: 0.3, breite: 12, intuition: 3, blick: 2,
       rauschen: 84, patzer: 0.024, mattInEins: 1, gier: 1,
-      vorlieben: {}, zeit: [800, 1500], maxZeit: 2500,
+      vorlieben: {}, zeit: [800, 1500], maxZeit: 800,
     },
   },
   {

@@ -53,6 +53,17 @@ const mitGrenze = BOTS.filter((b) => b.staerke && b.staerke.grenze != null).map(
 pruefe('Grenze genau bei Delia, Ottilie, Koenig (300) und Lasse, Wiebke, Greta (200)',
   JSON.stringify(mitGrenze) === JSON.stringify(['delia:300', 'ottilie:300', 'koenig:300', 'lasse:200', 'wiebke:200', 'greta:200']), mitGrenze);
 
+// Auftrag fc-18:05: die tiefere Suche endet auf langsamen Geraeten spaetestens mit der kuerzesten Denkpause
+// (maxZeit = zeit[0]), und botZug gibt genau diesen Deckel als movetime an die Engine
+const deckel = BOTS.filter((b) => b.staerke && b.staerke.grenze != null).map((b) => `${b.id}:${b.staerke.maxZeit}/${b.staerke.zeit[0]}`);
+pruefe('maxZeit gleich der kuerzesten Denkpause bei allen Bots mit Grenze',
+  BOTS.filter((b) => b.staerke && b.staerke.grenze != null).every((b) => b.staerke.maxZeit === b.staerke.zeit[0]), deckel);
+const gesehen = [];
+for (const bot of [delia, botNachId('koenig')]) {
+  await botZug({ analyse: async (fen, o) => { gesehen.push(`${bot.id}:${o.movetime}`); return attrappe(100).analyse(fen); } }, FEN, bot, { ohnePause: true, zufall: () => 0.5 });
+}
+pruefe('botZug sucht mit movetime = maxZeit', JSON.stringify(gesehen) === JSON.stringify([`delia:${delia.staerke.zeit[0]}`, `koenig:${botNachId('koenig').staerke.zeit[0]}`]), gesehen);
+
 // Bots unter 1600 und ab 2200 unveraendert (Abdruck vor dem Umbau, Stand 5c6444f9)
 const abdruck = (s) => { let h = 2166136261; for (const c of JSON.stringify(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
 const unveraendert = BOTS.filter((b) => b.elo < 1600 || b.elo >= 2200).map((b) => b.staerke);
