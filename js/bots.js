@@ -62,6 +62,7 @@ export const ANLASS_NACH_ERGEBNIS = Object.freeze({ sieg: 'verliert', niederlage
 //  intuition   die besten n Engine-Zuege sind immer Kandidaten
 //  blick       zusaetzlich so viele naheliegende Zuege (gewichtet gezogen)
 //  rauschen    Bewertungsrauschen in Centipawn (Standardabweichung)
+//  grenze      (1600 bis 2100) kein Kandidat mehr als so viele Centipawn unter dem besten Zug der eigenen Analyse
 //  patzer      Chance auf einen spontanen Zug ohne Nachdenken
 //  mattInEins  Chance, ein Matt in 1 zu sehen (ab Stufe 4 immer)
 //  gier        Chance, bei einem Spontanzug trotzdem freies Material zu nehmen
@@ -182,8 +183,8 @@ export const BOTS = [
     id: 'delia', stufe: 16, welt: 3, elo: 1600,
     avatar: 'assets/avatare/07-dame-delia.svg', farbe: '#ff2d78',
     staerke: {
-      tiefe: 5, kurzTiefe: 2, kurzChance: 0.24, breite: 30, intuition: 3, blick: 3,
-      rauschen: 45, patzer: 0.02, mattInEins: 1, gier: 1,
+      grenze: 300, tiefe: 6, kurzTiefe: 3, kurzChance: 0.36, breite: 30, intuition: 3, blick: 3,
+      rauschen: 55, patzer: 0.02, mattInEins: 1, gier: 1,
       vorlieben: { schach: 250, opfer: 55 }, zeit: [700, 1400],
     },
   },
@@ -191,13 +192,13 @@ export const BOTS = [
     id: 'ottilie', stufe: 17, welt: 3, elo: 1700,
     avatar: 'assets/avatare/modern/ottilie.svg', farbe: '#567931',
     merkmale: { figur: 'B' },
-    staerke: { tiefe: 5, kurzTiefe: 2, kurzChance: 0.32, breite: 25, intuition: 3, blick: 2, rauschen: 82, patzer: 0.045, mattInEins: 1, gier: 1, vorlieben: { ruhig: 12 }, zeit: [800, 1500] },
+    staerke: { grenze: 300, tiefe: 7, kurzTiefe: 4, kurzChance: 0.32, breite: 25, intuition: 3, blick: 2, rauschen: 82, patzer: 0.045, mattInEins: 1, gier: 1, vorlieben: { ruhig: 12 }, zeit: [800, 1500] },
   },
   {
     id: 'koenig', stufe: 18, welt: 3, endgegner: true, elo: 1800,
     avatar: 'assets/avatare/08-kommissar-koenig.svg', farbe: '#d9b36c',
     staerke: {
-      tiefe: 6, kurzTiefe: 2, kurzChance: 0.36, breite: 20, intuition: 3, blick: 2,
+      grenze: 300, tiefe: 8, kurzTiefe: 4, kurzChance: 0.36, breite: 20, intuition: 3, blick: 2,
       rauschen: 90, patzer: 0.045, mattInEins: 1, gier: 1,
       endspiel: { rauschenFaktor: 0.5, tiefePlus: 3 },
       vorlieben: { koenigEndspiel: 15 }, zeit: [800, 1500],
@@ -207,19 +208,19 @@ export const BOTS = [
     id: 'lasse', stufe: 19, welt: 4, elo: 1900,
     avatar: 'assets/avatare/modern/lasse.svg', farbe: '#058894',
     merkmale: { figur: 'Q' },
-    staerke: { tiefe: 6, kurzTiefe: 2, kurzChance: 0.34, breite: 18, intuition: 3, blick: 2, rauschen: 76, patzer: 0.032, mattInEins: 1, gier: 1, vorlieben: { schach: 25, vorwaerts: 15 }, zeit: [800, 1500], maxZeit: 2500 },
+    staerke: { grenze: 200, tiefe: 8, kurzTiefe: 4, kurzChance: 0.34, breite: 18, intuition: 3, blick: 2, rauschen: 76, patzer: 0.032, mattInEins: 1, gier: 1, vorlieben: { schach: 25, vorwaerts: 15 }, zeit: [800, 1500], maxZeit: 2500 },
   },
   {
     id: 'wiebke', stufe: 20, welt: 4, elo: 2000,
     avatar: 'assets/avatare/modern/wiebke.svg', farbe: '#2772B0',
     merkmale: { figur: 'N' },
-    staerke: { tiefe: 7, kurzTiefe: 3, kurzChance: 0.32, breite: 14, intuition: 3, blick: 2, rauschen: 82, patzer: 0.028, mattInEins: 1, gier: 1, vorlieben: { ruhig: 10 }, zeit: [800, 1500], maxZeit: 2500 },
+    staerke: { grenze: 200, tiefe: 9, kurzTiefe: 5, kurzChance: 0.32, breite: 14, intuition: 3, blick: 2, rauschen: 92, patzer: 0.028, mattInEins: 1, gier: 1, vorlieben: { ruhig: 10 }, zeit: [800, 1500], maxZeit: 2500 },
   },
   {
     id: 'greta', stufe: 21, welt: 4, elo: 2100,
     avatar: 'assets/avatare/09-grossmeisterin-greta.svg', farbe: '#a06bff',
     staerke: {
-      tiefe: 7, kurzTiefe: 3, kurzChance: 0.3, breite: 12, intuition: 3, blick: 2,
+      grenze: 200, tiefe: 9, kurzTiefe: 5, kurzChance: 0.3, breite: 12, intuition: 3, blick: 2,
       rauschen: 84, patzer: 0.024, mattInEins: 1, gier: 1,
       vorlieben: {}, zeit: [800, 1500], maxZeit: 2500,
     },
@@ -728,6 +729,13 @@ function waehleKandidat(chess, zuege, analyse, bot, ctx) {
     const z = gewichteteWahl(pool, pool.map((m) => plausibel(m, bot, ctx.vollzug)), ctx.zufall);
     kandidaten.add(z.lan);
     pool = pool.filter((m) => m !== z);
+  }
+  // Grenze gegen grobe Fehler (1600 bis 2100, Bot-Patzer R19): kein Kandidat, den die eigene Analyse um mehr als s.grenze
+  // unter dem besten Zug sieht; nicht bewertete Zuege kennt die Analyse nicht und fallen dann heraus. Charakter-Boni und
+  // Rauschen waehlen danach nur noch innerhalb der Grenze.
+  if (s.grenze != null && rangliste.length) {
+    const boden = rangliste[0][1] - s.grenze;
+    for (const lan of [...kandidaten]) if (!bewertet.has(lan) || bewertet.get(lan) < boden) kandidaten.delete(lan);
   }
   if (kandidaten.size === 0) kandidaten.add(rangliste.length ? rangliste[0][0] : erlaubt[0].lan);
 
