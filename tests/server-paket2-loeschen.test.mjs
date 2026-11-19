@@ -105,11 +105,13 @@ async function loesche(db, uid) {
   pruefe('Schemas laufen (bisher, saison, weltrang, daten)', !fehler, fehler);
   if (fehler) { console.log(`\n${ok}/${gesamt} bestanden`); process.exit(1); }
 
-  const k = (await db.query(`select c.conrelid::regclass::text as t, c.confdeltype as art from pg_constraint c
+  // Name aus pg_class + pg_namespace: regclass::text laesst "public." weg, solange public im search_path steht
+  const k = (await db.query(`select cl.relname as t, c.confdeltype as art from pg_constraint c
+    join pg_class cl on cl.oid = c.conrelid join pg_namespace n on n.oid = cl.relnamespace
     where c.contype = 'f' and c.confrelid = 'auth.users'::regclass
-      and c.conrelid::regclass::text = any($1)`, [TABELLEN.map((t) => 'public.' + t)])).rows;
+      and n.nspname = 'public' and cl.relname = any($1)`, [TABELLEN])).rows;
   for (const t of TABELLEN) {
-    const z = k.find((x) => x.t === 'public.' + t);
+    const z = k.find((x) => x.t === t);
     pruefe(`${t}: Fremdschluessel auf auth.users mit on delete cascade`, z && z.art === 'c', JSON.stringify(z));
   }
 
@@ -149,6 +151,11 @@ async function loesche(db, uid) {
   const alt = '  user_id uuid primary key references auth.users (id) on delete cascade,\n  titel text,';
   const falsch = echt.replace(alt, '  user_id uuid primary key references auth.users (id),\n  titel text,');
   const { db, fehler } = await neueDb(falsch);
+  const fk = !fehler && (await db.query(`select c.confdeltype as art from pg_constraint c
+    join pg_class cl on cl.oid = c.conrelid join pg_namespace n on n.oid = cl.relnamespace
+    where c.contype = 'f' and c.confrelid = 'auth.users'::regclass and n.nspname = 'public' and cl.relname = 'saison_wahl'`)).rows;
+  pruefe('Gegenprobe: Fremdschluessel-Pruefung sieht bei saison_wahl keine Kaskade', fk && fk.length === 1 && fk[0].art !== 'c',
+    JSON.stringify(fk));
   const x = fehler || await lauf(db, 'Lage', LAGE);
   const e = !x && await loesche(db, A);
   const zeile = !x && (await db.query('select count(*)::int as n from public.saison_wahl where user_id = $1', [A])).rows[0].n;
