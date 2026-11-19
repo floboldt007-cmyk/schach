@@ -83,6 +83,7 @@ import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderst
 import { sitzung, eigenerName, ladeProfil, userId } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { pruefeUmzug } from './umzug.js';
+import { wechselNeuLaden, NEU_GELADEN_MERKER } from './sw-wechsel.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
@@ -938,15 +939,28 @@ function registriereSW() {
   let wechsel = false;
   // nur im Test: Ablauf des Versionswechsels fuer die Fehlermeldung von tests/e2e.test.mjs (Update)
   const swLog = (s) => { if (TEST) console.info('SW-Ablauf ' + s); };
+  // nur im Test kuerzer (?swnot=ms, tests/sw-update.test.mjs Runde 2)
+  const NOTBREMSE_MS = (TEST && Number((location.search.match(/[?&]swnot=(\d+)/) || [])[1])) || 30000;
   const neuLaden = (grund) => {
     if (!wechsel) return;
     wechsel = false;
     swLog('neu laden: ' + grund);
     location.reload();
   };
+  const hatteController = !!sw.controller;
   sw.addEventListener('controllerchange', () => {
     swLog('controllerchange wechsel=' + wechsel);
-    neuLaden('controllerchange');
+    if (wechsel) { neuLaden('controllerchange'); return; }
+    // den Wechsel hat eine fruehere Seite angestossen (Notbremse) oder ein anderer Tab (js/sw-wechsel.js)
+    let zuletztNeu = 0;
+    try { zuletztNeu = Number(sessionStorage.getItem(NEU_GELADEN_MERKER) || 0); } catch (e) { /* egal */ }
+    const was = wechselNeuLaden({ eigenerWechsel: false, hatteController, imSpiel: imSpiel() || !!(aktuell && aktuell.name === 'analyse'),
+      zuletztNeu, jetzt: Date.now() });
+    swLog('fremder Wechsel: ' + was);
+    if (was === 'neu laden') {
+      try { sessionStorage.setItem(NEU_GELADEN_MERKER, String(Date.now())); } catch (e) { /* egal */ }
+      location.reload();
+    } else if (was === 'hinweis') zeigeUpdateHinweis(() => location.reload());
   });
   const aktiviere = (w) => {
     swLog('aktiviere von ' + String((new Error().stack || '').split('\n')[2] || '').trim().replace(/^.*\/js\//, ''));
@@ -958,11 +972,19 @@ function registriereSW() {
     // frueh (b6, CI 13.11.2026): der alte Worker beantwortete die Seite noch aus dem alten Cache, die neue Version
     // uebernahm danach ohne Neuladen, und die alte Seite lief mit dem neuen Service Worker.
     w.addEventListener('statechange', () => {
+      swLog('neuer Worker ' + w.state);
       if (w.state === 'activated' || w.state === 'redundant') neuLaden('statechange ' + w.state);
     });
     w.postMessage('aktivieren');
     if (w.state === 'activated' || w.state === 'redundant') neuLaden('schon ' + w.state);
-    setTimeout(() => neuLaden('Notbremse'), 30000);   // falls die neue Version haengt: die Seite ist schon verlassen
+    // falls die neue Version haengt (eine Anfrage im alten Worker ist noch offen): die Seite ist schon verlassen. Der Merker
+    // zaehlt neu, damit die neue Seite nur den Hinweis zeigt, statt den Wechsel wieder anzustossen und 30 s spaeter erneut
+    // neu zu laden; uebernimmt die neue Version danach, laedt controllerchange einmal neu.
+    setTimeout(() => {
+      if (!wechsel) return;
+      try { sessionStorage.setItem(SW_MERKER, String(Date.now())); } catch (e) { /* egal */ }
+      neuLaden('Notbremse');
+    }, NOTBREMSE_MS);
   };
   const kuerzlich = () => {
     try { return Date.now() - Number(sessionStorage.getItem(SW_MERKER) || 0) < 15000; } catch (e) { return true; }
