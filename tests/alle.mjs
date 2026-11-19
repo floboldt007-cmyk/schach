@@ -135,6 +135,8 @@ const SUITEN = [
   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
   { name: 'info-lizenzen', datei: 'info-lizenzen.test.mjs', args: [], was: 'Info und Lizenzen: jede Fremdlizenz und der eigene Quellcode in DE und EN, Herkunft Kuerbis/Frost/Gold, jeder Figurensatz mit Herkunftszeile (Teil 1b), Gold und Elfenbein als bearbeitetes cburnett (Browser)' },
   // kommtMit: die Datei kommt erst mit diesem Zweig; bis dahin steht die Suite sichtbar als "kommt noch" da (fc-18:11, Punkt 4)
+  { name: 'r20-start-befunde', datei: 'r20-start-befunde.test.mjs', args: [], kommtMit: 'so/R20-start-befunde', was: 'Feinschliff R20: Einfuehrung zaehlt alle Seiten, Befunde 1 und 2 aus dem fable-check 19.11. (Browser)' },
+  { name: 'r20-fable-rest', datei: 'r20-fable-rest.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'fable-check 19.11.: Befunde 10, 11, 14 und 15 (Analyse am Handy u. a., Browser)' },
   { name: 'bot-grenze', datei: 'bot-grenze.test.mjs', args: [], kommtMit: 'so/R19-bot-grenze', was: 'Bots 1600 bis 2100: Grenze gegen grobe Fehler (Engine-Attrappe, feste Seeds)' },
   { name: 'r19-figuren-gold', datei: 'r19-figuren-gold.test.mjs', args: [], was: 'Labor-Figuren Gold und Elfenbein: 12 eigene Dateien mit fester Pruefsumme, Eintraege und Herkunft, auf jedem Brett Kante ab 3:1 und Weiss/Schwarz ab 25 L* (Browser)' },
   { name: 'r18-botschutz-link', datei: 'r18-botschutz-link.test.mjs', args: [], was: 'Bot-Schutz-Hinweis der Anmeldung: Link "Mehr dazu" >= 44 px und an 9 Punkten genau getroffen, 7 Groessen hell und dunkel (Browser)' },
