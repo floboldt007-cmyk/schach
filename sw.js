@@ -834,7 +834,7 @@ self.addEventListener('install', (e) => {
     await Promise.all(DATEIEN.map(async (datei) => {
       const antwort = await holeFrisch(datei, alt);
       if (!antwort.ok) throw new Error(`Vorladen fehlgeschlagen: ${datei} (${antwort.status})`);
-      await cache.put(datei, await ohneFrische(await mitTyp(datei, antwort)));
+      await cache.put(datei, ohneFrische(await mitTyp(datei, antwort)));
     }));
   })());
 });
@@ -870,10 +870,10 @@ self.addEventListener('fetch', (e) => {
 // Worker offen (Chromium wechselte einmal erst nach 30 s), ganz gelesen schloss WebKit den alten Worker mitten im Lesen
 // ("Service Worker context closed", 2 von 3 Laeufen). Grenze: Eintraege, die eine aeltere Fassung abgelegt hat, tragen den
 // Kopf noch nicht; das gilt fuer den ersten Wechsel nach dieser Aenderung.
-async function ohneFrische(antwort) {
+function ohneFrische(antwort) {
   const kopf = new Headers(antwort.headers);
   kopf.set('Cache-Control', 'no-cache');
-  return new Response(await antwort.blob(), { status: antwort.status, statusText: antwort.statusText, headers: kopf });
+  return new Response(antwort.body, { status: antwort.status, statusText: antwort.statusText, headers: kopf });
 }
 
 async function antworte(req, url) {
@@ -889,7 +889,7 @@ async function antworte(req, url) {
   const antwort = await fetch(req);
   if (antwort.status === 200 && antwort.type === 'basic') {
     const kopie = antwort.clone();
-    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then(async (cache) => cache && cache.put(req, await ohneFrische(kopie)))
+    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, ohneFrische(kopie)))
       .catch(() => { /* Speicher voll o. ae.: egal */ });
   }
   return antwort;
