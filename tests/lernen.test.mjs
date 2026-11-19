@@ -618,8 +618,9 @@ async function gratisTeil(browser) {
   }));
   pruefe('Gratis: Mattbilder mit 13 Schlössern (20 minus 6 leicht minus Probe), Probe „Ersticktes Matt“ offen mit Marke',
     r.gesperrt.length === 13 && r.schloss === 13 && !r.gesperrt.includes('grundreihe') && r.probeOffen && /Gratis-Probe/.test(r.probe), r);
-  pruefe('Gratis: Kopf zeigt die Sterne der Meisterschule (0 / 195), vier Bereichskarten, Gruppen nach Stufe',
-    /0\s*\/\s*195/.test(r.kopf) && r.karten === 4 && /Leicht · gratis\|Mittel\|Schwer und Meister/.test(r.gruppen), r);
+  // fuenf Karten seit dem Kurs Erste Schritte (19.11.2026, vorn, eigene Sterne; der Kopf zaehlt weiter nur die Meisterschule)
+  pruefe('Gratis: Kopf zeigt die Sterne der Meisterschule (0 / 195), fünf Bereichskarten (Kurs Erste Schritte vorn), Gruppen nach Stufe',
+    /0\s*\/\s*195/.test(r.kopf) && r.karten === 5 && /Leicht · gratis\|Mittel\|Schwer und Meister/.test(r.gruppen), r);
   await p.s.locator('.ms-lektion[data-id="anderssen"]').click();
   await p.s.waitForSelector('.ms-liste .premium-hinweis', { timeout: 5000 }).catch(() => {});
   pruefe('Gratis: Tipp aufs Schloss zeigt den Trainer-Hinweis unter der Zeile, keine Lektion',

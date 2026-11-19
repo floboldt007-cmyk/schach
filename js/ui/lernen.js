@@ -19,7 +19,7 @@ import { staffel, tempo } from '../bewegung.js';
 import { ladeModul } from '../storage.js';
 import { t, datum } from '../sprache.js';
 import { istPremium, premiumHinweis } from '../abo.js';
-import { BEREICHE, artVon, stand, summe } from '../pakete/lernen/mattbilder.js';
+import { BEREICHE, ANSICHT, artVon, stand, summe } from '../pakete/lernen/mattbilder.js';
 import { istOffen, istGratis, istProbe, istImTrainer, inWillkommenswoche, willkommenBis } from '../pakete/lernen/zugang.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import '../sprachen/allgemein.js';
@@ -43,7 +43,9 @@ export function zeige(root, params, app) {
   root.append(s);
   ladeLernenCss();
   const st = stand(ladeModul(PAKET, {}));
-  let bereich = BEREICHE.find((b) => b.id === (params && params.bereich)) || BEREICHE[0];
+  // Kurs Erste Schritte (19.11.2026) steht als Karte vorn; geoeffnet wird er gezielt (params { bereich: 'erste' }, Start
+  // "Kennst du die Schachregeln?" Nein), ohne Angabe bleibt es wie bisher bei den Mattbildern
+  let bereich = ANSICHT.find((b) => b.id === (params && params.bereich)) || BEREICHE[0];
   s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: S('name'), chips: kopfChip(summe(st)) })}
     <div class="ms-rumpf">
       <div class="ms-bereiche" role="group" aria-label="${esc(S('bereichWahl'))}"></div>
@@ -64,14 +66,15 @@ export function zeige(root, params, app) {
   const inhalt = s.querySelector('.ms-bereich');
 
   function zeichneKarten() {
-    karten.innerHTML = BEREICHE.map((b) => {
+    karten.innerHTML = ANSICHT.map((b) => {
       const sum = summe(st, b.id);
       const anteil = sum.max ? Math.round((sum.sterne / sum.max) * 100) : 0;
       const gratis = b.lektionen.filter(istGratis).length;
-      return `<button class="ms-bkarte dr" type="button" data-bereich="${b.id}" aria-pressed="${b === bereich}">
+      // der Kurs ist ganz frei: keine Zeile "n gratis"
+      return `<button class="ms-bkarte dr" type="button" data-bereich="${b.id}" aria-pressed="${b === bereich}"${b.kurs ? ' data-kurs' : ''}>
         <b>${esc(S('bereich.' + b.id))}</b>
         <span class="ms-bk-zeile"><span class="ms-bk-sterne zahl">${icon('stern')}${sum.sterne}<span class="von"> / ${sum.max}</span></span>
-          <span class="ms-bk-gratis">${esc(S('gratisZahl', { n: gratis }))}</span></span>
+          ${b.kurs ? '' : `<span class="ms-bk-gratis">${esc(S('gratisZahl', { n: gratis }))}</span>`}</span>
         <span class="ms-bk-balken" aria-hidden="true"><i style="width:${anteil}%"></i></span></button>`;
     }).join('');
   }
@@ -110,7 +113,11 @@ export function zeige(root, params, app) {
     const nr = (l) => bereich.lektionen.indexOf(l);
     inhalt.innerHTML = `${seitenKopf({ ueber: S('name'), titel: S('bereich.' + bereich.id), text: S('text.' + bereich.id) })}
       ${weiterHtml()}
-      ${GRUPPEN.map(([id, stufen]) => {
+      ${bereich.kurs ? [...new Set(bereich.lektionen.map((l) => l.kapitel))].map((k) => {
+        const liste = bereich.lektionen.filter((l) => l.kapitel === k);
+        return `<section class="ms-gruppe" data-kapitel="${k}"><h2>${esc(S('kapitel.' + k))}</h2>
+          <ol class="ms-liste">${liste.map((l) => zeile(l, nr(l), false)).join('')}</ol></section>`;
+      }).join('') : GRUPPEN.map(([id, stufen]) => {
         const liste = bereich.lektionen.filter((l) => stufen.includes(l.stufe));
         if (!liste.length) return '';
         return `<section class="ms-gruppe" data-stufe="${id}"><h2>${esc(S('gruppe.' + id))}</h2>
@@ -123,7 +130,7 @@ export function zeige(root, params, app) {
   }
 
   function waehle(id) {
-    const neu = BEREICHE.find((b) => b.id === id);
+    const neu = ANSICHT.find((b) => b.id === id);
     if (!neu || neu === bereich) return;
     bereich = neu;
     for (const k of karten.querySelectorAll('.ms-bkarte')) k.setAttribute('aria-pressed', String(k.dataset.bereich === id));

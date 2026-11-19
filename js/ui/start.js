@@ -4,7 +4,8 @@
 //
 //   zeige(root, { seite }, app) -> { verlasse() }
 //   seite: 'w1' | 'w2' | 'w3'   drei kurze Seiten (Was ist Crownmate, deine Gegner, wie du lernst), ueberspringbar
-//          'frage'              "Kennst du die Schachregeln?": Ja -> Einstufung, Nein -> Regel-Hilfe (Raetsel-Bildschirm)
+//          'frage'              "Kennst du die Schachregeln?": Ja -> Einstufung, Nein -> Kurs Erste Schritte (lernen
+//                               { bereich: 'erste' }, seit 19.11.2026; die Regel-Hilfe bleibt in den Einstellungen)
 //          'einstufung'         Angebot des Einstufungstests (8 Aufgaben im Raetsel-Bildschirm)
 //          'empfehlung'         Ergebnis der letzten Einstufung: Bot mit Begruendung, Probepartie oder Partie, Leiter
 //          'nach-regeln'        nach der Regel-Hilfe: erste Partie gegen den ersten Bot der Leiter (BOTS[0], Bauer Lukas)
@@ -301,7 +302,9 @@ export function zeige(root, params, app) {
     else if (was === 'ueberspringen') geheZu('frage');
     else if (was === 'punkt') geheZu(k.dataset.ziel, INTRO.indexOf(k.dataset.ziel) < i ? -1 : 1);
     else if (was === 'ja' || was === 'einstufung-seite' || was === 'wiederholen') geheZu('einstufung');
-    else if (was === 'nein') { D.setzeRueck('frage'); app.gehe('raetsel', { quelle: D.QUELLE_REGELN }); }
+    // Nein: Kurs Erste Schritte (19.11.2026, js/pakete/lernen/erste-schritte.js); die Regel-Hilfe (Raetsel-Quelle
+    // start-regeln) bleibt ueber die Einstellungen, Gruppe Erste Schritte, erreichbar, bis der Kurs alle Kapitel hat
+    else if (was === 'nein') { D.setzeRueck('frage'); app.gehe('lernen', { bereich: 'erste' }); }
     else if (was === 'einstufung-start') { D.setzeRueck('einstufung'); app.gehe('raetsel', { quelle: D.QUELLE_EINSTUFUNG }); }
     // Etappe A: "Ich kenne mich aus" fuehrt zur Startseite heim, der Knopf zur Arena bleibt bei der Arena
     else if (was === 'raus') app.gehe('heim', {}, { ersetzen: true });

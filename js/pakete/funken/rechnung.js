@@ -99,6 +99,8 @@ export const LERN = Object.freeze({
   wort: 5,
   karte1: 10, karte2: 4, kartenTag: 8,
   lektion: 40, ringSicher: 20, ringGemeistert: 40,
+  // Kurs "Erste Schritte" (Ereignis-Id 'erste-...'): 10 beim ersten Abschluss, keine Ring-Boni (Annahme 19.11.2026, Flo kann kippen)
+  kurs: 10,
   raetsel: Object.freeze([[200, 12], [-199, 8], [-399, 4], [-Infinity, 1]]), raetselFalsch: 1,
 });
 // Tabelle C (Tag und Meilensteine)
@@ -271,11 +273,16 @@ export function kartenFunken({ richtig, versuch = 1 } = {}) {
   return 0;
 }
 
-// alt: bisher gebuchte Stufen der Lektion ('a' abgeschlossen, 's' sicher, 'g' gemeistert); ringe: Stand danach
-export function lektionFunken({ alt = '', ringe = {} } = {}) {
+// alt: bisher gebuchte Stufen der Lektion ('a' abgeschlossen, 's' sicher, 'g' gemeistert); ringe: Stand danach;
+// id: Ereignis-Id der Lektion ('<bereich>-<id>'), der Kurs (erste-...) bucht nur LERN.kurs beim ersten Abschluss
+export function lektionFunken({ alt = '', ringe = {}, id = '' } = {}) {
   const r = ringe || {};
   let funken = 0;
   let neu = String(alt || '');
+  if (/^erste-/.test(String(id || ''))) {
+    if (!neu.includes('a')) { funken += LERN.kurs; neu += 'a'; }
+    return { funken, neu };
+  }
   if (!neu.includes('a')) { funken += LERN.lektion; neu += 'a'; }
   if (r.sicher === true && !neu.includes('s')) { funken += LERN.ringSicher; neu += 's'; }
   if (r.gemeistert === true && !neu.includes('g')) { funken += LERN.ringGemeistert; neu += 'g'; }
