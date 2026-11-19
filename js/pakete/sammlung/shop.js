@@ -1,4 +1,6 @@
-// Shop-Bereich der Sammlung: limitierte Editionen (Server-Etappe 1, supabase/werkstatt-schema.sql). Verkauft wird noch
+// Shop-Bereich der Sammlung. Seit R19 ist Shop A (js/pakete/sammlung/shop-entwurf.js) der Standard: fuenf feste Plaetze,
+// ohne Kauf-Weg Schloss und "Bald" statt Preis und Kaufen. Der alte Shop unten erscheint nur noch mit ?shopStil=alt.
+// Alter Shop: limitierte Editionen (Server-Etappe 1, supabase/werkstatt-schema.sql). Verkauft wird noch
 // nichts: Der Kaufknopf heisst "Bald verfuegbar", bis Gewerbe und Rechtstexte stehen (ENTSCHEIDUNGEN 29.10. und 30.10.).
 // Regeln (ENTSCHEIDUNGEN 29.10./30.10., Fairness-Test):
 // - Editionen sieht nur, wer angemeldet ist und "18 oder aelter" bestaetigt hat (edition_staende liefert sonst []).
@@ -135,16 +137,19 @@ export function shopBereich({ app } = {}) {
     return b;
   };
   async function lade() {
-    // R19 Shop A mit fuenf festen Plaetzen (nur mit ?shopStil=a, js/pakete/sammlung/shop-entwurf.js): auch als Gast und bei
-    // einem Serverfehler, dann ohne Editionen ("Preis folgt"); den Preis liest derselbe Aufruf wie unten
+    // R19 Shop A mit fuenf festen Plaetzen (Standard seit 16.11., js/pakete/sammlung/shop-entwurf.js): auch als Gast und bei
+    // einem Serverfehler; derselbe Aufruf wie unten liefert die Editionen. Angemeldet steht eine Edition nur, wenn der Server
+    // sie liefert (ab 18, wie der alte Weg), ein Gast sieht sie wie unten als Katalog-Stueck. Der alte Weg darunter
+    // (Anmelden, Altersfrage, Anprobe) kommt nur noch mit ?shopStil=alt
     const stil = shopStil();
     if (stil) {
       satz(S('shop.laedt'));
       let editionen = [];
-      if (sitzung()) {
-        try { const r = await rufe('edition_staende', (await aktiveSitzung()).access_token); editionen = Array.isArray(r) ? r : []; } catch (e) { /* ohne Preis */ }
+      const gast = !sitzung();
+      if (!gast) {
+        try { const r = await rufe('edition_staende', (await aktiveSitzung()).access_token); editionen = Array.isArray(r) ? r : []; } catch (e) { /* ohne Editionen */ }
       }
-      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen, katalog: KATALOG, produktName, bereich: s, app })); return; }
+      try { inhalt.replaceChildren(await shopEntwurf({ stil, editionen, gast, katalog: KATALOG, produktName, bereich: s })); return; }
       catch (e) { console.error(e); }
     }
     if (!sitzung()) {

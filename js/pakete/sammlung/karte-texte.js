@@ -4,9 +4,9 @@ import { registriereTexte } from '../../sprache.js';
 registriereTexte('p-karte', {
   de: {
     'stufe.0': 'Noch offen', 'stufe.1': 'Bronze', 'stufe.2': 'Silber', 'stufe.3': 'Gold',
-    'fam.siege': 'Siegeszug', 'fam.bots': 'Bot-Leiter', 'fam.welten': 'Weltenbummler', 'fam.sterne': 'Sternensammler',
-    'fam.endgegner': 'Endgegner', 'fam.siegesfolge': 'Siegesfolge', 'fam.raetsel': 'Rätselfreund', 'fam.serie': 'Treue',
-    'fam.level': 'Erfahrung', 'fam.liga': 'Ligaaufstieg',
+    'fam.siege': 'Siegeszug', 'fam.bots': 'Bot-Leiter', 'fam.welten': 'Welten\u00ADbummler', 'fam.sterne': 'Sternen\u00ADsammler',
+    'fam.endgegner': 'Endgegner', 'fam.siegesfolge': 'Sieges\u00ADfolge', 'fam.raetsel': 'Rätsel\u00ADfreund', 'fam.serie': 'Treue',
+    'fam.level': 'Erfahrung', 'fam.liga': 'Liga\u00ADaufstieg',
     'was.siege': 'Siege gegen Bots', 'was.bots': 'verschiedene Bots besiegt', 'was.welten': 'Welten gemeistert',
     'was.sterne': 'Sterne', 'was.endgegner': 'Endgegner besiegt', 'was.siegesfolge': 'Siege in Folge',
     'was.raetsel': 'Rätsel gelöst', 'was.serie': 'Tage Serie', 'was.level': 'Level', 'was.liga': 'Kronen-Stufe',
@@ -28,6 +28,9 @@ registriereTexte('p-karte', {
     'b.erfolg-raetselmeister': 'Rätselmeister', 'b.erfolg-seriensieger': 'Seriensieger', 'b.erfolg-turmbezwinger': 'Turmbezwinger',
     'b.weg.saison': 'Aus der Liga: Platz 1 der Wochen-Gruppe oder erster Aufstieg',
     'b.weg.stufe': 'Aus der Liga: Platz 1 in {stufe} oder Aufstieg nach {stufe}', 'b.weg.stufeUnten': 'Aus der Liga: Platz 1 einer Gruppe in {stufe}', 'b.weg.erfolg': 'Gold-Stufe: {name}',
+    // R19 Season auf der Karte des Gegners: bestes Abzeichen und ein selbst gewaehlter Titel (Flo 14.11.2026)
+    'saison.abzeichen': 'S{n} · {stufe}', 'saison.abzeichenLang': 'Bestes Season-Abzeichen: Season {n}, {stufe}',
+    'saison.titel.crownmaster': 'Crownmaster Season {n}', 'saison.titel.top10': 'Top 10 Season {n}', 'saison.titel.top100': 'Top 100 Season {n}',
   },
   en: {
     'stufe.0': 'Not yet', 'stufe.1': 'Bronze', 'stufe.2': 'Silver', 'stufe.3': 'Gold',
@@ -52,5 +55,7 @@ registriereTexte('p-karte', {
     'b.erfolg-raetselmeister': 'Puzzle master', 'b.erfolg-seriensieger': 'Streak winner', 'b.erfolg-turmbezwinger': 'Tower breaker',
     'b.weg.saison': 'From the league: first place in the weekly group or a first promotion',
     'b.weg.stufe': 'From the league: first place in {stufe} or promotion to {stufe}', 'b.weg.stufeUnten': 'From the league: first place in a {stufe} group', 'b.weg.erfolg': 'Gold tier: {name}',
+    'saison.abzeichen': 'S{n} · {stufe}', 'saison.abzeichenLang': 'Best season badge: Season {n}, {stufe}',
+    'saison.titel.crownmaster': 'Crownmaster Season {n}', 'saison.titel.top10': 'Top 10 Season {n}', 'saison.titel.top100': 'Top 100 Season {n}',
   },
 });

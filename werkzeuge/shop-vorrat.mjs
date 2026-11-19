@@ -1,6 +1,6 @@
 // Shop-Vorrat (Konzept 06.11.2026, Abschnitt 4 und 10b: "Shop-Inhalte zeichnet Claude als SVG, zum Start mindestens
 // 4 Wochen Vorrat, rund 24 Stuecke. Flo gibt jedes Set frei."). Eigene Formen (GPL-3.0 wie das Projekt), keine Preise:
-// die stehen nur im Vault. Noch NICHT eingebaut: nichts in js/, css/ oder sw.js verweist auf diese Dateien.
+// die stehen nur im Vault. Die App liest die Liste in js/pakete/sammlung/shop-entwurf.js; sw.js verweist nicht auf diese Dateien.
 //   node werkzeuge/shop-vorrat.mjs   schreibt assets/shop/** , assets/shop/vorrat.json und docs/shop-vorrat.html
 // Figuren-Sets: 12 Figuren je Set wie assets/pieces/<set>/ (wK.svg ... bP.svg), zwei Grundformen (rund gedrechselt,
 // kantig geschliffen) mit eigenem Schmuck je Set. Bretter: Vorschau-SVG plus hell/dunkel/rand im Format von
@@ -162,7 +162,8 @@ const BRETTER = [
   { id: 'sandstein', name: 'Sandstein', seltenheit: 'Selten', hell: '#F1E1C2', dunkel: '#C4935E', rand: '#6E4A2A', text: 'Warmer Stein mit feiner Koernung.',
     muster: () => je(HELL, (x, y) => `<circle cx="${x + 3}" cy="${y + 4}" r=".7"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".5"/>`).replace(/<circle/g, '<circle fill="rgba(120,80,40,.28)"')
       + je(DUNKEL, (x, y) => `<circle fill="rgba(80,40,10,.25)" cx="${x + 4}" cy="${y + 7}" r=".8"/>`) },
-  { id: 'mitternacht', name: 'Mitternacht', seltenheit: 'Selten', hell: '#C9CFE6', dunkel: '#2E3766', rand: '#12152B', text: 'Tiefblau mit winzigen Sternen.',
+  // Kennung bleibt mitternacht; der sichtbare Name weicht der Edition "Mitternacht & Gold" aus (Freigabe 18.11.2026)
+  { id: 'mitternacht', name: 'Nachtblau', nameEn: 'Night Blue', seltenheit: 'Selten', hell: '#C9CFE6', dunkel: '#46549B', rand: '#12152B', text: 'Kräftiges Blau mit winzigen Sternen.',
     muster: () => je(DUNKEL, (x, y) => `<circle cx="${x + 3}" cy="${y + 3}" r=".55"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".4"/>`).replace(/<circle/g, '<circle fill="rgba(255,255,255,.7)"') },
   { id: 'kirschbluete', name: 'Kirschblüte', seltenheit: 'Selten', hell: '#FBE8EC', dunkel: '#D98AA0', rand: '#6B2E3E', text: 'Zartrosa mit kleinen Blueten.',
     muster: () => je(HELL, (x, y) => [0, 1, 2, 3, 4].map((i) => { const w = -Math.PI / 2 + (i * 2 * Math.PI) / 5; return `<circle fill="rgba(217,138,160,.4)" cx="${n(x + 5.5 + 1.5 * Math.cos(w))}" cy="${n(y + 5.5 + 1.5 * Math.sin(w))}" r="1"/>`; }).join('')) },
@@ -177,11 +178,12 @@ const BRETTER = [
     muster: () => '', rahmen: () => '<g fill="#D99A6C">' + [[3, 3], [97, 3], [3, 97], [97, 97], [50, 3], [50, 97], [3, 50], [97, 50]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3"/>`).join('') + '</g>' },
   // G-002 (Ausreisser 07.11.): Felder waren unter dem Schleier schlecht zu unterscheiden; jetzt hellere helle und dunklere
   // dunkle Felder, das Nordlicht liegt nur im Rahmen und als feine Kante um das Feld
-  { id: 'aurora', name: 'Aurora', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#1E3050', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
+  // 18.11.2026: dunkel bei Aurora, Nachtblau und Kronsaal aufgehellt, schwarze Figuren brauchen dort mindestens 3:1
+  { id: 'aurora', name: 'Aurora', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#375994', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
     muster: () => '', defs: '<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3BE8B0"/><stop offset=".5" stop-color="#4C6EF5"/><stop offset="1" stop-color="#B565F0"/></linearGradient>',
     ueber: '<path d="M0 6a6 6 0 0 1 6-6h88a6 6 0 0 1 6 6v88a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6zM6 6v88h88V6z" fill="url(#a)" fill-rule="evenodd" opacity=".85"/>'
       + '<rect x="6" y="6" width="88" height="88" fill="none" stroke="url(#a)" stroke-width=".8"/>' },
-  { id: 'kronsaal', name: 'Kronsaal', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#7A1F2E', rand: '#B8862B', text: 'Sonder-Brett: Weinrot und Gold mit Kronen im Feld.',
+  { id: 'kronsaal', name: 'Kronsaal', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#A52A3E', rand: '#B8862B', text: 'Sonder-Brett: Karminrot und Gold mit Kronen im Feld.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x + 3} ${y + 7.5}V${y + 4}l1.5 1.5 1-2 1 2 1.5-1.5v3.5z" fill="rgba(232,190,90,.5)"/>`),
     rahmen: () => '<rect x="3.2" y="3.2" width="93.6" height="93.6" rx="4" fill="none" stroke="#F3D27A" stroke-width=".9"/><rect x="6" y="6" width="88" height="88" fill="none" stroke="#5A3A08" stroke-width=".7"/>' },
 ];
@@ -216,9 +218,12 @@ const EFFEKTE = [
     svg: () => '<g stroke="#22223A" stroke-width=".6">' + Array.from({ length: 14 }, (_, i) => { const x = 6 + ((i * 37) % 88), d = 1.8 + (i % 4) * 0.35, s = -((i * 0.53) % d);
       return `<rect x="${x}" y="-4" width="4" height="8" rx="1" fill="${KONFETTI_FARBEN[i % 5]}">${bewegt('translate', `0 -12;${(i % 3) * 6 - 6} 112`, d, s)}${bewegt('rotate', `0 ${x + 2} 0;${i % 2 ? 360 : -360} ${x + 2} 0`, d, s, true)}</rect>`; }).join('') + '</g>' },
   { id: 'lichtsaeule', name: 'Lichtsäule', art: 'sieg', seltenheit: 'Selten', text: 'Ein Lichtstrahl steigt ueber dem Koenig auf.',
-    svg: () => '<defs><linearGradient id="s" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#F59F00" stop-opacity=".9"/><stop offset="1" stop-color="#F59F00" stop-opacity="0"/></linearGradient></defs>'
-      + `<rect x="36" y="0" width="28" height="100" rx="14" fill="url(#s)">${anim('opacity', '.35;1;.35', 1.6)}</rect><rect x="46" y="8" width="8" height="92" rx="4" fill="#FFD43B">${anim('opacity', '.5;1;.5', 1.6)}</rect>`
-      + '<g fill="#E8590C">' + [0, 1, 2, 3, 4].map((i) => `<circle cx="${40 + i * 5}" cy="90" r="1.8">${anim('cy', '92;8', 1.8, -i * 0.36)}${anim('opacity', '1;0', 1.8, -i * 0.36)}</circle>`).join('') + '</g>' },
+    // Freigabe 18.11.2026 (wirkte wie ein dicker Balken): schmaler Kegel, feiner Kern, Ring am Fuss, aufsteigende Funkel
+    svg: () => '<defs><linearGradient id="s" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFC233" stop-opacity="0"/><stop offset=".16" stop-color="#FFC233" stop-opacity=".7"/><stop offset="1" stop-color="#FFC233" stop-opacity="0"/></linearGradient>'
+      + '<linearGradient id="k" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFF1C2" stop-opacity="0"/><stop offset=".16" stop-color="#FFF1C2"/><stop offset="1" stop-color="#FFF1C2" stop-opacity="0"/></linearGradient></defs>'
+      + `<path d="M43 92L49 6h2L57 92z" fill="url(#s)">${anim('opacity', '.4;1;.4', 1.6)}</path><rect x="49.2" y="10" width="1.6" height="82" rx=".8" fill="url(#k)">${anim('opacity', '.6;1;.6', 1.6)}</rect>`
+      + `<ellipse cx="50" cy="92" rx="6" ry="2" fill="none" stroke="#FFC233" stroke-width="1.2">${anim('rx', '6;20', 1.6)}${anim('ry', '2;5', 1.6)}${anim('opacity', '1;0', 1.6)}</ellipse>`
+      + '<g fill="#FFC233" stroke="#8A6100" stroke-width=".6">' + [[40, 84, 0], [60, 78, -0.6], [46, 70, -1.2]].map(([x, y, s]) => `<path d="${funkel(x, y, 3.2)}">${bewegt('translate', '0 0;0 -56', 1.8, s)}${anim('opacity', '0;1;0', 1.8, s)}</path>`).join('') + '</g>' },
   { id: 'sternschnuppe', name: 'Sternschnuppe', art: 'sieg', seltenheit: 'Selten', text: 'Ein Stern zieht mit Schweif ueber das Brett.',
     svg: () => '<defs><linearGradient id="t" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="-32" y2="19"><stop offset="0" stop-color="#FFC233"/><stop offset="1" stop-color="#FFC233" stop-opacity="0"/></linearGradient></defs>'
       + `<g>${bewegt('translate', '14 82;86 18', 1.6, -0.6)}${anim('opacity', '0;1;1;0', 1.6, -0.6, ' keyTimes="0;.15;.8;1"')}<path d="M0 0L-32 19" stroke="url(#t)" stroke-width="5" stroke-linecap="round"/><path d="${STERN5(8)}" fill="#FFC233" stroke="#8A6100" stroke-width="1.2" stroke-linejoin="round"/></g>`
@@ -247,10 +252,12 @@ for (const set of SETS) {
   }
   stuecke.push({ id: set.id, art: 'figuren', name: set.name, seltenheit: set.seltenheit, text: set.text, ordner: `assets/shop/figuren/${set.id}`, figuren: 12 });
 }
+// Fertiger Satz aus assets/pieces (Flos Wahl 18.11.2026): steht im Vorrat, wird hier nicht gezeichnet
+stuecke.push({ id: 'goldelfenbein', art: 'figuren', name: 'Gold und Elfenbein', name_en: 'Gold and Ivory', seltenheit: 'Episch', text: 'Klassische Formen in Gold und Elfenbein.', ordner: 'assets/pieces/goldelfenbein', figuren: 12 });
 for (const b of BRETTER) {
   const rel = `assets/shop/bretter/${b.id}.svg`;
   groessen.push([rel, schreibe(rel, brettSvg(b))]);
-  stuecke.push({ id: b.id, art: 'brett', name: b.name, seltenheit: b.seltenheit, text: b.text, datei: rel, hell: b.hell, dunkel: b.dunkel, rand: b.rand });
+  stuecke.push({ id: b.id, art: 'brett', name: b.name, ...(b.nameEn ? { name_en: b.nameEn } : {}), seltenheit: b.seltenheit, text: b.text, datei: rel, hell: b.hell, dunkel: b.dunkel, rand: b.rand });
 }
 for (const e of EFFEKTE) {
   const rel = `assets/shop/effekte/${e.id}.svg`;
@@ -258,8 +265,8 @@ for (const e of EFFEKTE) {
   stuecke.push({ id: e.id, art: 'effekt', anlass: e.art, name: e.name, seltenheit: e.seltenheit, text: e.text, datei: rel });
 }
 const vorrat = {
-  stand: '2026-11-06',
-  hinweis: 'Nur Grafiken, noch nicht in die App eingebaut. Flo gibt jedes Stueck frei. Keine Preise: die stehen nur im Vault.',
+  stand: '2026-11-18',
+  hinweis: 'Grafiken fuer den Shop, die App liest diese Liste (js/pakete/sammlung/shop-entwurf.js). Verkauft wird damit noch nichts. Flo gibt jedes Stueck frei. Keine Preise: die stehen nur im Vault.',
   quelle: 'werkzeuge/shop-vorrat.mjs',
   seltenheiten: ['Häufig', 'Selten', 'Episch', 'Exklusiv'],
   stuecke,
@@ -298,7 +305,7 @@ h1{margin:0 0 4px;font-size:24px}h2{margin:28px 0 10px;font-size:18px}.leise{col
 .reihe{display:flex}.reihe img{width:26px;height:26px}.gross{width:110px;height:110px}
 </style></head><body>
 <h1>Shop-Vorrat Crownmate</h1>
-<p class="leise">${stuecke.length} Stuecke, Stand ${vorrat.stand}. Noch nicht in die App eingebaut, Flo gibt jedes Stueck frei. Je Stueck links heller, rechts dunkler Grund.
+<p class="leise">${stuecke.length} Stuecke, Stand ${vorrat.stand}. Die App liest diese Liste, verkauft wird damit noch nichts. Flo gibt jedes Stueck frei. Je Stueck links heller, rechts dunkler Grund.
 Seltenheit: ${vorrat.seltenheiten.map((st) => `${st} ${zaehl(st)}`).join(', ')}. Liste: assets/shop/vorrat.json.</p>
 ${[['figuren', 'Figuren-Sets (je 12 Figuren)'], ['brett', 'Bretter'], ['effekt', 'Sieges- und Zug-Effekte']].map(([art, titel]) => `<h2>${titel}</h2><div class="raster">${stuecke.filter((s) => s.art === art).map(karte).join('')}</div>`).join('\n')}
 </body></html>

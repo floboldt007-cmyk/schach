@@ -141,18 +141,20 @@ export function verbindeKopf(wurzel, app, { beiZurueck = null, beiEinstellungen 
     rahmen = 0;
     for (const kopf of wurzel.querySelectorAll('.haupt-kopf')) {
       const chips = kopf.querySelector('.kopf-chips');
-      const erster = chips && [...chips.children].find((c) => c.offsetWidth > 0 || c.getClientRects().length);
       kopf.classList.remove('ohne-chips');
-      if (chips && erster && chips.clientWidth + 1 < erster.offsetWidth) kopf.classList.add('ohne-chips');
-      // Ansicht (Flo 30.10.): auch spaetere Chips nie als Stummel; was nicht ganz passt, tritt zurueck
       if (!chips) continue;
+      // erst zuruecksetzen, dann messen: ein ausgeblendeter Chip hat keine Breite und galt beim naechsten Messen als "kein Chip"
       for (const c of chips.children) c.classList.remove('passt-nicht');
-      if (kopf.classList.contains('ohne-chips')) continue;
+      const erster = [...chips.children].find((c) => c.offsetWidth > 0 || c.getClientRects().length);
+      if (erster && chips.clientWidth + 1 < erster.offsetWidth) { kopf.classList.add('ohne-chips'); continue; }
+      // Ansicht (Flo 30.10.): auch spaetere Chips nie als Stummel; was nicht ganz passt, tritt zurueck
       const links = chips.getBoundingClientRect().left;
       for (const c of chips.children) {
         if (!(c.offsetWidth > 0)) continue;
         if (c.getBoundingClientRect().right - links > chips.clientWidth + 1) c.classList.add('passt-nicht');
       }
+      // bleibt kein Chip stehen, geht auch die Kapsel: ihr Polster war sonst der kleine Punkt im Kopf (Befund live 349)
+      if (chips.children.length && ![...chips.children].some((c) => c.offsetWidth > 0)) kopf.classList.add('ohne-chips');
     }
   };
   const spaeter = () => { if (!rahmen && typeof requestAnimationFrame === 'function') rahmen = requestAnimationFrame(passeChips); };

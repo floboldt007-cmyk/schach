@@ -98,9 +98,13 @@ pruefe('Handy und reduzierte Bewegung sind gestaltet', /max-width: 420px/.test(c
   pruefe('Rad ohne Kreatur zeigt die Sticker', radEintraege(null).every((e) => /class="emote-sticker"/.test(e.svg) && new RegExp(`data-emote="${e.id}"`).test(e.svg)));
   const ohne = teileEmotes(false);
   const mit = teileEmotes(true);
-  pruefe('Sammlung: Kreaturen gehoeren zu den Emotes (Gruppe unter den Stickern), nur fuer den Erfinder',
-    ohne.length === 8 && ohne.every((x) => x.frei && /emote-sticker/.test(x.bild) && x.gruppe === DE['gruppe.sticker'])
-    && mit.length === 8 + KREATUREN.length && mit.slice(8).every((x) => x.labor && x.gruppe === DE.kreaturen && /data-kreatur=/.test(x.bild) && typeof x.wahl === 'function'),
+  // seit R19 (tests/r19-emotes-erspielbar.test.mjs): hinter den acht Gratis-Stickern stehen sechs erspielbare Sticker, danach
+  // die Kreaturen; ohne Fortschritt ist alles davon gesperrt, im Labor des Erfinders frei
+  pruefe('Sammlung: Kreaturen gehoeren zu den Emotes (Gruppe unter den Stickern), ohne Fortschritt gesperrt und nicht waehlbar',
+    ohne.length === 14 + KREATUREN.length && ohne.slice(0, 8).every((x) => x.frei && /emote-sticker/.test(x.bild) && x.gruppe === DE['gruppe.sticker'])
+    && ohne.slice(8, 14).every((x) => !x.frei && x.gruppe === DE['gruppe.premium'])
+    && ohne.slice(14).every((x) => !x.frei && !x.labor && x.gruppe === DE.kreaturen && typeof x.wahl !== 'function')
+    && mit.length === 14 + KREATUREN.length && mit.slice(14).every((x) => x.labor && x.gruppe === DE.kreaturen && /data-kreatur=/.test(x.bild) && typeof x.wahl === 'function'),
     { ohne: ohne.length, mit: mit.length });
 }
 
@@ -507,8 +511,8 @@ async function kreaturTeil(browser) {
   await warteFlo(seite);
   await seite.locator('.em-aktion[data-emote-aktion="emotes"]').click({ timeout: 5000 });
   const rad = await seite.evaluate(() => [...document.querySelectorAll('.em-popup .em-wahl')].map((b) => b.dataset.wert + (b.classList.contains('em-kreatur') ? ':' + (b.querySelector('svg.kreatur') || { dataset: {} }).dataset.art : '')));
-  pruefe('Browser Labor: im Rad steht Kronli vorn (winken, staunen, denken, verbeugen), danach die Strichsymbole',
-    rad.slice(0, 4).join() === 'hallo:winken,staunen:staunen,denken:denken,respekt:verbeugen' && rad.length === 8 && rad.slice(4).every((x) => !x.includes(':')), rad);
+  pruefe('Browser Labor: im Rad steht Kronli vorn (winken, staunen, denken, verbeugen), danach die Strichsymbole und die sechs erspielbaren Sticker',
+    rad.slice(0, 4).join() === 'hallo:winken,staunen:staunen,denken:denken,respekt:verbeugen' && rad.length === 14 && rad.slice(4).every((x) => !x.includes(':')), rad);
   await seite.locator('.em-popup .em-wahl[data-wert="hallo"]').click({ timeout: 5000 });
   await warte(200);
   const blase = await seite.evaluate(() => { const k = document.querySelector('.em-blase.em-eigen svg.kreatur'); return k ? { art: k.dataset.art, anim: getComputedStyle(k).animationName, b: Math.round(k.getBoundingClientRect().width) } : null; });

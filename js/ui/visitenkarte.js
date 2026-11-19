@@ -6,7 +6,8 @@
 //
 //   visitenkarte(karte, { groesse }) -> div.vk[data-groesse][data-banner][data-ki?]
 //     karte { name, titel: { name, bild? } | null, banner, avatar (SVG), kronenStufe (0..17 | null), elo (100..4000 | null), ki,
-//             orden: [{ name, bild, stufe 1..3 }] }
+//             orden: [{ name, bild, stufe 1..3 }], saison: { saison, stufe } | null, saisonTitel: 'crownmaster-s1' | null }
+//   saisonText(abzeichen) -> 'S1 · Crownmate I' | '',  saisonTitelText(id) -> 'Crownmaster Season 1' | ''
 //   bannerUrl(id) -> URL des Banners (unbekannte Ids: das Start-Banner)
 //   BOT_BANNER, botBanner(bot) -> 'bot-…'   fest je Bot-Id, nie fuer Menschen
 //   botKarte(bot) -> karte          KI-Gegner: Name des Bots, Bot-Banner, sein Bild, Zeichen KI
@@ -18,7 +19,7 @@ import { waehle } from '../orte.js';
 import { t } from '../sprache.js';
 import { floAvatar, profilAvatar, avatarVon } from '../thema.js';
 import { profilWahl } from '../profil.js';
-import { stufeInfo } from '../pakete/liga/kronen.js';
+import { stufeInfo, saisonAbzeichen, saisonTitel } from '../pakete/liga/kronen.js';
 import '../pakete/sammlung/karte-texte.js';
 
 const K = (k, w) => t('p-karte.' + k, w);
@@ -62,6 +63,21 @@ export function kronenText(index) {
   return `${K('liga.' + (LIGA_NAMEN[s.farbe] || s.liga))} ${ROEMISCH[s.rang]}`;
 }
 
+// Rang-Symbol der Liga (assets/liga/<liga>.svg, wie js/pakete/liga/gruppe.js)
+export function ligaSymbolUrl(index) {
+  return new URL(`../../assets/liga/${stufeInfo(index).liga}.svg`, import.meta.url).href;
+}
+
+// R19 Season: "S1 · Crownmate I" und "Crownmaster Season 1"; unpassende Werte ergeben ''
+export function saisonText(abzeichen) {
+  const a = saisonAbzeichen(abzeichen);
+  return a ? K('saison.abzeichen', { n: a.saison, stufe: kronenText(a.stufe) }) : '';
+}
+export function saisonTitelText(id) {
+  const x = saisonTitel(id);
+  return x ? K('saison.titel.' + x.art, { n: x.saison }) : '';
+}
+
 export function botKarte(bot) {
   return { name: (bot && bot.name) || K('karte.kiGegner'), titel: null, banner: botBanner(bot), ki: true, kronenStufe: null, orden: [],
     avatar: bot ? `<img src="${esc(avatarVon(bot))}" alt="">` : '' };
@@ -80,6 +96,9 @@ export function karteVomServer(d, { orden = () => null, titel = () => null } = {
     kronenStufe: Number.isInteger(o.kronen_stufe) && o.kronen_stufe >= 0 && o.kronen_stufe < 18 ? o.kronen_stufe : null,
     // Online-Elo nur, wenn der Server sie mitschickt (supabase/karte-elo-schema.sql), Grenzen wie js/ui/online.js
     elo: Number.isInteger(o.elo) && o.elo >= 100 && o.elo <= 4000 ? o.elo : null,
+    // R19 Season (saison_karte_der_partie ueber karteDerPartie): nur das beste Abzeichen und ein selbst gewaehlter Titel
+    saison: saisonAbzeichen(o.saison && o.saison.abzeichen),
+    saisonTitel: (saisonTitel(o.saison && o.saison.titel) || {}).id || null,
     avatar: profilAvatar({ figur: o.motiv, grund: o.grund, rahmen: o.rahmen }, 'w'),
     orden: vitrine.map((v) => {
       if (!v || typeof v.familie !== 'string' || !Number.isInteger(v.stufe) || v.stufe < 1 || v.stufe > 3) return null;
@@ -98,11 +117,12 @@ export function fremdeKarte(daten) {
 export function eigeneKarte() {
   let k = null;
   try { k = waehle('karte:eigene?', {}); } catch (e) { k = null; }
-  if (k) return k;
+  // eigen: nur die eigene Karte zeigt die leere Vitrine als Einladung, fremde Karten lassen sie weg (Flo 15.11.2026)
+  if (k) return { ...k, eigen: true };
   // ohne Paket sammlung: Profilbild und Banner aus der eigenen Wahl, sonst nichts
   const w = profilWahl();
   return { name: K('karte.du'), titel: null, banner: MENSCHEN_BANNER.includes(w.banner) ? w.banner : 'start', ki: false, kronenStufe: null,
-    orden: [], avatar: floAvatar('w') };
+    orden: [], avatar: floAvatar('w'), eigen: true };
 }
 
 export function visitenkarte(karte = {}, { groesse = 'mittel' } = {}) {
@@ -126,6 +146,10 @@ export function visitenkarte(karte = {}, { groesse = 'mittel' } = {}) {
   const krone = kronenText(k.kronenStufe);
   const elo = Number.isInteger(k.elo) ? ` · ${K('karte.elo', { elo: k.elo })}` : '';
   const titel = k.titel ? `<span class="vk-titel">${k.titel.bild || ''}<span>${esc(k.titel.name)}</span></span>` : '';
+  const symbol = krone ? `<img class="vk-liga-symbol" src="${esc(ligaSymbolUrl(k.kronenStufe))}" alt="" width="14" height="16">` : '';
+  const sz = saisonText(k.saison);
+  const stt = saisonTitelText(k.saisonTitel);
+  const saison = sz || stt ? `<span class="vk-season">${sz ? `<span class="vk-season-abz" aria-label="${esc(K('saison.abzeichenLang', { n: k.saison.saison, stufe: kronenText(k.saison.stufe) }))}"><img class="vk-season-symbol" src="${esc(ligaSymbolUrl(k.saison.stufe))}" alt="" width="18" height="22">${esc(sz)}</span>` : ''}${stt ? `<span class="vk-season-titel">${esc(stt)}</span>` : ''}</span>` : '';
   const orden = (k.orden || []).slice(0, 3);
   el.innerHTML = `${bild}
     <div class="vk-kopf">
@@ -133,10 +157,11 @@ export function visitenkarte(karte = {}, { groesse = 'mittel' } = {}) {
       <div class="vk-text">
         <span class="vk-namenszeile">${name}${ki}</span>
         ${titel}
-        <span class="vk-krone${krone ? '' : ' leer'}">${esc((krone || (k.ki ? K('karte.kiGegner') : K('karte.ohneLiga'))) + elo)}</span>
+        <span class="vk-krone${krone ? '' : ' leer'}">${symbol}${esc((krone || (k.ki ? K('karte.kiGegner') : K('karte.ohneLiga'))) + elo)}</span>
+        ${saison}
       </div>
     </div>
-    ${k.ki ? '' : `<ul class="vk-orden" aria-label="${esc(K('karte.orden'))}">${orden.length ? orden.map((o) => {
+    ${k.ki || (!orden.length && !k.eigen) ? '' : `<ul class="vk-orden" aria-label="${esc(K('karte.orden'))}">${orden.length ? orden.map((o) => {
     const st = [1, 2, 3].includes(o.stufe) ? o.stufe : 0;
     return `<li${st ? ` data-stufe="${st}"` : ''}><span class="vk-orden-bild" aria-hidden="true">${o.bild || ''}</span>
       <span class="vk-orden-name">${esc(o.name)}</span>${st ? `<small class="vk-orden-stufe">${esc(K('stufe.' + st))}</small>` : ''}</li>`;

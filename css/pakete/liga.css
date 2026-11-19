@@ -35,8 +35,7 @@
 .liga-stufe[data-zustand="hier"] .liga-stufe-stand { color: var(--text); font-weight: 800; }
 .liga-kurz { display: grid; gap: var(--a1); min-width: 0; }
 .liga-titel { font-family: var(--display); font-size: var(--fs-text); }
-.liga-unter, .liga-hilfe, .liga-bilanz { color: var(--text-2); font-size: var(--fs-klein); line-height: 1.55; }
-.liga-hilfe { margin: var(--a2) 0; }
+.liga-unter, .liga-bilanz { color: var(--text-2); font-size: var(--fs-klein); line-height: 1.55; }
 .liga-mehr { margin-left: auto; color: var(--text-2); }
 .liga-mehr .ico { width: 18px; height: 18px; }
 .liga-aufklappen[open] .liga-mehr { transform: rotate(90deg); }
@@ -60,12 +59,6 @@
 .liga-knopf { min-height: var(--tipp); padding: var(--a2) var(--a3); font: inherit; color: var(--text); border: 1px solid var(--linie-2); border-radius: var(--r-s); background: var(--flaeche); cursor: pointer; }
 .liga-bilanz { margin: var(--a2) 0; }
 .liga-abrechnung { font-size: var(--fs-klein); color: var(--text); line-height: 1.55; padding-block: var(--a1); }
-.liga-kurve svg { display: block; width: 100%; max-height: 110px; color: var(--akzent-text); }
-.liga-kurve polyline { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-.liga-archiv { list-style: none; padding: 0; margin: 0; }
-.liga-abzeichen { display: flex; flex-wrap: wrap; align-items: center; gap: var(--a2); padding-block: var(--a2); border-bottom: 1px solid var(--linie); }
-.liga-abzeichen .ico { width: 20px; height: 20px; color: var(--akzent-text); }
-.liga-abzeichen small { color: var(--text-2); font-size: var(--fs-klein); }
 
 /* Liga im Ergebnis als Karte (Flo 30.10. abends: "Liga anzeigen", "farbiger und mehr durchdacht"): Wappen der Stufe,
    Stand mit Balken bis zur naechsten Stufe, Aenderung in Gruen oder Rot und warum. Die Farbe der Stufe (--liga-f) setzt
@@ -222,3 +215,140 @@
   transform: rotate(45deg) translateY(-2px); }
 .lg-gr-regeln[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
 .lg-gr-regeln p { margin: 0 0 8px; line-height: 1.45; }
+/* R19 Season: Leiste im Profil (ich:kopf) und Blatt am Season-Ende; nur Theme-Tokens */
+.ss-leiste[hidden] { display: none !important; }
+.ss-leiste p { margin: 0 0 var(--a2); line-height: 1.45; }
+/* Kopf mit Link "Alle Ligen", darunter der schmale Wochen-Balken (Flo 15.11.: Woche 3 von 8 als Balken mit Text) */
+.ss-kopfzeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: var(--a2); }
+.ss-kopfzeile .ss-kopf { margin: 0; }
+.ss-alle-ligen, .lg-gr-alle-link { min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--text); font: inherit;
+  font-size: 14px; font-weight: 700; text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px;
+  text-underline-offset: 4px; cursor: pointer; }
+.lg-gr-alle-link { justify-self: start; }
+.ss-fortschritt { height: 8px; margin: 0 0 6px; border-radius: var(--r-pille, 999px); background: var(--flaeche-3); box-shadow: inset 0 0 0 1px var(--linie); overflow: hidden; }
+.ss-fortschritt > span { display: block; height: 100%; border-radius: inherit; background: var(--gold); }
+.ss-lauf { font-size: 13px; font-weight: 600; color: var(--text-2); }
+/* Wappen mit Gewicht: die beste Stufe gross, die Abzeichen als Kacheln (vorhandene Liga-Symbole, keine neuen Bilder) */
+.ss-symbol { flex: none; height: auto; }
+.ss-bisher { display: flex; align-items: center; gap: 14px; margin: var(--a3) 0; font-weight: 700; font-size: 15px; }
+.ss-ligen-knopf { display: inline-grid; place-items: center; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.ss-bisher .ss-ligen-knopf { flex: none; width: 72px; height: 80px; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); }
+.ss-bisher .ss-symbol { width: 56px; }
+.ss-abzeichen { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin: 0 0 var(--a3); padding: 0; list-style: none; }
+.ss-abz-kachel { width: 100%; gap: 6px; min-height: 100px; padding: 10px 6px; border-radius: var(--r-m); background: var(--flaeche-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, var(--linie)); font-size: 13px; font-weight: 700; text-align: center; }
+.ss-abz-kachel .ss-symbol { width: 44px; }
+/* --fokus ist eine ganze outline-Angabe (modern.css: 2.5px solid ...); "3px solid var(--fokus)" waere ungueltig und loescht den Ring */
+.ss-ligen-knopf:focus-visible, .ss-alle-ligen:focus-visible, .lg-alle-ligen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+/* Titelwahl als echte Auswahl: Haken am gewaehlten Titel, darunter die Vorschau der eigenen Karte */
+.ss-wahl { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--a2); }
+.ss-titel { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.ss-haken { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; visibility: hidden; }
+.ss-haken svg { width: 14px; height: 14px; }
+.ss-titel[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.ss-titel[aria-pressed="true"] .ss-haken { visibility: visible; }
+.ss-titel:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.ss-vorschau-titel { margin-top: var(--a3) !important; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.ss-vorschau { margin-bottom: var(--a3); }
+.ss-vorschau .vk { max-width: 420px; }
+.ss-hilfe { font-size: 15px; color: var(--text-2); }
+.ss-fehler:empty { display: none; }
+.ss-fehler { color: var(--warn); font-weight: 600; }
+/* "Alle Ligen" (saison.js zeigeLigen): die Ligen als Stapel von oben nach unten, die eigene Liga golden umrandet */
+.sheet-karte.ss-ligen-blatt { width: min(560px, calc(100% - 24px)); overflow-y: auto; text-align: left;
+  max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+.ss-ligen { display: grid; gap: 8px; margin-top: 14px; }
+.ss-ligen-liga { padding: 10px 12px; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); }
+.ss-ligen-liga[data-hier] { box-shadow: inset 0 0 0 2px var(--gold); }
+.ss-ligen-kopf { display: flex; align-items: center; gap: 12px; }
+.ss-ligen-kopf .ss-symbol { width: 40px; }
+.ss-ligen-kopf h4 { margin: 0; font-family: var(--display); font-size: 17px; color: var(--text); }
+.sheet-karte .ss-ligen-satz { margin: 2px 0 0; font-size: 14px; font-weight: 500; line-height: 1.4; color: var(--text-2); }
+.ss-ligen-stufen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0 52px; padding: 0; list-style: none; }
+.ss-ligen-stufe { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border-radius: 999px;
+  background: var(--flaeche); box-shadow: inset 0 0 0 1px var(--linie); font-size: 13px; font-weight: 700; color: var(--text); }
+.ss-ligen-du { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.sheet-karte .ss-ligen-regel { margin: 6px 0 0; padding: 12px; border-radius: var(--r-m); background: var(--flaeche-2); font-size: 14px; font-weight: 500;
+  line-height: 1.45; color: var(--text); }
+/* Fenster am Season-Ende: Abzeichen als Held (Auftritt und Gold-Chips in css/visitenkarte.css, Abschnitt Season-Gold:
+   diese Datei bleibt bei Theme-Tokens ohne eigene Bewegung, tests/liga.test.mjs) */
+.ss-ende { display: grid; justify-items: center; gap: 10px; margin: 8px 0 4px; }
+.ss-ende p { margin: 0; line-height: 1.45; }
+.ss-ende-held { display: grid; place-items: center; width: 148px; height: 148px; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--gold) 34%, transparent), transparent); }
+.ss-ende-held .ss-symbol { width: 104px; }
+.sheet-karte .ss-ende-abz { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--text); }
+.sheet-karte .ss-ende-chips-titel { margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.ss-ende-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.ss-chip { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 999px; font-size: 15px; font-weight: 800; }
+.sheet-karte .ss-ende-neu { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+/* Liga: das eigene Wappen auf der Buehne oeffnet "Alle Ligen" */
+.lg-gr-wappen-knopf { display: grid; padding: 0; border: 0; background: none; border-radius: var(--r-m); cursor: pointer; }
+
+/* Weltrangliste nach Online-Elo (welt.js, G-006 AC-11, 14.11.2026): Kopf, Teilnahme mit Knopf, dann die Liste wie die
+   Gruppe (Banner-Streifen links, Name auf der Flaeche, rechts die Elo) */
+/* Hoechstbreite wie der Reiter "Ich" (punkte.css): am PC lagen Name und Elo sonst ueber 1.500 px auseinander (R19) */
+.lg-welt { gap: 12px; max-width: 760px; }
+.lg-welt-kopf h2 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); color: var(--text); }
+.lg-welt-kopf p { margin: 2px 0 0; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.lg-welt-teilnahme { display: grid; justify-items: start; gap: 10px; padding: 16px; border-radius: var(--r-xl); background: var(--flaeche);
+  box-shadow: var(--kante); }
+.lg-welt-teilnahme p { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.45; color: var(--text-2); }
+.lg-welt-teilnahme .lg-welt-stand { color: var(--text); }
+.lg-welt-meldung { margin: 0; font-size: 14px; font-weight: 600; color: var(--warn); }
+.lg-welt-leer { margin: 0; padding: 16px; font-size: 15px; font-weight: 600; color: var(--text-2); }
+.lg-welt-fussnote { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.lg-welt-liste { display: grid; min-width: 0; margin: 0; padding: 0; list-style: none; border-radius: var(--r-xl); background: var(--flaeche);
+  box-shadow: var(--kante); overflow: hidden; }
+.lg-welt-zeile { position: relative; isolation: isolate; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center;
+  gap: 10px; min-height: 56px; padding: 6px 14px 6px 12px; }
+.lg-welt-zeile + .lg-welt-zeile { border-top: 1px solid var(--linie); }
+.lg-welt-zeile.ich { background: var(--gold-weich); box-shadow: inset 4px 0 0 var(--gold); }
+.lg-welt-streifen { position: absolute; inset: 0 auto 0 0; z-index: -1; width: 112px; background: center / cover no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, black 0, black 30%, transparent 80%); mask-image: linear-gradient(90deg, black 0, black 30%, transparent 80%);
+  opacity: .9; pointer-events: none; }
+.lg-welt-rang { justify-self: center; min-width: 30px; padding: 1px 4px; border-radius: var(--r-s); background: var(--flaeche);
+  box-shadow: 0 0 0 1px var(--linie); font-family: var(--display); font-weight: var(--gw-titel); font-size: 16px; color: var(--text);
+  text-align: center; font-variant-numeric: tabular-nums; }
+.lg-welt-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lg-welt-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: var(--text); }
+.lg-welt-du { flex: none; padding: 1px 6px; border-radius: var(--r-s); background: var(--gold); color: var(--auf-akzent); font-size: 12px; font-weight: 800; }
+.lg-welt-elo { display: inline-flex; align-items: baseline; gap: 4px; font-family: var(--display); font-weight: var(--gw-titel); font-size: 16px;
+  color: var(--text); font-variant-numeric: tabular-nums; }
+.lg-welt-elo small { font-family: inherit; font-size: 12px; font-weight: 700; color: var(--text-2); }
+
+/* ---------- R19 Liga neu (15.11.2026, Flo: "billig, viel Text, wenig Farbe"): Preis und Platz als Bild ---------- */
+/* Belohnung einer Zeile: der echte Preis gross in einem Goldrahmen, daneben ein warmer Satz statt einer Erklaerung */
+.lg-gr-info.lg-gr-preis { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; margin: 2px 0 8px;
+  padding: 12px 14px; border-radius: var(--r-l); color: var(--text);
+  background: radial-gradient(closest-side at 18% 50%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 72%), var(--flaeche-2);
+  box-shadow: inset 0 0 0 2px var(--gold), var(--s1); }
+.lg-gr-info.lg-gr-preis[hidden] { display: none; }
+.lg-gr-preis-bild { display: grid; place-items: center; min-width: 64px; }
+/* das Banner ist 4:1 mit dem Wappen links; der 2:1-Ausschnitt beginnt links, damit das Wappen ganz zu sehen ist */
+.lg-gr-preis-bild img { display: block; width: 128px; height: 64px; object-fit: cover; object-position: left center; border-radius: var(--r-m);
+  box-shadow: 0 0 0 2px var(--gold), var(--s2); }
+.lg-gr-preis-bild svg { width: 64px; height: 64px; }
+.lg-gr-preis-text { display: grid; gap: 4px; min-width: 0; }
+.lg-gr-preis-text b { font-family: var(--display); font-size: 16px; font-weight: var(--gw-titel); color: var(--text); }
+.lg-gr-preis-text span { font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--text-2); }
+
+/* Weltrangliste, eigene Platz-Karte (Variante A): Banner oben, Platz gross in Gold, darunter der Weg zum naechsten Platz */
+.lg-welt-platz { position: relative; display: grid; gap: 10px; width: 100%; min-width: 0; padding: 0 0 14px; overflow: hidden;
+  border-radius: var(--r-l); background: var(--flaeche-2); box-shadow: inset 0 0 0 2.5px var(--gold), var(--s2); }
+.lg-welt-platz-banner { display: block; height: 72px; background: center / cover no-repeat;
+  -webkit-mask-image: linear-gradient(180deg, black 55%, transparent); mask-image: linear-gradient(180deg, black 55%, transparent); }
+.lg-welt-platz-kopf { display: flex; align-items: center; gap: 14px; min-width: 0; margin-top: -30px; padding: 0 16px; }
+/* Gold auf hellem Grund hat nur gut 2:1, darum eine dunkle Plakette in beiden Themen (Gold darauf deutlich ueber 3:1) */
+.lg-welt-platz-rang { flex: none; padding: 2px 14px; border-radius: 999px; background: color-mix(in srgb, var(--gold) 14%, black); color: var(--gold);
+  box-shadow: inset 0 0 0 2px var(--gold), var(--s1); font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel);
+  line-height: 1.1; font-variant-numeric: tabular-nums; }
+.lg-welt-platz-wer { display: grid; min-width: 0; padding-top: 22px; }
+.lg-welt-platz-wer b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; color: var(--text); }
+.lg-welt-platz-wer span { font-size: 14px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.lg-welt-teilnahme .lg-welt-platz-ziel { display: flex; align-items: center; gap: 6px; margin: 0 16px; font-size: 14.5px; font-weight: 700; color: var(--text); }
+.lg-welt-platz-ziel .ico { width: 18px; height: 18px; color: var(--gold); }
+.lg-welt-platz-balken { display: block; height: 8px; margin: 0 16px; overflow: hidden; border-radius: 999px; background: var(--flaeche-3); }
+.lg-welt-platz-balken i { display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 60%, var(--flaeche)), var(--gold)); }
