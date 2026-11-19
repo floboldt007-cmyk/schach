@@ -130,7 +130,14 @@ async function main() {
   await k.addInitScript((schl) => { if (!localStorage.getItem(schl)) localStorage.setItem(schl, JSON.stringify({ gesehen: '2026-01-01' })); }, P + 'modul:start');
   const s = await k.newPage();
   const fehler = [];
-  s.on('pageerror', (e) => fehler.push(e.message));
+  // wie tests/e2e.test.mjs: WebKit meldet einen beim Neuladen abgebrochenen Abruf der eigenen Seite (ein Klang, der gerade
+  // laedt) als "<Adresse> due to access control checks."; hier gemessen 19.11.2026 in 8 von 10 WebKit-Laeufen, mit und ohne
+  // sw.js ohneFrische, nur in den Teilen mit Neuladen. Abrufe anderer Adressen bleiben ein Fehler.
+  const eigene = () => `127.0.0.1:${server.address().port}/`;
+  s.on('pageerror', (e) => {
+    if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(eigene())) return;
+    fehler.push(e.message);
+  });
   // offene Anfragen der Seite: haengt eine davon im alten Service Worker, wartet die neue Fassung nach skipWaiting
   const offen = new Map();
   s.on('request', (q) => offen.set(q, Date.now()));
