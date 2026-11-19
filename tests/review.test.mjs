@@ -14,7 +14,7 @@ import { Chess } from '../vendor/chess/chess.js';
 import {
   gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, begrenzeLeistung, coachText,
   sanDeutsch, materialBilanz, analysierePartie, bewerteZug, volatilitaetsGewichte, KLASSEN, START_FEN, warKnapp,
-  GRENZEN, spielphasen, coachKern, seitenGenauigkeit,
+  GRENZEN, spielphasen, coachKern, seitenGenauigkeit, analyseSchluessel,
 } from '../js/review.js';
 import { EROEFFNUNGEN, eroeffnung, tabellenFehler, stellungsSchluessel } from '../js/openings.js';
 
@@ -498,9 +498,10 @@ async function asyncTests() {
   fehler = null;
   try { await analysierePartie(new FakeEngine(), ['e2e4'], { signal: ac.signal }); } catch (e) { fehler = e; }
   pruefe('Partie: AbortSignal bricht ab', fehler && fehler.abgebrochen === true);
-  // vorab: Analysen aus der Live-Bewertung werden wiederverwendet, fehlende neu gerechnet
+  // vorab: Analysen aus der Live-Bewertung werden wiederverwendet, fehlende neu gerechnet (Schluessel mit
+  // 50-Zuege-Zaehler, tests/r20-analyse-matt)
   const vorab = new Map();
-  for (const a of fake.aufrufe.slice(0, 5)) vorab.set(stellungsSchluessel(a.fen), await fake.analyse(a.fen, { depth: 14, multipv: 2 }));
+  for (const a of fake.aufrufe.slice(0, 5)) vorab.set(analyseSchluessel(a.fen), await fake.analyse(a.fen, { depth: 14, multipv: 2 }));
   const fakeV = new FakeEngine({
     [vorNf6]: [{ eval: ev(30), pv: ['g7g6', 'h5f3'] }, { eval: ev(45), pv: ['d8e7', 'g1f3'] }],
     [nachNf6]: [{ eval: matt(1), pv: ['h5f7'] }, { eval: ev(300), pv: ['h5f3'] }],
