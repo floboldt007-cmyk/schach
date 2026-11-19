@@ -128,6 +128,7 @@ const SUITEN = [
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
+  { name: 'seitenfehler-stelle', datei: 'seitenfehler-stelle.test.mjs', args: [], was: 'Seitenfehler nennen die erste Code-Stelle; Worker-Wechsel-Abbruch nur fuer die eigene Adresse still' },
   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
   { name: 'info-lizenzen', datei: 'info-lizenzen.test.mjs', args: [], was: 'Info und Lizenzen: jede Fremdlizenz und der eigene Quellcode in DE und EN, Herkunft Kuerbis/Frost/Gold, Gold und Elfenbein als bearbeitetes cburnett (Browser)' },
   { name: 'r19-figuren-gold', datei: 'r19-figuren-gold.test.mjs', args: [], was: 'Labor-Figuren Gold und Elfenbein: 12 eigene Dateien mit fester Pruefsumme, Eintraege und Herkunft, auf jedem Brett Kante ab 3:1 und Weiss/Schwarz ab 25 L* (Browser)' },
@@ -197,6 +198,7 @@ const SUITEN = [
   { name: 'r20-kopf-chip', datei: 'r20-kopf-chip.test.mjs', args: [], was: 'Feinschliff R20 B3: Kopf-Chips ganz da oder ganz weg, nie ein Stummel; / max nur am PC' },
   { name: 'r20-blatt-fokus', datei: 'r20-blatt-fokus.test.mjs', args: [], was: 'Feinschliff R20 B7: Blatt per Tipp ohne Fokusring, per Tastatur mit; Rueckfrage fokussiert den sicheren Knopf' },
   { name: 'r20-effekt-vorschau', datei: 'r20-effekt-vorschau.test.mjs', args: [], was: 'Feinschliff R20: Regal Effekte im Shop, Vorschau einmal auf dem echten Brett an der richtigen Stelle, Standbild bei weniger Bewegung' },
+  { name: 'r20-erste-schritte', datei: 'r20-erste-schritte.test.mjs', args: [], was: 'Feinschliff R20: Kurs Erste Schritte fuer Anfaenger (Stufe A): Sterne sammeln mit Umwandlungs-Falle, gut anfangen, Einstieg ueber "Nein", 10 Funken je Aufgabe' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten

@@ -26,9 +26,17 @@
 //   stand(roh) -> { lek: { [id]: { s, z } } }   Speicherstand (Modul lernen) gesaeubert: s Sterne 1..3, z beste Zuege
 //   merke(roh, id, { sterne, zuege }) -> neuer Stand   bessere Sterne bleiben, weniger Zuege bleiben
 //   summe(st, bereichId?) -> { sterne, max, geschafft }   ohne bereichId ueber alle Bereiche
+//   Kurs "Erste Schritte" (19.11.2026, ./erste-schritte.js): eigener Bereich KURS { id: 'erste', kurs: true }, in der
+//   Uebersicht vorn (ANSICHT = [KURS, ...BEREICHE]). BEREICHE, ALLE und summe(st) ohne bereichId bleiben die Meisterschule
+//   (Probe je Bereich, Zahl der Lektionen, Sammlung); lektion, bereichVon, stand, merke und summe(st, 'erste') kennen beide.
+//   art 'sammeln': Flo sammelt mit einer Figur Sterne ein, ohne Gegner. ladeSammeln(fen) -> Chess ohne Koenige,
+//   weissWieder(chess) setzt nach dem Zug Weiss wieder an den Zug, sternGeschafft(rest, feld) -> rest ohne das Feld;
+//   pruefeZiel(l, _, chess, { zuege, rest }): geschafft ohne Sterne, zuViele ab grenze(ziel). Sterne nach sterneSammeln.
+import { Chess } from '../../../vendor/chess/chess.js';
 import { ENDSPIELE } from './endspiele.js';
 import { EROEFFNUNGEN } from './eroeffnungen.js';
 import { TAKTIK } from './taktik.js';
+import { ERSTE_SCHRITTE } from './erste-schritte.js';
 
 export const STUFEN = Object.freeze(['leicht', 'mittel', 'schwer', 'meister']);
 // Runde 2 (Ueben) und 3 (Meisterprobe) der langen Lektionen (R19, Flo 14.11.2026: "Lektionen zu schnell durch"), Stellungen
@@ -63,7 +71,9 @@ export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 24,
     runden: Object.freeze([R('8/3B2K1/8/8/8/k2N4/8/8 w - - 0 1', 26), R('8/8/8/7K/8/8/1N6/1B2k3 w - - 0 1', 31)]) }),
 ]);
-export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik']);
+export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik', 'sammeln', 'schach', 'partie']);
+// Zug-Zaehler: im Kurs vor dem ersten Zug nur der Ziel-Text, kein "Zug 0" (claude-code-60 19.11.); Meisterschule immer
+export const zaehlerSichtbar = (bereich, zuege) => !(bereich && bereich.kurs && zuege === 0);
 export const BEREICHE = Object.freeze([
   Object.freeze({ id: 'matt', lektionen: LEKTIONEN }),
   Object.freeze({ id: 'taktik', lektionen: TAKTIK }),
@@ -71,9 +81,31 @@ export const BEREICHE = Object.freeze([
   Object.freeze({ id: 'eroeffnung', lektionen: EROEFFNUNGEN }),
 ]);
 export const ALLE = Object.freeze(BEREICHE.flatMap((b) => b.lektionen));
+export const KURS = Object.freeze({ id: 'erste', kurs: true, lektionen: ERSTE_SCHRITTE });
+export const ANSICHT = Object.freeze([KURS, ...BEREICHE]);
+// Kurs und Meisterschule zusammen: Suche und Speicher
+const JEDE = Object.freeze([...ERSTE_SCHRITTE, ...ALLE]);
 export const artVon = (l) => (l && l.art) || 'matt';
-export const bereichVon = (l) => BEREICHE.find((b) => b.lektionen.includes(l)) || BEREICHE[0];
-export const lektion = (id) => ALLE.find((l) => l.id === id) || null;
+export const bereichVon = (l) => ANSICHT.find((b) => b.lektionen.includes(l)) || BEREICHE[0];
+export const lektion = (id) => JEDE.find((l) => l.id === id) || null;
+
+// ---------- Sammeln (Kurs, Kapitel 1) ----------
+export const ladeSammeln = (fen) => new Chess(fen, { skipValidation: true });
+export function weissWieder(chess) {
+  const teile = chess.fen().split(' ');
+  if (teile[1] === 'w') return chess;
+  teile[1] = 'w';
+  teile[3] = '-';
+  chess.load(teile.join(' '), { skipValidation: true });
+  return chess;
+}
+export const sternGeschafft = (rest, feld) => (rest || []).filter((x) => x !== feld);
+// 3 bei der kleinsten Zugzahl, 2 bei hoechstens zwei Zuegen mehr, sonst 1
+export function sterneSammeln({ ziel, zuege }) {
+  const z = Math.max(1, Math.round(Number(ziel) || 1));
+  const n = Math.max(1, Math.round(Number(zuege) || 1));
+  return n <= z ? 3 : n <= z + 2 ? 2 : 1;
+}
 // Runde 1 ist die Lektionsstellung selbst; Lektionen ohne runden haben genau diese eine
 export const rundenVon = (l) => (l ? [{ fen: l.fen, ziel: l.ziel }, ...(Array.isArray(l.runden) ? l.runden : [])] : []);
 
@@ -95,12 +127,16 @@ export function bilanz(chess) {
 // Vorsprung des Gegners (Schwarz) in Punkten; waechst er gegenueber dem Start um 3 oder mehr, hat Flo Material verloren
 const vorsprung = (bl) => bl.b.mat - bl.w.mat;
 
-export function pruefeZiel(l, start, chess, { wann = 'flo', zuege = 0 } = {}) {
+export function pruefeZiel(l, start, chess, { wann = 'flo', zuege = 0, rest = null } = {}) {
   const art = artVon(l);
   if (art === 'folge') return null;   // der Zugfolge-Trainer (js/ui/lektion.js) zaehlt selbst
+  // Sammeln: kein Gegner, nur Flos Zuege zaehlen; rest = noch liegende Sterne
+  if (art === 'sammeln') return Array.isArray(rest) && rest.length === 0 ? 'geschafft' : zuege >= grenze(l.ziel) ? 'zuViele' : null;
   const halten = art === 'halten';
   if (wann === 'flo') {
     if (chess.isCheckmate()) return 'geschafft';
+    // Schach geben (Kurs, Kapitel 3): geschafft, sobald der Gegner im Schach steht; sonst wie matt weiter
+    if (art === 'schach' && chess.inCheck()) return 'geschafft';
     if (chess.isStalemate()) return halten ? 'geschafft' : 'patt';
     if (chess.isDraw()) return halten ? 'geschafft' : 'remis';
     if (art !== 'matt') {
@@ -150,9 +186,11 @@ export function pruefeLektion(l, Chess) {
   if (!ARTEN.includes(artVon(l))) f.push(`${l.id}: Art ${l.art}`);
   if (!Number.isInteger(l.ziel) || l.ziel < 1) f.push(`${l.id}: ziel ${l.ziel}`);
   if (artVon(l) === 'taktik' && !(Number.isInteger(l.gewinn) && l.gewinn >= 1 && l.gewinn <= 9)) f.push(`${l.id}: gewinn ${l.gewinn}`);
+  if (artVon(l) === 'sammeln') return f.concat(pruefeSammeln(l));
   let c = null;
   try { c = new Chess(l.fen); } catch (e) { f.push(`${l.id}: FEN ${e.message}`); return f; }
-  if (c.turn() !== 'w') f.push(`${l.id}: Weiss muss am Zug sein`);
+  // Zugfolgen duerfen mit Schwarz am Zug beginnen (Gegner-Vorzug, Kurs Erste Schritte: Schach geben, d7-d5 vor en passant)
+  if (c.turn() !== 'w' && artVon(l) !== 'folge') f.push(`${l.id}: Weiss muss am Zug sein`);
   if (c.isGameOver()) f.push(`${l.id}: Stellung ist schon vorbei`);
   const teile = l.fen.split(' ');
   teile[1] = 'b'; teile[3] = '-';
@@ -173,16 +211,58 @@ export function pruefeLektion(l, Chess) {
       if (m.san !== san) f.push(`${l.id}: ${san} heisst bei chess.js ${m.san}`);
       if (dran === l.farbe) eigene++;
     }
-    if (folge.length && (folge.length - 1) % 2 !== (l.farbe === 'w' ? 0 : 1)) f.push(`${l.id}: der letzte Zug gehoert nicht Flo`);
+    // vom Anzieher der Stellung aus gezaehlt: der letzte Zug gehoert dem, der bei gerader Laenge-1 anfaengt
+    if (folge.length && (folge.length - 1) % 2 !== (c.turn() === l.farbe ? 0 : 1)) f.push(`${l.id}: der letzte Zug gehoert nicht Flo`);
     if (eigene !== l.ziel) f.push(`${l.id}: ziel ${l.ziel}, aber ${eigene} eigene Zuege`);
   }
+  return f;
+}
+
+// Kurs Kapitel 6 (art 'partie', fc-20:01): Sterne aus den gespeicherten Partien (storage ladePartien). Es zaehlt jede beendete
+// FREIE Partie (modus 'frei', ohne Wertung) gegen botId; frei startet nur der Kurs. 1 = zu Ende gespielt, 2 = gewonnen,
+// zuege = Flos Zuege der besten (fuer merke). Keine Partie: null.
+export function kursPartieSterne(partien, botId) {
+  let best = null;
+  for (const p of Array.isArray(partien) ? partien : []) {
+    if (!p || p.modus !== 'frei' || p.botId !== botId || !['sieg', 'remis', 'niederlage'].includes(p.ergebnis)) continue;
+    const s = p.ergebnis === 'sieg' ? 2 : 1;
+    const z = Math.max(1, Math.min(999, Math.ceil((Array.isArray(p.zuege) ? p.zuege.length : 1) / 2)));
+    if (!best || s > best.sterne || (s === best.sterne && z < best.zuege)) best = { sterne: s, zuege: z };
+  }
+  return best;
+}
+
+// Sammeln: genau eine weisse Figur, kein Koenig noetig, 1 bis 6 Sterne auf freien gueltigen Feldern. Falle (in Node belegt,
+// tests/r20-erste-schritte.test.mjs): ohne Koenige stuerzt chess.js moves({ verbose: true }) mit einem Bauern AUF Reihe 1/8
+// ab; dazu gehoert die Umwandlung erst in Kapitel 4. Darum Bauer nur auf Reihe 2 bis 5 und kein Bauern-Stern ueber Reihe 6.
+function pruefeSammeln(l) {
+  const f = [];
+  let c = null;
+  try { c = ladeSammeln(l.fen); } catch (e) { return [`${l.id}: FEN ${e.message}`]; }
+  if (c.turn() !== 'w') f.push(`${l.id}: Weiss muss am Zug sein`);
+  const figuren = c.board().flat().filter(Boolean);
+  if (figuren.length !== 1 || figuren[0].color !== 'w') return f.concat(`${l.id}: genau eine weisse Figur`);
+  const fig = figuren[0];
+  const reihe = Number(fig.square[1]);
+  const sterne = Array.isArray(l.sterne) ? l.sterne : [];
+  if (sterne.length < 1 || sterne.length > 6) f.push(`${l.id}: 1 bis 6 Sterne`);
+  if (new Set(sterne).size !== sterne.length) f.push(`${l.id}: Stern doppelt`);
+  for (const z of sterne) {
+    if (!/^[a-h][1-8]$/.test(z)) f.push(`${l.id}: Stern ${z} ungueltig`);
+    else if (z === fig.square) f.push(`${l.id}: Stern ${z} unter der Figur`);
+  }
+  if (fig.type === 'p') {
+    if (reihe < 2 || reihe > 5) f.push(`${l.id}: Bauer nur auf Reihe 2 bis 5 (Falle Reihe 1/8, Umwandlung erst Kapitel 4)`);
+    if (sterne.some((z) => Number(z[1]) > 6)) f.push(`${l.id}: Bauern-Stern ueber Reihe 6`);
+  }
+  if (!Number.isInteger(l.ziel) || l.ziel < 1) f.push(`${l.id}: ziel ${l.ziel}`);
   return f;
 }
 
 export function stand(roh) {
   const lek = {};
   const quelle = roh && typeof roh === 'object' && roh.lek && typeof roh.lek === 'object' ? roh.lek : {};
-  for (const l of ALLE) {
+  for (const l of JEDE) {
     const e = quelle[l.id];
     if (!e || typeof e !== 'object') continue;
     const s = Math.round(Number(e.s));
@@ -204,7 +284,7 @@ export function merke(roh, id, { sterne: s, zuege } = {}) {
 
 export function summe(st, bereichId = null) {
   const lek = stand(st).lek;
-  const b = bereichId ? BEREICHE.find((x) => x.id === bereichId) : null;
+  const b = bereichId ? ANSICHT.find((x) => x.id === bereichId) : null;
   const liste = b ? b.lektionen : ALLE;
   return {
     sterne: liste.reduce((a, l) => a + (lek[l.id] ? lek[l.id].s : 0), 0),

@@ -1,0 +1,184 @@
+// Stellen-Suche fuer Seitenfehler (tests/seitenfehler-stelle.mjs): aus dem Stapel eines pageerror die erste Code-Stelle,
+// damit ein Seitenfehler im CI-Protokoll sagt, ob er aus der App oder aus einem Skript des Tests kommt (Diagnose M-14:30).
+// Stapel in beiden Schreibweisen: Chromium ("    at f (url:z:s)") und WebKit ("f@url:z:s"). Reiner Node-Test, kein Browser.
+import { stelleAusStapel, swWechselFilter, eigenerZugriffsAbbruch } from './seitenfehler-stelle.mjs';
+import { readdirSync, readFileSync } from 'node:fs';
+
+const ergebnisse = [];
+function pruefe(name, ok, detail = '') {
+  ergebnisse.push({ name, ok });
+  console.log(`${ok ? 'ok  ' : 'FEHLER'} ${name}${ok ? '' : ' ' + JSON.stringify(detail)}`);
+}
+const gleich = (name, ist, soll) => pruefe(name, ist === soll, { ist, soll });
+
+gleich('Chromium: erste Stelle, ohne Rechner und Port',
+  stelleAusStapel("TypeError: Cannot read properties of null (reading 'x')\n    at zeige (http://127.0.0.1:4321/js/ui/verlauf.js:12:5)\n    at http://127.0.0.1:4321/js/app.js:3:1"),
+  'at zeige (/js/ui/verlauf.js:12:5)');
+gleich('Chromium: Stelle ohne Funktionsnamen',
+  stelleAusStapel('Error: kaputt\n    at http://127.0.0.1:4321/js/app.js:3:1'),
+  'at /js/app.js:3:1');
+gleich('WebKit: erste Stelle, ohne Rechner und Port',
+  stelleAusStapel('zeige@http://127.0.0.1:4321/js/ui/verlauf.js:12:5\nglobal code@http://127.0.0.1:4321/js/app.js:3:1'),
+  'zeige@/js/ui/verlauf.js:12:5');
+gleich('WebKit: anonyme Stelle',
+  stelleAusStapel('@http://127.0.0.1:4321/js/brett.js:7:9'),
+  '@/js/brett.js:7:9');
+// die Meldungszeile ist nie die Stelle, auch wenn sie "at ", "@" oder ".js" enthaelt
+gleich('Meldung mit "that " ist keine Stelle',
+  stelleAusStapel('Error: The object that was passed is invalid\n    at pruefe (http://127.0.0.1:4321/js/konto.js:40:3)'),
+  'at pruefe (/js/konto.js:40:3)');
+gleich('Meldung mit ".js" ist keine Stelle',
+  stelleAusStapel('Error: Laden von modul.js fehlgeschlagen\n    at lade (http://127.0.0.1:4321/js/lader.js:2:1)'),
+  'at lade (/js/lader.js:2:1)');
+gleich('Meldung mit "@" ist keine Stelle',
+  stelleAusStapel('Error: Adresse a@b.de ungueltig\n    at sende (http://127.0.0.1:4321/js/konto.js:9:1)'),
+  'at sende (/js/konto.js:9:1)');
+gleich('nur die Meldung, keine Stelle: leer', stelleAusStapel('Error: boom at start'), '');
+gleich('leerer Stapel: leer', stelleAusStapel(''), '');
+gleich('kein Stapel: leer', stelleAusStapel(undefined), '');
+gleich('Skript des Tests (page.evaluate) wird genannt',
+  stelleAusStapel('Error: x\n    at eval (eval at evaluate (:291:30), <anonymous>:1:7)'),
+  'at eval (eval at evaluate (:291:30), <anonymous>:1:7)');
+
+// Kaltreview 19.11. (B1-B3): eingebaute Rahmen ohne Zeile:Spalte sind keine Stelle, und die Meldung (auch mehrzeilig)
+// wird vorn abgeschnitten, wenn sie mitgegeben ist. Playwright liefert auch in WebKit die Meldungszeile vorn (Probe 19.11.)
+gleich('B1 Chromium: eingebauter Rahmen (JSON.parse) wird uebersprungen',
+  stelleAusStapel('SyntaxError: Unexpected token\n    at JSON.parse (<anonymous>)\n    at lade (http://127.0.0.1:4321/js/z.js:5:6)'),
+  'at lade (/js/z.js:5:6)');
+gleich('B1 Chromium: eingebauter Rahmen (new Promise) wird uebersprungen',
+  stelleAusStapel('Error: x\n    at new Promise (<anonymous>)\n    at warte (http://127.0.0.1:4321/js/z.js:8:1)'),
+  'at warte (/js/z.js:8:1)');
+const b2 = 'Modul fehlt: lade@http://127.0.0.1:4321/js/z.js:5:6';
+gleich('B2 Meldung, die wie eine WebKit-Stelle endet, zaehlt nicht',
+  stelleAusStapel(`Error: ${b2}\n    at start (http://127.0.0.1:4321/js/a.js:1:2)`, b2), 'at start (/js/a.js:1:2)');
+const b3 = 'Zeile eins\nat zwei (http://127.0.0.1:4321/js/x.js:1:1)';
+gleich('B3 mehrzeilige Meldung mit Folgezeile "at ..." zaehlt nicht',
+  stelleAusStapel(`Error: ${b3}\n    at echt (http://127.0.0.1:4321/js/y.js:3:4)`, b3), 'at echt (/js/y.js:3:4)');
+gleich('Nachpruefung B3: Meldung mitten im Stapel schneidet nicht ab',
+  stelleAusStapel('Error: anders\n    at erst (http://127.0.0.1:4321/js/a.js:1:1)\n    at x (http://127.0.0.1:4321/js/b.js:2:2)', 'at erst'),
+  'at erst (/js/a.js:1:1)');
+gleich('Meldung, die im Stapel fehlt, aendert nichts',
+  stelleAusStapel('zeige@http://127.0.0.1:4321/js/ui/verlauf.js:12:5', 'andere Meldung'), 'zeige@/js/ui/verlauf.js:12:5');
+
+// Worker-Wechsel (WebKit in der CI, Laeufe 44538473111, 44530007843, 44519489369): die eigene 7-s-Anfrage __langsam laeuft
+// durch den alten Worker, der beim Uebernehmen der neuen Fassung endet. WebKit meldet das dreimal: requestfailed mit Adresse,
+// pageerror und Konsole ohne Adresse. Still wird es nur fuer die Testanfrage selbst (Nachpruefung 19.11. B1: nicht fuer jede
+// Datei der eigenen Adresse), und eine Meldung nur mit passender, hoechstens 2 s alter Anfrage (B2).
+const EIGEN = 'http://127.0.0.1:4321/';
+const ZU = 'Service Worker context closed';
+const TESTANFRAGE = (u) => u.startsWith(EIGEN) && /\/__langsam\?/.test(u);
+{
+  const f = swWechselFilter(TESTANFRAGE), fehler = [];
+  const ab = f.anfrage(ZU, EIGEN + 'schach/js/app.js', fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  pruefe('Gegenprobe B1: App-Datei unter derselben Adresse bleibt rot', !ab && fehler.length === 1, { ab, fehler });
+}
+{
+  let jetzt = 1000;
+  const f = swWechselFilter(TESTANFRAGE, { uhr: () => jetzt }), fehler = [];
+  f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  jetzt += 2500;
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU + ' [at lade (/js/app.js:5:6)]', fehler);
+  pruefe('Gegenprobe B2: spaeterer Seitenfehler (Anfrage aelter als 2 s) bleibt rot', fehler.length === 1, fehler);
+}
+{
+  let jetzt = 1000;
+  const f = swWechselFilter(TESTANFRAGE, { uhr: () => jetzt }), fehler = [];
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  jetzt += 2500;
+  f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  pruefe('Gegenprobe B2: alte Meldung (vor mehr als 2 s) wird von der Anfrage nicht entfernt', fehler.length === 1, fehler);
+}
+{
+  let jetzt = 1000;
+  const f = swWechselFilter(TESTANFRAGE, { uhr: () => jetzt }), fehler = [];
+  f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  jetzt += 1500;
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  pruefe('B2: Meldung innerhalb von 2 s nach der Anfrage ist still', fehler.length === 0, fehler);
+}
+{
+  const f = swWechselFilter(TESTANFRAGE), fehler = [];
+  const ab = f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  f.melde('konsole', 'Failed to load resource: ' + ZU, '', 'Failed to load resource: ' + ZU, fehler);
+  pruefe('Wechsel: eigene Anfrage zuerst, danach Seite und Konsole: alles still', ab && fehler.length === 0, { ab, fehler });
+}
+{
+  const f = swWechselFilter(TESTANFRAGE), fehler = [];
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  f.melde('konsole', 'Failed to load resource: ' + ZU, '', 'Failed to load resource: ' + ZU, fehler);
+  const vorher = fehler.length;
+  const ab = f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  pruefe('Wechsel: Meldungen vor der Anfrage werden mit ihr wieder still', vorher === 2 && ab && fehler.length === 0, { vorher, ab, fehler });
+}
+{
+  const f = swWechselFilter(TESTANFRAGE), fehler = [];
+  const ab = f.anfrage(ZU, 'https://fremd.example/x.js', fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  pruefe('Gegenprobe: dieselbe Meldung fuer eine fremde Adresse bleibt rot', !ab && fehler.length === 1, { ab, fehler });
+}
+{
+  const f = swWechselFilter(TESTANFRAGE), fehler = [];
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  pruefe('Gegenprobe: Meldung ohne passende Anfrage bleibt rot', fehler.length === 1, fehler);
+}
+{
+  const f = swWechselFilter(TESTANFRAGE), fehler = [];
+  f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  f.melde('seite', ZU, '', 'Seitenfehler: ' + ZU, fehler);
+  pruefe('Gegenprobe: je Anfrage nur eine Meldung jeder Art still', fehler.length === 1, fehler);
+}
+{
+  const f = swWechselFilter(TESTANFRAGE), fehler = [];
+  const ab = f.anfrage('Load failed', EIGEN + 'schach/a.js', fehler);
+  f.melde('seite', 'Service Worker context closed bei x', '', 'Seitenfehler: Service Worker context closed bei x', fehler);
+  pruefe('Gegenprobe: anderer Grund und andere Meldung bleiben Fehler', !ab && fehler.length === 1, { ab, fehler });
+}
+{
+  const f = swWechselFilter(TESTANFRAGE), fehler = [];
+  f.anfrage(ZU, EIGEN + 'schach/__langsam?ms=7000', fehler);
+  f.melde('konsole', 'Failed to load resource: ' + ZU, 'https://fremd.example/y', 'Failed to load resource: ' + ZU + ' @ https://fremd.example/y', fehler);
+  pruefe('Gegenprobe: Konsolenmeldung mit fremder Adresse bleibt rot', fehler.length === 1, fehler);
+}
+
+// WebKit: abgebrochener Abruf beim Neuladen als "<Adresse> due to access control checks." (fc-18:11 Zusatz 8: frueher
+// genuegte, dass die eigene Adresse IRGENDWO in der Meldung stand)
+{
+  const EIGEN = 'http://127.0.0.1:4321/';
+  const fall = (name, meldung, soll) => pruefe(name, eigenerZugriffsAbbruch(meldung, EIGEN) === soll, { meldung, soll });
+  fall('eigene Adresse vor "due to": still', 'http://127.0.0.1:4321/schach/klaenge/zug.mp3 due to access control checks.', true);
+  // echte Meldung aus Playwright-WebKit (suite5.log 19.11.): ohne "http:", mit einem Schraegstrich vorn
+  fall('echte WebKit-Form "/127.0.0.1:PORT/..." ohne Schema: still', '/127.0.0.1:4321/schach/assets/klang/arcade/zug.mp3 due to access control checks.', true);
+  fall('Gegenprobe: echte WebKit-Form mit anderem Port bleibt rot', '/127.0.0.1:43210/schach/a.mp3 due to access control checks.', false);
+  fall('Gegenprobe: echte WebKit-Form mit fremdem Rechner bleibt rot', '/boese.example/127.0.0.1:4321/a.mp3 due to access control checks.', false);
+  fall('mit WebKit-Vorsatz "Fetch API cannot load": still', 'Fetch API cannot load http://127.0.0.1:4321/schach/a.mp3 due to access control checks.', true);
+  fall('Gegenprobe: fremde Adresse mit der eigenen im Abfrage-Teil bleibt rot',
+    'https://boese.example/x?zurueck=http://127.0.0.1:4321/ due to access control checks.', false);
+  fall('Gegenprobe: anderer Port bleibt rot', 'http://127.0.0.1:43210/schach/a.mp3 due to access control checks.', false);
+  fall('Gegenprobe: eigene Adresse vorn, fremde vor "due to" bleibt rot',
+    'Fetch API cannot load http://127.0.0.1:4321/ -> https://fremd.example/a.js due to access control checks.', false);
+  fall('Gegenprobe: anderer Fehler mit eigener Adresse bleibt rot', 'http://127.0.0.1:4321/schach/a.mp3 not found', false);
+  // Nachpruefung 3 (19.11.): B1 nur http(s)/ws(s) gilt als Schema; B2 Port-Grenze unabhaengig vom Schraegstrich in `eigen`
+  fall('Gegenprobe B1: fremdes "boese:" vor der eigenen Adresse bleibt rot', 'boese:127.0.0.1:4321/a.mp3 due to access control checks.', false);
+  fall('Gegenprobe B1: fremder Rechner "boese.example:" davor bleibt rot', 'boese.example:127.0.0.1:4321/a.mp3 due to access control checks.', false);
+  const ohneStrich = (meldung) => eigenerZugriffsAbbruch(meldung, 'http://127.0.0.1:4321');
+  pruefe('Gegenprobe B2: Port 43210 gegen eigen ohne Schraegstrich bleibt rot',
+    ohneStrich('/127.0.0.1:43210/a.mp3 due to access control checks.') === false);
+  pruefe('B2: eigen ohne Schraegstrich, eigene Adresse still', ohneStrich('/127.0.0.1:4321/a.mp3 due to access control checks.') === true);
+  pruefe('B2: Adresse endet direkt nach dem Port: still', ohneStrich('http://127.0.0.1:4321 due to access control checks.') === true);
+}
+// fc-18:11 Zusatz 10: keine Testdatei prueft diese Ausnahme noch selbst per includes (heim.test.mjs hatte zwei Stellen);
+// jede Ausnahme fuer "due to access control checks" geht ueber eigenerZugriffsAbbruch()
+{
+  const ordner = new URL('./', import.meta.url);
+  const alt = readdirSync(ordner).filter((d) => /\.m?js$/.test(d)).flatMap((d) => readFileSync(new URL(d, ordner), 'utf8').split('\n')
+    .map((z, i) => ({ d, i: i + 1, z })).filter(({ z }) => /due to access control checks/.test(z) && /\.includes\(/.test(z)))
+    .map(({ d, i }) => `${d}:${i}`);
+  pruefe('keine Testdatei filtert "due to access control checks" per includes', alt.length === 0, alt);
+}
+
+const gut = ergebnisse.filter((e) => e.ok).length;
+console.log(`\n${gut}/${ergebnisse.length} bestanden`);
+process.exit(gut === ergebnisse.length ? 0 : 1);
