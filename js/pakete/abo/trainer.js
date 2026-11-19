@@ -39,6 +39,7 @@ import './texte.js';
 const A = (k, w) => t('p-abo.' + k, w);
 import { anim, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
+import { schluckeFolgeKlick } from '../../ui/bauteile.js';
 import { kontoFreigeschaltet } from '../../konto.js';
 import {
   istPremium, premiumStand, ladeProdukt, kaufen, verwalten, stelleAboCssSicher, inStoreHuelle, kaufStand, bestaetigeKauf,
@@ -316,7 +317,7 @@ export function zeigeTrainer({ app = null } = {}) {
     }
   }
 
-  schleier.addEventListener('pointerdown', () => ende());
+  schleier.addEventListener('pointerdown', () => { ende(); schluckeFolgeKlick(); });
   document.addEventListener('keydown', taste, true);
   document.addEventListener('abo:stand', beiStand);
   try { abScreen = hoere('app:screen', () => ende()); } catch (e) { /* egal */ }

@@ -192,6 +192,23 @@ export function schliesseSheet() {
   if (offenesSheet) offenesSheet.ende();
 }
 
+// Schleier, die bei pointerdown schliessen (Dialog in app.js, sheet() und die Blaetter der Pakete): .weg laesst Klicks
+// durch bzw. der Ort ist schon weg, der click desselben Tipps traefe also den Knopf darunter (Befund 19.11.2026: Touch,
+// "Zurueck zum Start" verliess die Partie). Genau einmal schlucken; der Fang geht nach dem geschluckten click, beim
+// naechsten Druck oder nach 600 ms von selbst weg, damit nie ein spaeterer echter Klick verloren geht.
+export function schluckeFolgeKlick() {
+  let uhr = 0;
+  const weg = () => {
+    clearTimeout(uhr);
+    document.removeEventListener('click', fang, true);
+    document.removeEventListener('pointerdown', weg, true);
+  };
+  const fang = (e) => { e.preventDefault(); e.stopImmediatePropagation(); weg(); };
+  document.addEventListener('click', fang, true);
+  document.addEventListener('pointerdown', weg, true);
+  uhr = setTimeout(weg, 600);
+}
+
 // sperreMs: Knoepfe der Art "gefahr" nehmen erst so viele ms nach dem Oeffnen einen Tipp an und nie einen Doppeltipp
 // (detail > 1). Sonst landet der zweite Tipp eines Doppeltipps auf dem Knopf, der an derselben Stelle des naechsten Blatts sitzt.
 export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen = null, inhalt = null,
@@ -259,7 +276,7 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
       });
       leiste.append(b);
     }
-    schleier.addEventListener('pointerdown', () => ende(abbrechen));
+    schleier.addEventListener('pointerdown', () => { ende(abbrechen); schluckeFolgeKlick(); });
     document.addEventListener('keydown', taste, true);
     // U4 (Flo 09.11.2026): alles hinter dem Blatt stilllegen, damit auch ein Bildschirmleser nicht dahinter springt.
     // Die Meldungen (role=status) bleiben hoerbar; zurueckgesetzt wird nur, was hier stillgelegt wurde.

@@ -73,7 +73,7 @@ import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
-import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
+import { toast, toastLeeren, schliesseSheet, schluckeFolgeKlick } from './ui/bauteile.js';
 import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
@@ -319,21 +319,6 @@ hoere('speicher:fehler', () => {
 // ---------- Rueckfrage-Dialog ----------
 
 let offenerDialog = null;
-// Tipp auf den Schleier schliesst schon bei pointerdown, und .dialog-ort.weg laesst Klicks durch: der click desselben Tipps
-// traefe sonst den Knopf darunter (Befund 19.11.2026: iPhone, "Zurueck zum Start" verliess die Partie). Genau einmal
-// schlucken; der Fang geht nach dem geschluckten click, beim naechsten Druck oder nach 600 ms von selbst weg.
-function schluckeFolgeKlick() {
-  let uhr = 0;
-  const weg = () => {
-    clearTimeout(uhr);
-    document.removeEventListener('click', fang, true);
-    document.removeEventListener('pointerdown', weg, true);
-  };
-  const fang = (e) => { e.preventDefault(); e.stopImmediatePropagation(); weg(); };
-  document.addEventListener('click', fang, true);
-  document.addEventListener('pointerdown', weg, true);
-  uhr = setTimeout(weg, 600);
-}
 function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen = null } = {}) {
   schliesseDialog();
   return new Promise((resolve) => {
