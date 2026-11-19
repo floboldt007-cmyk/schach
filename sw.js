@@ -834,7 +834,7 @@ self.addEventListener('install', (e) => {
     await Promise.all(DATEIEN.map(async (datei) => {
       const antwort = await holeFrisch(datei, alt);
       if (!antwort.ok) throw new Error(`Vorladen fehlgeschlagen: ${datei} (${antwort.status})`);
-      await cache.put(datei, await mitTyp(datei, antwort));
+      await cache.put(datei, await ohneFrische(await mitTyp(datei, antwort)));
     }));
   })());
 });
@@ -862,14 +862,18 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(antworte(req, url));
 });
 
-// Was der Worker ausliefert, ist fuer den Browser nie "frisch": WebKit (Safari) haelt Antworten sonst mit der max-age des
-// Servers (GitHub Pages: 600 s) im eigenen Speicher und laedt Module beim Neuladen nach einem Versionswechsel von dort,
+// Was im Cache liegt, ist fuer den Browser nie "frisch": WebKit (Safari) haelt Antworten des Workers sonst mit der max-age
+// des Servers (GitHub Pages: 600 s) im eigenen Speicher und laedt Module beim Neuladen nach einem Versionswechsel von dort,
 // ohne den Worker zu fragen. Die Seite lief dann mit altem Code unter dem neuen Worker (tests/sw-update.test.mjs unter
 // WebKit, 19.11.2026: nach dem Wechsel auf Fassung 1 lief heim.js aus Fassung 0, ohne Anfrage an den Worker).
-function ohneFrische(antwort) {
+// Der Kopf wird beim Ablegen gesetzt, nicht bei jeder Antwort: umgebaut je Anfrage hielt ein Strom den Abruf im alten
+// Worker offen (Chromium wechselte einmal erst nach 30 s), ganz gelesen schloss WebKit den alten Worker mitten im Lesen
+// ("Service Worker context closed", 2 von 3 Laeufen). Grenze: Eintraege, die eine aeltere Fassung abgelegt hat, tragen den
+// Kopf noch nicht; das gilt fuer den ersten Wechsel nach dieser Aenderung.
+async function ohneFrische(antwort) {
   const kopf = new Headers(antwort.headers);
   kopf.set('Cache-Control', 'no-cache');
-  return new Response(antwort.body, { status: antwort.status, statusText: antwort.statusText, headers: kopf });
+  return new Response(await antwort.blob(), { status: antwort.status, statusText: antwort.statusText, headers: kopf });
 }
 
 async function antworte(req, url) {
@@ -880,14 +884,13 @@ async function antworte(req, url) {
   const start = url.pathname === BASIS || url.pathname === BASIS + 'index.html';
   const treffer = start ? await caches.match(BASIS + 'index.html', { cacheName: CACHE })
     : await caches.match(req, { cacheName: CACHE, ignoreSearch: navigation });
-  if (treffer) return ohneFrische(treffer);
+  if (treffer) return treffer;
   // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen, aber nur, solange der eigene Cache noch besteht
   const antwort = await fetch(req);
   if (antwort.status === 200 && antwort.type === 'basic') {
     const kopie = antwort.clone();
-    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, kopie))
+    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then(async (cache) => cache && cache.put(req, await ohneFrische(kopie)))
       .catch(() => { /* Speicher voll o. ae.: egal */ });
-    return ohneFrische(antwort);
   }
   return antwort;
 }
