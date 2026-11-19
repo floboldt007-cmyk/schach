@@ -69,10 +69,12 @@ async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, 
   // Test-Keys von Cloudflare (developers.cloudflare.com/turnstile/troubleshooting/testing): 1x…AA besteht immer und
   // liefert tok-1, tok-2 (neu nach reset), 2x…AB scheitert immer (error-callback).
   if (botschutz) await k.addInitScript((key) => { window.__botschutzTestKey = key; }, botschutz);
-  const turnstileNachbau = () => `window.turnstile = { n: 0, resets: 0, opt: null,
+  // offen: gezeichnete, noch nicht entfernte Widgets (das echte Turnstile warnt "Cannot find Widget ..., consider using
+  // turnstile.remove()", wenn eines mit seinem Ort verschwindet, fable-check 19.11. Nr 7)
+  const turnstileNachbau = () => `window.turnstile = { n: 0, resets: 0, opt: null, gezeichnet: 0, offen: [],
     gib() { const o = this.opt; if (/^2x/.test(o.sitekey)) o['error-callback']('600010'); else o.callback('tok-' + (++this.n)); },
-    render(el, o) { this.opt = o; el.dataset.gerendert = o.theme + '|' + o.language; setTimeout(() => this.gib(), 50); return 'w1'; },
-    reset() { this.resets++; setTimeout(() => this.gib(), 50); }, remove() {} };`;
+    render(el, o) { this.opt = o; el.dataset.gerendert = o.theme + '|' + o.language; setTimeout(() => this.gib(), 50); const id = 'w' + (++this.gezeichnet); this.offen.push(id); return id; },
+    reset() { this.resets++; setTimeout(() => this.gib(), 50); }, remove(id) { this.offen = this.offen.filter((x) => x !== id); } };`;
   await k.route('**/*', async (route) => {
     const req = route.request(); const url = new URL(req.url());
     if (url.hostname === '127.0.0.1') return route.continue();
@@ -319,6 +321,15 @@ try {
     await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
     pruefe('Bot-Schutz: jedes Token nur einmal (nach dem Senden reset, zweites Senden mit tok-2)',
       await s.evaluate(() => window.turnstile.resets) >= 1 && zustand.otpBody[1]?.gotrue_meta_security?.captcha_token === 'tok-2', zustand.otpBody);
+    // fable-check 19.11. Nr 7: beim Verlassen der Einstellungen blieb das Widget bei Turnstile eingetragen ("Cannot find Widget")
+    await s.evaluate(() => { location.hash = '#arena'; }); await s.waitForTimeout(600);
+    const weg = await s.evaluate(() => ({ offen: window.turnstile.offen.slice(), gezeichnet: window.turnstile.gezeichnet }));
+    await s.evaluate((h) => { location.hash = h; }, EINST);
+    await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
+    await s.evaluate(() => { location.hash = '#arena'; }); await s.waitForTimeout(600);
+    const weg2 = await s.evaluate(() => ({ offen: window.turnstile.offen.slice(), gezeichnet: window.turnstile.gezeichnet }));
+    pruefe('Bot-Schutz: Einstellungen verlassen entfernt das Widget (turnstile.remove), auch beim zweiten Besuch',
+      weg.offen.length === 0 && weg2.offen.length === 0 && weg2.gezeichnet === weg.gezeichnet + 1, { weg, weg2 });
     pruefe('Bot-Schutz: keine Seitenfehler', zustand.fehler.length === 0, zustand.fehler);
     await k.close();
   }

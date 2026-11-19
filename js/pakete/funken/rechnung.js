@@ -11,6 +11,7 @@
 //       (keine Live-Bewertung) zaehlt ein Zug nicht (lieber zu wenig als zu viel).
 //   ergebnisFunken({ ergebnis, eigeneZuege, hilfe }) -> Zahl   Sieg 40, Remis 25, Niederlage ab 15 eigenen Zuegen 10
 //       ("Kampfgeist"), Ende vor dem 10. eigenen Zug 0; mit Hilfe (Hinweis oder Zuruecknehmen) halbiert.
+//       Endet die Partie vor dem 10. eigenen Zug ohne Sieg (Aufgabe, Remis), ist die ganze Partie 0 (partieFunken: kurz).
 //   verwertung({ ergebnis, zuege }) -> { funken, par, ueber, ab }   nur bei Sieg: ab dem ersten Zug, nach dem die eigene
 //       Gewinnchance mindestens 90 % war, Par = Mattdistanz + 3 (sonst 30 Zuege); 30 minus 1 je Zug ueber Par, nie < 0.
 //       zuege: { gewinnNachher, matt } (matt: eigene Zuege bis zum Matt nach diesem Zug oder null). Ohne jede
@@ -47,7 +48,7 @@
 // Fairness (5.2 Regel 18, 5.3): Funken sind nie negativ, nur Qualitaet zaehlt, Deckel 40, Faktor gegen Farmen,
 // Tagesbogen ab 800, hoechstens x2, Level ohne Spielwirkung. Kein Math.random in dieser Datei.
 
-export const STAND = 1;
+export const STAND = 2; // 2: kurze Partie ohne Sieg = 0 (19.11.2026)
 
 // Funken je offenem Zug nach Zugklasse (IDs aus js/zugklassen.js): Genial 12, Goldrichtig 8, Praezise 5, Sauber 4,
 // Solide 3, Unscharf 1, Daneben/Verschenkt/Weit daneben 0 (belegen einen Platz, nie Abzug)
@@ -212,14 +213,17 @@ export function lageAusPartien(partien, eloVon) {
 
 export function partieFunken({ zuege = [], ergebnis, eigeneZuege = 0, hilfe = false, gegner = null, genauigkeit = null,
   faktor = 1, botName = 'den Bot' } = {}) {
-  const zw = zugwerte(zuege);
+  // Vor dem 10. eigenen Zug zaehlt nur ein Sieg (wie die Partie-Punkte, R9-PunkteKurz Variante A): frueh aufgeben oder
+  // ein schnelles Remis bringt 0, sonst liesse sich mit Theorie und offenen Eroeffnungszuegen farmen (fable-check 19.11. Nr 3)
+  const kurz = Math.floor(zahl(eigeneZuege) || 0) < MIN_ZUEGE && ergebnis !== 'sieg';
+  const zw = zugwerte(kurz ? [] : zuege);
   const erg = ergebnisFunken({ ergebnis, eigeneZuege, hilfe });
   const vw = verwertung({ ergebnis, zuege });
-  const lb = lichtblicke({ ergebnis, eigeneZuege, genauigkeit, gegner, zuege, botName });
+  const lb = kurz ? [] : lichtblicke({ ergebnis, eigeneZuege, genauigkeit, gegner, zuege, botName });
   const f = zahl(faktor) != null && faktor > 0 ? Math.min(2, faktor) : 1;
   const basis = zw.zugwerte + zw.theorie + erg + vw.funken + lb.length * LICHTBLICK_FUNKEN;
   return {
-    stand: STAND, basis, zugwerte: zw.zugwerte, theorie: zw.theorie, offen: zw.offen, entschieden: zw.entschieden,
+    stand: STAND, basis, kurz, zugwerte: zw.zugwerte, theorie: zw.theorie, offen: zw.offen, entschieden: zw.entschieden,
     unbekannt: zw.unbekannt, deckel: zw.deckel, klassen: zw.klassen, ergebnis: erg, hilfe: !!hilfe, verwertung: vw.funken,
     par: vw.par, lichtblicke: lb, faktor: f, vorRueckenwind: basis * f,
   };
