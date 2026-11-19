@@ -1,7 +1,7 @@
-// Baut die App-Icons der Schach-Arena: Springer mit Neon-Verlauf auf Nachtblau (wie das Logo).
+// Baut die App-Icons von Crownmate: das Premium-Wappen (Krone auf Scheibe mit Strahlenkranz) auf dunklem Grund.
 // Schreibt favicon.svg und rendert per Playwright (Chromium) die PNGs:
-//   icon-192.png, icon-512.png          Zweck "any": abgerundetes Quadrat, Ecken durchsichtig
-//   icon-maskable-512.png               Zweck "maskable": volle Flaeche, Springer in der Sicherheitszone
+//   icon-192.png, icon-512.png          Zweck "any": volle Flaeche, ohne Alphakanal (keine hellen Ecken)
+//   icon-maskable-512.png               Zweck "maskable": volle Flaeche, Wappen in der Sicherheitszone
 //   apple-touch-icon.png (180)          volle Flaeche, ohne Alphakanal (iOS rundet selbst)
 //
 //   node assets/icons/baue-icons.mjs            alles bauen
@@ -18,61 +18,47 @@ const require = createRequire(import.meta.url);
 const ORDNER = path.dirname(fileURLToPath(import.meta.url));
 
 // ---------- Form ----------
-// Springerkopf (nach links blickend) im 100er-Raster, Sockel darunter
-const KOPF = 'M34 80C33 70 36 63 43 57C37 58 31 61 26 63C22 64.5 18 62.5 17 58.5C16 55 17 52 20 50'
-  + 'L34 33C36 27 39 22 43 19L42 8.5L52 15.5C66 17 78 28 80 46C81 58 79.5 70 76.5 80Z';
-const SOCKEL = '<rect x="27" y="80" width="56" height="7" rx="2.5"/><rect x="22" y="86" width="66" height="8" rx="3"/>';
-// Auge, Nuester und Maehnenkerben (dunkel, auf dem Verlauf)
-const DETAILS = '<circle cx="41.5" cy="30.5" r="2.7"/><circle cx="22.5" cy="53.5" r="1.5"/>'
-  + '<path d="M67 27.5l-5.5 4.2M74.5 39l-6.6 2.6M77.5 52l-7 .8M77.5 65l-7-1" fill="none" stroke-width="2.6" stroke-linecap="round"/>'
-  + '<path d="M29.5 81H80.5M25 86.8H85" fill="none" stroke-width="1.4"/>';
-// Umriss: x 17..88, y 8.5..94, Mitte:
-const MITTE = { x: 52.5, y: 51.25 };
+// Das Wappen der Premium-Seite (emblem() in js/ui/premium.js) im 120er-Raster, Farben fest aus dem dunklen Design
+const GOLD = '#F2BE4A';
+const BAND = '#F2C96D';   // --gold 78 % mit --text gemischt
+const SCHEIBE = '#403A2C';   // --gold 16 % mit --flaeche gemischt
+const FLAECHE = '#1E2126';
+const AKZENT = '#C8441E';
+const GRUND = '#15171B';
 
-const VERLAUF = [['0', '#19f6e8'], ['.38', '#a06bff'], ['.72', '#ff2d78'], ['1', '#ff8a1e']];
-const NACHT = '#070914';
+const funkel = (x, y, s) => `<path fill="${GOLD}" d="M${x} ${y - s}C${x + s * .18} ${y - s * .18} ${x + s * .18} ${y - s * .18} ${x + s} ${y}`
+  + `C${x + s * .18} ${y + s * .18} ${x + s * .18} ${y + s * .18} ${x} ${y + s}C${x - s * .18} ${y + s * .18} ${x - s * .18} ${y + s * .18} ${x - s} ${y}`
+  + `C${x - s * .18} ${y - s * .18} ${x - s * .18} ${y - s * .18} ${x} ${y - s}z"/>`;
 
-// art: 'rund' (Zweck any, Ecken frei), 'voll' (Apple, ganze Flaeche), 'maskable', 'favicon'
-export function iconSvg(art = 'rund') {
+function wappen(fein) {
+  const strahlen = Array.from({ length: 16 }, (_, i) => {
+    const w = (i * 22.5) * Math.PI / 180;
+    const [x1, y1, x2, y2] = [60 + Math.cos(w) * 44, 60 + Math.sin(w) * 44, 60 + Math.cos(w) * 57, 60 + Math.sin(w) * 57];
+    return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}"/>`;
+  }).join('');
+  return `${fein ? `<g stroke="${GOLD}" stroke-width="2.4" stroke-linecap="round" opacity=".5">${strahlen}</g>` : ''}
+<circle cx="60" cy="60" r="40" fill="${SCHEIBE}" stroke="${GOLD}" stroke-width="2.2"/>
+${fein ? `<circle cx="60" cy="60" r="35" fill="none" stroke="${GOLD}" stroke-width="1.2" stroke-dasharray="1.5 3.2" opacity=".7"/>` : ''}
+<path d="M37 74 33 47l13.5 11L60 38l13.5 20L87 47l-4 27z" fill="${GOLD}" stroke="${GOLD}" stroke-width="2.4" stroke-linejoin="round"/>
+<path d="M37.5 74h45v7.5h-45z" fill="${BAND}"/>
+<circle cx="60" cy="63" r="4.2" fill="${FLAECHE}" stroke="${AKZENT}" stroke-width="2.6"/>
+<circle cx="46" cy="66" r="2.6" fill="${AKZENT}"/><circle cx="74" cy="66" r="2.6" fill="${AKZENT}"/>
+<circle cx="33" cy="46" r="3" fill="${GOLD}"/><circle cx="60" cy="37" r="3.4" fill="${GOLD}"/><circle cx="87" cy="46" r="3" fill="${GOLD}"/>
+${fein ? `${funkel(16.8, 31.1, 7)}${funkel(88.9, 16.8, 5)}${funkel(103.2, 88.9, 6)}` : ''}`;   // Funken je mittig zwischen zwei Strahlen
+}
+
+// art: 'voll' (Zweck any und Apple, ganze Flaeche), 'maskable', 'favicon' (Ecken frei)
+export function iconSvg(art = 'voll') {
   const S = 512;
-  const voll = art === 'voll' || art === 'maskable';
   const fav = art === 'favicon';
-  const radius = fav ? 112 : 114;
-  // Springergroesse: maskable passt in den Kreis der Sicherheitszone (Radius 40 %)
-  const skala = art === 'maskable' ? 3.45 : fav ? 4.75 : 3.95;
-  const tx = S / 2 - MITTE.x * skala;
-  const ty = S / 2 - MITTE.y * skala + (fav ? 2 : 6);
-  const stops = VERLAUF.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('');
-  const form = `<path d="${KOPF}"/>${SOCKEL}`;
-  const flaeche = voll ? `<rect width="${S}" height="${S}" fill="url(#hg)"/>`
-    : `<rect width="${S}" height="${S}" rx="${radius}" fill="url(#hg)"/>`;
-  const gitter = fav ? '' : `<g mask="url(#gm)" opacity=".24">${
-    Array.from({ length: 12 }, (_, i) => `<path d="M0 ${22 + i * 42}H${S}M${22 + i * 42} 0V${S}"/>`).join('')}</g>`;
-  // Neon-Rahmen (nicht beim maskable-Icon, das wird beschnitten)
-  const rahmen = art === 'maskable' ? '' : fav
-    ? `<rect x="14" y="14" width="${S - 28}" height="${S - 28}" rx="${radius - 14}" fill="none" stroke="url(#rg)" stroke-width="16"/>`
-    : `<rect x="16" y="16" width="${S - 32}" height="${S - 32}" rx="${radius - 16}" fill="none" stroke="url(#rg)" stroke-width="7" filter="url(#weich)" opacity=".9"/>`
-      + `<rect x="16" y="16" width="${S - 32}" height="${S - 32}" rx="${radius - 16}" fill="none" stroke="url(#rg)" stroke-width="4"/>`;
-  const glanz = fav ? '' : `<ellipse cx="256" cy="${ty + 92 * skala}" rx="${40 * skala}" ry="${7 * skala}" fill="#a06bff" opacity=".35" filter="url(#weit)"/>`
-    + `<g transform="translate(${tx} ${ty}) scale(${skala})" fill="url(#sg)" opacity=".75" filter="url(#schein)">${form}</g>`;
+  // maskable: alles bleibt im Kreis der Sicherheitszone (Radius 40 %); Favicon: nur Scheibe und Krone, gross
+  const skala = art === 'maskable' ? 3.4 : fav ? 6 : 4;
+  const versatz = S / 2 - 60 * skala;
+  const flaeche = `<rect width="${S}" height="${S}"${fav ? ' rx="112"' : ''} fill="${GRUND}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}">
-<defs>
-<radialGradient id="hg" cx=".5" cy="0" r="1.15"><stop offset="0" stop-color="#1c2658"/><stop offset=".55" stop-color="#0a0c1a"/><stop offset="1" stop-color="#05060d"/></radialGradient>
-<linearGradient id="sg" gradientUnits="userSpaceOnUse" x1="22" y1="14" x2="84" y2="94">${stops}</linearGradient>
-<linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">${stops}</linearGradient>
-<radialGradient id="gv" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
-<mask id="gm"><rect width="${S}" height="${S}" fill="url(#gv)"/></mask>
-<filter id="schein" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="${(5 / skala).toFixed(2)}"/></filter>
-<filter id="weich" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="6"/></filter>
-<filter id="weit" x="-50%" y="-200%" width="200%" height="500%"><feGaussianBlur stdDeviation="18"/></filter>
-</defs>
 ${flaeche}
-${gitter ? gitter.replace('<g ', '<g stroke="#3a5cff" stroke-width="2" ') : ''}
-${rahmen}
-${glanz}
-<g transform="translate(${tx} ${ty}) scale(${skala})">
-<g fill="url(#sg)">${form}</g>
-<g fill="${NACHT}" stroke="${NACHT}">${DETAILS}</g>
+<g transform="translate(${versatz} ${versatz}) scale(${skala})">
+${wappen(!fav)}
 </g>
 </svg>
 `;
@@ -181,8 +167,8 @@ async function baue() {
   const browser = await chromium.launch();
   try {
     const ziele = [
-      ['icon-192.png', 'rund', 192, true],
-      ['icon-512.png', 'rund', 512, true],
+      ['icon-192.png', 'voll', 192, false],
+      ['icon-512.png', 'voll', 512, false],
       ['icon-maskable-512.png', 'maskable', 512, false],
       ['apple-touch-icon.png', 'voll', 180, false],
     ];

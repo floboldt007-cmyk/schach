@@ -122,6 +122,12 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .online-partie .spieler.mit-banner .name, .online-partie .spieler.mit-banner .unter { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
 .online-partie .spieler .name b { font-weight: inherit; }
 .online-partie .spieler .on-titel { flex: none; font-size: inherit; }
+/* R19 M6: durchsichtiger Knopf ueber der ganzen Gegnerleiste, ein Tipp oeffnet sein Profil (js/ui/gegner-profil.js);
+   die Leiste sieht aus wie vorher, nur der Fokusring zeigt ihn */
+.online-partie .spieler.on-oben { position: relative; }
+.online-partie .spieler.on-spieler > .on-gegner-knopf { position: absolute; inset: 0; z-index: 2; margin: 0; padding: 0; border: 0;
+  border-radius: inherit; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.online-partie .spieler.on-spieler > .on-gegner-knopf:focus-visible { outline: var(--fokus); outline-offset: -3px; }
 .on-hinweise { display: flex; flex-direction: column; gap: 6px; }
 /* Tageskontingent der Live-Bewertung (gewertet, ohne Premium): ruhige Zeile wie der Uhr-Hinweis */
 .on-live[hidden] { display: none; }

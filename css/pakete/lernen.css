@@ -11,7 +11,7 @@
   letter-spacing: .04em; color: #F5C451; background: #1C1B19; vertical-align: 1px; }
 .ms-karte .t-fuss { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .ms-sterne-zahl { display: inline-flex; align-items: center; gap: 6px; font-weight: 750; color: var(--text-2); font-size: 14px; }
-.ms-sterne-zahl .ico { width: 18px; height: 18px; color: var(--stern); }
+.ms-sterne-zahl .ico { width: 18px; height: 18px; color: var(--stern-an); }
 
 /* ---------- Uebersicht ---------- */
 /* Flo 01.11.2026 (iPad): "bei den Lektionen kann ich nicht nach unten scrollen". Der Rumpf war hoechstens 860 px breit und
@@ -22,7 +22,7 @@
   padding: 8px max(var(--rand), calc((100% - 860px) / 2 + var(--rand))) calc(28px + env(safe-area-inset-bottom, 0px)); }
 .ms-gesamt { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 6px 14px; border-radius: var(--r-pille);
   background: var(--flaeche); box-shadow: var(--s1), var(--kante); font-weight: 750; font-size: 14.5px; }
-.ms-gesamt .ico { width: 18px; height: 18px; color: var(--stern); }
+.ms-gesamt .ico { width: 18px; height: 18px; color: var(--stern-an); }
 .ms-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 8px 10px; }
 /* Bereichskarten (07.11.2026, ersetzen das Segment): Name, Sterne, Gratis-Zahl, Balken; vier nebeneinander, Handy 2 x 2 */
 .ms-bereiche { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -35,10 +35,13 @@
 .ms-bkarte[aria-pressed="true"] { background: var(--tinte); color: var(--auf-tinte); box-shadow: var(--s2); }
 .ms-bk-zeile { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; font-size: 13px; font-weight: 750; }
 .ms-bk-sterne { display: inline-flex; align-items: center; gap: 4px; }
-.ms-bk-sterne .ico { width: 15px; height: 15px; color: var(--stern); }
+.ms-bk-sterne .ico { width: 15px; height: 15px; color: var(--stern-an); }
 .ms-bk-sterne .von, .ms-bk-gratis { opacity: .72; }
 .ms-bk-balken { display: block; height: 5px; border-radius: var(--r-pille); background: var(--linie); overflow: hidden; }
 .ms-bkarte[aria-pressed="true"] .ms-bk-balken { background: rgba(255, 255, 255, .22); }
+/* gewaehlte Buch-Karte: Grund ist --tinte (hell fast schwarz, dunkel fast weiss); dort traegt --stern-auf-tinte das Gold
+   mit >= 3:1 (dunkel vorher 1,52:1, R19 Sterne) */
+.ms-bkarte[aria-pressed="true"] .ms-bk-sterne .ico { color: var(--stern-auf-tinte); }
 .ms-willkommen { display: flex; align-items: center; gap: 8px; margin: 12px 2px 0; color: var(--text-2); font-size: 14px; font-weight: 600; line-height: 1.4; }
 .ms-willkommen .ico { flex: none; width: 16px; height: 16px; color: var(--stern); }
 .ms-bk-balken > i { display: block; height: 100%; border-radius: inherit; background: var(--stern); }
@@ -73,8 +76,8 @@
 .ms-stufe[data-stufe="schwer"] { background: var(--tinte); color: var(--auf-tinte); box-shadow: none; }
 .ms-stufe[data-stufe="meister"] { background: #1C1B19; color: #F5C451; box-shadow: none; }
 .ms-sterne { display: inline-flex; gap: 2px; }
-.ms-sterne > i { display: grid; color: var(--linie-2); }
-.ms-sterne > i.an { color: var(--stern); }
+.ms-sterne > i { display: grid; color: var(--stern-aus); }
+.ms-sterne > i.an { color: var(--stern-an); }
 .ms-sterne .ico { width: 18px; height: 18px; }
 .ms-pfeil { display: grid; color: var(--text-3); }
 .ms-pfeil .ico { width: 18px; height: 18px; }

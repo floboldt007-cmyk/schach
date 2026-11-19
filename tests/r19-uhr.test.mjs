@@ -482,9 +482,10 @@ if (!pw) {
             localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l));
             return v;
           }, String(aendere));
+          // die Stoppuhr startet vor dem Fortsetzen: die App-Uhr laeuft schon, bevor die Partie "bereit" meldet (Engines laden)
+          const t0 = Date.now();
           await s.evaluate(() => { window.__test = { maxWarten: 0, botPause: 30 }; window.__app.gehe('partie', { fortsetzen: true }); });
           await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.chess().history().length === 2, null, { timeout: 30000 });
-          const t0 = Date.now();
           await warte(300);
           await s.goto('about:blank');
           const lauf = Date.now() - t0;
