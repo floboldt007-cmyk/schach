@@ -319,6 +319,21 @@ hoere('speicher:fehler', () => {
 // ---------- Rueckfrage-Dialog ----------
 
 let offenerDialog = null;
+// Tipp auf den Schleier schliesst schon bei pointerdown, und .dialog-ort.weg laesst Klicks durch: der click desselben Tipps
+// traefe sonst den Knopf darunter (Befund 19.11.2026: iPhone, "Zurueck zum Start" verliess die Partie). Genau einmal
+// schlucken; der Fang geht nach dem geschluckten click, beim naechsten Druck oder nach 600 ms von selbst weg.
+function schluckeFolgeKlick() {
+  let uhr = 0;
+  const weg = () => {
+    clearTimeout(uhr);
+    document.removeEventListener('click', fang, true);
+    document.removeEventListener('pointerdown', weg, true);
+  };
+  const fang = (e) => { e.preventDefault(); e.stopImmediatePropagation(); weg(); };
+  document.addEventListener('click', fang, true);
+  document.addEventListener('pointerdown', weg, true);
+  uhr = setTimeout(weg, 600);
+}
 function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen = null } = {}) {
   schliesseDialog();
   return new Promise((resolve) => {
@@ -370,7 +385,11 @@ function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art
       b.addEventListener('click', () => ende(k.wert));
       leiste.append(b);
     }
-    ort.addEventListener('pointerdown', (e) => { if (e.target === ort) ende(abbrechen); });
+    ort.addEventListener('pointerdown', (e) => {
+      if (e.target !== ort) return;
+      ende(abbrechen);
+      schluckeFolgeKlick();
+    });
     document.addEventListener('keydown', taste, true);
     document.body.append(ort);
     offenerDialog = { ort, ende: () => ende(abbrechen) };
