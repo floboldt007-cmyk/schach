@@ -2166,17 +2166,25 @@ export function zeige(root, params, app) {
     o.querySelector('.erg-zu').addEventListener('click', zeigeBrett);
     // Punkt 30 (Barrierefreiheit 09.11.): das Blatt haelt den Fokus wie ein Dialog. Tab kreist im Blatt, Escape zeigt
     // das Brett (wie das Auge oben rechts); der Bildschirm dahinter ist inert (sperreHintergrund).
+    // Flo 20.11.2026 (Antwort 9): das Auge kommt im Tab-Gang direkt hinter dem Knopf, auf dem der Fokus beim Fuellen landet
+    // (startFokus, die Folgeaktion); vorher kam es nach "Zu den Bots" als letztes. Die Reihe fuehrt deshalb das Blatt selbst.
+    let startFokus = null;
+    const tabReihe = (ziele) => {
+      const auge = o.querySelector('.erg-zu');
+      if (!startFokus || startFokus === auge || !ziele.includes(startFokus) || !ziele.includes(auge)) return ziele;
+      const reihe = ziele.filter((x) => x !== auge);
+      reihe.splice(reihe.indexOf(startFokus) + 1, 0, auge);
+      return reihe;
+    };
     o.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); zeigeBrett(); return; }
       if (e.key !== 'Tab') return;
-      const ziele = [...o.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')]
-        .filter((x) => !x.disabled && x.getClientRects().length);
+      const ziele = tabReihe([...o.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')]
+        .filter((x) => !x.disabled && x.getClientRects().length));
       if (!ziele.length) return;
-      const erst = ziele[0];
-      const letzt = ziele[ziele.length - 1];
-      const jetzt = document.activeElement;
-      if (e.shiftKey && (jetzt === erst || !ziele.includes(jetzt))) { e.preventDefault(); letzt.focus(); }
-      else if (!e.shiftKey && (jetzt === letzt || !ziele.includes(jetzt))) { e.preventDefault(); erst.focus(); }
+      const i = ziele.indexOf(document.activeElement);
+      e.preventDefault();
+      ziele[i < 0 ? (e.shiftKey ? ziele.length - 1 : 0) : (i + (e.shiftKey ? ziele.length - 1 : 1)) % ziele.length].focus();
     });
     // Sieg-Blatt (Flo 09.11., Variante C): Sterne und darunter der Level-Fortschritt; Punkte und Wertung
     // blendet css/ergebnis.css aus, ein Verweis fuehrt in die Liga. Nur bei wertenden Partien, sonst gibt es dort nichts.
@@ -2306,7 +2314,7 @@ export function zeige(root, params, app) {
         const karten = fuelleKarte(erg, review, rechnet, nachtrag, wertet);
         if (revancheFokus && !karteOrtEl.contains(document.activeElement)) {
           const r = karteOrtEl.querySelector('.gd-revanche');
-          if (r) r.focus({ preventScroll: true });
+          if (r) { r.focus({ preventScroll: true }); if (startFokus && !startFokus.isConnected) startFokus = r; }
         }
         const sterne = p.sterne || [false, false, false];
         const neueSterne = erg.neueSterne || [false, false, false];
@@ -2449,7 +2457,7 @@ export function zeige(root, params, app) {
           // neben dem orangen Analyse-Knopf (R16-Kritik E3, Auswahl a)
           const folge = knoepfe.querySelector('[data-ziel="kurs"]') || (ergebnis !== 'sieg' && knoepfe.querySelector('[data-ziel="analyse"]'))
             || knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]') || revanche;
-          if (folge) folge.focus({ preventScroll: true });
+          if (folge) { folge.focus({ preventScroll: true }); startFokus = folge; }
         }
         o.classList.add(rechnet ? 'vorlaeufig' : 'gefuellt');
         if (!rechnet) o.classList.remove('vorlaeufig');
