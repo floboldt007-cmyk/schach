@@ -132,6 +132,10 @@ const SUITEN = [
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
+  // R23-erstbesuch (fc-06:00, 20.11.2026): install legt nur den KERN ab, der Rest kommt in Haeppchen; WebKit beendet install nach etwa 30 s
+  { name: 'sw-erstbesuch', datei: 'sw-erstbesuch.test.mjs', args: [], exklusiv: 'Zeitgrenze der Installation', was: 'Erstbesuch Slow 4G (Chromium): Worker aktiv, Kern im Cache, Nachladen setzt fort' },
+  { name: 'sw-erstbesuch-webkit', datei: 'sw-erstbesuch.test.mjs', args: [], env: { BROWSER: 'webkit', NETZ: 'fast3g' }, exklusiv: 'Zeitgrenze der Installation', was: 'Erstbesuch Fast 3G (WebKit): Installation unter 28 s, danach offline' },
+  { name: 'sw-kern', datei: 'sw-kern.mjs', args: [], was: 'KERN in sw.js deckt jede Datei, die ohne Netz gebraucht wird' },
   { name: 'alle-auswahl', datei: 'alle-auswahl.test.mjs', args: [], was: 'alle.mjs: unbekannter Name in --nur bricht ab, "kommt noch" sichtbar, keine verwaiste Testdatei' },
   // bis 19.11.2026 verwaist (lief in keiner Suite, Inventur fc-18:11 Zusatz 11)
   { name: 'heim', datei: 'heim.test.mjs', args: [], was: 'Startseite heim: Buehne, Als Naechstes, drei Wege, ohne Scrollen auf dem iPad, hell und dunkel (Browser)' },
@@ -233,7 +237,7 @@ const DAUERN = new Map([
   ['daten', 12], ['server-abo', 0], ['abo', 33], ['server-coach', 29], ['coach-ki', 30],
   ['server-schule', 0], ['schule', 59], ['storage', 3], ['liga', 53], ['sicherung', 0],
   ['review', 2], ['ereignisse', 1], ['fairness', 1], ['spiel', 15], ['engine-bots', 104],
-  ['board', 68], ['vorzuege', 17], ['sw', 0], ['sw-update', 40], ['brett-tastatur', 30], ['sw-cache', 0], ['thema', 55], ['klang', 12],
+  ['board', 68], ['vorzuege', 17], ['sw', 0], ['sw-update', 40], ['brett-tastatur', 30], ['sw-cache', 0], ['sw-erstbesuch', 69], ['sw-erstbesuch-webkit', 145], ['sw-kern', 19], ['thema', 55], ['klang', 12],
   ['navigation', 39], ['ansicht', 150], ['arena', 154], ['funken', 124], ['punkte', 167], ['serie', 140],
   ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
