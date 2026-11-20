@@ -1,5 +1,5 @@
 -- EINSPIELEN (Flo, nie Claude): Supabase SQL Editor, diese ganze Datei ausfuehren (wiederholbar), DANACH
---   supabase/raetsel-duell-rls-test.sql und supabase/zwei-ligen-rls-test.sql: kein "FEHLER:", Ende mit ROLLBACK.
+--   supabase/zwei-ligen-rls-test.sql: kein "FEHLER:", Ende mit ROLLBACK.
 --   Rueckweg: supabase/raetsel-duell-ki-sofort-zurueck.sql.
 --   Reihenfolge: nach zwei-ligen-schema.sql (dessen duell_auswerten gilt live seit 11.11.2026 und ist hier die Grundlage).
 --   Laeuft zwei-ligen-schema.sql oder raetsel-duell-schema.sql spaeter noch einmal, danach diese Datei erneut einspielen,
@@ -8,11 +8,14 @@
 -- Raetsel-Duell gegen die KI wertet sofort aus (R26 AC-05, Flo 20.11.2026): bisher endete ein KI-Duell erst, wenn die
 -- KI ihre vollen 180 s "zu Ende gespielt" hatte, auch wenn der Spieler laengst fertig war (Fehler kuerzen seine Zeit um
 -- je 5 s, oder alle Raetsel waren durch). Jetzt endet es, sobald der Spieler fertig ist (alle Raetsel durch: sofort, es
--- kommt kein Zug mehr) oder seine eigene Zeit samt Gnadenfrist um ist. Die KI zaehlt dabei mit genau der Zeit, die der
--- Spieler hatte (bis zu seinem letzten Zug bzw. seinem Ende), in der Wertung und in der Anzeige.
--- Ersetzt: duell_auswerten (Fassung aus zwei-ligen-schema.sql, nur der KI-Zweig neu), duell_stand,
--- duell_faellige_auswerten und duell_alle_faelligen_auswerten (Fassungen aus raetsel-duell-schema.sql). Neu: zwei Helfer.
--- Gewertete Duelle und Freundschaften bleiben unveraendert.
+-- kommt kein Zug mehr) oder seine eigene Zeit samt Gnadenfrist um ist. Das Ergebnis bleibt dasselbe wie bisher: die KI
+-- behaelt ihre vollen 180 s, ihr Verlauf ist rein gerechnet (duell_ki_verlauf, ohne Uhr) und steht deshalb sofort fest.
+-- Bewusst NICHT "die KI zaehlt nur mit der Zeit des Spielers": dann koennte ein fuehrender Spieler mit absichtlichen
+-- Fehlern (je 5 s) seine Uhr und damit die KI anhalten und so den Sieg samt Kronen festhalten.
+-- Ersetzt: duell_auswerten (Fassung aus zwei-ligen-schema.sql, nur die Wartebedingung im KI-Zweig neu),
+-- duell_faellige_auswerten und duell_alle_faelligen_auswerten (Fassungen aus raetsel-duell-schema.sql). Neu: ein Helfer.
+-- duell_stand bleibt, wie es ist (es zeigt nach dem Ende schon den Verlauf der vollen 180 s). Gewertete Duelle und
+-- Freundschaften bleiben unveraendert.
 
 -- Schluss eines Spielers: alle Raetsel durch -> sein letzter Zug (hoechstens sein Ende), sonst sein eigenes Ende
 -- (Start + 180 s - 5 s je Fehler)
@@ -26,18 +29,6 @@ as $$
   select case when s.idx >= cardinality(d.raetsel)
               then least(coalesce(s.letzter_zug_am, d.start_am), public.duell_ende_am(d.start_am, d.dauer_s, s.fehler))
               else public.duell_ende_am(d.start_am, d.dauer_s, s.fehler) end;
-$$;
-
--- Sekunden, mit denen die KI zaehlt: die Zeit des Spielers bis zu seinem Schluss, zwischen 0 und der Duell-Dauer
-create or replace function public.duell_ki_sekunden(d public.duelle, s public.duell_spieler)
-returns numeric
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select least(d.dauer_s::numeric,
-               greatest(0::numeric, extract(epoch from public.duell_spieler_schluss(d, s) - d.start_am)::numeric));
 $$;
 
 -- Duell auswerten (wie zwei-ligen-schema.sql); Kronen gehen ueber kronen_einfach_buchen in die Raetsel-Liga, ein
@@ -74,8 +65,8 @@ begin
   select * into sa from public.duell_spieler s where s.duell = d.id and s.user_id = d.a for update;
   if d.art = 'ki' then
     -- R26 AC-05: fertig ist das Duell, sobald der Spieler fertig ist (alle Raetsel durch: sofort) oder seine eigene Zeit
-    -- samt Gnadenfrist um ist; die KI zaehlt mit seiner Zeit, nicht mit den vollen 180 s
-    ki := public.duell_ki_verlauf(d.seed, d.ki_elo, public.duell_ratings(d), public.duell_ki_sekunden(d, sa));
+    -- samt Gnadenfrist um ist; die KI zaehlt weiter mit den vollen 180 s (gerechnet, ohne Uhr: steht sofort fest)
+    ki := public.duell_ki_verlauf(d.seed, d.ki_elo, public.duell_ratings(d), d.dauer_s);
     gb := (ki->>'geloest')::integer;
     fb := (ki->>'fehler')::integer;
     -- die Klammer ist noetig: PL/pgSQL beendet die Bedingung sonst am ersten "then" (dem im case)
@@ -198,74 +189,8 @@ begin
 end;
 $$;
 
--- Stand eines Duells fuer einen Teilnehmer (wie raetsel-duell-schema.sql). Neu (R26 AC-05): die KI zeigt hoechstens den
--- Stand zum Schluss des Spielers, laufend und nach dem Ende gleich, damit die Zahl beim Ende nicht zurueckspringt.
-create or replace function public.duell_stand(duell uuid)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  uid uuid := auth.uid();
-  d public.duelle;
-  ich public.duell_spieler;
-  er public.duell_spieler;
-  gegner jsonb;
-  ki jsonb;
-  erg text;
-  delta integer;
-  rae jsonb;
-begin
-  if uid is null then
-    raise exception 'DUELL_ANMELDUNG';
-  end if;
-  select * into d from public.duelle x where x.id = duell_stand.duell;
-  if d.id is null or uid not in (d.a, coalesce(d.b, d.a)) then
-    return jsonb_build_object('fehler', 'DUELL_UNBEKANNT');
-  end if;
-  -- auswerten prueft selbst, ob beide Zeiten um sind
-  if d.status = 'laeuft' and now() >= d.start_am then
-    d := public.duell_auswerten(d.id);
-  end if;
-  select * into ich from public.duell_spieler s where s.duell = d.id and s.user_id = uid;
-  if d.art = 'ki' then
-    ki := case when d.status = 'beendet'
-               then public.duell_ki_verlauf(d.seed, d.ki_elo, public.duell_ratings(d), public.duell_ki_sekunden(d, ich))
-               when d.start_am is null or now() < d.start_am then '{"geloest": 0, "fehler": 0}'::jsonb
-               else public.duell_ki_verlauf(d.seed, d.ki_elo, public.duell_ratings(d),
-                      least(greatest(0, extract(epoch from now() - d.start_am))::numeric, public.duell_ki_sekunden(d, ich))) end;
-    gegner := public.duell_spieler_json((ki->>'geloest')::integer, (ki->>'fehler')::integer,
-                public.duell_ende_am(d.start_am, d.dauer_s, (ki->>'fehler')::integer))
-              || jsonb_build_object('ki', true, 'elo', d.ki_elo);
-  else
-    select * into er from public.duell_spieler s where s.duell = d.id and s.user_id <> uid;
-    gegner := case when er.user_id is null then null
-                   else public.duell_spieler_json(er.geloest, er.fehler, public.duell_ende_am(d.start_am, d.dauer_s, er.fehler))
-                        || jsonb_build_object('ki', false) end;
-  end if;
-  if d.status = 'laeuft' and now() >= d.start_am and now() < public.duell_ende_am(d.start_am, d.dauer_s, ich.fehler) then
-    rae := public.duell_raetsel_anzeige(d, ich);
-  end if;
-  if d.status = 'beendet' then
-    erg := case when d.ergebnis = 'remis' then 'remis'
-                when (d.ergebnis = 'a') = (uid = d.a) then 'sieg' else 'niederlage' end;
-    delta := coalesce((select kb.delta from public.kronen_buchungen kb
-                       where kb.user_id = uid and kb.quelle in ('duell', 'duell_ki') and kb.ref = d.id::text), 0);
-  end if;
-  return jsonb_build_object(
-    'duell', d.id, 'art', d.art, 'status', d.status, 'jetzt', now(), 'start_am', d.start_am, 'dauer_s', d.dauer_s,
-    'code', case when d.status = 'offen' then d.code end,
-    'ich', public.duell_spieler_json(ich.geloest, ich.fehler, public.duell_ende_am(d.start_am, d.dauer_s, ich.fehler)),
-    'gegner', gegner, 'raetsel', rae, 'ergebnis', erg, 'kronen_delta', delta);
-end;
-$$;
-
--- ---------- Rechte (wie bisher; die Helfer nur intern) ----------
+-- ---------- Rechte (wie bisher; der Helfer nur intern) ----------
 revoke all on function public.duell_spieler_schluss(public.duelle, public.duell_spieler) from public, anon, authenticated;
-revoke all on function public.duell_ki_sekunden(public.duelle, public.duell_spieler) from public, anon, authenticated;
 revoke all on function public.duell_auswerten(uuid) from public, anon, authenticated;
 revoke all on function public.duell_faellige_auswerten(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.duell_alle_faelligen_auswerten() from public, anon, authenticated, service_role;
-revoke all on function public.duell_stand(uuid) from public, anon, authenticated;
-grant execute on function public.duell_stand(uuid) to authenticated;
