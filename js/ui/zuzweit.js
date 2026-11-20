@@ -268,7 +268,7 @@ function partie(root, quelle, app, fortgesetzt) {
     const ausrichtung = namen.drehen ? chess.turn() : 'w';
     const dreht = brett.ausrichtung !== ausrichtung;
     brett.setzeAusrichtung(ausrichtung);
-    const m = chess.history({ verbose: true }).at(-1);
+    const verlauf = chess.history({ verbose: true }), m = verlauf[verlauf.length - 1];
     brett.setzeStellung(chess.fen(), { animieren, letzterZug: m ? [m.from, m.to] : null, schach: chess.inCheck() ? true : null });
     brett.erlaubeZuege(z.phase === 'spiel' && !fragt ? zielKarte(chess, { turmRochade: einst.turmRochade === true }) : null);
     if (dreht && animieren) {
