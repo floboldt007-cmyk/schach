@@ -114,7 +114,15 @@ async function loesche(db, uid) {
 // null sein darf (sonst scheitert das Loeschen an not null, Nachpruefung N3).
 // Der delete-Weg zaehlt nur ohne Kommentare und Zeichenketten und nur mit "where user_id = uid" (N2). Grenze: ein toter
 // Zweig (if false then ... end if) bleibt fuer diese Textpruefung unsichtbar; den deckt nur ein echter Lauf wie M5.
+// B1: weitere Personenspalten. Eine uuid-Spalte (nicht user_id) zaehlt als Person, wenn sie per Fremdschluessel auf auth.users
+// zeigt oder, ohne jeden Fremdschluessel, einen Personennamen traegt (heute duelle.a/b, partien_online.weiss/schwarz/
+// erstellt_von, freundschaften.von/an, freund_einladungen.von, klassen.leitung, verwaltung_protokoll.wer/ziel_user, 11
+// Spalten, alle per Fremdschluessel mit Kaskade bzw. wer mit set null auf freier Spalte). Zeigt sie auf eine andere
+// Tabelle (klassen_fortschritt.mitglied), haengt sie an deren Zeile und wird dort geprueft. Grenze: ein Personenbezug ohne
+// Fremdschluessel unter einem fremden Namen (etwa "ref") oder in text-/jsonb-Spalten bleibt unsichtbar.
+const PERSON = /^(a|b|an|von|wer|spieler|gegner|nutzer|user|mitglied|freund|besitzer|person|konto|leitung|erstellt_von|weiss|schwarz)(_id)?$|_(user|nutzer|spieler|gegner|konto)(_id)?$/i;
 const ohneKommentare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ').replace(/'(?:[^']|'')*'/g, "''");
+const geleert = (text, t, s) => new RegExp(`delete\\s+from\\s+(public\\.)?"?${t}"?\\s+where\\s+"?${s}"?\\s*=\\s*uid\\b`, 'i').test(text);
 async function ungedeckt(db) {
   const tabellen = (await db.query(`select cl.relname as t from pg_class cl join pg_namespace n on n.oid = cl.relnamespace
     join pg_attribute a on a.attrelid = cl.oid and a.attname = 'user_id' and not a.attisdropped
@@ -127,8 +135,7 @@ async function ungedeckt(db) {
     where c.contype = 'f' and n.nspname = 'public'`)).rows;
   const text = ohneKommentare((await db.query(`select prosrc from pg_proc where proname = 'konto_loeschen'
     and pronamespace = 'public'::regnamespace`)).rows.map((r) => r.prosrc).join('\n'));
-  const gedeckt = new Set(tabellen.filter((t) =>
-    new RegExp(`delete\\s+from\\s+(public\\.)?"?${t}"?\\s+where\\s+user_id\\s*=\\s*uid\\b`, 'i').test(text)));
+  const gedeckt = new Set(tabellen.filter((t) => geleert(text, t, 'user_id')));
   for (let neu = true; neu;) {
     neu = false;
     for (const t of tabellen) {
@@ -140,7 +147,24 @@ async function ungedeckt(db) {
       }
     }
   }
-  return { tabellen, offen: tabellen.filter((t) => !gedeckt.has(t)) };
+  const uuids = (await db.query(`select cl.relname as t, a.attname as s, a.attnotnull as pflicht,
+      coalesce(json_agg(json_build_object('zs', zn.nspname, 'z', ziel.relname, 'art', c.confdeltype))
+        filter (where c.oid is not null), '[]') as fk
+    from pg_class cl join pg_namespace n on n.oid = cl.relnamespace
+    join pg_attribute a on a.attrelid = cl.oid and a.attnum > 0 and not a.attisdropped and a.atttypid = 'uuid'::regtype
+    left join pg_constraint c on c.contype = 'f' and c.conrelid = cl.oid and a.attnum = any(c.conkey)
+    left join pg_class ziel on ziel.oid = c.confrelid left join pg_namespace zn on zn.oid = ziel.relnamespace
+    where n.nspname = 'public' and cl.relkind in ('r', 'p') and a.attname <> 'user_id'
+    group by cl.relname, a.attname, a.attnotnull order by 1, 2`)).rows;
+  const spalten = []; const offeneSpalten = [];
+  for (const { t, s, pflicht, fk } of uuids) {
+    const auth = fk.filter((f) => f.zs === 'auth' && f.z === 'users');
+    if (!auth.length && (fk.length || !PERSON.test(s))) continue;
+    spalten.push(`${t}.${s}`);
+    const geht = (auth.length && auth.every((f) => f.art === 'c' || (f.art === 'n' && !pflicht))) || geleert(text, t, s);
+    if (!geht) offeneSpalten.push(`${t}.${s}`);
+  }
+  return { tabellen, offen: tabellen.filter((t) => !gedeckt.has(t)), spalten, offeneSpalten };
 }
 
 // ---------- echter Stand ----------
@@ -184,6 +208,28 @@ async function ungedeckt(db) {
     await db.exec(`drop table public.${PROBE};`);
     pruefe(`Gegenprobe ${name}: ${PROBE} ${rot ? 'faellt auf' : 'gilt als gedeckt'}`,
       p.offen.includes(PROBE) === rot && p.offen.length === (rot ? 1 : 0), p.offen.join(', '));
+  }
+
+  // B1 (Nachpruefung 2, 19.11.2026): Personen stehen nicht nur in Spalten namens user_id (duelle.a, partien_online.weiss,
+  // freundschaften.von ...). Jede weitere uuid-Spalte mit Fremdschluessel auf auth.users oder mit Personennamen muss mitgehen
+  pruefe(`alle ${g.spalten.length} weiteren Personenspalten: Kaskade, set null auf freier Spalte oder delete in konto_loeschen()`,
+    g.spalten.length >= 10 && !g.offeneSpalten.length, g.offeneSpalten.join(', '));
+  const personen = [
+    ['P1 spieler ohne Fremdschluessel', 'spieler', 'spieler uuid not null, rang int', true],
+    ['P2 gegner_id mit Fremdschluessel ohne Kaskade', 'gegner_id', 'gegner_id uuid references auth.users (id), rang int', true],
+    ['P3 gegner_id mit Kaskade', 'gegner_id', 'gegner_id uuid references auth.users (id) on delete cascade, rang int', false],
+    ['P4 von mit set null auf freier Spalte', 'von', 'von uuid references auth.users (id) on delete set null, rang int', false],
+    ['P5 erstellt_von mit set null auf not null', 'erstellt_von', 'erstellt_von uuid not null references auth.users (id) on delete set null, rang int', true],
+    ['P6 beliebiger Name mit Fremdschluessel ohne Kaskade', 'x', 'x uuid references auth.users (id), rang int', true],
+    ['P7 uuid ohne Personennamen und ohne Fremdschluessel', 'partie', 'partie uuid not null, rang int', false],
+  ];
+  for (const [name, spalte, spalten, rot] of personen) {
+    await db.exec(`create table public.${PROBE} (${spalten});`);
+    const p = await ungedeckt(db);
+    await db.exec(`drop table public.${PROBE};`);
+    pruefe(`Gegenprobe ${name}: ${PROBE}.${spalte} ${rot ? 'faellt auf' : 'gilt als gedeckt'}`,
+      p.offeneSpalten.includes(`${PROBE}.${spalte}`) === rot && p.offeneSpalten.length === (rot ? 1 : 0) && !p.offen.length,
+      p.offeneSpalten.join(', '));
   }
 
   const x = await lauf(db, 'Lage', LAGE);
@@ -265,6 +311,29 @@ async function ungedeckt(db) {
     !fehler && def.includes(anker) && !f && vorher.offen.includes(PROBE) && !nachher.offen.length,
     fehler || f || `vorher=${vorher.offen} nachher=${nachher.offen}`);
   pruefe('Gegenprobe M5: konto_loeschen() leert die Zeile von A, die von B bleibt',
+    !x && !e && zeilen.length === 1 && zeilen[0] === B, x || e || JSON.stringify(zeilen));
+}
+
+// ---------- Gegenprobe P8: Personenspalte ohne Fremdschluessel, die konto_loeschen() ausdruecklich leert (B1) ----------
+{
+  const { db, fehler } = await neueDb();
+  await db.exec(`create table public.${PROBE} (spieler uuid not null, rang int);`);
+  const vorher = await ungedeckt(db);
+  const def = (await db.query(`select pg_get_functiondef('public.konto_loeschen()'::regprocedure) as d`)).rows[0].d;
+  const anker = 'delete from public.nutzung where user_id = uid;';
+  // INTENTIONAL-SLOP[G5]: SQL nur aus festen Testwerten (PROBE, A, B) fuer PGlite im Speicher, kein Eingang von aussen
+  const f = !fehler && def.includes(anker)
+    && await lauf(db, 'konto_loeschen mit spieler', def.replace(anker, anker + `\n  delete from public.${PROBE} where spieler = uid;`));
+  const nachher = await ungedeckt(db);
+  // INTENTIONAL-SLOP[G5]: wie oben, feste Testwerte
+  const x = f || await lauf(db, 'Lage P8', LAGE + `\n  insert into public.${PROBE} values ('${A}', 3), ('${B}', 5);`);
+  const e = !x && await loesche(db, A);
+  const zeilen = !x && (await db.query(`select spieler::text as u from public.${PROBE}`)).rows.map((r) => r.u);
+  // INTENTIONAL-SLOP[G5]: nur der Pruefname, kein SQL
+  pruefe(`Gegenprobe P8: ohne delete faellt ${PROBE}.spieler auf, mit "delete ... where spieler = uid" gilt sie als gedeckt`,
+    !fehler && def.includes(anker) && !f && vorher.offeneSpalten.includes(`${PROBE}.spieler`) && !nachher.offeneSpalten.length,
+    fehler || f || `vorher=${vorher.offeneSpalten} nachher=${nachher.offeneSpalten}`);
+  pruefe('Gegenprobe P8: konto_loeschen() leert die Zeile von A, die von B bleibt',
     !x && !e && zeilen.length === 1 && zeilen[0] === B, x || e || JSON.stringify(zeilen));
 }
 
