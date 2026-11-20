@@ -598,6 +598,26 @@ export function zeige(root, params, app) {
     if (!Number.isFinite(p) || !z.live[p] || z.live[p].status !== 'fertig') return;
     coachEl.classList.toggle('kompakt');
   });
+  // Tastatur und VoiceOver (fc-05:45): solange ein Antippen den Coach auf- oder zuklappt, ist seine Kopfzeile ein Schalter
+  // (role=button, aria-expanded); Enter und Leertaste loesen denselben Klick aus. Ohne das blieben Text und Knoepfe des
+  // eingeklappten Coachs (PC nach dem Bot-Zug, Handy hoch) unerreichbar (tests/r22-tastatur.test.mjs)
+  function coachSchalter() {
+    const kopf = coachEl.querySelector(':scope > .c-kopf');
+    if (!kopf) return;
+    const p = Number(coachEl.dataset.ply);
+    const rest = coachEl.classList.contains('hat-rest');
+    if (!rest && !(Number.isFinite(p) && z.live[p] && z.live[p].status === 'fertig')) {
+      kopf.removeAttribute('role'); kopf.removeAttribute('tabindex'); kopf.removeAttribute('aria-expanded');
+      return;
+    }
+    kopf.setAttribute('role', 'button');
+    kopf.tabIndex = 0;
+    kopf.setAttribute('aria-expanded', String(rest ? coachEl.classList.contains('offen') : !coachEl.classList.contains('kompakt')));
+  }
+  new MutationObserver(coachSchalter).observe(coachEl, { attributes: true, attributeFilter: ['class', 'data-ply'], childList: true });
+  coachEl.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.c-kopf[role="button"]')) { e.preventDefault(); e.target.click(); }
+  });
 
   // U7: Klang-Schalter im Kopf (stumm, die Lautstaerke bleibt; wie der Kopf der Hauptseiten)
   function klangUmschalten(k) {
