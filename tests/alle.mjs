@@ -147,6 +147,7 @@ const SUITEN = [
   { name: 'r20-coach-buch', datei: 'r20-coach-buch.test.mjs', args: [], kommtMit: 'so/R20-coach-buch', was: 'Feinschliff R20 (43): Coach-Buch' },
   { name: 'r20-buch-luecken', datei: 'r20-buch-luecken.test.mjs', args: [], was: 'Feinschliff R20 (43): 41 bekannte Linien aus lichess im Eroeffnungsbuch, deutsch und englisch benannt' },
   { name: 'r20-lernen-gegner', datei: 'r20-lernen-gegner.test.mjs', args: [], was: 'Feinschliff R20: Lektionen mit Gegner gelten nach einem ruhigen falschen Zug nicht als geschafft (Halten-Regeln nur fuer halten)' },
+  { name: 'r20-sieg-frei-genau', datei: 'r20-sieg-frei-genau.test.mjs', args: [], was: 'Feinschliff R20: Sieg ohne Sterne (freie Partie, Kurs Kapitel 6) zeigt die Genauigkeit statt eines leeren Rahmens' },
   { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
   { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },
