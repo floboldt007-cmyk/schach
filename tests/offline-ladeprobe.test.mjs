@@ -36,10 +36,8 @@ const PRAEFIX = '/schach/';
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg', '.webmanifest': 'application/manifest+json', '.ico': 'image/x-icon' };
-const serverLog = [];
 const server = http.createServer((req, res) => {
   const pfad = decodeURIComponent(new URL(req.url, 'http://test').pathname);
-  serverLog.push(pfad);
   if (!pfad.startsWith(PRAEFIX)) { res.writeHead(404); res.end(); return; }
   const p = path.resolve(root, '.' + pfad.slice(PRAEFIX.length - 1).replace(/\/$/, '/index.html'));
   if (!p.startsWith(root)) { res.writeHead(403); res.end(); return; }
@@ -49,7 +47,8 @@ const server = http.createServer((req, res) => {
 const PORT = Number(process.env.PORT) || await freierPort();
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 // im Testbetrieb registriert die App den Service Worker nur mit &sw (js/app.js registriereSW)
-const START = `http://127.0.0.1:${PORT}${PRAEFIX}index.html?test&sw`;
+const EIGEN = `http://127.0.0.1:${PORT}/`;
+const START = `${EIGEN}${PRAEFIX.slice(1)}index.html?test&sw`;
 const BILDER = process.env.BILDER || '';
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 const ENGINE = process.env.BROWSER || 'chromium';
@@ -111,10 +110,11 @@ try {
     const seitenfehler = [], konsole = [], netz = [];
     const beobachte = (s) => {
       s.on('pageerror', (e) => seitenfehler.push(`${offline ? 'offline' : 'online'} ${s.url().replace(/^.*#/, '#')}: ${e.message} ${(e.stack || '').split('\n').slice(0, 3).join(' | ')}`));
-      s.on('console', (m) => { if (m.type() === 'error') konsole.push({ offline, text: m.text() }); });
-      s.on('requestfailed', (r) => { if (offline) netz.push(`${r.url().replace(/\?.*$/, '')} ${r.failure() ? r.failure().errorText : ''}`); });
+      s.on('console', (m) => { if (m.type() === 'error') konsole.push({ offline, text: m.text(), url: (m.location() && m.location().url) || '' }); });
+      s.on('requestfailed', (r) => { if (offline) netz.push({ url: r.url().replace(/\?.*$/, ''), grund: r.failure() ? r.failure().errorText : '' }); });
     };
     const s = await k.newPage(); s.setDefaultTimeout(15000); beobachte(s);
+    let offlineId = null;
     const bild = (p, n) => (BILDER ? p.screenshot({ path: path.join(BILDER, `${ENGINE}-${g.name}-${n}.png`) }).catch(() => {}) : null);
     try {
       // ---------- (c) Erstbesuch, Service Worker ----------
@@ -136,7 +136,6 @@ try {
       // ---------- (a) Netz aus ----------
       offline = true;
       await k.setOffline(true);
-      const vorServer = serverLog.length;
       const ohneNetz = await ladeBisHeim(s, START).catch((e) => { throw new Error('Neustart ohne Netz: ' + e.message.split('\n')[0]); });
       console.log(`MESSUNG ${tag} neustart_offline_ms=${ohneNetz}`); // INTENTIONAL-SLOP[T4]: Messwerte sind Ausgabe
       await bild(s, '1-heim-offline');
@@ -157,6 +156,8 @@ try {
         await warte(2000);
         await bild(s, '2-sieg-offline');
         const nachPartien = await partien(s);
+        const neu = nachPartien.filter((id) => !vorPartien.includes(id));
+        if (neu.length === 1) offlineId = neu[0];
         pruefe(`${tag}: ohne Netz laeuft die Partie bis zum Sieg und wird gespeichert`, sieg && nachPartien.length === vorPartien.length + 1,
           { sieg, vorher: vorPartien.length, nachher: nachPartien.length });
       }
@@ -188,24 +189,29 @@ try {
         text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 160) }));
       pruefe(`${tag}: Online ohne Netz sagt "Keine Verbindung" und laedt nicht endlos`, onlineHinweis && onlineLage.laedt === 0, onlineLage);
       // (d) Konsole und Server waehrend offline
-      const unerwartet = konsole.filter((x) => x.offline && !ERWARTET.some((re) => re.test(x.text)));
-      for (const x of konsole.filter((y) => y.offline && ERWARTET.some((re) => re.test(y.text)))) console.log(`NETZFEHLER ${tag} konsole: ${x.text.slice(0, 160)}`); // INTENTIONAL-SLOP[T4]: Liste fuer den Bericht
-      for (const x of [...new Set(netz)]) console.log(`NETZFEHLER ${tag} anfrage: ${x.slice(0, 160)}`);
+      // erwartet nur, wenn die Meldung nicht von einer eigenen Adresse stammt (Kaltreview B1c)
+      const erwartet = (x) => !x.url.startsWith(EIGEN) && ERWARTET.some((re) => re.test(x.text));
+      const unerwartet = konsole.filter((x) => x.offline && !erwartet(x));
+      for (const x of konsole.filter((y) => y.offline && erwartet(y))) console.log(`NETZFEHLER ${tag} konsole: ${x.text.slice(0, 160)}`); // INTENTIONAL-SLOP[T4]: Liste fuer den Bericht
+      for (const x of [...new Set(netz.map((y) => `${y.url} ${y.grund}`))]) console.log(`NETZFEHLER ${tag} anfrage: ${x.slice(0, 160)}`);
       pruefe(`${tag}: ohne Netz keine unerwarteten Konsolenfehler`, unerwartet.length === 0, unerwartet.slice(0, 5).map((x) => x.text));
-      const anServer = serverLog.slice(vorServer).filter((p) => !p.endsWith('/sw.js'));
-      pruefe(`${tag}: ohne Netz geht keine Anfrage an den App-Server (alles aus dem Cache)`, anServer.length === 0, anServer.slice(0, 5));
+      // Kaltreview B1 (f2, 20.11.): setOffline laesst offline nichts zum Server durch, ein Serverprotokoll bliebe immer leer.
+      // Was fehlt, sieht man an der fehlgeschlagenen Anfrage: keine an die eigene App (ausser sw.js, dessen Update-Pruefung offline scheitern darf)
+      const eigeneFehlt = [...new Set(netz.filter((x) => x.url.startsWith(EIGEN) && !x.url.endsWith('/sw.js')).map((x) => `${x.url} ${x.grund}`))];
+      pruefe(`${tag}: ohne Netz kommt jede App-Datei aus dem Cache (keine eigene Anfrage scheitert)`, eigeneFehlt.length === 0, eigeneFehlt.slice(0, 5));
 
       // ---------- (b) Netz wieder an ----------
       offline = false;
       await k.setOffline(false);
       await s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
       await ladeBisHeim(s, START);
+      // Kaltreview B2: genau die offline gespielte Partie (Kennung von vorhin) muss in Speicher und Verlauf stehen
       const danach = await partien(s);
       await s.evaluate(() => window.__app.gehe('verlauf'));
-      const zeilen = await klappt(s.locator('.vl-zeile').first().waitFor({ timeout: 15000 }));
+      const zeile = !!offlineId && await klappt(s.locator(`.vl-zeile[data-id="${offlineId}"]`).waitFor({ timeout: 15000 }));
       await bild(s, '6-verlauf-online');
       pruefe(`${tag}: Netz wieder an: die offline gespielte Partie ist noch da und steht im Verlauf`,
-        zeilen && danach.length >= 1 && danach.length === (await partien(s)).length, { zeilen, partien: danach.length });
+        zeile && danach.includes(offlineId), { offlineId, zeile, partien: danach.length });
     } catch (e) {
       await bild(s, 'abbruch');
       pruefe(`${tag}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
