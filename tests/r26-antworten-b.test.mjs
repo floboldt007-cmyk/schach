@@ -52,6 +52,13 @@ function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`
   const doppelName = vorrat.filter((s) => !gleicherSatz(s) && (namen.de.has(s.name.toLowerCase()) || namen.en.has(String(s.name_en).toLowerCase())))
     .map((s) => `${s.id}: ${s.name} / ${s.name_en}`);
   pruefe('6 Shop: kein Brett- oder Figuren-Name gibt es in derselben Sprache auch in der Sammlung', doppelName.length === 0, doppelName);
+  // Shop-Banner (assets/banner/vorrat.json) duerfen ebenfalls keinen Namen der Sammlung tragen (Kaltreview antworten-b:
+  // "Kronjuwel" hiess wie das Sammlungs-Brett); Englisch nur, wo das Banner einen englischen Namen hat
+  const shopBanner = JSON.parse(lies('assets/banner/vorrat.json')).banner.filter((b) => b.art === 'shop');
+  const bannerDoppel = shopBanner.filter((b) => namen.de.has(b.name.toLowerCase()) || (b.name_en && namen.en.has(b.name_en.toLowerCase())))
+    .map((b) => `${b.id}: ${b.name} / ${b.name_en}`);
+  pruefe('6 Shop: kein Shop-Banner traegt in derselben Sprache den Namen eines Bretts oder Figurensatzes der Sammlung',
+    shopBanner.length > 0 && bannerDoppel.length === 0, bannerDoppel);
   const vorratIds = vorrat.map((s) => s.id);
   pruefe('6 Shop: Kennungen im Vorrat eindeutig', new Set(vorratIds).size === vorratIds.length);
   const fehlt = vorrat.flatMap((s) => (s.art === 'brett' ? [s.datei] : [`${s.ordner}/wK.svg`, `${s.ordner}/bP.svg`])).filter((d) => !existsSync(path.join(WURZEL, d)));
