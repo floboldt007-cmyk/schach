@@ -118,7 +118,7 @@ const SUITEN = [
   { name: 'r19-emotes-erspielbar', datei: 'r19-emotes-erspielbar.test.mjs', args: [], was: 'R19 Emotes und Finisher erspielbar (Variante C): Kreaturen und drei Finisher ueber die Welt-Endgegner, sechs Sticker ueber das Funken-Level, vier Finisher bald im Shop, volles Rad auf dem iPhone 13 (Browser)' },
   { name: 'funktion-emotes-finisher', datei: 'funktion-emotes-finisher.test.mjs', args: [], was: 'Funktionsprobe Emotes, Finisher, Klaenge: Sticker senden, Blitzschlag mit Polarlicht (Erfinder), Shop Anhoeren laedt bei Bedarf (iPhone 13 + PC)' },
   { name: 'r19-emotes-online', datei: 'r19-emotes-online.test.mjs', args: [], was: 'R19 Emotes und Finisher online: Knoepfe im KI-Ersatz ohne ?emotes, nicht gegen Bots und zu zweit; eigenes Matt in der Online-Partie startet den Finisher (Server simuliert)' },
-  { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
+  { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], env: { PROBE_STRENG: '1' }, was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
   { name: 'funktion-funken-aufgeben', datei: 'funktion-funken-aufgeben.test.mjs', args: [], kommtMit: 'so/R20-proben', was: 'Funktionsprobe Funken und Aufgeben (Browser)' },
   { name: 'funktion-einstellungen-season', datei: 'funktion-einstellungen-season.test.mjs', args: [], kommtMit: 'so/R20-proben', was: 'Funktionsprobe Einstellungen und Season mit ?test&paket2 (Browser)' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
@@ -127,6 +127,7 @@ const SUITEN = [
   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
   { name: 'sheet-knoepfe', datei: 'sheet-knoepfe.test.mjs', args: [], was: 'Blaetter: ein Knopf volle Breite und mittig, zwei Knoepfe wie bisher (Browser)' },
   { name: 'sw-update', datei: 'sw-update.test.mjs', args: [], was: 'SW-Update laedt nur geaenderte Dateien (ETag/304)' },
+  { name: 'offline-ladeprobe', datei: 'offline-ladeprobe.test.mjs', args: [], kommtMit: 'so/R20-offline', was: 'Offline: die App startet ohne Netz aus dem Service Worker (?test&sw, Browser)' },
   { name: 'sw-wechsel', datei: 'sw-wechsel.test.mjs', args: [], was: 'Wechsel des Service Workers: hoechstens einmal neu laden, nie im Spiel' },
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
@@ -144,6 +145,7 @@ const SUITEN = [
   { name: 'en-rest', datei: 'en-rest.test.mjs', args: [], kommtMit: 'so/R20-en-rest', exklusiv: 'Browser-Durchgang (iPhone 13 + PC, 32 Seiten)', was: 'Gast mit Sprache EN: keine deutschen Reste, Umlaute, Schluessel, undefined oder abgeschnittenen Zeilen auf Heim, Partie, Ergebnis, Analyse, Zu zweit, Duell, Lektionen, Erste Schritte 1 und 6, Liga, Einstellungen; Premium/Shop nur melden' },
   { name: 'r20-kurs-zurueck', datei: 'r20-kurs-zurueck.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Zurueck im Kurs' },
   { name: 'r20-coach-buch', datei: 'r20-coach-buch.test.mjs', args: [], kommtMit: 'so/R20-coach-buch', was: 'Feinschliff R20 (43): Coach-Buch' },
+  { name: 'r20-buch-luecken', datei: 'r20-buch-luecken.test.mjs', args: [], was: 'Feinschliff R20 (43): 41 bekannte Linien aus lichess im Eroeffnungsbuch, deutsch und englisch benannt' },
   { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
   { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },
@@ -233,7 +235,7 @@ const DAUERN = new Map([
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
   ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['bot-grenze', 8],
-  ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24], ['funktion-funken-aufgeben', 45], ['funktion-einstellungen-season', 10],
+  ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24], ['offline-ladeprobe', 28], ['funktion-funken-aufgeben', 45], ['funktion-einstellungen-season', 10],
 ]);
 
 function teile(suiten, anzahl) {
@@ -262,6 +264,8 @@ async function lauf(suite) {
         // Kein PORT von hier: jede Suite nimmt ohne PORT einen freien Port (tests/freier-port.mjs). Vom Listenplatz
         // abgeleitete Ports (9200 + Platz) stiessen zusammen, sobald zwei Worktrees gleichzeitig alle.mjs liefen.
         ...(process.env.BILDER ? { BILDER: path.join(process.env.BILDER, suite.name) } : {}),
+        // Eigene Umgebung je Eintrag (env:), z. B. PROBE_STRENG fuer eine Probe, deren harte Pruefungen schon zaehlen sollen
+        ...(suite.env || {}),
       },
       // 20 Minuten je Suite, nicht fuer die gesamte Sammlung (der volle Lauf braucht laenger).
       zeitlimitMs: 20 * 60 * 1000,
