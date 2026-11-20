@@ -48,13 +48,16 @@ pruefe('ARTEN kennt schach', M.ARTEN.includes('schach'));
 // fc-20:01 (Flo 19.11.: die Partie am Kapitelende zaehlt NICHT fuer die Wertung): Kapitel 6 = eine Aufgabe art 'partie'
 pruefe('Kapitel 6 Deine erste Partie: genau es-partie (art partie, Grundstellung), ARTEN kennt partie', ids(6) === 'es-partie:partie'
   && M.ARTEN.includes('partie') && kap(6)[0].fen === 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', ids(6));
-// Sterne aus den gespeicherten Partien: nur beendete FREIE Partien (modus 'frei') gegen den Kurs-Gegner; 1 zu Ende, 2 gewonnen
-const kp = (modus, botId, ergebnis, n = 7) => ({ id: 'p' + n, modus, botId, ergebnis, zuege: Array.from({ length: n }, () => 'e2e4') });
+// Sterne aus den gespeicherten Partien: nur beendete FREIE Partien (modus 'frei') gegen den Kurs-Gegner MIT der Kurs-Kennung
+// extra.lernen.kurs (fc-02:20 a, tests/r20-kurs-sterne.test.mjs); 1 zu Ende, 2 gewonnen
+const kp = (modus, botId, ergebnis, n = 7, extra = { lernen: { kurs: 'es-partie' } }) => ({ id: 'p' + n, modus, botId, ergebnis, extra,
+  zuege: Array.from({ length: n }, () => 'e2e4') });
 const kps = (liste) => versuche(() => (M.kursPartieSterne ? M.kursPartieSterne(liste, 'fridolin') : 'fehlt'));
-pruefe('kursPartieSterne: frei gegen den Gegner 1 bei Remis/Niederlage, 2 bei Sieg (Zuege = Flos Zuege); normal, anderer Bot, ohne Ergebnis zaehlt nicht',
+pruefe('kursPartieSterne: frei gegen den Gegner 1 bei Remis/Niederlage, 2 bei Sieg (Zuege = Flos Zuege); normal, anderer Bot, ohne Ergebnis, ohne Kurs-Kennung zaehlt nicht',
   kps([]) === null && kps([kp('frei', 'fridolin', 'niederlage')])?.sterne === 1
   && kps([kp('frei', 'fridolin', 'remis'), kp('frei', 'fridolin', 'sieg')])?.sterne === 2 && kps([kp('frei', 'fridolin', 'sieg')])?.zuege === 4
-  && kps([kp('normal', 'fridolin', 'sieg'), kp('frei', 'benno', 'sieg'), kp('frei', 'fridolin', null), null]) === null, kps([kp('frei', 'fridolin', 'sieg')]));
+  && kps([kp('normal', 'fridolin', 'sieg'), kp('frei', 'benno', 'sieg'), kp('frei', 'fridolin', null), null]) === null
+  && kps([kp('frei', 'fridolin', 'sieg', 7, null)]) === null, kps([kp('frei', 'fridolin', 'sieg', 7, null)]));
 pruefe('lektion() und bereichVon() finden Kurs-Aufgaben', !!M.lektion('es-turm') && M.bereichVon(M.lektion('es-turm')).id === 'erste'
   && M.bereichVon(M.lektion('grundreihe')).id === 'matt');
 
