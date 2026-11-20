@@ -9,6 +9,7 @@
 //                     1 Stern = gelernt, 2 = sicher, 3 = gemeistert); das Paket funken bucht daraus Lern-Funken
 // Speicher: Modul lernen (js/storage.js MODUL_BUDGET), Aufbau in mattbilder.js stand().
 // Defensiv: Ein Fehler hier haelt die App nie an.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { ladeModul } from '../../storage.js';
 import { laborFrei } from '../../labor.js';
@@ -24,15 +25,10 @@ const S = (k, w) => t('p-lernen.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function ladeLernenCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-paket="lernen"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../../css/pakete/lernen.css', import.meta.url).href;
-    l.dataset.paket = 'lernen';
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles bedienbar */ }
+  return ladePaketCss('lernen', { screens: ['lernen', 'lektion'] });
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladeLernenCss());
 
 export function trainingKarte(app) {
   ladeLernenCss();

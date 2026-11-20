@@ -8,6 +8,7 @@
 // Scheitert die Meldung (Netz), bleibt der Knopf "Strittig melden" als Rueckfall. Ein gemeldetes Ende (Matt, Patt,
 // Remis-Regeln) wird mit chess.js nachgeprueft; stimmt es nicht, steht dort "Ergebnis nicht nachvollziehbar" statt
 // Sieg oder Niederlage.
+import { ladePaketCss } from '../paket-css.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { t } from '../sprache.js';
 import '../sprachen/online.js';
@@ -35,6 +36,8 @@ import { BRETT_FEIER } from '../feier.js';
 import { tempo } from '../bewegung.js';
 
 const WURZEL = new URL('../../', import.meta.url);
+// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js)
+await ladePaketCss('online', { screens: ['online'], href: new URL('css/online.css', WURZEL).href, marke: { online: '' } });
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const andere = f => f === 'w' ? 'b' : 'w';
 const TEMPI = { ohne: [null, 0], '5': [300, 0], '10': [600, 0], '15': [900, 10] };
@@ -97,10 +100,6 @@ export function zeige(root, params, app) {
     abgebrochen: O('zurueckgezogen'), strittig: O('strittig') };
   const STATUS = { offen: O('offen'), laeuft: O('laeuft'), beendet: O('beendet') };
 
-  if (!document.querySelector('link[data-online]')) {
-    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('css/online.css', WURZEL).href;
-    link.dataset.online = ''; document.head.append(link);
-  }
   const s = document.createElement('section'); s.className = 'screen online-screen'; s.setAttribute('aria-label', O('titel'));
   // Handy-Runde 08.11.: Kopf wie Lernen und Ich (Zurueck = woher man kam, Titel "Online"); ohne laufende Partie bleibt
   // die Leiste unten stehen (js/app.js reiterVon)

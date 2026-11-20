@@ -435,7 +435,7 @@ export function reiterVon(screen, liste = reiterListe(), params = {}) {
 }
 
 const leiste = { el: null, pille: null, lage: null, sichtbar: false, gezeigt: false, wegAnim: null, pilleLage: null, pilleV: null, pilleB: null,
-  ro: null, rahmen: 0, fokusFolgt: false };
+  ro: null, rahmen: 0, pilleRahmen: 0, fokusFolgt: false };
 
 function baueReiter(liste) {
   if (leiste.el) return;
@@ -464,7 +464,7 @@ function baueReiter(liste) {
   // damit die Messung selbst keine Schleife ausloest
   const spaeter = () => {
     if (leiste.rahmen) return;
-    leiste.rahmen = requestAnimationFrame(() => { leiste.rahmen = 0; if (leiste.sichtbar) platziereReiter(); });
+    leiste.rahmen = requestAnimationFrame(() => { leiste.rahmen = 0; if (leiste.sichtbar) platziereReiter({ imBild: true }); });
   };
   if (typeof ResizeObserver === 'function') {
     leiste.ro = new ResizeObserver(spaeter);
@@ -481,7 +481,7 @@ function baueReiter(liste) {
 }
 
 // unten (schwebende Glas-Kapsel) oder seite (Seitenleiste links im Querformat ab 1021 px); die Leiste haengt immer am body
-function platziereReiter() {
+function platziereReiter({ imBild = false } = {}) {
   const nav = leiste.el;
   if (!nav) return;
   let seite = false;
@@ -490,7 +490,11 @@ function platziereReiter() {
   leiste.lage = seite ? 'seite' : 'unten';
   nav.dataset.lage = leiste.lage;
   document.documentElement.dataset.reiter = leiste.lage;
-  setzePille();
+  // die Pille misst den aktiven Reiter: im naechsten Bild, nicht mitten im Aufbau des neuen Screens (Leistung F2, fc-11:15;
+  // dort kostete das Messen auf schwachen Geraeten ein eigenes Layout von 200 ms). Mehrere Aufrufe je Bild: einmal messen.
+  // Laeuft der Aufruf schon im Bild (Drehen, Groesse), sofort: sonst stand die Pille ein gemaltes Bild lang daneben (f2)
+  if (imBild || typeof requestAnimationFrame !== 'function') { setzePille(); return; }
+  if (!leiste.pilleRahmen) leiste.pilleRahmen = requestAnimationFrame(() => { leiste.pilleRahmen = 0; setzePille(); });
 }
 
 // Pille hinter den aktiven Reiter; gleitet mit der weichen Feder vom alten Platz, unten waagrecht, in der Seitenleiste

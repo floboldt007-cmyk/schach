@@ -31,6 +31,7 @@
 //             bei app:bereit/app:screen). Die Feier "Erzfeind bezwungen" speichert feier.js als Text in der Sprache des
 //             Augenblicks (Nachlese bleibt so, wie sie gemeldet wurde).
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
 import { melde } from '../../feier.js';
@@ -142,15 +143,10 @@ function sorgeSaetze() {
 
 // ---------- Einhaengen (defensiv) ----------
 function ladeCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-paket="gedaechtnis"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../../css/pakete/gedaechtnis.css', import.meta.url).href;
-    l.dataset.paket = L.PAKET;
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles lesbar */ }
+  return ladePaketCss('gedaechtnis');
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladeCss());
 
 function registriere() {
   ladeCss();

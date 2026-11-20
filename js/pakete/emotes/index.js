@@ -1,4 +1,5 @@
 // Emote-Rad und Schnell-Chat. Der Transport bleibt absichtlich hinter senden(): Online kann spaeter andocken.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
 import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen, ladeFortschritt, endgegnerBesiegt, alleBotsBesiegt } from '../../storage.js';
@@ -373,11 +374,11 @@ function emoteBereich() {
 }
 
 function ladeCss() {
-  if (typeof document === 'undefined' || document.querySelector('link[data-paket="emotes"]')) return;
-  const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = new URL('../../../css/pakete/emotes.css', import.meta.url).href; l.dataset.paket = MODUL; document.head.append(l);
+  return ladePaketCss('emotes');
 }
 
-ladeCss();
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladeCss());
 anbieten('partie:aktionen', (k) => aktionsKnopf(k, 'emotes'), { paket: MODUL, reihenfolge: 20 });
 anbieten('partie:aktionen', (k) => aktionsKnopf(k, 'chat'), { paket: MODUL, reihenfolge: 21 });
 anbieten('partie:spieler-leiste', ({ buehne }) => { if (!einstellungen().an) return null; const e = document.createElement('span'); e.className = 'em-live sr'; e.setAttribute('aria-live', 'polite'); buehne.el.append(e); return e; }, { paket: MODUL, reihenfolge: 80 });

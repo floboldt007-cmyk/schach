@@ -1,5 +1,6 @@
 // P4: Anbindung ausschliesslich ueber Ereignisse, Orte, Feier- und Icon-Register, Modul-Speicher.
 // Keine Engine-Arbeit, kein Zugriff auf fremde Screen-Elemente. Fehler bleiben im Paket.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { BOTS, botNachId } from '../../bots.js';
@@ -123,13 +124,8 @@ hoere('partie:analysiert', sicher((d) => {
 }));
 
 if (typeof document !== 'undefined') {
-  sicher(() => {
-    const css = document.createElement('link');
-    css.rel = 'stylesheet';
-    css.href = new URL('../../../css/pakete/liga.css', import.meta.url).href;
-    css.dataset.paket = MODUL;
-    document.head.append(css);
-  })();
+  // beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+  await beimStart(ladePaketCss(MODUL, { screens: ['bestenliste'] }));
   // Die Saison-Liga-Karte der Bots-Seite (Ort arena:panel-oben) entfaellt mit der einen Liga (Flo 08.11.2026)
   anbieten('arena:panel-bot', sicher((k) => botBilanz(k)), { reihenfolge: 15, paket: MODUL });
   anbieten('ergebnis:abrechnung', sicher((k) => abrechnungsZeile(k, lese())), { reihenfolge: 30, paket: MODUL });

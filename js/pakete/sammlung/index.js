@@ -3,6 +3,7 @@
 // Erfolge, die sich aus dem Spielstand ablesen lassen (keine eigene Buchfuehrung, nichts zum Kaufen). Finisher, Emotes
 // und Titel bringen ihre Pakete selbst am Ort sammlung:bereich mit.
 // Orte: ich:kopf Profil 10 und duell:profil? (profil.js); sammlung:bereich Erfinder 5 (nur mit Sonderstuecken, erfinder.js), Rahmen 35 (profil.js), Bretter 40, Klaenge 50, Erfolge 90, Shop 95 (Editionen, js/pakete/sammlung/shop.js)
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten, waehle } from '../../orte.js';
 import { freischalten, bereich } from '../../ui/ich.js';
 import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl, ladeModul, ladePartien, wertet } from '../../storage.js';
@@ -34,11 +35,8 @@ const S = (k, w) => t('p-sammlung.' + k, w);
 // Farben wie die Brettwahl in js/ui/partie.js (BRETTER): hell, dunkel
 const BRETTER = Object.freeze([['nacht', '#e4e8f6', '#7c87b6', '#2A3150'], ['gruen', '#eeeed2', '#769656', '#3E5A2A'], ['holz', '#f0d9b5', '#b58863', '#6E4420']]);
 
-if (typeof document !== 'undefined' && !document.querySelector('link[data-paket="sammlung"]')) {
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.dataset.paket = PAKET;
-  css.href = new URL('../../../css/pakete/sammlung.css', import.meta.url).href;
-  document.head.appendChild(css);
-}
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladePaketCss('sammlung', { screens: ['ich'] }));
 
 const klangBild = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9a4 4 0 0 1 0 6M19.5 6.5a8 8 0 0 1 0 11"/></svg>';
 const sternBild = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z"/></svg>';
