@@ -3,6 +3,8 @@
 // verloren. Geprueft: offener Dialog nimmt Klicks an, Schleier-Tipp schliesst, und 50 ms nach dem Schliessen kommt ein Zug
 // auf dem Brett darunter an (Zu zweit, iPhone 13 und PC 1280).
 //   node tests/dialog-zuklappen.test.mjs
+//   DROSSEL=6 node tests/dialog-zuklappen.test.mjs   CPU per CDP gedrosselt (nur Chromium), Probe fuer Last wie in der CI
+//   VERZUG=300 node tests/dialog-zuklappen.test.mjs  haelt den Testlaeufer nach dem Schliessen kuenstlich auf (langsamer Runner)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -36,6 +38,15 @@ const { defaultBrowserType: _typ, ...IPHONE } = pw.devices['iPhone 13'];
 const { defaultBrowserType: _typSE, ...IPHONE_SE } = pw.devices['iPhone SE'];
 const GERAETE = [['iphone13', IPHONE, true], ['iphonese', IPHONE_SE, true], ['pc1280', { viewport: { width: 1280, height: 800 } }, false]];
 
+// CPU-Drossel per CDP (Emulation.setCPUThrottlingRate), damit Zeitfehler wie in der CI auch lokal auftreten
+const DROSSEL = Number(process.env.DROSSEL) || 0;
+const VERZUG = Number(process.env.VERZUG) || 0;
+async function drossle(k, s) {
+  if (!DROSSEL) return;
+  const c = await k.newCDPSession(s);
+  await c.send('Emulation.setCPUThrottlingRate', { rate: DROSSEL });
+}
+
 let browser;
 try {
   browser = await browserTyp(pw).launch({ headless: true });
@@ -46,6 +57,7 @@ try {
       if (!localStorage.getItem('schach-arena:v1:einstellungen')) localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus' }));
     });
     const s = await k.newPage(); s.setDefaultTimeout(15000);
+    await drossle(k, s);
     const fehler = [];
     s.on('pageerror', e => fehler.push(e.message));
     await s.goto(`http://127.0.0.1:${PORT}/?test#heim`);
@@ -84,6 +96,7 @@ try {
     await frage(); await s.locator('.dialog-ort:not(.weg) .dialog').waitFor();
     await tipp(await mitte('.dialog-knoepfe .knopf'));
     await s.waitForTimeout(50);
+    if (VERZUG) await s.waitForTimeout(VERZUG);
     const wegNoch = await s.evaluate(() => !!document.querySelector('.dialog-ort.weg'));
     await tipp(f2); await tipp(f3);
     const zug = await s.waitForFunction(() => window.__partie.z.zuege.join() === 'f2f3', null, { timeout: 2000 }).then(() => true, () => false);
@@ -123,6 +136,7 @@ try {
     await k.route('**/*.supabase.co/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
     await k.addInitScript(() => localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus' })));
     const s = await k.newPage(); s.setDefaultTimeout(15000);
+    await drossle(k, s);
     const fehler = [];
     s.on('pageerror', e => fehler.push(e.message));
     await s.goto(`http://127.0.0.1:${PORT}/?test#heim`);
