@@ -305,8 +305,11 @@ try {
     await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
     pruefe('Bot-Schutz: mit der Anmeldung genau ein Skript, nur von challenges.cloudflare.com (explizit gezeichnet)',
       zustand.cf.length === 1 && zustand.cf[0] === '/turnstile/v0/api.js?render=explicit', zustand.cf);
-    pruefe(`Bot-Schutz: Widget gezeichnet (${GERAET.schema === 'dark' ? 'dunkel' : 'hell'}, deutsch) und Hinweis auf den Bot-Schutz sichtbar`,
-      await s.locator('.konto-botschutz').getAttribute('data-gerendert') === `${GERAET.schema}|de` &&await s.locator('.konto-botschutz-hinweis').isVisible(),
+    // erwartet wird das Farbschema, das der Browser der Seite wirklich meldet (kein App-Thema gesetzt, also System), nicht
+    // GERAET.schema: so stimmt die Pruefung auch, wenn das Schema von aussen kommt (fc-02:30, Dunkel-Lauf der Funktionsprobe 371)
+    const schema = await s.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    pruefe(`Bot-Schutz: Widget gezeichnet (${schema === 'dark' ? 'dunkel' : 'hell'}, deutsch) und Hinweis auf den Bot-Schutz sichtbar`,
+      await s.locator('.konto-botschutz').getAttribute('data-gerendert') === `${schema}|de` &&await s.locator('.konto-botschutz-hinweis').isVisible(),
       await s.locator('.konto-botschutz').getAttribute('data-gerendert'));
     await bild(s, 'botschutz-widget');
     const mehr = await s.locator('.konto-botschutz-hinweis a').evaluateAll((a) => a.map((x) => ({ href: x.href, ziel: x.target })));
