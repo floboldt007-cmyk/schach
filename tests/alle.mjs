@@ -118,6 +118,8 @@ const SUITEN = [
   { name: 'funktion-emotes-finisher', datei: 'funktion-emotes-finisher.test.mjs', args: [], was: 'Funktionsprobe Emotes, Finisher, Klaenge: Sticker senden, Blitzschlag mit Polarlicht (Erfinder), Shop Anhoeren laedt bei Bedarf (iPhone 13 + PC)' },
   { name: 'r19-emotes-online', datei: 'r19-emotes-online.test.mjs', args: [], was: 'R19 Emotes und Finisher online: Knoepfe im KI-Ersatz ohne ?emotes, nicht gegen Bots und zu zweit; eigenes Matt in der Online-Partie startet den Finisher (Server simuliert)' },
   { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
+  { name: 'funktion-funken-aufgeben', datei: 'funktion-funken-aufgeben.test.mjs', args: [], kommtMit: 'so/R20-proben', was: 'Funktionsprobe Funken und Aufgeben (Browser)' },
+  { name: 'funktion-einstellungen-season', datei: 'funktion-einstellungen-season.test.mjs', args: [], kommtMit: 'so/R20-proben', was: 'Funktionsprobe Einstellungen und Season mit ?test&paket2 (Browser)' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
   { name: 'r15-ergebnis-teilen', datei: 'r15-ergebnis-teilen.test.mjs', args: [], was: 'Feinschliff R15: Duell-Nochmal in Suchfarbe, Niederlage mit Liga-Verweis, ein Knopf "Teilen ..." nach dem Sieg (Browser)' },
   { name: 'r15-ich-lektion', datei: 'r15-ich-lektion.test.mjs', args: [], was: 'Feinschliff R15: Vitrine im Banner am PC, Spielerleisten in der Lektion, Zu-zweit-Brett wie die Bot-Partie (Browser)' },
@@ -230,7 +232,7 @@ const DAUERN = new Map([
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
   ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['bot-grenze', 8],
-  ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24],
+  ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24], ['funktion-funken-aufgeben', 45], ['funktion-einstellungen-season', 10],
 ]);
 
 function teile(suiten, anzahl) {
