@@ -1,6 +1,7 @@
 // Raetsel-Duell gegen die KI wertet sofort aus (R26 AC-05, Flo 20.11.2026): sobald der Spieler fertig ist (alle Raetsel
 // durch) oder seine eigene Zeit samt Gnadenfrist um ist, endet das Duell, statt bis zum Ende der vollen 180 s der KI zu
-// warten. Die KI zaehlt dann mit genau der Zeit, die der Spieler hatte. Der Test spielt in PGlite (Postgres als
+// warten. Die KI behaelt ihre vollen 180 s (gerechnet, steht sofort fest): das Ergebnis ist dasselbe wie bisher, nur
+// frueher. Fall H prueft, dass absichtliche Fehler die KI nicht anhalten. Der Test spielt in PGlite (Postgres als
 // WebAssembly, ohne Netz, ohne Supabase) die Schemas wie in Supabase ein, dann supabase/raetsel-duell-ki-sofort-schema.sql
 // (vorwaerts), supabase/raetsel-duell-ki-sofort-zurueck.sql (Rueckweg) und wieder vorwaerts. Die Zeit stellt er, indem er
 // start_am in die Vergangenheit legt. Laeuft im CI-Job "sql" (nicht in tests/alle.mjs, dort fehlt PGlite); lokal nur
@@ -104,25 +105,35 @@ async function stand(d, u) {
 }
 
 // A) Zeit um mit 10 Fehlern: eigenes Ende nach 130 s, 140 s sind vorbei (Gnade 3 s). Bisher wartete die Auswertung bis
-//    180 s + 3 s; jetzt endet das Duell, und die KI zaehlt mit 130 s.
+//    180 s + 3 s; jetzt endet das Duell sofort, die KI zaehlt wie bisher mit ihren vollen 180 s.
 {
   const { d, u } = await kiDuell({ vor: 140, fehler: 10, geloest: 4 });
   const s = await stand(d, u);
-  const soll = await kiBei(d, 130);
+  const soll = await kiBei(d, 180);
   pruefe('A: eigene Zeit um (10 Fehler, 140 s): das Duell ist sofort beendet', s.status === 'beendet', JSON.stringify(s));
-  pruefe('A: die KI zaehlt mit der Zeit des Spielers (130 s), Anzeige wie Wertung',
+  pruefe('A: die KI zaehlt mit ihren vollen 180 s, Anzeige wie Wertung',
     s.gegner && s.gegner.geloest === soll.geloest && s.gegner.fehler === soll.fehler, JSON.stringify({ gegner: s.gegner, soll }));
   pruefe('A: Ergebnis aus eigener Sicht steht fest', ['sieg', 'remis', 'niederlage'].includes(s.ergebnis), s.ergebnis);
 }
-// B) alle Raetsel durch nach 60 s, 80 s sind vorbei: sofort beendet (keine Gnade noetig, es kommt kein Zug mehr), KI bei
-//    60 s und nicht bei 80 s
+// B) alle Raetsel durch nach 60 s, 62 s sind vorbei: sofort beendet (keine Gnade noetig, es kommt kein Zug mehr)
 {
-  const { d, u } = await kiDuell({ vor: 80, fertigNach: 60 });
+  const { d, u } = await kiDuell({ vor: 62, fertigNach: 60 });
   const s = await stand(d, u);
-  const soll = await kiBei(d, 60);
+  const soll = await kiBei(d, 180);
   pruefe('B: alle Raetsel durch: das Duell ist sofort beendet', s.status === 'beendet', JSON.stringify({ status: s.status }));
-  pruefe('B: die KI zaehlt bis zum letzten Zug des Spielers (60 s)',
+  pruefe('B: die KI zaehlt mit ihren vollen 180 s',
     s.gegner && s.gegner.geloest === soll.geloest && s.gegner.fehler === soll.fehler, JSON.stringify({ gegner: s.gegner, soll }));
+}
+// H) Schlupfloch zu: 10 geloest nach 40 s, dann 28 absichtliche Fehler (eigene Uhr endet bei 40 s), 44 s vorbei. Das Duell
+//    endet sofort, die KI zaehlt trotzdem mit 180 s; das Ergebnis ist dasselbe, als haette der Spieler die Zeit abgewartet
+{
+  const { d } = await kiDuell({ vor: 44, fehler: 28, geloest: 10 });
+  const st = await auswerten(d);
+  const soll = await kiBei(d, 180);
+  const r = (await db.query('select ergebnis from public.duelle where id = $1', [d])).rows[0].ergebnis;
+  const erwartet = 10 > soll.geloest ? 'a' : soll.geloest > 10 ? 'b' : 28 < soll.fehler ? 'a' : 28 > soll.fehler ? 'b' : 'remis';
+  pruefe('H: absichtliche Fehler halten die KI nicht an (Wertung mit ihren vollen 180 s)', st === 'beendet' && r === erwartet,
+    JSON.stringify({ st, r, erwartet, soll }));
 }
 // C) laeuft noch: 30 s gespielt, keine Fehler -> bleibt offen
 {
@@ -166,8 +177,8 @@ if (!ohne) {
   f = await lauf(db, `${RUECKWEG} (zweites Mal)`, lies(RUECKWEG));
   pruefe(`${RUECKWEG} ist wiederholbar`, f === null, f);
   const helfer = (await db.query(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname in ('duell_ki_sekunden', 'duell_spieler_schluss')`)).rows[0].n;
-  pruefe('Rueckweg: die neuen Helfer duell_ki_sekunden und duell_spieler_schluss sind weg', helfer === 0, helfer);
+    where n.nspname = 'public' and p.proname = 'duell_spieler_schluss'`)).rows[0].n;
+  pruefe('Rueckweg: der neue Helfer duell_spieler_schluss ist weg', helfer === 0, helfer);
   const { d } = await kiDuell({ vor: 140, fehler: 10 });
   pruefe('Rueckweg: alte Fassung wartet wieder bis 180 s + Gnade', (await auswerten(d)) === 'laeuft');
   const { d: dv, u: uv } = await kiDuell({ vor: 184, geloest: 3 });
