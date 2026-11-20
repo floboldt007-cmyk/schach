@@ -95,7 +95,12 @@ try {
         });
         const seitenfehler = [];
         const s = await k.newPage(); s.setDefaultTimeout(15000);
-        s.on('pageerror', (e) => seitenfehler.push(`${offline ? 'offline' : 'online'} ${s.url().replace(/^.*#/, '#')}: ${e.message}`));
+        // WebKit meldet eine Anfrage, die der Service Worker ohne Netz und ohne Cache ablehnt (sw.js antworte: throw), als
+        // Seitenfehler ohne Stapel: "TypeError: Load failed" und eine zweite Meldung mit der Adresse. Fuer Dateien ausserhalb
+        // des Kerns ist das ohne Netz erwartet (das fehlende Paket, Stockfish aus ZUERST); jede andere Meldung zaehlt.
+        const erwartet = (e) => offline && !e.stack && (e.message === 'TypeError: Load failed'
+          || (/^\/[^ ]+\/schach\/(.+)\.$/.test(e.message) && !KERN.includes(e.message.replace(/^\/[^ ]+\/schach\/(.+)\.$/, '$1'))));
+        s.on('pageerror', (e) => { if (!erwartet(e)) seitenfehler.push(`${offline ? 'offline' : 'online'} ${s.url().replace(/^.*#/, '#')}: ${e.message}`); });
         try {
           await bisHeim(s, START);
           // waitForFunction wertet ein Promise als wahr: darum im Fenster selbst warten, bis der Worker steuert und
