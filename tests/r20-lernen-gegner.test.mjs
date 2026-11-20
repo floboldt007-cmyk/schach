@@ -85,6 +85,20 @@ for (const art of mitGegner) {
   pruefe('Art partie (Grundstellung): Gegenzug ergibt nicht geschafft', M.pruefeZiel(l, start, c, { wann: 'gegner', zuege: 1 }) !== 'geschafft');
 }
 
+// Zuggrenze (Kaltreview 43): fuer schach und partie greift zuViele genau bei grenze(ziel), in einer ruhigen Stellung
+// (ruhiger Zug + Antwort, wie oben). Davor null, und der Gegner-Zweig ergibt bei keiner Zugzahl geschafft.
+for (const l of [lektionen.find((x) => x.id === 'es-schach'), lektionen.find((x) => x.id === 'es-partie')]) {
+  const c = new Chess(l.fen); const start = M.bilanz(c);
+  c.move(ruhig(c)[0].san);
+  const nachFlo = new Chess(c.fen());
+  c.move(ruhig(c)[0].san);
+  const g = M.grenze(l.ziel);
+  const flo = [g - 1, g].map((z) => M.pruefeZiel(l, start, nachFlo, { wann: 'flo', zuege: z }));
+  const gegner = [1, g - 1, g].map((z) => M.pruefeZiel(l, start, c, { wann: 'gegner', zuege: z }));
+  pruefe(`${l.id}: ruhige Stellung, Zug ${g - 1} laeuft weiter, Zug ${g} ist zuViele, Gegner-Zweig nie geschafft`,
+    flo[0] === null && flo[1] === 'zuViele' && gegner.every((x) => x !== 'geschafft'), { flo, gegner });
+}
+
 // Gegenprobe halten: Ueberstehen bleibt geschafft (die Regel, die vorher fuer alle galt, gilt dort weiter)
 {
   const l = lektionen.find((x) => M.artVon(x) === 'halten' && x.id.startsWith('es-'));
