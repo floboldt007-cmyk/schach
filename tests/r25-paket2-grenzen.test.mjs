@@ -30,7 +30,23 @@ if (!pw) { pruefe('Playwright gefunden', false); console.log(`${ok}/${ok + fehle
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg' };
+// Zweiter Ort (Kaltreview 43): die Lobby "Gegner gefunden" mit zwei mittleren Karten nebeneinander, gebaut mit dem echten
+// Modul js/ui/visitenkarte.js und allen Stylesheets der index.html
+const STILE = [...readFileSync(path.join(root, 'index.html'), 'utf8').matchAll(/<link[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+const LOBBY = `<!doctype html><html lang="de" data-screen="lobby"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+${STILE.map((h) => `<link rel="stylesheet" href="/${h}">`).join('')}</head><body>
+<div class="lb-suche"><div class="lb-suche-karte"><div class="lb-karten" id="lb"></div></div></div>
+<script type="module">
+import { visitenkarte } from '/js/ui/visitenkarte.js';
+const karte = (n, name) => ({ name, avatar: '', kronenStufe: 17, elo: 1512, saison: { saison: n, stufe: 17 }, saisonTitel: 'crownmaster-s' + n });
+window.baue = (n) => {
+  const vs = Object.assign(document.createElement('b'), { className: 'lb-karten-vs', textContent: 'VS' });
+  document.getElementById('lb').replaceChildren(visitenkarte(karte(n, 'Flo'), { groesse: 'mittel' }), vs, visitenkarte(karte(n, 'Gegnerin'), { groesse: 'mittel' }));
+};
+window.fertig = true;
+</script></body></html>`;
 const server = http.createServer((req, res) => {
+  if (new URL(req.url, 'http://test').pathname === '/probe-lobby.html') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(LOBBY); return; }
   const p = path.resolve(root, '.' + decodeURIComponent(new URL(req.url, 'http://test').pathname).replace(/\/$/, '/index.html'));
   if (!p.startsWith(root)) { res.writeHead(403); res.end(); return; }
   try { const d = readFileSync(p); res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(d); }
@@ -91,6 +107,45 @@ try {
       pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
     }
     pruefe(`${name}: keine Seiten- oder Konsolenfehler`, fehlerListe.length === 0, fehlerListe.slice(0, 5));
+    await k.close();
+  }
+  // Lobby, zwei Karten nebeneinander: 641 px ist die erste Breite mit zwei Spalten (je 299 px), 320 px die schmalste.
+  // Season 9998 darf bei 641 px zweizeilig werden (Grenzfall, fc 20.11.2026), der kurze Titel bleibt einzeilig.
+  // "lang" ersetzt den Titel durch ein Wort ohne Leerzeichen, breiter als die Karte (Schutz fuer kuenftige Titel und
+  // Uebersetzungen): nur overflow-wrap: anywhere bricht es um, nur max-width: 100% haelt den Chip in der Karte.
+  const LANG = 'Weltranglistenkronenmeisterschaftstitel';
+  for (const breite of [320, 641]) for (const fall of ['1', '9998', 'lang']) {
+    const name = `Lobby ${breite} px Season ${fall}`;
+    const k = await browser.newContext({ viewport: { width: breite, height: 900 }, locale: 'de-DE', serviceWorkers: 'block' });
+    const s = await k.newPage(); s.setDefaultTimeout(15000);
+    const fehlerListe = [];
+    s.on('pageerror', (e) => fehlerListe.push(e.message));
+    try {
+      await s.goto(`${HERKUNFT}/probe-lobby.html`);
+      await s.waitForFunction(() => window.fertig === true);
+      await s.evaluate(([n, lang, wort]) => {
+        window.baue(n);
+        if (lang) for (const e of document.querySelectorAll('.vk-season-titel')) e.textContent = wort;
+      }, [fall === 'lang' ? 1 : Number(fall), fall === 'lang', LANG]);
+      await s.waitForTimeout(150);
+      const m = await s.evaluate(() => [...document.querySelectorAll('.lb-karten .vk')].flatMap((vk) => {
+        const v = vk.getBoundingClientRect();
+        return [...vk.querySelectorAll('.vk-season-abz, .vk-season-titel')].map((e) => {
+          const r = e.getBoundingClientRect();
+          return { art: e.className, links: Math.round(r.left - v.left), rechts: Math.round(v.right - r.right),
+            schneidet: e.scrollWidth > e.clientWidth + 1, hoch: Math.round(r.height) };
+        });
+      }));
+      if (BILDER) await s.locator('.lb-karten').screenshot({ path: path.join(BILDER, `lobby-${breite}-s${fall}.png`) });
+      pruefe(`${name}: beide Karten zeigen Abzeichen und Titel`, m.length === 4, m);
+      pruefe(`${name}: kein Season-Chip ragt ueber die Karte hinaus`, m.every((x) => x.links >= 0 && x.rechts >= 0), m);
+      pruefe(`${name}: kein Season-Chip schneidet seinen Text ab`, m.every((x) => !x.schneidet), m);
+      if (fall === '1') pruefe(`${name}: der kurze Titel bleibt einzeilig`, m.every((x) => x.hoch <= 30), m);
+      if (fall === 'lang') pruefe(`${name}: das lange Wort bricht um`, m.filter((x) => /titel/.test(x.art)).every((x) => x.hoch > 30), m);
+    } catch (e) {
+      pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
+    }
+    pruefe(`${name}: keine Seitenfehler`, fehlerListe.length === 0, fehlerListe.slice(0, 5));
     await k.close();
   }
 } finally {
