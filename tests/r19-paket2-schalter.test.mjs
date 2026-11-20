@@ -145,8 +145,8 @@ if (!process.env.PAKET2_OHNE_BROWSER) {
       await alleLigen(liga.s);
       text = await sichtbar(liga.s);
       pruefe(`Browser ${sprache}: Alle Ligen ohne Season-Woerter`, !VERBOTEN.test(text), text.match(VERBOTEN)?.[0]);
-      pruefe(`Browser ${sprache}: Alle Ligen zeigt weiter alle sechs Ligen mit Satz`,
-        await liga.s.locator('.ss-ligen-blatt .ss-ligen-satz').evaluateAll((l) => l.length === 6 && l.every((e) => e.textContent.trim().length > 20)));
+      pruefe(`Browser ${sprache}: Alle Ligen zeigt weiter alle sechs Ligen mit sichtbarem Satz`,
+        await liga.s.locator('.ss-ligen-blatt .ss-ligen-satz').evaluateAll((l) => l.length === 6 && l.every((e) => e.textContent.trim().length > 20 && e.getClientRects().length > 0)));
       pruefe(`Browser ${sprache}: Liga ruft keine Season- und Welt-Funktion`, liga.server2.length === 0, liga.server2);
       await liga.kontext.close();
 
