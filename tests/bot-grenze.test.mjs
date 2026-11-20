@@ -53,10 +53,11 @@ const mitGrenze = BOTS.filter((b) => b.staerke && b.staerke.grenze != null).map(
 pruefe('Grenze genau bei Delia, Ottilie, Koenig (300) und Lasse, Wiebke, Greta (200)',
   JSON.stringify(mitGrenze) === JSON.stringify(['delia:300', 'ottilie:300', 'koenig:300', 'lasse:200', 'wiebke:200', 'greta:200']), mitGrenze);
 
-// Auftrag fc-18:05: die tiefere Suche endet auf langsamen Geraeten spaetestens mit der kuerzesten Denkpause
+// Auftrag fc-18:05: die tiefere Suche endet auf langsamen Geraeten in der Regel innerhalb der kuerzesten Denkpause
+// (movetime ist weich: gemessene Ueberschreitung hoechstens 5 ms am PC, Handy geschaetzt etwa 30 ms, Vault Messung Leiter neu geeicht)
 // (maxZeit = zeit[0]), und botZug gibt genau diesen Deckel als movetime an die Engine
 const deckel = BOTS.filter((b) => b.staerke && b.staerke.grenze != null).map((b) => `${b.id}:${b.staerke.maxZeit}/${b.staerke.zeit[0]}`);
-pruefe('maxZeit gleich der kuerzesten Denkpause bei allen Bots mit Grenze',
+pruefe('maxZeit gleich der kuerzesten Denkpause bei allen Bots mit Grenze (Suche endet in der Regel innerhalb der Pause)',
   BOTS.filter((b) => b.staerke && b.staerke.grenze != null).every((b) => b.staerke.maxZeit === b.staerke.zeit[0]), deckel);
 const gesehen = [];
 for (const bot of [delia, botNachId('koenig')]) {

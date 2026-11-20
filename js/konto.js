@@ -651,7 +651,9 @@ export function kontoGruppe({ app } = {}) {
   gleicheAb();
   // Abmelden von aussen (Konto loeschen in der Gruppe "Daten") oder Anmeldung in einem anderen Tab: neu zeichnen
   const uhr = setInterval(() => { if (!!sitzung() !== gezeichnetMit) { render(); gleicheAb(); } }, 1000);
-  return { el, verlasse() { clearInterval(uhr); planeSicherung(0); } };
+  // Bot-Schutz beim Verlassen abmelden: sonst bleibt das Widget bei Turnstile eingetragen, waehrend sein Ort verschwindet
+  // ("Cannot find Widget ..., consider using turnstile.remove()" bei jedem Besuch, fable-check 19.11. Nr 7)
+  return { el, verlasse() { clearInterval(uhr); planeSicherung(0); schutz?.entferne(); schutz = null; } };
 }
 function alsApp() {
   try { return globalThis.navigator?.standalone === true || !!globalThis.matchMedia?.('(display-mode: standalone)')?.matches; } catch (e) { return false; }

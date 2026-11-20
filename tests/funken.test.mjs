@@ -84,7 +84,7 @@ gruppe = 'Level-Kurve';
   pruefe('fortschritt: Level, Titel, im Level, bis zum nächsten, Anteil, nächster Titel', fs.level === 10 && fs.titel === 'Fackelträger'
     && fs.inLevel === 100 && fs.kostet === 460 && fs.bis === 360 && Math.abs(fs.anteil - 100 / 460) < 1e-9
     && fs.naechsterTitel.level === 15 && fs.naechsterTitel.name === 'Lagerfeuer', fs);
-  pruefe('Rechenstand der Kurve ist 1', L.STAND === 1 && R.STAND === 1 && S.STAND === 1);
+  pruefe('Rechenstand: Kurve 1, Rechnung 2 (kurze Partie ohne Sieg = 0), Speicher 1', L.STAND === 1 && R.STAND === 2 && S.STAND === 1);
 }
 
 gruppe = 'Titel und Belohnungen';
@@ -516,6 +516,35 @@ gruppe = 'Partie buchen';
   const sieg = S.buchePartie(st, { ...d, partieId: 'sg', neueSterne: [false, false, false] }, { lauf, jetzt, gegner: { partien: 2, maxZuege: 50, letzteGenauigkeit: 10 } });
   pruefe('Kein Genauigkeits-Lichtblick nach einem Sieg', S.nachtragPartie(st, { partieId: 'sg', wertet: true, partie: { genauigkeit: 99 } }, { jetzt }).buchungen.length === 0
     && sieg.eintrag.lb.length === 0);
+}
+
+// fable-check 19.11. Nr 3: nach 6 Zuegen aufgeben brachte +14/+18 (Theorie und offene Zuege), beliebig wiederholbar. Wie bei
+// den Partie-Punkten (R9-PunkteKurz, Variante A: "Ein Sieg zaehlt immer") zaehlt vor dem 10. eigenen Zug nur ein Sieg.
+gruppe = 'Kurze Partie: nur ein Sieg zählt';
+{
+  setzeSpeicher(fakeSpeicher());
+  const jetzt = ort(2026, 10, 22, 20);
+  const st = S.lade(jetzt);
+  const lauf = { id: 'l6', farbe: 'w', fa: 1, fn: 'Herausforderung', z: {} };
+  const klassen = [];
+  for (let ply = 0; ply < 12; ply++) {
+    if (ply % 2) { klassen.push(null); continue; }
+    const k = ply < 6 ? 'buch' : 'bester';
+    klassen.push(k);
+    S.merkeZug(lauf, { ply, klasse: k, gewinnVorher: 0.5, gewinnNachher: 0.5 });
+  }
+  const d = { laufId: 'l6', botId: 'rudi', modus: 'normal', wertet: true, eigeneZuege: 6, liveKlassen: klassen,
+    hinweise: 0, zuruecknahmen: 0, neueSterne: [false, false, false] };
+  const aufgabe = S.buchePartie(st, { ...d, partieId: 'a6', ergebnis: 'niederlage', grund: 'aufgabe' }, { lauf, jetzt });
+  pruefe('Aufgeben nach 6 Zügen: 0 Partie-Funken, Grund „kurz“ (kein Funken-Farmen durch frühes Aufgeben)',
+    aufgabe.eintrag.p === 0 && aufgabe.eintrag.z === 0 && aufgabe.eintrag.th === 0 && aufgabe.eintrag.gr === 'kurz' && st.gesamt === 0, aufgabe.eintrag);
+  const remis = S.buchePartie(st, { ...d, partieId: 'r6', ergebnis: 'remis', grund: 'wiederholung' }, { lauf, jetzt });
+  pruefe('Remis nach 6 Zügen: ebenso 0, Grund „kurz“', remis.eintrag.p === 0 && remis.eintrag.gr === 'kurz' && st.gesamt === 0, remis.eintrag);
+  const sieg = S.buchePartie(st, { ...d, partieId: 's6', ergebnis: 'sieg', grund: 'matt' }, { lauf, jetzt });
+  pruefe('Sieg nach 6 Zügen zählt weiter: 3 Theorie + 3 × Präzise (15) + Verwertung 30 = 48, ohne Ergebnis-Bonus',
+    sieg.eintrag.p === 48 && sieg.eintrag.th === 3 && sieg.eintrag.z === 15 && sieg.eintrag.v === 30 && !sieg.eintrag.e && !sieg.eintrag.gr, sieg.eintrag);
+  const zehn = S.buchePartie(st, { ...d, partieId: 'n10', ergebnis: 'niederlage', grund: 'aufgabe', eigeneZuege: 10 }, { lauf, jetzt });
+  pruefe('Aufgeben ab dem 10. eigenen Zug: die Züge zählen (Konzept 3.2, tapfere Niederlage)', zehn.eintrag.p === 18 && !zehn.eintrag.gr, zehn.eintrag);
 }
 
 gruppe = 'Lernen buchen';
