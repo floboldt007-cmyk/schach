@@ -71,16 +71,20 @@ try {
     const tipp = async ([x, y]) => (finger ? s.touchscreen.tap(x, y) : s.mouse.click(x, y));
     const frage = () => s.evaluate(() => { window.__antwort = undefined; window.__app.frage({ titel: 'Probe', knoepfe: [{ text: 'OK', wert: 'ok', art: 'primaer' }], abbrechen: 'zu' })
       .then(w => { window.__antwort = w; }); });
+    // Dialog steht und ist fertig eingeblendet: unter CPU-Last laeuft die Einblend-Animation noch, wenn die Knopf-Mitte
+    // gemessen wird, und der Tipp verfehlt den wandernden Knopf (DROSSEL=6, 1 von 10 Laeufen)
+    const offen = async () => { await s.locator('.dialog-ort:not(.weg) .dialog').waitFor();
+      await s.waitForFunction(() => document.querySelector('.dialog-ort:not(.weg)')?.getAnimations({ subtree: true }).every((a) => a.playState !== 'running'), null, { timeout: 5000 }); };
 
     // 1. offener Dialog nimmt den Knopf an (die Reparatur darf ihn nicht klicklos machen)
-    await frage(); await s.locator('.dialog-ort:not(.weg) .dialog').waitFor();
+    await frage(); await offen();
     await tipp(await mitte('.dialog-knoepfe .knopf'));
     pruefe(`${name}: offener Dialog nimmt den Knopf an`, await s.waitForFunction(() => window.__antwort === 'ok', null, { timeout: 3000 }).then(() => true, () => false));
     await s.waitForFunction(() => !document.querySelector('.dialog-ort'));
 
     // 2. Tipp auf den Schleier schliesst mit "abbrechen"; getippt wird genau ueber "Zurueck zum Start"
     const zurueck = await mitte('[data-zz="zurueck"]');
-    await frage(); await s.locator('.dialog-ort:not(.weg) .dialog').waitFor();
+    await frage(); await offen();
     await tipp(zurueck);
     pruefe(`${name}: Tipp auf den Schleier schliesst`, await s.waitForFunction(() => window.__antwort === 'zu', null, { timeout: 3000 }).then(() => true, () => false));
     await s.waitForFunction(() => !document.querySelector('.dialog-ort'));
@@ -97,7 +101,7 @@ try {
     // 200-ms-Timer, der gestellt wird, waehrend .dialog-ort.weg steht. Erst nach den Tipps laeuft er ab. Die Pruefung bleibt
     // gleich streng: echte Tipps gehen durch den zuklappenden Dialog aufs Brett.
     const f2 = await mitte('.zz-brett .feld[data-feld="f2"]'), f3 = await mitte('.zz-brett .feld[data-feld="f3"]');
-    await frage(); await s.locator('.dialog-ort:not(.weg) .dialog').waitFor();
+    await frage(); await offen();
     await s.evaluate(() => {
       const echt = window.setTimeout;
       window.__zuGehalten = null;
@@ -126,7 +130,7 @@ try {
     pruefe(`${name}: Probe lief im Zuklapp-Fenster (.dialog-ort.weg stand noch, 200-ms-Timer gehalten)`, wegNoch && gehalten, { wegNoch, gehalten });
 
     // 4. Gegenprobe: nach dem Schliessen per Schleier kommt ein spaeterer Tipp (nach der Frist von 600 ms) normal an
-    await frage(); await s.locator('.dialog-ort:not(.weg) .dialog').waitFor();
+    await frage(); await offen();
     await tipp(zurueck);
     await s.waitForFunction(() => window.__antwort === 'zu' && !document.querySelector('.dialog-ort'), null, { timeout: 3000 });
     await s.waitForTimeout(700);
