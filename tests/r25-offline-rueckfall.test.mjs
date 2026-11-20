@@ -9,6 +9,7 @@
 //   (3) "Zur Arena" von dort zeigt die Arena (kein Kreis)
 //   (4) PC: derselbe Satz auf Englisch
 //   (5) keine Seitenfehler
+//   (6) ein Screen im Kern ohne das CSS seines Pakets (Bestenliste ohne css/pakete/liga.css) zeigt denselben Satz
 //   node tests/r25-offline-rueckfall.test.mjs           beide Engines (PLAYWRIGHT_PFAD); BROWSER=webkit nur eine
 import { createRequire } from 'node:module';
 import http from 'node:http';
@@ -57,6 +58,8 @@ const HEIM = '.heim-screen .heim-buehne';
 const ARENA = '#app > .screen.arena';
 const PLATZHALTER = '#app > .screen.platzhalter';
 const PAKET = 'spielhalle';
+// (6): Bestenliste liegt im Kern, ihr Paket-CSS nimmt der Test aus dem Cache
+const CSS_FEHLT = { screen: 'bestenliste', datei: 'css/pakete/liga.css' };
 const SATZ = { de: 'Dieser Teil ist noch nicht geladen. Bitte einmal mit Internet öffnen.', en: "This part isn't downloaded yet. Please open it once with internet." };
 const klappt = (p) => p.then(() => true, () => false);
 const { defaultBrowserType: _typ, ...IPHONE } = pw.devices['iPhone 13'];
@@ -97,9 +100,11 @@ try {
         const s = await k.newPage(); s.setDefaultTimeout(15000);
         // WebKit meldet eine Anfrage, die der Service Worker ohne Netz und ohne Cache ablehnt (sw.js antworte: throw), als
         // Seitenfehler ohne Stapel: "TypeError: Load failed" und eine zweite Meldung mit der Adresse. Fuer Dateien ausserhalb
-        // des Kerns ist das ohne Netz erwartet (das fehlende Paket, Stockfish aus ZUERST); jede andere Meldung zaehlt.
+        // des Kerns ist das ohne Netz erwartet (das fehlende Paket, Stockfish aus ZUERST) und fuer die Datei, die (6) selbst aus
+        // dem Cache nimmt; jede andere Meldung zaehlt.
+        const fehltErwartet = (d) => !KERN.includes(d) || d === CSS_FEHLT.datei;
         const erwartet = (e) => offline && !e.stack && (e.message === 'TypeError: Load failed'
-          || (/^\/[^ ]+\/schach\/(.+)\.$/.test(e.message) && !KERN.includes(e.message.replace(/^\/[^ ]+\/schach\/(.+)\.$/, '$1'))));
+          || (/^\/[^ ]+\/schach\/(.+)\.$/.test(e.message) && fehltErwartet(e.message.replace(/^\/[^ ]+\/schach\/(.+)\.$/, '$1'))));
         s.on('pageerror', (e) => { if (!erwartet(e)) seitenfehler.push(`${offline ? 'offline' : 'online'} ${s.url().replace(/^.*#/, '#')}: ${e.message}`); });
         try {
           await bisHeim(s, START);
@@ -169,6 +174,24 @@ try {
             const en = await klappt(s.waitForFunction((x) => document.querySelector('#app > .screen')?.innerText.includes(x), SATZ.en, { timeout: 10000 }));
             pruefe(`${tag}: (4) auf Englisch "${SATZ.en}"`, en, (await screenText(s)).slice(0, 160));
           }
+
+          // (6) Modul im Kern, aber das CSS seines Pakets fehlt (ein Update bringt neues Paket-CSS, js/paket-css.js):
+          // ohne Netz derselbe Satz statt eines ungestalteten Screens
+          await s.evaluate(async (datei) => {
+            for (const name of await caches.keys()) {
+              const c = await caches.open(name);
+              for (const r of await c.keys()) if (new URL(r.url).pathname.endsWith('/' + datei)) await c.delete(r);
+            }
+          }, CSS_FEHLT.datei);
+          await bisHeim(s, START);
+          await s.evaluate(() => { window.__ohneNeuladen = true; });
+          await s.evaluate((p) => window.__app.gehe(p), CSS_FEHLT.screen);
+          const text = g.englisch ? SATZ.en : SATZ.de;
+          const cssSatz = await klappt(s.waitForFunction((x) => document.querySelector('#app > .screen')?.innerText.includes(x), text, { timeout: 10000 }));
+          await s.waitForTimeout(1500);
+          const cssLage = await s.evaluate(() => ({ hash: location.hash, marke: window.__ohneNeuladen === true }));
+          pruefe(`${tag}: (6) ohne ${CSS_FEHLT.datei} zeigt ${CSS_FEHLT.screen} den Satz, ohne Neuladen und Sprung`,
+            cssSatz && cssLage.marke && cssLage.hash === '#' + CSS_FEHLT.screen, { text: (await screenText(s)).slice(0, 120), ...cssLage });
         } catch (e) {
           pruefe(`${tag}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
         }
