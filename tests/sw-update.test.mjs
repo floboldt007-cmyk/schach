@@ -102,6 +102,15 @@ const startBereit = (s) => s.waitForFunction(() => !!document.querySelector('.sc
 // Zuletzt gesehene Lage, damit ein Fehlschlag zeigt, woran es hing (CI 44657402343: Runde 2 rot unter Linux-WebKit,
 // nur die Versionsnummer im Detail; lokal 3 von 3 gruen)
 let letzteLage = null;
+async function frischerBlick(s) {
+  const f = await s.context().newPage();
+  try {
+    await f.goto(new URL('/__frischer-blick', s.url()).href).catch(() => {});
+    return await begrenzt('Frischer Blick', () => f.evaluate(async () => {
+      const r = await navigator.serviceWorker.getRegistration(); return r && r.active ? r.active.state : null;
+    }), AUSWERTUNG_MS);
+  } catch (e) { return 'fehler: ' + e.message.slice(0, 80); } finally { await f.close().catch(() => {}); }
+}
 async function warteAufVersion(s, version, ms = 60000) {
   const ende = Date.now() + ms;
   letzteLage = null;
@@ -119,6 +128,17 @@ async function warteAufVersion(s, version, ms = 60000) {
           controller: !!navigator.serviceWorker.controller };
       });
       letzteLage = { version: v, ...lage };
+      // WebKit meldet den Schritt activating -> activated nicht an eine Seite, die WAEHREND activating geladen wurde: deren
+      // Bild bleibt auf "activating", obwohl activate laengst fertig ist (20.11.2026, Linux-CI 44663587812 und lokal unter
+      // Last 2 von 12: activate lief in 12 ms durch, eine frische Seite und ein Neuladen sahen "activated", die alte Seite
+      // 60 s lang "activating"). Die App wartet nach dem Neuladen auf keinen dieser Zustaende. Darum bestaetigt dann eine
+      // frische Seite (404-Adresse: startet die App nicht und landet nicht im Cache) den Zustand des Workers.
+      if (v === version && lage.seite && !lage.ruhig && lage.worker && lage.worker.active === 'activating'
+        && !lage.worker.waiting && !lage.worker.installing && JSON.stringify(lage.caches) === soll) {
+        lage.frisch = await frischerBlick(s);
+        lage.ruhig = lage.frisch === 'activated';
+        letzteLage.frisch = lage.frisch;
+      }
       if (v === version && lage.seite && lage.ruhig && JSON.stringify(lage.caches) === soll) jetzt = lage.seite;
     } catch (e) { if (fristAbgelaufen(e)) throw e; /* sonst: die Seite laedt gerade neu */ }
     if (jetzt && jetzt === zuletzt) { await startBereit(s).catch(() => {}); return true; }
