@@ -189,7 +189,10 @@ pruefe('es-patt: der naheliegende Damenzug Qg6 ergibt Patt (die Falle)', !!patt 
   const E = await import('./lektion-engine.mjs');
   const sf = E.stockfish();
   await sf.init();
-  for (const l of (kurs ? kurs.lektionen : []).filter((x) => ['taktik', 'halten', 'schach', 'matt', 'umwandeln'].includes(x.art))) {
+  // ohne schach: Stockfish sucht den staerksten Zug, nicht ein Schachgebot. Gruen war es nur, weil bis 20.11. jeder ruhige
+  // Zug mit Antwort als geschafft galt (tests/r20-lernen-gegner.test.mjs); dass ein Schachgebot geschafft ist, prueft oben
+  // 'pruefeZiel schach'
+  for (const l of (kurs ? kurs.lektionen : []).filter((x) => ['taktik', 'halten', 'matt', 'umwandeln'].includes(x.art))) {
     const r = await E.spiele(sf, l, l.fen, { go: 'nodes 150000', goGegner: 'nodes 400000' }).catch((e) => ({ ende: e.message }));
     pruefe(`${l.id}: Stockfish gegen Stockfish endet geschafft in ${l.ziel} Zug/Zuegen`, r.ende === 'geschafft' && r.zuege <= l.ziel, r);
   }
