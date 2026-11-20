@@ -9,6 +9,10 @@
 //   (4) danach liegt jede Datei aus DATEIEN im Cache, es gibt nur den einen Cache
 // Das Netz drosselt der eigene Server (eine Leitung fuer alle Antworten, je Anfrage eine RTT, ETag/304 und gzip wie
 // GitHub Pages), damit es in Chromium und WebKit gleich ist.
+// Die Grenze von 28 s (WebKit, Fast 3G) gilt fuer DIESEN Testserver: HTTP/1.1, hoechstens 6 Leitungen, je Anfrage eine volle
+// RTT. Er ist absichtlich strenger als GitHub Pages (HTTP/2, alle Anfragen auf einer Leitung, gerechnet etwa 9 s). Gemessen
+// 20.11.2026 bei 226 Kern-Dateien: 26,5 s, je Datei etwa 0,09 s, je KB gzip etwa 0,006 s; die Zahl der Dateien zaehlt mehr
+// als ihre Groesse. Wer nah an der Grenze ist, soll Dateien sparen, nicht Bytes.
 //   node tests/sw-erstbesuch.test.mjs            Chromium
 //   BROWSER=webkit node tests/sw-erstbesuch.test.mjs
 //   NETZ=fast3g ...                              562 ms, 1,44 Mbit/s
@@ -110,12 +114,17 @@ async function main() {
   const seitenfehler = [];
   s.on('pageerror', (e) => seitenfehler.push(e.message.slice(0, 160)));
   const adresse = `http://127.0.0.1:${server.address().port}/schach/index.html?test&sw`;
-  // Lage des Workers aus Sicht der Seite; liest den Cache der eigenen Fassung
+  // Lage des Workers aus Sicht der Seite; liest den Cache der eigenen Fassung.
+  // Der Zustand wird VOR dem Cache gelesen: r.active ist live, und die Installation legt ihre letzte Datei Millisekunden vor
+  // "activated" ab. In der alten Reihenfolge (Cache zuerst, Zustand danach) fehlte so ab und zu genau die letzte Datei, die
+  // Lage hiess aber schon "activated" (1 von 16 Laeufen, WebKit Fast 3G, 20.11.2026: bricolage-grotesque.woff2; im selben
+  // Moment fand caches.match sie). "activated" heisst: install ist fertig, jedes cache.put ist durch.
   const lage = () => begrenzt('Lage', () => s.evaluate(async (name) => {
     const r = await navigator.serviceWorker.getRegistration();
+    const aktiv = r && r.active ? r.active.state : null;
     const c = (await caches.keys()).includes(name) ? await caches.open(name) : null;
     const im = c ? (await c.keys()).map((q) => new URL(q.url).pathname.replace(/^\/schach\//, '')) : [];
-    return { reg: !!r, aktiv: r && r.active ? r.active.state : null, installiert: !!(r && r.installing), steuert: !!navigator.serviceWorker.controller,
+    return { reg: !!r, aktiv, installiert: !!(r && r.installing), steuert: !!navigator.serviceWorker.controller,
       caches: await caches.keys(), im };
   }, sw.CACHE), 20000).catch((e) => ({ fehler: e.message.slice(0, 80) }));
   const t0 = Date.now();

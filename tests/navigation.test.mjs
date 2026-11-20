@@ -762,6 +762,9 @@ async function testeBauteile(browser) {
   await halte.focus();
   await seite.keyboard.press('Enter');
   await seite.waitForSelector('.sheet-ort .sheet-karte');
+  // Der Fokus kommt ein Bild nach dem Aufbau (js/ui/bauteile.js sheet(), Leistung F3: sonst rechnet focus() das Layout mitten
+  // im Aufbau). Das catch beendet nur das Warten; die Pruefung darunter bleibt hart und sieht dann den falschen Fokus.
+  await seite.waitForFunction(() => document.querySelector('.sheet-karte').contains(document.activeElement), null, { timeout: 2000 }).catch(() => {});
   const blatt = await seite.evaluate(() => ({ titel: document.querySelector('.sheet-karte h3').textContent, knoepfe: [...document.querySelectorAll('.sheet-knoepfe button')].map((b) => b.textContent),
     fokus: document.activeElement.textContent, rolle: document.querySelector('.sheet-karte').getAttribute('role') }));
   pruefe('Tastatur: Blatt „Aufgeben?“ mit Weiterspielen/Aufgeben, Fokus auf dem sicheren Knopf', blatt.titel === 'Aufgeben?' && blatt.knoepfe.join() === 'Weiterspielen,Aufgeben'

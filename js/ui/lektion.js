@@ -43,6 +43,8 @@ import { t } from '../sprache.js';
 import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand, rundenVon,
   ladeSammeln, weissWieder, sternGeschafft, sterneSammeln, zaehlerSichtbar } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
+// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js)
+await ladeLernenCss();
 import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
 import { sterneHtml, kursPartieAbgleich } from './lernen.js';
 import { BOTS } from '../bots.js';
@@ -104,7 +106,6 @@ export function zeige(root, params, app) {
     setTimeout(() => { if (!weg) app.gehe('lernen', l ? { bereich: bereichVon(l).id } : {}, { ersetzen: true }); }, 0);
     return { verlasse() { weg = true; } };
   }
-  ladeLernenCss();
   const ber = bereichVon(l);
   const art = artVon(l);
   if (art === 'partie') return zeigeKursPartie(s, l, ber, app);

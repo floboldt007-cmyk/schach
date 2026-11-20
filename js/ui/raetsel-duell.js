@@ -15,6 +15,7 @@
 //   mit .rd-uhr; .rd-zeile; .rd-reihe) | .rd-ende. Optik: css/pakete/raetsel-duell.css.
 // Tests: window.__duellKiMs verkuerzt die 10 s bis zum KI-Gegner, window.__duellAbfrageMs die Abfrage (Standard 1 s).
 // Mit ?test: window.__duell = { brett() -> Brett | null } (nur lesen; z. B. autoDame, das kein DOM-Merkmal hat).
+import { ladePaketCss } from '../paket-css.js';
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
@@ -42,15 +43,10 @@ const RING = 2 * Math.PI * 44;
 const DAUER_MS = KONST.DAUER_S * 1000;
 
 function ladeCss() {
-  try {
-    if (document.querySelector('link[data-paket="raetsel-duell"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../css/pakete/raetsel-duell.css', import.meta.url).href;
-    l.dataset.paket = 'raetsel-duell';
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles bedienbar */ }
+  return ladePaketCss('raetsel-duell', { screens: ['raetsel-duell'] });
 }
+// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js)
+await ladeCss();
 
 function fehlerText(e) {
   const k = e && (e.kennung || e.detail);
@@ -99,7 +95,6 @@ export function zeige(root, params, app) {
   s.setAttribute('aria-label', D('name'));
   root.append(s);
   let weg = false;
-  ladeCss();
   const einst = (() => { try { return app && typeof app.einstellungen === 'function' ? app.einstellungen() : ladeEinstellungen(); } catch (e) { return {}; } })();
   s.innerHTML = `${hauptKopf({ titel: D('name'), unter: D('unter'), zurueck: true, chips: '', marke: false })}<div class="rd-rumpf"></div>`;
   const rumpf = s.querySelector('.rd-rumpf');

@@ -191,6 +191,11 @@ let offenesSheet = null;
 export function schliesseSheet() {
   if (offenesSheet) offenesSheet.ende();
 }
+export const sheetOffen = () => !!offenesSheet;
+
+// Fokus erst im naechsten Bild (Leistung F3, fc-11:15): focus() rechnet sonst das Layout mitten im Aufbau des Blatts, auf
+// schwachen Geraeten 150 bis 250 ms (Vault R20-Kritik/leistung/bericht.md). Im Bild ist das Layout ohnehin faellig.
+const imNaechstenBild = (fn) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : setTimeout(fn, 0));
 
 // Schleier, die bei pointerdown schliessen (Dialog in app.js, sheet() und die Blaetter der Pakete): .weg laesst Klicks
 // durch bzw. der Ort ist schon weg, der click desselben Tipps traefe also den Knopf darunter (Befund 19.11.2026: Touch,
@@ -213,7 +218,10 @@ export function schluckeFolgeKlick() {
 // (detail > 1). Sonst landet der zweite Tipp eines Doppeltipps auf dem Knopf, der an derselben Stelle des naechsten Blatts sitzt.
 export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen = null, inhalt = null,
   klasse = '', sperreMs = 0 } = {}) {
-  schliesseSheet();
+  // Ersetzt dieses Blatt ein offenes, geht der Fokus am Ende an dessen Ausloeser zurueck (das alte Blatt gibt ihn dann
+  // nicht erst zurueck, nur damit dieses ihn wieder nimmt)
+  const ersetzt = offenesSheet;
+  if (ersetzt) ersetzt.ende({ ohneFokus: true });
   return new Promise((resolve) => {
     const ort = document.createElement('div');
     ort.className = 'sheet-ort';
@@ -227,11 +235,22 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
     const schleier = ort.querySelector('.sheet-schleier');
     const leiste = ort.querySelector('.sheet-knoepfe');
     if (inhalt) leiste.before(inhalt);
-    const vorherFokus = document.activeElement;
+    const vorherFokus = ersetzt && ersetzt.vorherFokus && ersetzt.vorherFokus.isConnected ? ersetzt.vorherFokus : document.activeElement;
     let fertig = false;
+    let fokusAusstehend = false;   // true vom Oeffnen bis zum Fokus im naechsten Bild
     const stillgelegt = [];
     const taste = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); ende(abbrechen); return; }
+      // Enter oder Leertaste vor dem Fokus im naechsten Bild: den Fokus jetzt setzen und die Taste dort wirken lassen, wie
+      // vor F3 (sonst faellt die erste Taste ins Leere und die zweite trifft den Knopf, Kaltreview c9 Befund 1, Probe F).
+      // Nur bis zu diesem Bild: liegt der Fokus spaeter ausserhalb (Klick auf den Text), loest keine Taste den Knopf aus.
+      if ((e.key === 'Enter' || e.key === ' ') && fokusAusstehend && !karte.contains(document.activeElement)) {
+        fokusAusstehend = false;
+        e.preventDefault();
+        erster.focus({ preventScroll: true });
+        erster.click();
+        return;
+      }
       if (e.key === 'Tab') {
         const k = [...karte.querySelectorAll('button, [tabindex="0"]')].filter((b) => !b.disabled);
         if (!k.length) return;
@@ -241,7 +260,7 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
         naechster.focus();
       }
     };
-    function ende(wert) {
+    function ende(wert, { ohneFokus = false } = {}) {
       if (fertig) return;
       fertig = true;
       document.removeEventListener('keydown', taste, true);
@@ -254,7 +273,9 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
         anim(schleier, [{ opacity: 1 }, { opacity: 0 }], { d: 220, k: 'sanft', fill: 'forwards' });
         Promise.resolve(a.finished).catch(() => {}).then(() => ort.remove());
       }
-      if (vorherFokus && vorherFokus.isConnected && typeof vorherFokus.focus === 'function') {
+      // Zurueck an den Ausloeser, sofort: die Aufrufer im then bauen darauf (profil.js und ich.js zeichnen neu und suchen den
+      // Nachfolger, tests/r22-tastatur.test.mjs). Ersetzt ein neues Blatt dieses, uebernimmt es den Ausloeser (ohneFokus).
+      if (!ohneFokus && vorherFokus && vorherFokus.isConnected && typeof vorherFokus.focus === 'function') {
         try { vorherFokus.focus({ preventScroll: true }); } catch (f) { /* egal */ }
       }
       resolve(wert);
@@ -286,13 +307,21 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
       stillgelegt.push(el);
     }
     document.body.append(ort);
-    offenesSheet = { ort, ende: () => ende(abbrechen) };
+    offenesSheet = { ort, vorherFokus, ende: (o) => ende(abbrechen, o) };
     anim(karte, [{ transform: 'translateY(100%)' }, { transform: 'none' }], { d: 480, k: 'gleiten' });
     anim(schleier, [{ opacity: 0 }, { opacity: 1 }], { d: 260, k: 'sanft' });
     // Rueckfrage zum Aufgeben: der sichere Knopf (ohne Art "gefahr") bekommt den Fokus
     const erster = leiste.querySelector('.primaer') || [...leiste.querySelectorAll('button')].find((b) => !b.classList.contains('gefahr'))
       || leiste.querySelector('button');
-    if (erster) erster.focus({ preventScroll: true });
+    // einmal, im naechsten Bild; hat bis dahin schon etwas im Blatt den Fokus (Aufrufer, Tab), bleibt er dort
+    if (erster) {
+      fokusAusstehend = true;
+      imNaechstenBild(() => {
+        fokusAusstehend = false;
+        if (fertig || karte.contains(document.activeElement)) return;
+        erster.focus({ preventScroll: true });
+      });
+    }
   });
 }
 

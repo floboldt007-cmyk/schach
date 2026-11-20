@@ -135,26 +135,41 @@ export function verbindeKopf(wurzel, app, { beiZurueck = null, beiEinstellungen 
   wurzel.addEventListener('click', klick);
   // Chips: passt nicht einmal der erste ganz neben Titel und Knoepfe, ausblenden statt einen Stummel zu zeigen
   // (gemessen bei jeder Groessenaenderung und jeder Aenderung im Screen, z. B. neu gezeichneter Kopf oder die Reiter-Pille
-  // zieht ein oder aus; hoechstens einmal je Bild, ohne Schleife)
+  // zieht ein oder aus; hoechstens einmal je Bild, ohne Schleife). Leistung F2 (fc-11:15): erst alle Koepfe zuruecksetzen,
+  // dann alles lesen (ein Layout), dann schreiben; abwechselnd Lesen und Schreiben rechnete das Layout je Chip neu
   let rahmen = 0;
   const passeChips = () => {
     rahmen = 0;
+    const koepfe = [];
     for (const kopf of wurzel.querySelectorAll('.haupt-kopf')) {
       const chips = kopf.querySelector('.kopf-chips');
       kopf.classList.remove('ohne-chips');
       if (!chips) continue;
       // erst zuruecksetzen, dann messen: ein ausgeblendeter Chip hat keine Breite und galt beim naechsten Messen als "kein Chip"
       for (const c of chips.children) c.classList.remove('passt-nicht');
-      const erster = [...chips.children].find((c) => c.offsetWidth > 0 || c.getClientRects().length);
-      if (erster && chips.clientWidth + 1 < erster.offsetWidth) { kopf.classList.add('ohne-chips'); continue; }
+      koepfe.push({ kopf, chips, kinder: [...chips.children] });
+    }
+    for (const k of koepfe) {
+      k.breite = k.chips.clientWidth;
+      k.erster = k.kinder.find((c) => c.offsetWidth > 0 || c.getClientRects().length);
+      k.ersterBreite = k.erster ? k.erster.offsetWidth : 0;
+      k.links = k.chips.getBoundingClientRect().left;
+      k.rechts = k.kinder.map((c) => (c.offsetWidth > 0 ? c.getBoundingClientRect().right : null));
+    }
+    for (const { kopf, chips, kinder, breite, erster, ersterBreite, links, rechts } of koepfe) {
+      if (erster && breite + 1 < ersterBreite) { kopf.classList.add('ohne-chips'); continue; }
       // Ansicht (Flo 30.10.): auch spaetere Chips nie als Stummel; was nicht ganz passt, tritt zurueck
-      const links = chips.getBoundingClientRect().left;
-      for (const c of chips.children) {
-        if (!(c.offsetWidth > 0)) continue;
-        if (c.getBoundingClientRect().right - links > chips.clientWidth + 1) c.classList.add('passt-nicht');
+      let bleibt = rechts.some((r) => r !== null);
+      if (rechts.some((r) => r !== null && r - links > breite + 1)) {
+        // selten: dann der Reihe nach wie bisher, denn ein zuruecktretender Chip macht den folgenden Platz
+        for (const c of kinder) {
+          if (!(c.offsetWidth > 0)) continue;
+          if (c.getBoundingClientRect().right - links > chips.clientWidth + 1) c.classList.add('passt-nicht');
+        }
+        bleibt = kinder.some((c) => c.offsetWidth > 0);
       }
       // bleibt kein Chip stehen, geht auch die Kapsel: ihr Polster war sonst der kleine Punkt im Kopf (Befund live 349)
-      if (chips.children.length && ![...chips.children].some((c) => c.offsetWidth > 0)) kopf.classList.add('ohne-chips');
+      if (kinder.length && !bleibt) kopf.classList.add('ohne-chips');
     }
   };
   const spaeter = () => { if (!rahmen && typeof requestAnimationFrame === 'function') rahmen = requestAnimationFrame(passeChips); };
@@ -162,7 +177,9 @@ export function verbindeKopf(wurzel, app, { beiZurueck = null, beiEinstellungen 
   let mo = null;
   if (typeof ResizeObserver === 'function') { ro = new ResizeObserver(spaeter); ro.observe(wurzel); }
   if (typeof MutationObserver === 'function') { mo = new MutationObserver(spaeter); mo.observe(wurzel, { childList: true, subtree: true }); }
-  passeChips();
+  // der erste Abgleich im naechsten Bild, vor dem ersten Malen (Leistung F2): jetzt mitten im Aufbau des Screens kostete er
+  // ein eigenes Layout, und das Bild danach rechnete es noch einmal
+  if (typeof requestAnimationFrame === 'function') spaeter(); else passeChips();
   const beiEinst = () => zeigeKlang();
   const beiThema = () => zeigeModus();
   window.addEventListener('schach:einstellungen', beiEinst);

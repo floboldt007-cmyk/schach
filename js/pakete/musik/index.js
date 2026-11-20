@@ -1,4 +1,5 @@
 // Lobby-Musik: generative Web-Audio-Melodien, nur ausserhalb einer Partie.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
 import { hatWeltsiegel, ladeFortschritt } from '../../storage.js';
@@ -10,11 +11,8 @@ import { t } from '../../sprache.js';
 import './texte.js';
 
 // Paket-CSS nur zusammen mit dem Paket laden (wie finisher); ?test&kern bleibt dadurch wirklich paketfrei.
-if (typeof document !== 'undefined' && !document.querySelector('link[data-paket="musik"]')) {
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.dataset.paket = 'musik';
-  css.href = new URL('../../../css/pakete/musik.css', import.meta.url).href;
-  document.head.appendChild(css);
-}
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladePaketCss('musik'));
 
 let app = null;
 let screen = 'arena';
