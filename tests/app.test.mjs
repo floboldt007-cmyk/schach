@@ -470,7 +470,9 @@ async function testePartie(seite, h, fehler) {
   pruefe('Overlay: Knopf "Zur Analyse"', await seite.locator('.erg-knoepfe [data-ziel="analyse"]').count() === 1);
   // R12-W1: nach einer Niederlage bleibt die Analyse der leuchtende Hauptknopf (Lernen hilft dann mehr)
   pruefe('Niederlage: „Zur Analyse“ bleibt der Hauptknopf', await seite.locator('.erg-knoepfe .knopf.primaer[data-ziel="analyse"]').count() === 1);
-  pruefe('Overlay: Knopf "Nochmal"', await seite.locator('.erg-knoepfe [data-ziel="nochmal"]').count() === 1);
+  // nach der Niederlage heisst der Knopf "Revanche" (Flos Antwort 1, 20.11.2026; tests/r26-antworten-a.test.mjs)
+  const nochmalKnopf = await seite.locator('.erg-knoepfe [data-ziel="nochmal"]').allTextContents();
+  pruefe('Overlay: Knopf "Revanche" (data-ziel nochmal)', nochmalKnopf.length === 1 && nochmalKnopf[0].trim() === 'Revanche', JSON.stringify(nochmalKnopf));
   const liste = await h.gespeichert();
   const p = liste[0] || {};
   pruefe('Partie gespeichert (localStorage)', liste.length === 1 && p.ergebnis === 'niederlage' && p.grund === 'aufgabe', JSON.stringify(p).slice(0, 160));

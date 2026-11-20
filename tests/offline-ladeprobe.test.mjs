@@ -265,18 +265,28 @@ try {
       });
       await ladeBisHeim(s2, START);
       await s2.evaluate(() => {
+        // Flos Antwort 10 (20.11.2026): offline sagt ein ruhiger Toast "Sparmodus" (tests/r26-antworten-a.test.mjs); jeder
+        // Toast wird mit seinem Ton gemerkt, damit der rote Fehler "Schach-Engine startet nicht" auffaellt
         window.__engineHinweis = '';
-        new MutationObserver(() => { const m = document.body.innerText.match(/[^\n]*Schach-Engine[^\n]*/); if (m) window.__engineHinweis = m[0]; })
-          .observe(document.body, { childList: true, subtree: true, characterData: true });
+        window.__engineToasts = [];
+        new MutationObserver(() => {
+          const t = document.querySelector('.toast-ort .toast');
+          if (!t) return;
+          const eintrag = (t.classList.contains('fehler') ? 'fehler: ' : 'info: ') + t.textContent;
+          if (!window.__engineToasts.includes(eintrag)) window.__engineToasts.push(eintrag);
+          if (/Sparmodus/.test(t.textContent)) window.__engineHinweis = eintrag;
+        }).observe(document.body, { childList: true, subtree: true, characterData: true });
         localStorage.removeItem('schach-arena:v1:laufend');
         window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w' });
       });
       const ohneSf = await klappt(s2.waitForFunction((sel) => window.__partie && window.__partie.bereit === true && window.__partie.phase() === 'flo'
         && document.querySelectorAll(sel + ' .brett img.figur').length === 32, SCREEN, { timeout: 40000 }));
       const hinweis = await klappt(s2.waitForFunction(() => !!window.__engineHinweis, null, { timeout: 15000 }));
-      const hinweisText = await s2.evaluate(() => window.__engineHinweis);
-      pruefe(`${tag}: ohne Stockfish im Cache startet die Bot-Partie und sagt, dass die Engine fehlt`,
-        sfWeg > 0 && ohneSf && hinweis && /startet nicht/.test(hinweisText), { sfWeg, ohneSf, hinweis: hinweisText });
+      const { hinweisText, toasts } = await s2.evaluate(() => ({ hinweisText: window.__engineHinweis, toasts: window.__engineToasts.slice() }));
+      pruefe(`${tag}: ohne Stockfish im Cache startet die Bot-Partie und sagt ruhig, dass der Bot im Sparmodus spielt`,
+        sfWeg > 0 && ohneSf && hinweis && hinweisText.startsWith('info: ') && /Sparmodus/.test(hinweisText), { sfWeg, ohneSf, hinweis: hinweisText });
+      pruefe(`${tag}: ohne Stockfish kein roter Fehlerton ("Schach-Engine startet nicht")`,
+        !toasts.some((x) => x.startsWith('fehler: ') || /startet nicht/.test(x)), toasts);
       pruefe(`${tag}: ohne Stockfish scheitert keine andere Anfrage`, s2fremd.length === 0, [...new Set(s2fremd)].slice(0, 5));
       await s2.close();
       // (d) Konsole und Server waehrend offline
