@@ -127,6 +127,7 @@ const SUITEN = [
   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
   { name: 'sheet-knoepfe', datei: 'sheet-knoepfe.test.mjs', args: [], was: 'Blaetter: ein Knopf volle Breite und mittig, zwei Knoepfe wie bisher (Browser)' },
   { name: 'sw-update', datei: 'sw-update.test.mjs', args: [], was: 'SW-Update laedt nur geaenderte Dateien (ETag/304)' },
+  { name: 'offline-ladeprobe', datei: 'offline-ladeprobe.test.mjs', args: [], kommtMit: 'so/R20-offline', was: 'Offline: die App startet ohne Netz aus dem Service Worker (?test&sw, Browser)' },
   { name: 'sw-wechsel', datei: 'sw-wechsel.test.mjs', args: [], was: 'Wechsel des Service Workers: hoechstens einmal neu laden, nie im Spiel' },
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
@@ -234,7 +235,7 @@ const DAUERN = new Map([
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
   ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['bot-grenze', 8],
-  ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24], ['funktion-funken-aufgeben', 45], ['funktion-einstellungen-season', 10],
+  ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24], ['offline-ladeprobe', 28], ['funktion-funken-aufgeben', 45], ['funktion-einstellungen-season', 10],
 ]);
 
 function teile(suiten, anzahl) {
