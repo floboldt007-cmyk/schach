@@ -240,6 +240,14 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
     const stillgelegt = [];
     const taste = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); ende(abbrechen); return; }
+      // Enter oder Leertaste vor dem Fokus im naechsten Bild: den Fokus jetzt setzen und die Taste dort wirken lassen, wie
+      // vor F3 (sonst faellt die erste Taste ins Leere und die zweite trifft den Knopf, Kaltreview c9 Befund 1, Probe F)
+      if ((e.key === 'Enter' || e.key === ' ') && erster && !karte.contains(document.activeElement)) {
+        e.preventDefault();
+        erster.focus({ preventScroll: true });
+        erster.click();
+        return;
+      }
       if (e.key === 'Tab') {
         const k = [...karte.querySelectorAll('button, [tabindex="0"]')].filter((b) => !b.disabled);
         if (!k.length) return;
