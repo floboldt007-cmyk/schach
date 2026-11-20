@@ -73,5 +73,19 @@ for (const [zuege, de, en] of LUECKEN) {
   pruefe(`${zuege}: englisch "${en}"`, anzeige === en, anzeige);
 }
 
+// Quelle genannt (fc-01:30, Nachtrag): CC0 verlangt keine Nennung, die Info-Seite nennt sie trotzdem, wie bei den Raetseln
+const { readFileSync } = await import('node:fs');
+const { t } = await import('../js/sprache.js');
+await import('../js/sprachen/einstellungen.js');
+const ui = readFileSync(new URL('../js/ui/einstellungen.js', import.meta.url), 'utf8');
+pruefe('Info-Seite verlinkt lichess-org/chess-openings', ui.includes('https://github.com/lichess-org/chess-openings'));
+for (const sp of ['de', 'en']) {
+  setzeSprache(sp);
+  const titel = t('einstellungen.info.eroeffnungen');
+  const text = t('einstellungen.info.eroeffnungenText', { link: 'X' });
+  setzeSprache('de');
+  pruefe(`${sp}: Eintrag Eroeffnungsnamen mit CC0`, titel !== 'einstellungen.info.eroeffnungen' && /CC0/.test(text), [titel, text]);
+}
+
 console.log(`${ok}/${ok + fehler} bestanden`);
 process.exit(fehler ? 1 : 0);
