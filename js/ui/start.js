@@ -63,8 +63,9 @@ if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]tes
 function ladeCss() {
   return ladePaketCss('start', { screens: ['start'] });
 }
-// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js)
-await ladeCss();
+// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js); nur mit Paket-Einstieg, ohne ihn geht zeige() still zur
+// Arena und das CSS bleibt weg (tests/start.test.mjs "#start ohne Paket-Einstieg")
+if (D.paketGeladen()) await ladeCss();
 
 // Zusatz (klein) mit Leerzeichen davor: der Name des Knopfs liest sich dann "... Laeufer wertet nicht" (Screenreader);
 // im Flex-Knopf zeichnet das Leerzeichen nichts
@@ -206,6 +207,7 @@ export function zeige(root, params, app) {
     setTimeout(() => { try { app.gehe('arena', {}, { ersetzen: true }); } catch (e) { /* egal */ } }, 0);
     return { verlasse() {} };
   }
+  ladeCss();
   D.markiereGesehen();
   const p = params && typeof params === 'object' ? params : {};
   const rueck = D.nimmRueck();
