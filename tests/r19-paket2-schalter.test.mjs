@@ -109,10 +109,13 @@ if (!process.env.PAKET2_OHNE_BROWSER) {
     ...[...document.querySelectorAll('[aria-label], [title], [placeholder]')].filter((e) => e.getClientRects().length)
       .flatMap((e) => [e.getAttribute('aria-label'), e.getAttribute('title'), e.getAttribute('placeholder')])].filter(Boolean).join('\n'));
   const browser = await browserTyp(pw).launch({ headless: true });
+  const pruefeAlle = pruefe;
   try {
-    for (const sprache of ['de', 'en']) {
+    // jede Sprache auf PC und iPhone 13 (fc-05:20: eine Probe je Haupthandlung auf beiden Geraeten)
+    for (const [g, viewport] of [['PC', { width: 1280, height: 900 }], ['iPhone 13', { width: 390, height: 844 }]]) for (const sprache of ['de', 'en']) {
+      const pruefe = (name, ...r) => pruefeAlle(`${g} ${name}`, ...r);
       const seite = async (zusatz, hash) => {
-        const kontext = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+        const kontext = await browser.newContext({ viewport, serviceWorkers: 'block' });
         const s = await kontext.newPage();
         const server2 = [];
         await s.route('**/*', (r) => {
