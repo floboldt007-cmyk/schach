@@ -237,6 +237,15 @@ const SUITEN = [
   { name: 'r20-effekt-vorschau', datei: 'r20-effekt-vorschau.test.mjs', args: [], was: 'Feinschliff R20: Regal Effekte im Shop, Vorschau einmal auf dem echten Brett an der richtigen Stelle, Standbild bei weniger Bewegung' },
   { name: 'r20-erste-schritte', datei: 'r20-erste-schritte.test.mjs', args: [], was: 'Feinschliff R20: Kurs Erste Schritte fuer Anfaenger (Stufe A): Sterne sammeln mit Umwandlungs-Falle, gut anfangen, Einstieg ueber "Nein", 10 Funken je Aufgabe' },
   { name: 'r25-leistung', datei: 'r25-leistung.test.mjs', args: [], was: 'Feinschliff R25 Leistung: Fokus und Messen beim Oeffnen im naechsten Bild, Pille nach dem Drehen, schnelles Enter oder Leerzeichen im ersten Bild gibt nicht auf (Browser)' },
+  { name: 'online-ende', datei: 'online-ende.test.mjs', args: [], was: 'Funktionsprobe Online-Ende: Revanche, Aufgeben, Remis, Neu laden (Browser)' },
+  { name: 'r25-brett-fokus', datei: 'r25-brett-fokus.test.mjs', args: [], was: 'R25 Tastatur-Fokus auf dem Brett sichtbar, Rahmen und Koordinaten (Browser)' },
+  { name: 'r25-brett-start', datei: 'r25-brett-start.test.mjs', args: [], was: 'R25 Brett beim Start der Partie sofort in voller Groesse (Browser)' },
+  { name: 'r25-coach-kopf-offen', datei: 'r25-coach-kopf-offen.test.mjs', args: [], was: 'R25 Coach-Kopf als Schalter: Tippflaeche zu und offen mindestens 44 px (Browser)' },
+  { name: 'r25-datenschutz-tippflaeche', datei: 'r25-datenschutz-tippflaeche.test.mjs', args: [], was: 'R25 Link Datenschutzerklaerung vor dem Alters-Haken gross genug (Browser)' },
+  { name: 'r25-eroeffnung-index', datei: 'r25-eroeffnung-index.test.mjs', args: [], was: 'R25 F1 Leistung: Eroeffnungs-Index beim Start der Bot-Partie nur einmal' },
+  { name: 'r25-offline-rueckfall', datei: 'r25-offline-rueckfall.test.mjs', args: [], was: 'R25 Offline-Rueckfall: ohne Netz direkt nach einem Update startet die App (Browser)' },
+  { name: 'r25-paket-css', datei: 'r25-paket-css.test.mjs', args: [], was: 'R25 Paket-CSS vor dem Aufbau des Screens geladen (Browser)' },
+  { name: 'r25-zugliste', datei: 'r25-zugliste.test.mjs', args: [], was: 'R25 F4 Leistung: Zugliste nur geaenderte Zeilen neu bauen' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
