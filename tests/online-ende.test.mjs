@@ -194,8 +194,22 @@ async function neuerKontext(uid, viewport) {
 }
 const START = () => `http://127.0.0.1:${PORT}/?test&kern&erw=pakete/online/index`;
 // erst bereit, wenn genau ein Screen steht und das Brett Flaeche hat (wie tests/online-ranked-probe.test.mjs)
-const bereit = s => s.waitForFunction(() => window.__online?.brett() && !window.__online.busy()
-  && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100, null, { timeout: 15000 });
+// und erst, wenn das Brett zwei Bilder lang dieselbe Lage hat: auf dem iPhone steht es beim Erscheinen ein Bild lang mit 280 statt 384 px
+// (gemessen 20.11.2026, Chromium und WebKit, 16 bis 24 ms); ein Tipp genau dann traf das alte Feld und ging verloren
+async function bereit(s) {
+  await s.waitForFunction(() => window.__online?.brett() && !window.__online.busy()
+    && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100, null, { timeout: 15000 });
+  await s.evaluate(() => new Promise((fertig) => {
+    let vorher = null, gleich = 0;
+    const schau = () => {
+      const r = document.querySelector('.on-brett').getBoundingClientRect();
+      const lage = [r.x, r.y, r.width].map(Math.round).join();
+      gleich = lage === vorher ? gleich + 1 : 0; vorher = lage;
+      if (gleich >= 2) fertig(); else requestAnimationFrame(schau);
+    };
+    schau();
+  }));
+}
 const sucheBereit = s => s.waitForFunction(() => ['bereit', 'laufend'].includes(document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand), null, { timeout: 15000 });
 async function tippe(s, uci) {
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
@@ -213,15 +227,22 @@ async function beideSuchen(a, b) {
   return ids[0] && ids[0] === ids[1] ? ids[0] : null;
 }
 const sieht = (s, uci) => s.waitForFunction(u => (window.__online?.partie()?.zuege || '').split(' ').includes(u), uci, { timeout: 10000 }).then(() => true).catch(() => false);
+// Tipps je Zug der letzten spiele()-Runde; jeder Zug muss beim ersten Tipp ankommen (Pruefung im Hauptteil, Kaltreview f2:
+// eine stille Wiederholung verdeckte ein Brett, das Tipps verschluckt). Die Wiederholung unten haelt die Probe nur am Laufen,
+// damit ein verschluckter Tipp als Zahl sichtbar wird statt als Abbruch
+let versuche = [];
 async function spiele(weiss, schwarz, zuege) {
+  versuche = [];
   for (let i = 0; i < zuege.length; i++) {
     const [am, gegen] = i % 2 === 0 ? [weiss, schwarz] : [schwarz, weiss];
-    // ein Tipp gleich nach dem Bildschirmwechsel geht manchmal ins Leere (gemessen 20.11.: Zug 1 nie gesendet); dann noch einmal
-    for (let n = 0; n < 3; n++) {
+    let n = 0;
+    while (n < 3) {
+      n++;
       await bereit(am); await tippe(am, zuege[i]);
       if (await am.waitForFunction(u => (window.__online?.partie()?.zuege || '').split(' ').includes(u), zuege[i], { timeout: 3000 }).then(() => true, () => false)) break;
       await am.evaluate(() => document.activeElement?.blur?.());
     }
+    versuche.push(n);
     if (!(await sieht(gegen, zuege[i]))) {
       const st = await am.evaluate(() => ({ id: window.__online?.partie()?.id, zuege: window.__online?.partie()?.zuege, busy: window.__online?.busy(), screens: document.querySelectorAll('.screen').length,
         dialog: !!document.querySelector('.dialog-ort:not(.weg)'), blatt: !!document.querySelector('.ergebnis-overlay:not([hidden])') }));
@@ -363,6 +384,7 @@ try {
         await schwarz.locator('[data-online="annehmen"]').click({ timeout: 10000 }).catch(() => {});
         await pruefeBlatt(weiss, g, ende, 'anbietend', 'remis', 'remis'); await pruefeBlatt(schwarz, g, ende, 'annehmend', 'remis', 'remis');
       }
+      pruefe(`${g} ${ende}: jeder Zug kommt beim ersten Tipp an`, versuche.every((n) => n === 1), versuche);
       // "Meine Partien" fuehrt zur Online-Seite, die Suche steht wieder bereit
       const zurueck = await Promise.all([a, b].map(async s => {
         await s.locator('.ergebnis-overlay:not([hidden]) [data-online="liste-zurueck"]').click({ timeout: 5000 }).catch(() => {});
