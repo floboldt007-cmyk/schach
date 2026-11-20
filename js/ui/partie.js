@@ -1010,7 +1010,7 @@ export function zeige(root, params, app) {
         <p class="c-text">${esc(t('partie.coach.liveAusText'))}</p>`, 'leer');
       return;
     }
-    coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.dein'))}</span></div>
+    coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf" data-kurz="${esc(t('partie.coach.kurz'))}"><span class="c-klasse">${esc(t('partie.coach.dein'))}</span></div>
       <p class="c-text">${esc(t(z.zuege.length ? 'partie.coach.weiterText' : 'partie.coach.startText'))}</p>`, 'leer');
   }
   // iPad (Flo 01.11.2026 abends: flackert noch): Je Zug wechselte die Coach-Karte zweimal den Inhalt, erst "Coach schaut",
