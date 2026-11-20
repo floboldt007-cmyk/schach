@@ -187,6 +187,20 @@ async function neuerKontext(uid, viewport) {
     localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus' }));
     Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
   }, { s: sitzungVon(uid) });
+  // Lage des Bretts je Bild ab seinem Erscheinen, nur beobachtet (bereit(): Frist und Deckel fuer den Sprung)
+  await k.addInitScript(() => {
+    const uhr = (window.__brettUhr = { el: null, t0: 0, zuletzt: 0, lage: null, lagen: [], gemessen: false });
+    const schau = () => {
+      const b = document.querySelector('.on-brett'), t = performance.now();
+      if (b !== uhr.el) Object.assign(uhr, { el: b, t0: t, zuletzt: t, lage: null, lagen: [], gemessen: false });
+      if (b) {
+        const r = b.getBoundingClientRect(), lage = [r.x, r.y, r.width].map(Math.round).join();
+        if (lage !== uhr.lage) { uhr.lage = lage; uhr.zuletzt = t; uhr.lagen = [...uhr.lagen, `${Math.round(t - uhr.t0)} ms ${lage}`].slice(-6); }
+      }
+      requestAnimationFrame(schau);
+    };
+    requestAnimationFrame(schau);
+  });
   const seite = await k.newPage(); seite.setDefaultTimeout(15000);
   seite.on('pageerror', e => fehler.push(`${uid}: ${e.message}`));
   seite.uid = uid;
@@ -199,17 +213,32 @@ const START = () => `http://127.0.0.1:${PORT}/?test&kern&erw=pakete/online/index
 async function bereit(s) {
   await s.waitForFunction(() => window.__online?.brett() && !window.__online.busy()
     && document.querySelectorAll('.screen').length === 1 && document.querySelector('.on-brett')?.getBoundingClientRect().width > 100, null, { timeout: 15000 });
-  await s.evaluate(() => new Promise((fertig) => {
+  // Frist (Nachpruefung f2, M11): ein Brett, das nie ruhig wird, hielt die Probe ohne Meldung an
+  const sprung = await s.evaluate((frist) => new Promise((fertig, scheitern) => {
     let vorher = null, gleich = 0;
+    const ende = performance.now() + frist, uhr = window.__brettUhr;
     const schau = () => {
       const r = document.querySelector('.on-brett').getBoundingClientRect();
       const lage = [r.x, r.y, r.width].map(Math.round).join();
       gleich = lage === vorher ? gleich + 1 : 0; vorher = lage;
-      if (gleich >= 2) fertig(); else requestAnimationFrame(schau);
+      if (gleich >= 2) {
+        // je Brett einmal: wie lange es vom Erscheinen bis zur letzten Lageaenderung sprang (M13: Warten verdeckte jede Laenge)
+        if (!uhr || uhr.gemessen) { fertig(null); return; }
+        uhr.gemessen = true;
+        fertig({ ms: Math.round(uhr.zuletzt - uhr.t0), lagen: uhr.lagen.join(' / ') });
+      } else if (performance.now() > ende) scheitern(new Error(`Brett nach ${frist / 1000} s nicht ruhig: ${(uhr?.lagen || [lage]).join(' / ')}`));
+      else requestAnimationFrame(schau);
     };
     schau();
-  }));
+  }), RUHE_FRIST_MS);
+  if (sprung) spruenge.push({ wer: s.uid, ...sprung });
 }
+// Ein Brett steht nach dem Erscheinen spaetestens nach einem Bild still. Gemessen 20.11.2026, 16 Bretter je Lauf: auf
+// so/R25-brett-start c3e02f03 0 ms (Chromium und WebKit); davor sprang es bei "Bewegung aus" bis 71 ms (Chromium) bzw.
+// 120 ms (WebKit), 280 -> 384 px
+const RUHE_FRIST_MS = 3000;
+const SPRUNG_DECKEL_MS = 17;
+const spruenge = [];
 const sucheBereit = s => s.waitForFunction(() => ['bereit', 'laufend'].includes(document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand), null, { timeout: 15000 });
 async function tippe(s, uci) {
   for (const f of [uci.slice(0, 2), uci.slice(2, 4)]) {
@@ -404,6 +433,8 @@ try {
     await a.context().close(); await b.context().close();
     for (const erg of ['niederlage', 'remis']) await duellEnde(g, erg);
   }
+  pruefe(`jedes Brett steht nach dem Erscheinen spaetestens nach ${SPRUNG_DECKEL_MS} ms still (gemessen: ${spruenge.map((x) => x.ms).join(', ') || 'keins'})`,
+    spruenge.length > 0 && spruenge.every((x) => x.ms <= SPRUNG_DECKEL_MS), spruenge.filter((x) => x.ms > SPRUNG_DECKEL_MS).slice(0, 3));
   pruefe('keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet: [...new Set(unerwartet)] });
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
 finally {
