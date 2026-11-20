@@ -144,6 +144,7 @@ const SUITEN = [
   { name: 'en-rest', datei: 'en-rest.test.mjs', args: [], kommtMit: 'so/R20-en-rest', exklusiv: 'Browser-Durchgang (iPhone 13 + PC, 32 Seiten)', was: 'Gast mit Sprache EN: keine deutschen Reste, Umlaute, Schluessel, undefined oder abgeschnittenen Zeilen auf Heim, Partie, Ergebnis, Analyse, Zu zweit, Duell, Lektionen, Erste Schritte 1 und 6, Liga, Einstellungen; Premium/Shop nur melden' },
   { name: 'r20-kurs-zurueck', datei: 'r20-kurs-zurueck.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Zurueck im Kurs' },
   { name: 'r20-coach-buch', datei: 'r20-coach-buch.test.mjs', args: [], kommtMit: 'so/R20-coach-buch', was: 'Feinschliff R20 (43): Coach-Buch' },
+  { name: 'r20-buch-luecken', datei: 'r20-buch-luecken.test.mjs', args: [], was: 'Feinschliff R20 (43): 41 bekannte Linien aus lichess im Eroeffnungsbuch, deutsch und englisch benannt' },
   { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
   { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },
