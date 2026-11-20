@@ -2573,7 +2573,8 @@ async function testeSpielFundament(browser) {
       chip: document.querySelector('.ergebnis-overlay .erg-kopf .chip.uebung').textContent, modus: document.querySelector('.ergebnis-overlay .erg-kopf .chip').dataset.modus,
       sterne: document.querySelectorAll('.ergebnis-overlay .erg-stern').length, knopf: document.querySelector('.ergebnis-overlay [data-ziel="ab-hier"]').textContent.trim(),
     }));
-    pruefe('Boss: Ergebnis mit Chip BOSS, ohne Sterne, Knopf "Nochmal"', erg.chip === 'BOSS' && erg.modus === 'boss' && erg.sterne === 0 && erg.knopf === 'Nochmal', JSON.stringify(erg));
+    // nach dem Aufgeben (Niederlage) heisst der Knopf "Revanche" (Flos Antwort 1, 20.11.2026; tests/r26-antworten-a.test.mjs)
+    pruefe('Boss: Ergebnis mit Chip BOSS, ohne Sterne, Knopf "Revanche"', erg.chip === 'BOSS' && erg.modus === 'boss' && erg.sterne === 0 && erg.knopf === 'Revanche', JSON.stringify(erg));
     const d = (await h.gespeichert())[0];
     const sterneNachher = await seite.evaluate(async () => (await import('./js/storage.js')).gesamtSterne());
     pruefe('Boss: Datensatz mit modus, boss und seed; keine Sterne, Fortschritt unverändert', d.modus === 'boss' && d.boss.id === 'test-boss' && d.seed === k.gest.seed
