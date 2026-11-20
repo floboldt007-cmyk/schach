@@ -99,8 +99,12 @@ const startBereit = (s) => s.waitForFunction(() => !!document.querySelector('.sc
 // Wartet auf den Endzustand nach einem Wechsel des Service Workers, statt einmal zu pruefen: die Zielversion steuert
 // die Seite, keine Fassung wartet mehr, nur ihr Cache ist uebrig (activate hat den alten geloescht), und die Seite laedt
 // nicht mehr neu (zweimal hintereinander dieselbe fertig geladene Seite, performance.timeOrigin).
+// Zuletzt gesehene Lage, damit ein Fehlschlag zeigt, woran es hing (CI 44657402343: Runde 2 rot unter Linux-WebKit,
+// nur die Versionsnummer im Detail; lokal 3 von 3 gruen)
+let letzteLage = null;
 async function warteAufVersion(s, version, ms = 60000) {
   const ende = Date.now() + ms;
+  letzteLage = null;
   const soll = JSON.stringify(['schach-arena-v' + version]);
   let zuletzt = null;
   while (Date.now() < ende) {
@@ -110,8 +114,11 @@ async function warteAufVersion(s, version, ms = 60000) {
       const lage = await auswerten(s, async () => {
         const r = await navigator.serviceWorker.getRegistration();
         return { seite: document.readyState === 'complete' ? performance.timeOrigin : null, caches: await caches.keys(),
-          ruhig: !!r && !r.waiting && !r.installing && !!r.active && r.active.state === 'activated' };
+          ruhig: !!r && !r.waiting && !r.installing && !!r.active && r.active.state === 'activated',
+          worker: r ? { installing: r.installing && r.installing.state, waiting: r.waiting && r.waiting.state, active: r.active && r.active.state } : null,
+          controller: !!navigator.serviceWorker.controller };
       });
+      letzteLage = { version: v, ...lage };
       if (v === version && lage.seite && lage.ruhig && JSON.stringify(lage.caches) === soll) jetzt = lage.seite;
     } catch (e) { if (fristAbgelaufen(e)) throw e; /* sonst: die Seite laedt gerade neu */ }
     if (jetzt && jetzt === zuletzt) { await startBereit(s).catch(() => {}); return true; }
@@ -214,7 +221,7 @@ async function main() {
     await s.goto(basis.replace('?test&sw', '?test&sw&swnot=3000')); await startBereit(s);
     const da = await warteAufVersion(s, VERSION + 2);
     schritt('Runde 2: Endzustand pruefen');
-    pruefe(`Runde 2: Version ${VERSION + 2} steuert die Seite, nur ihr Cache bleibt`, da, JSON.stringify(await swVersion(s)));
+    pruefe(`Runde 2: Version ${VERSION + 2} steuert die Seite, nur ihr Cache bleibt`, da, JSON.stringify({ jetzt: await swVersion(s), zuletzt: letzteLage }));
     // Herkunft von js/ui/heim.js, falls die Seite alten Code hat: im Cache der neuen Fassung, ueber den Worker, laut Timing
     const herkunft = () => werte(s, async (v) => {
       const fassungIn = (t) => (t.match(/__swFassung = (\d+)/) || [])[1] || '0';
