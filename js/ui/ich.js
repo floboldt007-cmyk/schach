@@ -207,6 +207,11 @@ function zeigeIch(root, params = {}, app) {
         s.dataset.bereich = '';
         zeichnePlaetze();
         zeigeStand();
+        // Tastatur und VoiceOver (fc-05:45): sheet() gab den Fokus an den Ausloeser zurueck, den zeichnePlaetze() eben ersetzt
+        // hat (oder er stand auf einem anderen Bildschirm, "Zur Sammlung", dann bleibt er im ausblendenden Blatt .weg); dann bekommt
+        // ihn der Platz mit derselben Kennung
+        const f = document.activeElement;
+        if (!f || f === document.body || !f.isConnected || !f.getClientRects().length || f.closest('.weg')) platzOrt.querySelector(`[data-bereich="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
       });
   }
 

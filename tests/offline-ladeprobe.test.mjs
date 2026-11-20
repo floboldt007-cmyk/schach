@@ -118,7 +118,24 @@ try {
       } catch (e) { /* egal */ } // INTENTIONAL-SLOP[F1]: Speicher gesperrt heisst Probe ohne Vorbelegung
     });
     const seitenfehler = [], konsole = [], netz = [];
+    // Zeit je Seitenfehler (gleicher Index) und je vollem Neuladen der Hauptseite: eine Navigationsanfrage der Hauptseite,
+    // dann ihr framenavigated (ein Sprung nur im #-Teil hat keine Anfrage und zaehlt nicht)
+    const seitenfehlerZeit = [], neuladenZeit = [];
     const beobachte = (s) => {
+      // Kaltreview 43 (Mutant D): eine Navigation ohne neues Dokument (204, Abbruch) darf einen spaeteren #-Sprung nicht zum
+      // Neuladen machen. Darum zaehlt framenavigated nur, wenn die offene Anfrage auf genau diese Adresse (ohne #) ging.
+      let navAdresse = null;
+      const ohneRaute = (u) => u.replace(/#.*$/, '');
+      const istNav = (r) => r.isNavigationRequest() && r.frame() === s.mainFrame();
+      s.on('request', (r) => { if (istNav(r)) navAdresse = ohneRaute(r.url()); });
+      s.on('requestfailed', (r) => { if (istNav(r)) navAdresse = null; });
+      s.on('response', (r) => { if (istNav(r.request()) && (r.status() === 204 || r.status() === 205)) navAdresse = null; });
+      s.on('framenavigated', (f) => {
+        if (f !== s.mainFrame()) return;
+        if (navAdresse && navAdresse === ohneRaute(f.url())) neuladenZeit.push(Date.now());
+        navAdresse = null;
+      });
+      s.on('pageerror', () => seitenfehlerZeit.push(Date.now()));
       s.on('pageerror', (e) => seitenfehler.push(`${offline ? 'offline' : 'online'} ${s.url().replace(/^.*#/, '#')}: ${e.message} ${(e.stack || '').split('\n').slice(0, 3).join(' | ')}`));
       s.on('console', (m) => { if (m.type() === 'error') konsole.push({ offline, text: m.text(), url: (m.location() && m.location().url) || '' }); });
       s.on('requestfailed', (r) => { if (offline) netz.push({ url: r.url().replace(/\?.*$/, ''), grund: r.failure() ? r.failure().errorText : '' }); });
@@ -140,6 +157,11 @@ try {
       });
       if (!imCache) throw new Error('ohne fertigen Service Worker ist der Offline-Teil sinnlos');
       pruefe(`${tag}: Startseite liegt im Cache des Service Workers`, imCache);
+      // Gegenprobe (PROBE_KLANG_GEGEN=1): derselbe Wortlaut wie der WebKit-Abbruch, aber ohne folgendes Neuladen -> muss rot sein
+      if (process.env.PROBE_KLANG_GEGEN === '1') {
+        await s.evaluate(() => setTimeout(() => { throw new Error(`Fetch API cannot load ${location.origin}/schach/assets/klang/arcade/brillant.mp3 due to access control checks.`); }, 0));
+        await warte(1500);
+      }
       const wieder = await ladeBisHeim(s, START);
       console.log(`MESSUNG ${tag} erstbesuch_ms=${erst} wiederbesuch_ms=${wieder}`); // INTENTIONAL-SLOP[T4]: Messwerte sind Ausgabe
 
@@ -259,18 +281,24 @@ try {
     // "Fetch API cannot load ...supabase.co... due to access control checks", die Seite selbst sieht keinen ungefangenen
     // Fehler (belegt 20.11.2026 mit Gegenprobe). Darum zaehlen ungefangene Fehler im Fenster immer, diese Rohmeldung nur
     // offline als erwarteter Netzfehler. Ausnahme Klang: js/sounds.js hole() faengt jeden Abruf ab (.catch(() => null)),
-    // WebKit meldet einen abgebrochenen mp3-Abruf trotzdem gelegentlich so, auch mit Netz (f2 1 von 5, hier 1 von 4).
-    // Fehlt eine eigene Datei wirklich, faellt das bei "keine eigene Anfrage scheitert" auf.
+    // WebKit meldet einen mp3-Abruf, den das Neuladen der Seite abbricht, trotzdem so, auch mit Netz. Gemessen 20.11.2026
+    // (f2, 8 Laeufe WebKit unter Last): 55 von 55 Klang-Meldungen lagen 10 bis 60 ms VOR einem vollen Neuladen, keine
+    // ohne; Playwright nannte "Load request cancelled". Darum gilt die Ausnahme nur mit einem Neuladen der Hauptseite
+    // hoechstens KLANG_VOR_MS danach (oder KLANG_NACH_MS davor, falls die Meldung spaeter ankommt); ein Klang-Fehler ohne
+    // Neuladen bleibt rot (Gegenprobe PROBE_KLANG_GEGEN=1).
     await sammleUngefangen(s);
     const ungefangen = UNGEFANGEN.splice(0);
-    const klangAbbruch = (x) => /Fetch API cannot load https?:\/\/127\.0\.0\.1:\d+\/schach\/assets\/klang\/\S+\.mp3 due to access control checks/.test(x);
-    const netzSeitenfehler = (x) => (/^offline /.test(x) && /Fetch API cannot load https:\/\/[a-z0-9]+\.supabase\.co\//.test(x)) || klangAbbruch(x);
+    const klangMeldung = (x) => /Fetch API cannot load https?:\/\/127\.0\.0\.1:\d+\/schach\/assets\/klang\/\S+\.mp3 due to access control checks/.test(x);
+    const KLANG_VOR_MS = 200, KLANG_NACH_MS = 100;
+    const vorNeuladen = (i) => neuladenZeit.some((n) => n - seitenfehlerZeit[i] <= KLANG_VOR_MS && seitenfehlerZeit[i] - n <= KLANG_NACH_MS);
+    const klangAbbruch = (x, i) => klangMeldung(x) && vorNeuladen(i);
+    const netzSeitenfehler = (x, i) => (/^offline /.test(x) && /Fetch API cannot load https:\/\/[a-z0-9]+\.supabase\.co\//.test(x)) || klangAbbruch(x, i);
     // Kaltreview f2 (fc-0330b): jeder Klang-Treffer steht als eigene Zeile im Log, damit eine Haeufung in der CI zaehlbar ist
     // (grep -c "NETZFEHLER .* klang:"); die Ausnahme selbst bleibt auf klang/*.mp3 mit genau dieser WebKit-Meldung begrenzt
-    for (const x of seitenfehler.filter(netzSeitenfehler)) console.log(`NETZFEHLER ${tag} ${klangAbbruch(x) ? 'klang' : 'seitenfehler'}: ${x.slice(0, 160)}`); // INTENTIONAL-SLOP[T4]: Liste fuer den Bericht
+    seitenfehler.forEach((x, i) => { if (netzSeitenfehler(x, i)) console.log(`NETZFEHLER ${tag} ${klangAbbruch(x, i) ? 'klang' : 'seitenfehler'}: ${x.slice(0, 160)}`); }); // INTENTIONAL-SLOP[T4]: Liste fuer den Bericht
     pruefe(`${tag}: keine ungefangenen Fehler in der Seite`, ungefangen.length === 0, ungefangen.slice(0, 5));
-    pruefe(`${tag}: keine Seitenfehler ausser erwarteten Netzfehlern ohne Netz`, seitenfehler.filter((x) => !netzSeitenfehler(x)).length === 0,
-      seitenfehler.filter((x) => !netzSeitenfehler(x)).slice(0, 5));
+    const unerwartet = seitenfehler.filter((x, i) => !netzSeitenfehler(x, i));
+    pruefe(`${tag}: keine Seitenfehler ausser erwarteten Netzfehlern ohne Netz`, unerwartet.length === 0, unerwartet.slice(0, 5));
     await k.close();
   }
 } finally {

@@ -44,11 +44,13 @@ const P = 'schach-arena:v1:';
 const HEUTE = new Date().toISOString().slice(0, 10);
 const PS = '.screen.partie:not(.online-screen)';
 const MATT = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
+// Knopf und freie Partie auf beiden Geraeten (fc-05:20: eine Probe je Haupthandlung auf iPhone 13 und PC)
+const GERAETE = [['iPhone 13', { viewport: { width: 390, height: 844 }, hasTouch: true }], ['PC', { viewport: { width: 1280, height: 800 } }]];
 
 const browser = await pw.chromium.launch();
 const fehler = [];
-async function seite({ sprache = 'de' } = {}) {
-  const k = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+async function seite({ sprache = 'de', geraet = GERAETE[0][1] } = {}) {
+  const k = await browser.newContext(geraet);
   await k.route('**/*', (r) => (new URL(r.request().url()).hostname === '127.0.0.1' ? r.continue() : r.abort()));
   await k.addInitScript((sp) => {
     if (sessionStorage.getItem('vorbelegt')) return; sessionStorage.setItem('vorbelegt', '1');
@@ -77,8 +79,8 @@ const kursKnopf = (s) => s.evaluate(() => { const b = document.querySelector('.e
   return b ? { text: b.textContent.replace(/\s+/g, ' ').trim(), sichtbar: !!(b.offsetWidth && b.offsetHeight) } : null; });
 
 // ---------- Kurs-Partie: Knopf, Wortlaut, Ziel, Sterne sofort ----------
-for (const [sprache, wort] of [['de', 'Zurück zum Kurs'], ['en', 'Back to the course']]) {
-  const { k, s } = await seite({ sprache });
+for (const [g, geraet] of GERAETE) for (const [sprache, wort] of [['de', 'Zurück zum Kurs'], ['en', 'Back to the course']]) {
+  const { k, s } = await seite({ sprache, geraet });
   await s.evaluate(() => window.__app.gehe('lektion', { id: 'es-partie' }));
   await s.waitForSelector('.ls-partie [data-a="partie"]', { timeout: 15000 }).catch(() => {});
   await botPlan(s);
@@ -87,20 +89,20 @@ for (const [sprache, wort] of [['de', 'Zurück zum Kurs'], ['en', 'Back to the c
   const sieg = await ergebnisDa(s);
   await s.waitForTimeout(1500);
   const knopf = await kursKnopf(s);
-  pruefe(`Kurs-Partie (${sprache}): Ergebnisblatt zeigt "${wort}"`, sieg && !!knopf && knopf.sichtbar && knopf.text === wort, { sieg, knopf });
+  pruefe(`${g} Kurs-Partie (${sprache}): Ergebnisblatt zeigt "${wort}"`, sieg && !!knopf && knopf.sichtbar && knopf.text === wort, { sieg, knopf });
   await s.locator('.ergebnis-overlay [data-ziel="kurs"]').click({ timeout: 5000 }).catch(() => {});
   await s.waitForSelector('.ms-lektion[data-id="es-partie"]', { timeout: 10000 }).catch(() => {});
   const ziel = await s.evaluate(() => ({ hash: location.hash, screen: document.querySelector('.screen')?.className || '',
     kurs: !!document.querySelector('.ms-lektion[data-id="es-partie"]'),
     sterne: document.querySelector('.ms-lektion[data-id="es-partie"] .ms-sterne')?.dataset.sterne || '' }));
-  pruefe(`Kurs-Partie (${sprache}): der Knopf fuehrt zur Kurs-Uebersicht, es-partie dort sofort mit 2 Sternen`,
+  pruefe(`${g} Kurs-Partie (${sprache}): der Knopf fuehrt zur Kurs-Uebersicht, es-partie dort sofort mit 2 Sternen`,
     ziel.kurs && /ms-screen/.test(ziel.screen) && ziel.sterne === '2', ziel);
   await k.close();
 }
 
 // ---------- freie Partie gegen denselben Bot, nicht aus dem Kurs: kein Knopf ----------
-{
-  const { k, s } = await seite();
+for (const [g, geraet] of GERAETE) {
+  const { k, s } = await seite({ geraet });
   await s.evaluate(() => window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w', modus: 'frei' }));
   await s.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 }).catch(() => {});
   await botPlan(s);
@@ -108,7 +110,7 @@ for (const [sprache, wort] of [['de', 'Zurück zum Kurs'], ['en', 'Back to the c
   const sieg = await ergebnisDa(s);
   await s.waitForTimeout(1500);
   const knopf = await kursKnopf(s);
-  pruefe('freie Partie ohne Kurs: kein "Zurück zum Kurs"', sieg && knopf === null, { sieg, knopf });
+  pruefe(`${g} freie Partie ohne Kurs: kein "Zurück zum Kurs"`, sieg && knopf === null, { sieg, knopf });
   await k.close();
 }
 
