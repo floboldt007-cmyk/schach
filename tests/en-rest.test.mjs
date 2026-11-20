@@ -20,6 +20,7 @@ const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function ladePlaywright() {
   for (const k of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
+    // INTENTIONAL-SLOP[F1]: Suchreihe wie in sprache.test.mjs; scheitern alle, wirft die Zeile danach
     try { return require(k); } catch (e) { /* naechster */ }
   }
   throw new Error('Playwright nicht gefunden (PLAYWRIGHT_PFAD setzen)');
@@ -85,7 +86,9 @@ async function reste(s) {
     for (const { text, el, attr } of teile) {
       const worte = (text.toLowerCase().match(/\p{L}{4,}/gu) || []).filter((w) => deutsch.has(w));
       const grund = [];
-      if (/[äöüÄÖÜß]/.test(text.replace(new RegExp([...namen].join('|') || '$^', 'giu'), ''))) grund.push('umlaut');
+      // Eigennamen (Bots) duerfen Umlaute tragen; Namen woertlich, Sonderzeichen geschuetzt
+      const namenRe = new RegExp([...namen].map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') || '$^', 'giu');
+      if (/[äöüÄÖÜß]/.test(text.replace(namenRe, ''))) grund.push('umlaut');
       if (worte.length) grund.push('deutsch:' + [...new Set(worte)].slice(0, 4).join(','));
       if (/\bundefined\b|\bNaN\b|\[object |\bnull\b/.test(text)) grund.push('leerwert');
       if (schluessel.has(text) || /^[a-z][a-z0-9-]*(\.[a-zA-Z0-9-]+){1,}$/.test(text)) grund.push('schluessel');
@@ -160,6 +163,7 @@ let browser;
 try {
   const bis = Date.now() + 10000;
   for (;;) {
+    // INTENTIONAL-SLOP[F1]: Server faehrt noch hoch; die Schleife endet nach 10 s mit einem Fehler (bis)
     try { const r = await fetch(`http://127.0.0.1:${PORT}/index.html`); await r.arrayBuffer(); if (r.ok) break; } catch (e) { /* noch nicht */ }
     if (Date.now() > bis) throw new Error('Server startet nicht');
     await warte(150);
@@ -193,6 +197,7 @@ try {
   if (browser) await browser.close();
   server.kill();
 }
+// INTENTIONAL-SLOP[T4]: das ist der Bericht des Tests (wie in allen tests/*.test.mjs)
 for (const m of meldungen) console.log(m);
 for (const f of fehler) console.log(f);
 console.log(`${ok}/${ok + fehler.length} bestanden`);
