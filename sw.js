@@ -878,6 +878,7 @@ const KERN = [
   'js/pakete/liga/wertung.js',
   'js/pakete/liga/kronen.js',
   'js/pakete/liga/gruppe.js',
+  'js/pakete/liga/saison.js',
   'js/pakete/liga/welt.js',
   'css/pakete/funken.css',
   'js/pakete/funken/ansicht.js',
