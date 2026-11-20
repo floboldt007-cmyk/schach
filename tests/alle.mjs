@@ -162,6 +162,7 @@ const SUITEN = [
   { name: 'r25-paket2-grenzen', datei: 'r25-paket2-grenzen.test.mjs', args: [], was: 'Paket 2 unter Extremdaten: Season-Chips der Visitenkarte nie abgeschnitten (Ich, Lobby 320/641 px), kurze Titel einzeilig' },
   { name: 'r26-antworten-b', datei: 'r26-antworten-b.test.mjs', args: [], was: 'Flos Antworten 6-9 (20.11.): Shop-Namen eigen, Google offline gesperrt, iPad quer gefuellt (Handy/PC gleich), Auge nach dem Startfokus' },
   { name: 'r26-antworten-a', datei: 'r26-antworten-a.test.mjs', args: [], was: 'Flos Antworten 20.11.: Revanche nach Niederlage, freie Partie ohne Punktezeile, Lernen ein Hauptknopf, lange Grundmatts als Frage, Engine-Text ohne Internet (DE/EN)' },
+  { name: 'r26-effekte', datei: 'r26-effekte.test.mjs', args: [], was: 'Feinschliff R26 AC-08: drei Zug- und drei Sieg-Effekte und das Klangset Seide, versteckt (nur Labor oder ?probe=effekte), Pegel wie die anderen Sets' },
   { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
   { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },

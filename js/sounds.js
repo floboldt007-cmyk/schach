@@ -257,6 +257,8 @@ export const PAKETE_LABOR = Object.freeze({
   // R19 (werkzeuge/klang-sets-r19.mjs): wie die anderen Labor-Sets nur im Erfinder-Konto, sonst im Shop mit Schloss
   polarlicht: Object.freeze({ name: 'Polarlicht', pfad: 'assets/klang/polarlicht/' }),
   donner: Object.freeze({ name: 'Donner', pfad: 'assets/klang/donner/' }),
+  // R26 AC-08 (werkzeuge/klang-sets-r26.mjs): Seide, weich und trocken; nur im Erfinder-Konto, im Shop nicht ausgelegt
+  seide: Object.freeze({ name: 'Seide', pfad: 'assets/klang/seide/' }),
 });
 const paketVon = (p) => (Object.hasOwn(PAKETE_KLANG, p) ? PAKETE_KLANG[p] : Object.hasOwn(PAKETE_LABOR, p) ? PAKETE_LABOR[p] : null);
 export const KLANGGRUPPEN = Object.freeze(['brett', 'bewertung', 'feier', 'uhr', 'boss', 'finisher', 'bedienung']);

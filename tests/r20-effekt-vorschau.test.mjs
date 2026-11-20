@@ -41,7 +41,8 @@ function pruefe(name, gut, detail = '') {
 }
 
 const VORRAT = JSON.parse(readFileSync(new URL('../assets/shop/vorrat.json', import.meta.url), 'utf8'));
-const EFFEKTE = VORRAT.stuecke.filter((v) => v.art === 'effekt').map((v) => v.id);
+// R26 AC-08: versteckte Effekte (versteckt: true) stehen nicht in der Auslage, sie zaehlen hier nicht (tests/r26-effekte.test.mjs)
+const EFFEKTE = VORRAT.stuecke.filter((v) => v.art === 'effekt' && !v.versteckt).map((v) => v.id);
 const AUSLAGE = JSON.parse(readFileSync(new URL('../assets/shop/auslage.json', import.meta.url), 'utf8'));
 pruefe('Vorrat: 9 Effekte', EFFEKTE.length === 9, EFFEKTE);
 pruefe('Auslage: das Regal Effekte zeigt alle 9 in der Reihenfolge des Vorrats',

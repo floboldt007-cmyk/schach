@@ -240,6 +240,45 @@ const EFFEKTE = [
         const x = 50 + 30 * Math.cos(w), y = 52 + 30 * Math.sin(w), dreh = (w * 180) / Math.PI - 180 + seite * 20, s = (k * 0.12) - 1.9;
         blaetter.push(`<ellipse cx="0" cy="0" rx="3.2" ry="7" transform="translate(${n(x)} ${n(y)}) rotate(${n(dreh)})">${anim('opacity', '0;1;1;0', 2.6, s, ' keyTimes="0;.3;.85;1"')}</ellipse>`); i++; }
       return `<g fill="#E0A800" stroke="#6B4C00" stroke-width="1">${blaetter.join('')}</g><path d="${KRONE_KLEIN}" transform="translate(50 15) scale(1.3)" fill="#FFC233" stroke="#6B4C00" stroke-width="1" stroke-linejoin="round">${anim('opacity', '.6;1;.6', 2.6)}</path>`; } },
+  // R26 AC-08 (Flo 20.11.2026: "Zug- und Schachmatt-Animationen ausbauen, mehr Auswahl"): sechs neue, nur Gold auf dunkler
+  // Kontur wie Lichtsaeule und Kronenregen. versteckt: kein Regal der Auslage nennt sie, nur das Erfinder-Konto oder
+  // ?probe=effekte zeigt sie im Shop (js/pakete/sammlung/shop-entwurf.js, tests/r26-effekte.test.mjs). Flo waehlt aus.
+  { id: 'siegelring', name: 'Siegelring', nameEn: 'Signet Ring', art: 'zug', seltenheit: 'Selten', versteckt: true, text: 'Ein goldener Ring senkt sich wie ein Siegel auf das Zielfeld.',
+    svg: () => `<circle cx="50" cy="50" r="17" fill="#FFC233">${anim('opacity', '0;0;.4;0', 1.1, 0, ' keyTimes="0;.3;.38;1"')}</circle><g fill="none">`
+      + `<circle cx="50" cy="50" r="46" stroke="#E0A800" stroke-width="5.5">${anim('r', '46;17;18', 1.1, 0, ' keyTimes="0;.35;1"')}${anim('opacity', '0;1;0', 1.1, 0, ' keyTimes="0;.3;1"')}</circle>`
+      + `<circle cx="50" cy="50" r="17" stroke="#FFF1C2" stroke-width="2.2">${anim('r', '17;17;44', 1.1, 0, ' keyTimes="0;.35;1"')}${anim('opacity', '0;0;1;0', 1.1, 0, ' keyTimes="0;.33;.4;1"')}</circle></g>`
+      + '<g fill="#FFC233" stroke="#6B4C00" stroke-width=".5">' + [45, 135, 225, 315].map((w) => { const r = (w * Math.PI) / 180;
+        return `<path d="${funkel(50 + 30 * Math.cos(r), 50 + 30 * Math.sin(r), 4.2)}">${anim('opacity', '0;0;1;0', 1.1, 0, ' keyTimes="0;.32;.5;1"')}</path>`; }).join('') + '</g>' },
+  { id: 'goldstaub', name: 'Goldstaub', nameEn: 'Gold Dust', art: 'zug', seltenheit: 'Selten', versteckt: true, text: 'Feiner Goldstaub stiebt auf und sinkt leise ab.',
+    svg: () => `<circle cx="50" cy="50" r="20" fill="#FFC233">${anim('opacity', '0;.35;0;0', 1.3, 0, ' keyTimes="0;.12;.6;1"')}${anim('r', '10;24;24', 1.3, 0, ' keyTimes="0;.4;1"')}</circle>`
+      + '<g stroke="#6B4C00" stroke-width=".5">' + Array.from({ length: 16 }, (_, i) => { const w = (i * 2 * Math.PI) / 16 + 0.2, weit = 24 + (i % 3) * 9;
+      const dx = n(weit * Math.cos(w)), dy = n(weit * Math.sin(w) * 0.8 + 8), g = 2.4 + (i % 3) * 0.8, s = -(i % 4) * 0.05;
+      return `<path d="${raute(50, 50, g, g * 1.5)}" fill="${['#FFC233', '#F3D27A', '#E0A800'][i % 3]}">${bewegt('translate', `0 0;${dx} ${dy}`, 1.3, s)}${anim('opacity', '0;1;1;0', 1.3, s, ' keyTimes="0;.12;.55;1"')}</path>`; }).join('') + '</g>' },
+  { id: 'kronenfunke', name: 'Kronenfunke', nameEn: 'Crown Spark', art: 'zug', seltenheit: 'Episch', versteckt: true, text: 'Ein Goldfunke blitzt auf dem Zielfeld, feine Strahlen laufen aus.',
+    svg: () => '<g stroke="#FFC233" stroke-width="2.4" stroke-linecap="round">' + Array.from({ length: 8 }, (_, i) => { const w = (i * Math.PI) / 4 + Math.PI / 8;
+      const [c, s] = [Math.cos(w), Math.sin(w)];
+      return `<line x1="${n(50 + 9 * c)}" y1="${n(50 + 9 * s)}" x2="${n(50 + 46 * c)}" y2="${n(50 + 46 * s)}">${anim('opacity', '0;1;0', 0.9, 0, ' keyTimes="0;.25;1"')}${anim('stroke-width', '3.4;.4', 0.9)}</line>`; }).join('') + '</g>'
+      + `<g transform="translate(50 50)"><g>${bewegt('scale', '0;1.25;0', 0.9)}${bewegt('rotate', '0;45', 0.9, 0, true)}<path d="${funkel(0, 0, 24)}" fill="#FFF1C2" stroke="#8A6100" stroke-width="1.2"/><path d="${funkel(0, 0, 11)}" fill="#FFC233" transform="rotate(45)"/></g></g>` },
+  { id: 'strahlenkranz', name: 'Strahlenkranz', nameEn: 'Golden Halo', art: 'sieg', seltenheit: 'Episch', versteckt: true, text: 'Goldene Strahlen drehen sich langsam um die Mitte des Bretts.',
+    svg: () => '<defs><radialGradient id="g"><stop offset="0" stop-color="#FFE9A8" stop-opacity=".75"/><stop offset=".5" stop-color="#FFC233" stop-opacity=".22"/><stop offset="1" stop-color="#FFC233" stop-opacity="0"/></radialGradient>'
+      + '<linearGradient id="r" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFC233" stop-opacity=".85"/><stop offset="1" stop-color="#FFC233" stop-opacity="0"/></linearGradient></defs>'
+      + `<circle cx="50" cy="50" r="34" fill="url(#g)">${anim('r', '8;34;30', 2.4, 0, ' keyTimes="0;.3;1"')}${anim('opacity', '0;1;1;0', 2.4, 0, ' keyTimes="0;.2;.8;1"')}</circle>`
+      + `<g>${bewegt('rotate', '0 50 50;30 50 50', 2.4)}${anim('opacity', '0;1;1;0', 2.4, 0, ' keyTimes="0;.25;.8;1"')}` + Array.from({ length: 12 }, (_, i) => `<path d="M48.6 40L50 4L51.4 40z" fill="url(#r)" transform="rotate(${i * 30} 50 50)"/>`).join('') + '</g>'
+      + '<g fill="#FFC233" stroke="#8A6100" stroke-width=".5">' + [[30, 30, -0.3], [72, 36, -0.9], [36, 72, -1.5]].map(([x, y, s]) => `<path d="${funkel(x, y, 2.8)}">${anim('opacity', '0;1;0', 1.2, s)}</path>`).join('') + '</g>' },
+  { id: 'kroenungsglanz', name: 'Krönungsglanz', nameEn: 'Coronation Glow', art: 'sieg', seltenheit: 'Episch', versteckt: true, text: 'Eine grosse Krone senkt sich auf die Mitte, ein Lichtring breitet sich aus.',
+    svg: () => `<ellipse cx="50" cy="58" rx="10" ry="3" fill="none" stroke="#FFC233" stroke-width="1.6">${anim('rx', '10;10;44', 2.2, 0, ' keyTimes="0;.45;1"')}${anim('ry', '3;3;12', 2.2, 0, ' keyTimes="0;.45;1"')}${anim('opacity', '0;0;1;0', 2.2, 0, ' keyTimes="0;.42;.5;1"')}</ellipse>`
+      + `<g>${bewegt('translate', '0 -46;0 0;0 0', 2.2, 0)}${anim('opacity', '0;1;1;0', 2.2, 0, ' keyTimes="0;.2;.85;1"')}`
+      + `<path d="${KRONE}" transform="translate(50 46) scale(.9) translate(-50 -36)" fill="#FFC233" stroke="#6B4C00" stroke-width="1.6" stroke-linejoin="round"/>`
+      + '<path d="M31 46h38" transform="translate(50 46) scale(.9) translate(-50 -36)" stroke="#FFF1C2" stroke-width="1.2" opacity=".8"/>'
+      + '<g fill="#FFF1C2" stroke="#6B4C00" stroke-width=".6">' + SPITZEN.map(([x, y]) => `<circle cx="${n(50 + (x - 50) * 0.9)}" cy="${n(46 + (y - 36) * 0.9)}" r="1.8"/>`).join('') + '</g></g>'
+      + '<g fill="#FFC233" stroke="#8A6100" stroke-width=".5">' + [[28, 40, 1.05], [72, 44, 1.2], [50, 22, 1.35]].map(([x, y, b]) => `<path d="${funkel(x, y, 3)}" opacity="0">${anim('opacity', '0;0;1;0', 2.2, 0, ` keyTimes="0;${n(b / 2.2)};${n((b + 0.25) / 2.2)};1"`)}</path>`).join('') + '</g>' },
+  { id: 'meistersiegel', name: 'Meistersiegel', nameEn: 'Master Seal', art: 'sieg', seltenheit: 'Exklusiv', versteckt: true, text: 'Sonder-Effekt: ein goldenes Siegel mit Krone praegt sich in die Mitte, eine Welle laeuft aus.',
+    svg: () => '<defs><radialGradient id="m" cx=".4" cy=".35"><stop offset="0" stop-color="#FFE9A8"/><stop offset=".6" stop-color="#E0A800"/><stop offset="1" stop-color="#8A6100"/></radialGradient></defs>'
+      + `<circle cx="50" cy="50" r="17" fill="none" stroke="#FFC233" stroke-width="2">${anim('r', '17;17;46', 2.2, 0, ' keyTimes="0;.3;1"')}${anim('opacity', '0;0;.9;0', 2.2, 0, ' keyTimes="0;.28;.34;1"')}${anim('stroke-width', '2;2;.4', 2.2, 0, ' keyTimes="0;.3;1"')}</circle>`
+      + `<g transform="translate(50 50)"><g>${bewegt('scale', '1.9;1;1.04;1', 2.2, 0)}${anim('opacity', '0;1;1;0', 2.2, 0, ' keyTimes="0;.2;.85;1"')}`
+      + '<path d="M-9 12L-14 30L-8 26L-4 31L-1 14z" fill="#8A1F2B" stroke="#4A0E15" stroke-width=".8"/><path d="M9 12L14 30L8 26L4 31L1 14z" fill="#8A1F2B" stroke="#4A0E15" stroke-width=".8"/>'
+      + '<circle r="17" fill="url(#m)" stroke="#6B4C00" stroke-width="1.4"/><circle r="13.5" fill="none" stroke="#6B4C00" stroke-width=".7" stroke-dasharray="1.2 1.6"/>'
+      + `<path d="${KRONE_KLEIN}" transform="scale(1.35)" fill="#FFF1C2" stroke="#6B4C00" stroke-width=".8" stroke-linejoin="round"/></g></g>` },
 ];
 const effektSvg = (e) => `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">${e.svg()}</svg>`;
 
@@ -266,7 +305,8 @@ for (const b of BRETTER) {
 for (const e of EFFEKTE) {
   const rel = `assets/shop/effekte/${e.id}.svg`;
   groessen.push([rel, schreibe(rel, effektSvg(e))]);
-  stuecke.push({ id: e.id, art: 'effekt', anlass: e.art, name: e.name, name_en: e.nameEn, seltenheit: e.seltenheit, text: e.text, datei: rel });
+  stuecke.push({ id: e.id, art: 'effekt', anlass: e.art, name: e.name, name_en: e.nameEn, seltenheit: e.seltenheit, text: e.text, datei: rel,
+    ...(e.versteckt ? { versteckt: true } : {}) });
 }
 const vorrat = {
   stand: '2026-11-18',
@@ -288,7 +328,7 @@ const vorschau = (s) => {
 };
 const ART = { figuren: 'Figuren-Set', brett: 'Brett', effekt: 'Effekt' };
 const karte = (s) => `<article class="karte s-${s.seltenheit === 'Häufig' ? 'haeufig' : s.seltenheit.toLowerCase()}"><header><b>${esc(s.name)}</b><span class="stufe">${s.seltenheit}</span></header>`
-  + `<p>${ART[s.art]}${s.anlass ? (s.anlass === 'sieg' ? ' · Sieg' : ' · Zug') : ''} · ${esc(s.text)}</p><div class="gruende"><div class="hell">${vorschau(s)}</div><div class="dunkel">${vorschau(s)}</div></div></article>`;
+  + `<p>${ART[s.art]}${s.anlass ? (s.anlass === 'sieg' ? ' · Sieg' : ' · Zug') : ''}${s.versteckt ? ' · versteckt (Auswahl)' : ''} · ${esc(s.text)}</p><div class="gruende"><div class="hell">${vorschau(s)}</div><div class="dunkel">${vorschau(s)}</div></div></article>`;
 const zaehl = (st) => stuecke.filter((s) => s.seltenheit === st).length;
 const html = `<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

@@ -21,7 +21,7 @@
 //                   Felder und Koordinaten setzt brettFlaeche als Stylesheet am Sockel (.brett-rahmen)
 //   BRETT_FAMILIEN  die sechs Familien in Reihenfolge; FREIE_BRETTER_PLAN dieselben Angaben fuer Nacht, Gruen, Holz
 //   LABOR_FIGUREN   ['kuerbis', ...]          Saetze unter assets/pieces/<id>/ (werkzeuge/figuren-3d.mjs, figuren-stile.mjs)
-//   LABOR_KLAENGE   ['juwel', 'grusel', 'kristall', 'polarlicht', 'donner']  Klangsets unter assets/klang/<id>/
+//   LABOR_KLAENGE   ['juwel', 'grusel', 'kristall', 'polarlicht', 'donner', 'seide']  Klangsets unter assets/klang/<id>/
 //                   (werkzeuge/klang-juwel.mjs, werkzeuge/labor-klaenge.mjs, werkzeuge/klang-sets-r19.mjs, js/sounds.js)
 //   istLabor(art, id) -> boolean               art 'brett' | 'figuren' | 'klang'
 //   laborFrei() -> boolean                     nur der Erfinder
@@ -156,7 +156,7 @@ export const MOTIV_BRETTER = Object.freeze([
 // ganz vorn Gold und Elfenbein (Flos Wahl R19 14.11.2026): cburnett-Form mit Material
 export const LABOR_FIGUREN = Object.freeze(['goldelfenbein', 'drachen', 'zombies', 'geister', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos', 'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'moosgeister', 'tiefsee', 'elfenbein',
   'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'pixel', 'geo']);
-export const LABOR_KLAENGE = Object.freeze(['juwel', 'grusel', 'kristall', 'polarlicht', 'donner']);
+export const LABOR_KLAENGE = Object.freeze(['juwel', 'grusel', 'kristall', 'polarlicht', 'donner', 'seide']);
 
 export function istLabor(art, id) {
   if (art === 'brett') return LABOR_BRETTER.some((b) => b.id === id) || MOTIV_BRETTER.some((b) => b.id === id);

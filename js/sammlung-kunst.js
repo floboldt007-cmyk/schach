@@ -107,6 +107,16 @@ const KLANG = {
       + [[12, 3.4, 0.85], [20, 2.6, 0.5]].map(([r, ws, o], i) => `<path class="rk rk-atmen" style="animation-delay:${(i * 0.35).toFixed(2)}s" d="M${88 + i * 2} ${80 - r * 0.7}a${r} ${r} 0 0 1 0 ${(r * 1.4).toFixed(1)}" fill="none" stroke="#F2BE4A" stroke-width="${ws}" stroke-linecap="round" opacity="${o}"/>`).join('')
       + funke(26, 84, 0.8, 0.4, '#FFE08A') + funke(94, 30, 0.7, 1.0, '#FFF1C1');
   },
+  // R26 AC-08 (Labor, im Shop nicht ausgelegt): Seide, ein weiches goldenes Band ueber dunklem Grund mit einer Note
+  seide: () => {
+    const g = id('sd');
+    return `<defs>${verlauf(g, ['#FFF1C1', '#F2BE4A', '#B07A1E'], 0, 1)}</defs>`
+      + '<circle cx="60" cy="60" r="48" fill="#15121C"/><circle cx="60" cy="60" r="48" fill="none" stroke="#F2BE4A" stroke-width="2.4"/>'
+      + `<path class="rk rk-atmen" d="M18 70C34 50 46 78 62 62s28-22 42-10" fill="none" stroke="url(#${g})" stroke-width="9" stroke-linecap="round" opacity=".9"/>`
+      + `<path d="M22 82C38 66 50 88 64 74s26-16 36-8" fill="none" stroke="url(#${g})" stroke-width="3.4" stroke-linecap="round" opacity=".5"/>`
+      + '<path d="M58 30v24a6 5 0 1 1-3-4.4V34l14-4v6l-11 3z" fill="#FFF1C1" stroke="#9C6B12" stroke-width="1.2" stroke-linejoin="round"/>'
+      + funke(84, 32, 0.7, 0.3, '#FFF1C1') + funke(30, 40, 0.5, 1.1, '#FFE08A');
+  },
 };
 
 export function klangKunst(kid) {

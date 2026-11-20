@@ -153,7 +153,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   funkenlinie: false,    // Funkenlinie am Brett waehrend der Partie
   lebensleiste: true,    // Boss-Partien: Lebensleiste statt Bewertungsbalken
   // Premium-Umbau (PLAN 4): Klang
-  klangpaket: '',        // '' (Standard der Ansicht, modern: Arcade, D6) | 'holz' | 'arcade' | Labor: 'grusel' | 'kristall' | 'juwel' | 'polarlicht' | 'donner'
+  klangpaket: '',        // '' (Standard der Ansicht, modern: Arcade, D6) | 'holz' | 'arcade' | Labor: 'grusel' | 'kristall' | 'juwel' | 'polarlicht' | 'donner' | 'seide'
   lautstaerke: 0.8,      // 0..1 in Schritten von 0,05 (Master = Wert hoch 2)
   musik: false,          // ruhige Menue-Musik (bewusst standardmaessig aus)
   musikLautstaerke: 0.35,// getrennt von Zugklaengen
@@ -201,7 +201,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
     // 20 Motiv-Bretter Fassung 4 (Flo 14.11.2026), Katalog js/labor.js MOTIV_BRETTER
     'kirchenfenster', 'seekarte', 'sternbilder', 'intarsie', 'orientteppich', 'goldthron', 'honigwabe', 'marmorsaal', 'jadepalast', 'eiskristall',
     'lavafeld', 'urwald', 'zahnwerk', 'papyrus', 'kirschgarten', 'art-deco', 'unterwasser', 'galaxie', 'mosaik', 'buchleder']),
-  klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall', 'juwel', 'polarlicht', 'donner']),
+  klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall', 'juwel', 'polarlicht', 'donner', 'seide']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
   zugBestaetigen: Object.freeze(['aus', 'ohneUhr', 'immer']),

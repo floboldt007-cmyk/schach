@@ -25,6 +25,12 @@ Schloss): mit `werkzeuge/klang-sets-r19.mjs` aus den selbst synthetisierten Juwe
 höher mit Oktav-Schimmer und hellem Hall, Donner eine Quarte tiefer mit tiefem Rumms und dunklem Hall), ohne Aufnahme und ohne
 fremdes Material. Ebenfalls eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena.
 
+**Labor-Klangset „Seide“** (`seide/`, 40 Dateien, nur im Erfinder-Konto, im Shop nicht ausgelegt): mit
+`werkzeuge/klang-sets-r26.mjs` selbst synthetisiert. Zug, Schlagen, Rochade, Schach und Sieg sind neu gebaut (runder Holz-Tock,
+Marimba-Töne, warmer Dreiklang), die übrigen Klänge aus den selbst synthetisierten Juwel-Klängen abgeleitet (eine kleine Terz
+tiefer, Tiefpass, weniger Hall), ohne Aufnahme und ohne fremdes Material. Ebenfalls eigene Werke von Flo, alle Rechte
+vorbehalten, Nutzung nur in der Schach-Arena.
+
 Es steckt keine fremde Aufnahme, kein Sample und kein Klang aus einer anderen App darin (weder chess.com
 noch lichess noch eine Klangbibliothek). Rechte Dritter an den Klängen gibt es deshalb nicht.
 

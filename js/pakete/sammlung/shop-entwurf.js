@@ -24,6 +24,7 @@ import { figurenPfad } from '../../figurensatz.js';
 import { sheet } from '../../ui/bauteile.js';
 import { t, sprache } from '../../sprache.js';
 import { PAKETE_KLANG, PAKETE_LABOR, klang } from '../../sounds.js';
+import { laborFrei } from '../../labor.js';
 import { klangKunst, finisherKunst } from '../../sammlung-kunst.js';
 import { emoteSvg } from '../../emote-kunst.js';
 import { icon } from '../../ui/icons.js';
@@ -49,7 +50,7 @@ const ladeJson = (pfad, leer) => fetch(pfad).then((r) => (r.ok ? r.json() : leer
 const vorratName = (v) => (sprache() === 'en' && v.name_en) || v.name;
 
 // Ein Eintrag der Auslage als Stueck, oder null, wenn die Id fuer diese Art nicht im Bestand ist
-function stueck(art, eintrag, { vorrat, katalog, editionen, gast, produktName }) {
+function stueck(art, eintrag, { vorrat, katalog, editionen, gast, produktName, probe }) {
   const id = eintrag && typeof eintrag.id === 'string' ? eintrag.id : null;
   if (!id) return null;
   const ausVorrat = (vArt) => (vorrat.stuecke || []).find((v) => v.id === id && v.art === vArt);
@@ -79,6 +80,8 @@ function stueck(art, eintrag, { vorrat, katalog, editionen, gast, produktName })
   }
   if (art === 'effekt') {
     const v = ausVorrat('effekt');
+    // versteckte Stuecke (R26 AC-08) nur auf dem Probe-Weg, auch wenn ein Eintrag in der Auslage sie nennt
+    if (v && v.versteckt && !probe) return null;
     return v ? { id, art, name: vorratName(v), seltenheit: schluessel(v.seltenheit), unter: S('entwurf.art.effekt'), datei: v.datei, anlass: v.anlass } : null;
   }
   // "Signatur" ist Flos Erfinder-Stueck (Nr. 0, 1 von 1) und wird nie verkauft
@@ -213,6 +216,10 @@ async function vorschau(s, { bereich }) {
 }
 
 const REGALE = ['emote', 'finisher', 'klang', 'effekt'];
+// Probe-Weg fuer versteckte Stuecke: das Erfinder-Konto (Labor) oder ?probe=effekte in der Adresse; Kauf und Preis gibt es dort nicht
+function probeWeg() {
+  try { return laborFrei() || new URLSearchParams(location.search).get('probe') === 'effekte'; } catch (e) { return false; }
+}
 function regal(art, eintraege, platzId, kontext, wahl) {
   const stuecke = (Array.isArray(eintraege) ? eintraege : []).filter((e) => e && e.id !== platzId)
     .map((e) => stueck(art, e, kontext)).filter(Boolean);
@@ -239,9 +246,14 @@ export async function shopEntwurf({ stil, editionen = [], gast = false, katalog 
   wurzel.dataset.shopStil = stil;
   const schaufenster = document.createElement('div');
   schaufenster.className = 'shf-plaetze';
-  const kontext = { vorrat, katalog, editionen, gast, produktName };
+  const kontext = { vorrat, katalog, editionen, gast, produktName, probe: probeWeg() };
   schaufenster.append(...ARTEN.map((art) => karte(art, stueck(art, plaetze.find((p) => p && p.art === art), kontext), wahl)));
-  const regale = auslage && typeof auslage.regale === 'object' && auslage.regale ? auslage.regale : {};
+  const regale = { ...(auslage && typeof auslage.regale === 'object' && auslage.regale ? auslage.regale : {}) };
+  // R26 AC-08: versteckte Effekte stehen in keiner Auslage; der Probe-Weg haengt sie hinten an das Effekt-Regal
+  if (kontext.probe) {
+    const versteckt = (vorrat.stuecke || []).filter((v) => v && v.versteckt && v.art === 'effekt').map((v) => ({ id: v.id }));
+    regale.effekt = [...(Array.isArray(regale.effekt) ? regale.effekt : []), ...versteckt];
+  }
   wurzel.append(schaufenster, ...REGALE.map((art) => regal(art, regale[art], plaetze.find((p) => p && p.art === art)?.id, kontext, wahl)).filter(Boolean));
   await Promise.all([...wurzel.querySelectorAll('.shf-rk[data-art="effekt"]')].map(async (k) => {
     const svg = await effektStandbild(k.dataset.datei);

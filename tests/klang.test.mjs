@@ -220,7 +220,8 @@ async function testeNode() {
   // Labor-Klangsets (nur Erfinder, js/labor.js; werkzeuge/labor-klaenge.mjs aus Holz): dieselben Namen, gueltige MP3, klein
   gruppe = 'Labor-Klaenge';
   // R19 emotes-finisher: Polarlicht und Donner kommen als Labor-Sets dazu (werkzeuge/klang-sets-r19.mjs)
-  pruefe('PAKETE_LABOR: Grusel, Kristall, Juwel, Polarlicht und Donner, Ordner unter assets/klang/', JSON.stringify(Object.keys(PAKETE_LABOR)) === '["grusel","kristall","juwel","polarlicht","donner"]'
+  // R26 AC-08: Seide kommt dazu (werkzeuge/klang-sets-r26.mjs, tests/r26-effekte.test.mjs)
+  pruefe('PAKETE_LABOR: Grusel, Kristall, Juwel, Polarlicht, Donner und Seide, Ordner unter assets/klang/', JSON.stringify(Object.keys(PAKETE_LABOR)) === '["grusel","kristall","juwel","polarlicht","donner","seide"]'
     && Object.keys(PAKETE_LABOR).every((p) => PAKETE_LABOR[p].pfad === `assets/klang/${p}/`));
   for (const p of Object.keys(PAKETE_LABOR)) {
     const ordner = path.join(WURZEL, PAKETE_LABOR[p].pfad);

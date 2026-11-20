@@ -276,6 +276,72 @@
       "seltenheit": "Exklusiv",
       "text": "Sonder-Effekt: ein Lorbeerkranz waechst Blatt fuer Blatt, oben die Krone.",
       "datei": "assets/shop/effekte/goldkranz.svg"
+    },
+    {
+      "id": "siegelring",
+      "art": "effekt",
+      "anlass": "zug",
+      "name": "Siegelring",
+      "name_en": "Signet Ring",
+      "seltenheit": "Selten",
+      "text": "Ein goldener Ring senkt sich wie ein Siegel auf das Zielfeld.",
+      "datei": "assets/shop/effekte/siegelring.svg",
+      "versteckt": true
+    },
+    {
+      "id": "goldstaub",
+      "art": "effekt",
+      "anlass": "zug",
+      "name": "Goldstaub",
+      "name_en": "Gold Dust",
+      "seltenheit": "Selten",
+      "text": "Feiner Goldstaub stiebt auf und sinkt leise ab.",
+      "datei": "assets/shop/effekte/goldstaub.svg",
+      "versteckt": true
+    },
+    {
+      "id": "kronenfunke",
+      "art": "effekt",
+      "anlass": "zug",
+      "name": "Kronenfunke",
+      "name_en": "Crown Spark",
+      "seltenheit": "Episch",
+      "text": "Ein Goldfunke blitzt auf dem Zielfeld, feine Strahlen laufen aus.",
+      "datei": "assets/shop/effekte/kronenfunke.svg",
+      "versteckt": true
+    },
+    {
+      "id": "strahlenkranz",
+      "art": "effekt",
+      "anlass": "sieg",
+      "name": "Strahlenkranz",
+      "name_en": "Golden Halo",
+      "seltenheit": "Episch",
+      "text": "Goldene Strahlen drehen sich langsam um die Mitte des Bretts.",
+      "datei": "assets/shop/effekte/strahlenkranz.svg",
+      "versteckt": true
+    },
+    {
+      "id": "kroenungsglanz",
+      "art": "effekt",
+      "anlass": "sieg",
+      "name": "Krönungsglanz",
+      "name_en": "Coronation Glow",
+      "seltenheit": "Episch",
+      "text": "Eine grosse Krone senkt sich auf die Mitte, ein Lichtring breitet sich aus.",
+      "datei": "assets/shop/effekte/kroenungsglanz.svg",
+      "versteckt": true
+    },
+    {
+      "id": "meistersiegel",
+      "art": "effekt",
+      "anlass": "sieg",
+      "name": "Meistersiegel",
+      "name_en": "Master Seal",
+      "seltenheit": "Exklusiv",
+      "text": "Sonder-Effekt: ein goldenes Siegel mit Krone praegt sich in die Mitte, eine Welle laeuft aus.",
+      "datei": "assets/shop/effekte/meistersiegel.svg",
+      "versteckt": true
     }
   ]
 }
