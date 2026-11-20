@@ -43,6 +43,10 @@ const BODEN_STREUUNG = 0.10;
 const BODEN_STREUUNG_AB = 400;
 // Wer danach immer noch klar gewinnt (ab +5), bekommt hoechstens "ungenau"
 const BODEN_GEWONNEN_CP = 500;
+// Spiegelbildlich (Flos JA 20.11.2026, R20-Kritik/coach-qualitaet): wer vorher schon klar verloren stand (ab -5), bekommt
+// aus der Untergrenze hoechstens "ungenau". Dort schwanken die Zahlen mit der Suchtiefe so stark, dass 12 % der Zuege nur
+// eine von zwei Tiefen "schwer" nannte. Die Gewinnchance und die Matt-Regeln gelten weiter.
+const BODEN_VERLOREN_CP = -500;
 // So viel Gewinnchance zaehlt ein angehobener Zug mindestens (fuer Genauigkeit und Kartei)
 const BODEN_VERLUST = { ungenau: GRENZEN.gut + 0.01, fehler: GRENZEN.ungenau + 0.01, patzer: GRENZEN.fehler + 0.01 };
 
@@ -663,7 +667,7 @@ function untergrenze(d) {
   const streuung = BODEN_STREUUNG * Math.max(0, Math.abs(v) - BODEN_STREUUNG_AB);
   if (minus < BODEN_CP.fehler + streuung) return null;
   const notiz = `Bewertung −${(minus / 100).toFixed(1).replace('.', ',')}`;
-  if (n >= BODEN_GEWONNEN_CP) return { klasse: 'ungenau', notiz };
+  if (n >= BODEN_GEWONNEN_CP || v <= BODEN_VERLOREN_CP) return { klasse: 'ungenau', notiz };
   return { klasse: minus >= BODEN_CP.patzer + streuung ? 'patzer' : 'fehler', notiz };
 }
 
