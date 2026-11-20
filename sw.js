@@ -1177,6 +1177,16 @@ function ohneFrische(antwort, inhalt = antwort.body) {
   return new Response(inhalt, { status: antwort.status, statusText: antwort.statusText, headers: kopf });
 }
 
+// Treffer in einem aelteren Cache dieser App (neueste zuerst), ohne einen Cache anzulegen (caches.match mit cacheName)
+async function aeltererTreffer(req, navigation) {
+  const namen = (await caches.keys()).filter((n) => n.startsWith(PRAEFIX) && nummer(n) < VERSION).sort((a, b) => nummer(b) - nummer(a));
+  for (const n of namen) {
+    const t = await caches.match(req, { cacheName: n, ignoreSearch: navigation });
+    if (t) return t;
+  }
+  return null;
+}
+
 async function antworte(req, url) {
   // Nie caches.open vor dem Treffer: das legt einen fehlenden Cache an. Bis clients.claim() der neuen Fassung beantwortet
   // die alte noch Anfragen, ihr Cache ist da aber schon geloescht und kaeme so wieder (tests/sw-cache.test.mjs, CI 09.11.2026).
@@ -1187,7 +1197,16 @@ async function antworte(req, url) {
     : await caches.match(req, { cacheName: CACHE, ignoreSearch: navigation });
   if (treffer) return treffer;
   // nicht im Cache: aus dem Netz holen und fuer das naechste Mal ablegen, aber nur, solange der eigene Cache noch besteht
-  const antwort = await fetch(req);
+  let antwort;
+  try {
+    antwort = await fetch(req);
+  } catch (f) {
+    // Ohne Netz nach einem Update (Kaltreview fc-08:50, 20.11.2026): bis nachladen() fertig ist, fehlt dem eigenen Cache
+    // alles ausser dem Kern. Der aeltere Cache, den activate dafuer behaelt, hat es noch; eine alte Datei ist besser als keine.
+    const alt = komplett ? null : await aeltererTreffer(req, navigation);
+    if (alt) return alt;
+    throw f;
+  }
   if (antwort.status === 200 && antwort.type === 'basic') {
     const kopie = antwort.clone();
     caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, ohneFrische(kopie)))

@@ -162,6 +162,30 @@ async function lage() {
     (await caches.keys()).join(', '));
 }
 
+// 6) Update mit Luecken, dann ohne Netz (Kaltreview fc-08:50, 20.11.2026): eine Datei, die der neue Cache noch nicht hat,
+// kommt aus dem von activate behaltenen alten Cache statt als Netzfehler; der alte Cache wird dabei nicht neu angelegt
+{
+  const caches = new CacheStorage();
+  const altCache = await caches.open(alt);
+  for (const d of DATEIEN) await altCache.put(ORT + d, new Response('// alt ' + d));
+  const neuCache = await caches.open(neu);
+  for (const d of KERN) await neuCache.put(ORT + d, new Response('// neu ' + d));
+  const ohneNetz = async () => { throw new TypeError('Failed to fetch'); };
+  const n = worker(VERSION + 1, caches, ohneNetz);
+  await n.ereignis('activate');
+  const rest = DATEIEN.find((d) => !KERN.includes(d));
+  let antwort = null, fehlerText = '';
+  try { antwort = await n.ereignis('fetch', anfrage(rest)); } catch (e) { fehlerText = e.message; }
+  pruefe('ohne Netz nach einem Update: eine Datei ausserhalb des Kerns kommt aus dem behaltenen alten Cache',
+    !!antwort && (await antwort.text()) === '// alt ' + rest, fehlerText || rest);
+  const kern = await n.ereignis('fetch', anfrage(KERN.find((d) => d !== 'index.html')));
+  pruefe('ohne Netz nach einem Update: eine Kern-Datei kommt weiter aus dem neuen Cache', !!kern && /^\/\/ neu /.test(await kern.text()));
+  let weg = '';
+  try { await n.ereignis('fetch', anfrage('js/gibt-es-nirgends.js')); } catch (e) { weg = e.message; }
+  pruefe('ohne Netz: eine Datei, die kein Cache hat, bleibt ein Netzfehler', weg === 'Failed to fetch', weg);
+  pruefe('ohne Netz: es entsteht kein weiterer Cache', JSON.stringify(await caches.keys()) === JSON.stringify([alt, neu]), (await caches.keys()).join(', '));
+}
+
 const gut = ergebnisse.filter((e) => e.ok).length;
 console.log(`\n${gut}/${ergebnisse.length} bestanden`);
 process.exit(gut === ergebnisse.length ? 0 : 1);

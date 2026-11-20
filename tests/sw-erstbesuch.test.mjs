@@ -80,7 +80,7 @@ async function sende(res, puffer) {
   }
   res.end();
 }
-let anfragen = 0;
+let anfragen = 0, swGeladen = null;
 const server = http.createServer(async (q, res) => {
   let p = decodeURIComponent(new URL(q.url, 'http://x').pathname);
   if (!p.startsWith('/schach/')) { res.writeHead(404); return res.end(); }
@@ -95,6 +95,8 @@ const server = http.createServer(async (q, res) => {
   res.writeHead(200, { 'Content-Type': TYPEN[path.extname(p)] || 'application/octet-stream', 'Cache-Control': 'max-age=600', ETag: d.etag,
     ...(gz ? { 'Content-Encoding': 'gzip' } : {}) });
   await sende(res, gz ? d.gz : d.roh);
+  // Beginn der Installation: sw.js ist vollstaendig beim Browser, gleich danach laeuft das install-Ereignis
+  if (p === 'sw.js' && swGeladen === null) swGeladen = Date.now();
 });
 
 async function main() {
@@ -120,23 +122,27 @@ async function main() {
   try {
     await s.goto(adresse, { waitUntil: 'commit', timeout: 120000 });
     await s.waitForFunction(() => !!document.querySelector('#app > .screen:not(.lade-screen)'), null, { timeout: 120000 });
+    // Ende der Installation: ready loest aus, sobald die Registrierung einen aktiven (oder aktivierenden) Worker hat
+    await s.evaluate(() => { navigator.serviceWorker.ready.then(() => { window.__aktivAm = Date.now(); }); }).catch(() => {});
     // (1) ein Worker wird aktiv: hoechstens 120 s nach dem Aufruf; auf a424fce3 verschwand die Registrierung unter WebKit
     let l = await lage();
-    let warReg = false, installSeit = null;
+    let warReg = false;
     while (Date.now() - t0 < 120000 && !(l.aktiv === 'activated')) {
       if (l.reg) warReg = true;
-      if (l.installiert && installSeit === null) installSeit = Date.now();
       if (warReg && !l.reg && !l.fehler) break;   // Registrierung weg: install ist gescheitert
       await warte(500);
       l = await lage();
     }
-    const aktivNach = Date.now() - t0;
-    const installMs = installSeit === null ? null : Date.now() - installSeit;
-    pruefe(`Erstbesuch: ein Worker ist aktiv (${Math.round(aktivNach / 1000)} s)`, l.aktiv === 'activated',
+    const aktivAm = await s.evaluate(() => window.__aktivAm || null).catch(() => null);
+    const aktivNach = (aktivAm || Date.now()) - t0;
+    // gemessen ab dem install-Ereignis (Kaltreview fc-08:50: frueher ab der ersten Beobachtung von installing, das war spaeter)
+    const installMs = aktivAm && swGeladen ? aktivAm - swGeladen : null;
+    const swNach = swGeladen ? Math.round((swGeladen - t0) / 1000) : '?';
+    pruefe(`Erstbesuch: ein Worker ist aktiv (${Math.round(aktivNach / 1000)} s nach dem Aufruf, sw.js geladen nach ${swNach} s)`, l.aktiv === 'activated',
       JSON.stringify({ reg: l.reg, aktiv: l.aktiv, installiert: l.installiert, caches: l.caches, im: l.im && l.im.length }));
     // Die Grenze gilt fuer WebKit (dort endet install nach etwa 30 s); Chromium kennt diese Grenze nicht, dort nur grob 60 s
     const grenze = process.env.BROWSER === 'webkit' ? NETZ.grenze : 60000;
-    pruefe(`Erstbesuch: die Installation dauert hoechstens ${grenze / 1000} s (${installMs === null ? '?' : (installMs / 1000).toFixed(1)} s)`,
+    pruefe(`Erstbesuch: die Installation (sw.js geladen bis aktiv) dauert hoechstens ${grenze / 1000} s (${installMs === null ? '?' : (installMs / 1000).toFixed(1)} s)`,
       l.aktiv === 'activated' && installMs !== null && installMs <= grenze);
     // (2) der Kern liegt dann vollstaendig im Cache
     const kern = Array.isArray(sw.KERN) ? sw.KERN : null;

@@ -813,6 +813,44 @@ async function testeBrowser(browser) {
     pruefe('kein Seitenfehler, keine Konsolenfehler außer der Netzmeldung des Browsers', echt.length === 0, echt.join(' | '));
     await k2.close();
   }
+
+  // Ohne Netz (Kaltreview fc-08:50, 20.11.2026): navigator.onLine sagt false, die Dateien kommen aber noch (aus dem Cache
+  // des Service Workers). Dann muss vorgeladen werden. Scheitert ein Abruf ohne Netz, zaehlt die Datei nicht als fehlend,
+  // und wieder online laedt sie nach.
+  gruppe = 'Ohne Netz';
+  for (const fall of ['cache', 'leer']) {
+    let netzDa = fall === 'cache';
+    const { kontext: k3, seite: s3 } = await neueSeite(browser, { routen: [
+      ['**/assets/klang/arcade/*.mp3', (r) => (netzDa ? r.continue() : r.abort('internetdisconnected'))],
+    ] });
+    await k3.addInitScript(() => {
+      window.__netz = false;
+      Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => window.__netz === true });
+    });
+    await s3.goto(BASIS + '#arena');
+    await s3.waitForSelector('.screen.arena');
+    if (fall === 'cache') {
+      // wie der Cache des Service Workers: die 40 Dateien liegen im Cache Storage, dann laedt klang ohne Netz vor
+      const mp3 = readdirSync(path.join(WURZEL, 'assets/klang/arcade')).filter((d) => d.endsWith('.mp3'));
+      await s3.evaluate(async (namen) => {
+        const { klang } = await import('./js/sounds.js');
+        const c = await caches.open('probe-klang');
+        await Promise.all(namen.map((d) => fetch(`assets/klang/arcade/${d}`).then((a) => c.put(`assets/klang/arcade/${d}`, a)))); // INTENTIONAL-SLOP[F6]: Abruf beim eigenen Testserver; scheitert er, bricht die Probe rot ab
+        await klang.vorladen();
+      }, mp3);
+    }
+    const v3 = await warteDekodiert(s3, fall === 'cache' ? 40 : 1, fall === 'cache' ? 20000 : 3000);
+    if (fall === 'cache') {
+      pruefe('ohne Netz, alles im Cache: alle 40 Dateien dekodiert', v3.dekodiert === 40 && v3.fehlt === 0, v3);
+    } else {
+      pruefe('ohne Netz, nichts im Cache: keine Datei als fehlend gemerkt', v3.dekodiert === 0 && v3.fehlt === 0, v3);
+      netzDa = true;
+      await s3.evaluate(() => { window.__netz = true; window.dispatchEvent(new Event('online')); });
+      const v4 = await warteDekodiert(s3);
+      pruefe('wieder online: alle 40 Dateien nachgeladen', v4.dekodiert === 40 && v4.fehlt === 0, v4);
+    }
+    await k3.close();
+  }
 }
 
 // =====================================================================

@@ -244,6 +244,41 @@ try {
       pruefe(`${tag}: Online ohne laufende Partie hat einen eigenen Offline-Text (nicht "die Partie bleibt gespeichert")`, !offen.parteiText && onlineHinweis, offen);
       pruefe(`${tag}: ohne Netz ist "Duell suchen" gesperrt (disabled, aria-disabled) mit sichtbarem Hinweis`,
         offen.da && offen.aus && offen.aria === 'true' && offen.hinweis, offen);
+      // Ohne Stockfish (Kaltreview fc-08:50, 20.11.2026): ein neuer Spieler, dessen Nachladen Stockfish noch nicht abgelegt
+      // hat. Die Bot-Partie startet trotzdem und sagt es (die Meldung ist eine kurze Einblendung, darum ein Beobachter).
+      // Eigene Seite im selben Kontext: ihre gewollt scheiternden Stockfish-Abrufe gehoeren nicht in die Listen von s;
+      // jede ANDERE gescheiterte Anfrage an die eigene App ist rot (wie unten: ausser sw.js, Fremdadressen scheitern offline).
+      const s2 = await k.newPage();
+      const s2fremd = [];
+      s2.on('requestfailed', (r) => {
+        const u = r.url().replace(/\?.*$/, '');
+        if (u.startsWith(EIGEN) && !u.endsWith('/sw.js') && !/\/vendor\/stockfish\//.test(u)) s2fremd.push(u);
+      });
+      await ladeBisHeim(s2, START);
+      const sfWeg = await s2.evaluate(async () => {
+        let n = 0;
+        for (const name of await caches.keys()) {
+          const c = await caches.open(name);
+          for (const r of await c.keys()) if (/\/vendor\/stockfish\//.test(r.url)) { await c.delete(r); n++; }
+        }
+        return n;
+      });
+      await ladeBisHeim(s2, START);
+      await s2.evaluate(() => {
+        window.__engineHinweis = '';
+        new MutationObserver(() => { const m = document.body.innerText.match(/[^\n]*Schach-Engine[^\n]*/); if (m) window.__engineHinweis = m[0]; })
+          .observe(document.body, { childList: true, subtree: true, characterData: true });
+        localStorage.removeItem('schach-arena:v1:laufend');
+        window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w' });
+      });
+      const ohneSf = await klappt(s2.waitForFunction((sel) => window.__partie && window.__partie.bereit === true && window.__partie.phase() === 'flo'
+        && document.querySelectorAll(sel + ' .brett img.figur').length === 32, SCREEN, { timeout: 40000 }));
+      const hinweis = await klappt(s2.waitForFunction(() => !!window.__engineHinweis, null, { timeout: 15000 }));
+      const hinweisText = await s2.evaluate(() => window.__engineHinweis);
+      pruefe(`${tag}: ohne Stockfish im Cache startet die Bot-Partie und sagt, dass die Engine fehlt`,
+        sfWeg > 0 && ohneSf && hinweis && /startet nicht/.test(hinweisText), { sfWeg, ohneSf, hinweis: hinweisText });
+      pruefe(`${tag}: ohne Stockfish scheitert keine andere Anfrage`, s2fremd.length === 0, [...new Set(s2fremd)].slice(0, 5));
+      await s2.close();
       // (d) Konsole und Server waehrend offline
       // erwartet nur, wenn die Meldung nicht von einer eigenen Adresse stammt (Kaltreview B1c)
       const erwartet = (x) => !x.url.startsWith(EIGEN) && ERWARTET.some((re) => re.test(x.text));

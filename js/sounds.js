@@ -457,9 +457,14 @@ function spaeter(fn, ms) {
   return h;
 }
 
-// Ohne Netz nicht vorladen (fc-06:00, 20.11.2026): bei einem neuen Spieler kommen die Klaenge erst nach der Installation in
-// den Cache (sw.js, nachladen); ein Abruf jetzt scheitert, und jede Datei bliebe bis zum Neustart in fehlt. Wieder online,
-// laedt es nach.
+// Ohne Netz (fc-06:00, 20.11.2026): bei einem neuen Spieler kommen die Klaenge erst nach der Installation in den Cache
+// (sw.js, nachladen). Scheitert ein Abruf, waehrend navigator.onLine false sagt, zaehlt die Datei nicht als fehlend
+// (sonst bliebe sie bis zum Neustart in fehlt), und wieder online laedt es nach. Vorab sperren darf das nicht: wer alles
+// im Cache hat, bekommt die Dateien auch ohne Netz (Kaltreview fc-08:50). Ohne Netz wird nur geholt, was ein Cache hat: jeder
+// Abruf ins Leere waere eine Fehlermeldung in der Konsole (tests/offline-ladeprobe.test.mjs).
+async function imCache(adresse) {
+  try { return !!(await caches.match(adresse)); } catch (e) { return true; } // INTENTIONAL-SLOP[E5]: Cache nicht lesbar heisst: wie bisher abrufen
+}
 let wartetAufNetz = false;
 function ohneNetz() {
   if (typeof navigator === 'undefined' || navigator.onLine !== false) return false;
@@ -472,13 +477,19 @@ function ohneNetz() {
 
 function vorladen() {
   vorladenAn = true;
-  if (!paket || !umgebung() || ohneNetz()) return Promise.resolve(vorrat());
+  if (!paket || !umgebung()) return Promise.resolve(vorrat());
   if (ladeLauf && ladeLauf.gen === generation) return ladeLauf.promise;
   const gen = generation;
   const p = paket;
-  const offen = DATEIEN.filter((d) => !puffer.has(d) && !fehlt.has(d));
+  let offen = DATEIEN.filter((d) => !puffer.has(d) && !fehlt.has(d));
   const lauf = { gen, promise: null };
   lauf.promise = (async () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false && typeof caches !== 'undefined') {
+      const da = await Promise.all(offen.map((d) => imCache(url(p, d))));
+      if (gen !== generation) return vorrat();
+      if (da.includes(false)) ohneNetz();
+      offen = offen.filter((d, i) => da[i]);
+    }
     const versprechen = [];
     const starte = (i) => {
       if (i < offen.length && !versprechen[i]) versprechen[i] = hole(url(p, offen[i]));
@@ -492,7 +503,7 @@ function vorladen() {
       const b = daten ? await dekodiere(daten) : null;
       if (gen !== generation) return vorrat();
       if (b) puffer.set(offen[i], b);
-      else fehlt.add(offen[i]);
+      else if (daten || !ohneNetz()) fehlt.add(offen[i]);
       await pause();   // in kleinen Bloecken, damit die Arena nicht ruckelt
     }
     if (ladeLauf === lauf) ladeLauf = null;
