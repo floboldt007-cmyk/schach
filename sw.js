@@ -1177,6 +1177,14 @@ function ohneFrische(antwort, inhalt = antwort.body) {
   return new Response(inhalt, { status: antwort.status, statusText: antwort.statusText, headers: kopf });
 }
 
+// Nie aus einem aelteren Cache: Module, Stile und Seiten (Nachpruefung 19, 20.11.2026). Ein altes Modul neben neuen kann
+// einen Export importieren, den es nicht mehr gibt (v262 -> v268: js/ui/lobby.js alt importiert ligaTabelle, das
+// js/pakete/lobby/index.js neu nicht mehr hat), und bricht dann ohne Netz mit einem Linkfehler. Alle in den Kern passte
+// nicht: WebKit Fast 3G brauchte damit 30,4 s Installation, die Grenze ist 28 s. Fehlt so ein Modul, scheitert der
+// Abruf wie vor dem Rueckgriff. Stockfish ist kein Modul der App (Worker-Skript, wechselt nur als Ganzes).
+const NIE_ALT = /\.(m?js|css|html)$/;
+const nieAlt = (url) => NIE_ALT.test(url.pathname) && !url.pathname.startsWith(BASIS + 'vendor/stockfish/');
+
 // Treffer in einem aelteren Cache dieser App (neueste zuerst), ohne einen Cache anzulegen (caches.match mit cacheName)
 async function aeltererTreffer(req, navigation) {
   const namen = (await caches.keys()).filter((n) => n.startsWith(PRAEFIX) && nummer(n) < VERSION).sort((a, b) => nummer(b) - nummer(a));
@@ -1203,7 +1211,7 @@ async function antworte(req, url) {
   } catch (f) {
     // Ohne Netz nach einem Update (Kaltreview fc-08:50, 20.11.2026): bis nachladen() fertig ist, fehlt dem eigenen Cache
     // alles ausser dem Kern. Der aeltere Cache, den activate dafuer behaelt, hat es noch; eine alte Datei ist besser als keine.
-    const alt = komplett ? null : await aeltererTreffer(req, navigation);
+    const alt = komplett || nieAlt(url) ? null : await aeltererTreffer(req, navigation);
     if (alt) return alt;
     throw f;
   }
