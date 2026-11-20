@@ -519,16 +519,12 @@ export function zeige(root, params, app) {
   }
 
   function tippeKnoten(b, el) {
-    // gesperrt in der offenen Welt: Meldung und Ruetteln; in der Vorschau-Welt oeffnet der Tipp die Karte (zeigeDetail)
+    // gesperrt in der offenen Welt: Ruetteln, dann oeffnet der Tipp die Karte wie in der Vorschau-Welt (fc-23:00, vorher
+    // nur eine Meldung): statt "Spielen" steht dort der Sperr-Hinweis (sperrHinweis) und darunter der Ort arena:gesperrt
     if (el.classList.contains('gesperrt') && !vorschauTor(b)) {
-      // den Bot nennen, den Flo jetzt spielen kann (der direkte Vorgaenger ist evtl. selbst gesperrt)
-      const vorher = BOTS.find((x) => x.stufe === b.stufe - 1);
-      app.meldung(vorher && vorher.id === naechster.id ? t('arena.gesperrt.erst', { name: vorher.name })
-        : t('arena.gesperrt.zuerst', { name: naechster.name }));
       el.classList.remove('ruettel');
       void el.offsetWidth;
       el.classList.add('ruettel');
-      return;
     }
     if (gewaehlt === b.id) {
       // schon gewaehlt: auf dem Handy zum Panel (Weg: die Karte geht auf), dazu ein kurzer Wink des Spielen-Knopfs
@@ -788,8 +784,18 @@ export function zeige(root, params, app) {
     } else karte.scrollTop = ziel;
   }
 
+  // Sperr-Hinweis einer gesperrten Station: in der Vorschau-Welt der Endgegner davor, in der offenen Welt der Bot, den Flo
+  // jetzt spielen kann (der direkte Vorgaenger ist evtl. selbst gesperrt)
+  function sperrHinweis(b) {
+    const tor = vorschauTor(b);
+    if (tor) return t('arena.vorschau.hinweis', { name: tor.name });
+    const vorher = BOTS.find((x) => x.stufe === b.stufe - 1);
+    return vorher && vorher.id === naechster.id ? t('arena.gesperrt.erst', { name: vorher.name }) : t('arena.gesperrt.zuerst', { name: naechster.name });
+  }
+
   // ---------- Gegner-Panel ----------
   let panelLauf = 0;
+  let ortGesperrt = null;
   let blaseBesonders = false;
   function zeigeDetail(neueBlase, animiert = false) {
     const lauf = ++panelLauf;
@@ -801,12 +807,14 @@ export function zeige(root, params, app) {
     const laufBot = laufend ? botNachId(laufend.botId) : null;
     // Vorschau-Welt: statt "Spielen" der Hinweis, wer die Welt oeffnet; ohne Farbwahl (es gibt noch nichts zu spielen)
     const tor = z === 'gesperrt' ? vorschauTor(b) : null;
-    const status = t('arena.status.' + (tor ? 'vorschau' : z === 'besiegt' ? 'besiegt' : z === 'aktuell' ? 'aktuell'
+    const gesperrt = z === 'gesperrt';
+    const status = t('arena.status.' + (tor ? 'vorschau' : gesperrt ? 'gesperrt' : z === 'besiegt' ? 'besiegt' : z === 'aktuell' ? 'aktuell'
       : neuEingezogen(b) ? 'neu' : b.endgegner ? 'endgegner' : 'offen'));
     const satz = begruessung(b);
     detail.style.setProperty('--bf', botFarbe(b));
     const bau = () => {
       if (lauf !== panelLauf || weg) return;
+      if (ortGesperrt) { ortGesperrt.verlasse(); ortGesperrt = null; }
       // Variante A (Flo 08.11.2026, "so viel Text und so viel Schnickschnack"): das Panel zeigt nur den Gegner (Kopf,
       // Spruch, Stern-Ziele, Farbe, Spielen). Liga-Karte (Ort arena:panel-oben), Heute-Karte (arena:heute, jetzt auf der
       // Startseite), Bot-Zeilen (arena:panel-bot), Merkmale und Bilanz entfallen; oben bleibt nur die Nachlese.
@@ -836,10 +844,10 @@ export function zeige(root, params, app) {
         <div class="ziel-sterne" aria-label="${esc(t('arena.ziele.aria'))}">
           ${zielSterneHtml(f.sterne)}
         </div>
-        <div class="wahl wahl-farbe"${tor ? ' hidden' : ''}><div class="wahl-titel">${esc(t('arena.farbe.titel'))}</div><div class="farbwahl-ort"></div></div>
+        <div class="wahl wahl-farbe"${gesperrt ? ' hidden' : ''}><div class="wahl-titel">${esc(t('arena.farbe.titel'))}</div><div class="farbwahl-ort"></div></div>
         <div class="ort-tempo" hidden></div>
-        <div class="cta-platz">${tor
-    ? `<p class="sp-gesperrt">${esc(t('arena.vorschau.hinweis', { name: tor.name }))}</p>`
+        <div class="cta-platz">${gesperrt
+    ? `<p class="sp-gesperrt">${esc(sperrHinweis(b))}</p><div class="ort-gesperrt" hidden></div>`
     : `<button class="knopf primaer gross spielen dr" type="button" data-aktion="spielen"><span class="sp-text">${spielenText(b, z === 'besiegt')}</span><span class="pf">${icon('pfeil')}</span></button>`}</div>
       </div>`;
 
@@ -861,6 +869,11 @@ export function zeige(root, params, app) {
       detail.querySelector('.karte-griff').addEventListener('click', () => setzeKarteOffen(!karteOffen));
       setzeKarteOffen(karteOffen);
       detail.querySelector('[data-aktion="spielen"]')?.addEventListener('click', () => spielen(b));
+      const ortSperre = detail.querySelector('.ort-gesperrt');
+      if (ortSperre) {
+        ortGesperrt = fuelle('arena:gesperrt', ortSperre, { app, bot: b });
+        ortSperre.hidden = ortGesperrt.anzahl === 0;
+      }
       detail.querySelector('[data-aktion="steckbrief"]').addEventListener('click', () => zeigeSteckbrief(b));
       const fort = detail.querySelector('[data-aktion="fortsetzen"]');
       if (fort) {
@@ -1215,6 +1228,7 @@ export function zeige(root, params, app) {
       karte.removeEventListener('pointerup', beiZiehEnde);
       karte.removeEventListener('pointercancel', beiZiehEnde);
       for (const o of Object.values(orte)) if (o) o.verlasse();
+      if (ortGesperrt) { ortGesperrt.verlasse(); ortGesperrt = null; }
       kopfHandle.verlasse();
     },
   };

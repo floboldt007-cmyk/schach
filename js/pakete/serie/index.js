@@ -266,9 +266,12 @@ function anbieterHeim(k) {
   if (!wahl && (lg.heuteGezaehlt || lg.pause || lg.ruhetag)) return null;
   const training = !wahl && !!app && sicher(() => angeboten('training:karten') > 0, 'Training') === true;
   const text = t(wahl ? 'p-serie.wahl.label' : 'p-serie.heute.offen');
+  // die Zeile ist einzeilig (css/heim.css): sichtbar die Kurzform, die auf dem iPhone SE (147 px) ganz passt; der ganze Satz
+  // steht im Label (fable-check 19.11. Nr 9, Entscheid fc: Text kuerzen, die Einzeilen-Regel bleibt)
+  const sichtbar = wahl ? text : t('p-serie.heute.kurz');
   // R19: der Weg des Bauern als Fortschritt (Feld von T.FELDER bis zur Umwandlung; mit offener Wahl ist er angekommen)
   const bis = wahl ? '' : ` · ${t(lg.bisUmwandlung === 1 ? 'p-serie.bis.eins' : 'p-serie.bis.mehr', { n: lg.bisUmwandlung })}`;
-  return zeile({ symbol: icon('se-bauer'), titel: t('p-serie.name'), text, label: `${t('p-serie.name')} · ${text}${bis}`, paket: PAKET,
+  return zeile({ symbol: icon('se-bauer'), titel: t('p-serie.name'), text: sichtbar, label: `${t('p-serie.name')} · ${text}${bis}`, paket: PAKET,
     fortschritt: { art: 'schritte', n: T.FELDER, an: wahl ? T.FELDER : lg.feld },
     beiTipp: () => sicher(() => (training ? app.gehe('training') : zeigeBlatt()), 'Startseite') });
 }

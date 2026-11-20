@@ -192,6 +192,23 @@ export function schliesseSheet() {
   if (offenesSheet) offenesSheet.ende();
 }
 
+// Schleier, die bei pointerdown schliessen (Dialog in app.js, sheet() und die Blaetter der Pakete): .weg laesst Klicks
+// durch bzw. der Ort ist schon weg, der click desselben Tipps traefe also den Knopf darunter (Befund 19.11.2026: Touch,
+// "Zurueck zum Start" verliess die Partie). Genau einmal schlucken; der Fang geht nach dem geschluckten click, beim
+// naechsten Druck oder nach 600 ms von selbst weg, damit nie ein spaeterer echter Klick verloren geht.
+export function schluckeFolgeKlick() {
+  let uhr = 0;
+  const weg = () => {
+    clearTimeout(uhr);
+    document.removeEventListener('click', fang, true);
+    document.removeEventListener('pointerdown', weg, true);
+  };
+  const fang = (e) => { e.preventDefault(); e.stopImmediatePropagation(); weg(); };
+  document.addEventListener('click', fang, true);
+  document.addEventListener('pointerdown', weg, true);
+  uhr = setTimeout(weg, 600);
+}
+
 // sperreMs: Knoepfe der Art "gefahr" nehmen erst so viele ms nach dem Oeffnen einen Tipp an und nie einen Doppeltipp
 // (detail > 1). Sonst landet der zweite Tipp eines Doppeltipps auf dem Knopf, der an derselben Stelle des naechsten Blatts sitzt.
 export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen = null, inhalt = null,
@@ -259,7 +276,7 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
       });
       leiste.append(b);
     }
-    schleier.addEventListener('pointerdown', () => ende(abbrechen));
+    schleier.addEventListener('pointerdown', () => { ende(abbrechen); schluckeFolgeKlick(); });
     document.addEventListener('keydown', taste, true);
     // U4 (Flo 09.11.2026): alles hinter dem Blatt stilllegen, damit auch ein Bildschirmleser nicht dahinter springt.
     // Die Meldungen (role=status) bleiben hoerbar; zurueckgesetzt wird nur, was hier stillgelegt wurde.
@@ -374,7 +391,9 @@ export function toastLeeren() {
 
 // ---------- Mini-Brett ----------
 const FIGUR = /^[prnbqkPRNBQK]$/;
-export function miniBrett(fen, { zuletzt = [], klasse = '' } = {}) {
+// sterne: Felder mit goldenem Stern (Kurs Erste Schritte, Art sammeln, 19.11.2026), liegen ueber der Figur; gross: die
+// Figuren als grosses Bild (3,4 Felder), am Brettrand verankert, damit nichts abgeschnitten wird (fuer eine Figur gedacht)
+export function miniBrett(fen, { zuletzt = [], klasse = '', sterne = [], gross = false } = {}) {
   const reihen = String(fen || '').trim().split(/\s+/)[0].split('/');
   const felder = [];
   for (let r = 0; r < 8; r++) {
@@ -388,6 +407,8 @@ export function miniBrett(fen, { zuletzt = [], klasse = '' } = {}) {
     while (f < 8) { felder.push(null); f++; }
   }
   const markiert = new Set((Array.isArray(zuletzt) ? zuletzt : []).map((x) => String(x).toLowerCase()));
+  const stern = new Set((Array.isArray(sterne) ? sterne : []).map((x) => String(x).toLowerCase()));
+  const anker = (r, c) => `${c === 0 ? 'left' : c === 7 ? 'right' : 'center'} ${r === 0 ? 'top' : r === 7 ? 'bottom' : 'center'}`;
   let html = '';
   for (let i = 0; i < 64; i++) {
     const r = Math.floor(i / 8);
@@ -395,9 +416,13 @@ export function miniBrett(fen, { zuletzt = [], klasse = '' } = {}) {
     const name = 'abcdefgh'[c] + (8 - r);
     const dunkel = (r + c) % 2 === 1;
     const fig = felder[i];
-    html += `<i class="${dunkel ? 'd' : 'h'}${markiert.has(name) ? ' z' : ''}">${fig ? `<img src="${PIECES}${fig}.svg" alt="" loading="lazy" draggable="false">` : ''}</i>`;
+    const bild = fig ? `<img${gross ? ` class="g" style="transform-origin: ${anker(r, c)}"` : ''} src="${PIECES}${fig}.svg" alt="" loading="lazy" draggable="false">` : '';
+    // ein Stern am Rand rueckt nach innen (--sx/--sy), sonst schnitte der Brettrand ihn ab
+    const rand = stern.has(name) && (c % 7 === 0 || r % 7 === 0)
+      ? ` style="--sx: ${c === 0 ? '28%' : c === 7 ? '-28%' : '0%'}; --sy: ${r === 0 ? '28%' : r === 7 ? '-28%' : '0%'}"` : '';
+    html += `<i class="${dunkel ? 'd' : 'h'}${markiert.has(name) ? ' z' : ''}${stern.has(name) ? ' s' : ''}"${rand}>${bild}</i>`;
   }
-  return `<div class="mini${klasse ? ' ' + esc(klasse) : ''}" aria-hidden="true">${html}</div>`;
+  return `<div class="mini${gross ? ' mini-gross' : ''}${klasse ? ' ' + esc(klasse) : ''}" aria-hidden="true">${html}</div>`;
 }
 
 // ---------- Wischleiste: weiche Kanten dort, wo es weitergeht ----------

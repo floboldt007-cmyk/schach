@@ -161,6 +161,20 @@ function gruppe(app) {
   return el;
 }
 
+// ---------- Karte eines gesperrten Bots (Ort arena:gesperrt, fc-23:00) ----------
+// Wer die Einfuehrung uebersprungen hat, fand die Einstufung nur unter Einstellungen > Extras (Allround-Check 19.11.2026
+// Nr. 2). Unter dem Sperr-Hinweis steht jetzt der Weg dorthin, nach einer Einstufung zur Empfehlung (wie gruppe()).
+// Die Freischaltung bleibt der Reihe nach: die Einstufung empfiehlt nur einen Gegner fuer eine Probepartie.
+function sperrAngebot(app) {
+  const em = sicher(() => D.aktuelleEmpfehlung(), 'Empfehlung');
+  const el = document.createElement('div');
+  el.className = 'st-sperre';
+  el.innerHTML = `<p class="st-sperre-text">${esc(t('p-start.sperre.text'))}</p>
+    <button class="knopf dr st-sperre-knopf" type="button">${esc(t(em ? 'p-start.sperre.empfehlung' : 'p-start.sperre.knopf'))}</button>`;
+  el.querySelector('.st-sperre-knopf').addEventListener('click', () => sicher(() => app.gehe('start', { seite: em ? 'empfehlung' : 'einstufung' }), 'Einstufung'));
+  return el;
+}
+
 // ---------- Einhaengen (defensiv) ----------
 function ladeCss() {
   try {
@@ -187,6 +201,7 @@ function registriere() {
   }), 'Erster Screen'), { reihenfolge: L.WAHL_REIHENFOLGE, paket: L.PAKET });
   anbieten('arena:heute', (k) => sicher(() => neuZeile(k), 'Heute'), { reihenfolge: 70, paket: L.PAKET });
   anbieten('heim:naechstes', (k) => sicher(() => neuHeim(k), 'Startseite'), { reihenfolge: 8, paket: L.PAKET });
+  anbieten('arena:gesperrt', (k) => sicher(() => (k && k.app ? sperrAngebot(k.app) : null), 'Sperre'), { reihenfolge: 50, paket: L.PAKET });
   anbieten('einstellungen:gruppen', (k) => sicher(() => (k && k.app ? gruppe(k.app) : null), 'Einstellungen'), { reihenfolge: 90, paket: L.PAKET });
 
   // Fahrplan beginnt beim ersten Start mit dem Paket (ausserhalb des Hoerers: die Partienliste kann gross sein). Erfahren

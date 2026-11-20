@@ -550,7 +550,8 @@
   .an-eb-unten { top: 0; bottom: 0; right: auto; width: var(--w, 50%); height: auto; }
   .an-eb-unten::before { top: 0; bottom: 0; left: auto; right: -1px; width: 2px; height: auto; }
   .an-eb-mitte { top: 0; bottom: 0; left: 50%; right: auto; width: 1px; height: auto; }
-  .an-eb-wert, .an-eb-wert[data-seite="oben"] { top: 1px; bottom: auto; left: 6px; right: auto; text-align: left; }
+  /* die Zahl liegt mit dem Balken waagrecht (fable-check 19.11. Nr 10: Schreibrichtung und Drehung kamen aus der senkrechten Fassung) */
+  .an-eb-wert, .an-eb-wert[data-seite="oben"] { top: 1px; bottom: auto; left: 6px; right: auto; text-align: left; writing-mode: horizontal-tb; transform: none; }
   .an-eb-wert[data-seite="oben"] { left: auto; right: 6px; text-align: right; }
   /* R19 Analyse neu: die Momente-Karten als Reihe zum Wischen, die naechste Karte schaut rechts herein */
   .an-momente { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 10px; overscroll-behavior-x: contain;

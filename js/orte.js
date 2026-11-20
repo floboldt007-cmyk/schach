@@ -54,6 +54,9 @@ export const ORTE = Object.freeze({
   // { app, bot, fortschritt }
   'arena:steckbrief': 'dom',
   'arena:start': 'aufruf',
+  // unter dem Sperr-Hinweis der Karte eines gesperrten Bots (fc-23:00): Paket start bietet die Einstufung an, Kontext
+  // { app, bot }
+  'arena:gesperrt': 'dom',
   'partie:begruessung?': 'wahl',
   'ergebnis:karte': 'dom',
   'analyse:coach': 'dom',

@@ -73,7 +73,7 @@ import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
-import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
+import { toast, toastLeeren, schliesseSheet, schluckeFolgeKlick } from './ui/bauteile.js';
 import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
@@ -370,7 +370,11 @@ function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art
       b.addEventListener('click', () => ende(k.wert));
       leiste.append(b);
     }
-    ort.addEventListener('pointerdown', (e) => { if (e.target === ort) ende(abbrechen); });
+    ort.addEventListener('pointerdown', (e) => {
+      if (e.target !== ort) return;
+      ende(abbrechen);
+      schluckeFolgeKlick();
+    });
     document.addEventListener('keydown', taste, true);
     document.body.append(ort);
     offenerDialog = { ort, ende: () => ende(abbrechen) };

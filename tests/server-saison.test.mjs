@@ -277,6 +277,23 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
   grant select on test_p to authenticated, anon;`);
   const pid = (await wert(db, 'select id from test_p')).id;
   {
+    // Datenschutz durch Voreinstellung (Art. 25 Abs. 2 DSGVO, Flo 19.11.2026): ohne eigenes Einschalten sieht der Gegner nichts
+    const vorher = (await als(db, T(1), `select public.saison_karte_der_partie('${pid}') k`))?.k;
+    pruefe('Vorgabe aus: ohne Einschalten sieht der Gegner weder Abzeichen noch Titel', vorher?.w?.abzeichen === null && vorher?.w?.titel === null, JSON.stringify(vorher?.w));
+    pruefe('Vorgabe aus: eigener Stand meldet sichtbar false', (await als(db, U2, 'select public.saison_mein_stand() s'))?.s?.sichtbar === false);
+    pruefe('Vorgabe aus: Datenauskunft ohne Zeile meldet sichtbar false', (await als(db, T(1), 'select public.meine_daten() d'))?.d?.saison?.sichtbar === false);
+    const spalte = await wert(db, `select column_default d from information_schema.columns where table_schema = 'public' and table_name = 'saison_wahl' and column_name = 'sichtbar'`);
+    pruefe('Vorgabe aus: Spalte saison_wahl.sichtbar hat default false', spalte?.d === 'false', JSON.stringify(spalte));
+    // Einschalten ist eine Einwilligung (Art. 6 Abs. 1 lit. a, Art. 8 Abs. 1 DSGVO, Flo 19.11.2026): nur mit Haken "mindestens 16"
+    const zeile = async () => (await db.query(`select sichtbar, alter_bestaetigt_am am from public.saison_wahl where user_id = '${U2}'`)).rows[0];
+    const ohne = await als(db, U2, 'select public.saison_sichtbar_setzen(true, false) r');
+    pruefe('Einschalten ohne Haken: SAISON_ALTER, bleibt aus', /SAISON_ALTER/.test(ohne?.fehler || '') && (await zeile())?.sichtbar !== true, JSON.stringify(ohne));
+    const alt = await als(db, U2, 'select public.saison_sichtbar_setzen(true) r');
+    pruefe('Aufruf ohne zweiten Wert gilt als ohne Haken', /SAISON_ALTER/.test(alt?.fehler || ''), JSON.stringify(alt));
+    const mit = await als(db, U2, 'select public.saison_sichtbar_setzen(true, true) r');
+    pruefe('Einschalten mit Haken: an, Zeitpunkt gespeichert', mit?.r?.sichtbar === true && (await zeile())?.sichtbar === true && !!(await zeile())?.am, JSON.stringify(mit));
+    const auskunft = (await als(db, U2, 'select public.meine_daten() d'))?.d?.saison;
+    pruefe('Datenauskunft nennt den Zeitpunkt der Bestaetigung', !!auskunft?.alter_bestaetigt_am && auskunft?.sichtbar === true, JSON.stringify(auskunft));
     const r = await als(db, T(1), `select public.saison_karte_der_partie('${pid}') k`);
     const k = r?.k;
     pruefe('Gegner sieht bei U2 das BESTE Abzeichen (Saison 1, 17) und den gewaehlten Titel', k?.w?.abzeichen?.saison === 1 && k.w.abzeichen.stufe === 17 && Object.keys(k.w.abzeichen).length === 2 && k?.w?.titel === 'crownmaster-s1', JSON.stringify(r));
@@ -289,6 +306,35 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
     const an = await als(db, null, `select public.saison_karte_der_partie('${pid}') k`);
     pruefe('anon: abgewiesen', !!an?.fehler, JSON.stringify(an));
   }
+  // Schalter in den Einstellungen (Flo 18.11.2026): aus = der Gegner bekommt weder Abzeichen noch Titel
+  {
+    const karte = async () => (await als(db, T(1), `select public.saison_karte_der_partie('${pid}') k`))?.k;
+    const stand = async () => (await als(db, U2, 'select public.saison_mein_stand() s'))?.s;
+    pruefe('Schalter: nach dem Einschalten sichtbar', (await stand())?.sichtbar === true);
+    const aus = await als(db, U2, 'select public.saison_sichtbar_setzen(false) r');
+    pruefe('Schalter aus: Antwort und eigener Stand', aus?.r?.sichtbar === false && (await stand())?.sichtbar === false, JSON.stringify(aus));
+    const nachAus = (await db.query(`select alter_bestaetigt_am am from public.saison_wahl where user_id = '${U2}'`)).rows[0];
+    pruefe('Schalter aus (Widerruf): Zeitpunkt der Bestaetigung geloescht', nachAus && nachAus.am === null, JSON.stringify(nachAus));
+    const k = await karte();
+    pruefe('Schalter aus: Gegner sieht weder Abzeichen noch Titel', k?.w?.abzeichen === null && k?.w?.titel === null, JSON.stringify(k?.w));
+    pruefe('Schalter aus: dieselben Felder wie sonst', JSON.stringify(Object.keys(k?.w || {}).sort()) === '["abzeichen","du","titel"]', JSON.stringify(k?.w));
+    await als(db, U2, `select public.saison_titel_waehle('crownmaster-s1') r`);
+    pruefe('Titelwahl aendert den Schalter nicht', (await stand())?.sichtbar === false);
+    const d = (await als(db, U2, 'select public.meine_daten() d'))?.d;
+    pruefe('Datenauskunft nennt den Schalter', d?.saison?.sichtbar === false, JSON.stringify(d?.saison));
+    const anon = await als(db, null, 'select public.saison_sichtbar_setzen(true) r');
+    pruefe('anon: Schalter abgewiesen', !!anon?.fehler, JSON.stringify(anon));
+    await als(db, U2, 'select public.saison_sichtbar_setzen(true, true) r');
+    const wieder = await karte();
+    pruefe('Schalter wieder an: Gegner sieht Abzeichen und Titel', wieder?.w?.abzeichen?.stufe === 17 && wieder?.w?.titel === 'crownmaster-s1', JSON.stringify(wieder?.w));
+    // Altzeile aus einer frueheren Fassung (sichtbar true, ohne Zeitpunkt): zaehlt nicht als Einwilligung
+    await db.exec(`update public.saison_wahl set alter_bestaetigt_am = null where user_id = '${U2}'`);
+    const altzeile = await karte();
+    pruefe('Altzeile ohne Zeitpunkt: Gegner sieht nichts, eigener Stand meldet aus', altzeile?.w?.abzeichen === null && altzeile?.w?.titel === null
+      && (await stand())?.sichtbar === false, JSON.stringify(altzeile?.w));
+    await als(db, U2, 'select public.saison_sichtbar_setzen(true, true) r');
+  }
+
   // Titel, der nicht mehr im Besitz ist, zeigt nichts
   await db.exec(`delete from public.saison_titel where user_id = '${U2}'`);
   {
@@ -325,7 +371,8 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
   pruefe('saison-zurueck.sql laeuft', !z, z);
   const weg = await wert(db, `select to_regclass('public.saison_abzeichen') a, to_regclass('public.saison_titel') b,
     to_regclass('public.saison_wahl') c, to_regclass('public.saison_abrechnungen') d, to_regprocedure('public.saison_abrechnen()') e,
-    to_regprocedure('public.saison_karte_der_partie(uuid)') f`);
+    to_regprocedure('public.saison_karte_der_partie(uuid)') f, to_regprocedure('public.saison_sichtbar_setzen(boolean)') g,
+    to_regprocedure('public.saison_sichtbar_setzen(boolean, boolean)') h`);
   pruefe('Rueckweg: Tabellen und Funktionen weg', Object.values(weg).every((v) => v === null), JSON.stringify(weg));
   const lz = (await db.query(`select prosrc from pg_proc where proname = 'liga_abrechnen'`)).rows[0]?.prosrc || '';
   pruefe('Rueckweg: liga_abrechnen wieder die live Fassung ohne Haken', !lz.includes('saison_abrechnen') && lz.includes("g.liga = 'raetsel'"));
@@ -336,6 +383,20 @@ const titelVon = async (db, uid) => (await db.query(`select saison, art from pub
   pruefe('liga_abrechnen laeuft nach dem Rueckweg', !nach, nach);
   const wieder = await lauf(db, 'saison-schema.sql erneut', lies('supabase/saison-schema.sql'));
   pruefe('saison-schema.sql danach wieder einspielbar', !wieder, wieder);
+  // Mehrfach einspielbar (Auftrag M-08:03:14 d): zweimal hintereinander, eine aeltere Fassung mit Vorgabe an wird umgestellt
+  await db.exec(`alter table public.saison_wahl alter column sichtbar set default true;
+    alter table public.saison_wahl drop column alter_bestaetigt_am;`);
+  const zweimal = await lauf(db, 'saison-schema.sql ein zweites Mal', lies('supabase/saison-schema.sql'));
+  const spalten = await wert(db, `select (select column_default from information_schema.columns where table_schema = 'public'
+      and table_name = 'saison_wahl' and column_name = 'sichtbar') d,
+    (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'saison_wahl'
+      and column_name = 'alter_bestaetigt_am') z,
+    to_regprocedure('public.saison_sichtbar_setzen(boolean)') alt`);
+  pruefe('saison-schema.sql zweimal hintereinander; aeltere Fassung bekommt Vorgabe aus, Zeitpunkt-Spalte und nur die neue Funktion',
+    !zweimal && spalten?.d === 'false' && Number(spalten?.z) === 1 && spalten?.alt === null, zweimal || JSON.stringify(spalten));
+  const r1 = await lauf(db, 'saison-zurueck.sql', lies('supabase/saison-zurueck.sql'));
+  const r2 = await lauf(db, 'saison-zurueck.sql (zweites Mal)', lies('supabase/saison-zurueck.sql'));
+  pruefe('saison-zurueck.sql ist wiederholbar', !r1 && !r2, r1 || r2);
 }
 
 // ---------- 2b. Live-Stand (Kaltreview 14.11.): daten-schema.sql ohne R19, Flo spielt NUR saison-schema.sql ein ----------

@@ -7,14 +7,15 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 365;
-const STAND = '58a79670650e';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 378;
+const STAND = '7346caddab23';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  'js/pakete/lernen/erste-schritte.js',
   'js/pakete/sammlung/effekt-vorschau.js',
   'js/pakete/sammlung/taten.js',
   // Etappe 4b: Visitenkarte, Erfolgs-Stufen, Taler; Banner ohne Shop (der kommt spaeter)
@@ -834,7 +835,8 @@ self.addEventListener('install', (e) => {
     await Promise.all(DATEIEN.map(async (datei) => {
       const antwort = await holeFrisch(datei, alt);
       if (!antwort.ok) throw new Error(`Vorladen fehlgeschlagen: ${datei} (${antwort.status})`);
-      await cache.put(datei, await mitTyp(datei, antwort));
+      const fertig = await mitTyp(datei, antwort);
+      await cache.put(datei, WEBKIT ? ohneFrische(fertig, await fertig.blob()) : fertig);
     }));
   })());
 });
@@ -862,6 +864,26 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(antworte(req, url));
 });
 
+// Was im Cache liegt, ist fuer den Browser nie "frisch": WebKit (Safari) haelt Antworten des Workers sonst mit der max-age
+// des Servers (GitHub Pages: 600 s) im eigenen Speicher und laedt Module beim Neuladen nach einem Versionswechsel von dort,
+// ohne den Worker zu fragen. Die Seite lief dann mit altem Code unter dem neuen Worker (tests/sw-update.test.mjs unter
+// WebKit, 19.11.2026: nach dem Wechsel auf Fassung 1 lief heim.js aus Fassung 0, ohne Anfrage an den Worker).
+// Der Kopf wird beim Ablegen gesetzt, nicht bei jeder Antwort: umgebaut je Anfrage schloss WebKit den alten Worker mitten
+// im Lesen ("Service Worker context closed", 2 von 3 Laeufen). Nur WebKit (Safari und jeder Browser auf iPhone und iPad,
+// auch Chrome dort: "CriOS" ohne "Chrome/"): Chromium laedt nie alten Code (sw-update 15 von 15), mit no-cache fragt es aber
+// jede Datei neu beim Worker an und wartete beim Wechsel dann ab und zu 30 s bis zur Notbremse (3 von 24 Laeufen, ohne den
+// Kopf 0 von 15). Die Installation legt jede Datei neu ab, auch die per 304 aus dem alten Cache uebernommenen (holeFrisch),
+// der neue Cache traegt den Kopf also ganz. Grenze: was eine Fassung OHNE diesen Kopf schon ausgeliefert hat, liegt bei
+// Safari noch mit max-age im Speicher; nur der erste Wechsel weg von einer solchen Fassung kann noch alten Code laden.
+const KENNUNG = self.navigator?.userAgent || ''; // INTENTIONAL-SLOP[R3]: self ist im Worker das globale Objekt
+const WEBKIT = /AppleWebKit\//.test(KENNUNG) && !/(Chrome|Chromium)\//.test(KENNUNG);
+function ohneFrische(antwort, inhalt = antwort.body) {
+  if (!WEBKIT) return antwort;
+  const kopf = new Headers(antwort.headers);
+  kopf.set('Cache-Control', 'no-cache');
+  return new Response(inhalt, { status: antwort.status, statusText: antwort.statusText, headers: kopf });
+}
+
 async function antworte(req, url) {
   // Nie caches.open vor dem Treffer: das legt einen fehlenden Cache an. Bis clients.claim() der neuen Fassung beantwortet
   // die alte noch Anfragen, ihr Cache ist da aber schon geloescht und kaeme so wieder (tests/sw-cache.test.mjs, CI 09.11.2026).
@@ -875,7 +897,7 @@ async function antworte(req, url) {
   const antwort = await fetch(req);
   if (antwort.status === 200 && antwort.type === 'basic') {
     const kopie = antwort.clone();
-    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, kopie))
+    caches.has(CACHE).then((da) => da && caches.open(CACHE)).then((cache) => cache && cache.put(req, ohneFrische(kopie)))
       .catch(() => { /* Speicher voll o. ae.: egal */ });
   }
   return antwort;

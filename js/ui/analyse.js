@@ -30,7 +30,7 @@ import { klang } from '../sounds.js';
 import {
   ladePartie, ladePartien, ladeReview, ergaenzeAnalyse, naechsterGegner,
   ladeLaufendePartie, loescheLaufendePartie, eigeneZuege, BESTWERT_MIN_ZUEGE,
-  pruefeZuzweit, istOnline,
+  pruefeZuzweit, zuzweitName, istOnline,
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle } from '../orte.js';
@@ -178,7 +178,7 @@ export function ergebnisInfo(partie, letzteNummer) {
   const grund = schluessel ? t(`analyse.ergebnis.${schluessel}`, { n }) : '';
   const namen = pruefeZuzweit(partie.zuzweit);
   const wort = zweiMenschen && e !== 'remis'
-    ? t('analyse.ergebnis.gewinnt', { name: namen[stand === '1:0' ? 'weiss' : 'schwarz'] })
+    ? t('analyse.ergebnis.gewinnt', { name: zuzweitName(namen[stand === '1:0' ? 'weiss' : 'schwarz']) })
     : e === 'sieg' ? t('allgemein.sieg') : e === 'niederlage' ? t('allgemein.niederlage') : t('allgemein.remis');
   return { stand, grund, wort, art: e === 'sieg' ? 'sieg' : e === 'niederlage' ? 'niederlage' : 'remis' };
 }
@@ -235,7 +235,8 @@ export function zeige(root, params = {}, app) {
   const zuzweit = () => st.partie?.modus === 'zuzweit' && !online();
   // zu kurz fuer eine verlaessliche Bewertung: dieselbe Grenze wie der Bestwert und "zu kurz" in der Genauigkeit
   const istKurz = () => eigeneZuege(st.partie) < BESTWERT_MIN_ZUEGE;
-  const personenName = (f) => pruefeZuzweit(st.partie?.zuzweit)[f === 'w' ? 'weiss' : 'schwarz'];
+  // nur zur Anzeige: Standardnamen in der App-Sprache (storage.zuzweitName); die Revanche nimmt die gespeicherten Namen
+  const personenName = (f) => zuzweitName(pruefeZuzweit(st.partie?.zuzweit)[f === 'w' ? 'weiss' : 'schwarz']);
   const personenBild = (f) => `<div class="an-avatar" aria-hidden="true"><img src="${pfad('assets/pieces/' + f + 'K.svg')}" alt=""></div>`;
   // Gegner in Beschriftungen und Bild: der Bot, in der Online-Partie der Mensch auf der anderen Seite
   const gegnerKurz = () => (online() ? personenName(st.bf) : kurzName(st.bot));

@@ -241,6 +241,7 @@ export function zeige(root, params = {}, app) {
             <li><b>${E('info.klaenge')}</b><span>${E('info.klaengeText')}</span></li>
             <li><b>${E('info.bilder')}</b><span>${E('info.bilderText')}</span></li>
             <li><b>${E('info.lichess')}</b><span>${E('info.lichessText', { link: `<a href="https://database.lichess.org/" target="_blank" rel="noopener">${E('info.lichessDb')}</a>` })}</span></li>
+            <li><b>${E('info.eroeffnungen')}</b><span>${E('info.eroeffnungenText', { link: `<a href="https://github.com/lichess-org/chess-openings" target="_blank" rel="noopener">lichess-org/chess-openings</a>` })}</span></li>
           </ul>
         </section>
        </div>

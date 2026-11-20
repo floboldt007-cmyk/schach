@@ -331,11 +331,19 @@ async function testeArena(seite, h) {
   pruefe('Panel: drei Stern-Ziele', await seite.locator('.detail .ziel-sterne > div').count() === 3);
   pruefe('Panel: Begrüßung als Sprechblase', (await seite.locator('.detail .sprechblase').innerText()).length > 5);
 
+  // fc-23:00 (Allround-Check 19.11.2026 Nr. 2): ein gesperrter Bot oeffnet seine Karte wie in der Vorschau-Welt, statt
+  // "Spielen" der Sperr-Hinweis und darunter der Weg zur Einstufung; vorher blieb Willi gewaehlt und es kam nur eine Meldung
   await h.tippe('.knoten[data-bot="benno"]');
-  await seite.waitForSelector('.toast');
-  const toast = await seite.locator('.toast').innerText();
-  pruefe('Gesperrter Bot: "Besiege erst Vogelscheuche Willi"', /Besiege erst Vogelscheuche Willi/.test(toast), toast);
-  pruefe('Gesperrter Bot wird nicht ausgewählt', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
+  await seite.waitForSelector('.detail .sp-gesperrt', { timeout: 5000 }).catch(() => {});
+  const sperre = await seite.evaluate(() => ({ h2: document.querySelector('.detail h2').textContent, hinweis: (document.querySelector('.detail .sp-gesperrt') || {}).textContent || '',
+    spielen: document.querySelectorAll('.detail [data-aktion="spielen"]').length, einstufung: !!document.querySelector('.detail .st-sperre-knopf') }));
+  // ?test&kern laeuft ohne Paket start: dann kein Knopf zur Einstufung (Ort arena:gesperrt bleibt leer); mit Paket prueft es
+  // tests/r20-start-befunde.test.mjs
+  pruefe('Gesperrter Bot: Karte mit "Besiege erst Vogelscheuche Willi.", kein Spielen, ohne Paket start kein Einstufungs-Knopf', /Bauer Lukas/.test(sperre.h2)
+    && sperre.hinweis === 'Besiege erst Vogelscheuche Willi.' && sperre.spielen === 0 && !sperre.einstufung, JSON.stringify(sperre));
+  await h.tippe('.knoten[data-bot="fridolin"]');
+  await seite.waitForSelector('.farbwahl [data-farbe="w"]', { timeout: 5000 }).catch(() => {});
+  pruefe('zurueck zu Willi: wieder Spielen', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()) && await seite.locator('.detail [data-aktion="spielen"]').count() === 1);
 
   await h.tippe('.farbwahl [data-farbe="w"]');
   pruefe('Farbwahl Weiß aktiv', await seite.locator('.farbwahl [data-farbe="w"][aria-checked="true"]').count() === 1);
@@ -914,8 +922,9 @@ async function testePruefrunde(browser) {
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena .knoten');
     await h.tippe('.knoten[data-bot="hilde"]');
-    await seite.waitForSelector('.toast');
-    const t = await seite.locator('.toast').innerText();
+    // fc-23:00: die Karte des gesperrten Bots nennt den aktuellen Gegner (vorher eine Meldung)
+    await seite.waitForSelector('.detail .sp-gesperrt', { timeout: 5000 }).catch(() => {});
+    const t = await seite.evaluate(() => (document.querySelector('.detail .sp-gesperrt') || {}).textContent || '');
     pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Vogelscheuche Willi/.test(t), t);
     // Vorschau-Welt (Flo 15.11.2026): ihr Bot oeffnet seine Karte, statt "Spielen" nennt sie den Endgegner davor
     await h.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');

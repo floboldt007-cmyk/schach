@@ -40,6 +40,8 @@
     border: 1px solid var(--text-2); text-decoration: none; font-weight: var(--gw-stark); }
   .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
   .fuss a { margin-right: var(--a3); }
+  /* einzeln stehende Links: Tippflaeche 44 px (fable-check 19.11. Nr 15); Links im Fliesstext bleiben Text (WCAG 2.5.8) */
+  .stand a, .fuss a, dd > a, a.kl-mail { display: inline-flex; align-items: center; min-height: var(--tipp); }
   .kl-feld { display: grid; gap: var(--a1); margin: 0 0 var(--a3); font-weight: var(--gw-stark); }
   .kl-feld input { width: 100%; min-height: var(--tipp); padding: 0 12px; border-radius: var(--r-m, 10px); border: 1px solid var(--text-2);
     background: var(--grund); color: var(--text); font: inherit; font-weight: normal; }
@@ -77,7 +79,8 @@
       <li>dein Cloud-Spielstand</li>
       <li>geteilte Partien und Nutzungsdaten</li>
       <li>das Anmeldeprotokoll</li>
-      <li>deine Visitenkarte mit Erfolgen und Talern, deine Liga mit Kronen und Wochen-Gruppen, deine Rätsel-Duelle (für
+      <li>deine Visitenkarte mit Erfolgen und Talern, deine Liga mit Kronen und Wochen-Gruppen, deine Season-Abzeichen und
+      Season-Titel, deine Teilnahme an der Weltrangliste, deine Rätsel-Duelle (für
       beide Spieler), deine Online-Partien, deine Daten im Schulmodus und die Altersangabe für den Shop</li>
     </ul>
     <p>Was bleibt: der Spielstand auf deinen Geräten. Server-Protokolle und Datensicherungen von Supabase löschen sich

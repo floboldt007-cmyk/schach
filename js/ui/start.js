@@ -4,7 +4,8 @@
 //
 //   zeige(root, { seite }, app) -> { verlasse() }
 //   seite: 'w1' | 'w2' | 'w3'   drei kurze Seiten (Was ist Crownmate, deine Gegner, wie du lernst), ueberspringbar
-//          'frage'              "Kennst du die Schachregeln?": Ja -> Einstufung, Nein -> Regel-Hilfe (Raetsel-Bildschirm)
+//          'frage'              "Kennst du die Schachregeln?": Ja -> Einstufung, Nein -> Kurs Erste Schritte (lernen
+//                               { bereich: 'erste' }, seit 19.11.2026; die Regel-Hilfe bleibt in den Einstellungen)
 //          'einstufung'         Angebot des Einstufungstests (8 Aufgaben im Raetsel-Bildschirm)
 //          'empfehlung'         Ergebnis der letzten Einstufung: Bot mit Begruendung, Probepartie oder Partie, Leiter
 //          'nach-regeln'        nach der Regel-Hilfe: erste Partie gegen den ersten Bot der Leiter (BOTS[0], Bauer Lukas)
@@ -17,7 +18,7 @@
 //   Das Willkommen gilt als gesehen, sobald es einmal da war (Modul start, gesehen), auch wenn Flo die App gleich schliesst.
 // DOM: section.screen.st-screen[data-seite] > header.haupt-kopf (mit button.st-raus, ggf. .kopf-zurueck), .st-rumpf >
 //   .st-buehne (.st-bild, .st-text mit .ueberzeile, h1.st-titel, p, .st-chips, .st-wahl, .st-knoepfe), nav.st-punkte (w1
-//   bis w3). Stapel der Seite einstufung: .st-stapel > .st-stapel-ort (Lage, Drehung) > .st-stapel-karte (gleitet ein).
+//   bis einstufung). Stapel der Seite einstufung: .st-stapel > .st-stapel-ort (Lage, Drehung) > .st-stapel-karte (gleitet ein).
 //   Knoepfe tragen data-st (weiter, ueberspringen, punkt, ja, nein, einstufung-start, probe, leiter, spielen, benno,
 //   einstufung-seite, wiederholen, arena, raus).
 // Optik: css/pakete/start.css (link[data-paket="start"], vom Paket oder hier eingehaengt). Nur Tokens.
@@ -41,7 +42,10 @@ import '../sprachen/einstellungen.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const SEITEN = Object.freeze(['w1', 'w2', 'w3', 'frage', 'einstufung', 'empfehlung', 'nach-regeln']);
-const INTRO = ['w1', 'w2', 'w3'];
+// Punkte unten (fc-23:00, Allround-Check 19.11.2026 Nr. 1): alle Schritte mit demselben Weiter zaehlen, auch Regelfrage und
+// Einstufung; vorher sagten drei Punkte "Seite 3 von 3", und danach kamen noch zwei Seiten. Empfehlung und nach-regeln
+// sind Ergebnisse (dort keine Punkte).
+const INTRO = ['w1', 'w2', 'w3', 'frage', 'einstufung'];
 // w1: eine ruhige Eroeffnung (Italienisch), der letzte Zug bekommt die Marke "Praezise"
 const FEN_WILLKOMMEN = 'r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4';
 const FEN_GRUND = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -301,7 +305,9 @@ export function zeige(root, params, app) {
     else if (was === 'ueberspringen') geheZu('frage');
     else if (was === 'punkt') geheZu(k.dataset.ziel, INTRO.indexOf(k.dataset.ziel) < i ? -1 : 1);
     else if (was === 'ja' || was === 'einstufung-seite' || was === 'wiederholen') geheZu('einstufung');
-    else if (was === 'nein') { D.setzeRueck('frage'); app.gehe('raetsel', { quelle: D.QUELLE_REGELN }); }
+    // Nein: Kurs Erste Schritte (19.11.2026, js/pakete/lernen/erste-schritte.js); die Regel-Hilfe (Raetsel-Quelle
+    // start-regeln) bleibt ueber die Einstellungen, Gruppe Erste Schritte, erreichbar, bis der Kurs alle Kapitel hat
+    else if (was === 'nein') { D.setzeRueck('frage'); app.gehe('lernen', { bereich: 'erste' }); }
     else if (was === 'einstufung-start') { D.setzeRueck('einstufung'); app.gehe('raetsel', { quelle: D.QUELLE_EINSTUFUNG }); }
     // Etappe A: "Ich kenne mich aus" fuehrt zur Startseite heim, der Knopf zur Arena bleibt bei der Arena
     else if (was === 'raus') app.gehe('heim', {}, { ersetzen: true });
@@ -315,7 +321,7 @@ export function zeige(root, params, app) {
       if (em) spiele(em.bot.id, em.probe);
     }
   });
-  // Pfeiltasten blaettern durch die drei ersten Seiten
+  // Pfeiltasten blaettern durch die Seiten mit Punkten
   s.addEventListener('keydown', (ev) => {
     const i = INTRO.indexOf(jetzt);
     if (i < 0 || ev.defaultPrevented || ev.altKey || ev.ctrlKey || ev.metaKey) return;

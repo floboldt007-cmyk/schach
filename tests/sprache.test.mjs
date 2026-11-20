@@ -376,6 +376,8 @@ async function schrittZwei(browser) {
       else if (u.pathname.endsWith('/karte_melde_stufen') || u.pathname.endsWith('/karte_waehle')) body = { taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } };
       // Handy-Runde 08.11.: die Online-Seite fragt, ob die Liga da ist; mit Antwort zeigt sie die Gegnersuche (deren englische Texte prueft dieser Lauf mit)
       else if (u.pathname.endsWith('/kronen_mein_stand')) body = { stufe: 0, kronen: 0, platz: null, ziel: null, n: 30, woche: '2026-11-02' };
+      // Season-Schalter (Flo 18.11.2026): die Einstellungen fragen mit Konto nach dem eigenen Stand, die Gruppe laeuft so im englischen Lauf mit
+      else if (u.pathname.endsWith('/saison_mein_stand')) body = { saison: 0, start: '2027-01-04', abzeichen: [], titel: [], gewaehlt: null, sichtbar: true };
       else if (u.pathname === '/functions/v1/coach') body = { text: 'Develop your knight and protect the center.', rest: 4, modell: 'probe' };
       else { unerwartet.push(u.pathname); body = {}; }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });

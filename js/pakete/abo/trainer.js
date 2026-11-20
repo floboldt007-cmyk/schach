@@ -13,7 +13,7 @@
 //              Bis dahin stehen sie unter "Kommt noch, ebenfalls gratis" (Luecken-Check 2, Paragraf 5 UWG).
 //   bereiteGratis(), geplanteGratis()
 //   bereiteVorteile(), verkaufbar(produkt)   Kauf nur mit mindestens einem gebauten Vorteil (oder Stripe-Testmodus)
-//   ALTER_HINWEIS, ALTER_FRAGE, UNTER_18   Texte zum Alter: Crownmate ist ab 16, das Abo im Web ab 18 (SPIELKONZEPT 2b.8
+//   ALTER_HINWEIS, ALTER_FRAGE, UNTER_18   Texte zum Alter: Konto ab 13, das Abo im Web ab 18 (SPIELKONZEPT 2b.8
 //              Regel 22: Abo fuer Minderjaehrige nur ueber die Familienfreigabe der Stores, die gibt es im Web nicht).
 //              Vor dem ersten Kauf fragt das Blatt einmal "18 oder aelter?" (alterAngabe in js/abo.js).
 //   Zustaende (data-zustand an .trainer-karte):
@@ -39,6 +39,8 @@ import './texte.js';
 const A = (k, w) => t('p-abo.' + k, w);
 import { anim, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
+// INTENTIONAL-SLOP[D6]: Importpfad, steht in jeder importierenden Datei woertlich
+import { schluckeFolgeKlick } from '../../ui/bauteile.js';
 import { kontoFreigeschaltet } from '../../konto.js';
 import {
   istPremium, premiumStand, ladeProdukt, kaufen, verwalten, stelleAboCssSicher, inStoreHuelle, kaufStand, bestaetigeKauf,
@@ -82,10 +84,10 @@ const ZUSAGEN = Object.freeze([
   'Bezahlt wird über Stripe. Die App sieht keine Kartendaten.',
 ]);
 export const GEPLANT_HINWEIS = 'Noch nicht enthalten. Es kommt erst in den Trainer, wenn es fertig ist.';
-// Crownmate ist ab 16 (ENTSCHEIDUNGEN 17.10.). Ein Abo ist ein Vertrag mit laufenden Kosten; 16- und 17-Jaehrige
+// Ein Konto gibt es ab 13, Einwilligungen ab 16 (Flo 18.11.2026). Ein Abo ist ein Vertrag mit laufenden Kosten; Minderjaehrige
 // schliessen es nach Regel 22 nur ueber die Familienfreigabe der Stores ab. Im Web gibt es die nicht, also dort ab 18.
 // Ob es spaeter einen Weg mit Zustimmung der Eltern gibt, entscheidet Flo mit der Fachperson (ANLEITUNG, Abschnitt Abo).
-export const ALTER_HINWEIS = 'Den Trainer gibt es im Web ab 18. Spielen und Lernen in Crownmate bleiben ab 16 frei.';
+export const ALTER_HINWEIS = 'Den Trainer gibt es im Web ab 18. Spielen und Lernen in Crownmate bleiben frei.';
 export const ALTER_FRAGE = 'Eine Frage vorab: Bist du 18 oder älter? Ein Abo ist ein Vertrag mit laufenden Kosten, deshalb gibt es den Trainer im Web erst ab 18.';
 export const UNTER_18 = 'Den Trainer gibt es im Web erst ab 18. Alles andere in Crownmate bleibt für dich frei.';
 const TEST_HINWEIS = 'Stripe-Testmodus: Es fließt kein echtes Geld.';
@@ -316,7 +318,7 @@ export function zeigeTrainer({ app = null } = {}) {
     }
   }
 
-  schleier.addEventListener('pointerdown', () => ende());
+  schleier.addEventListener('pointerdown', () => { ende(); schluckeFolgeKlick(); });
   document.addEventListener('keydown', taste, true);
   document.addEventListener('abo:stand', beiStand);
   try { abScreen = hoere('app:screen', () => ende()); } catch (e) { /* egal */ }

@@ -99,6 +99,9 @@ export const EROEFFNUNGEN = [
   { zuege: 'e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4', name: 'Russische Verteidigung: Klassische Variante' },
   { zuege: 'e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4 d4 d5 Bd3', name: 'Russische Verteidigung: Hauptvariante' },
   { zuege: 'e4 e5 Nf3 Nf6 d4', name: 'Russische Verteidigung: Steinitz-Angriff' },
+  // fc-00:40 (Allround-Check 19.11.2026 Nr. 5): 3. Lc4 ist Theorie (ECO C42, nach 3...Sxe4 4. Sc3 das Boden-Kieseritzky-
+  // Gambit) und bekam ohne diese Zeile "?!"; dieselbe Stellung entsteht auch ueber 1. e4 e5 2. Lc4 Sf6 3. Sf3
+  { zuege: 'e4 e5 Nf3 Nf6 Bc4', name: 'Russische Verteidigung: Italienische Variante' },
   { zuege: 'e4 e5 Nf3 d6', name: 'Philidor-Verteidigung' },
   { zuege: 'e4 e5 Nf3 d6 d4 exd4', name: 'Philidor-Verteidigung: Abtauschvariante' },
   { zuege: 'e4 e5 Nf3 d6 d4 Nf6 Nc3 Nbd7', name: 'Philidor-Verteidigung: Hanham-Variante' },
@@ -274,6 +277,52 @@ export const EROEFFNUNGEN = [
   { zuege: 'f4 e5', name: 'From-Gambit' },
   { zuege: 'f4 d5', name: 'Bird-Eröffnung: Holländische Variante' },
   { zuege: 'b3 e5', name: 'Nimzowitsch-Larsen-Angriff: Moderne Variante' },
+
+  // ---------- Abgleich mit lichess-org/chess-openings (fc-01:30, 20.11.2026) ----------
+  // Linien bis 8 Halbzuege, die fehlten und vom Coach "?!" bekamen (Stockfish Tiefe 14), mit mindestens 100
+  // Meisterpartien in der lichess-Meisterdatenbank; Liste CC0-1.0 (Stand 3ba6b20d), deutsche Namen eigene.
+  // Messung und Begruendung: tests/r20-buch-luecken.test.mjs
+  { zuege: 'c4 Nf6 d4 c5 Nf3', name: 'Englische Eröffnung: Symmetrische Variante, Anti-Benoni' },
+  { zuege: 'd4 e6 c4 b6', name: 'Englische Verteidigung' },
+  { zuege: 'e4 e6 d4 d5 Nd2 Nc6', name: 'Französische Verteidigung: Tarrasch-Variante, Guimard-Verteidigung' },
+  { zuege: 'e4 c6 d4 d5 Nc3 g6', name: 'Caro-Kann-Verteidigung: Gurgenidse-System' },
+  { zuege: 'e4 e6 d4 d5 Nc3 Nc6', name: 'Französische Verteidigung: Hecht-Reefschläger-Variante' },
+  { zuege: 'e4 c5 Nc3 e6 g3', name: 'Sizilianische Verteidigung: Geschlossene Variante mit g3' },
+  { zuege: 'e4 e6 d4 d5 Bd3', name: 'Französische Verteidigung: Schlechter-Variante' },
+  { zuege: 'e4 e6 d4 c5', name: 'Französische Verteidigung: Franco-Sizilianisch' },
+  { zuege: 'd4 b5', name: 'Polnische Verteidigung' },
+  { zuege: 'e4 e5 Nf3 Nc6 Nc3 g6', name: 'Dreispringerspiel: Steinitz-Verteidigung' },
+  { zuege: 'e4 Nf6 d3', name: 'Aljechin-Verteidigung: Maróczy-Variante' },
+  { zuege: 'Nf3 b5', name: 'Réti-Eröffnung: Polnische Verteidigung' },
+  { zuege: 'd4 Nf6 Nc3 c5', name: 'Indische Verteidigung: Umgekehrte Tschigorin-Verteidigung' },
+  { zuege: 'e4 c5 d4 cxd4 c3 d3', name: 'Sizilianische Verteidigung: Abgelehntes Morra-Gambit mit d3' },
+  { zuege: 'Nf3 f5 e4', name: 'Réti-Eröffnung: Lisitsin-Gambit' },
+  { zuege: 'e4 e5 Nc3 Nc6 f4', name: 'Wiener Gambit mit Max-Lange-Verteidigung' },
+  { zuege: 'd4 c5 d5 f5', name: 'Benoni-Verteidigung: Alt-Benoni, Mujannah-Aufbau' },
+  { zuege: 'e4 e5 Nf3 Qe7', name: 'Gunderam-Verteidigung' },
+  { zuege: 'e4 e5 Nf3 Nc6 Be2', name: 'Königsspringerspiel: Tayler-Eröffnung' },
+  { zuege: 'e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Qh4', name: 'Schottische Partie: Steinitz-Variante' },
+  { zuege: 'e4 e6 d4 d5 Nc3 Bb4 Bd2', name: 'Französische Verteidigung: Winawer-Variante, Fingerslip-Variante' },
+  { zuege: 'e4 c6 d4 Na6', name: 'Caro-Kann-Verteidigung: De-Bruycker-Verteidigung' },
+  { zuege: 'e4 Nc6 d4 d5 Nc3 Nf6', name: 'Nimzowitsch-Verteidigung: Skandinavische Variante mit Sf6' },
+  { zuege: 'e4 c5 f4 d5 Nc3', name: 'Sizilianische Verteidigung: McDonnell-Angriff mit Sc3' },
+  { zuege: 'e4 e5 f4 exf4 Nf3 Ne7', name: 'Königsgambit: Bonsch-Osmolowski-Variante' },
+  { zuege: 'e4 g6 d4 Bg7 Nc3 c5 dxc5 Qa5', name: 'Pterodactylus-Verteidigung: Östliche Variante' },
+  { zuege: 'e4 e5 f4 d5 exd5 c6', name: 'Falkbeer-Gegengambit: Nimzowitsch-Marshall-Variante' },
+  { zuege: 'e4 e5 f4 d5 exd5 e4', name: 'Falkbeer-Gegengambit: Staunton-Linie' },
+  { zuege: 'e4 e5 Nf3 Nf6 Nxe5 d6 Nxf7', name: 'Russische Verteidigung: Cochrane-Gambit' },
+  { zuege: 'e4 c5 Nf3 e6 b4', name: 'Sizilianische Verteidigung: Verzögertes Flügelgambit' },
+  { zuege: 'e4 c5 Nf3 g6 d4 Bg7 Nc3 Qa5', name: 'Sizilianische Verteidigung: Pterodactylus-Variante' },
+  { zuege: 'Nf3 d5 d4 Bg4', name: 'Damenbauernspiel: Anti-Torre' },
+  { zuege: 'e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 d5', name: 'Sizilianische Verteidigung: Nimzo-Amerikanische Variante' },
+  { zuege: 'd4 Nf6 Nc3 d5 e4', name: 'Damenbauernspiel: Hübsch-Gambit' },
+  { zuege: 'e4 Nc6 Nf3 f5', name: 'Nimzowitsch-Verteidigung: Colorado-Gegengambit' },
+  { zuege: 'e4 Nc6 Nf3 e6', name: 'Nimzowitsch-Verteidigung: Franco-Nimzowitsch-Variante' },
+  { zuege: 'e4 e6 d4 d5 e5 c5 Qg4', name: 'Französische Verteidigung: Vorstoßvariante, Nimzowitsch-Angriff' },
+  { zuege: 'e4 e5 Nf3 Nc6 Bb5 Bb4', name: 'Spanische Partie: Alapin-Verteidigung' },
+  { zuege: 'e4 c5 Nf3 Nc6 b4', name: 'Sizilianische Verteidigung: Portsmouth-Gambit' },
+  { zuege: 'e4 c6 d4 d5 Nc3 b5', name: 'Caro-Kann-Verteidigung: Gurgenidse-Gegenangriff' },
+  { zuege: 'd4 Nf6 f3', name: 'Indische Verteidigung: Paleface-Angriff' },
 ];
 
 // Stellungsschluessel: Brett, Zugrecht, Rochaderechte, en passant (ohne Zugzaehler)

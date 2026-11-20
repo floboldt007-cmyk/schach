@@ -198,9 +198,21 @@ export function duellProfil() {
 
 // nach jedem Blatt der Profil-Wahl (Bild, Hintergrund, Rahmen, Vitrine, Banner): neu zeichnen und die Karte an den
 // Server geben, damit der naechste Gegner den neuen Stand sieht (ohne Konto kehrt der Abgleich sofort zurueck)
-function neuZeichnen(app) {
+function neuZeichnen(app, ziel = '') {
   karteAbgleichen();
   try { app?.gehe?.('ich', {}, { ersetzen: true }); } catch (e) { /* egal */ }
+  if (ziel) fokusAuf(ziel);
+}
+// Tastatur und VoiceOver (fc-05:45): der neu gezeichnete Bildschirm ersetzt den Ausloeser des Blatts, sheet() gab den Fokus
+// an den alten Knopf zurueck; sein Nachfolger (gleicher Selektor) bekommt ihn, sobald er steht (tests/r22-tastatur.test.mjs)
+// Der alte Bildschirm haengt waehrend des Wechsels noch kurz (unsichtbar) im DOM: darum zaehlt nur ein SICHTBARER Fokus
+function fokusAuf(ziel, n = 0) {
+  const f = document.activeElement;
+  if (!(f && f !== document.body && f.isConnected && f.getClientRects().length && !f.closest('.weg'))) {
+    const el = [...document.querySelectorAll(ziel)].find((e) => e.getClientRects().length);
+    if (el) { el.focus({ preventScroll: true }); return; }
+  }
+  if (n < 20) setTimeout(() => fokusAuf(ziel, n + 1), 50);
 }
 
 // Motive und Hintergruende fuers Profilbild (Flo 31.10.2026: "mehr Optionen, denk dir was aus, nur ich der Erschaffer kann
@@ -303,7 +315,7 @@ function waehleAussehen(app) {
     }
   });
   sheet({ titel: S('profil.aendern'), inhalt, klasse: 'pr-blatt', knoepfe: [{ text: S('profil.fertig'), wert: true, art: 'primaer' }], abbrechen: true })
-    .then(() => neuZeichnen(app)).catch(() => {});
+    .then(() => neuZeichnen(app, '.pr-aendern')).catch(() => {});
 }
 
 // Etappe 4b: zur Wahl stehen die erreichten Erfolgs-Familien (mit Stufe), nie etwas Gekauftes
@@ -330,7 +342,7 @@ function waehleOrden(app, platz) {
   if (wahl.vitrine[platz]) knoepfe.unshift({ text: S('profil.leeren'), wert: 'leeren' });
   sheet({ titel: S('profil.waehle'), inhalt, klasse: 'pr-blatt', knoepfe, abbrechen: 'fertig' }).then((w) => {
     if (w === 'leeren') { const neu = profilWahl().vitrine; neu[platz] = null; setzeProfilWahl({ vitrine: neu }); }
-    neuZeichnen(app);
+    neuZeichnen(app, `.pr-orden[data-platz="${platz}"]`);
   }).catch(() => {});
 }
 
