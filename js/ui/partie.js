@@ -3065,13 +3065,12 @@ export function zeige(root, params, app) {
   }
   pfeilTippPruefen();
 
-  // im ersten Bild-Rueckruf, also vor dem ersten Malen (das Brett steht dort schon in Endgroesse,
-  // tests/r25-brett-start.test.mjs), aber nicht mehr im langen Aufbau-Task (R25 F1)
+  // einmal am Ende des Aufbaus, nicht bei jedem Zwischenschritt (R25 F1). Synchron wie vor F1: im Bild-Rueckruf malte
+  // WebKit bei Bewegung normal ein Bild vorher, und das Brett schrumpfte danach (iPhone SE 375 -> 368, iPhone 13
+  // 390 -> 384, tests/r25-brett-start.test.mjs); die Hoehen haelt halteCoachHoehe wie bisher im naechsten Bild fest
   aufgebaut = true;
-  // erst die Hoehen festhalten, dann layout(): umgekehrt aenderten die Mindesthoehen den Platz, und das Brett schrumpfte
-  // ein Bild spaeter (iPhone 13: 390 -> 384, tests/r25-brett-start.test.mjs)
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { if (weg) return; halteCoachHoehe(); layout(); });
-  else layout();
+  layout();
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { if (!weg) halteCoachHoehe(); });
 
   // Figurensatz wirkt sofort (R3, 12.11.2026, dieselbe Luecke wie in js/ui/online.js vom 11.11.): kommt der Erfinder-Status
   // erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt Flo einen anderen
