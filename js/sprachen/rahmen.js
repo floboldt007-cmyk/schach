@@ -68,6 +68,7 @@ registriereTexte('rahmen', {
     'platzhalter.hoppla': 'HOPPLA',
     'platzhalter.kaputt': 'Hier ist etwas schiefgegangen. Versuch es gleich noch einmal.',
     'platzhalter.nichtGeladen': 'Der Bereich „{name}“ konnte nicht geladen werden. Prüfe die Internetverbindung und lade die App neu.',
+    'platzhalter.ohneNetz': 'Dieser Teil ist noch nicht geladen. Bitte einmal mit Internet öffnen.',
     neuLaden: 'Neu laden',
     zurArena: 'Zu den Bots',
     // Update-Hinweis
@@ -189,6 +190,7 @@ registriereTexte('rahmen', {
     'platzhalter.hoppla': 'OOPS',
     'platzhalter.kaputt': 'Something went wrong here. Please try again in a moment.',
     'platzhalter.nichtGeladen': 'The section “{name}” could not be loaded. Check your internet connection and reload the app.',
+    'platzhalter.ohneNetz': "This part isn't downloaded yet. Please open it once with internet.",
     neuLaden: 'Reload',
     zurArena: 'Go to the bots',
     'update.neu': 'New version',
