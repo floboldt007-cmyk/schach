@@ -148,6 +148,8 @@ const SUITEN = [
   { name: 'r20-buch-luecken', datei: 'r20-buch-luecken.test.mjs', args: [], was: 'Feinschliff R20 (43): 41 bekannte Linien aus lichess im Eroeffnungsbuch, deutsch und englisch benannt' },
   { name: 'r20-lernen-gegner', datei: 'r20-lernen-gegner.test.mjs', args: [], was: 'Feinschliff R20: Lektionen mit Gegner gelten nach einem ruhigen falschen Zug nicht als geschafft (Halten-Regeln nur fuer halten)' },
   { name: 'r20-sieg-frei-genau', datei: 'r20-sieg-frei-genau.test.mjs', args: [], was: 'Feinschliff R20: Sieg ohne Sterne (freie Partie, Kurs Kapitel 6) zeigt die Genauigkeit statt eines leeren Rahmens' },
+  { name: 'r23-ipad-blatt', datei: 'r23-ipad-blatt.test.mjs', args: [], was: 'Feinschliff R23: Knopf Fertig im Sammlungs-Blatt ganz sichtbar ueber der Unterkante (iPad, Handy, PC)' },
+  { name: 'r22-tastatur', datei: 'r22-tastatur.test.mjs', args: [], was: 'Tastatur/Vorleser: Fokus nach Ich-Blatt zurueck, Coach aufklappbar, Knoepfe benannt (PC + iPhone 13)' },
   { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
   { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },
