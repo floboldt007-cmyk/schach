@@ -6,8 +6,9 @@
 // activate den alten Cache. Bis clients.claim() steuert noch die alte Fassung die Seite, eine Anfrage in diesem
 // Moment landet bei ihr. Legt ihr Fetch-Handler dabei den alten Cache neu an, bleibt er bis zum naechsten Update liegen.
 //   node tests/sw-cache.test.mjs
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 import path from 'node:path';
 
@@ -15,6 +16,12 @@ const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEXT = readFileSync(path.join(WURZEL, 'sw.js'), 'utf8');
 const VERSION = Number(TEXT.match(/const VERSION = (\d+);/)[1]);
 const ORT = 'https://example.org/schach/';
+const { DATEIEN, KERN } = (() => {
+  const k = { self: { location: new URL(ORT + 'sw.js'), addEventListener() {} }, URL };
+  vm.createContext(k);
+  vm.runInContext(TEXT + '\n;globalThis.__l = { DATEIEN, KERN };', k);
+  return k.__l;
+})();
 
 const ergebnisse = [];
 function pruefe(name, ok, detail = '') {
@@ -53,7 +60,9 @@ function worker(version, caches, netz) {
   const hoerer = {};
   const self = { location: new URL(ORT + 'sw.js'), addEventListener: (t, f) => { hoerer[t] = f; },
     clients: { claim: async () => {} }, skipWaiting: async () => {} };
-  const kontext = { self, caches, fetch: netz, Response, Request, Headers, URL, console };
+  // wie im Browser: eine relative Adresse gilt relativ zu sw.js (Node verlangt sonst eine volle)
+  const ImWorker = class extends Request { constructor(u, o) { super(typeof u === 'string' ? new URL(u, self.location).href : u, o); } }; // INTENTIONAL-SLOP[R3]: self ist hier das nachgebaute Worker-Objekt
+  const kontext = { self, caches, fetch: netz, Response, Request: ImWorker, Headers, URL, console };
   vm.createContext(kontext);
   vm.runInContext(TEXT.replace(`const VERSION = ${VERSION};`, `const VERSION = ${version};`), kontext);
   return {
@@ -72,7 +81,9 @@ const alt = `schach-arena-v${VERSION}`, neu = `schach-arena-v${VERSION + 1}`;
 async function lage() {
   const caches = new CacheStorage();
   (await caches.open(alt)).put(ORT + 'index.html', new Response('alt'));
-  (await caches.open(neu)).put(ORT + 'index.html', new Response('neu'));
+  // der neue Cache ist vollstaendig: dann loescht activate den alten (mit Luecken behaelt es ihn, Fall 4 unten)
+  const voll = await caches.open(neu);
+  for (const d of DATEIEN) await voll.put(ORT + d, new Response(d === 'index.html' ? 'neu' : '// ' + d));
   const a = worker(VERSION, caches, netz), n = worker(VERSION + 1, caches, netz);
   await n.ereignis('activate');
   caches.geoeffnet = [];
@@ -107,6 +118,111 @@ async function lage() {
   pruefe('Normal: nachgeladene Datei landet im eigenen Cache', !!(await (await caches.open(neu)).match(ORT + 'js/nachgeladen.js')));
   const zweit = await n.ereignis('fetch', anfrage('js/nachgeladen.js'));
   pruefe('Normal: beim zweiten Mal kommt sie aus dem Cache', zweit && await zweit.text() === '// aus dem Netz');
+}
+
+// 4) Update, die Installation hat nur den Kern abgelegt (fc-06:00, 20.11.2026): activate behaelt den alten Cache, damit das
+// Nachladen den Rest per ETag (304) aus ihm nimmt statt voll aus dem Netz, und raeumt ihn erst weg, wenn alles da ist
+{
+  const caches = new CacheStorage();
+  const altCache = await caches.open(alt);
+  for (const d of DATEIEN) await altCache.put(ORT + d, new Response('// alt ' + d, { headers: { ETag: '"e1"' } }));
+  const neuCache = await caches.open(neu);
+  for (const d of KERN) await neuCache.put(ORT + d, new Response('// neu ' + d));
+  let voll = 0, bedingt = 0;
+  const netz304 = async (r) => {
+    if (r.headers.get('If-None-Match')) { bedingt++; return new Response(null, { status: 304 }); }
+    voll++; return netz();
+  };
+  const n = worker(VERSION + 1, caches, netz304);
+  await n.ereignis('activate');
+  pruefe('Update mit Luecken: activate behaelt den alten Cache fuer das Nachladen', JSON.stringify(await caches.keys()) === JSON.stringify([alt, neu]),
+    (await caches.keys()).join(', '));
+  for (let i = 0; i < 5 && (await caches.keys()).includes(alt); i++) await n.ereignis('fetch', anfrage('index.html'));
+  pruefe('Update mit Luecken: das Nachladen nimmt den Rest per 304 aus dem alten Cache, kein voller Abruf',
+    voll === 0 && bedingt === DATEIEN.length - KERN.length, `voll ${voll}, bedingt ${bedingt}, Rest ${DATEIEN.length - KERN.length}`);
+  const rest = DATEIEN.find((d) => !KERN.includes(d));
+  pruefe('Update mit Luecken: danach liegt jede Datei im neuen Cache, der alte ist weg', JSON.stringify(await caches.keys()) === JSON.stringify([neu])
+    && (await (await caches.open(neu)).keys()).length === DATEIEN.length && /alt/.test(await (await (await caches.open(neu)).match(ORT + rest)).text()),
+    (await caches.keys()).join(', '));
+}
+
+// 5) Das Nachladen der aktiven Fassung raeumt nur aeltere Caches weg, nie einen neueren (der kann gerade installieren),
+// und eine geloeschte Fassung legt beim Nachladen ihren Cache nicht wieder an
+{
+  const caches = new CacheStorage();
+  const eigen = await caches.open(alt);
+  for (const d of KERN) await eigen.put(ORT + d, new Response('// ' + d));
+  (await caches.open(neu)).put(ORT + 'index.html', new Response('neu'));
+  const a = worker(VERSION, caches, netz);
+  await a.ereignis('fetch', anfrage('index.html'));
+  pruefe('Nachladen: fuellt den eigenen Cache und laesst den neueren stehen', JSON.stringify(await caches.keys()) === JSON.stringify([alt, neu])
+    && (await eigen.keys()).length === DATEIEN.length, `${(await caches.keys()).join(', ')}; ${(await eigen.keys()).length} von ${DATEIEN.length}`);
+  await caches.delete(alt);
+  await a.ereignis('fetch', anfrage('js/spaet.js'));
+  pruefe('Nachladen: eine geloeschte Fassung legt ihren Cache nicht wieder an', JSON.stringify(await caches.keys()) === JSON.stringify([neu]),
+    (await caches.keys()).join(', '));
+}
+
+// 6) Update mit Luecken, dann ohne Netz (Kaltreview fc-08:50, 20.11.2026): eine Datei, die der neue Cache noch nicht hat,
+// kommt aus dem von activate behaltenen alten Cache statt als Netzfehler; der alte Cache wird dabei nicht neu angelegt.
+// Nachpruefung 19 (20.11.2026): NIE fuer Module, Stile und Seiten, sonst laufen alte und neue Fassung gemischt.
+{
+  const caches = new CacheStorage();
+  const altCache = await caches.open(alt);
+  for (const d of DATEIEN) await altCache.put(ORT + d, new Response('// alt ' + d));
+  const neuCache = await caches.open(neu);
+  for (const d of KERN) await neuCache.put(ORT + d, new Response('// neu ' + d));
+  const ohneNetz = async () => { throw new TypeError('Failed to fetch'); };
+  const n = worker(VERSION + 1, caches, ohneNetz);
+  await n.ereignis('activate');
+  const holeOhneNetz = async (d) => { try { const a = await n.ereignis('fetch', anfrage(d)); return a ? await a.text() : 'leer'; } catch (e) { return 'Netzfehler: ' + e.message; } };
+  const rest = DATEIEN.find((d) => !KERN.includes(d) && /\.(png|webp|svg|mp3|woff2|json)$/.test(d));
+  const restText = await holeOhneNetz(rest);
+  pruefe('ohne Netz nach einem Update: ein Bild/Klang ausserhalb des Kerns kommt aus dem behaltenen alten Cache',
+    restText === '// alt ' + rest, `${rest}: ${restText}`);
+  const sf = DATEIEN.find((d) => /^vendor\/stockfish\/.+\.js$/.test(d) && !KERN.includes(d));
+  const sfText = await holeOhneNetz(sf);
+  pruefe('ohne Netz nach einem Update: Stockfish (kein Modul der App) kommt aus dem alten Cache', sfText === '// alt ' + sf, `${sf}: ${sfText}`); // INTENTIONAL-SLOP[G5]: Prueftext und Dateiinhalt, keine Datenbankabfrage
+  const gemischt = [];
+  for (const d of DATEIEN.filter((x) => !KERN.includes(x) && /\.(m?js|css|html)$/.test(x) && !/^vendor\/stockfish\//.test(x))) {
+    if (/^\/\/ alt /.test(await holeOhneNetz(d))) gemischt.push(d);
+  }
+  pruefe('ohne Netz nach einem Update: KEIN Modul, Stil oder Seite kommt aus dem alten Cache (sonst alte und neue Fassung gemischt)',
+    gemischt.length === 0, `${gemischt.length} gemischt, z. B. ${gemischt.slice(0, 4).join(', ')}`);
+  const kern = await n.ereignis('fetch', anfrage(KERN.find((d) => d !== 'index.html')));
+  pruefe('ohne Netz nach einem Update: eine Kern-Datei kommt weiter aus dem neuen Cache', !!kern && /^\/\/ neu /.test(await kern.text()));
+  let weg = '';
+  try { await n.ereignis('fetch', anfrage('js/gibt-es-nirgends.js')); } catch (e) { weg = e.message; }
+  pruefe('ohne Netz: eine Datei, die kein Cache hat, bleibt ein Netzfehler', weg === 'Failed to fetch', weg);
+  pruefe('ohne Netz: es entsteht kein weiterer Cache', JSON.stringify(await caches.keys()) === JSON.stringify([alt, neu]), (await caches.keys()).join(', '));
+}
+
+// 7) Nachbau v262 -> v268 (Nachpruefung 19, 20.11.2026, PR #170): js/ui/lobby.js alt importiert ligaTabelle aus
+// js/pakete/lobby/index.js, die neue Fassung exportiert es nicht mehr. Ohne Netz nach dem Update liefert der Worker beide
+// Dateien; Node linkt sie wie der Browser. Gemischt: Linkfehler (stiller Bruch). Richtig: lobby.js fehlt als Netzfehler.
+{
+  const caches = new CacheStorage();
+  const altCache = await caches.open(alt);
+  await altCache.put(ORT + 'js/ui/lobby.js', new Response("import { ligaTabelle } from '../pakete/lobby/index.js';\nexport const lobby = ligaTabelle;\n"));
+  await altCache.put(ORT + 'js/pakete/lobby/index.js', new Response('export const ligaTabelle = 1;\n'));
+  const neuCache = await caches.open(neu);
+  for (const d of KERN) await neuCache.put(ORT + d, new Response('// neu ' + d));
+  await neuCache.put(ORT + 'js/pakete/lobby/index.js', new Response('export const lobbyNeu = 2;\n'));
+  const n = worker(VERSION + 1, caches, async () => { throw new TypeError('Failed to fetch'); });
+  await n.ereignis('activate');
+  const ordner = mkdtempSync(path.join(tmpdir(), 'sw-cache-v268-'));
+  let ergebnis;
+  try {
+    for (const d of ['js/ui/lobby.js', 'js/pakete/lobby/index.js']) {
+      const a = await n.ereignis('fetch', anfrage(d));
+      mkdirSync(path.dirname(path.join(ordner, d)), { recursive: true });
+      writeFileSync(path.join(ordner, d), await a.text());
+    }
+    await import(pathToFileURL(path.join(ordner, 'js/ui/lobby.js')).href);
+    ergebnis = 'geladen';
+  } catch (e) { ergebnis = e.name + ': ' + e.message; }
+  pruefe('v262 -> v268 ohne Netz: das alte Modul wird nicht neben das neue gelegt (Netzfehler statt Linkfehler)',
+    /^TypeError: Failed to fetch/.test(ergebnis), ergebnis);
 }
 
 const gut = ergebnisse.filter((e) => e.ok).length;
