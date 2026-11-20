@@ -18,6 +18,7 @@
 //             Einstellungen "teilen" { bild: '' | 'hell' | 'dunkel', name: false } (Wahl im Blatt, bleibt)
 // Test:       zustand() -> { offen, modus, bereit, texte, datei: { name, type, size } | null, weg, name }
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null, das Blatt meldet nur still.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
 import { ladePartie, ladeModul, speichereModul, ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
@@ -460,15 +461,10 @@ function knopf({ app, partie, bot, ort, herausfordern = null }) {
 
 // ---------- Einhaengen (defensiv) ----------
 function ladeCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-paket="teilen"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../../css/pakete/teilen.css', import.meta.url).href;
-    l.dataset.paket = 'teilen';
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleiben die Bauteile lesbar */ }
+  return ladePaketCss('teilen');
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladeCss());
 
 try {
   ladeCss();

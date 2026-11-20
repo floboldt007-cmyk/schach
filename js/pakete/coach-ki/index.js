@@ -22,6 +22,7 @@
 //   Netz), fragt die App den Server, der den Trainer selbst prueft: So sieht kein zahlender Nutzer einen Kaufhinweis,
 //   nur weil gerade das Netz fehlt (dann "offline").
 // Defensiv: Ein Fehler hier stoert nie die Analyse.
+import { ladePaketCss } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { t } from '../../sprache.js';
 import './texte.js';
@@ -41,12 +42,7 @@ const ZUKLAPPEN = new Set(['antwort', 'premium', 'abgemeldet']);
 let kartenNr = 0;
 
 function stelleCssSicher() {
-  if (typeof document === 'undefined' || document.querySelector('link[data-paket-css="coach-ki"]')) return;
-  const l = document.createElement('link');
-  l.rel = 'stylesheet';
-  l.href = new URL('../../../css/pakete/coach-ki.css', import.meta.url).href;
-  l.dataset.paketCss = 'coach-ki';
-  document.head.appendChild(l);
+  ladePaketCss('coach-ki', { marke: { paketCss: 'coach-ki' } });
 }
 
 export function coachKnopf({ app = null, partie = null, zug = null, du = null } = {}) {
