@@ -437,6 +437,15 @@ export function reiterVon(screen, liste = reiterListe(), params = {}) {
 const leiste = { el: null, pille: null, lage: null, sichtbar: false, gezeigt: false, wegAnim: null, pilleLage: null, pilleV: null, pilleB: null,
   ro: null, rahmen: 0, fokusFolgt: false };
 
+// Design-Probe W1 (nur ?test&design=w1b|w1c, R19-Auswahl leiste-symbole): Strich-Symbole in Gold statt der Spiel-Symbole,
+// Start traegt die Krone; w1a und ohne Probe bleibt es beim Spiel-Symbol (css/navigation.css faerbt es in w1a golden)
+const REITER_LINIE = { heim: 'krone', bots: 'bot', liga: 'pokal', ich: 'person' };
+function reiterSymbol(ic) {
+  const w1 = document.documentElement.dataset.designW1;
+  if (w1 === 'b' || w1 === 'c') return `<span class="reiter-sym" aria-hidden="true">${icon(REITER_LINIE[ic] || ic)}</span>`;
+  return spielSymbol(ic);
+}
+
 function baueReiter(liste) {
   if (leiste.el) return;
   const nav = document.createElement('nav');
@@ -446,7 +455,7 @@ function baueReiter(liste) {
   // die Marke zeigt nur die Seitenleiste (css/navigation.css), wie im Entwurf ipad-pc-v2
   nav.innerHTML = '<span class="reiter-marke" aria-hidden="true">Crownmate</span><span class="reiter-pille" aria-hidden="true"></span>'
     + REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, , ic]) =>
-    `<button type="button" class="reiter dr" data-reiter="${n}">${spielSymbol(ic)}<span>${t('rahmen.reiter.' + n)}</span></button>`).join('');
+    `<button type="button" class="reiter dr" data-reiter="${n}">${reiterSymbol(ic)}<span>${t('rahmen.reiter.' + n)}</span></button>`).join('');
   nav.addEventListener('click', (e) => {
     const k = e.target.closest('[data-reiter]');
     if (!k) return;
@@ -1135,6 +1144,8 @@ function ladeScreenTexte() {
 }
 
 function starte() {
+  // Design-Probe (nur im Testmodus, R19-Auswahl): ?design=w1a.w3b setzt html[data-design-w1] und html[data-design-w3]
+  if (TEST) for (const [, w, v] of (new URLSearchParams(location.search).get('design') || '').matchAll(/w(\d)([abc])/g)) document.documentElement.dataset['designW' + w] = v;
   setzeSymbole(SYMBOLE);
   spracheAusAdresse();
   wendeEinstellungenAn(ladeEinstellungen());

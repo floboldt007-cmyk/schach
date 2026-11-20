@@ -56,6 +56,10 @@ const ICONS = {
   laden: '<path d="M5.5 8.5h13l-1 11.5h-11z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/>',
   // Glas-Leiste (Konzept 2026-11-06, Entwurf online-shop .dock): Reiter Liga als Kronen-Umriss
   liga: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" stroke-linejoin="round"/>',
+  // Design-Probe W1 b/c (R19-Auswahl leiste-symbole): Reiter Bots als Strich-Roboter
+  bot: '<path d="M12 4v3"/><circle cx="12" cy="3.2" r="1" fill="currentColor" stroke="none"/><rect x="4.5" y="7" width="15" height="12" rx="4"/>'
+    + '<circle cx="9.4" cy="12.6" r="1.5" fill="currentColor" stroke="none"/><circle cx="14.6" cy="12.6" r="1.5" fill="currentColor" stroke="none"/>'
+    + '<path d="M10 16.2h4M2.5 11.5v3M21.5 11.5v3"/>',
 };
 
 const NAME = /^[a-z][a-z0-9-]{0,39}$/;

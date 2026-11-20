@@ -197,6 +197,15 @@ export function zeige(root, params, app) {
   const bild = art => `<span class="on-bild" aria-hidden="true">${FIGUREN[art].split(' ').map(x =>
     `<img src="${new URL(`assets/pieces/${x[0]}${x[1]}.svg`, WURZEL).href}" alt="" style="grid-area:${9 - Number(x[3])}/${x.charCodeAt(2) - 96}">`).join('')}`
     + `${art === 'duell' ? '<b class="on-bild-uhr zahl">3:00</b>' : ''}</span>`;
+  // Design-Probe W3 (nur ?test&design=w3a|w3b|w3c, R19-Auswahl online-seite): Freunde als Karte mit zwei Knoepfen statt
+  // der Klapp-Zeile; die Knoepfe oeffnen das Formular darunter. Ohne Probe gibt es die Karte nicht.
+  const freundeKarte = () => (document.documentElement.dataset.designW3
+    ? `<section class="on-freunde-karte" aria-labelledby="on-freunde-t"><span class="on-freunde-paar" aria-hidden="true">`
+      + ['wK', 'bK'].map((f) => `<img src="${new URL(`assets/pieces/${f}.svg`, WURZEL).href}" alt="">`).join('') + '</span>'
+      + `<div class="on-freunde-text"><h3 id="on-freunde-t">${esc(O('freunde.zeile'))}</h3><p>${esc(O('freunde.zeileText'))}</p></div>`
+      + `<div class="on-freunde-knoepfe"><button class="knopf dr" type="button" data-online="freunde-einladen">${esc(O('einladen'))}</button>`
+      + `<button class="knopf dr" type="button" data-online="freunde-code">${esc(O('codeEingeben'))}</button></div></section>`
+    : '');
   const tuer = (art, rumpf) => `<section class="on-art on-tuer" data-art="${art}" aria-labelledby="on-${art}-t">
       <div class="on-tuer-kopf">${bild(art)}<div class="on-tuer-text"><span class="on-tuer-ueber">${esc(O(`tuer.${art}.ueber`))}</span>
         <h2 id="on-${art}-t">${esc(O(art === 'duell' ? 'ruhig.duellTitel' : `tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
@@ -248,7 +257,7 @@ export function zeige(root, params, app) {
         </div>`)}
       ${tuer('duell', `<button class="knopf primaer dr on-tuer-knopf" type="button" data-online="duell">${esc(O('tuer.duell.knopf'))}</button>
         <p class="on-tuer-hinweis on-netz-hinweis" hidden>${esc(O('netz.fehlt'))}</p>`)}
-      </div>
+      </div>${freundeKarte()}
       <details class="on-freunde"${code || params.freunde ? ' open' : ''}>
         <summary class="on-freunde-zeile dr"><span class="on-freunde-symbol" aria-hidden="true">${icon('person')}</span>
           <span><b>${esc(O('freunde.zeile'))}</b><small>${esc(O('freunde.zeileText'))}</small></span></summary>
@@ -1204,6 +1213,16 @@ export function zeige(root, params, app) {
     if (a === 'duell') { app.gehe('raetsel-duell', { suchen: true }); return; }
     if (a === 'liga') { app.gehe('bestenliste'); return; }
     if (a === 'liste-zurueck') { app.gehe('online', { freunde: true }); return; }
+    // Design-Probe W3: die Freunde-Karte oeffnet das passende Formular und setzt den Fokus hinein
+    if (a === 'freunde-einladen' || a === 'freunde-code') {
+      const fr = s.querySelector('.on-freunde');
+      if (!fr) return;
+      fr.open = true;
+      const ziel = fr.querySelector(a === 'freunde-code' ? '[data-form="beitreten"] [name="code"]' : '[data-form="einladen"] select');
+      ziel?.scrollIntoView({ block: 'center' });
+      ziel?.focus();
+      return;
+    }
     if (a === 'konto') { kontoFreigeschaltet('#konto'); app.gehe('einstellungen', { seite: 'konto' }); return; }
     if (a === 'liste') { ladeListe(); return; }
     if (a === 'brett') { zeigeBlatt(false); return; }

@@ -241,3 +241,23 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   .haupt-kopf .kopf-premium { width: var(--tipp); padding: 0; }
   .haupt-kopf .kopf-premium span { display: none; }   /* der Name steht im aria-label */
 }
+
+/* ---------- Design-Probe W1 (nur ?test&design=w1a|w1b|w1c, R19-Auswahl leiste-symbole; NICHT live) ----------
+   Flo 20.11.2026: "Die Symbole der unteren Leiste sind zu neon und komisch in den Farben. Sie sollen wie Crownmate
+   aussehen." Aufbau der Leiste bleibt, nur die Symbole aendern sich.
+   a  Ein Metall: die Spiel-Symbole bleiben, alle in Gold; inaktiv leicht zurueckgenommen
+   b  Gold-Linie: feine Strich-Symbole in Gold (Start = Krone, js/app.js reiterSymbol), aktiv heller
+   c  Wappen: Strich-Symbol auf einer kleinen Plakette mit Goldrand, die aktive Plakette ist ganz Gold */
+html[data-design-w1="a"] .reiter-leiste .reiter .sy { --sy-hell: #F6DE9A; --sy-mitte: #C8922C; --sy-rand: #6B4A12; --sy-glut: #F2BE4A;
+  opacity: .82; }
+html[data-design-w1="a"] .reiter-leiste .reiter.an .sy { opacity: 1; }
+html[data-design-w1="b"] .reiter-leiste .reiter-sym, html[data-design-w1="c"] .reiter-leiste .reiter-sym { display: grid; place-items: center; flex: none; }
+html[data-design-w1="b"] .reiter-leiste .reiter-sym { width: 26px; height: 26px; color: light-dark(#8A6A2A, #BFA56E);
+  transition: color var(--d-s) var(--sanft), transform var(--d-m) var(--feder); }
+html[data-design-w1="b"] .reiter-leiste .reiter-sym .ico { width: 24px; height: 24px; stroke-width: 1.7; }
+html[data-design-w1="b"] .reiter-leiste .reiter.an .reiter-sym { color: light-dark(#7A5B0E, #F2BE4A); transform: scale(1.08); }
+html[data-design-w1="c"] .reiter-leiste .reiter-sym { width: 32px; height: 32px; box-sizing: border-box; border-radius: 10px;
+  border: 1.5px solid light-dark(#9A7024, #9C7A34); background: light-dark(#FBF4E3, #221D14); color: light-dark(#7A5B0E, #E9C46A); }
+html[data-design-w1="c"] .reiter-leiste .reiter-sym .ico { width: 18px; height: 18px; stroke-width: 1.9; }
+html[data-design-w1="c"] .reiter-leiste .reiter.an .reiter-sym { border-color: #C8922C; background: linear-gradient(160deg, #F6D77A, #C8922C);
+  color: #1C1B19; box-shadow: 0 2px 8px rgba(200, 146, 44, .35); }

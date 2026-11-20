@@ -284,3 +284,65 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .online-screen:not(.online-partie) .on-tueren[data-zustand="ohne"] .on-tuer { background: transparent; box-shadow: none; }
 .online-screen:not(.online-partie) .on-freunde-symbol { color: var(--text-2); }
 .online-screen:not(.online-partie) .on-bild { filter: saturate(.65); }
+
+/* ---------- Design-Probe W3 (nur ?test&design=w3a|w3b|w3c, R19-Auswahl online-seite; NICHT live) ----------
+   Flo 20.11.2026: Elo nicht schoen, "Online" weiss, Freund einladen/Code eingeben herzlos, Raetsel und Partie gleich
+   (beide orange). Partie bekommt Gold, das Raetsel-Duell ein kuehles Saphir; Freunde werden eine Karte mit zwei
+   Knoepfen (js/ui/online.js freundeKarte), die Klapp-Zeile tritt zurueck, das Formular darunter bleibt.
+   a  Zwei Materialien: gefuellte Knoepfe Gold und Saphir, Elo als Goldmedaille
+   b  Buehne: Partie ist der grosse Hauptknopf, das Duell der zweite (Saphir-Rand), Elo als Chip, warme Freunde-Karte
+   c  Ruhig edel: dunkle Knoepfe mit farbiger Schrift und Rand, Titel bleibt bewusst neutral */
+html[data-design-w3] .online-screen { --w3-gold: linear-gradient(160deg, #F6D77A, #C8922C); --w3-saphir: linear-gradient(160deg, #3F72C4, #1E3F7A);
+  --w3-gold-text: var(--kt-stark); --w3-saphir-text: light-dark(#24508F, #9CC0F5); }
+html[data-design-w3] .online-screen .on-freunde-zeile { display: none; }
+html[data-design-w3] .online-screen .on-freunde-karte { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px 14px;
+  margin-top: var(--a3); padding: 14px; border-radius: var(--r-l); background: var(--on-karte, var(--flaeche)); box-shadow: var(--kante); }
+html[data-design-w3] .online-screen .on-freunde-paar { display: flex; }
+html[data-design-w3] .online-screen .on-freunde-paar img { width: 40px; height: 40px; }
+html[data-design-w3] .online-screen .on-freunde-paar img + img { margin-left: -12px; }
+html[data-design-w3] .online-screen .on-freunde-text h3 { margin: 0; font-size: 16px; }
+html[data-design-w3] .online-screen .on-freunde-text p { margin: 2px 0 0; font-size: 13px; color: var(--text-2); }
+html[data-design-w3] .online-screen .on-freunde-knoepfe { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+html[data-design-w3] .online-screen .on-freunde-knoepfe .knopf { min-height: 46px; justify-content: center; }
+html[data-design-w3] .online-screen .on-tuer[data-art="partie"] .on-tuer-ueber { color: var(--w3-gold-text); }
+html[data-design-w3] .online-screen .on-tuer[data-art="duell"] .on-tuer-ueber { color: var(--w3-saphir-text); }
+
+/* a: zwei Materialien */
+html[data-design-w3="a"] .online-screen .haupt-kopf .kopf-seite { color: var(--w3-gold-text); }
+html[data-design-w3="a"] .online-screen .on-tuer[data-art="partie"] .on-tuer-knopf { background: var(--w3-gold); color: #1C1B19; border-color: transparent; }
+html[data-design-w3="a"] .online-screen .on-tuer[data-art="duell"] .on-tuer-knopf { background: var(--w3-saphir); color: #fff; border-color: transparent; }
+html[data-design-w3="a"] .online-screen .on-liga-schild { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FBE7A6, #C8922C 70%);
+  color: #3A2A08; box-shadow: 0 0 0 2px light-dark(#E6C878, #6B4A12); }
+html[data-design-w3="a"] .online-screen .on-gross-wert { color: var(--w3-gold-text); }
+html[data-design-w3="a"] .online-screen .on-freunde-karte { background: color-mix(in srgb, #E0A22B 9%, var(--on-karte, var(--flaeche))); }
+html[data-design-w3="a"] .online-screen [data-online="freunde-einladen"] { background: var(--w3-gold); color: #1C1B19; border-color: transparent; }
+html[data-design-w3="a"] .online-screen [data-online="freunde-code"] { color: var(--w3-gold-text); border: 1.5px solid currentColor; }
+
+/* b: Buehne */
+html[data-design-w3="b"] .online-screen .haupt-kopf .kopf-seite { color: var(--w3-gold-text); }
+html[data-design-w3="b"] .online-screen .on-tuer[data-art="partie"] { box-shadow: 0 0 0 1.5px light-dark(#D9B25A, #8A6A2A), var(--kante); }
+html[data-design-w3="b"] .online-screen .on-tuer[data-art="partie"] .on-tuer-knopf { min-height: 58px; font-size: 18px; background: var(--w3-gold);
+  color: #1C1B19; border-color: transparent; box-shadow: 0 6px 18px rgba(200, 146, 44, .32); }
+html[data-design-w3="b"] .online-screen .on-tuer[data-art="duell"] .on-tuer-knopf { background: transparent; color: var(--w3-saphir-text);
+  border: 2px solid currentColor; }
+html[data-design-w3="b"] .online-screen .on-liga { border-radius: var(--r-pille); box-shadow: 0 0 0 1.5px light-dark(#D9B25A, #8A6A2A); }
+html[data-design-w3="b"] .online-screen .on-liga-schild { border-radius: 50%; background: var(--w3-gold); color: #3A2A08; }
+html[data-design-w3="b"] .online-screen .on-gross-wert { color: var(--w3-gold-text); }
+html[data-design-w3="b"] .online-screen .on-freunde-karte { background: linear-gradient(135deg, color-mix(in srgb, #E0A22B 16%, var(--on-karte, var(--flaeche))),
+  var(--on-karte, var(--flaeche)) 70%); }
+html[data-design-w3="b"] .online-screen .on-freunde-paar img { width: 52px; height: 52px; }
+html[data-design-w3="b"] .online-screen [data-online="freunde-einladen"] { background: var(--w3-gold); color: #1C1B19; border-color: transparent; }
+html[data-design-w3="b"] .online-screen [data-online="freunde-code"] { background: transparent; color: var(--w3-gold-text); border: 2px solid currentColor; }
+
+/* c: ruhig edel */
+html[data-design-w3="c"] .online-screen .on-tuer-knopf { background: var(--flaeche-2); border: 1.5px solid currentColor; }
+html[data-design-w3="c"] .online-screen .on-tuer[data-art="partie"] .on-tuer-knopf { color: var(--w3-gold-text); }
+html[data-design-w3="c"] .online-screen .on-tuer[data-art="duell"] .on-tuer-knopf { color: var(--w3-saphir-text); }
+html[data-design-w3="c"] .online-screen .on-liga-schild { border-radius: 50%; background: transparent; color: var(--w3-gold-text);
+  box-shadow: inset 0 0 0 2px currentColor; }
+html[data-design-w3="c"] .online-screen .on-freunde-knoepfe .knopf { background: var(--flaeche-2); color: var(--w3-gold-text); border: 1.5px solid currentColor; }
+/* Hochformat-Raster (oben): die Karte steht an der Stelle der Klapp-Zeile, das aufgeklappte Formular darunter */
+@media (orientation: portrait) and (min-height: 740px) {
+  html[data-design-w3] .on-inhalt > .on-freunde-karte { grid-row: 6; }
+  html[data-design-w3] .on-inhalt > .on-freunde { grid-row: 8; }
+}
