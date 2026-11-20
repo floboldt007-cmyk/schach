@@ -185,6 +185,25 @@ for (const [g, geraet] of GERAETE) {
     pruefe(`${g} Coach: Leertaste klappt wieder zu`, wiederZu.offen === 'false' && !wiederZu.knopf, wiederZu);
     await k.close();
   }
+  // ---------- B2) nach dem Verlassen der Partie ist der Coach-Beobachter getrennt (Kaltreview 7b, fc-05:45) ----------
+  {
+    const { k, s } = await seite(geraet);
+    await s.evaluate(() => window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w' }));
+    await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && !!document.querySelector('.coach'), null, { timeout: 40000 });
+    await s.evaluate(() => { window.__alterCoach = document.querySelector('.coach'); });
+    await s.evaluate(() => window.__app.gehe('heim'));
+    await s.waitForFunction(() => !window.__alterCoach.isConnected, null, { timeout: 10000 }).catch(() => {});
+    // am abgehaengten Coach: neue Kopfzeile und "hat-rest"; ein noch verbundener Beobachter machte daraus einen Schalter
+    const still = await s.evaluate(async () => {
+      const c = window.__alterCoach;
+      c.innerHTML = '<div class="c-kopf"></div>';
+      c.classList.add('hat-rest');
+      await new Promise((r) => setTimeout(r, 50));
+      return { getrennt: !c.isConnected, rolle: c.querySelector('.c-kopf').getAttribute('role') };
+    });
+    pruefe(`${g} Coach: nach dem Verlassen der Partie reagiert der Beobachter nicht mehr`, still.getrennt && still.rolle === null, still);
+    await k.close();
+  }
   // ---------- C) kein sichtbarer Knopf ohne Namen ----------
   {
     const { k, s } = await seite(geraet);

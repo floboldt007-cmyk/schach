@@ -614,7 +614,8 @@ export function zeige(root, params, app) {
     kopf.tabIndex = 0;
     kopf.setAttribute('aria-expanded', String(rest ? coachEl.classList.contains('offen') : !coachEl.classList.contains('kompakt')));
   }
-  new MutationObserver(coachSchalter).observe(coachEl, { attributes: true, attributeFilter: ['class', 'data-ply'], childList: true });
+  const coachMo = new MutationObserver(coachSchalter);
+  coachMo.observe(coachEl, { attributes: true, attributeFilter: ['class', 'data-ply'], childList: true });
   coachEl.addEventListener('keydown', (e) => {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.c-kopf[role="button"]')) { e.preventDefault(); e.target.click(); }
   });
@@ -3132,6 +3133,7 @@ export function zeige(root, params, app) {
       if (hochMq && hochMq.removeEventListener) hochMq.removeEventListener('change', setzeGegnerLeiste);
       if (handyMq && handyMq.removeEventListener) handyMq.removeEventListener('change', layout);
       if (layoutRo) layoutRo.disconnect();
+      coachMo.disconnect();
       if (layoutBild) cancelAnimationFrame(layoutBild);
       if (duellAus) duellAus();
       if (halte) halte.verlasse();
