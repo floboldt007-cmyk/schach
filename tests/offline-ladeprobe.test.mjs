@@ -239,9 +239,11 @@ try {
     // Fehlt eine eigene Datei wirklich, faellt das bei "keine eigene Anfrage scheitert" auf.
     await sammleUngefangen(s);
     const ungefangen = UNGEFANGEN.splice(0);
-    const netzSeitenfehler = (x) => (/^offline /.test(x) && /Fetch API cannot load https:\/\/[a-z0-9]+\.supabase\.co\//.test(x))
-      || /Fetch API cannot load https?:\/\/127\.0\.0\.1:\d+\/schach\/assets\/klang\/\S+\.mp3 due to access control checks/.test(x);
-    for (const x of seitenfehler.filter(netzSeitenfehler)) console.log(`NETZFEHLER ${tag} seitenfehler: ${x.slice(0, 160)}`); // INTENTIONAL-SLOP[T4]: Liste fuer den Bericht
+    const klangAbbruch = (x) => /Fetch API cannot load https?:\/\/127\.0\.0\.1:\d+\/schach\/assets\/klang\/\S+\.mp3 due to access control checks/.test(x);
+    const netzSeitenfehler = (x) => (/^offline /.test(x) && /Fetch API cannot load https:\/\/[a-z0-9]+\.supabase\.co\//.test(x)) || klangAbbruch(x);
+    // Kaltreview f2 (fc-0330b): jeder Klang-Treffer steht als eigene Zeile im Log, damit eine Haeufung in der CI zaehlbar ist
+    // (grep -c "NETZFEHLER .* klang:"); die Ausnahme selbst bleibt auf klang/*.mp3 mit genau dieser WebKit-Meldung begrenzt
+    for (const x of seitenfehler.filter(netzSeitenfehler)) console.log(`NETZFEHLER ${tag} ${klangAbbruch(x) ? 'klang' : 'seitenfehler'}: ${x.slice(0, 160)}`); // INTENTIONAL-SLOP[T4]: Liste fuer den Bericht
     pruefe(`${tag}: keine ungefangenen Fehler in der Seite`, ungefangen.length === 0, ungefangen.slice(0, 5));
     pruefe(`${tag}: keine Seitenfehler ausser erwarteten Netzfehlern ohne Netz`, seitenfehler.filter((x) => !netzSeitenfehler(x)).length === 0,
       seitenfehler.filter((x) => !netzSeitenfehler(x)).slice(0, 5));
