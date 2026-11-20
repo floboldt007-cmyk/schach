@@ -237,12 +237,15 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
     if (inhalt) leiste.before(inhalt);
     const vorherFokus = ersetzt && ersetzt.vorherFokus && ersetzt.vorherFokus.isConnected ? ersetzt.vorherFokus : document.activeElement;
     let fertig = false;
+    let fokusAusstehend = false;   // true vom Oeffnen bis zum Fokus im naechsten Bild
     const stillgelegt = [];
     const taste = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); ende(abbrechen); return; }
       // Enter oder Leertaste vor dem Fokus im naechsten Bild: den Fokus jetzt setzen und die Taste dort wirken lassen, wie
-      // vor F3 (sonst faellt die erste Taste ins Leere und die zweite trifft den Knopf, Kaltreview c9 Befund 1, Probe F)
-      if ((e.key === 'Enter' || e.key === ' ') && erster && !karte.contains(document.activeElement)) {
+      // vor F3 (sonst faellt die erste Taste ins Leere und die zweite trifft den Knopf, Kaltreview c9 Befund 1, Probe F).
+      // Nur bis zu diesem Bild: liegt der Fokus spaeter ausserhalb (Klick auf den Text), loest keine Taste den Knopf aus.
+      if ((e.key === 'Enter' || e.key === ' ') && fokusAusstehend && !karte.contains(document.activeElement)) {
+        fokusAusstehend = false;
         e.preventDefault();
         erster.focus({ preventScroll: true });
         erster.click();
@@ -312,7 +315,9 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
       || leiste.querySelector('button');
     // einmal, im naechsten Bild; hat bis dahin schon etwas im Blatt den Fokus (Aufrufer, Tab), bleibt er dort
     if (erster) {
+      fokusAusstehend = true;
       imNaechstenBild(() => {
+        fokusAusstehend = false;
         if (fertig || karte.contains(document.activeElement)) return;
         erster.focus({ preventScroll: true });
       });
