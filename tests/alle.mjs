@@ -118,7 +118,7 @@ const SUITEN = [
   { name: 'r19-emotes-erspielbar', datei: 'r19-emotes-erspielbar.test.mjs', args: [], was: 'R19 Emotes und Finisher erspielbar (Variante C): Kreaturen und drei Finisher ueber die Welt-Endgegner, sechs Sticker ueber das Funken-Level, vier Finisher bald im Shop, volles Rad auf dem iPhone 13 (Browser)' },
   { name: 'funktion-emotes-finisher', datei: 'funktion-emotes-finisher.test.mjs', args: [], was: 'Funktionsprobe Emotes, Finisher, Klaenge: Sticker senden, Blitzschlag mit Polarlicht (Erfinder), Shop Anhoeren laedt bei Bedarf (iPhone 13 + PC)' },
   { name: 'r19-emotes-online', datei: 'r19-emotes-online.test.mjs', args: [], was: 'R19 Emotes und Finisher online: Knoepfe im KI-Ersatz ohne ?emotes, nicht gegen Bots und zu zweit; eigenes Matt in der Online-Partie startet den Finisher (Server simuliert)' },
-  { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
+  { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], env: { PROBE_STRENG: '1' }, was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
   { name: 'funktion-funken-aufgeben', datei: 'funktion-funken-aufgeben.test.mjs', args: [], kommtMit: 'so/R20-proben', was: 'Funktionsprobe Funken und Aufgeben (Browser)' },
   { name: 'funktion-einstellungen-season', datei: 'funktion-einstellungen-season.test.mjs', args: [], kommtMit: 'so/R20-proben', was: 'Funktionsprobe Einstellungen und Season mit ?test&paket2 (Browser)' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
@@ -264,6 +264,8 @@ async function lauf(suite) {
         // Kein PORT von hier: jede Suite nimmt ohne PORT einen freien Port (tests/freier-port.mjs). Vom Listenplatz
         // abgeleitete Ports (9200 + Platz) stiessen zusammen, sobald zwei Worktrees gleichzeitig alle.mjs liefen.
         ...(process.env.BILDER ? { BILDER: path.join(process.env.BILDER, suite.name) } : {}),
+        // Eigene Umgebung je Eintrag (env:), z. B. PROBE_STRENG fuer eine Probe, deren harte Pruefungen schon zaehlen sollen
+        ...(suite.env || {}),
       },
       // 20 Minuten je Suite, nicht fuer die gesamte Sammlung (der volle Lauf braucht laenger).
       zeitlimitMs: 20 * 60 * 1000,
