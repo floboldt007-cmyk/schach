@@ -266,6 +266,11 @@
   outline: var(--fokus, 2.5px solid #CC4820);
   outline-offset: -4px;
   border-radius: 2px;
+  /* Die Akzentfarbe allein hatte gegen manche Felder nur 1,01:1 bis 1,99:1 (f2, R20-Kritik/zustaende-kontrast F1). Darum
+     liegt sie zwischen einem weissen Band aussen (0 bis 1,5 px) und einem fast schwarzen innen (4 bis 5,5 px): eines der
+     beiden hat gegen jedes Feld mehr als 4:1, gemessen mindestens 4,3:1 (tests/r25-brett-fokus.test.mjs, Grenze 3:1).
+     Der obere Schatten deckt den unteren. */
+  box-shadow: inset 0 0 0 1.5px #fff, inset 0 0 0 5.5px #141414;
 }
 
 /* ---------- W0+a: Striche (Mattnetz) und Koenigsfall ---------- */
