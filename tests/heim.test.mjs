@@ -491,7 +491,9 @@ async function testeTagesziele(browser, heute) {
   });
   pruefe('"Als Naechstes" steht unter den drei Wegen', r.sichtbar && r.unterWegen, JSON.stringify(r));
   pruefe('Reihenfolge: Bauernmarsch (Tageswerk), Tagesraetsel, dann die Liga', r.reihe.join() === 'serie,tagesraetsel,heim-liga', r.reihe.join());
-  pruefe('Bauernmarsch: "Heute: 1 Partie oder 3 Rätsel spielen"', r.marsch === 'Bauernmarsch | Heute: 1 Partie oder 3 Rätsel spielen', r.marsch);
+  // sichtbar die Kurzform (einzeilig, passt aufs iPhone SE), der ganze Satz steht im Label (fable-check 19.11. Nr 9)
+  pruefe('Bauernmarsch: "Heute: Partie/3 Rätsel", Label mit dem ganzen Satz', r.marsch === 'Bauernmarsch | Heute: Partie/3 Rätsel'
+    && r.aria.some((a) => /Heute: 1 Partie oder 3 Rätsel spielen/.test(a || '')), r.marsch);
   pruefe('Tagesraetsel: Nummer und Zuege', /^Tagesrätsel \| Rätsel \d+, in \d+ (Zug|Zügen)$/.test(r.raetsel || ''), r.raetsel);
   pruefe('jede Zeile ein Knopf ab 44 px mit Beschriftung', r.knoepfe && r.aria.every((a) => a && !/undefined|NaN/.test(a)), JSON.stringify(r.aria));
   await seite.locator('.heim-naechstes [data-paket="serie"]').click();
