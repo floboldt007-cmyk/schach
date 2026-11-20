@@ -112,9 +112,19 @@ try {
     // dann ihr framenavigated (ein Sprung nur im #-Teil hat keine Anfrage und zaehlt nicht)
     const seitenfehlerZeit = [], neuladenZeit = [];
     const beobachte = (s) => {
-      let navOffen = false;
-      s.on('request', (r) => { if (r.isNavigationRequest() && r.frame() === s.mainFrame()) navOffen = true; });
-      s.on('framenavigated', (f) => { if (f === s.mainFrame() && navOffen) { navOffen = false; neuladenZeit.push(Date.now()); } });
+      // Kaltreview 43 (Mutant D): eine Navigation ohne neues Dokument (204, Abbruch) darf einen spaeteren #-Sprung nicht zum
+      // Neuladen machen. Darum zaehlt framenavigated nur, wenn die offene Anfrage auf genau diese Adresse (ohne #) ging.
+      let navAdresse = null;
+      const ohneRaute = (u) => u.replace(/#.*$/, '');
+      const istNav = (r) => r.isNavigationRequest() && r.frame() === s.mainFrame();
+      s.on('request', (r) => { if (istNav(r)) navAdresse = ohneRaute(r.url()); });
+      s.on('requestfailed', (r) => { if (istNav(r)) navAdresse = null; });
+      s.on('response', (r) => { if (istNav(r.request()) && (r.status() === 204 || r.status() === 205)) navAdresse = null; });
+      s.on('framenavigated', (f) => {
+        if (f !== s.mainFrame()) return;
+        if (navAdresse && navAdresse === ohneRaute(f.url())) neuladenZeit.push(Date.now());
+        navAdresse = null;
+      });
       s.on('pageerror', () => seitenfehlerZeit.push(Date.now()));
       s.on('pageerror', (e) => seitenfehler.push(`${offline ? 'offline' : 'online'} ${s.url().replace(/^.*#/, '#')}: ${e.message} ${(e.stack || '').split('\n').slice(0, 3).join(' | ')}`));
       s.on('console', (m) => { if (m.type() === 'error') konsole.push({ offline, text: m.text(), url: (m.location() && m.location().url) || '' }); });
