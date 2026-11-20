@@ -1,0 +1,2 @@
+/* Variante 2 Schatten-Kante: weiss wie heute, aber mit kraeftigem dunklem Rand statt des leichten Schattens */
+.brett .feld.d .koord { color: #fff; text-shadow: 0 0 1px rgba(0, 0, 0, .8), 0 0 3px rgba(0, 0, 0, .6); }

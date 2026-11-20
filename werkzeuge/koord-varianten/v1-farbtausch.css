@@ -1,0 +1,3 @@
+/* Variante 1 Farbtausch (wie lichess): die Koordinate traegt die Farbe des anderen Feldes, ohne Schatten */
+.brett .feld.h .koord { color: var(--b-dunkel); text-shadow: none; }
+.brett .feld.d .koord { color: var(--b-hell); text-shadow: none; }

@@ -1,0 +1,4 @@
+/* Variante 3 dunkle Schrift: auf beiden Feldern eine dunkle Mischung der dunklen Feldfarbe (heute nur auf hellen Feldern,
+   dort mit 72 %; hier etwas dunkler, damit auch helle Holzfelder 4,5:1 erreichen) */
+.brett .feld.h .koord { color: color-mix(in srgb, var(--b-dunkel) 55%, #000); text-shadow: none; }
+.brett .feld.d .koord { color: color-mix(in srgb, var(--b-dunkel) 25%, #000); text-shadow: none; }
