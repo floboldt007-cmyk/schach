@@ -127,8 +127,10 @@ const LAUF = { saison: 2, start: '2027-03-01', woche: 3, wochen: 8, ende: '2027-
   abzeichen: [{ saison: 1, stufe: 17 }], titel: ['crownmaster-s1', 'top100-s1'], gewaehlt: null };
 
 // stand: Antwort auf saison_mein_stand ('offline' bricht ab, { __status } ist eine Absage); konto: angemeldet
-async function neueSeite(browser, { stand, konto = true, titelAbsage = false } = {}) {
-  const kontext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+// Haupthandlung (Leiste, Titelwahl, Season-Ende-Blatt) auf beiden Geraeten (fc-05:20), der Rest in Handygroesse
+const GERAETE = [['iPhone 13', { width: 390, height: 844 }], ['PC', { width: 1280, height: 800 }]];
+async function neueSeite(browser, { stand, konto = true, titelAbsage = false, viewport = GERAETE[0][1] } = {}) {
+  const kontext = await browser.newContext({ viewport, serviceWorkers: 'block' });
   const seite = await kontext.newPage();
   const fehler = [];
   const gesendet = [];
@@ -173,14 +175,17 @@ const leiste = (seite) => seite.evaluate(() => {
     knoepfe: el ? [...el.querySelectorAll('.ss-titel')].map((b) => [b.textContent.trim(), b.getAttribute('aria-pressed')]) : [],
     blatt: document.querySelectorAll('.sheet-karte.ss-blatt').length, blattText: document.querySelector('.ss-blatt')?.textContent.replace(/\s+/g, ' ').trim() || '' };
 });
-const warteLeiste = (seite) => seite.waitForFunction(() => { const el = document.querySelector('.ss-leiste'); return el && !el.hidden; }, null, { timeout: 8000 })
+// sichtbar heisst: nicht hidden UND mit Flaeche (ein display:none nur am PC liess die Probe sonst gruen, Mutant fc-05:20)
+const warteLeiste = (seite) => seite.waitForFunction(() => { const el = document.querySelector('.ss-leiste'); return el && !el.hidden && el.getClientRects().length > 0; }, null, { timeout: 8000 })
   .then(() => true, () => false);
 const ohneUnsinn = (x) => !/NaN|undefined|null|\{[a-z]+\}/.test(x);
 
 const browser = await browserTyp(pw).launch({ headless: true });
 try {
-  { // laufende Season mit Abzeichen und Titeln, Season 1 gerade vorbei
-    const { kontext, seite, fehler, gesendet } = await neueSeite(browser, { stand: LAUF });
+  const pruefeAlle = pruefe;
+  for (const [g, viewport] of GERAETE) { // laufende Season mit Abzeichen und Titeln, Season 1 gerade vorbei
+    const pruefe = (name, ...r) => pruefeAlle(`${g}: ${name}`, ...r);
+    const { kontext, seite, fehler, gesendet } = await neueSeite(browser, { stand: LAUF, viewport });
     pruefe('Leiste erscheint im Profil "Ich"', await warteLeiste(seite));
     await seite.waitForSelector('.ss-blatt', { timeout: 5000 }).catch(() => {});
     let l = await leiste(seite);
@@ -194,14 +199,15 @@ try {
       && l.blattText.includes('Dein Abzeichen: Crownmate I') && l.blattText.includes('Neue Titel') && l.blattText.includes('Crownmaster Season 1')
       && l.blattText.includes('Top 100 Season 1') && l.blattText.includes('Season 2 startet für dich bei Sovereign I'), l.blattText);
     pruefe('keine Platzhalter oder NaN', ohneUnsinn(l.text) && ohneUnsinn(l.blattText), l.text + ' | ' + l.blattText);
-    await seite.click('.ss-blatt .sheet-knoepfe button');
+    // ein Klick, der nicht geht, zeigt sich in den Pruefungen danach statt als Absturz
+    await seite.click('.ss-blatt .sheet-knoepfe button', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => !document.querySelector('.ss-blatt'), null, { timeout: 4000 }).catch(() => {});
-    await seite.click('.ss-titel[data-titel="crownmaster-s1"]');
+    await seite.click('.ss-titel[data-titel="crownmaster-s1"]', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => document.querySelector('.ss-titel[data-titel="crownmaster-s1"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 4000 }).catch(() => {});
     l = await leiste(seite);
     pruefe('Titelwahl: Tipp auf Crownmaster sendet ihn und drueckt den Knopf', gesendet.includes('saison_titel_waehle:{"titel":"crownmaster-s1"}')
       && l.knoepfe[1][1] === 'true' && l.knoepfe[0][1] === 'false', [gesendet, l.knoepfe]);
-    await seite.click('.ss-titel[data-titel=""]');
+    await seite.click('.ss-titel[data-titel=""]', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => document.querySelector('.ss-titel[data-titel=""]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 4000 }).catch(() => {});
     pruefe('Titelwahl: "Keinen zeigen" sendet titel null', gesendet.includes('saison_titel_waehle:{"titel":null}'), gesendet);
     await seite.reload();
