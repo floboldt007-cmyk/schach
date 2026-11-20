@@ -99,6 +99,9 @@ export const EROEFFNUNGEN = [
   { zuege: 'e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4', name: 'Russische Verteidigung: Klassische Variante' },
   { zuege: 'e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4 d4 d5 Bd3', name: 'Russische Verteidigung: Hauptvariante' },
   { zuege: 'e4 e5 Nf3 Nf6 d4', name: 'Russische Verteidigung: Steinitz-Angriff' },
+  // fc-00:40 (Allround-Check 19.11.2026 Nr. 5): 3. Lc4 ist Theorie (ECO C42, nach 3...Sxe4 4. Sc3 das Boden-Kieseritzky-
+  // Gambit) und bekam ohne diese Zeile "?!"; dieselbe Stellung entsteht auch ueber 1. e4 e5 2. Lc4 Sf6 3. Sf3
+  { zuege: 'e4 e5 Nf3 Nf6 Bc4', name: 'Russische Verteidigung: Italienische Variante' },
   { zuege: 'e4 e5 Nf3 d6', name: 'Philidor-Verteidigung' },
   { zuege: 'e4 e5 Nf3 d6 d4 exd4', name: 'Philidor-Verteidigung: Abtauschvariante' },
   { zuege: 'e4 e5 Nf3 d6 d4 Nf6 Nc3 Nbd7', name: 'Philidor-Verteidigung: Hanham-Variante' },
