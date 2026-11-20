@@ -218,13 +218,16 @@ export function pruefeLektion(l, Chess) {
   return f;
 }
 
-// Kurs Kapitel 6 (art 'partie', fc-20:01): Sterne aus den gespeicherten Partien (storage ladePartien). Es zaehlt jede beendete
-// FREIE Partie (modus 'frei', ohne Wertung) gegen botId; frei startet nur der Kurs. 1 = zu Ende gespielt, 2 = gewonnen,
-// zuege = Flos Zuege der besten (fuer merke). Keine Partie: null.
-export function kursPartieSterne(partien, botId) {
+// Kurs Kapitel 6 (art 'partie', fc-20:01): Sterne aus den gespeicherten Partien (storage ladePartien). Es zaehlt eine beendete
+// FREIE Partie (modus 'frei', ohne Wertung) gegen botId mit der Kurs-Kennung extra.lernen.kurs === kurs (js/ui/lektion.js gibt
+// sie ueber js/ui/partie.js mit). Frei starten auch die Probe-Partie der Einstufung und "Ab hier"; die zaehlten bis 20.11.
+// mit (fc-02:20 a, tests/r20-kurs-sterne.test.mjs). 1 = zu Ende gespielt, 2 = gewonnen, zuege = Flos Zuege der besten
+// (fuer merke). Keine Partie: null.
+export function kursPartieSterne(partien, botId, kurs = 'es-partie') {
   let best = null;
   for (const p of Array.isArray(partien) ? partien : []) {
     if (!p || p.modus !== 'frei' || p.botId !== botId || !['sieg', 'remis', 'niederlage'].includes(p.ergebnis)) continue;
+    if (!p.extra || !p.extra.lernen || p.extra.lernen.kurs !== kurs) continue;
     const s = p.ergebnis === 'sieg' ? 2 : 1;
     const z = Math.max(1, Math.min(999, Math.ceil((Array.isArray(p.zuege) ? p.zuege.length : 1) / 2)));
     if (!best || s > best.sterne || (s === best.sterne && z < best.zuege)) best = { sterne: s, zuege: z };

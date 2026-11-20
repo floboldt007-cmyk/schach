@@ -13,7 +13,8 @@
 //   taktik, halten, matt, umwandeln wie in der Meisterschule (Engine verteidigt).
 //   art 'partie'  (Kapitel 6): eine ganze Partie gegen den ersten Bot der Leiter, modus 'frei', also ohne Wertung (Flo
 //                 19.11.2026). Gestartet wird sie in js/ui/lektion.js, die Sterne traegt js/ui/lernen.js kursPartieAbgleich
-//                 aus den gespeicherten Partien ein (mattbilder.js kursPartieSterne: 1 zu Ende, 2 gewonnen).
+//                 aus den gespeicherten Partien ein (mattbilder.js kursPartieSterne: 1 zu Ende, 2 gewonnen; es zaehlt nur
+//                 die Partie mit der Kurs-Kennung extra.lernen.kurs, nicht jede freie Partie gegen den Bot).
 //   kapitel       Nummer des Kapitels (Gruppen der Uebersicht js/ui/lernen.js)
 import { GRUNDSTELLUNG } from './eroeffnungen.js';
 
