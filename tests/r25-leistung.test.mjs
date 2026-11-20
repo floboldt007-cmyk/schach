@@ -282,6 +282,10 @@ await kF.addInitScript(() => {
   const roh = window.requestAnimationFrame.bind(window);
   window.__langsam = false;
   window.requestAnimationFrame = (f) => (window.__langsam ? setTimeout(() => roh(f), 400) : roh(f));
+  // Zaehler der geoeffneten Blaetter (Fix-Review c9): trennt "blieb offen" von "zu und ueber den Halte-Knopf neu geoeffnet"
+  window.__oeffnungen = 0;
+  new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.classList?.contains('sheet-ort')) window.__oeffnungen++; })
+    .observe(document, { childList: true, subtree: true });
 });
 const sF = await kF.newPage();
 const fehlerF = [];
@@ -290,7 +294,7 @@ await sF.goto(`http://127.0.0.1:${PORT}/tests/bauteile.html`);
 await sF.waitForFunction(() => window.__bt && document.querySelector('.halte-knopf'), null, { timeout: 30000 });
 for (const tempo of ['langsam', 'normal']) {
   for (const taste of ['Enter', ' ']) {
-    const vorher = await sF.evaluate((l) => { window.__langsam = l; return window.__bt.ausgeloest(); }, tempo === 'langsam');
+    const vorher = await sF.evaluate((l) => { window.__langsam = l; window.__oeffnungen = 0; return window.__bt.ausgeloest(); }, tempo === 'langsam');
     await sF.locator('.halte-knopf').focus();
     await sF.keyboard.press('Enter');
     // in der Luecke: das Blatt steht, der Fokus noch nicht darin (nur 'langsam' garantiert das)
@@ -302,7 +306,7 @@ for (const tempo of ['langsam', 'normal']) {
     await sF.keyboard.press(taste);
     await warte(tempo === 'langsam' ? 1500 : 600);
     const nachher = await sF.evaluate(() => ({ ausgeloest: window.__bt.ausgeloest(), blaetter: document.querySelectorAll('.sheet-ort').length,
-      titel: document.querySelector('.sheet-karte h3')?.textContent, fokus: document.activeElement?.textContent }));
+      titel: document.querySelector('.sheet-karte h3')?.textContent, fokus: document.activeElement?.textContent, oeffnungen: window.__oeffnungen }));
     const name = taste === ' ' ? 'Leerzeichen' : 'Enter';
     if (tempo === 'langsam') pruefe(`Fokus ein Bild spaeter (${tempo}, ${name}): die Tasten fallen wirklich in die Luecke (Blatt steht, Fokus noch nicht darin)`,
       luecke.blatt && !luecke.imBlatt, luecke);
@@ -312,6 +316,27 @@ for (const tempo of ['langsam', 'normal']) {
     await sF.keyboard.press('Escape');
     await sF.waitForFunction(() => !document.querySelector('.sheet-ort'), null, { timeout: 3000 }).catch(() => {});
   }
+}
+// G) Fix-Review c9: nach dem ersten Fokus loest eine Taste ausserhalb der Karte keinen Knopf aus. Klick auf den Text des
+// Blatts (Fokus geht auf BODY), dann Leerzeichen oder Enter: das Blatt bleibt offen, ohne neu geoeffnet zu werden.
+for (const taste of [' ', 'Enter']) {
+  const vorher = await sF.evaluate(() => { window.__oeffnungen = 0; return window.__bt.ausgeloest(); });
+  await sF.locator('.halte-knopf').focus();
+  await sF.keyboard.press('Enter');
+  await sF.waitForFunction(() => document.querySelector('.sheet-karte')?.contains(document.activeElement), null, { timeout: 3000 }).catch(() => {});
+  await warte(300);
+  await sF.locator('.sheet-karte h3').click();
+  const davor = await sF.evaluate(() => document.activeElement?.tagName);
+  await sF.keyboard.press(taste);
+  await warte(600);
+  const nachher = await sF.evaluate(() => ({ ausgeloest: window.__bt.ausgeloest(), blaetter: document.querySelectorAll('.sheet-ort:not(.weg)').length,
+    titel: document.querySelector('.sheet-ort:not(.weg) .sheet-karte h3')?.textContent, oeffnungen: window.__oeffnungen, sheetWert: window.__bt.sheetWert() }));
+  const name = taste === ' ' ? 'Leerzeichen' : 'Enter';
+  pruefe(`Klick auf den Blatt-Text, dann ${name}: das Blatt bleibt offen, kein Knopf loest aus, nicht neu geoeffnet`,
+    davor !== 'BUTTON' && nachher.ausgeloest === vorher && nachher.blaetter === 1 && nachher.titel === 'Aufgeben?' && nachher.oeffnungen === 1,
+    { davor, vorher, nachher });
+  await sF.keyboard.press('Escape');
+  await sF.waitForFunction(() => !document.querySelector('.sheet-ort'), null, { timeout: 3000 }).catch(() => {});
 }
 pruefe('Fokus ein Bild spaeter: keine Seitenfehler', fehlerF.length === 0, fehlerF.slice(0, 3));
 await kF.close();
