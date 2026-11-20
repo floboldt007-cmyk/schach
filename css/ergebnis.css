@@ -263,7 +263,9 @@
 .ergebnis-karte .abrechnung > .liga-abrechnung { padding: 10px 12px; text-align: left; color: var(--text-2); font-weight: 650; }
 /* Sieg: gewinnen (Sterne, Genauigkeit im mittleren Stern) und wachsen (Funken-Balken); Punkte und Wertung in der Liga */
 /* Ausnahme: bietet die Punkte-Zeile einen Ueberhol-Post an, bleibt sie stehen (sonst waere er nach Siegen unerreichbar) */
-.ergebnis-overlay.sieg :is(.erg-genau, .erg-f-zeile[data-quelle="level"], .abrechnung > .pk-abr:not(:has(.pk-post)), .abrechnung > .liga-abrechnung) { display: none; }
+/* die Genauigkeit nur neben den Sternen: ein Sieg ohne Sterne (freie Partie, Kurs Kapitel 6) zeigt sie gross, sonst stand
+   dort ein leerer Rahmen (fc-04:00 a, tests/r20-sieg-frei-genau.test.mjs) */
+.ergebnis-overlay.sieg :is(.erg-sterne ~ .erg-genau, .erg-f-zeile[data-quelle="level"], .abrechnung > .pk-abr:not(:has(.pk-post)), .abrechnung > .liga-abrechnung) { display: none; }
 /* Niederlage (R7 Ergebnis A, 13.11.2026): wie beim Sieg stehen Punkte und Wertung in der Liga, nur solange der Verweis
    dorthin im Blatt steht (wertende Partien, js/ui/partie.js) */
 .ergebnis-overlay.niederlage:has(.erg-liga-verweis) :is(.abrechnung > .pk-abr:not(:has(.pk-post)), .abrechnung > .liga-abrechnung) { display: none; }

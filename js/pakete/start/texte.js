@@ -41,6 +41,10 @@ export const DE = {
   'gruppe.stand': '{tag} · {geloest} von {gesamt} gelöst · Empfehlung {name}',
   'gruppe.standLeer': '8 kurze Aufgaben, danach ein passender Gegner. Wertet nichts.',
   'gruppe.zurEmpfehlung': 'Zur Empfehlung',
+  // Angebot unter dem Sperr-Hinweis eines Bots (Ort arena:gesperrt, fc-23:00); die Einstufung schaltet nichts frei
+  'sperre.text': 'Schon stärker? Die Einstufung zeigt dir in ein paar Minuten, welcher Gegner zu dir passt. Gegen ihn spielst du dann eine Probepartie.',
+  'sperre.knopf': 'Einstufung machen',
+  'sperre.empfehlung': 'Zu deiner Empfehlung',
   'gruppe.einstufen': 'Einstufung machen',
   tag: '{tag}.{monat}.',
   // Erster Sieg (Feier-Zeile)
@@ -200,6 +204,9 @@ export const EN = {
   'gruppe.stand': '{tag} · {geloest} of {gesamt} solved · Recommended: {name}',
   'gruppe.standLeer': '8 short puzzles, then a fitting opponent. Does not count.',
   'gruppe.zurEmpfehlung': 'See recommendation',
+  'sperre.text': 'Already stronger? The placement shows you in a few minutes which opponent suits you. You then play them in a trial game.',
+  'sperre.knopf': 'Take the placement',
+  'sperre.empfehlung': 'See your recommendation',
   'gruppe.einstufen': 'Take the placement',
   tag: '{monat}/{tag}',
   // Erster Sieg

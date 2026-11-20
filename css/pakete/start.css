@@ -205,3 +205,8 @@
   .st-titel { font-size: 25px; }
   .st-text p { font-size: 14px; line-height: 1.38; }
 }
+
+/* Karte eines gesperrten Bots in der Arena (Ort arena:gesperrt, fc-23:00): unter dem Sperr-Hinweis der Weg zur Einstufung */
+.st-sperre { display: grid; gap: 8px; margin-top: 10px; }
+.st-sperre-text { margin: 0; color: var(--text-2); font-size: 14px; font-weight: 600; line-height: 1.4; text-align: center; }
+.st-sperre .st-sperre-knopf { width: 100%; min-height: var(--tipp); }

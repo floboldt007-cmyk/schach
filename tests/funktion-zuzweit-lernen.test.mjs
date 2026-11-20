@@ -14,6 +14,9 @@
 // Lektionen: je Lektionsart (ARTEN in js/pakete/lernen/mattbilder.js) die erste Gratis-Lektion, fuer die der Node-Teil
 // gegen die Test-Verteidigung (erster legaler Zug, window.__test.lektionZug) einen Weg bis "geschafft" findet; Zugfolgen
 // spielen ihre Folge. Kein Loesungszug steht von Hand im Test, eine neue Lektion oder Art kommt von selbst dazu.
+// Kurs "Erste Schritte" (KURS, fc-02:30): gesucht wird erst in der Meisterschule (ALLE), dann im Kurs. Sammeln hat keinen
+// Gegner (ladeSammeln, weissWieder, Sterne wie tests/r20-erste-schritte.test.mjs); die Art partie ist eine freie Bot-Partie
+// (Kapitel 6), gespielt als Schaefermatt mit festem Zugplan des Bots wie dort.
 import http from 'node:http';
 import os from 'node:os';
 import { createRequire } from 'node:module';
@@ -21,7 +24,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
-import { ARTEN, ALLE, artVon, bereichVon, bilanz, pruefeZiel, grenze } from '../js/pakete/lernen/mattbilder.js';
+import { ARTEN, ALLE, KURS, artVon, bereichVon, bilanz, pruefeZiel, grenze, ladeSammeln, weissWieder, sternGeschafft } from '../js/pakete/lernen/mattbilder.js';
 import { istGratis } from '../js/pakete/lernen/zugang.js';
 import { browserTyp } from './browser.mjs';
 import { messeAnsicht, introWeg, ROLLEN } from './gleichheit-messung.mjs';
@@ -118,16 +121,49 @@ function falscherZug(l, fen, richtig) {
   const laeuftWeiter = kandidaten.find(m => { c.move(m); const r = pruefeZiel(l, start, c, { wann: 'flo', zuege: 1 }); c.undo(); return r === null; });
   return (laeuftWeiter || kandidaten[0])?.lan || null;
 }
+// Sammeln: kein Gegner, nach jedem Zug wieder Weiss am Zug; geschafft, sobald kein Stern mehr liegt (hoechstens l.ziel Zuege)
+function sammelweg(l) {
+  function suche(c, rest, tiefe) {
+    for (const m of c.moves({ verbose: true })) {
+      if (m.promotion) continue;   // kein Bauer auf Reihe 8, sonst stuerzt moves() ab (tests/r20-erste-schritte.test.mjs)
+      const fen = c.fen();
+      c.move(m); weissWieder(c);
+      const neu = sternGeschafft(rest, m.to);
+      const w = !neu.length ? [] : tiefe > 1 ? suche(c, neu, tiefe - 1) : null;
+      c.load(fen, { skipValidation: true });
+      if (w) return [m.lan, ...w];
+    }
+    return null;
+  }
+  for (let d = 1; d <= l.ziel; d++) { const w = suche(ladeSammeln(l.fen), [...l.sterne], d); if (w) return w; }
+  return null;
+}
+// falscher Sammelzug: legal, nicht der erste Loesungszug, landet auf keinem Stern
+const sammelFalsch = (l, richtig) => ladeSammeln(l.fen).moves({ verbose: true }).find(m => m.lan !== richtig && !m.promotion && !l.sterne.includes(m.to))?.lan || null;
+// Partie (Kapitel 6): Schaefermatt gegen den Zugplan des Bots (window.__test.botZug); null, wenn er nicht matt setzt
+const SCHAEFER = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
+const BOT_PLAN = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };
+function partieweg(l) {
+  const c = new Chess(l.fen);
+  for (const u of SCHAEFER) {
+    c.move({ from: u.slice(0, 2), to: u.slice(2, 4) });
+    const a = BOT_PLAN[u]; if (a) c.move({ from: a.slice(0, 2), to: a.slice(2, 4) });
+  }
+  return c.isCheckmate() ? SCHAEFER : null;
+}
 const PLAN = [];
 for (const art of ARTEN) {
   let gewaehlt = null;
-  for (const l of ALLE.filter(x => artVon(x) === art && istGratis(x))) {
+  for (const l of [...ALLE, ...KURS.lektionen].filter(x => artVon(x) === art && istGratis(x))) {
     if (art === 'folge') { const { weg, vorErstem } = folgeweg(l); gewaehlt = { l, weg, falsch: falscherZug(l, vorErstem, weg[0]) }; break; }
+    if (art === 'partie') { const weg = partieweg(l); if (weg) { gewaehlt = { l, weg, falsch: null }; break; } continue; }
+    if (art === 'sammeln') { const weg = sammelweg(l); if (weg) { gewaehlt = { l, weg, falsch: sammelFalsch(l, weg[0]) }; break; } continue; }
     const weg = loesungsweg(l);
     if (weg) { gewaehlt = { l, weg, falsch: falscherZug(l, l.fen, weg[0]) }; break; }
   }
-  pruefe(`Node: Lektionsart "${art}" hat eine Gratis-Lektion mit Weg bis "geschafft"`, !!gewaehlt && !!gewaehlt.falsch, art, { hart: true });
-  if (gewaehlt && gewaehlt.falsch) PLAN.push({ art, ...gewaehlt });
+  // die Partie hat keinen falschen Zug: sie wird gespielt, nicht geloest
+  pruefe(`Node: Lektionsart "${art}" hat eine Gratis-Lektion mit Weg bis "geschafft"`, !!gewaehlt && (art === 'partie' || !!gewaehlt.falsch), art, { hart: true });
+  if (gewaehlt && (art === 'partie' || gewaehlt.falsch)) PLAN.push({ art, ...gewaehlt });
 }
 console.log('Lektionen: ' + PLAN.map(p => `${p.art}=${p.l.id} (${p.weg.length} Zuege, falsch ${p.falsch})`).join(' | '));
 
@@ -386,6 +422,41 @@ const LS = '.ls-screen .ls-brett';
 const sterneVon = (s, bereich) => s.evaluate(b => { const t = document.querySelector(`.ms-bkarte[data-bereich="${b}"] .ms-bk-sterne`)?.textContent || '';
   return Number((t.match(/\d+/) || [NaN])[0]); }, bereich);
 
+// Kurs Kapitel 6 (art partie): die Aufgabe startet eine freie Bot-Partie; Sieg per Schaefermatt gegen BOT_PLAN, danach
+// steht sie in der Liste als geschafft (Ablauf wie tests/r20-erste-schritte.test.mjs)
+const PARTIE_BRETT = '.screen.partie:not(.online-screen) .brett-felder';
+// INTENTIONAL-SLOP[O6]: Handlung mit Rueckruf und Zugschleife wie meisterschule() darunter, gleiche Tiefe
+async function kursPartie(s, l, weg) {
+  const bereich = bereichVon(l).id;
+  const gestartet = await handlung(s, `Lektion partie (${l.id}): aus der Liste starten, Partie-Knopf da`, async () => {
+    if (!(await s.locator('.ms-screen').isVisible().catch(() => false))) { await s.evaluate(() => window.__app.gehe('lernen')); await s.locator('.ms-screen .ms-lektion').first().waitFor(); }
+    await s.locator(`.ms-bkarte[data-bereich="${bereich}"]`).click();
+    await s.locator(`.ms-lektion[data-id="${l.id}"]`).click();
+    const da = await s.locator('.ls-partie [data-a="partie"]').waitFor({ timeout: 15000 }).then(() => true, () => false);
+    return { gut: da, detail: await lz(s) };
+  });
+  if (!gestartet) return;
+  const gewonnen = await handlung(s, `Lektion partie (${l.id}): Partie gegen den Bot, Zuege ${weg.join(' ')} bis zum Sieg`, async () => {
+    await s.evaluate((plan) => {
+      window.__test = { ...(window.__test || {}), botZug: () => { const v = window.__partie.chess().history({ verbose: true }); return plan[v[v.length - 1].lan] || null; } };
+    }, BOT_PLAN);
+    await tippe(s, '.ls-partie [data-a="partie"]');
+    await s.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.phase() === 'flo', null, { timeout: 30000 });
+    for (const u of weg) {
+      await s.waitForFunction(() => window.__partie && window.__partie.phase() === 'flo', null, { timeout: 30000 });
+      await feldZug(s, PARTIE_BRETT, u);
+    }
+    const sieg = await s.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 }).then(() => true, () => false);
+    return { gut: sieg, detail: { sieg, zuege: await s.evaluate(() => window.__partie.chess().history()) } };
+  });
+  if (!gewonnen) return;
+  await handlung(s, `Lektion partie (${l.id}): zurueck zur Liste, als geschafft markiert`, async () => {
+    await s.evaluate((b) => window.__app.gehe('lernen', { bereich: b }), bereich);
+    const da = await s.locator(`.ms-lektion[data-id="${l.id}"][data-geschafft]`).waitFor({ timeout: 10000 }).then(() => true, () => false);
+    return { gut: da, detail: { da } };
+  });
+}
+
 async function meisterschule(s, bot) {
   const g = s.geraet.name;
   await setzeVerteidigung(s);
@@ -397,6 +468,7 @@ async function meisterschule(s, bot) {
   });
   let gemessen = false;
   for (const { art, l, weg, falsch } of PLAN) {
+    if (art === 'partie') { await kursPartie(s, l, weg); continue; }
     const bereich = bereichVon(l).id, folge = art === 'folge';
     let vorher = NaN, lsMasse = null;
     const gestartet = await handlung(s, `Lektion ${art} (${l.id}): aus der Liste starten, "Los geht's"`, async () => {

@@ -38,9 +38,10 @@ export const sterneHtml = (n) => `<span class="ms-sterne" data-sterne="${n}" rol
 const kopfChip = (sum) => `<span class="chip zahl chip-sterne ms-kopf-sterne" title="${esc(S('sterne', { n: sum.sterne, max: sum.max }))}">${icon('stern', 'stern')}`
   + `<span class="sr">${esc(S('sterne', { n: sum.sterne, max: sum.max }))}</span> ${sum.sterne}<span class="von"> / ${sum.max}</span></span>`;
 
-// Kurs Kapitel 6 (fc-20:01): die freie Partie gegen den ersten Bot der Leiter traegt erst die Uebersicht bzw. die Aufgabe ein
-// (beim Oeffnen, aus den gespeicherten Partien), nicht die Partie selbst: sie zaehlt nicht fuer die Wertung. Neue oder bessere
-// Sterne: merke + lektion:beendet; das Paket funken bucht die 10 Kurs-Funken nur beim ersten Abschluss (rechnung.js lektionFunken)
+// Kurs Kapitel 6 (fc-20:01): die Kurs-Partie (freie Partie gegen den ersten Bot der Leiter mit extra.lernen.kurs) traegt erst
+// die Uebersicht bzw. die Aufgabe ein (beim Oeffnen, aus den gespeicherten Partien), nicht die Partie selbst: sie zaehlt nicht
+// fuer die Wertung. Neue oder bessere Sterne: merke + lektion:beendet; gespeicherte Sterne baut der Abgleich nie ab (merke
+// nimmt das Maximum). Das Paket funken bucht die 10 Kurs-Funken nur beim ersten Abschluss (rechnung.js lektionFunken)
 export function kursPartieAbgleich() {
   try {
     const roh = ladeModul(PAKET, {});

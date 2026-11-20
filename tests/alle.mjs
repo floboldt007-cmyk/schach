@@ -35,6 +35,7 @@ const SUITEN = [
   { name: 'testserver', datei: 'testserver.test.mjs', args: [], was: 'Gemeinsamer Test-Server der Browser-Suiten: MIME-Typen, 404/301/304, Last ohne Verweigerung' },
   { name: 'konto', datei: 'konto.test.mjs', args: [], was: 'Konto, Anmeldung und Cloud-Spielstand' },
   { name: 'konto-link', datei: 'konto-link.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster (Dialoge, Uhr)', was: 'Anmelde-Link: Rückkehr, Abgleich-Riegel, zwei Tabs (Browser)' },
+  { name: 'dialog-zuklappen', datei: 'dialog-zuklappen.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster (Dialoge, Uhr)', was: 'Rueckfrage-Dialog: Tipp auf den Schleier loest nichts darunter aus, Klick 50 ms nach dem Schliessen kommt an (iPhone 13, SE, PC)' },
   { name: 'apple-knopf', datei: 'apple-knopf.test.mjs', args: [], was: 'Anmeldeblatt: abgeschalteter Apple-Weg berechnet unsichtbar, Google und Code-Anmeldung sichtbar (Browser)' },
   { name: 'online', datei: 'online.test.mjs', args: [], was: 'Online gegen Freunde: Einladung, Zuege, Abfrage' },
   { name: 'online-haengt-vertrag', datei: 'online-haengt-vertrag.test.mjs', args: [], was: 'Haengende Online-Partie: Client wartet gewertet ranked_haengt_s + 1 s, sonst 10 Min (Vertrag mit zwei-ligen-schema.sql)' },
@@ -117,20 +118,40 @@ const SUITEN = [
   { name: 'r19-emotes-erspielbar', datei: 'r19-emotes-erspielbar.test.mjs', args: [], was: 'R19 Emotes und Finisher erspielbar (Variante C): Kreaturen und drei Finisher ueber die Welt-Endgegner, sechs Sticker ueber das Funken-Level, vier Finisher bald im Shop, volles Rad auf dem iPhone 13 (Browser)' },
   { name: 'funktion-emotes-finisher', datei: 'funktion-emotes-finisher.test.mjs', args: [], was: 'Funktionsprobe Emotes, Finisher, Klaenge: Sticker senden, Blitzschlag mit Polarlicht (Erfinder), Shop Anhoeren laedt bei Bedarf (iPhone 13 + PC)' },
   { name: 'r19-emotes-online', datei: 'r19-emotes-online.test.mjs', args: [], was: 'R19 Emotes und Finisher online: Knoepfe im KI-Ersatz ohne ?emotes, nicht gegen Bots und zu zweit; eigenes Matt in der Online-Partie startet den Finisher (Server simuliert)' },
-  { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
+  { name: 'funktion-zuzweit-lernen', datei: 'funktion-zuzweit-lernen.test.mjs', args: [], env: { PROBE_STRENG: '1' }, was: 'Funktionsprobe Zu zweit und Meisterschule: alle sechs Lektionsarten bis geschafft' },
+  { name: 'funktion-funken-aufgeben', datei: 'funktion-funken-aufgeben.test.mjs', args: [], kommtMit: 'so/R20-proben', was: 'Funktionsprobe Funken und Aufgeben (Browser)' },
+  { name: 'funktion-einstellungen-season', datei: 'funktion-einstellungen-season.test.mjs', args: [], kommtMit: 'so/R20-proben', was: 'Funktionsprobe Einstellungen und Season mit ?test&paket2 (Browser)' },
   { name: 'gleichheit-ansichten', datei: 'gleichheit-ansichten.test.mjs', args: [], was: 'Gleichheits-Liste: jede Partie-Ansicht gegen die Bot-Partie (Abweichungen nur mit PROBE_STRENG=1 hart)' },
   { name: 'r15-ergebnis-teilen', datei: 'r15-ergebnis-teilen.test.mjs', args: [], was: 'Feinschliff R15: Duell-Nochmal in Suchfarbe, Niederlage mit Liga-Verweis, ein Knopf "Teilen ..." nach dem Sieg (Browser)' },
   { name: 'r15-ich-lektion', datei: 'r15-ich-lektion.test.mjs', args: [], was: 'Feinschliff R15: Vitrine im Banner am PC, Spielerleisten in der Lektion, Zu-zweit-Brett wie die Bot-Partie (Browser)' },
   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
   { name: 'sheet-knoepfe', datei: 'sheet-knoepfe.test.mjs', args: [], was: 'Blaetter: ein Knopf volle Breite und mittig, zwei Knoepfe wie bisher (Browser)' },
   { name: 'sw-update', datei: 'sw-update.test.mjs', args: [], was: 'SW-Update laedt nur geaenderte Dateien (ETag/304)' },
+  { name: 'offline-ladeprobe', datei: 'offline-ladeprobe.test.mjs', args: [], kommtMit: 'so/R20-offline', was: 'Offline: die App startet ohne Netz aus dem Service Worker (?test&sw, Browser)' },
   { name: 'sw-wechsel', datei: 'sw-wechsel.test.mjs', args: [], was: 'Wechsel des Service Workers: hoechstens einmal neu laden, nie im Spiel' },
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
+  { name: 'alle-auswahl', datei: 'alle-auswahl.test.mjs', args: [], was: 'alle.mjs: unbekannter Name in --nur bricht ab, "kommt noch" sichtbar, keine verwaiste Testdatei' },
+  // bis 19.11.2026 verwaist (lief in keiner Suite, Inventur fc-18:11 Zusatz 11)
+  { name: 'heim', datei: 'heim.test.mjs', args: [], was: 'Startseite heim: Buehne, Als Naechstes, drei Wege, ohne Scrollen auf dem iPad, hell und dunkel (Browser)' },
+  { name: 'brettgroesse', datei: 'brettgroesse.test.mjs', args: [], was: 'Brettbreite in Analyse und Partie ueber festen Untergrenzen (Browser)' },
   { name: 'seitenfehler-stelle', datei: 'seitenfehler-stelle.test.mjs', args: [], was: 'Seitenfehler nennen die erste Code-Stelle; Worker-Wechsel-Abbruch nur fuer die eigene Adresse still' },
   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
-  { name: 'info-lizenzen', datei: 'info-lizenzen.test.mjs', args: [], was: 'Info und Lizenzen: jede Fremdlizenz und der eigene Quellcode in DE und EN, Herkunft Kuerbis/Frost/Gold, Gold und Elfenbein als bearbeitetes cburnett (Browser)' },
+  { name: 'info-lizenzen', datei: 'info-lizenzen.test.mjs', args: [], was: 'Info und Lizenzen: jede Fremdlizenz und der eigene Quellcode in DE und EN, Herkunft Kuerbis/Frost/Gold, jeder Figurensatz mit Herkunftszeile (Teil 1b), Gold und Elfenbein als bearbeitetes cburnett (Browser)' },
+  // kommtMit: die Datei kommt erst mit diesem Zweig; bis dahin steht die Suite sichtbar als "kommt noch" da (fc-18:11, Punkt 4)
+  { name: 'r20-start-befunde', datei: 'r20-start-befunde.test.mjs', args: [], kommtMit: 'so/R20-start-befunde', was: 'Feinschliff R20: Einfuehrung zaehlt alle Seiten, Befunde 1 und 2 aus dem fable-check 19.11. (Browser)' },
+  { name: 'r20-fable-rest', datei: 'r20-fable-rest.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'fable-check 19.11.: Befunde 10, 11, 14 und 15 (Analyse am Handy u. a., Browser)' },
+  { name: 'en-rest', datei: 'en-rest.test.mjs', args: [], kommtMit: 'so/R20-en-rest', exklusiv: 'Browser-Durchgang (iPhone 13 + PC, 32 Seiten)', was: 'Gast mit Sprache EN: keine deutschen Reste, Umlaute, Schluessel, undefined oder abgeschnittenen Zeilen auf Heim, Partie, Ergebnis, Analyse, Zu zweit, Duell, Lektionen, Erste Schritte 1 und 6, Liga, Einstellungen; Premium/Shop nur melden' },
+  { name: 'r20-kurs-zurueck', datei: 'r20-kurs-zurueck.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Zurueck im Kurs' },
+  { name: 'r20-coach-buch', datei: 'r20-coach-buch.test.mjs', args: [], kommtMit: 'so/R20-coach-buch', was: 'Feinschliff R20 (43): Coach-Buch' },
+  { name: 'r20-buch-luecken', datei: 'r20-buch-luecken.test.mjs', args: [], was: 'Feinschliff R20 (43): 41 bekannte Linien aus lichess im Eroeffnungsbuch, deutsch und englisch benannt' },
+  { name: 'r20-lernen-gegner', datei: 'r20-lernen-gegner.test.mjs', args: [], was: 'Feinschliff R20: Lektionen mit Gegner gelten nach einem ruhigen falschen Zug nicht als geschafft (Halten-Regeln nur fuer halten)' },
+  { name: 'r20-sieg-frei-genau', datei: 'r20-sieg-frei-genau.test.mjs', args: [], was: 'Feinschliff R20: Sieg ohne Sterne (freie Partie, Kurs Kapitel 6) zeigt die Genauigkeit statt eines leeren Rahmens' },
+  { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
+  { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
+  { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },
+  { name: 'bot-grenze', datei: 'bot-grenze.test.mjs', args: [], kommtMit: 'so/R19-bot-grenze', was: 'Bots 1600 bis 2100: Grenze gegen grobe Fehler (Engine-Attrappe, feste Seeds)' },
   { name: 'r19-figuren-gold', datei: 'r19-figuren-gold.test.mjs', args: [], was: 'Labor-Figuren Gold und Elfenbein: 12 eigene Dateien mit fester Pruefsumme, Eintraege und Herkunft, auf jedem Brett Kante ab 3:1 und Weiss/Schwarz ab 25 L* (Browser)' },
   { name: 'r18-botschutz-link', datei: 'r18-botschutz-link.test.mjs', args: [], was: 'Bot-Schutz-Hinweis der Anmeldung: Link "Mehr dazu" >= 44 px und an 9 Punkten genau getroffen, 7 Groessen hell und dunkel (Browser)' },
   { name: 'klang', datei: 'klang.test.mjs', args: [], was: 'Klangpakete: Katalog, Dateien, Pegel, Abspielen' },
@@ -164,6 +185,8 @@ const SUITEN = [
   { name: 'app', datei: 'app.test.mjs', args: SCHNELL ? ['--schnell'] : [], was: 'Arena, Partie, Ergebnis' },
   { name: 'screens', datei: 'screens.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Analyse, Verlauf, Einstellungen' },
   { name: 'e2e', datei: 'e2e.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], exklusiv: 'Browser-Zeitfenster unter CPU-Last', was: 'Ganzer Ablauf, offline, Update' },
+  // ersetzt tests/webkit.test.mjs (fc-18:11 Zusatz 12): dieselbe Partie wie e2e auf dem iPhone 13, in CI auch unter WebKit
+  { name: 'e2e-iphone', datei: 'e2e.test.mjs', args: ['--iphone', '--ohne-bilder'], exklusiv: 'Browser-Zeitfenster unter CPU-Last', was: 'Sieg gegen Lukas, Analyse, Verlauf, Einstellungen auf dem iPhone 390' },
   { name: 'notfall', datei: 'notfall.test.mjs', args: [], exklusiv: 'Zeitgrenzen 3 s und 15 s', was: 'Notfall-Wächter: Reparieren, wenn die App nicht startet' },
   { name: 'bericht', datei: 'bericht.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster unter CPU-Last', was: 'Tester-Bericht: Fehlerprotokoll (nur lokal), Bericht ansehen, kopieren, teilen' },
   { name: 'native', datei: 'native.test.mjs', args: [], was: 'App-Store-Huelle (Capacitor): Konfiguration, Kopie der Web-App' },
@@ -213,7 +236,8 @@ const DAUERN = new Map([
   ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
-  ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60],
+  ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['bot-grenze', 8],
+  ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24], ['offline-ladeprobe', 28], ['funktion-funken-aufgeben', 45], ['funktion-einstellungen-season', 10],
 ]);
 
 function teile(suiten, anzahl) {
@@ -229,6 +253,7 @@ function teile(suiten, anzahl) {
 
 async function lauf(suite) {
   if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
+    if (suite.kommtMit) return { ...suite, code: 0, kommtNoch: true, sekunden: 0, ok: null, gesamt: null, fehler: [], ende: [] };
     return { ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, fehler: [`FEHLER Suite-Datei fehlt: tests/${suite.datei}`], ende: [] };
   }
   let letzte = 'Start';
@@ -241,6 +266,8 @@ async function lauf(suite) {
         // Kein PORT von hier: jede Suite nimmt ohne PORT einen freien Port (tests/freier-port.mjs). Vom Listenplatz
         // abgeleitete Ports (9200 + Platz) stiessen zusammen, sobald zwei Worktrees gleichzeitig alle.mjs liefen.
         ...(process.env.BILDER ? { BILDER: path.join(process.env.BILDER, suite.name) } : {}),
+        // Eigene Umgebung je Eintrag (env:), z. B. PROBE_STRENG fuer eine Probe, deren harte Pruefungen schon zaehlen sollen
+        ...(suite.env || {}),
       },
       // 20 Minuten je Suite, nicht fuer die gesamte Sammlung (der volle Lauf braucht laenger).
       zeitlimitMs: 20 * 60 * 1000,
@@ -258,6 +285,12 @@ async function lauf(suite) {
   } finally { clearInterval(puls); }
 }
 
+// ein unbekannter Name in --nur ist ein Fehler, nie still uebergangen (fc-18:11, Punkt 5: "--nur=bot-grenze,spiel" meldete "1/1")
+const unbekannt = NUR ? NUR.filter((n) => !SUITEN.some((s) => s.name === n)) : [];
+if (unbekannt.length) {
+  console.log(`Unbekannte Suite in --nur: ${unbekannt.join(', ')}. Namen: ` + SUITEN.map((s) => s.name).join(', '));
+  process.exit(2);
+}
 let auswahl = NUR ? SUITEN.filter((s) => NUR.includes(s.name)) : SUITEN;
 if (TEIL) auswahl = teile(auswahl, TEIL[1])[TEIL[0] - 1].suiten;
 if (!auswahl.length) {
@@ -277,9 +310,9 @@ async function starte(s) {
     if (e.ausgabe && !e.ausgabe.endsWith('\n')) process.stdout.write('\n');
     console.log(`--- ${s.name}: Ende ---`);
   }
-  const status = e.code === 0 ? 'ok    ' : 'FEHLER';
+  const status = e.kommtNoch ? 'NOCH  ' : e.code === 0 ? 'ok    ' : 'FEHLER';
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
-  console.log(`${status} ${s.name.padEnd(12)} ${zahl.padStart(9)}  ${e.sekunden.toFixed(1).padStart(6)} s`);
+  console.log(`${status} ${s.name.padEnd(12)} ${zahl.padStart(9)}  ${e.sekunden.toFixed(1).padStart(6)} s${e.kommtNoch ? `   kommt noch mit ${e.kommtMit} (tests/${e.datei} fehlt)` : ''}`);
   if (e.code !== 0 && !LAUT) {
     const zeigen = e.fehler.length ? e.fehler.slice(0, 20) : e.ende;
     for (const z of zeigen) console.log('       ' + z);
@@ -304,13 +337,16 @@ await Promise.all(laufend);
 
 ergebnisse.sort((a, b) => SUITEN.indexOf(a) - SUITEN.indexOf(b));
 const schlecht = ergebnisse.filter((e) => e.code !== 0);
+const noch = ergebnisse.filter((e) => e.kommtNoch);
+const gelaufen = ergebnisse.length - noch.length;
 const summeOk = ergebnisse.reduce((a, e) => a + (e.ok || 0), 0);
 const summe = ergebnisse.reduce((a, e) => a + (e.gesamt || 0), 0);
 console.log('\nZusammenfassung');
 console.log('Suite         Prüfungen    Zeit   Ergebnis');
 for (const e of ergebnisse) {
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
-  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${e.code === 0 ? 'bestanden' : 'FEHLGESCHLAGEN'}`);
+  const ergebnis = e.kommtNoch ? `kommt noch mit ${e.kommtMit}` : e.code === 0 ? 'bestanden' : 'FEHLGESCHLAGEN';
+  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${ergebnis}`);
 }
-console.log(`\n${ergebnisse.length - schlecht.length}/${ergebnisse.length} Suiten bestanden, ${summeOk}/${summe} Prüfungen, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+console.log(`\n${gelaufen - schlecht.length}/${gelaufen} Suiten bestanden${noch.length ? `, ${noch.length} kommt noch` : ''}, ${summeOk}/${summe} Prüfungen, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 process.exit(schlecht.length ? 1 : 0);

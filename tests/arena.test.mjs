@@ -527,15 +527,20 @@ async function testeKarteQuer(browser) {
   const wahl3 = await waehleStation('fridolin');
   pruefe('alle drei Ziele erreicht (Willi, 3 Sterne, Revanche)', wahl3.h2 === 'Vogelscheuche Willi' && wahl3.ueber === 'Bot 1 von 6 · Besiegt' && wahl3.an === 3 && wahl3.mini === 3
     && wahl3.spielen === 'Revanche gegen Willi' && wahl3.gewaehlt === 'fridolin' && wahl3.pressed === 'truefalse', JSON.stringify(wahl3));
+  // fc-23:00: ein gesperrter Bot oeffnet seine Karte (wie die Vorschau-Welt), statt "Spielen" der Sperr-Hinweis; keine Meldung
+  const sperrKarte = () => seite.evaluate(() => ({ h2: document.querySelector('.detail h2').textContent, hinweis: (document.querySelector('.detail .sp-gesperrt') || {}).textContent || '',
+    spielen: document.querySelectorAll('.detail [data-aktion="spielen"]').length, toast: document.querySelectorAll('.toast').length }));
   await tippe(seite, '.knoten[data-bot="gustav"]');
-  await seite.waitForSelector('.toast');
-  const t1 = await seite.locator('.toast').innerText();
-  pruefe('gesperrt direkt hinter dem aktuellen: „Besiege erst Postbotin Paula“, Panel bleibt', /Besiege erst Postbotin Paula/.test(t1) && (await seite.locator('.detail h2').innerText()) === 'Vogelscheuche Willi', t1);
-  await seite.evaluate(() => { for (const t of document.querySelectorAll('.toast')) t.remove(); });
+  await seite.waitForSelector('.detail .sp-gesperrt', { timeout: 5000 }).catch(() => {});
+  const t1 = await sperrKarte();
+  pruefe('gesperrt direkt hinter dem aktuellen: Karte mit „Besiege erst Postbotin Paula.“ statt Spielen, keine Meldung', t1.hinweis === 'Besiege erst Postbotin Paula.' && t1.spielen === 0 && t1.toast === 0, t1);
   await tippe(seite, '.knoten[data-bot="hilde"]');
-  await seite.waitForSelector('.toast');
-  const t2 = await seite.locator('.toast').innerText();
-  pruefe('gesperrt weiter oben: „Besiege zuerst Postbotin Paula“', /Besiege zuerst Postbotin Paula/.test(t2), t2);
+  await seite.waitForFunction(() => /Hilde/.test(document.querySelector('.detail h2').textContent), null, { timeout: 5000 }).catch(() => {});
+  const t2 = await sperrKarte();
+  pruefe('gesperrt weiter oben: „Besiege zuerst Postbotin Paula“', /Besiege zuerst Postbotin Paula/.test(t2.hinweis) && t2.spielen === 0, t2);
+  // zurueck zu Willi (die Karte eines gesperrten Bots hat keine Farbwahl)
+  await tippe(seite, '.knoten[data-bot="fridolin"]');
+  await seite.waitForSelector('.farbwahl [data-farbe="b"]', { timeout: 5000 }).catch(() => {});
   await tippe(seite, '.farbwahl [data-farbe="b"]');
   // Standard-Profilbild ist seit 31.10.2026 der Bauer (der Koenig gehoert dem Erfinder, js/profil.js NUR_ERFINDER)
   pruefe('Farbwahl Schwarz: aria-checked, Flos Figur zeigt den schwarzen Bauern', await seite.evaluate(() => document.querySelector('.farbwahl [data-farbe="b"]').getAttribute('aria-checked') === 'true'

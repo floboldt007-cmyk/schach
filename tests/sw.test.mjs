@@ -155,6 +155,14 @@ function main() {
   const fehlt = liste.filter((d) => !existsSync(path.join(WURZEL, d)) || !statSync(path.join(WURZEL, d)).isFile());
   pruefe('Jede gelistete Datei existiert (kein 404)', fehlt.length === 0, fehlt.join(', '));
 
+  // WebKit-Fix (so/R19-webkit-sw): ohne ihn laeuft Safari nach einem Update mit altem Code (tests/sw-update.test.mjs unter
+  // WebKit). Ein Sammel-Merge hat ihn am 19.11.2026 still geloescht (bf006fb9, Konflikt in sw.js mit --theirs geloest).
+  const ablegen = text.split('\n').filter((z) => /\bcache\.put\(/.test(z));
+  pruefe('WebKit-Fix: KENNUNG, WEBKIT und ohneFrische stehen in sw.js', /const WEBKIT = /.test(text) && /function ohneFrische\(/.test(text)
+    && /const KENNUNG = /.test(text));
+  pruefe('WebKit-Fix: jedes cache.put legt ueber ohneFrische ab', ablegen.length >= 2 && ablegen.every((z) => z.includes('ohneFrische(')),
+    ablegen.map((z) => z.trim()).join(' | '));
+
   // Pakete: erst Pflicht, wenn sie in PAKETE (js/erweiterungen.js) stehen
   const pakete = lesePakete(readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8'));
   pruefe('js/erweiterungen.js: Liste PAKETE lesbar', Array.isArray(pakete), 'export const PAKETE = Object.freeze([...]) fehlt');

@@ -37,6 +37,8 @@
     border: 1px solid var(--linie); text-decoration: none; font-weight: var(--gw-stark); }
   .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
   .fuss a { margin-right: var(--a3); }
+  /* einzeln stehende Links: Tippflaeche 44 px (fable-check 19.11. Nr 15); Links im Fliesstext bleiben Text (WCAG 2.5.8) */
+  .stand a, .fuss a, dd > a, a.kl-mail { display: inline-flex; align-items: center; min-height: var(--tipp); }
 </style>
 </head>
 <body>
