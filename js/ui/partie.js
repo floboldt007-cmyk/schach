@@ -2426,6 +2426,9 @@ export function zeige(root, params, app) {
           const naechster = !wertet || bot.stufe == null ? null : neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
           // nicht wertend: "Nochmal ab hier" mit denselben Params (Uebung bzw. eigene Stellung), sonst "Nochmal"
           const abHier = z.modus === 'uebung' || (z.modus === 'normal' && !!startFen);
+          // Flos Antwort 1 (20.11.2026): nach einer Niederlage heisst derselbe Knopf "Revanche", wie die Bots sie anbieten
+          // ("Willst du Revanche?"); nach Sieg und Remis bleibt "Nochmal"
+          const nochmalText = esc(t(ergebnis === 'niederlage' ? 'partie.erg.revanche' : 'partie.erg.nochmal'));
           // R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner leuchtet "Nächster Gegner", die Analyse
           // steht klein darunter neben "Zu den Bots"; nach Niederlage und Remis bleibt die Analyse vorne
           const siegVorne = ergebnis === 'sieg' && !!naechster;
@@ -2437,10 +2440,10 @@ export function zeige(root, params, app) {
             ? `<button class="knopf primaer gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>
           <button class="erg-link" type="button" data-ziel="analyse">${icon('analyse')}<span>${esc(t('partie.erg.zurAnalyse'))}</span></button>`
             : `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
-          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${esc(t(abHier ? 'partie.erg.abHier' : 'partie.erg.nochmal'))}</button>`
+          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${abHier ? esc(t('partie.erg.abHier')) : nochmalText}</button>`
             : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>`
               : revanche ? ''
-                : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
+                : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${nochmalText}</button>`}`;
           // steht "Zur Analyse" allein in der zweispaltigen Reihe (neben der Revanche), nimmt es die ganze Breite
           if (!siegVorne && knoepfe.children.length === 1) knoepfe.firstElementChild.style.gridColumn = '1 / -1';
           // Kurs-Partie (Kapitel 6, z.extra.lernen.kurs): "Zurueck zum Kurs" leuchtet ueber die ganze Breite vorn, die
@@ -3014,7 +3017,13 @@ export function zeige(root, params, app) {
       if (!laufend) await Promise.all([eb.newGame(), ew.newGame()]);
     } catch (err) {
       // dauerhafte Fehler (z. B. iPadOS zu alt) meldet app.js selbst mit genauem Grund
-      if (!weg && !(err && err.dauerhaft)) app.meldung(t('partie.meldung.engineStartet'), { art: 'fehler' });
+      // Flos Antwort 10 (20.11.2026): ohne Internet (erster Besuch, Engine noch nicht im Cache) der freundliche Satz zum
+      // Sparmodus, als ruhige Info statt roter Fehlermeldung; mit Netz bleibt die ehrliche Fehlermeldung, denn dann liegt
+      // es nicht am Internet
+      const ohneNetz = typeof navigator !== 'undefined' && navigator.onLine === false;
+      if (!weg && !(err && err.dauerhaft)) {
+        app.meldung(t(ohneNetz ? 'partie.meldung.engineOffline' : 'partie.meldung.engineStartet'), { art: ohneNetz ? 'info' : 'fehler' });
+      }
       z.engineGemeldet = true;
     }
     if (weg) return;

@@ -249,7 +249,7 @@ function fuelleKarte(el, app) {
       ${offenArchiv ? `<button class="knopf dr tr-archiv" type="button">${esc(t('p-tagesraetsel.karte.archiv', { n: offenArchiv }))}</button>` : '<span></span>'}
       ${st.fertig
         ? `<button class="knopf dr tr-teilen" type="button">${esc(t('allgemein.teilen'))}</button>`
-        : `<button class="knopf dr primaer tr-los" type="button">${esc(t('p-tagesraetsel.karte.loesen'))}${icon('vor')}</button>`}
+        : `<button class="knopf dr tr-los" type="button">${esc(t('p-tagesraetsel.karte.loesen'))}${icon('vor')}</button>`}
     </div>`;
   const los = el.querySelector('.tr-los');
   if (los) los.addEventListener('click', (ev) => oeffne(app, ev));
