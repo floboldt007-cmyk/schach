@@ -516,10 +516,12 @@ export function kontoGruppe({ app } = {}) {
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
       ${status}<p class="es-hilfe konto-oder">${K('oder')}</p><div class="es-knoepfe konto-anbieter"><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`
       + `<button class="knopf konto-apple" type="button" data-konto="apple" hidden>${K('apple')}</button></div>`
+      + `<p class="es-hilfe konto-netz-hinweis" hidden>${K('brauchtNetz')}</p>`
       + (alsApp() ? `<p class="es-hilfe konto-app-hinweis">${K('appHinweis')}</p>` : '')}
       ${s ? status : ''}
       <p class="es-hilfe">${K('gespeichert')}${s ? ' ' + K('datenHinweis') : ''}</p>`;
     zeigeWege();
+    netzStand();
     if (s) zeigeName();
     if (!s) {
       schutz = botschutz(el.querySelector('.konto-botschutz'), { modus: aufgeloesterModus(), sprache: sprache() });
@@ -562,6 +564,19 @@ export function kontoGruppe({ app } = {}) {
     if (ap) ap.hidden = !wege.apple;
     const oder = el.querySelector('.konto-oder'); if (oder) oder.hidden = !wege.google && !wege.apple;
   };
+  // Flo 20.11.2026 (Antwort 7): ohne Netz fuehrten Google und Apple ins Leere. Dann gesperrt mit Hinweis, online wieder frei
+  // (Muster netzStand in js/ui/online.js). Die Gruppe wird oft neu gezeichnet, deshalb liest render() den Stand selbst.
+  const netzStand = () => {
+    const aus = navigator.onLine === false;
+    for (const k of el.querySelectorAll('.konto-anbieter [data-konto]')) k.disabled = aus;
+    const h = el.querySelector('.konto-netz-hinweis');
+    if (h) h.hidden = !aus || [...el.querySelectorAll('.konto-anbieter [data-konto]')].every((k) => k.hidden);
+  };
+  const beiNetz = () => {
+    if (el.isConnected) { netzStand(); return; }
+    removeEventListener('online', beiNetz); removeEventListener('offline', beiNetz);
+  };
+  addEventListener('online', beiNetz); addEventListener('offline', beiNetz);
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-konto]')?.dataset.konto; if (!a) return;
     try {
