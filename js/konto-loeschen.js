@@ -55,7 +55,10 @@ export function starte(doc = document) {
   const knopf = (k, fn) => $(`[data-kl="${k}"]`).addEventListener('click', async (e) => {
     const b = e.currentTarget; if (b.disabled) return;
     b.disabled = true;
-    try { await fn(); } finally { if (b.isConnected && b.dataset.kl !== 'loeschen') b.disabled = false; }
+    try { await fn(); } finally {
+      if (b.isConnected && b.dataset.kl !== 'loeschen') b.disabled = false;
+      if (b.dataset.kl === 'google') netz();
+    }
   });
 
   knopf('code', () => versuche(async () => {
@@ -74,7 +77,19 @@ export function starte(doc = document) {
     await pruefeCode(email || $('.kl-email').value, $('.kl-code').value);
     melde(''); zeige();
   }));
-  knopf('google', () => versuche(async () => { melde(text('zuGoogle')); meldeMitGoogleAn(); }));
+  // Flo 20.11.2026 (Antwort 7, wie netzStand in js/konto.js): ohne Netz ist "Mit Google anmelden" gesperrt, ein Hinweis
+  // (einstellungen.konto.brauchtNetz) sagt warum, online sofort wieder frei. knopf() gibt den Knopf nach dem Tipp frei, darum dort netz().
+  const google = $('[data-kl="google"]');
+  google.parentElement.insertAdjacentHTML('afterend', '<p class="kl-oder kl-netz-hinweis" hidden></p>');
+  const netzHinweis = google.parentElement.nextElementSibling;
+  netzHinweis.textContent = t('einstellungen.konto.brauchtNetz');
+  const netz = () => { const aus = navigator.onLine === false; google.disabled = aus; netzHinweis.hidden = !aus; };
+  addEventListener('online', netz); addEventListener('offline', netz);
+  netz();
+  knopf('google', () => versuche(async () => {
+    if (navigator.onLine === false) return;
+    melde(text('zuGoogle')); meldeMitGoogleAn();
+  }));
   knopf('weiter', async () => {
     melde('');
     let abo = '';

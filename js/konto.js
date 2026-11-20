@@ -493,6 +493,21 @@ export function kontoFreigeschaltet(hash = globalThis.location?.hash || '', spei
 // Schalter fuer die Testbereiche (Online, Schule, Abo, Coach), die weiter erst nach #konto erscheinen.
 function kontoSichtbar() { return true; }
 
+// Netz-Stand der Konto-Gruppen (Antwort 7): EIN online/offline-Paar fuer alle Gruppen. Vorher haengte jeder Aufruf von
+// kontoGruppe ein eigenes Paar an window, das erst beim naechsten Netzwechsel wieder abging; jedes Oeffnen der
+// Einstellungen stapelte eins mehr (Review antworten-b, gemessen: 6 Paare nach 6 Oeffnungen, tests/r26-konto-rest.test.mjs).
+// Abgehaengte Gruppen fallen beim naechsten Aufruf heraus; die neue ist dann noch nicht im Dokument und bleibt.
+const netzGruppen = new Map();   // Gruppen-Element -> netzStand
+let netzHoert = false;
+function meldeNetzGruppe(el, netzStand) {
+  for (const g of netzGruppen.keys()) if (!g.isConnected) netzGruppen.delete(g);
+  netzGruppen.set(el, netzStand);
+  if (netzHoert) return;
+  netzHoert = true;
+  const beiNetz = () => { for (const [g, stand] of netzGruppen) if (g.isConnected) stand(); };
+  addEventListener('online', beiNetz); addEventListener('offline', beiNetz);
+}
+
 export function kontoGruppe({ app } = {}) {
   if (!kontoSichtbar() || typeof document === 'undefined') return null;
   const el = document.createElement('section'); el.className = 'es-gruppe flaeche konto-gruppe';
@@ -572,11 +587,7 @@ export function kontoGruppe({ app } = {}) {
     const h = el.querySelector('.konto-netz-hinweis');
     if (h) h.hidden = !aus || [...el.querySelectorAll('.konto-anbieter [data-konto]')].every((k) => k.hidden);
   };
-  const beiNetz = () => {
-    if (el.isConnected) { netzStand(); return; }
-    removeEventListener('online', beiNetz); removeEventListener('offline', beiNetz);
-  };
-  addEventListener('online', beiNetz); addEventListener('offline', beiNetz);
+  meldeNetzGruppe(el, netzStand);
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-konto]')?.dataset.konto; if (!a) return;
     try {
