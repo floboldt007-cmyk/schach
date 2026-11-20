@@ -773,7 +773,7 @@ export function zeige(root, params, app) {
     if (!alt || alt.id !== p.id) { gehoert = n; return; }
     if (alt.status === 'offen' && p.status === 'laeuft') ton('start');
     if (n > gehoert && p.status === 'laeuft' && !widerspruch) {
-      const m = chess.history({ verbose: true }).at(-1);
+      const verlauf = chess.history({ verbose: true }), m = verlauf[verlauf.length - 1];
       ton(zugKlangName(m, chess.inCheck()));
     }
     gehoert = n;
@@ -791,7 +791,7 @@ export function zeige(root, params, app) {
   function finisher() {
     const effekte = inhalt.querySelector('.on-effekte');
     if (!effekte || !brett) return;
-    const verbose = chess.history({ verbose: true }), m = verbose.at(-1) || null;
+    const verbose = chess.history({ verbose: true }), m = verbose[verbose.length - 1] || null;
     let koenigFeld = null;
     for (const reihe of chess.board()) for (const f of reihe) if (f && f.type === 'k' && f.color === chess.turn()) koenigFeld = f.square;
     const buehne = Object.freeze({ el: s, effekte, brett, feld(f) {
@@ -1118,7 +1118,7 @@ export function zeige(root, params, app) {
   }
   function zeichne() {
     if (!brett || weg || blockiert) return;
-    const m = chess.history({ verbose: true }).at(-1);
+    const verlauf = chess.history({ verbose: true }), m = verlauf[verlauf.length - 1];
     brett.setzeStellung(chess.fen(), { letzterZug: m ? [m.from, m.to] : null, schach: chess.inCheck() ? true : null });
     karten();
     zeichneGeschlagen();
@@ -1170,13 +1170,19 @@ export function zeige(root, params, app) {
     let m;
     const fenVorher = chess.fen();
     try { m = chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { return false; }
-    bewerteLive(fenVorher, m);
+    // R26 (altes Tablet): Bewertung, Klang und Zeichnen duerfen den Zug nie aufhalten; er steht schon in chess und muss
+    // an den Server, sonst nimmt das Brett ihn zurueck oder die naechste Abfrage setzt ihn zurueck
+    try { bewerteLive(fenVorher, m); } catch (e) { console.error(e); }
     // Nur der Zug geht an den Server; ob er gilt und wie die Partie danach steht, entscheidet er (Etappe 1a)
     const daten = { uci: m.lan };
     // der eigene Zug klingt sofort; endet die Partie mit ihm, kommt nur der Ende-Klang, sobald der Server bestaetigt
     gehoert = chess.history().length;
     if (!chess.isGameOver()) ton(zugKlangName(m, chess.inCheck()));
-    queueMicrotask(() => { if (!weg) { zeichne(); aktion(() => online.sendeZug(p.id, daten)); } });
+    queueMicrotask(() => {
+      if (weg) return;
+      try { zeichne(); } catch (e) { console.error(e); }
+      aktion(() => online.sendeZug(p.id, daten));
+    });
     // Sofort sperren, damit auch im selben Ereignis kein zweiter Zug durchkommt.
     brett.erlaubeZuege(null);
     return true;
