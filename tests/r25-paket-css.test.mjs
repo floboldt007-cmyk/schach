@@ -60,10 +60,11 @@ function rekorder({ sitzung }) {
       localStorage.setItem('schach-arena:v1:hinweis-installieren', '1');
     }
   } catch (e) { /* egal */ }
-  const r = (window.__css = { bilder: [], fehler: [], t0: performance.now() });
+  const r = (window.__css = { bilder: [], fehler: [], links: [], t0: performance.now() });
   const merke = (l) => {
     if (l.__css) return;
     l.__css = { fertig: false };
+    r.links.push({ datei: (l.href || '').split('/').pop(), t: performance.now() });
     l.addEventListener('load', () => { l.__css.fertig = true; });
     l.addEventListener('error', () => { l.__css.fertig = true; });
   };
@@ -112,7 +113,10 @@ async function seite({ css = null } = {}) {
   s.on('pageerror', (e) => fehler.push(e.message));
   return { k, s, fehler };
 }
-const bereit = (s) => s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('#app > .screen'), null, { timeout: 45000 });
+// bereit = ein echter Screen steht (html[data-screen]); #app > .screen allein ist schon der Lade-Platzhalter aus index.html,
+// dann sind die Pakete noch nicht registriert (gemessen: start/dienst paketGeladen() noch false, "start" ging zur Arena)
+const bereit = (s) => s.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('#app > .screen')
+  && document.documentElement.dataset.screen, null, { timeout: 45000 });
 const bilder = (s) => s.evaluate(() => window.__css.bilder);
 const ohneStil = (liste, screen = null) => liste.filter((b) => b.screen && (!screen || b.screen === screen) && b.offen.length);
 const erstesBild = (liste, screen = null) => liste.find((b) => b.screen && (!screen || b.screen === screen));
@@ -170,9 +174,15 @@ for (const [fall, css, grund, vonMs, bisMs] of [['fehlt (404)', { art: 'fehlt' }
   await warte(bisMs + 1000);
   const l = await bilder(s);
   const erst = erstesBild(l, 'lernen');
+  // Die Frist laeuft ab dem Anstoss von lernen.css, nicht ab dem Oeffnen: das Paket lernen steht in PAKETE und stoesst sein
+  // CSS schon beim Start an. Oeffnet der Test spaeter als die Frist (WebKit, langsamer Start), baut der Screen sofort.
+  const anstoss = (await s.evaluate(() => window.__css.links)).find((x) => x.datei === 'lernen.css');
+  const ab = anstoss ? Math.max(t0, anstoss.t + vonMs) : null;
+  const bis = anstoss ? Math.max(t0, anstoss.t + (vonMs ? 4000 : 0)) + (vonMs ? bisMs - 4000 : bisMs) : null;
   const nach = erst ? erst.t - t0 : null;
   const meld = await s.evaluate(() => window.__css.fehler);
-  pruefe(`Lernen, CSS ${fall}: der Screen baut trotzdem, nach ${vonMs} bis ${bisMs} ms`, nach != null && nach >= vonMs && nach <= bisMs, { nach, letzte: l.slice(-1) });
+  pruefe(`Lernen, CSS ${fall}: der Screen baut trotzdem, ${vonMs} bis ${bisMs} ms nach dem Anstoss von lernen.css (frueh. ab dem Oeffnen)`,
+    erst != null && ab != null && erst.t >= ab && erst.t <= bis, { nach, anstossVorOeffnen: anstoss ? Math.round(t0 - anstoss.t) : null, ab, bis, gebaut: erst?.t });
   pruefe(`Lernen, CSS ${fall}: genau eine Meldung schach:paket-fehler (paket lernen, art css, grund ${grund}, PaketCssFehler)`,
     meld.length === 1 && meld[0].paket === 'lernen' && meld[0].art === 'css' && meld[0].grund === grund && meld[0].name === 'PaketCssFehler', meld);
   pruefe(`Lernen, CSS ${fall}: keine Seitenfehler`, fehler.length === 0, fehler.slice(0, 3));
