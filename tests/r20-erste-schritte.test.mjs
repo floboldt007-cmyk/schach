@@ -57,7 +57,7 @@ pruefe('kursPartieSterne: frei gegen den Gegner 1 bei Remis/Niederlage, 2 bei Si
   kps([]) === null && kps([kp('frei', 'fridolin', 'niederlage')])?.sterne === 1
   && kps([kp('frei', 'fridolin', 'remis'), kp('frei', 'fridolin', 'sieg')])?.sterne === 2 && kps([kp('frei', 'fridolin', 'sieg')])?.zuege === 4
   && kps([kp('normal', 'fridolin', 'sieg'), kp('frei', 'benno', 'sieg'), kp('frei', 'fridolin', null), null]) === null
-  && kps([kp('frei', 'fridolin', 'sieg', 7, undefined)]) === null, kps([kp('frei', 'fridolin', 'sieg')]));
+  && kps([kp('frei', 'fridolin', 'sieg', 7, null)]) === null, kps([kp('frei', 'fridolin', 'sieg', 7, null)]));
 pruefe('lektion() und bereichVon() finden Kurs-Aufgaben', !!M.lektion('es-turm') && M.bereichVon(M.lektion('es-turm')).id === 'erste'
   && M.bereichVon(M.lektion('grundreihe')).id === 'matt');
 
