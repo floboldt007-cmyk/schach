@@ -69,7 +69,8 @@ function zaehler({ sitzung }) {
   const aufrufer = () => {
     const zeilen = String(new Error().stack || '').split('\n');
     for (const l of zeilen) {
-      const m = l.match(/at (?:(\S+) )?\(?\S*?\/(js\/[^:)]+):(\d+)/);
+      // Chromium: "at name (url:zeile:spalte)", WebKit: "name@url:zeile:spalte"
+      const m = l.match(/at (?:(\S+) )?\(?\S*?\/(js\/[^:)]+):(\d+)/) || l.match(/^(\S*?)@\S*?\/(js\/[^:)]+):(\d+)/);
       if (m) return `${m[2]}#${(m[1] || 'anonym').replace(/^Object\.|^HTMLElement\./, '')}`;
     }
     return null;
@@ -237,6 +238,41 @@ const d = await s.evaluate(async () => {
 });
 pruefe('zahl(): Intl.NumberFormat je Sprache und Optionen nur einmal gebaut (60 Aufrufe, 2 Formate)', d.bau <= 2, d);
 pruefe('zahl(): Ausgabe unveraendert, Sprachwechsel wirkt', d.gleich && d.en === d.pruef[1] && d.de === d.pruef[0], d);
+
+// E) Pille beim Drehen (Kaltreview f2): der ResizeObserver-Weg laeuft schon im Bild und setzt die Pille sofort. Gelesen wird
+// je Bild NACH dem Rendern (MessageChannel aus dem rAF), also das, was gemalt wurde; kein Bild nach dem Drehen darf die
+// Pille neben dem aktiven Reiter zeigen (die Lage wechselt seite -> unten, die Pille springt dabei ohne Gleiten)
+const kE = await browser.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 1, serviceWorkers: 'block', locale: 'de-DE' });
+await kE.route('**/*.supabase.co/**', (route) => route.abort());
+const sE = await kE.newPage();
+// WebKit meldet beim Drehen "ResizeObserver loop completed with undelivered notifications." als Seitenfehler, auch auf
+// der Basis 827b3ce4 (vor dieser Arbeit, an fc gemeldet); nur diese eine Meldung und nur in diesem Fall zaehlt nicht
+sE.on('pageerror', (e) => { if (!/^ResizeObserver loop completed with undelivered notifications\.$/.test(e.message)) seitenfehler.push(e.message); });
+await sE.goto(`http://127.0.0.1:${PORT}/index.html?test#bots`);
+await sE.waitForSelector('.reiter-pille');
+await warte(1200);
+await sE.evaluate(() => {
+  const log = (window.__pilleBilder = []);
+  const p = document.querySelector('.reiter-pille');
+  const lies = () => {
+    const k = document.querySelector('nav [aria-current="page"]');
+    const a = p.getBoundingClientRect(), c = k.getBoundingClientRect(), lage = document.documentElement.dataset.reiter;
+    const unter = lage === 'seite' ? Math.abs(a.top - c.top) <= 2 : Math.abs(a.left - c.left) <= 2;
+    log.push({ breite: innerWidth, lage, unter });
+    if (log.length < 30) requestAnimationFrame(nach);
+  };
+  const mc = new MessageChannel();
+  mc.port1.onmessage = lies;
+  const nach = () => mc.port2.postMessage(0);
+  requestAnimationFrame(nach);
+});
+await sE.setViewportSize({ width: 820, height: 1180 });
+await warte(1000);
+const bilderE = await sE.evaluate(() => window.__pilleBilder);
+const gedreht = bilderE.filter((b) => b.breite === 820);
+pruefe('Drehen: in jedem Bild nach dem Drehen steht die Pille unter dem aktiven Reiter (Lage unten)',
+  gedreht.length >= 3 && gedreht.every((b) => b.unter && b.lage === 'unten'), gedreht.slice(0, 4));
+await kE.close();
 
 pruefe('keine Seitenfehler', seitenfehler.length === 0, seitenfehler.slice(0, 3));
 await browser.close();

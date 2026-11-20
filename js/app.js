@@ -464,7 +464,7 @@ function baueReiter(liste) {
   // damit die Messung selbst keine Schleife ausloest
   const spaeter = () => {
     if (leiste.rahmen) return;
-    leiste.rahmen = requestAnimationFrame(() => { leiste.rahmen = 0; if (leiste.sichtbar) platziereReiter(); });
+    leiste.rahmen = requestAnimationFrame(() => { leiste.rahmen = 0; if (leiste.sichtbar) platziereReiter({ imBild: true }); });
   };
   if (typeof ResizeObserver === 'function') {
     leiste.ro = new ResizeObserver(spaeter);
@@ -481,7 +481,7 @@ function baueReiter(liste) {
 }
 
 // unten (schwebende Glas-Kapsel) oder seite (Seitenleiste links im Querformat ab 1021 px); die Leiste haengt immer am body
-function platziereReiter() {
+function platziereReiter({ imBild = false } = {}) {
   const nav = leiste.el;
   if (!nav) return;
   let seite = false;
@@ -492,7 +492,8 @@ function platziereReiter() {
   document.documentElement.dataset.reiter = leiste.lage;
   // die Pille misst den aktiven Reiter: im naechsten Bild, nicht mitten im Aufbau des neuen Screens (Leistung F2, fc-11:15;
   // dort kostete das Messen auf schwachen Geraeten ein eigenes Layout von 200 ms). Mehrere Aufrufe je Bild: einmal messen.
-  if (typeof requestAnimationFrame !== 'function') { setzePille(); return; }
+  // Laeuft der Aufruf schon im Bild (Drehen, Groesse), sofort: sonst stand die Pille ein gemaltes Bild lang daneben (f2)
+  if (imBild || typeof requestAnimationFrame !== 'function') { setzePille(); return; }
   if (!leiste.pilleRahmen) leiste.pilleRahmen = requestAnimationFrame(() => { leiste.pilleRahmen = 0; setzePille(); });
 }
 
