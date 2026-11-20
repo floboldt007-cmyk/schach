@@ -316,7 +316,10 @@ export function zeige(root, params, app) {
   const z = {
     bot, farbe, startFen, modus,
     ziel: modus === 'uebung' ? kopie(laufend ? laufend.ziel : params.ziel) : null,
-    extra: (laufend && kopie(laufend.extra)) || {},
+    // Kurs-Partie (Kapitel 6, js/ui/lektion.js params.kurs): die Kennung liegt bei den Daten des Pakets lernen, damit sie ein
+    // Neuladen mitten in der Partie uebersteht (laufende Partie); das Ergebnisblatt zeigt dann "Zurueck zum Kurs"
+    extra: (laufend && kopie(laufend.extra))
+      || (typeof params?.kurs === 'string' && /^[a-z0-9-]{1,40}$/.test(params.kurs) ? { lernen: { kurs: params.kurs } } : {}),
     liveTrivial: [],   // je Ply: selbstverstaendlicher Zug (fuer die COMBO neutral)
     maxSerie: 0,
     blasePrio: 0,
@@ -2380,6 +2383,14 @@ export function zeige(root, params, app) {
                 : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
           // steht "Zur Analyse" allein in der zweispaltigen Reihe (neben der Revanche), nimmt es die ganze Breite
           if (!siegVorne && knoepfe.children.length === 1) knoepfe.firstElementChild.style.gridColumn = '1 / -1';
+          // Kurs-Partie (Kapitel 6, z.extra.lernen.kurs): "Zurueck zum Kurs" leuchtet ueber die ganze Breite vorn, die
+          // Analyse und "Nochmal" stehen darunter; die Kurs-Uebersicht traegt die Sterne beim Oeffnen ein (kursPartieAbgleich)
+          const kurs = z.extra && z.extra.lernen && z.extra.lernen.kurs;
+          if (kurs) {
+            knoepfe.querySelector('[data-ziel="analyse"].primaer')?.classList.remove('primaer');
+            knoepfe.insertAdjacentHTML('afterbegin', `<button class="knopf primaer gross" type="button" data-ziel="kurs" style="grid-column: 1 / -1">${icon('zurueck')} ${esc(t('partie.erg.zumKurs'))}</button>`);
+            knoepfe.querySelector('[data-ziel="kurs"]').addEventListener('click', () => app.gehe('lernen', { bereich: 'erste' }));
+          }
           // aktuellErg: nach dem Nachtrag zaehlt auch ein neuer Stern 2
           knoepfe.querySelector('[data-ziel="analyse"]').addEventListener('click', () => app.gehe('analyse', {
             partieId: p.id, neuFreigeschaltet: neu ? neu.id : undefined, neueSterne: aktuellErg.neueSterne,
@@ -2415,7 +2426,7 @@ export function zeige(root, params, app) {
           // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
           // Nach Niederlage und Remis ist das "Zur Analyse" (R12-W1); sonst traegt die Revanche einen orangen Fokusring
           // neben dem orangen Analyse-Knopf (R16-Kritik E3, Auswahl a)
-          const folge = (ergebnis !== 'sieg' && knoepfe.querySelector('[data-ziel="analyse"]'))
+          const folge = knoepfe.querySelector('[data-ziel="kurs"]') || (ergebnis !== 'sieg' && knoepfe.querySelector('[data-ziel="analyse"]'))
             || knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]') || revanche;
           if (folge) folge.focus({ preventScroll: true });
         }

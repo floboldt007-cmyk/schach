@@ -86,8 +86,9 @@ function zeigeKursPartie(s, l, ber, app) {
       <button class="knopf primaer dr" type="button" data-a="partie">${esc(S('partieKnopf'))}${icon('vor')}</button>
     </div></div>`;
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  // kurs: das Ergebnisblatt der Partie zeigt damit "Zurueck zum Kurs" (js/ui/partie.js, fc-00:35 c)
   s.querySelector('[data-a="partie"]').addEventListener('click', () => {
-    if (BOTS[0]) app.gehe('partie', { botId: BOTS[0].id, farbe: 'w', modus: 'frei' });
+    if (BOTS[0]) app.gehe('partie', { botId: BOTS[0].id, farbe: 'w', modus: 'frei', kurs: l.id });
   });
   return { verlasse() { try { kopf.verlasse(); } catch (x) { /* egal */ } } };
 }

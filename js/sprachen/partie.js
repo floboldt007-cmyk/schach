@@ -166,6 +166,7 @@ registriereTexte('partie', {
     'erg.lobby': 'Zu den Bots',
     'erg.abHier': 'Nochmal ab hier',
     'erg.nochmal': 'Nochmal',
+    'erg.zumKurs': 'Zurück zum Kurs',
     'erg.naechster': 'Nächster Gegner',
     'erg.freundHerausfordern': 'Freund herausfordern',
     // Chip nicht wertender Partien
@@ -324,6 +325,7 @@ registriereTexte('partie', {
     'erg.lobby': 'To the bots',
     'erg.abHier': 'Retry from here',
     'erg.nochmal': 'Play again',
+    'erg.zumKurs': 'Back to the course',
     'erg.naechster': 'Next opponent',
     'erg.freundHerausfordern': 'Challenge a friend',
     'chip.uebung': 'PRACTICE',
