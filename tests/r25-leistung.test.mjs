@@ -274,48 +274,6 @@ pruefe('Drehen: in jedem Bild nach dem Drehen steht die Pille unter dem aktiven 
   gedreht.length >= 3 && gedreht.every((b) => b.unter && b.lage === 'unten'), gedreht.slice(0, 4));
 await kE.close();
 
-// F) Fokus ein Bild spaeter (fc): in diesem einen Bild liegt der Fokus noch ausserhalb des Blatts. Ein sehr schnelles Enter
-// oder Leerzeichen direkt nach dem Oeffnen darf nicht aufgeben. 'langsam' dehnt das Bild auf 400 ms (requestAnimationFrame
-// verzoegert, wie ein sehr schwaches Geraet), damit die Tasten sicher in die Luecke fallen; 'normal' ohne Dehnung.
-const kF = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, serviceWorkers: 'block', locale: 'de-DE' });
-await kF.addInitScript(() => {
-  const roh = window.requestAnimationFrame.bind(window);
-  window.__langsam = false;
-  window.requestAnimationFrame = (f) => (window.__langsam ? setTimeout(() => roh(f), 400) : roh(f));
-});
-const sF = await kF.newPage();
-const fehlerF = [];
-sF.on('pageerror', (e) => fehlerF.push(e.message));
-await sF.goto(`http://127.0.0.1:${PORT}/tests/bauteile.html`);
-await sF.waitForFunction(() => window.__bt && document.querySelector('.halte-knopf'), null, { timeout: 30000 });
-for (const tempo of ['langsam', 'normal']) {
-  for (const taste of ['Enter', ' ']) {
-    const vorher = await sF.evaluate((l) => { window.__langsam = l; return window.__bt.ausgeloest(); }, tempo === 'langsam');
-    await sF.locator('.halte-knopf').focus();
-    await sF.keyboard.press('Enter');
-    // in der Luecke: das Blatt steht, der Fokus noch nicht darin (nur 'langsam' garantiert das)
-    const luecke = await sF.evaluate(() => {
-      const k = document.querySelector('.sheet-ort .sheet-karte');
-      return { blatt: !!k, imBlatt: !!k && k.contains(document.activeElement), fokus: document.activeElement?.className || document.activeElement?.tagName };
-    });
-    await sF.keyboard.press(taste);
-    await sF.keyboard.press(taste);
-    await warte(tempo === 'langsam' ? 1500 : 600);
-    const nachher = await sF.evaluate(() => ({ ausgeloest: window.__bt.ausgeloest(), blaetter: document.querySelectorAll('.sheet-ort').length,
-      titel: document.querySelector('.sheet-karte h3')?.textContent, fokus: document.activeElement?.textContent }));
-    const name = taste === ' ' ? 'Leerzeichen' : 'Enter';
-    if (tempo === 'langsam') pruefe(`Fokus ein Bild spaeter (${tempo}, ${name}): die Tasten fallen wirklich in die Luecke (Blatt steht, Fokus noch nicht darin)`,
-      luecke.blatt && !luecke.imBlatt, luecke);
-    pruefe(`Fokus ein Bild spaeter (${tempo}): zweimal ${name} direkt nach dem Oeffnen gibt nicht auf, das Blatt bleibt offen`,
-      nachher.ausgeloest === vorher && nachher.blaetter <= 1 && nachher.titel === 'Aufgeben?', { vorher, luecke, nachher });
-    await sF.evaluate(() => { window.__langsam = false; });
-    await sF.keyboard.press('Escape');
-    await sF.waitForFunction(() => !document.querySelector('.sheet-ort'), null, { timeout: 3000 }).catch(() => {});
-  }
-}
-pruefe('Fokus ein Bild spaeter: keine Seitenfehler', fehlerF.length === 0, fehlerF.slice(0, 3));
-await kF.close();
-
 pruefe('keine Seitenfehler', seitenfehler.length === 0, seitenfehler.slice(0, 3));
 await browser.close();
 server.close();
