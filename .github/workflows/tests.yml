@@ -77,6 +77,8 @@ jobs:
         run: node tests/server-liga-bild.test.mjs
       - name: Raetsel-Duell-SQL ausfuehren
         run: node tests/server-raetsel-duell.test.mjs
+      - name: KI-Duell wertet sofort aus (vorbereitet, nicht eingespielt; Spieler-Ende, KI mit Spielerzeit, Rueckweg)
+        run: node tests/server-raetsel-duell-ki-sofort.test.mjs
       - name: Datenauskunft-SQL ausfuehren (alle Schemata, Vollstaendigkeit)
         run: node tests/server-daten.test.mjs
       - run: node tests/server-saison.test.mjs
