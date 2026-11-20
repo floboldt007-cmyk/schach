@@ -285,7 +285,23 @@ function hilfen(seite) {
       for (const n of namen) inhalt[n] = (await (await caches.open(n)).keys()).map((r) => new URL(r.url).pathname);
       return inhalt;
     }),
-    swVersion: () => seite.evaluate(() => new Promise((resolve) => {
+    // Seit ceaba2d2 (Erstbesuch auf langsamem Netz) legt die Installation nur den KERN ab, den Rest holt nachladen() danach
+    // in Haeppchen, angestossen von Anfragen der Seite; erst danach ist der Cache voll und der aeltere weg (sw.js). Wartet,
+    // bis nur noch der Cache `name` da ist und alle DATEIEN enthaelt, und stoesst dabei mit einer Anfrage nach (fetch-Ereignis).
+    nachgeladen: async (name, frist = 120000) => {
+      const soll = SW.DATEIEN.map((d) => PRAEFIX + d);
+      const ende = Date.now() + frist;
+      let inhalt = {};
+      do {
+        await seite.evaluate(() => fetch('manifest.webmanifest').then((r) => r.text()).catch(() => null));
+        inhalt = await h.cache();
+        const app = Object.keys(inhalt).filter((n) => n.startsWith('schach-arena-'));
+        if (app.length === 1 && app[0] === name && soll.every((p) => inhalt[name].includes(p))) break;
+        await seite.waitForTimeout(500);
+      } while (Date.now() < ende);
+      return inhalt;
+    },
+    swVersion:() => seite.evaluate(() => new Promise((resolve) => {
       const sw = navigator.serviceWorker;
       if (!sw.controller) { resolve(null); return; }
       const t = setTimeout(() => resolve(null), 3000);
@@ -386,8 +402,8 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
   pruefe('Service Worker aktiv, Bereich /schach/', reg.scope === START && reg.skript === START + 'sw.js', JSON.stringify(reg));
   await seite.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
   pruefe('Service Worker steuert die Seite (clients.claim)', await seite.evaluate(() => !!navigator.serviceWorker.controller));
-  const cache = await h.cache();
   const name = SW.CACHE;
+  const cache = await h.nachgeladen(name);
   const soll = SW.DATEIEN.map((d) => PRAEFIX + d);
   const ist = cache[name] || [];
   const fehlt = soll.filter((p) => !ist.includes(p));
@@ -749,7 +765,7 @@ async function testeUpdate(seite, h, fehler) {
   await h.screen('arena');
   pruefe('Nach "Neu laden": neue Version aktiv', (await h.swVersion()) === neueVersion);
   pruefe('Neue Dateien geladen (am HTTP-Cache vorbei)', await seite.evaluate((v) => document.querySelector('meta[name="schach-test-version"]')?.content === String(v), neueVersion));
-  let cache = await h.cache();
+  let cache = await h.nachgeladen('schach-arena-v' + neueVersion);
   pruefe('Alter Cache gelöscht, neuer vollständig', Object.keys(cache).join() === 'schach-arena-v' + neueVersion
     && SW.DATEIEN.every((d) => cache['schach-arena-v' + neueVersion].includes(PRAEFIX + d)), Object.keys(cache).join(', '));
   pruefe('Kein Hinweis mehr', await seite.locator('.update-hinweis').count() === 0);
@@ -767,7 +783,7 @@ async function testeUpdate(seite, h, fehler) {
   await S('b6 neue Dateien da', () => seite.waitForFunction((v) => document.querySelector('meta[name="schach-test-version"]')?.content === String(v), neueVersion, { timeout: 20000 }));
   await S('b7 Arena', () => h.screen('arena'));
   pruefe('Beim nächsten Start: neue Version übernimmt', (await S('b8 Version fragen', () => h.swVersion())) === neueVersion);
-  cache = await S('b9 Cache lesen', () => h.cache());
+  cache = await S('b9 Cache lesen', () => h.nachgeladen('schach-arena-v' + neueVersion), 130000);
   pruefe('Beim nächsten Start: nur der neue Cache', Object.keys(cache).join() === 'schach-arena-v' + neueVersion, Object.keys(cache).join(', '));
 
   // c) Flo 31.10.2026 abends ("auf dem Handy hat sich nichts veraendert"): eine bereitliegende Version uebernimmt beim
