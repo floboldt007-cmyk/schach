@@ -20,6 +20,7 @@
 import { anim, tempo } from '../../bewegung.js';
 import { klang } from '../../sounds.js';
 import { icon } from '../../ui/icons.js';
+import { schluckeFolgeKlick } from '../../ui/bauteile.js';
 import { t, sprache, zahl } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
 import * as L from './level.js';
@@ -681,7 +682,7 @@ export function oeffneSpiegel(inhalt, { titel = tx('spiegel.titel') } = {}) {
     }
     if (vorher && vorher.isConnected && typeof vorher.focus === 'function') { try { vorher.focus({ preventScroll: true }); } catch (f) { /* egal */ } }
   }
-  schleier.addEventListener('pointerdown', schliesse);
+  schleier.addEventListener('pointerdown', () => { schliesse(); schluckeFolgeKlick(); });
   ort.querySelector('.fk-schliessen').addEventListener('click', schliesse);
   document.addEventListener('keydown', taste, true);
   document.body.append(ort);

@@ -24,7 +24,7 @@ import { ladePartie, ladeModul, speichereModul, ladeModulEinstellungen, speicher
 import { botNachId } from '../../bots.js';
 import { avatarVon, aufgeloesterModus, aktuellesThema, themaVon } from '../../thema.js';
 import { icon, registriereIcon } from '../../ui/icons.js';
-import { segment, schalter, toast } from '../../ui/bauteile.js';
+import { segment, schalter, toast, schluckeFolgeKlick } from '../../ui/bauteile.js';
 import { anim, tempo } from '../../bewegung.js';
 import { sitzung, ladeProfil } from '../../konto.js';
 import { tagSchluessel } from '../../tag.js';
@@ -333,7 +333,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     naechstes.focus();
   }
 
-  schleier.addEventListener('pointerdown', () => ende());
+  schleier.addEventListener('pointerdown', () => { ende(); schluckeFolgeKlick(); });
   ort.querySelector('[data-tl="abbrechen"]').addEventListener('click', () => ende());
   function erledigt(weg, meldung) {
     stand.weg = weg;
