@@ -46,8 +46,10 @@
 /* R19 Season: Rang-Symbol der Liga, bestes Season-Abzeichen und gewaehlter Season-Titel (auf dem dunklen Banner) */
 .vk-liga-symbol { display: inline-block; width: 14px; height: 16px; margin-right: 5px; vertical-align: -3px; }
 .vk-season { display: flex; flex-wrap: wrap; gap: 4px 6px; min-width: 0; margin-top: 2px; }
-.vk-season-abz, .vk-season-titel { display: inline-flex; align-items: center; min-height: 26px; padding: 0 8px; border-radius: 7px;
-  font-size: 13px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; text-shadow: none; }
+/* R25 (Belastungsprobe fc-12:40): nie breiter als die Karte; passt der Text nicht in eine Zeile, bricht er um statt
+   abgeschnitten zu werden (320 px: "Crownmaster Season 1" ragte 4 px hinaus). Wo er passt, bleibt er einzeilig. */
+.vk-season-abz, .vk-season-titel { display: inline-flex; align-items: center; min-height: 26px; max-width: 100%; padding: 0 8px; border-radius: 7px;
+  font-size: 13px; font-weight: 800; letter-spacing: .02em; overflow-wrap: anywhere; text-shadow: none; }
 /* R19 (Flo 15.11.: "hat ja Bedeutung"): das Abzeichen traegt das Wappen seiner Liga, gut lesbar auf dem Banner */
 .vk-season-abz { gap: 5px; padding-left: 5px; color: #FFF; background: rgba(0, 0, 0, .42); border: 1px solid rgba(255, 212, 122, .6); }
 .vk-season-symbol { flex: none; width: 18px; height: auto; }
