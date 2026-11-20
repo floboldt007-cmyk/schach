@@ -579,6 +579,23 @@ Online-Seite wieder die Liga statt der Elo.
 `daten-auskunft-zurueck.sql` läuft erst nach den Schritten 2 und 3. Vorher bricht die Datei mit einer Meldung ab, damit
 Saison und Weltrangliste nicht still aus der Datenauskunft fallen.
 
+## Rätsel-Duell gegen die KI wertet sofort aus (Stand 20.11.2026, vorbereitet, noch nicht eingespielt)
+
+Bisher endete ein Rätsel-Duell gegen die KI erst nach den vollen 180 Sekunden, auch wenn der Spieler längst fertig war.
+Jetzt endet es sofort, wenn alle Rätsel gelöst sind, oder 15 Sekunden nach dem eigenen Ende, wenn die Zeit um ist. Die
+15 Sekunden sind da, damit ein Zug, der kurz vor dem Ende ankam, noch zählt. Das Ergebnis bleibt dasselbe wie bisher.
+
+1. **SQL Editor** → den ganzen Inhalt von `supabase/raetsel-duell-ki-sofort-schema.sql` → **Run**. Die Datei kommt
+   **nach** `zwei-ligen-schema.sql` und lässt sich gefahrlos zweimal einspielen.
+2. Prüfen: den ganzen Inhalt von `supabase/zwei-ligen-rls-test.sql` ausführen. Erwartung: kein `FEHLER:`, Ende mit
+   `ROLLBACK`.
+
+**Wichtig:** Läuft `zwei-ligen-schema.sql` oder `raetsel-duell-schema.sql` noch einmal, danach
+`raetsel-duell-ki-sofort-schema.sql` wieder einspielen. Sonst wartet das KI-Duell wieder die vollen 180 Sekunden.
+
+**Rückweg:** `supabase/raetsel-duell-ki-sofort-zurueck.sql` stellt die alten Fassungen wieder her. Schon beendete
+Duelle bleiben, wie sie sind.
+
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 
 Flo: „Die ersten 100 Spieler bekommen einen Titel freigeschaltet.“ Die Datei `supabase/pionier-schema.sql` gibt den

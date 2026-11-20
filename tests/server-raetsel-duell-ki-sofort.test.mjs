@@ -104,13 +104,13 @@ async function stand(d, u) {
   return s;
 }
 
-// A) Zeit um mit 10 Fehlern: eigenes Ende nach 130 s, 140 s sind vorbei (Gnade 3 s). Bisher wartete die Auswertung bis
-//    180 s + 3 s; jetzt endet das Duell sofort, die KI zaehlt wie bisher mit ihren vollen 180 s.
+// A) Zeit um mit 10 Fehlern: eigenes Ende nach 130 s, 150 s sind vorbei (KI-Nachfrist 15 s). Bisher wartete die
+//    Auswertung bis 180 s + 3 s; jetzt endet das Duell sofort, die KI zaehlt wie bisher mit ihren vollen 180 s.
 {
-  const { d, u } = await kiDuell({ vor: 140, fehler: 10, geloest: 4 });
+  const { d, u } = await kiDuell({ vor: 150, fehler: 10, geloest: 4 });
   const s = await stand(d, u);
   const soll = await kiBei(d, 180);
-  pruefe('A: eigene Zeit um (10 Fehler, 140 s): das Duell ist sofort beendet', s.status === 'beendet', JSON.stringify(s));
+  pruefe('A: eigene Zeit um (10 Fehler, 150 s): das Duell ist sofort beendet', s.status === 'beendet', JSON.stringify(s));
   pruefe('A: die KI zaehlt mit ihren vollen 180 s, Anzeige wie Wertung',
     s.gegner && s.gegner.geloest === soll.geloest && s.gegner.fehler === soll.fehler, JSON.stringify({ gegner: s.gegner, soll }));
   pruefe('A: Ergebnis aus eigener Sicht steht fest', ['sieg', 'remis', 'niederlage'].includes(s.ergebnis), s.ergebnis);
@@ -124,10 +124,10 @@ async function stand(d, u) {
   pruefe('B: die KI zaehlt mit ihren vollen 180 s',
     s.gegner && s.gegner.geloest === soll.geloest && s.gegner.fehler === soll.fehler, JSON.stringify({ gegner: s.gegner, soll }));
 }
-// H) Schlupfloch zu: 10 geloest nach 40 s, dann 28 absichtliche Fehler (eigene Uhr endet bei 40 s), 44 s vorbei. Das Duell
+// H) Schlupfloch zu: 10 geloest nach 40 s, dann 28 absichtliche Fehler (eigene Uhr endet bei 40 s), 60 s vorbei. Das Duell
 //    endet sofort, die KI zaehlt trotzdem mit 180 s; das Ergebnis ist dasselbe, als haette der Spieler die Zeit abgewartet
 {
-  const { d } = await kiDuell({ vor: 44, fehler: 28, geloest: 10 });
+  const { d } = await kiDuell({ vor: 60, fehler: 28, geloest: 10 });
   const st = await auswerten(d);
   const soll = await kiBei(d, 180);
   const r = (await db.query('select ergebnis from public.duelle where id = $1', [d])).rows[0].ergebnis;
@@ -145,6 +145,25 @@ async function stand(d, u) {
   const { d } = await kiDuell({ vor: 131.5, fehler: 10 });
   pruefe('D: in der Gnadenfrist nach dem eigenen Ende bleibt das Duell offen', (await auswerten(d)) === 'laeuft');
 }
+// I) Kaltreview F-20:05: ein Zug kommt bei 129 s an (eigenes Ende 130 s), verbucht wird er erst bei 140 s, nach einer
+//    Abfrage dazwischen. Mit nur 3 s Gnade war das Duell da schon beendet und der Zug fiel weg (4 statt 5 geloest). Die
+//    alte Fassung hielt bis 180 s + 3 s offen; die KI-Nachfrist (15 s) nimmt ihn wie bisher an.
+{
+  const { d, u } = await kiDuell({ vor: 140, fehler: 10, geloest: 4 });
+  await db.query('select public.duell_faellige_auswerten($1)', [u]);
+  pruefe('I: Abfrage 10 s nach dem eigenen Ende: das Duell bleibt fuer spaete Zuege offen', (await status(d)) === 'laeuft');
+  let geloest = null;
+  try {
+    geloest = (await db.query(`select (public.duell_zug_verbuchen($1, $2, 14, 0, true, true,
+      (select x.start_am from public.duelle x where x.id = $2) + interval '129 seconds') ->> 'geloest')::int as g`, [u, d])).rows[0].g;
+  } catch (e) {
+    geloest = e.message;
+  }
+  pruefe('I: der Zug, der vor dem Ende ankam, wird verbucht', geloest === 5, String(geloest));
+  await db.query(`update public.duelle set start_am = start_am - interval '10 seconds' where id = $1`, [d]);
+  pruefe('I: nach Ende + 15 s beendet, mit dem spaeten Zug gewertet', (await auswerten(d)) === 'beendet'
+    && (await db.query('select geloest from public.duell_spieler where duell = $1', [d])).rows[0].geloest === 5);
+}
 // E) volle Zeit ohne Fehler: wie bisher nach 180 s + Gnade beendet, KI mit 180 s
 {
   const { d, u } = await kiDuell({ vor: 184, geloest: 3 });
@@ -155,10 +174,10 @@ async function stand(d, u) {
 }
 // F) Sammel-Auswertungen nehmen ein KI-Duell, dessen Spieler fertig ist, auch vor 180 s mit
 {
-  const { d, u } = await kiDuell({ vor: 140, fehler: 10 });
+  const { d, u } = await kiDuell({ vor: 150, fehler: 10 });
   await db.query('select public.duell_faellige_auswerten($1)', [u]);
   pruefe('F: duell_faellige_auswerten beendet ein KI-Duell nach dem eigenen Ende', (await status(d)) === 'beendet');
-  const { d: d2 } = await kiDuell({ vor: 140, fehler: 10 });
+  const { d: d2 } = await kiDuell({ vor: 150, fehler: 10 });
   await db.query('select public.duell_alle_faelligen_auswerten()');
   pruefe('F: duell_alle_faelligen_auswerten beendet ein KI-Duell nach dem eigenen Ende', (await status(d2)) === 'beendet');
 }
@@ -179,7 +198,7 @@ if (!ohne) {
   const helfer = (await db.query(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'duell_spieler_schluss'`)).rows[0].n;
   pruefe('Rueckweg: der neue Helfer duell_spieler_schluss ist weg', helfer === 0, helfer);
-  const { d } = await kiDuell({ vor: 140, fehler: 10 });
+  const { d } = await kiDuell({ vor: 150, fehler: 10 });
   pruefe('Rueckweg: alte Fassung wartet wieder bis 180 s + Gnade', (await auswerten(d)) === 'laeuft');
   const { d: dv, u: uv } = await kiDuell({ vor: 184, geloest: 3 });
   const s = await stand(dv, uv);
