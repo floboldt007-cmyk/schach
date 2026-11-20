@@ -17,6 +17,7 @@ import http from 'node:http';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import vm from 'node:vm';
 import { browserTyp } from './browser.mjs';
 import { freierPort } from './freier-port.mjs';
 
@@ -32,6 +33,15 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 if (!pw) { pruefe('Playwright gefunden', false); console.log(`${ok}/${ok + fehler} bestanden`); process.exit(1); } // INTENTIONAL-SLOP[T4]: Ausgabeweg
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+// Der Kern aus sw.js (fc-06:00, 20.11.2026): nur ihn legt die Installation ab, der Rest kommt danach in Haeppchen. Die Probe
+// beschneidet den Cache vor dem Netz-Aus auf genau den Kern und Stockfish (ZUERST, der erste Happen danach), damit sie
+// zeigt, dass das fuer alles unten reicht.
+const KERN = (() => {
+  const k = { self: { location: new URL('https://example.org/schach/sw.js'), addEventListener() {} }, URL };
+  vm.createContext(k);
+  vm.runInContext(readFileSync(path.join(root, 'sw.js'), 'utf8') + '\n;globalThis.__kern = typeof KERN === "undefined" ? null : KERN.concat(typeof ZUERST === "undefined" ? [] : ZUERST);', k);
+  return k.__kern;
+})();
 const PRAEFIX = '/schach/';
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg',
@@ -136,6 +146,20 @@ try {
       // ---------- (a) Netz aus ----------
       offline = true;
       await k.setOffline(true);
+      // erst Netz aus (das Nachladen bricht ab), dann alles ausser dem Kern aus dem Cache: so laeuft der Rest wie bei einem
+      // neuen Spieler, dessen Nachladen noch nicht fertig ist
+      await s.waitForTimeout(500);
+      const beschnitten = Array.isArray(KERN) && await s.evaluate(async (kern) => {
+        const basis = location.pathname.replace(/index\.html$/, '');
+        const behalten = new Set(kern.map((d) => basis + d));
+        let rest = 0;
+        for (const n of await caches.keys()) {
+          const c = await caches.open(n);
+          for (const r of await c.keys()) if (!behalten.has(new URL(r.url).pathname)) { await c.delete(r); rest++; }
+        }
+        return rest;
+      }, KERN);
+      pruefe(`${tag}: Cache auf den Kern beschnitten (${KERN ? KERN.length : 0} Dateien, ${beschnitten || 0} weitere entfernt)`, Array.isArray(KERN) && beschnitten !== false);
       const ohneNetz = await ladeBisHeim(s, START).catch((e) => { throw new Error('Neustart ohne Netz: ' + e.message.split('\n')[0]); });
       console.log(`MESSUNG ${tag} neustart_offline_ms=${ohneNetz}`); // INTENTIONAL-SLOP[T4]: Messwerte sind Ausgabe
       await bild(s, '1-heim-offline');

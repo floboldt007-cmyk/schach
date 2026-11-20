@@ -1,8 +1,8 @@
 // Service Worker der Schach-Arena: legt alle App-Dateien in einen Cache, damit die App
 // (samt Stockfish) auch ohne Netz laeuft.
-//   Installation: laedt alle DATEIEN vor (eine fehlt = Installation scheitert).
-//   Aktivierung:  loescht alte Caches, uebernimmt offene Seiten.
-//   Abruf:        Cache zuerst, sonst Netz (und das Ergebnis in den Cache legen).
+//   Installation: laedt den KERN vor (eine fehlt = Installation scheitert), hoechstens 6 Dateien gleichzeitig.
+//   Aktivierung:  loescht alte Caches (den neuesten erst, wenn alle DATEIEN da sind), uebernimmt offene Seiten.
+//   Abruf:        Cache zuerst, sonst Netz (und das Ergebnis in den Cache legen); stoesst das Nachladen des Rests an.
 // Update: Bei jeder Aenderung an einer App-Datei VERSION hochzaehlen, am einfachsten mit
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
@@ -794,6 +794,246 @@ const DATEIEN = [
   'assets/icons/apple-touch-icon.png',
 ];
 
+// Der Kern: was die App ohne Netz zum Start braucht (erster Start, Heim, Lernen, Lektion, Konto, Online, Verlauf, eine
+// Bot-Partie bis zum ersten Zug). Nur ihn legt die Installation ab, den Rest holt nachladen() danach in Haeppchen, Stockfish
+// (ZUERST) als ersten. Grund (Messung fc-06:00, 20.11.2026, Playwright-WebKit mit gedrosseltem Netz): WebKit beendet das
+// install-Ereignis nach etwa 30 s. Mit allen DATEIEN war die Registrierung danach weg (Slow 4G: 743 von 770 im Cache,
+// Fast 3G: 292 von 770), also kein Offline und beim naechsten Besuch alles von vorn.
+// Die Liste erzeugt tests/sw-kern.mjs aus dem, was die Seite auf diesen Wegen wirklich abruft; tests/offline-ladeprobe.test.mjs
+// beschneidet den Cache auf genau den Kern und Stockfish und spielt dann ohne Netz.
+// KERN-ANFANG (erzeugt von tests/sw-kern.mjs --schreiben, nicht von Hand pflegen)
+const KERN = [
+  'js/pakete/lernen/erste-schritte.js',
+  'js/pakete/sammlung/effekt-vorschau.js',
+  'js/pakete/sammlung/taten.js',
+  'js/besitz.js',
+  'js/freigaben.js',
+  'js/karte.js',
+  'js/ui/visitenkarte.js',
+  'css/visitenkarte.css',
+  'js/pakete/sammlung/stufen.js',
+  'js/pakete/sammlung/moment.js',
+  'js/pakete/sammlung/karte-texte.js',
+  'js/pakete/lernen/taktik.js',
+  'js/pakete/lernen/eroeffnungen.js',
+  'css/pakete/musik.css',
+  'js/pakete/musik/index.js',
+  'js/pakete/musik/texte.js',
+  'js/musik.js',
+  'css/pakete/emotes.css',
+  'js/pakete/emotes/index.js',
+  'js/pakete/emotes/texte.js',
+  'css/pakete/lernen.css',
+  'js/pakete/lernen/index.js',
+  'js/pakete/lernen/mattbilder.js',
+  'js/pakete/lernen/endspiele.js',
+  'js/pakete/lernen/texte.js',
+  'js/pakete/lernen/zugang.js',
+  'js/ui/lernen.js',
+  'js/pakete/lobby/index.js',
+  'js/pakete/lobby/texte.js',
+  'js/ui/lektion.js',
+  'css/pakete/sammlung.css',
+  'js/pakete/sammlung/index.js',
+  'js/pakete/sammlung/shop.js',
+  'js/pakete/sammlung/shop-entwurf.js',
+  'js/pakete/sammlung/erfinder.js',
+  'js/pakete/sammlung/profil.js',
+  'js/pakete/sammlung/titel.js',
+  'js/pakete/sammlung/texte.js',
+  'css/pakete/finisher.css',
+  'js/pakete/finisher/index.js',
+  'js/pakete/finisher/texte.js',
+  'js/sprachen/bericht.js',
+  'js/pakete/verwaltung/texte.js',
+  'js/sprachen/abo.js',
+  'js/sprachen/online.js',
+  'js/pakete/funken/texte.js',
+  'js/pakete/gedaechtnis/texte.js',
+  'js/pakete/kartei/texte.js',
+  'js/pakete/liga/texte.js',
+  'js/pakete/punkte/texte.js',
+  'js/pakete/serie/texte.js',
+  'js/pakete/start/texte.js',
+  'js/pakete/tagesraetsel/texte.js',
+  'js/pakete/teilen/texte.js',
+  'js/pakete/zuzweit/texte.js',
+  'js/sprache.js',
+  'js/sprachen/allgemein.js',
+  'js/sprachen/analyse.js',
+  'js/sprachen/arena.js',
+  'js/sprachen/bots.js',
+  'js/sprachen/einstellungen.js',
+  'js/sprachen/eroeffnungen.js',
+  'js/sprachen/partie.js',
+  'js/sprachen/raetsel.js',
+  'js/sprachen/rahmen.js',
+  'css/pakete/tagesraetsel.css',
+  'js/pakete/tagesraetsel/index.js',
+  'js/pakete/tagesraetsel/logik.js',
+  'daten/tagesraetsel/raetsel.json',
+  'css/pakete/liga.css',
+  'js/pakete/liga/ansicht.js',
+  'js/pakete/liga/index.js',
+  'js/pakete/liga/wertung.js',
+  'js/pakete/liga/kronen.js',
+  'js/pakete/liga/gruppe.js',
+  'js/pakete/liga/welt.js',
+  'css/pakete/funken.css',
+  'js/pakete/funken/ansicht.js',
+  'js/pakete/funken/index.js',
+  'js/pakete/funken/level.js',
+  'js/pakete/funken/rechnung.js',
+  'js/pakete/funken/stand.js',
+  'css/pakete/punkte.css',
+  'js/pakete/punkte/ansicht.js',
+  'js/pakete/punkte/code.js',
+  'js/pakete/punkte/formel.js',
+  'js/pakete/punkte/index.js',
+  'js/pakete/punkte/liste.js',
+  'js/pakete/punkte/freunde.js',
+  'js/pakete/punkte/stand.js',
+  'js/pakete/punkte/tafel.js',
+  'css/pakete/serie.css',
+  'js/pakete/serie/ansicht.js',
+  'js/pakete/serie/index.js',
+  'js/pakete/serie/lauf.js',
+  'js/pakete/serie/stand.js',
+  'js/pakete/serie/tag.js',
+  'css/pakete/teilen.css',
+  'js/pakete/teilen/bild.js',
+  'js/pakete/teilen/index.js',
+  'js/pakete/teilen/logik.js',
+  'css/pakete/gedaechtnis.css',
+  'js/pakete/gedaechtnis/index.js',
+  'js/pakete/gedaechtnis/logik.js',
+  'js/pakete/gedaechtnis/saetze.js',
+  'css/pakete/kartei.css',
+  'js/pakete/kartei/index.js',
+  'js/pakete/kartei/logik.js',
+  'css/pakete/start.css',
+  'js/pakete/start/aufgaben.js',
+  'js/pakete/start/dienst.js',
+  'js/pakete/start/index.js',
+  'js/pakete/start/logik.js',
+  'daten/punkte/bot-laeufe.json',
+  'js/ui/bestenliste.js',
+  'js/ui/ich.js',
+  'js/ui/raetsel.js',
+  'js/ui/start.js',
+  'index.html',
+  'manifest.webmanifest',
+  'css/tokens.css',
+  'css/themes/modern.css',
+  'css/board.css',
+  'css/app.css',
+  'css/bauteile.css',
+  'css/navigation.css',
+  'css/arena.css',
+  'css/duell.css',
+  'css/partie.css',
+  'css/ergebnis.css',
+  'css/analyse.css',
+  'css/verlauf.css',
+  'css/einstellungen.css',
+  'css/training.css',
+  'css/heim.css',
+  'css/online.css',
+  'css/sicherung.css',
+  'css/daten.css',
+  'css/premium.css',
+  'css/screens.css',
+  'js/app.js',
+  'js/bewegung.js',
+  'js/board.js',
+  'js/bots.js',
+  'js/engine.js',
+  'js/ereignisse.js',
+  'js/erweiterungen.js',
+  'js/feier.js',
+  'js/inhalte.js',
+  'js/konto-config.js',
+  'js/botschutz.js',
+  'js/konto.js',
+  'js/umzug.js',
+  'js/sw-wechsel.js',
+  'js/profil.js',
+  'js/rahmen-kunst.js',
+  'js/sammlung-kunst.js',
+  'js/kreaturen-kunst.js',
+  'js/emote-kunst.js',
+  'js/titel-kunst.js',
+  'js/sonderstuecke.js',
+  'js/labor.js',
+  'js/figurensatz.js',
+  'js/abo.js',
+  'js/verwaltung.js',
+  'js/pakete/verwaltung/index.js',
+  'js/online.js',
+  'js/serverzeit.js',
+  'js/uhr.js',
+  'js/freunde.js',
+  'js/kronen.js',
+  'js/gegnersuche.js',
+  'js/openings.js',
+  'js/orte.js',
+  'js/review.js',
+  'js/sounds.js',
+  'js/storage.js',
+  'js/symbole.js',
+  'js/zugklassen.js',
+  'js/tag.js',
+  'js/sicherung.js',
+  'js/daten.js',
+  'js/protokoll.js',
+  'js/bericht.js',
+  'js/thema.js',
+  'js/ui/abrechnung.js',
+  'js/ui/bauteile.js',
+  'js/ui/brett-einstellungen.js',
+  'js/ui/duell.js',
+  'js/ui/einstellungen.js',
+  'js/ui/gegner-profil.js',
+  'js/ui/icons.js',
+  'js/ui/partie.js',
+  'js/ui/seite.js',
+  'js/ui/heim.js',
+  'js/ui/online.js',
+  'js/ui/zuzweit.js',
+  'js/pakete/zuzweit/index.js',
+  'js/ui/verlauf.js',
+  'vendor/chess/chess.js',
+  'assets/pieces/bB.svg',
+  'assets/pieces/bK.svg',
+  'assets/pieces/bN.svg',
+  'assets/pieces/bP.svg',
+  'assets/pieces/bQ.svg',
+  'assets/pieces/bR.svg',
+  'assets/pieces/wB.svg',
+  'assets/pieces/wK.svg',
+  'assets/pieces/wN.svg',
+  'assets/pieces/wP.svg',
+  'assets/pieces/wQ.svg',
+  'assets/pieces/wR.svg',
+  'assets/avatare/modern/benno.svg',
+  'assets/avatare/modern/fridolin.svg',
+  'assets/avatare/modern/paula.svg',
+  'assets/avatare/modern/gustav.svg',
+  'assets/schriften/manrope.woff2',
+  'assets/schriften/bricolage-grotesque.woff2',
+  'assets/icons/favicon.svg',
+  'assets/icons/icon-192.png',
+  'assets/icons/apple-touch-icon.png',
+];
+// KERN-ENDE
+// Der erste Happen nach der Aktivierung: Stockfish (1,8 MB, die Bot-Partie spielt bis dahin ohne Engine und sagt das), dann
+// die Bild-Avatare aller Bots (Heim zeigt je nach Fortschritt einen anderen naechsten Gegner). Im Kern kosteten die 30
+// Avatare auf Fast 3G unter WebKit etwa 3 s Installation (28,3 s statt 25,3 s, Grenze 30 s).
+const ZUERST = [...DATEIEN.filter((d) => /^vendor\/stockfish\//.test(d)),
+  ...DATEIEN.filter((d) => /^assets\/avatare\/modern\//.test(d) && !KERN.includes(d))];
+const GLEICHZEITIG = 6;
+const HAPPEN_MS = 15000;   // ein Happen Nachladen: deutlich unter den 30 s, nach denen WebKit ein Ereignis beendet
+
 // Dateien ohne Endung (LICENSE) liefert GitHub Pages als Download aus: als Text zeigen
 async function mitTyp(datei, antwort) {
   if (/\.[a-z0-9]+$/i.test(datei)) return antwort;
@@ -828,26 +1068,77 @@ async function holeFrisch(datei, alt) {
   return fetch(new Request(datei, { cache: 'no-cache' }));
 }
 
+async function ablegen(cache, datei, alt) {
+  const antwort = await holeFrisch(datei, alt);
+  if (!antwort.ok) throw new Error(`Vorladen fehlgeschlagen: ${datei} (${antwort.status})`);
+  const fertig = await mitTyp(datei, antwort);
+  await cache.put(datei, WEBKIT ? ohneFrische(fertig, await fertig.blob()) : fertig);
+}
+
+// arbeit(datei) fuer jede Datei der Liste, hoechstens GLEICHZEITIG auf einmal (alle auf einmal nahmen dem Start die Leitung);
+// nach dem ersten Fehler startet keine weitere, der Fehler kommt zurueck
+async function inStuecken(liste, arbeit) {
+  let naechste = 0, fehler = null;
+  const strang = async () => {
+    while (!fehler && naechste < liste.length) {
+      try { await arbeit(liste[naechste++]); } catch (f) { fehler = fehler || f; }
+    }
+  };
+  await Promise.all(Array.from({ length: GLEICHZEITIG }, strang));
+  if (fehler) throw fehler;
+}
+
+async function fehlend(cache) {
+  const da = new Set((await cache.keys()).map((r) => new URL(r.url).pathname));
+  const offen = DATEIEN.filter((d) => !da.has(new URL(d, self.location).pathname)); // INTENTIONAL-SLOP[R3]: self ist im Worker das globale Objekt
+  return [...ZUERST.filter((d) => offen.includes(d)), ...offen.filter((d) => !ZUERST.includes(d))];
+}
+
+const nummer = (name) => Number(name.slice(PRAEFIX.length + 1));
+
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     const alt = await alterCache().catch(() => null);
-    await Promise.all(DATEIEN.map(async (datei) => {
-      const antwort = await holeFrisch(datei, alt);
-      if (!antwort.ok) throw new Error(`Vorladen fehlgeschlagen: ${datei} (${antwort.status})`);
-      const fertig = await mitTyp(datei, antwort);
-      await cache.put(datei, WEBKIT ? ohneFrische(fertig, await fertig.blob()) : fertig);
-    }));
+    await inStuecken(KERN, (datei) => ablegen(cache, datei, alt));
   })());
 });
 
+// Den neuesten alten Cache behalten, solange im eigenen noch Dateien fehlen: nachladen() fragt fuer sie per ETag beim Server
+// nach (304), statt nach jedem Update Klaenge und Skins voll neu zu laden. Weg ist er, sobald alles da ist (nachladen).
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
-    const namen = await caches.keys();
-    await Promise.all(namen.filter((n) => n.startsWith(PRAEFIX) && n !== CACHE).map((n) => caches.delete(n)));
+    const namen = (await caches.keys()).filter((n) => n.startsWith(PRAEFIX) && n !== CACHE);
+    const offen = (await caches.has(CACHE)) ? (await fehlend(await caches.open(CACHE))).length : 0;
+    const behalten = offen ? namen.filter((n) => nummer(n) < VERSION).sort((a, b) => nummer(b) - nummer(a))[0] : null;
+    await Promise.all(namen.filter((n) => n !== behalten).map((n) => caches.delete(n)));
     await self.clients.claim();
   })());
 });
+
+// Ein Happen Nachladen: holt fehlende DATEIEN, bis HAPPEN_MS um sind oder ein Abruf scheitert (ohne Netz). Was schon im Cache
+// liegt, zaehlt, darum setzt ein abgebrochenes Nachladen beim naechsten Besuch fort statt von vorn. Angestossen von jeder
+// Anfrage der Seite (fetch unten), immer nur einer auf einmal. Danach raeumt es die aelteren Caches weg, nie einen neueren
+// (der kann gerade installieren).
+let happen = null;
+let komplett = false;
+function nachladen() {
+  if (!happen) happen = einHappen().catch(() => { /* naechste Anfrage versucht es wieder */ }).finally(() => { happen = null; });
+  return happen;
+}
+async function einHappen() {
+  if (!(await caches.has(CACHE))) return;   // eigener Cache geloescht (neuere Fassung aktiv): nichts anlegen
+  const cache = await caches.open(CACHE);
+  const alt = await alterCache().catch(() => null);
+  const ende = Date.now() + HAPPEN_MS;
+  await inStuecken(await fehlend(cache), async (datei) => {
+    if (Date.now() < ende) await ablegen(cache, datei, alt);
+  }).catch(() => { /* ohne Netz: beim naechsten Mal weiter */ });
+  if ((await fehlend(cache)).length) return;
+  komplett = true;
+  const aelter = (await caches.keys()).filter((n) => n.startsWith(PRAEFIX) && nummer(n) < VERSION);
+  await Promise.all(aelter.map((n) => caches.delete(n)));
+}
 
 // Die Seite bittet die wartende neue Version, sofort zu uebernehmen
 self.addEventListener('message', (e) => {
@@ -862,6 +1153,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin || !url.pathname.startsWith(BASIS)) return;
   e.respondWith(antworte(req, url));
+  if (!komplett) e.waitUntil(nachladen());
 });
 
 // Was im Cache liegt, ist fuer den Browser nie "frisch": WebKit (Safari) haelt Antworten des Workers sonst mit der max-age

@@ -457,9 +457,22 @@ function spaeter(fn, ms) {
   return h;
 }
 
+// Ohne Netz nicht vorladen (fc-06:00, 20.11.2026): bei einem neuen Spieler kommen die Klaenge erst nach der Installation in
+// den Cache (sw.js, nachladen); ein Abruf jetzt scheitert, und jede Datei bliebe bis zum Neustart in fehlt. Wieder online,
+// laedt es nach.
+let wartetAufNetz = false;
+function ohneNetz() {
+  if (typeof navigator === 'undefined' || navigator.onLine !== false) return false;
+  if (!wartetAufNetz && typeof addEventListener === 'function') {
+    wartetAufNetz = true;
+    addEventListener('online', () => { wartetAufNetz = false; try { vorladen(); } catch (f) { /* egal */ } }, { once: true }); // INTENTIONAL-SLOP[F1]: ein Fehler beim Nachladen der Klaenge bleibt still, wie beim Vorladen in einstellen()
+  }
+  return true;
+}
+
 function vorladen() {
   vorladenAn = true;
-  if (!paket || !umgebung()) return Promise.resolve(vorrat());
+  if (!paket || !umgebung() || ohneNetz()) return Promise.resolve(vorrat());
   if (ladeLauf && ladeLauf.gen === generation) return ladeLauf.promise;
   const gen = generation;
   const p = paket;
