@@ -493,8 +493,8 @@ async function browserTeil(browser) {
     raus: !!document.querySelector('.haupt-kopf .st-raus'), punkte: document.querySelectorAll('.st-punkte button').length,
     aktuell: document.querySelector('.st-punkte [aria-current]') && document.querySelector('.st-punkte [aria-current]').dataset.ziel,
     css: !!document.querySelector('link[data-paket="start"]') }));
-  pruefe('frischer Start ohne Partien: Willkommen (#start, Seite 1 von 3, "Einführung überspringen" im Kopf, eigenes CSS)', erst.hash === '#start' && erst.titel === 'Willkommen · Crownmate'
-    && erst.h1 === 'Schach, das mit dir wächst.' && erst.raus && erst.punkte === 3 && erst.aktuell === 'w1' && erst.css, JSON.stringify(erst));
+  pruefe('frischer Start ohne Partien: Willkommen (#start, Seite 1 von 5, "Einführung überspringen" im Kopf, eigenes CSS)', erst.hash === '#start' && erst.titel === 'Willkommen · Crownmate'
+    && erst.h1 === 'Schach, das mit dir wächst.' && erst.raus && erst.punkte === 5 && erst.aktuell === 'w1' && erst.css, JSON.stringify(erst));
   pruefe('beim allerersten Start kein Zurueck im Kopf (es gibt keinen Weg zurueck), nur "Einführung überspringen"',
     await seite.evaluate(() => !document.querySelector('.st-screen .kopf-zurueck') && !!document.querySelector('.st-screen .st-raus')));
   pruefe('Willkommen gilt als gesehen (Modul start, Tag mit Grenze 4:00)', (await modulImBrowser(seite)).gesehen === heute);
@@ -529,9 +529,10 @@ async function browserTeil(browser) {
   await seite.locator('[data-st="weiter"]').click();
   await warteSeite(seite, 'frage');
   const fr = await seite.evaluate(() => ({ h1: document.querySelector('.st-titel').textContent, wahl: [...document.querySelectorAll('.st-wahl-knopf b')].map((b) => b.textContent),
-    punkte: document.querySelector('.st-punkte').hidden, raus: !!document.querySelector('.st-raus') }));
-  pruefe('danach die Frage "Kennst du die Schachregeln?" mit Ja und Nein; keine Seiten-Punkte mehr, "Einführung überspringen" bleibt', fr.h1 === 'Kennst du die Schachregeln?'
-    && fr.wahl.join('|') === 'Ja, ich kenne sie|Nein, zeig sie mir' && fr.punkte && fr.raus, JSON.stringify(fr));
+    punkte: !document.querySelector('.st-punkte').hidden && (document.querySelector('.st-punkte [aria-current]') || {}).dataset?.ziel, raus: !!document.querySelector('.st-raus') }));
+  // fc-23:00: die Punkte zaehlen auch Frage und Einstufung (vorher "Seite 3 von 3", danach noch zwei Seiten)
+  pruefe('danach die Frage "Kennst du die Schachregeln?" mit Ja und Nein; Punkte auf Seite 4 von 5, "Einführung überspringen" bleibt', fr.h1 === 'Kennst du die Schachregeln?'
+    && fr.wahl.join('|') === 'Ja, ich kenne sie|Nein, zeig sie mir' && fr.punkte === 'frage' && fr.raus, JSON.stringify(fr));
   await bild(seite, 'frage-ipad');
   // Neuladen bleibt auf der Seite (params.seite im eigenen Verlaufseintrag), nicht Seite 1
   await seite.reload();
