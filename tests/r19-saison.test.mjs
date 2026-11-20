@@ -201,12 +201,14 @@ try {
     pruefe('keine Platzhalter oder NaN', ohneUnsinn(l.text) && ohneUnsinn(l.blattText), l.text + ' | ' + l.blattText);
     // ein Klick, der nicht geht, zeigt sich in den Pruefungen danach statt als Absturz
     await seite.click('.ss-blatt .sheet-knoepfe button', { timeout: 5000 }).catch(() => {});
-    await seite.waitForFunction(() => !document.querySelector('.ss-blatt'), null, { timeout: 4000 }).catch(() => {});
+    const blattZu = await seite.waitForFunction(() => !document.querySelector('.ss-blatt'), null, { timeout: 4000 }).then(() => true, () => false);
+    // Hinweis 43 (fc-05:20): bisher nur ueber die Titelwahl danach geprueft (offenes Blatt macht den Hintergrund inert)
+    pruefe('Season-Ende: der Knopf im Blatt schliesst es', blattZu);
     await seite.click('.ss-titel[data-titel="crownmaster-s1"]', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => document.querySelector('.ss-titel[data-titel="crownmaster-s1"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 4000 }).catch(() => {});
     l = await leiste(seite);
     pruefe('Titelwahl: Tipp auf Crownmaster sendet ihn und drueckt den Knopf', gesendet.includes('saison_titel_waehle:{"titel":"crownmaster-s1"}')
-      && l.knoepfe[1][1] === 'true' && l.knoepfe[0][1] === 'false', [gesendet, l.knoepfe]);
+      && l.knoepfe[1]?.[1] === 'true' && l.knoepfe[0]?.[1] === 'false', [gesendet, l.knoepfe]);
     await seite.click('.ss-titel[data-titel=""]', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => document.querySelector('.ss-titel[data-titel=""]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 4000 }).catch(() => {});
     pruefe('Titelwahl: "Keinen zeigen" sendet titel null', gesendet.includes('saison_titel_waehle:{"titel":null}'), gesendet);
@@ -223,12 +225,13 @@ try {
     const { kontext, seite, fehler } = await neueSeite(browser, { stand: { ...LAUF, abzeichen: [{ saison: 1, stufe: 9 }], titel: ['top10-s1'] }, titelAbsage: true });
     await warteLeiste(seite);
     await seite.waitForTimeout(400);
-    if (await seite.$('.ss-blatt')) { await seite.click('.ss-blatt .sheet-knoepfe button'); await seite.waitForTimeout(300); }
-    await seite.click('.ss-titel[data-titel="top10-s1"]');
+    if (await seite.$('.ss-blatt')) { await seite.click('.ss-blatt .sheet-knoepfe button', { timeout: 5000 }).catch(() => {}); await seite.waitForTimeout(300); }
+    // Hinweis 43 (fc-05:20): fehlt die Leiste, zeigt sich das als FEHLER der Pruefung darunter, nicht als Absturz
+    await seite.click('.ss-titel[data-titel="top10-s1"]', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => !!document.querySelector('.ss-fehler')?.textContent, null, { timeout: 4000 }).catch(() => {});
     const l = await leiste(seite);
-    pruefe('Titel-Absage: Fehlerhinweis, "Keinen zeigen" bleibt gedrueckt', l.text.includes('Das hat gerade nicht geklappt') && l.knoepfe[0][1] === 'true'
-      && l.knoepfe[1][1] === 'false', [l.text, l.knoepfe]);
+    pruefe('Titel-Absage: Fehlerhinweis, "Keinen zeigen" bleibt gedrueckt', l.text.includes('Das hat gerade nicht geklappt') && l.knoepfe[0]?.[1] === 'true'
+      && l.knoepfe[1]?.[1] === 'false', [l.text, l.knoepfe]);
     pruefe('Titel-Absage: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
