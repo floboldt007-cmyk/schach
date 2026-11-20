@@ -158,6 +158,10 @@ export function pruefeZiel(l, start, chess, { wann = 'flo', zuege = 0, rest = nu
   if (art === 'gewinnen') {
     return jetzt.b.p === 0 && jetzt.w.mat - jetzt.b.mat >= 5 && (jetzt.w.q > 0 || jetzt.w.r > 0) ? 'geschafft' : null;
   }
+  // Die Regeln darunter gelten nur fuer halten. Jede andere Art (schach, partie, kuenftige) fiel bis 20.11. hierher durch
+  // und galt nach einem ruhigen Zug mit Antwort als geschafft (Befund 19: es-schach mit 3 Sternen, tests/r20-lernen-gegner.test.mjs);
+  // zuViele prueft fuer sie der flo-Zweig
+  if (!halten) return null;
   // halten: Verlust wird erst nach Flos naechstem Zug gewertet (er darf zurueckschlagen)
   if (vorsprung(jetzt) - vorsprung(start) >= 3) return null;
   if (jetzt.b.p === 0 && jetzt.b.mat - jetzt.w.mat <= 2) return 'geschafft';
