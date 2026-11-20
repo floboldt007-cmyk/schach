@@ -50,8 +50,11 @@ const messen = () => {
     const e = document.querySelector(`.screen.partie .brett .feld.${art} .koord`);
     if (!e) { o[art] = null; continue; }
     const schrift = zuRgb(getComputedStyle(e).color); const feld = zuRgb(getComputedStyle(e.closest('.feld')).backgroundColor);
+    // Deckkraft des Schattens (0..255): die Farbe steht in text-shadow vor den Laengen, "none" heisst 0
+    const ts = getComputedStyle(e).textShadow;
+    const schatten = ts && ts !== 'none' ? zuRgb(ts.replace(/(\s+-?[\d.]+px){2,3}\s*$/, ''))[3] : 0;
     o[art] = { kontrast: kon(schrift, feld), deckend: schrift[3] === 255 && feld[3] === 255, groesse: getComputedStyle(e).fontSize,
-      feld: feld.slice(0, 3), schrift: schrift.slice(0, 3) };
+      feld: feld.slice(0, 3), schrift: schrift.slice(0, 3), weiss: lum(schrift) > 0.5, schatten };
   }
   return o;
 };
@@ -83,6 +86,8 @@ try {
       const L = await import('/js/labor.js'); const S = await import('/js/storage.js');
       return [...new Set([...S.EINSTELLUNG_WERTE.brett, ...L.LABOR_BRETTER.map((b) => b.id), ...L.MOTIV_BRETTER.map((b) => b.id)])];
     });
+    // Motiv-Bretter setzen ihre Koordinaten selbst, ohne Schatten (js/brett-motive.js, brett-motive-v4.js: text-shadow none)
+    const motive = new Set(await s.evaluate(async () => (await import('/js/labor.js')).MOTIV_BRETTER.map((b) => b.id)));
     if (modus === 'hell') pruefe(`Bretter gefunden (${ids.length})`, ids.length >= 60, ids.length);
     for (const id of ids) {
       await s.evaluate(async (b) => {
@@ -94,6 +99,8 @@ try {
       zeilen.push({ modus, brett: id, hell: m.h?.kontrast, dunkel: m.d?.kontrast, groesse: m.d?.groesse, feldH: m.h?.feld, feldD: m.d?.feld });
       const schlecht = ['h', 'd'].filter((a) => !m[a] || !m[a].deckend || m[a].kontrast < GRENZE);
       pruefe(`${id} ${modus}: helles Feld ${m.h?.kontrast}:1, dunkles Feld ${m.d?.kontrast}:1 (mind. ${GRENZE})`, schlecht.length === 0, m);
+      // Kaltreview 7b Befund 4: der Schatten bleibt unter weisser Schrift (Halt ueber dem Fuss einer Figur), unter dunkler nicht
+      if (!motive.has(id)) pruefe(`${id} ${modus}: dunkles Feld, Schatten nur unter weisser Schrift`, !!m.d && (m.d.weiss ? m.d.schatten > 0 : m.d.schatten === 0), m.d);
       if (BILDER && ['nacht', 'holz', 'gruen', 'marmor'].includes(id)) {
         const r = await s.evaluate(() => { const x = document.querySelector('.screen.partie .brett').getBoundingClientRect(); return { x: x.left, y: x.top + x.height * 0.625, width: x.width * 0.375, height: x.height * 0.375 }; });
         await s.screenshot({ path: path.join(BILDER, `${id}-${modus}.png`), clip: r });

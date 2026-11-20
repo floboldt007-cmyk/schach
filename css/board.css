@@ -112,7 +112,10 @@
       calc(1 - clamp(0, (0.2126 * r + 0.7152 * g + 0.0722 * b - 0.185) * 100000, 1) * (1 - r * 0.01))
       calc(1 - clamp(0, (0.2126 * r + 0.7152 * g + 0.0722 * b - 0.185) * 100000, 1) * (1 - g * 0.01))
       calc(1 - clamp(0, (0.2126 * r + 0.7152 * g + 0.0722 * b - 0.185) * 100000, 1) * (1 - b * 0.01)));
-    text-shadow: none;
+    /* der Schatten wie in der alten Regel nur unter weisser Schrift (Halt ueber dem Fuss einer Figur); unter dunkler
+       Schrift waere er ein Schleier, darum dieselbe Weiche als Deckkraft (Kaltreview 7b, Befund 4) */
+    text-shadow: 0 0 2px color(from var(--b-dunkel) srgb-linear 0 0 0
+      / calc((1 - clamp(0, (0.2126 * r + 0.7152 * g + 0.0722 * b - 0.185) * 100000, 1)) * 0.3));
   }
 }
 
