@@ -381,6 +381,31 @@ async function testeLogik() {
   pruefe('einstellen: gewaehltes Paket holz', klang.vorrat().paket === 'holz' && klang.vorrat().gewaehlt === 'holz');
   klang.einstellen({ klang: true, klangpaket: 'gibtsnicht' });
   pruefe('einstellen: unbekanntes Paket -> Standard der Ansicht', klang.vorrat().paket === 'arcade' && klang.vorrat().gewaehlt === '');
+  // R26 AC-04 (Flo 20.11.2026): die Klangwahl gilt nur im Spiel; Lobby, Menues und Shop klingen immer arcade. Der Ort
+  // kommt aus app:screen (wie die Lobby-Musik, js/pakete/musik/index.js)
+  {
+    const { sende } = await import('../js/ereignisse.js');
+    const { ortVonScreen } = await import('../js/sounds.js');
+    klang.einstellen({ klang: true, klangpaket: 'holz' });
+    const vorher = klang.vorrat();
+    sende('app:screen', { name: 'heim', params: {} });
+    const lobby = klang.vorrat();
+    sende('app:screen', { name: 'partie', params: { botId: 'b1' } });
+    const spiel = klang.vorrat();
+    sende('app:screen', { name: 'online', params: {} });
+    const onLobby = klang.vorrat();
+    sende('app:screen', { name: 'online', params: { partieId: 'p1' } });
+    const onSpiel = klang.vorrat();
+    pruefe('R26: ohne Screen gilt die Wahl (holz), Lobby spielt arcade, Partie holz, Online-Liste arcade, Online-Partie holz',
+      vorher.aktiv === 'holz' && lobby.aktiv === 'arcade' && lobby.ort === 'lobby' && lobby.paket === 'holz' && spiel.aktiv === 'holz' && spiel.ort === 'spiel'
+        && onLobby.aktiv === 'arcade' && onSpiel.aktiv === 'holz', { vorher, lobby, spiel, onLobby, onSpiel });
+    pruefe('R26: ortVonScreen kennt Spiel-Screens (Partie, Lektion, Raetsel, Duell, Analyse) und das Zu-zweit-Startblatt als Lobby',
+      ['partie', 'lektion', 'raetsel', 'raetsel-duell', 'analyse'].every((n) => ortVonScreen(n, {}) === 'spiel')
+        && ['heim', 'arena', 'einstellungen', 'ich', 'lobby', 'verlauf', 'lernen'].every((n) => ortVonScreen(n, {}) === 'lobby')
+        && ortVonScreen('partie', { modus: 'zuzweit' }) === 'lobby' && ortVonScreen('partie', { modus: 'zuzweit', zuzweit: { weiss: 'A' } }) === 'spiel');
+    klang.setzeOrt(null);
+    klang.einstellen({ klang: true, klangpaket: 'gibtsnicht' });
+  }
 
   // Stimmen: hoechstens 4, Vorrang 3 nie abgebrochen, Vorrang 0 zuerst geopfert
   uhr.t = 200;
@@ -542,9 +567,12 @@ async function testeBrowser(browser) {
   }, p);
   let r = await spieleAlle('arcade');
   pruefe('arcade: jede der 40 Dateien spielt aus der Datei', r.n === 40 && r.falsch.length === 0, r.falsch.slice(0, 3));
-  // Vorrat im selben Schritt wie die Wahl lesen: dazwischen koennte schon die erste Datei fertig dekodiert sein
+  // Vorrat im selben Schritt wie die Wahl lesen: dazwischen koennte schon die erste Datei fertig dekodiert sein.
+  // R26: die Seite steht auf der Arena (Lobby, dort klingt immer arcade); fuer die Pruefung des gewaehlten Pakets
+  // gilt der Ort Spiel, als stuende eine Partie offen
   const wechsel = await seite.evaluate(async () => {
     const { klang } = await import('./js/sounds.js');
+    klang.setzeOrt('spiel');
     window.__app.setzeEinstellungen({ klangpaket: 'holz' });
     return klang.vorrat();
   });
@@ -577,6 +605,31 @@ async function testeBrowser(browser) {
     && zurueck.dekodiert === 4, zurueck);
   await warteDekodiert(seite);
   await seite.evaluate(async () => { (await import('./js/sounds.js')).klang.stille(); });
+  await warte(300);
+
+  // R26 AC-04: gewaehltes Holz-Set, in der Lobby spielt der Zug-Klang aus arcade, in der Partie aus holz (echte Dateien)
+  gruppe = 'Ort (R26)';
+  const ort = await seite.evaluate(async () => {
+    const { klang } = await import('./js/sounds.js');
+    const { sende } = await import('./js/ereignisse.js');
+    const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+    const zuletzt = () => { const e = klang.protokoll().slice(-1)[0] || {}; return `${e.name}:${e.paket}:${e.quelle}`; };
+    window.__app.setzeEinstellungen({ klangpaket: 'holz' });
+    sende('app:screen', { name: 'heim', params: {} });
+    klang.stille(); klang.spiele('zug', { stufe: 0 });   // die erste Lobby-Anfrage holt die arcade-Datei nach
+    for (let i = 0; i < 100 && !klang.vorrat().fremd; i++) await pause(50);
+    klang.stille(); klang.spiele('zug', { stufe: 0 });
+    const lobby = zuletzt();
+    sende('app:screen', { name: 'partie', params: { botId: 'b1' } });
+    for (let i = 0; i < 200 && klang.vorrat().dekodiert < 40; i++) await pause(50);
+    klang.stille(); klang.spiele('zug', { stufe: 0 });
+    const spiel = zuletzt();
+    klang.stille(); klang.setzeOrt(null);
+    window.__app.setzeEinstellungen({ klangpaket: '' });
+    return { lobby, spiel, v: klang.vorrat() };
+  });
+  pruefe('Holz gewaehlt: Lobby spielt arcade aus der Datei, Partie holz aus der Datei', ort.lobby === 'zug:arcade:datei' && ort.spiel === 'zug:holz:datei', ort);
+  await warteDekodiert(seite);
   await warte(300);
 
   gruppe = 'Einstellungen';
