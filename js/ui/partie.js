@@ -804,7 +804,8 @@ export function zeige(root, params, app) {
         if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_NAME[k])}: </span></span>`;  // Vorlesen: Name ohne Satzzeichen (sonst "Solid.:")
         else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
       }
-      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}${i === ansehen.ply ? ' angesehen' : ''}" data-ply="${i}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
+      // .angesehen setzt zeigeZugNav am Ende auf die Knoten, darum nicht im Teil (sonst wiche der Merker vom Knoten ab)
+      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}" data-ply="${i}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
     };
     const zeilen = new Map();
     for (let i = 0; i < z.zuege.length; i++) {
@@ -812,28 +813,53 @@ export function zeige(root, params, app) {
       if (!zeilen.has(n)) zeilen.set(n, { w: null, b: null });
       zeilen.get(n)[farbeVon(i)] = i;
     }
-    let liste = '';
-    for (const [n, r] of zeilen) {
-      liste += `<span class="nr">${n}.</span>${r.w == null && r.b != null ? '<span class="z leer">…</span>' : zelle(r.w)}${zelle(r.b)}`;
-    }
-    if (!z.zuege.length) liste = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
+    const leer = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
+    const liste = [];
+    for (const [n, r] of zeilen) liste.push(`<span class="nr">${n}.</span>`, r.w == null && r.b != null ? '<span class="z leer">…</span>' : zelle(r.w), zelle(r.b));
     const listeEl = $('.zugliste');
-    listeEl.innerHTML = liste;
-    // ohne Zuege nichts zu rollen: scrollHeight zu lesen erzwang im Aufbau ein volles Layout (R25 F1)
-    if (z.zuege.length) listeEl.scrollTop = listeEl.scrollHeight;
+    setzeTeile(listeEl, liste.length ? liste : [leer]);
 
-    let leiste = '';
+    const leiste = [];
     for (let i = 0; i < z.zuege.length; i++) {
-      if (farbeVon(i) === 'w' || i === 0) leiste += `<span class="nr">${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'}</span>`;
-      leiste += zelle(i);
+      if (farbeVon(i) === 'w' || i === 0) leiste.push(`<span class="nr">${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'}</span>`);
+      leiste.push(zelle(i));
     }
     const leisteEl = $('.zugleiste');
-    // wie bei den Grossen: links und rechts im Streifen die Pfeile zum Blaettern (klebend, die Zuege rollen dazwischen)
-    leisteEl.innerHTML = `<button class="zl-pfeil zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button>`
-      + `<span class="zl-zuege">${leiste || `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`}</span>`
-      + `<button class="zl-pfeil zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button>`;
-    if (z.zuege.length) leisteEl.scrollLeft = leisteEl.scrollWidth;
+    // wie bei den Grossen: links und rechts im Streifen die Pfeile zum Blaettern (klebend, die Zuege rollen dazwischen).
+    // Die Pfeile entstehen einmal und bleiben stehen: liegt der Tastatur-Fokus auf einem, ueberlebt er den Zug des Bots (R25 F4)
+    if (!leisteEl.querySelector(':scope > .zl-zuege')) {
+      leisteEl.innerHTML = `<button class="zl-pfeil zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button>`
+        + '<span class="zl-zuege"></span>'
+        + `<button class="zl-pfeil zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button>`;
+    }
+    setzeTeile(leisteEl.querySelector(':scope > .zl-zuege'), leiste.length ? leiste : [leer]);
     zeigeZugNav();
+    // ans Ende rollen im naechsten Bild: scrollHeight/scrollWidth gleich nach dem Schreiben erzwangen mitten im Zug ein
+    // volles Layout (R25 F4, beim ersten Zug bei 6x 75 bis 171 ms); ohne Zuege nichts zu rollen (R25 F1)
+    if (!z.zuege.length || rollBild) return;
+    if (typeof requestAnimationFrame !== 'function') { rolleZuegeAnsEnde(); return; }
+    rollBild = requestAnimationFrame(() => { rollBild = 0; if (!weg) rolleZuegeAnsEnde(); });
+  }
+  let rollBild = 0;
+  function rolleZuegeAnsEnde() {
+    const listeEl = $('.zugliste');
+    const leisteEl = $('.zugleiste');
+    listeEl.scrollTop = listeEl.scrollHeight;
+    // ein angesehener Zug bleibt in der Mitte des Streifens (zeigeZugNav), nur sonst ans Ende
+    if (!leisteEl.querySelector('.z.angesehen')) leisteEl.scrollLeft = leisteEl.scrollWidth;
+  }
+  // Zellen nur ergaenzen und die geaenderten ersetzen, statt den ganzen Inhalt neu zu setzen (R25 F4): je Teil genau ein
+  // Element; der Merker der zuletzt gesetzten Teile haengt am Element und gilt nur, solange die Kinder dazu passen
+  function setzeTeile(el, teile) {
+    const alt = el.__teile && el.children.length === el.__teile.length ? el.__teile : null;
+    if (!alt) el.textContent = '';
+    for (let i = 0; i < teile.length; i++) {
+      if (alt && alt[i] === teile[i]) continue;
+      if (alt && i < alt.length) el.children[i].outerHTML = teile[i];
+      else el.insertAdjacentHTML('beforeend', teile[i]);
+    }
+    while (el.children.length > teile.length) el.lastElementChild.remove();
+    el.__teile = teile;
   }
 
   function zeichneKnoepfe() {
