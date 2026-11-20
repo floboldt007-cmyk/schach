@@ -111,16 +111,17 @@ try {
       await s.goto(BASIS + '#heim');
       await s.waitForFunction(() => window.__app && document.documentElement.dataset.screen, null, { timeout: 30000 });
       await warte(1200);
-      // kurz: 2 eigene Zuege, dann aufgeben
+      // kurz: genau ein Zug vor der Grenze (MIN_ZUEGE - 1 = 9 eigene Zuege), dann aufgeben. Kaltreview 43: mit nur 2 Zuegen
+      // bliebe eine falsche Grenze wie "< 3" gruen; 9 und 10 pinnen die Grenze von beiden Seiten
       pruefe(`${g.name}: Partie gegen fridolin startet`, await neuePartie(s));
-      await spieleBis(s, 2);
+      await spieleBis(s, MIN_ZUEGE - 1);
       const kurzZuege = await eigeneZuege(s);
       const k0 = await funken(s);
       const kurzAus = await aufgeben(s, g.finger);
       await warte(2500);
       await bild('aufgeben-zug2');
       const k1 = await funken(s);
-      pruefe(`${g.name}: Aufgeben nach ${kurzZuege} eigenen Zuegen zeigt das Niederlage-Blatt`, kurzAus && kurzZuege < MIN_ZUEGE, { kurzAus, kurzZuege });
+      pruefe(`${g.name}: Aufgeben nach ${kurzZuege} eigenen Zuegen zeigt das Niederlage-Blatt`, kurzAus && kurzZuege === MIN_ZUEGE - 1, { kurzAus, kurzZuege });
       pruefe(`${g.name}: Aufgeben vor Zug ${MIN_ZUEGE} bringt 0 Funken, der Verlauf nennt den Grund "kurz"`,
         k1.gesamt === k0.gesamt && !!k1.letzte && k1.letzte.id !== (k0.letzte && k0.letzte.id) && k1.letzte.gr === 'kurz' && k1.letzte.f === 0,
         { vorher: k0.gesamt, nachher: k1.gesamt, letzte: k1.letzte });
