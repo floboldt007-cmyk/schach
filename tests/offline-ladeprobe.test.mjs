@@ -188,6 +188,16 @@ try {
       const onlineLage = await s.evaluate(() => ({ hash: location.hash, laedt: [...document.querySelectorAll('[aria-busy="true"]')].filter((e) => e.getClientRects().length).length,
         text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 160) }));
       pruefe(`${tag}: Online ohne Netz sagt "Keine Verbindung" und laedt nicht endlos`, onlineHinweis && onlineLage.laedt === 0, onlineLage);
+      // fc-03:30: ohne laufende Partie spricht der Hinweis nicht von "der Partie"; "Duell suchen" ist gesperrt und sagt warum
+      const duellLage = () => s.evaluate(() => {
+        const k = document.querySelector('[data-online="duell"]'), h = document.querySelector('.on-netz-hinweis');
+        return { da: !!k, aus: !!k && k.disabled, aria: k && k.getAttribute('aria-disabled'), hinweis: !!h && !h.hidden && h.getClientRects().length > 0,
+          hinweisText: h ? h.textContent : '', parteiText: /Partie bleibt auf dem Server|game is saved on the server/.test(document.body.innerText) };
+      });
+      const offen = await duellLage();
+      pruefe(`${tag}: Online ohne laufende Partie hat einen eigenen Offline-Text (nicht "die Partie bleibt gespeichert")`, !offen.parteiText && onlineHinweis, offen);
+      pruefe(`${tag}: ohne Netz ist "Duell suchen" gesperrt (disabled, aria-disabled) mit sichtbarem Hinweis`,
+        offen.da && offen.aus && offen.aria === 'true' && offen.hinweis, offen);
       // (d) Konsole und Server waehrend offline
       // erwartet nur, wenn die Meldung nicht von einer eigenen Adresse stammt (Kaltreview B1c)
       const erwartet = (x) => !x.url.startsWith(EIGEN) && ERWARTET.some((re) => re.test(x.text));
@@ -203,6 +213,11 @@ try {
       // ---------- (b) Netz wieder an ----------
       offline = false;
       await k.setOffline(false);
+      // ohne Neuladen: das online-Ereignis gibt den Knopf wieder frei
+      await klappt(s.waitForFunction(() => { const x = document.querySelector('[data-online="duell"]'); return x && !x.disabled; }, null, { timeout: 10000 }));
+      const zurueck = await duellLage();
+      pruefe(`${tag}: Netz wieder an: "Duell suchen" ist ohne Neuladen wieder bedienbar, Hinweis weg`,
+        zurueck.da && !zurueck.aus && zurueck.aria !== 'true' && !zurueck.hinweis, zurueck);
       await s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
       await ladeBisHeim(s, START);
       // Kaltreview B2: genau die offline gespielte Partie (Kennung von vorhin) muss in Speicher und Verlauf stehen
@@ -219,11 +234,16 @@ try {
     // WebKit meldet einen abgefangenen Fetch-Fehler an Supabase (js/konto.js anfrage faengt ihn) als pageerror
     // "Fetch API cannot load ...supabase.co... due to access control checks", die Seite selbst sieht keinen ungefangenen
     // Fehler (belegt 20.11.2026 mit Gegenprobe). Darum zaehlen ungefangene Fehler im Fenster immer, diese Rohmeldung nur
-    // offline als erwarteter Netzfehler.
+    // offline als erwarteter Netzfehler. Ausnahme Klang: js/sounds.js hole() faengt jeden Abruf ab (.catch(() => null)),
+    // WebKit meldet einen abgebrochenen mp3-Abruf trotzdem gelegentlich so, auch mit Netz (f2 1 von 5, hier 1 von 4).
+    // Fehlt eine eigene Datei wirklich, faellt das bei "keine eigene Anfrage scheitert" auf.
     await sammleUngefangen(s);
     const ungefangen = UNGEFANGEN.splice(0);
-    const netzSeitenfehler = (x) => /^offline /.test(x) && /Fetch API cannot load https:\/\/[a-z0-9]+\.supabase\.co\//.test(x);
-    for (const x of seitenfehler.filter(netzSeitenfehler)) console.log(`NETZFEHLER ${tag} seitenfehler: ${x.slice(0, 160)}`); // INTENTIONAL-SLOP[T4]: Liste fuer den Bericht
+    const klangAbbruch = (x) => /Fetch API cannot load https?:\/\/127\.0\.0\.1:\d+\/schach\/assets\/klang\/\S+\.mp3 due to access control checks/.test(x);
+    const netzSeitenfehler = (x) => (/^offline /.test(x) && /Fetch API cannot load https:\/\/[a-z0-9]+\.supabase\.co\//.test(x)) || klangAbbruch(x);
+    // Kaltreview f2 (fc-0330b): jeder Klang-Treffer steht als eigene Zeile im Log, damit eine Haeufung in der CI zaehlbar ist
+    // (grep -c "NETZFEHLER .* klang:"); die Ausnahme selbst bleibt auf klang/*.mp3 mit genau dieser WebKit-Meldung begrenzt
+    for (const x of seitenfehler.filter(netzSeitenfehler)) console.log(`NETZFEHLER ${tag} ${klangAbbruch(x) ? 'klang' : 'seitenfehler'}: ${x.slice(0, 160)}`); // INTENTIONAL-SLOP[T4]: Liste fuer den Bericht
     pruefe(`${tag}: keine ungefangenen Fehler in der Seite`, ungefangen.length === 0, ungefangen.slice(0, 5));
     pruefe(`${tag}: keine Seitenfehler ausser erwarteten Netzfehlern ohne Netz`, seitenfehler.filter((x) => !netzSeitenfehler(x)).length === 0,
       seitenfehler.filter((x) => !netzSeitenfehler(x)).slice(0, 5));

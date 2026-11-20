@@ -130,13 +130,29 @@ export function zeige(root, params, app) {
   let gehoert = 0, uhrGewarnt = false;
   const ton = name => { try { klang.spiele(name); } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ } };
   const melde = text => { if (!weg) { status.textContent = text; status.hidden = !text; } };
-  const fehler = e => { melde(e?.message || O('fehler')); };
+  // ohne laufende Partie spricht der Offline-Hinweis nicht von "der Partie" (fc-03:30)
+  const fehler = e => {
+    const text = e?.message || O('fehler');
+    melde(text === O('offline') && !p && !params.partieId ? O('offline.ohnePartie') : text);
+  };
+  // ohne Netz ist "Duell suchen" gesperrt und sagt warum; das online-Ereignis gibt ihn ohne Neuladen frei (fc-03:30)
+  function netzStand() {
+    if (weg) return;
+    const k = inhalt.querySelector('[data-online="duell"]');
+    if (!k) return;
+    const aus = navigator.onLine === false;
+    k.disabled = aus || busy || blockiert;
+    if (aus) k.setAttribute('aria-disabled', 'true'); else k.removeAttribute('aria-disabled');
+    const h = inhalt.querySelector('.on-netz-hinweis');
+    if (h) h.hidden = !aus;
+  }
   const oeffne = partie => { if (!weg) { online.vergissEinladung(); app.gehe('online', { partieId: partie.id }); } };
   function sperre() {
     if (weg) return;
     for (const el of inhalt.querySelectorAll('button, input, select')) el.disabled = busy || blockiert;
     const angebot = inhalt.querySelector('[data-online="angeboten"]');
     if (angebot) angebot.disabled = true;
+    netzStand();
     // Blaettern aendert nichts an der Partie und bleibt auch waehrend einer Server-Antwort frei
     zeigeZugNav();
     brett?.erlaubeZuege(!busy && !blockiert && !widerspruch && online.binAmZug(p) ? zielKarte(chess, { turmRochade: app.einstellungen().turmRochade === true }) : null);
@@ -230,7 +246,8 @@ export function zeige(root, params, app) {
           <small class="on-ki-hinweis">${esc(O('suche.kiHinweis'))}</small>
           <button class="knopf dr" type="button" data-online="suche-stopp">${esc(O('suche.abbrechen'))}</button>
         </div>`)}
-      ${tuer('duell', `<button class="knopf primaer dr on-tuer-knopf" type="button" data-online="duell">${esc(O('tuer.duell.knopf'))}</button>`)}
+      ${tuer('duell', `<button class="knopf primaer dr on-tuer-knopf" type="button" data-online="duell">${esc(O('tuer.duell.knopf'))}</button>
+        <p class="on-tuer-hinweis on-netz-hinweis" hidden>${esc(O('netz.fehlt'))}</p>`)}
       </div>
       <details class="on-freunde"${code || params.freunde ? ' open' : ''}>
         <summary class="on-freunde-zeile dr"><span class="on-freunde-symbol" aria-hidden="true">${icon('person')}</span>
@@ -244,6 +261,7 @@ export function zeige(root, params, app) {
         <section class="on-karte flaeche"><h3>${esc(O('meine'))}</h3><p class="on-liste">${esc(O('ladeListe'))}</p><button class="knopf" type="button" data-online="liste">${esc(O('aktualisieren'))}</button></section>
       </details>`;
     inhalt.querySelector('[name="code"]').addEventListener('input', e => { e.target.value = online.normalisiereCode(e.target.value).slice(0, 6); });
+    netzStand();
     ladeListe();
     pruefeSuche();
   }
@@ -649,6 +667,7 @@ export function zeige(root, params, app) {
     bauBrett(); zeichne();
   }
   window.addEventListener('schach:einstellungen', beiEinstellungen);
+  window.addEventListener('online', netzStand); window.addEventListener('offline', netzStand);
   // Handy hoch: Brett von Rand zu Rand, ein Vielfaches von 8; passt die Spalte bis zu den Knoepfen nicht, wird es
   // kleiner, nie unter BRETT_MIN (wie layout() in js/ui/partie.js, dort ausserdem Coach und Zugstreifen)
   function layout() {
@@ -1226,5 +1245,6 @@ export function zeige(root, params, app) {
   if (app.test) window.__online = { partie: () => p, chess: () => chess, brett: () => brett, blockiert: () => blockiert, widerspruch: () => widerspruch, busy: () => busy, rest };
   start();
   return { verlasse() { weg = true; mattOrt?.verlasse(); live?.stop(); clearInterval(restUhr); clearTimeout(introUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
+    window.removeEventListener('online', netzStand); window.removeEventListener('offline', netzStand);
     window.removeEventListener('schach:einstellungen', beiEinstellungen); document.removeEventListener('keydown', zugTasten); schliesseAnsicht(); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
 }
