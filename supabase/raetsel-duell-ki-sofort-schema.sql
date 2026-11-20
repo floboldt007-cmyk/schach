@@ -8,7 +8,8 @@
 -- Raetsel-Duell gegen die KI wertet sofort aus (R26 AC-05, Flo 20.11.2026): bisher endete ein KI-Duell erst, wenn die
 -- KI ihre vollen 180 s "zu Ende gespielt" hatte, auch wenn der Spieler laengst fertig war (Fehler kuerzen seine Zeit um
 -- je 5 s, oder alle Raetsel waren durch). Jetzt endet es, sobald der Spieler fertig ist (alle Raetsel durch: sofort, es
--- kommt kein Zug mehr) oder seine eigene Zeit samt Gnadenfrist um ist. Das Ergebnis bleibt dasselbe wie bisher: die KI
+-- kommt kein Zug mehr) oder seine eigene Zeit samt 15 s Nachfrist fuer spaet verbuchte Zuege um ist (hoechstens bis
+-- 180 s + gnade_s wie bisher). Das Ergebnis bleibt dasselbe wie bisher: die KI
 -- behaelt ihre vollen 180 s, ihr Verlauf ist rein gerechnet (duell_ki_verlauf, ohne Uhr) und steht deshalb sofort fest.
 -- Bewusst NICHT "die KI zaehlt nur mit der Zeit des Spielers": dann koennte ein fuehrender Spieler mit absichtlichen
 -- Fehlern (je 5 s) seine Uhr und damit die KI anhalten und so den Sieg samt Kronen festhalten.
@@ -57,6 +58,10 @@ declare
   ba integer;
   bb integer;
   gnade interval := make_interval(secs => (k->>'gnade_s')::integer);
+  -- Nachfrist im KI-Duell nach dem eigenen Ende (Kaltreview F-20:05): ein Zug, der vor dem Ende bei der Edge Function
+  -- ankam, wird mit seiner Ankunftszeit verbucht, auch wenn die Verbuchung laenger als gnade_s dauert (Kaltstart). Die
+  -- alte Fassung hielt dafuer bis 180 s + gnade_s offen; 15 s decken die Verbuchung ab und sind nie spaeter als damals.
+  ki_gnade interval := interval '15 seconds';
 begin
   select * into d from public.duelle x where x.id = duell_auswerten.duell for update;
   if d.id is null or d.status <> 'laeuft' then
@@ -65,13 +70,15 @@ begin
   select * into sa from public.duell_spieler s where s.duell = d.id and s.user_id = d.a for update;
   if d.art = 'ki' then
     -- R26 AC-05: fertig ist das Duell, sobald der Spieler fertig ist (alle Raetsel durch: sofort) oder seine eigene Zeit
-    -- samt Gnadenfrist um ist; die KI zaehlt weiter mit den vollen 180 s (gerechnet, ohne Uhr: steht sofort fest)
+    -- samt KI-Nachfrist um ist (hoechstens bis 180 s + gnade_s wie bisher); die KI zaehlt weiter mit den vollen 180 s
+    -- (gerechnet, ohne Uhr: steht sofort fest)
     ki := public.duell_ki_verlauf(d.seed, d.ki_elo, public.duell_ratings(d), d.dauer_s);
     gb := (ki->>'geloest')::integer;
     fb := (ki->>'fehler')::integer;
     -- die Klammer ist noetig: PL/pgSQL beendet die Bedingung sonst am ersten "then" (dem im case)
-    if now() < public.duell_spieler_schluss(d, sa)
-               + (case when sa.idx >= cardinality(d.raetsel) then interval '0 seconds' else gnade end) then
+    if now() < (case when sa.idx >= cardinality(d.raetsel) then public.duell_spieler_schluss(d, sa)
+                     else least(public.duell_spieler_schluss(d, sa) + ki_gnade,
+                                d.start_am + make_interval(secs => d.dauer_s) + gnade) end) then
       return d;
     end if;
   else
