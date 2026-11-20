@@ -24,7 +24,7 @@
 //   freischalten()                                nur js/pakete/sammlung/index.js
 import { fuelle } from '../orte.js';
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
-import { sheet, schliesseSheet } from './bauteile.js';
+import { sheet, schliesseSheet, sheetOffen } from './bauteile.js';
 import { icon } from './icons.js';
 import { staffel, tempo } from '../bewegung.js';
 import { t } from '../sprache.js';
@@ -209,7 +209,9 @@ function zeigeIch(root, params = {}, app) {
         zeigeStand();
         // Tastatur und VoiceOver (fc-05:45): sheet() gab den Fokus an den Ausloeser zurueck, den zeichnePlaetze() eben ersetzt
         // hat (oder er stand auf einem anderen Bildschirm, "Zur Sammlung", dann bleibt er im ausblendenden Blatt .weg); dann bekommt
-        // ihn der Platz mit derselben Kennung
+        // ihn der Platz mit derselben Kennung. Hat ein anderes Blatt dieses ersetzt (Shop-Vorschau), gehoert ihm der Fokus
+        // (sheet() gibt ihn an seinem Ende weiter); messen und fokussieren hier rechnete nur das Layout mitten in dessen Aufbau
+        if (sheetOffen()) return;
         const f = document.activeElement;
         if (!f || f === document.body || !f.isConnected || !f.getClientRects().length || f.closest('.weg')) platzOrt.querySelector(`[data-bereich="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
       });

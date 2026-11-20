@@ -435,7 +435,7 @@ export function reiterVon(screen, liste = reiterListe(), params = {}) {
 }
 
 const leiste = { el: null, pille: null, lage: null, sichtbar: false, gezeigt: false, wegAnim: null, pilleLage: null, pilleV: null, pilleB: null,
-  ro: null, rahmen: 0, fokusFolgt: false };
+  ro: null, rahmen: 0, pilleRahmen: 0, fokusFolgt: false };
 
 function baueReiter(liste) {
   if (leiste.el) return;
@@ -490,7 +490,10 @@ function platziereReiter() {
   leiste.lage = seite ? 'seite' : 'unten';
   nav.dataset.lage = leiste.lage;
   document.documentElement.dataset.reiter = leiste.lage;
-  setzePille();
+  // die Pille misst den aktiven Reiter: im naechsten Bild, nicht mitten im Aufbau des neuen Screens (Leistung F2, fc-11:15;
+  // dort kostete das Messen auf schwachen Geraeten ein eigenes Layout von 200 ms). Mehrere Aufrufe je Bild: einmal messen.
+  if (typeof requestAnimationFrame !== 'function') { setzePille(); return; }
+  if (!leiste.pilleRahmen) leiste.pilleRahmen = requestAnimationFrame(() => { leiste.pilleRahmen = 0; setzePille(); });
 }
 
 // Pille hinter den aktiven Reiter; gleitet mit der weichen Feder vom alten Platz, unten waagrecht, in der Seitenleiste
