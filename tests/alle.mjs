@@ -141,6 +141,8 @@ const SUITEN = [
   { name: 'en-rest', datei: 'en-rest.test.mjs', args: [], kommtMit: 'so/R20-en-rest', exklusiv: 'Browser-Durchgang (iPhone 13 + PC, 32 Seiten)', was: 'Gast mit Sprache EN: keine deutschen Reste, Umlaute, Schluessel, undefined oder abgeschnittenen Zeilen auf Heim, Partie, Ergebnis, Analyse, Zu zweit, Duell, Lektionen, Erste Schritte 1 und 6, Liga, Einstellungen; Premium/Shop nur melden' },
   { name: 'r20-kurs-zurueck', datei: 'r20-kurs-zurueck.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Zurueck im Kurs' },
   { name: 'r20-coach-buch', datei: 'r20-coach-buch.test.mjs', args: [], kommtMit: 'so/R20-coach-buch', was: 'Feinschliff R20 (43): Coach-Buch' },
+  { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
+  { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'bot-grenze', datei: 'bot-grenze.test.mjs', args: [], kommtMit: 'so/R19-bot-grenze', was: 'Bots 1600 bis 2100: Grenze gegen grobe Fehler (Engine-Attrappe, feste Seeds)' },
   { name: 'r19-figuren-gold', datei: 'r19-figuren-gold.test.mjs', args: [], was: 'Labor-Figuren Gold und Elfenbein: 12 eigene Dateien mit fester Pruefsumme, Eintraege und Herkunft, auf jedem Brett Kante ab 3:1 und Weiss/Schwarz ab 25 L* (Browser)' },
   { name: 'r18-botschutz-link', datei: 'r18-botschutz-link.test.mjs', args: [], was: 'Bot-Schutz-Hinweis der Anmeldung: Link "Mehr dazu" >= 44 px und an 9 Punkten genau getroffen, 7 Groessen hell und dunkel (Browser)' },
