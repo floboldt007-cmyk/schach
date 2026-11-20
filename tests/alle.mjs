@@ -158,6 +158,7 @@ const SUITEN = [
   { name: 'r24-koord-kontrast', datei: 'r24-koord-kontrast.test.mjs', args: [], was: 'Flos Ja R24: Brett-Koordinaten mindestens 4,5:1 auf allen Brettern, hell und dunkel, mit Schatten' },
   { name: 'r24-raetsel-tr0101', datei: 'r24-raetsel-tr0101.test.mjs', args: [], was: 'Flos Ja R24: tr-0101 hat genau eine gewinnende Loesung' },
   { name: 'r24-mattbilder-tablebase', datei: 'r24-mattbilder-tablebase.test.mjs', args: [], was: 'Flos Ja R24: Matt in N der Mattbilder gleich der Tablebase (offline)' },
+  { name: 'r25-paket2-grenzen', datei: 'r25-paket2-grenzen.test.mjs', args: [], was: 'Paket 2 unter Extremdaten: Season-Chips der Visitenkarte nie abgeschnitten (Ich, Lobby 320/641 px), kurze Titel einzeilig' },
   { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
   { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },
