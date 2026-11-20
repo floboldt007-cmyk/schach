@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 381;
-const STAND = '4b662ed05cad';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 382;
+const STAND = '9d26a88c9506';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -67,6 +67,7 @@ const DATEIEN = [
   'js/pakete/lobby/texte.js',
   'js/ui/lobby.js',
   'js/ui/ki-ersatz.js',
+  'js/ersatz.js',
   'css/pakete/raetsel-duell.css',
   'js/pakete/lobby/raetsel-duell.js',
   'js/pakete/lobby/raetsel-duell-texte.js',
@@ -803,6 +804,7 @@ const DATEIEN = [
 // beschneidet den Cache auf genau den Kern und Stockfish und spielt dann ohne Netz.
 // KERN-ANFANG (erzeugt von tests/sw-kern.mjs --schreiben, nicht von Hand pflegen)
 const KERN = [
+  'js/ersatz.js',
   'js/pakete/lernen/erste-schritte.js',
   'js/pakete/sammlung/effekt-vorschau.js',
   'js/pakete/sammlung/taten.js',
