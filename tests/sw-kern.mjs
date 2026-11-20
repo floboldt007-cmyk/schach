@@ -71,7 +71,8 @@ async function bedarf() {
       await s.waitForSelector('.heim-screen', { timeout: 30000 });
       await ruhig(s);
       const wege = [
-        ['partie', { botId: 'fridolin', farbe: 'w' }], ['lektion', { id: 'grundreihe' }], ['lernen', {}],
+        // die Arena ist das Ziel, wenn ein Paket nicht laedt (js/app.js zeigeScreen): sie muss ohne Netz immer da sein
+        ['arena', {}], ['partie', { botId: 'fridolin', farbe: 'w' }], ['lektion', { id: 'grundreihe' }], ['lernen', {}],
         ['einstellungen', (geraet.viewport && geraet.viewport.width > 700) ? { gruppe: 'konto' } : { seite: 'konto' }], ['online', {}], ['verlauf', {}], ['heim', {}],
       ];
       for (const [ziel, arg] of wege) {
