@@ -131,7 +131,7 @@ import {
   bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, sanAnzeige, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
   analyseSchluessel,
 } from '../review.js';
-import { eroeffnung, eroeffnungsAnzeige } from '../openings.js';
+import { eroeffnung, eroeffnungsAnzeige, eroeffnungVorbereiten } from '../openings.js';
 import { klang, klassenKlang } from '../sounds.js';
 import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
@@ -428,6 +428,10 @@ export function zeige(root, params, app) {
     if (signal) signal.addEventListener('abort', fertig, { once: true });
   });
   let weg = false;
+  // R25 F1 (fc-11:00): im synchronen Aufbau rechnen layout() (setzeGegnerLeiste, uhr.zeige) und halteCoachHoehe nicht
+  // mit, sondern einmal im ersten Bild-Rueckruf, erst die Hoehen, dann layout(); jeder Aufruf dazwischen erzwang ein
+  // volles Layout des halb fertigen Screens (R20-Kritik/leistung)
+  let aufgebaut = false;
   const endeCtrl = new AbortController();
   const protokoll = [];
   const melde = (eintrag) => { if (app.test) protokoll.push({ t: Math.round(jetzt()), ...eintrag }); };
@@ -678,7 +682,7 @@ export function zeige(root, params, app) {
   }
 
   function zeichneGeschlagen() {
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
+    if (aufgebaut && typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
     const vonFlo = [];
     const vonBot = [];
     for (const m of z.verbose) if (m.captured) (m.color === farbe ? vonFlo : vonBot).push(m.captured);
@@ -815,7 +819,8 @@ export function zeige(root, params, app) {
     if (!z.zuege.length) liste = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
     const listeEl = $('.zugliste');
     listeEl.innerHTML = liste;
-    listeEl.scrollTop = listeEl.scrollHeight;
+    // ohne Zuege nichts zu rollen: scrollHeight zu lesen erzwang im Aufbau ein volles Layout (R25 F1)
+    if (z.zuege.length) listeEl.scrollTop = listeEl.scrollHeight;
 
     let leiste = '';
     for (let i = 0; i < z.zuege.length; i++) {
@@ -827,7 +832,7 @@ export function zeige(root, params, app) {
     leisteEl.innerHTML = `<button class="zl-pfeil zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button>`
       + `<span class="zl-zuege">${leiste || `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`}</span>`
       + `<button class="zl-pfeil zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button>`;
-    leisteEl.scrollLeft = leisteEl.scrollWidth;
+    if (z.zuege.length) leisteEl.scrollLeft = leisteEl.scrollWidth;
     zeigeZugNav();
   }
 
@@ -934,7 +939,7 @@ export function zeige(root, params, app) {
     if (ply == null) delete coachEl.dataset.ply; else coachEl.dataset.ply = String(ply);
     clearTimeout(z.kompaktUhr);
     pruefeCoachRest();
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
+    if (aufgebaut && typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
   }
   // Ruhige Spalte (Flo 30.10.2026: "manchmal flackert mein Bildschirm, wenn der Bot einen Zug macht"): Coach-Karte (wartet,
   // Buch, Kommentar, kompakt), Karte des Gegners (mit und ohne Sprechblase) und Knopfreihe wechselten je Zug ihre Hoehe,
@@ -2647,7 +2652,7 @@ export function zeige(root, params, app) {
     el.classList.toggle('ruf', el.textContent !== bot.name);
   }
   function layout() {
-    if (weg || !inhaltEl || !s.isConnected) return;
+    if (weg || !aufgebaut || !inhaltEl || !s.isConnected) return;
     loeseRuhe();
     const handy = istHandy();
     s.classList.toggle('handy', handy);
@@ -2996,6 +3001,10 @@ export function zeige(root, params, app) {
     }
   })();
 
+  // R25 F1 (fc-11:00): der Eroeffnungs-Index (erster Zug, Coach-Buch) entsteht nach dem ersten Bild in Stuecken, nicht
+  // im Aufbau (bei 6x Drossel 465 ms im Long Task, R20-Kritik/leistung)
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { if (!weg) eroeffnungVorbereiten(); });
+
   // Flo darf schon ziehen, waehrend die Engines noch laden (sie reihen sich ein)
   if (z.chess.turn() === farbe && !z.chess.isGameOver()) {
     z.phase = 'flo';
@@ -3030,7 +3039,13 @@ export function zeige(root, params, app) {
   }
   pfeilTippPruefen();
 
-  layout();
+  // im ersten Bild-Rueckruf, also vor dem ersten Malen (das Brett steht dort schon in Endgroesse,
+  // tests/r25-brett-start.test.mjs), aber nicht mehr im langen Aufbau-Task (R25 F1)
+  aufgebaut = true;
+  // erst die Hoehen festhalten, dann layout(): umgekehrt aenderten die Mindesthoehen den Platz, und das Brett schrumpfte
+  // ein Bild spaeter (iPhone 13: 390 -> 384, tests/r25-brett-start.test.mjs)
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { if (weg) return; halteCoachHoehe(); layout(); });
+  else layout();
 
   // Figurensatz wirkt sofort (R3, 12.11.2026, dieselbe Luecke wie in js/ui/online.js vom 11.11.): kommt der Erfinder-Status
   // erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt Flo einen anderen
