@@ -78,7 +78,13 @@ async function browserTeil() {
     return { sichtbar: !!nav && !nav.hidden && nav.getClientRects().length > 0, anzahl: k.length, ziele: k.map((b) => b.dataset.ziel).join(),
       aktuell: an ? an.dataset.ziel : null, label: an ? an.getAttribute('aria-label') : null, quer: document.documentElement.scrollWidth > window.innerWidth + 1 };
   });
-  const karte = (s) => s.evaluate(() => {
+  // erst messen, wenn die Einblendung der Karte durch ist (arena.js staffel, bewegung.js): mitten darin verschob ein Rest
+  // von translateY die Kante, und getBoundingClientRect las 43,99997 statt 44 px (CI 44708672749, iPhone SE); endlose
+  // Animationen zaehlen nicht, hoechstens 3 s
+  const karte = (s) => s.evaluate(async () => {
+    const laufend = (document.querySelector('.screen.arena')?.getAnimations({ subtree: true }) || [])
+      .filter((a) => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime));
+    await Promise.race([Promise.all(laufend.map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 3000))]);
     const d = document.querySelector('.screen.arena .detail');
     const k = d && d.querySelector('.st-sperre-knopf');
     const r = k ? k.getBoundingClientRect() : null;
@@ -146,6 +152,12 @@ async function browserTeil() {
           /Hilde/.test(g1.h2) && /Gesperrt/.test(g1.ueber) && g1.hinweis.startsWith('Gesperrt. Besiege zuerst Vogelscheuche Willi') && g1.spielen === 0 && g1.toast === 0 && !g1.farbe, g1);
         pruefe(`${lage}: F2 darunter das Angebot der Einstufung mit Knopf "${DE['sperre.knopf']}" (mindestens 44 px), kein Querscrollen`,
           g1.angebot === DE['sperre.text'] && g1.knopf === DE['sperre.knopf'] && g1.knopfGross && !g1.quer, g1);
+        // Selbstprobe der Messung (CI 44708672749, iPhone SE): die Karte kommt gestaffelt herein (arena.js staffel), und
+        // mitten darin las getBoundingClientRect 43,99997 px; ein Schrumpfen wie hier darf die Messung nicht treffen
+        await s.evaluate(() => { const k = document.querySelector('.screen.arena .detail .st-sperre-knopf');
+          (k?.closest('.cta-platz') || k)?.animate([{ transform: 'scale(.9)' }, { transform: 'none' }], { duration: 1200 }); });
+        const g1b = await karte(s);
+        pruefe(`${lage}: F2 die Messung wartet eine laufende Einblendung ab (Knopf mitten in der Animation)`, g1b.knopfGross, g1b);
         await bild(s, `f2-offen-${geraet}-${farbe}`);
         // Vorschau-Welt: der bisherige Hinweis bleibt woertlich, das Angebot kommt dazu
         await tippe('.screen.arena .ww-pfeil[data-richtung="1"]');
