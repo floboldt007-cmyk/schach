@@ -1,11 +1,13 @@
 {
   "zweck": "Welche Edge Functions unter supabase/functions/ muessen auf dem Server bereitgestellt sein (werkzeuge/functions-probe.mjs). Anlass 21.11.2026: online-zug fehlte seit dem 29.10. auf dem Server, kein Test merkte es, Online-Zuege gingen fuer niemanden.",
   "stand": "2026-11-21",
-  "pflicht": ["online-zug", "raetsel-duell"],
-  "duerfenFehlen": {
-    "coach": "noch nicht bereitgestellt, bis Flo anders entscheidet",
-    "stripe-webhook": "Abo-Kasse noch nicht live, bis Flo anders entscheidet",
-    "werkstatt-kasse": "Werkstatt-Kasse noch nicht live, bis Flo anders entscheidet",
-    "werkstatt-webhook": "Werkstatt-Kasse noch nicht live, bis Flo anders entscheidet"
+  "regeln": "da = Status, mit dem die bereitgestellte Function auf POST {} ohne Anmeldung antwortet (401 mit JWT-Pruefung; 400 bei Webhooks, die mit --no-verify-jwt bereitgestellt sind und ohne Stripe-Signatur ablehnen). 404 = fehlt, jeder andere Status = unklar. pflicht jetzt = fehlt/unklar ist ein Fehler; pflicht warnung = fehlt/unklar wird als Warnung gemeldet, kein Fehler, bis pflicht_ab erreicht ist (dann auf jetzt stellen); ohne pflicht darf sie bis pflicht_ab fehlen. Quelle: Vault, Schach-App/Feinschliff 2026-11-11/R27-Codex/codex-edge-functions.md.",
+  "functions": {
+    "online-zug": { "da": 401, "pflicht": "jetzt" },
+    "raetsel-duell": { "da": 401, "pflicht": "jetzt" },
+    "coach": { "da": 401, "pflicht_ab": "Coach-Paket an (Frag den Coach eingeschaltet)" },
+    "stripe-webhook": { "da": 400, "pflicht": "warnung", "pflicht_ab": "vor dem Aboverkauf" },
+    "werkstatt-kasse": { "da": 401, "pflicht_ab": "Kasse frei (Werkstatt-Kauf freigegeben)" },
+    "werkstatt-webhook": { "da": 400, "pflicht_ab": "Kasse frei (Werkstatt-Kauf freigegeben)" }
   }
 }
