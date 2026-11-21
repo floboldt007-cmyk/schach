@@ -71,6 +71,8 @@ jobs:
         run: node tests/server-karte-elo.test.mjs
       - name: Karte-Sondertitel-Vorschlag pruefen (nicht eingespielt)
         run: node tests/server-karte-sondertitel.test.mjs
+      - name: Gegner-Effekte-Vorschlag pruefen (nicht eingespielt; Besitz, RLS, Rueckweg, Listen wie die App)
+        run: node tests/server-gegner-effekte.test.mjs
       - name: Benutzername-Monatssperre pruefen (nicht eingespielt; Sperre, Besitzer frei, RLS-Test, Rueckweg)
         run: node tests/server-benutzername-sperre.test.mjs
       - name: Liga-Bild-SQL ausfuehren (vorbereitet, nicht eingespielt)

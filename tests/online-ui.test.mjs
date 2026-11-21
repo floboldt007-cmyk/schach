@@ -144,6 +144,13 @@ try {
     }
     // R19 Season (js/karte.js fragt parallel): ohne Abzeichen und Titel, die Karte bleibt wie bisher (Season prueft r19-saison)
     if (rpc === 'saison_karte_der_partie') return antwort({ w: { abzeichen: null, titel: null }, s: { abzeichen: null, titel: null } });
+    // Effekte vom Gegner (R26): hier wie live vor dem Einspielen (Funktion fehlt, 404), das Brett bleibt im eigenen Satz;
+    // was mit belegtem Besitz geschieht, prueft tests/r26-gegner-effekte.test.mjs
+    if (rpc === 'effekte_waehle') {
+      if (Object.keys(body).sort().join(',') !== 'figuren,finisher,zug') unerwartet.push('effekte_waehle mit anderen Feldern: ' + Object.keys(body).join(','));
+      return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
+    }
+    if (rpc === 'effekte_der_partie') return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {

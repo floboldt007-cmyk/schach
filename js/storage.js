@@ -174,6 +174,8 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   modus: 'system',       // 'system' | 'hell' | 'dunkel'
   koordLage: 'ecke',     // 'ecke' | 'rand'
   pfeile: true,          // Pfeile malen
+  gegnerEffekte: true,   // online: Figuren, Zug-Animation und Finisher des Gegners zeigen (js/gegner-effekte.js, Flo R26)
+  zugEffekt: 'aus',      // eigene Zug-Animation (assets/shop/vorrat.json, anlass zug); frei nur fuer den Erfinder (js/zug-effekt.js)
   arenaKarteHinweis: false, // einmaliger Zieh-Hinweis auf der schmalen Weltkarte wurde geschlossen
   duellIntro: 'besondere', // 'immer' | 'besondere' | 'aus' (Flo, D3)
   figuren: 'cburnett',   // Figuren-Satz (vorbereitet)
@@ -210,6 +212,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   modus: Object.freeze(['system', 'hell', 'dunkel']),
   koordLage: Object.freeze(['ecke', 'rand']),
   duellIntro: Object.freeze(['immer', 'besondere', 'aus']),
+  zugEffekt: Object.freeze(['aus', 'wellenring', 'funkenspur', 'blattwirbel', 'pixelstaub']),
   // blaupause nur mit Sonderstueck, Labor-Saetze (kuerbis bis goldelfenbein) nur fuer den Erfinder (Labor, js/labor.js; beides js/figurensatz.js)
   figuren: Object.freeze(['cburnett', 'blaupause', 'kuerbis', 'frost', 'gold', 'neon', 'glas', 'holz', 'pixel', 'geo', 'elfenbein', 'marmor', 'moosgeister', 'tiefsee',
     'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'zombies', 'geister', 'drachen', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos', 'goldelfenbein']),
