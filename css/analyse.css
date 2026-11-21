@@ -566,7 +566,7 @@
    ============================================================ */
 :root { --metall-hell: #F3DEA2; --metall: #C9A14A; --metall-tief: #8A6A26; --metall-weich: rgba(201, 161, 74, .14); --gold-text: #75561A; }
 :root[data-modus="dunkel"] { --gold-text: #DCC07A; }
-@media (prefers-color-scheme: dark) { :root:not([data-modus="hell"]) { --gold-text: #DCC07A; } }
+@media (prefers-color-scheme: dark) { :root[data-modus="system"] { --gold-text: #DCC07A; } }
 .an-screen { --an-metall: linear-gradient(135deg, var(--metall-hell), var(--metall) 48%, var(--metall-tief));
   --an-karte: inset 0 0 0 1px var(--linie), inset 0 1px 0 rgba(255, 255, 255, .06), var(--s1); }
 
@@ -706,4 +706,146 @@
   .an-kl-kopf, .an-kl, .an-kl-gesamt { grid-template-columns: minmax(0, 1fr) 56px 56px; column-gap: 4px; }
   .an-kl-kopf span:not(.an-k-titel) { font-size: 11px; letter-spacing: 0; text-transform: none; }
   .an-kl-mitte { gap: 6px; }
+}
+
+/* ============================================================
+   R27 A1, Runde 3 (Flo 21.11.: "Kack-Gold", "uebersichtlich und clean", "am besten ohne viel Runterscrollen, auf dem Handy").
+   1) Viel weniger Gold: Goldrichtig bekommt in der Analyse einen gedeckten Champagner-Ton statt Gelb, die Kacheln sind
+      dunkel mit farbigem Zeichen, Avatare und Brettrahmen neutral. Gold bleibt nur an der Ergebnis-Kante, den Sternen
+      und der Marke im Verlauf.
+   2) Hochformat: Brett oben, darunter eine Ergebniszeile, dann ein Umschalter Momente | Coach | Zuege | Verlauf mit
+      genau einem sichtbaren Bereich, die Navigation fest darunter. Auf dem iPhone 13 passt alles ohne Seiten-Scrollen;
+      ein langer Bereich rollt in sich.
+   ============================================================ */
+.an-screen { --k-stark: #A38A52; --kt-stark: #6B5524; --an-kachel: var(--flaeche-2); }
+:root[data-modus="dunkel"] .an-screen { --k-stark: #CDBB8A; --kt-stark: #E8D9B0; --an-kachel: #24272D; }
+@media (prefers-color-scheme: dark) {
+  :root[data-modus="system"] .an-screen { --k-stark: #CDBB8A; --kt-stark: #E8D9B0; --an-kachel: #24272D; }
+}
+/* die Toenung der Kachel (symbole.js: Klassenfarbe mit .3 und Rand mit .65) leiser */
+.an-screen .an-sym svg > rect:nth-of-type(2) { fill-opacity: .1 !important; }
+.an-screen .an-sym svg > rect:nth-of-type(3) { stroke-opacity: .4 !important; }
+.an-genau .an-avatar, .an-genau .an-avatar.an-ich { box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 3px var(--linie-2), var(--s1); }
+.an-brett-rahmen { background: #23252A; }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .an-brett-rahmen { background: linear-gradient(160deg, #2C2F35, #1B1D21); }
+}
+.an-brett-rahmen::after { box-shadow: inset 0 0 0 1px rgba(201, 161, 74, .28); }
+.an-moment .an-m-klasse { background: var(--flaeche-2); }
+
+/* Umschalter: nur im Hochformat */
+.an-reiter { display: none; }
+@media (orientation: portrait) {
+  .an-screen.scrollt { overflow-y: auto; }
+  .an-koerper { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .an-inhalt { flex: 1 1 auto; min-height: 0; gap: 8px; padding-bottom: 8px; }
+  .an-brettzone { order: 1; flex: none; }
+  .an-genau { order: 2; flex: none; }
+  .an-reiter { order: 3; flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px;
+    border-radius: 14px; background: var(--flaeche-2); box-shadow: inset 0 0 0 1px var(--linie); }
+  .an-reiter .knopf { min-height: 44px; height: 44px; padding: 0 4px; border: 0; border-radius: 10px; background: none; box-shadow: none;
+    font-size: 14px; font-weight: 750; color: var(--text-2); }
+  .an-reiter .knopf[aria-selected="true"] { background: var(--flaeche); color: var(--text); box-shadow: var(--s1), inset 0 0 0 1px var(--linie-2); }
+  .an-momente-box, .an-momente-leer, .an-coach, .an-klassen, .an-kurve-box { order: 4; flex: 1 1 auto; min-height: 132px; overflow-y: auto;
+    overscroll-behavior: contain; }
+  .an-banner, .an-ort-oben { order: 5; flex: none; }
+  .an-navi { order: 6; flex: none; }
+  .an-momente-zeile { display: none !important; }
+  .an-screen[data-reiter="coach"] .an-momente-box, .an-screen[data-reiter="zuege"] .an-momente-box, .an-screen[data-reiter="verlauf"] .an-momente-box,
+  .an-screen[data-reiter="coach"] .an-momente-leer, .an-screen[data-reiter="zuege"] .an-momente-leer, .an-screen[data-reiter="verlauf"] .an-momente-leer,
+  .an-screen:not([data-reiter="coach"]) .an-coach, .an-screen:not([data-reiter="zuege"]) .an-klassen,
+  .an-screen:not([data-reiter="verlauf"]) .an-kurve-box { display: none; }
+  /* der Verlauf fuellt seinen Bereich */
+  .an-kurve-box { display: flex; flex-direction: column; }
+  .an-kurve-box .an-kurve-wrap { flex: 1 1 auto; min-height: 84px; height: auto; }
+  /* Momente: Reihe zum Wischen, die Ueberschrift sagt der Umschalter schon */
+  .an-momente-box .an-momente-titel { display: none; }
+  .an-momente { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 10px; overscroll-behavior-x: contain;
+    scrollbar-width: none; gap: 12px; margin-inline: -10px; padding: 2px 10px 4px; }
+  .an-momente::-webkit-scrollbar { display: none; }
+  .an-moment.knopf, .an-moment.knopf:not(.du) { flex: 0 0 min(260px, 72vw); height: auto; scroll-snap-align: start; }
+
+  /* Ergebniszeile: Du 98,7 % | 1:0 | 86,4 % Gegner, eine Zeile */
+  .an-genau { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px; min-height: 52px; border-radius: 16px; box-shadow: var(--s1); }
+  .an-genau::before, .an-genau .an-avatar, .an-genau .an-g-mess, .an-genau .an-vs-grund, .an-genau .an-g-chips, .an-genau .an-vs-sterne,
+  .an-genau .an-vs-wort { display: none; }
+  .an-genau .an-seite { gap: 0; min-width: 0; }
+  .an-genau .an-seite-text { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .an-genau .an-seite:not(.an-re) .an-seite-text { flex-direction: row-reverse; }
+  .an-genau .an-g-wert { font-size: 20px; }
+  .an-genau .an-g-label { font-size: 13px; font-weight: 750; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .an-genau .an-vs { flex-direction: row; gap: 0; min-width: 0; }
+  .an-genau .an-vs b { font-size: 22px; }
+  .an-genau .an-g-hinweis { display: none; }
+}
+/* R27 A1, Runde 4 (cf/Flo: "jeder Bereich zeigt seinen Inhalt ganz"): auf dem Handy mehr Platz fuer den Bereich. Schmalere
+   Ergebniszeile, Navigation und Knopfleiste je 44 px, kleinere Abstaende; die Zugklassen als kompaktes Raster mit zwei
+   Spalten (Symbol, Name, "Du | Gegner"), 32 px je Kachel, ohne Kopfzeile. */
+@media (orientation: portrait) and (max-width: 699px) {
+  .an-inhalt { gap: 6px; padding-bottom: 6px; }
+  .an-genau { min-height: 40px; padding: 4px 14px; border-radius: 12px; }
+  .an-genau .an-g-wert { font-size: 18px; }
+  .an-genau .an-vs b { font-size: 20px; }
+  .an-reiter { padding: 2px; gap: 2px; border-radius: 12px; }
+  .an-navi .knopf, .an-navi .an-tempo { min-height: 44px; height: 44px; }
+  .an-aktionsleiste { padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px)); }
+  .an-aktionsleiste .knopf { min-height: 44px; height: 44px; }
+  .an-klassen { padding: 6px; }
+  .an-klassen .an-kl-kopf { display: none; }
+  .an-kl-raster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 6px; }
+  .an-kl, .an-kl-gesamt { grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 2px; min-height: 32px; height: 32px; padding: 0 6px 0 2px;
+    border: 0; border-radius: 8px; background: var(--flaeche-2); }
+  .an-kl-mitte { gap: 6px; font-size: 13px; }
+  .an-kl-mitte .an-sym, .an-kl-mitte svg { width: 24px; height: 24px; }
+  .an-kl .an-n { min-width: 0; padding: 0 4px; font-size: 13.5px; background: none; }
+  .an-kl .an-n.du:not(.nul) { background: none; }
+  .an-kl .an-n + .an-n::before { content: '|'; margin-right: 4px; font-weight: 400; color: var(--text-3); }
+  .an-kl-gesamt .an-kl-mitte { font-size: 11.5px; letter-spacing: .04em; }
+}
+/* Nochmal / Naechster Gegner stehen auf dem Handy oben rechts im Kopf statt in einer eigenen Leiste unten (gibt dem Bereich
+   rund 60 px). Knoepfe mit Zeichen zeigen nur das Zeichen (Beschriftung per aria-label), Knoepfe ohne Zeichen ("Online",
+   "Revanche") bleiben kurz beschriftet; "Zurueck" entfaellt dort, der Pfeil links im Kopf tut dasselbe. */
+@media (orientation: portrait) and (max-width: 699px) {
+  .an-aktionsleiste { display: none !important; }
+  .an-screen .kopf { gap: 8px; }
+  .an-kopf-knoepfe { display: flex; gap: 6px; flex: none; margin-left: auto; }
+  .an-kopf-knoepfe .knopf { min-height: 44px; height: 44px; padding: 0 12px; font-size: 13.5px; }
+  .an-kopf-knoepfe .knopf:has(svg) { width: 44px; padding: 0; font-size: 0; gap: 0; }
+  .an-kopf-knoepfe .knopf:has(svg) svg { width: 22px; height: 22px; }
+  .an-kopf-knoepfe .knopf[data-aktion="zurueck"] { display: none; }
+  .an-inhalt { gap: 5px; }
+}
+/* Belohnungs-Plaketten (Flo 21.11.: "Goldrichtig sieht zu unbelohnend aus"): Goldrichtig in Metall mit Glanzkante und
+   leisem Schein, das Zeichen dunkles Braungold (#3B2A0A auf #C9A14A: 7,0:1); Genial in Amethyst, das Zeichen weiss
+   (auf #7C4DDB 5,2:1). Die schwachen Klassen bleiben dunkle, ruhige Kacheln. */
+.an-sym.an-preis { display: inline-block; border-radius: 30%; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .28), 0 1px 2px rgba(0, 0, 0, .3); }
+.an-sym.an-preis svg > rect { display: none; }
+.an-sym.an-preis[data-k="stark"] { --an-preis-zeichen: #3B2A0A;
+  background: linear-gradient(145deg, var(--metall-hell), var(--metall) 52%, var(--metall-tief)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .28), 0 0 10px rgba(201, 161, 74, .35); }
+.an-sym.an-preis[data-k="brillant"] { --an-preis-zeichen: #FFFFFF;
+  background: linear-gradient(145deg, #D9C7FF, #7C4DDB 52%, #3F1C8C); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(0, 0, 0, .3), 0 0 10px rgba(124, 77, 219, .4); }
+.an-k-punkte i[data-k="stark"] { background: linear-gradient(145deg, var(--metall-hell), var(--metall) 55%, var(--metall-tief)); }
+.an-k-punkte i[data-k="brillant"] { background: linear-gradient(145deg, #D9C7FF, #7C4DDB 55%, #3F1C8C); }
+/* Handy hoch: rechts im Kopf stehen jetzt die zwei Knoepfe, die Unterzeile nennt darum wie im schmalen Querformat den
+   kurzen Namen und darf umbrechen, die Eroeffnung steht dort nicht (sonst "gegen Ritter Thor..."). Zugklassen-Namen im
+   schmalen Fenster duerfen umbrechen statt "Weit dan..." */
+@media (orientation: portrait) and (max-width: 699px) {
+  .an-screen .kopf .an-unter { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; }
+  .an-unter-zusatz, .an-unter-voll { display: none; }
+  .an-unter-kurz { display: inline; }
+}
+@container an-rechts (max-width: 520px) {
+  .an-kl-mitte span { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15; }
+}
+/* Handy hoch: das Brett richtet sich auch nach der Hoehe, damit auf kurzen Telefonen (iPhone SE, 667 px) Kopf, Brett,
+   Ergebniszeile, Umschalter, ein Bereich von mindestens 132 px und die Navigation ohne Seiten-Scrollen passen. 362 px =
+   Kopf 56 + Balken 16 + Ergebnis 40 + Umschalter 48 + Bereich 132 + Navigation 44 + Abstaende 26. Die kompakte
+   Momente-Zeile ueber dem Brett entfaellt, die Momente stehen im Bereich unter dem Umschalter. Untergrenze 280 px: auf
+   sehr kurzen Flaechen (SE in Safari mit Leisten, 548 px) rollt die Seite lieber ein Stueck, als das Brett winzig zu machen. */
+@media (orientation: portrait) and (max-width: 699px) {
+  .an-screen, .an-screen.ohne-balken { --an-brett: min(calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)),
+    max(280px, calc(100vh - 362px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+    --an-brett: min(calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)),
+    max(280px, calc(100dvh - 362px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
+  .an-brettzone { align-self: center; }
 }

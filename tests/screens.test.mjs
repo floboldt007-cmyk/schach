@@ -562,6 +562,9 @@ async function testeTouch(browser, d) {
   gruppe = 'Touch (iPad)';
   const { kontext, seite, fehler } = await neueSeite(browser, { breite: 820, hoehe: 1180, touch: true });
   await oeffne(seite, `screen=analyse&partieId=${d.oper}`);
+  // R27 A1: im Hochformat stehen Momente, Coach, Zuege und Verlauf hinter einem Umschalter, erst den Bereich antippen
+  const reiter = async (r) => { await seite.locator(`.an-reiter [data-reiter="${r}"]`).tap(); await warte(250); };
+  await reiter('verlauf');
   // seit dem Kundenblick 09.11. steht die Kurve im Hochformat unter dem Brett: erst hinscrollen, wie ein Finger
   await seite.locator('.an-kurve-wrap').evaluate((e) => e.scrollIntoView({ block: 'center' }));
   await seite.waitForTimeout(300);
@@ -576,6 +579,7 @@ async function testeTouch(browser, d) {
     const e = document.querySelector('.an-kl[data-klasse="brillant"]');
     const y = e.getBoundingClientRect().top; setTimeout(() => fertig(e.getBoundingClientRect().top === y), 600);
   }), null, { timeout: 8000 }).catch(() => {});
+  await reiter('zuege');
   await stehtStill();
   // Zugklassen sind immer offen
   await seite.locator('.an-kl[data-klasse="brillant"]').scrollIntoViewIfNeeded();

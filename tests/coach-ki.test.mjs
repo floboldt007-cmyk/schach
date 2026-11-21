@@ -361,7 +361,10 @@ async function zurAnalyse(seite, ply = PLY_LXF7) {
   }, PARTIE);
   await seite.evaluate(({ id, ply }) => window.__app.gehe('analyse', { partieId: id, ply }), { id: PARTIE.partie.id, ply });
   // data-klasse setzt die Analyse nur fuer einen Zug (in der Startstellung gibt es .an-c-klasse auch, aber keinen Ort)
-  await seite.waitForSelector('.an-coach[data-klasse]', { timeout: 30000 });
+  await seite.waitForSelector('.an-coach[data-klasse]', { state: 'attached', timeout: 30000 });
+  // Handy hoch (R27 A1): der Coach ist einer von vier Bereichen, erst den Umschalter auf Coach stellen
+  const reiter = seite.locator('.an-reiter [data-reiter="coach"]');
+  if (await reiter.isVisible()) await reiter.click();
   await warte(350);
 }
 const karte = (seite) => seite.evaluate(() => {

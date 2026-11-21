@@ -77,7 +77,7 @@ async function oeffne(seite, query = 'screen=keiner') {
 }
 async function oeffneAnalyse(seite, d, extra = '') {
   await oeffne(seite, `screen=analyse&partieId=${d.oper}${extra}`);
-  await seite.waitForSelector('.an-inhalt .an-coach', { timeout: 30000 });
+  await seite.waitForSelector('.an-inhalt .an-coach', { state: 'attached', timeout: 30000 });
   await warte(400);
 }
 const aktuellerPly = (seite) => seite.evaluate(() => Number(document.querySelector('.an-kurve').getAttribute('aria-valuenow')) - 1);
@@ -167,10 +167,13 @@ async function testeMomente(browser, d) {
     await oeffneAnalyse(seite, d);
     const m = await seite.evaluate(() => {
       const top = (s) => document.querySelector(s).getBoundingClientRect().top;
-      return { navi: top('.an-navi'), momente: top('.an-momente-box'), coach: top('.an-coach'), kurve: top('.an-kurve-box'),
+      return { reiter: top('.an-reiter'), navi: top('.an-navi'), momente: top('.an-momente-box'), coach: top('.an-coach'), kurve: top('.an-kurve-box'),
         ueber: document.documentElement.scrollWidth - innerWidth };
     });
-    pruefe('Momente direkt unter der Navigation, vor Coach und Verlauf', m.momente > m.navi && m.momente < m.coach && m.momente < m.kurve, JSON.stringify(m));
+    // R27 A1 (Flo 21.11.): Momente, Coach, Zuege und Verlauf sind Bereiche hinter einem Umschalter; am Start sind die
+    // Momente offen, zwischen Umschalter und Navigation, Coach und Verlauf verborgen (Lage 0)
+    pruefe('Momente zwischen Umschalter und Navigation, Coach und Verlauf verborgen',
+      m.momente > m.reiter && m.momente < m.navi && m.coach === 0 && m.kurve === 0, JSON.stringify(m));
     pruefe('Kein waagrechter Ueberlauf der Seite', m.ueber <= 0, JSON.stringify(m));
     // Kaltreview b4 16.11. (Befund 1, Entscheidung A): ohne Scrollen sind die Momente (SE: kompakte Zeile ueber dem Brett,
     // iPhone 13: die erste Karte) UND das ganze Brett im Bild
@@ -192,11 +195,13 @@ async function testeMomente(browser, d) {
         brettZuerst: document.querySelector('.an-screen').classList.contains('brett-zuerst'),
         scroll: document.querySelector('.an-screen').scrollTop + scrollY, hoehe: innerHeight };
     });
-    pruefe('Ohne Scrollen: Momente ganz im Bild', o.scroll === 0 && o.momenteGanz, JSON.stringify(o));
+    // R27 A1: unter 600 px Hoehe (SE in Safari mit Leisten, 548 px) haelt das Brett seine 280 px Untergrenze; dort beginnt
+    // die erste Karte im Bild, ganz sichtbar ist sie nach einem kurzen Wisch (Abwaegung an cf gemeldet, 21.11.)
+    pruefe(hoehe >= 600 ? 'Ohne Scrollen: Momente ganz im Bild' : 'Ohne Scrollen: Momente beginnen im Bild',
+      o.scroll === 0 && (hoehe >= 600 ? o.momenteGanz : o.momente.top < o.hoehe - 60), JSON.stringify(o));
     pruefe('Ohne Scrollen: Brett ganz im Bild', o.scroll === 0 && o.brettGanz, JSON.stringify(o));
-    pruefe(kurz ? `${name}: kompakte Zeile ueber dem Brett, Eintraege mindestens 44 px` : `${name}: grosse Karten, keine Zeile`,
-      kurz ? o.zeile && o.eintraege.length >= 2 && o.eintraege.every((x) => x >= 44) && o.momente.bottom <= o.brett.top : !o.zeile,
-      JSON.stringify(o));
+    // seit R27 A1 auch auf kurzen Telefonen Karten statt der kompakten Zeile: das Brett wird dort nach der Hoehe kleiner
+    pruefe(`${name}: grosse Karten, keine Zeile`, !o.zeile, JSON.stringify(o));
     pruefe('Momente nur einmal fuer Vorleser und Tastatur (Zeile verborgen, Karten tabbar)',
       o.wege.zeileVerborgen && o.wege.zeileTabs === 0 && o.wege.karten >= 2 && o.wege.kartenTabs === o.wege.karten, JSON.stringify(o.wege));
     if (BILDER_FIX && kurz) await seite.screenshot({ path: path.join(BILDER_FIX, `fix-${name.replace(/\s+/g, '-').toLowerCase()}-${breite}x${hoehe}.png`) });
@@ -228,7 +233,9 @@ async function testeAussehen(browser, d) {
         const svg = z.querySelector('.an-kl-mitte svg');
         const rect = svg.querySelector('rect');
         const k = z.dataset.klasse;
-        return { k, gross: Math.round(svg.getBoundingClientRect().width), grund: getComputedStyle(rect).fill, soll: farbe(`var(--k-${k})`),
+        const preis = svg.closest('.an-preis');
+        return { k, gross: Math.round(svg.getBoundingClientRect().width), grund: getComputedStyle(rect).fill, soll: farbe(getComputedStyle(document.querySelector('.an-screen')).getPropertyValue('--an-kachel').trim()),
+          preis: !!preis, verlauf: preis ? getComputedStyle(preis).backgroundImage.startsWith('linear-gradient') : false,
           deckkraft: getComputedStyle(svg).opacity };
       });
       const karten = [...document.querySelectorAll('.an-moment svg')].map((x) => Math.round(x.getBoundingClientRect().width));
@@ -241,7 +248,11 @@ async function testeAussehen(browser, d) {
         avatar: Math.round(document.querySelector('.an-genau .an-avatar').getBoundingClientRect().width) };
     });
     pruefe('Klassen-Symbole mindestens 32 px', s.zeilen.length >= 3 && s.zeilen.every((z) => z.gross >= 32), JSON.stringify(s.zeilen));
-    pruefe('Klassen-Symbole deckend in der Klassenfarbe', s.zeilen.every((z) => z.grund === z.soll && z.deckkraft === '1'), JSON.stringify(s.zeilen));
+    // R27 A1 (Flo 21.11.): Goldrichtig und Genial sind Plaketten mit Metall- bzw. Amethyst-Verlauf, alle anderen Klassen
+    // ruhige Kacheln (--an-kachel) mit farbigem Zeichen statt bunt gefuellter Flaechen
+    const belohnung = (k) => k === 'stark' || k === 'brillant';
+    pruefe('Klassen-Symbole: Belohnungen als Plakette, sonst ruhige Kachel', s.zeilen.every((z) => z.deckkraft === '1'
+      && (belohnung(z.k) ? z.preis && z.verlauf : !z.preis && z.grund === z.soll)), JSON.stringify(s.zeilen));
     pruefe('Symbole der Momente mindestens 36 px', s.karten.length >= 2 && s.karten.every((w) => w >= 36), JSON.stringify(s.karten));
     pruefe('Verlauf ohne Kleintext ("antippen", Legende)', s.tipp === 0 && !/antippen|tippen|▲|▼/.test(s.kurveText), s.kurveText);
     pruefe('Eigene Fehler im Verlauf gross markiert (mindestens 14 px)', s.punkte.length >= 1 && s.punkte.every((w) => w >= 14), JSON.stringify(s.punkte));
@@ -256,7 +267,10 @@ async function testeAussehen(browser, d) {
       const kontrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return Math.round((x + 0.05) / (y + 0.05) * 100) / 100; };
       const grundVon = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if ((rgb(c)[3] ?? 1) === 1 && !/rgba\(0, 0, 0, 0\)/.test(c)) return c; } return getComputedStyle(document.body).backgroundColor; };
       const zeichen = [...document.querySelectorAll('.an-momente .an-sym svg, .an-kl-mitte .an-sym svg')].map((svg) => {
-        const kachel = getComputedStyle(svg.querySelector('rect, circle, path')).fill;
+        // auf einer Plakette liegt das Zeichen in der Mitte des Verlaufs: dort ist der Grund --metall bzw. #7C4DDB
+        const preis = svg.closest('.an-preis');
+        const mitte = (w) => { const i = document.createElement('i'); i.style.color = w; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; };
+        const kachel = preis ? mitte(preis.dataset.k === 'stark' ? 'var(--metall)' : '#7C4DDB') : getComputedStyle(svg.querySelector('rect, circle, path')).fill;
         return { kachel, zeichen: getComputedStyle(svg).color, k: kontrast(kachel, getComputedStyle(svg).color) };
       });
       const kanten = [...document.querySelectorAll('.an-moment')].map((b) => kontrast(getComputedStyle(b).borderTopColor, grundVon(b.parentElement)));

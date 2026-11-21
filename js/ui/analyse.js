@@ -57,7 +57,14 @@ const ICON = {
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 // R19 Analyse neu (Flo 15.11.: Symbole "gross, hell und farbig" statt dunkel): dieselbe Kachel aus js/symbole.js, nur ist
 // ihr Grund (--flaeche) die Klassenfarbe und das Zeichen in --kg-* (Textfarbe auf der Klassenfarbe, je Klasse abgestimmt)
-const symbolDeckend = (k) => (SYMBOLE[k] ? `<span class="an-sym" style="--flaeche:var(--k-${k});--kt-${k}:var(--kg-${k})">${SYMBOLE[k]}</span>` : '');
+// R27 A1 (Flo 21.11.: "Kacheln dunkel mit farbigem Symbol statt bunt gefuellter Flaechen"): die Kachel ist eine ruhige
+// dunkle Flaeche (--an-kachel, css/analyse.css), das Zeichen in der Klassen-Textfarbe
+// Goldrichtig und Genial sind Belohnungen (Flo 21.11.: "zu unbelohnend"): eine kleine Plakette in Metall bzw. Amethyst,
+// das Zeichen dunkel bzw. hell darauf (Farben in css/analyse.css, .an-preis)
+const PREIS = new Set(['stark', 'brillant']);
+const symbolDeckend = (k) => (SYMBOLE[k] ? (PREIS.has(k)
+  ? `<span class="an-sym an-preis" data-k="${k}" style="--kt-${k}:var(--an-preis-zeichen)">${SYMBOLE[k]}</span>`
+  : `<span class="an-sym" style="--flaeche:var(--an-kachel)">${SYMBOLE[k]}</span>`) : '');
 
 // Tempo fuer "Variante zeigen" und das Abspielen der Partie (Flo 15.11.: Variante "zu schnell", Tempo waehlbar), ms je Zug;
 // vorher 1000 ms. Gemerkt auf dem Geraet wie die Hinweis-Merker in js/ui/partie.js
@@ -284,8 +291,9 @@ export function zeige(root, params = {}, app) {
       case 'abspielen': if (st.auto) stoppeAbspielen(); else starteAbspielen(); break;
       case 'tempo': wechsleTempo(); break;
       case 'zur-partie': springe(st.ply); break;
-      case 'moment': springe(Number(el.dataset.ply)); brettInSicht(); break;
-      case 'klasse': springeZuKlasse(el.dataset.klasse); break;
+      case 'moment': springe(Number(el.dataset.ply)); zeigeReiter('coach'); brettInSicht(); break;
+      case 'klasse': springeZuKlasse(el.dataset.klasse); zeigeReiter('coach'); break;
+      case 'reiter': zeigeReiter(el.dataset.reiter); break;
       case 'nochmal-rechnen': rechne(); break;
       case 'online': app.gehe('online', {}); break;
       default: break;
@@ -507,6 +515,7 @@ export function zeige(root, params = {}, app) {
         </div>
         <div class="an-rechts">
           ${genauHtml()}
+          ${reiterHtml()}
           ${momenteHtml()}
           ${bannerHtml()}
           <div class="an-ort-oben" hidden></div>
@@ -714,7 +723,7 @@ export function zeige(root, params = {}, app) {
       const du = z.farbe === st.sf;
       const l = (kx(i + 1) / KW) * 100;
       const t = (ky(st.kurve[i + 1]) / KH) * 100;
-      return `<i class="${du ? 'du' : ''}" style="left:${l.toFixed(2)}%;top:${t.toFixed(2)}%;--kf:var(--k-${esc(z.klasse)})" title="${esc(zugText(z))} ${esc(KLASSEN_NAME[z.klasse])}"></i>`;
+      return `<i class="${du ? 'du' : ''}" data-k="${esc(z.klasse)}" style="left:${l.toFixed(2)}%;top:${t.toFixed(2)}%;--kf:var(--k-${esc(z.klasse)})" title="${esc(zugText(z))} ${esc(KLASSEN_NAME[z.klasse])}"></i>`;
     }).join('');
   }
 
@@ -755,6 +764,22 @@ export function zeige(root, params = {}, app) {
     }).join('');
     return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}" data-n="${Math.min(plies.length, 5)}">${karten}</div></div>`
       + `<div class="an-momente-zeile" aria-hidden="true">${zeile}</div>`;
+  }
+
+  // R27 A1 (Flo 21.11.: "am besten ohne viel Runterscrollen, auf dem Handy"): im Hochformat steht unter Brett und
+  // Ergebniszeile ein Umschalter, von den vier Bereichen ist nur einer sichtbar (css/analyse.css, data-reiter am Screen).
+  // Im Querformat sind alle Bereiche zugleich da und der Umschalter ist ausgeblendet. Ein Moment oder eine Zugklasse
+  // fuehrt zum Coach, denn dort steht die Erklaerung zum Zug.
+  const REITER = ['momente', 'coach', 'zuege', 'verlauf'];
+  function reiterHtml() {
+    const aktiv = sec.dataset.reiter || 'momente';
+    return `<div class="an-reiter" role="tablist" aria-label="${esc(t('analyse.an.reiter.aria'))}">${REITER.map((r) =>
+      `<button class="knopf" type="button" role="tab" data-aktion="reiter" data-reiter="${r}" aria-selected="${r === aktiv}">${esc(t(`analyse.an.reiter.${r}`))}</button>`).join('')}</div>`;
+  }
+  function zeigeReiter(r) {
+    if (!REITER.includes(r)) return;
+    sec.dataset.reiter = r;
+    for (const k of sec.querySelectorAll('.an-reiter [data-reiter]')) k.setAttribute('aria-selected', String(k.dataset.reiter === r));
   }
 
   function klassenHtml() {

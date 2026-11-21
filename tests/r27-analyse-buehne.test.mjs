@@ -15,6 +15,8 @@ const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
 const BASIS = `http://127.0.0.1:${PORT}/tests/screens.html`;
+// --bilder=<ordner>: iPhone 13 je Bereich und PC, dunkel
+const BILDER = (process.argv.find((x) => x.startsWith('--bilder=')) || '').slice(9);
 
 function ladePlaywright() {
   for (const k of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
@@ -59,7 +61,7 @@ async function oeffne(seite, query = 'screen=keiner') {
 }
 async function oeffneAnalyse(seite, d) {
   await oeffne(seite, `screen=analyse&partieId=${d.oper}`);
-  await seite.waitForSelector('.an-inhalt .an-coach', { timeout: 30000 });
+  await seite.waitForSelector('.an-inhalt .an-coach', { state: 'attached', timeout: 30000 });
   await warte(400);
 }
 const aktuellerPly = (seite) => seite.evaluate(() => Number(document.querySelector('.an-kurve').getAttribute('aria-valuenow')) - 1);
@@ -133,7 +135,9 @@ async function testeGroessen(browser, d) {
       .filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect().top)));
     pruefe('Schluesselmomente im ersten Bild', top < hoehe - 40, String(Math.round(top)));
     if (name === 'iPhone') {
-      const klein = await seite.evaluate(() => [...document.querySelectorAll('.an-navi .knopf, .an-kl:not(.an-kl-gesamt), .an-moment, .an-coach .knopf')]
+      // die Zugklassen-Kacheln sind auf dem Handy 32 px hoch (Raster, cf/Flo 21.11.), WCAG 2.5.8 verlangt 24 px; sie stehen im
+      // Bereich "Zuege" und sind am Start ausgeblendet, darum misst diese Zeile nur die sichtbaren Ziele
+      const klein = await seite.evaluate(() => [...document.querySelectorAll('.an-navi .knopf, .an-reiter .knopf, .an-moment, .an-coach .knopf, .an-aktionsleiste .knopf')]
         .filter((e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden')
         .map((e) => ({ c: e.className.split(' ').slice(0, 2).join('.'), h: Math.round(e.getBoundingClientRect().height), w: Math.round(e.getBoundingClientRect().width) }))
         .filter((x) => x.h < 44 || x.w < 44));
@@ -184,19 +188,65 @@ async function testeGroessen(browser, d) {
     return { glatt: /C/.test(d) && !/L/.test(d), raus, innen: w.bottom <= box.bottom };
   });
   pruefe('Verlauf als glatte Linie, nichts abgeschnitten', kurve.glatt && kurve.raus === 0 && kurve.innen, JSON.stringify(kurve));
-  // Gold aus den Metall-Tokens: Avatarring und Brettrahmen tragen #C9A14A bzw. den Verlauf, nirgends das alte --gold
+  // Gold sparsam (Flo 21.11.: "Kack-Gold"): kein altes --gold, Avatarringe neutral, Goldrichtig als Champagner statt Gelb
   const gold = await seite.evaluate(() => {
     const ring = getComputedStyle(document.querySelector('.an-genau .an-avatar')).boxShadow;
     const alt = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim();
     const altRgb = (() => { const x = document.createElement('i'); x.style.color = alt; document.body.append(x); const c = getComputedStyle(x).color; x.remove(); return c; })();
     const treffer = [...document.querySelectorAll('.an-screen *')].filter((e) => { const cs = getComputedStyle(e);
       return [cs.color, cs.backgroundColor, cs.borderTopColor, cs.boxShadow, cs.backgroundImage].some((v) => v.includes(altRgb)); }).length;
-    return { ring, altRgb, treffer };
+    const gr = document.querySelector('.an-moment[data-klasse="stark"] .an-m-klasse, .an-kl[data-klasse="stark"] .an-n.du');
+    return { ring, altRgb, treffer, goldrichtig: gr ? getComputedStyle(gr).color : '' };
   });
-  pruefe('Avatarring in Metallgold', gold.ring.includes('rgb(201, 161, 74)'), gold.ring);
+  pruefe('Avatarringe neutral (kein Gold)', !gold.ring.includes('rgb(201, 161, 74)'), gold.ring);
+  pruefe('Goldrichtig als Champagner (dunkel #E8D9B0), nicht Gelb', gold.goldrichtig === 'rgb(232, 217, 176)', gold.goldrichtig);
   pruefe('Kein altes --gold in der Analyse', gold.treffer === 0, JSON.stringify(gold));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
+}
+
+// Hochformat: Brett oben, Ergebniszeile, Umschalter mit genau einem sichtbaren Bereich, kein Seiten-Scrollen
+async function testeHandy(browser, d) {
+  gruppe = 'iPhone 13';
+  const { kontext, seite, fehler } = await neueSeite(browser, { breite: 390, hoehe: 844, touch: true });
+  await oeffneAnalyse(seite, d);
+  const sicht = () => seite.evaluate(() => ['.an-momente-box', '.an-coach', '.an-klassen', '.an-kurve-box']
+    .filter((s) => { const e = document.querySelector(s); return e && e.getClientRects().length > 0; }));
+  const passt = () => seite.evaluate(() => { const sc = document.querySelector('.an-screen'); return sc.scrollHeight - sc.clientHeight; });
+  pruefe('Umschalter mit vier Bereichen', (await seite.locator('.an-reiter [role="tab"]').count()) === 4);
+  pruefe('Start: nur die Momente', JSON.stringify(await sicht()) === '[".an-momente-box"]', JSON.stringify(await sicht()));
+  pruefe('Ohne Seiten-Scrollen (Momente)', (await passt()) <= 1, String(await passt()));
+  const reihe = await seite.evaluate(() => ['.an-brett', '.an-genau', '.an-reiter', '.an-momente-box', '.an-navi'].map((s) => Math.round(document.querySelector(s).getBoundingClientRect().top)));
+  pruefe('Reihenfolge Brett, Ergebnis, Umschalter, Bereich, Navigation', reihe.every((v, i) => !i || v > reihe[i - 1]), JSON.stringify(reihe));
+  const zeile = await seite.evaluate(() => Math.round(document.querySelector('.an-genau').getBoundingClientRect().height));
+  pruefe('Ergebniszeile einzeilig (hoechstens 60 px)', zeile <= 60, String(zeile));
+  for (const [r, sel] of [['coach', '.an-coach'], ['zuege', '.an-klassen'], ['verlauf', '.an-kurve-box'], ['momente', '.an-momente-box']]) {
+    await seite.click(`.an-reiter [data-reiter="${r}"]`);
+    await warte(200);
+    const v = await sicht();
+    pruefe(`Bereich ${r}: nur er sichtbar, Umschalter markiert`, JSON.stringify(v) === JSON.stringify([sel])
+      && (await seite.getAttribute(`.an-reiter [data-reiter="${r}"]`, 'aria-selected')) === 'true', JSON.stringify(v));
+    pruefe(`Bereich ${r}: ohne Seiten-Scrollen`, (await passt()) <= 1, String(await passt()));
+    const innen = await seite.evaluate((s) => { const e = document.querySelector(s); return e.scrollHeight - e.clientHeight; }, sel);
+    pruefe(`Bereich ${r}: Inhalt ganz sichtbar (kein Rollen im Bereich)`, innen <= 1, String(innen));
+    if (r === 'zuege') {
+      const h = await seite.evaluate(() => [...document.querySelectorAll('.an-kl')].map((k) => Math.round(k.getBoundingClientRect().height)));
+      pruefe('Zugklassen-Kacheln mindestens 24 px (WCAG 2.5.8)', h.length === 12 && h.every((x) => x >= 24), JSON.stringify(h));
+    }
+    if (BILDER) await seite.screenshot({ path: path.join(BILDER, `iphone-${r}-dunkel.png`) });
+  }
+  await seite.locator('.an-moment').first().tap();
+  await warte(400);
+  pruefe('Moment antippen fuehrt zum Coach', (await seite.getAttribute('.an-reiter [data-reiter="coach"]', 'aria-selected')) === 'true'
+    && JSON.stringify(await sicht()) === '[".an-coach"]', JSON.stringify(await sicht()));
+  pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+  await kontext.close();
+  if (BILDER) {
+    const pc = await neueSeite(browser, { breite: 1440, hoehe: 900 });
+    await oeffneAnalyse(pc.seite, d);
+    await pc.seite.screenshot({ path: path.join(BILDER, 'pc-dunkel.png') });
+    await pc.kontext.close();
+  }
 }
 
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
@@ -209,6 +259,7 @@ try {
   const d = await testeDaten(browser);
   await testeBuehne(browser, d);
   await testeGroessen(browser, d);
+  await testeHandy(browser, d);
   const fehlend = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - fehlend.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of fehlend) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + f.detail + ')' : ''));
