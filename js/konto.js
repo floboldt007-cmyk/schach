@@ -298,7 +298,7 @@ export async function speichereBenutzername(benutzername) {
 export async function frageNameBestaetigen(app, name) {
   if (!app?.frage) return true;
   const w = await app.frage({ titel: K('nameTitel'), text: K('nameFrage', { name, tage: NAME_SPERRE_TAGE }),
-    knoepfe: [{ text: K('nameAbbrechen'), wert: 'nein' }, { text: K('nameBestaetigen'), wert: 'ja', art: 'primaer' }], abbrechen: 'nein' });
+    knoepfe: [{ text: K('nameAbbrechen'), wert: 'nein' }, { text: K('nameBestaetigen'), wert: 'ja', art: 'konto-gold' }], abbrechen: 'nein' });
   return w === 'ja';
 }
 // Ist der Name frei (beim Tippen)? true/false vom Server; null = unbekannt (offline, Haken-SQL fehlt): dann entscheidet
@@ -588,13 +588,16 @@ export function kontoGruppe({ app } = {}) {
     // R16 A2: ohne Sitzung steht die Statuszeile direkt unter "Code senden" (dort entstehen ihre Meldungen), vor "oder"
     const status = `<p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>`;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
-      <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
-      <p class="konto-name-haken" hidden>${hakenHtml()}<span>${K('bestaetigt')}</span></p>
+      <div class="konto-name-block">
+      <label class="konto-name-titel" for="konto-name-feld">${K('benutzername')}</label>
+      <div class="konto-name-zeile"><input id="konto-name-feld" class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" autocapitalize="none" spellcheck="false">`
+      + `<span class="konto-name-haken" hidden>${hakenHtml()}<span>${K('bestaetigt')}</span></span>`
+      + `<button class="knopf konto-name-knopf" type="button" data-konto="name" hidden disabled>${K('nameBestaetigen')}</button></div>
       <p class="es-hilfe konto-name-pruef" aria-live="polite"></p>
       <p class="es-hilfe konto-name-hinweis" hidden>${K('nameWaehlen')}</p>
       <p class="es-hilfe konto-name-sperre" hidden></p>
-      <div class="es-knoepfe konto-name-knoepfe" hidden><button class="knopf" type="button" data-konto="name" disabled>${K('nameBestaetigen')}</button></div>
-      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>${verdraengtZeile()}` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
+      </div>
+      <div class="es-knoepfe konto-sichern-zeile"><button class="knopf konto-sichern" data-konto="sichern">${K('sichern')}</button><button class="knopf konto-abmelden" data-konto="abmelden">${K('abmelden')}</button></div>${verdraengtZeile()}` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <div class="konto-botschutz" hidden></div><button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
       ${status}<p class="es-hilfe konto-oder">${K('oder')}</p><div class="es-knoepfe konto-anbieter"><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`
@@ -642,19 +645,20 @@ export function kontoGruppe({ app } = {}) {
   const pruefZeile = (text = '', art = '') => {
     const z = el.querySelector('.konto-name-pruef'); if (!z) return;
     z.textContent = text; z.dataset.art = art;
+    // "Der Name ist frei" mit kleinem gruenem Haken davor (Flos Ja zum Konto-Entwurf 21.11.)
+    if (art === 'gut' && text) z.insertAdjacentHTML('afterbegin', `<svg class="konto-frei-haken" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`);
   };
   const pruefeEingabe = () => {
-    const feld = el.querySelector('.konto-name'); const knoepfe = el.querySelector('.konto-name-knoepfe');
-    const knopf = knoepfe?.querySelector('[data-konto="name"]'); if (!feld || !knopf) return;
+    const feld = el.querySelector('.konto-name'); const knopf = el.querySelector('[data-konto="name"]'); if (!feld || !knopf) return;
     clearTimeout(pruefUhr); const nr = ++pruefNr;
     const wert = feld.value.trim(); const eigen = eigenerName(); const haken = eigenerNameBestaetigt();
     const istEigen = !!eigen && wert === eigen;
     const h = el.querySelector('.konto-name-haken'); if (h) h.hidden = !(istEigen && haken === true);
-    knopf.disabled = true;
-    // gesperrt, leer oder der eigene, schon bestaetigte (bzw. ohne Haken-SQL gespeicherte) Name: nichts zu bestaetigen
-    if (feld.readOnly || !wert || (istEigen && haken !== false)) { knoepfe.hidden = true; pruefZeile(); return; }
-    knoepfe.hidden = false;
-    if (istEigen) { knopf.disabled = false; pruefZeile(); return; }   // vom Server vergeben: selbst bestaetigen
+    // Flos Ja 21.11.: "Bestaetigen" ist ein kleiner Knopf im Feld und erscheint erst, wenn der Name gueltig und frei ist
+    // (bzw. der Server ihn vergeben hat und er noch keinen Haken traegt); gesperrt, leer oder schon bestaetigt: kein Knopf
+    knopf.disabled = true; knopf.hidden = true;
+    if (feld.readOnly || !wert || (istEigen && haken !== false)) { pruefZeile(); return; }
+    if (istEigen) { knopf.hidden = false; knopf.disabled = false; pruefZeile(); return; }   // vom Server vergeben: selbst bestaetigen
     if (!NAME.test(wert)) { pruefZeile(K('nameRegel'), 'fehler'); return; }
     pruefZeile(K('namePruefe'));
     pruefUhr = setTimeout(async () => {
@@ -662,7 +666,7 @@ export function kontoGruppe({ app } = {}) {
       if (nr !== pruefNr) return;
       if (frei === false) { pruefZeile(K('nameVergeben'), 'fehler'); return; }
       // null = unbekannt (offline oder ohne SQL): bestaetigen geht, der Server entscheidet
-      knopf.disabled = false; pruefZeile(frei ? K('nameIstFrei') : '', frei ? 'gut' : '');
+      knopf.hidden = false; knopf.disabled = false; pruefZeile(frei ? K('nameIstFrei') : '', frei ? 'gut' : '');
     }, 350);
   };
   el.addEventListener('input', (e) => { if (e.target.classList?.contains('konto-name')) pruefeEingabe(); });

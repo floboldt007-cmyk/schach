@@ -195,18 +195,43 @@
 .konto-gruppe .konto-status { font-size: .9rem; }
 /* R16 A1: --gefahr gab es in keinem Thema, das feste Dunkelrot stand dunkel bei 2,2:1; Warnfarbe wie css/daten.css */
 .konto-gruppe .konto-status[data-fehler="ja"] { color: var(--warn); }
-/* Gruener Haken am Benutzernamen (Flo 21.11.2026, Zeichen: css/bauteile.css .name-haken): das Wort
-   in Textfarbe, weil --gut als Schrift hell unter 4,5:1 laege. Gesperrt: graues, nur lesbares Feld. */
-.konto-gruppe .konto-name-haken { display: flex; align-items: center; gap: .35rem; margin: -.35rem 0 .5rem; font-weight: 700; color: var(--text); }
-.konto-gruppe .konto-name-haken[hidden], .konto-gruppe .konto-name-knoepfe[hidden] { display: none; }
+/* Gruener Haken am Benutzernamen (Flo 21.11.2026, Zeichen: css/bauteile.css .name-haken). */
+/* Flos Ja zum Konto-Entwurf (21.11.): zwei Gruppen. Oben der Name: Feld mit dem Knopf "Bestaetigen" (Goldrand) bzw. nach
+   dem Bestaetigen dem gruenen Haken im Feld, darunter die Statuszeile. Nach einer Trennlinie "Jetzt sichern" als einziger
+   gefuellter Knopf (gruen) und "Abmelden" schlicht mit Umriss. Gold als Schrift und Rand ist mit der Textfarbe gemischt:
+   reines Gold hat auf Weiss nur 2,2:1 (hell 4,77:1, dunkel ueber 9:1). */
+.konto-gruppe .konto-name-block { margin: var(--abstand-2, .75rem) 0 0; }
+.konto-gruppe label.konto-name-titel { display: block; margin: 0 0 var(--abstand-1, .4rem); }
+.konto-gruppe .konto-name-zeile { position: relative; display: flex; align-items: center; }
+.konto-gruppe .konto-name-zeile .konto-name { flex: 1; min-width: 0; min-height: 54px; padding-right: 8.5rem; }
+/* derselbe Goldrand-Knopf in der Rueckfrage (app.frage, art 'konto-gold'), dort in voller Dialog-Groesse */
+.dialog .knopf.konto-gold { --kg: var(--text); background: transparent; color: var(--kg); border: 1.5px solid var(--kg); box-shadow: none; font-weight: 800; }
+@supports (color: color-mix(in srgb, red 50%, blue)) { .dialog .knopf.konto-gold { --kg: color-mix(in srgb, var(--gold) 60%, var(--text)); } }
+@media (hover: hover) { .dialog .knopf.konto-gold:hover { background: var(--gold-weich); } }
+.konto-gruppe .konto-name-knopf, .konto-gruppe .konto-name-zeile .konto-name-haken { position: absolute; right: 5px; top: 5px; bottom: 5px; }
+.konto-gruppe .konto-name-knopf { --kg: var(--text); min-height: 44px; margin: 0; padding: 0 14px; border-radius: var(--radius-klein, 10px);
+  background: transparent; color: var(--kg); border: 1.5px solid var(--kg); box-shadow: none; font-size: 14px; font-weight: 800; }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .konto-gruppe .konto-name-knopf { --kg: color-mix(in srgb, var(--gold) 60%, var(--text)); }
+}
+@media (hover: hover) { .konto-gruppe .konto-name-knopf:not(:disabled):hover { background: var(--gold-weich); } }
+.konto-gruppe .konto-name-knopf:not(:disabled):active { background: var(--gold-weich); }
+.konto-gruppe .konto-name-zeile > [hidden] { display: none !important; }
+.konto-gruppe .konto-name-zeile .konto-name-haken { display: flex; align-items: center; gap: .35rem; padding: 0 .8rem; font-weight: 700;
+  color: var(--kt-bester); pointer-events: none; }
 .konto-gruppe .konto-name-haken .name-haken { margin: 0; }
+.konto-gruppe .konto-name-pruef { display: flex; align-items: center; gap: .35rem; margin: .5rem 0 0; }
 .konto-gruppe .konto-name-pruef:empty { display: none; }
+.konto-gruppe .konto-name-pruef[data-art="gut"] { color: var(--kt-bester); font-weight: 700; }
 .konto-gruppe .konto-name-pruef[data-art="fehler"] { color: var(--warn); }
+.konto-frei-haken { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.konto-gruppe .konto-name-sperre, .konto-gruppe .konto-name-hinweis { margin: .5rem 0 0; }
 .konto-gruppe .konto-name.gesperrt { background: var(--flaeche-3); color: var(--text-2); border-style: dashed; }
-/* Flo 21.11.: "Bestaetigen" gruen wie der Haken. Weiss auf --k-bester (#2F7D5B) 4,99:1, die Flaeche gegen den Grund hell
-   4,99:1 und dunkel 3,23:1. Hover und Druck: Ring in --kt-bester statt dunklerer Flaeche (eine dunklere Flaeche fiele im
-   dunklen Modus unter 3:1 zum Grund). Gesperrt gilt die gemeinsame Regel (.knopf:disabled). */
-.konto-gruppe .konto-name-knoepfe .knopf { color: var(--kg-bester); background: var(--k-bester); border-color: transparent; box-shadow: none; font-weight: 800; }
-@media (hover: hover) { .konto-gruppe .konto-name-knoepfe .knopf:not(:disabled):hover { box-shadow: 0 0 0 2px var(--kt-bester); } }
-.konto-gruppe .konto-name-knoepfe .knopf:not(:disabled):active { box-shadow: 0 0 0 2px var(--kt-bester); }
+.konto-gruppe .konto-sichern-zeile { margin-top: 1.25rem; padding-top: 1.1rem; border-top: 1px solid var(--linie-2); }
+/* Weiss auf --k-bester (#2F7D5B) 4,99:1; die Flaeche gegen den Grund hell 4,99:1, dunkel 3,23:1. Hover und Druck: Ring in
+   --kt-bester statt dunklerer Flaeche (eine dunklere Flaeche fiele im dunklen Modus unter 3:1 zum Grund). */
+.konto-gruppe .konto-sichern { flex: 1 1 12rem; color: var(--kg-bester); background: var(--k-bester); border-color: transparent; box-shadow: none; font-weight: 800; }
+@media (hover: hover) { .konto-gruppe .konto-sichern:not(:disabled):hover { box-shadow: 0 0 0 2px var(--kt-bester); } }
+.konto-gruppe .konto-sichern:not(:disabled):active { box-shadow: 0 0 0 2px var(--kt-bester); }
+.konto-gruppe .konto-abmelden { background: transparent; color: var(--text); border: 1.5px solid var(--text-3); box-shadow: none; }
 

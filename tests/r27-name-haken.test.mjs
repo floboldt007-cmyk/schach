@@ -84,7 +84,7 @@ const stand = (s) => s.evaluate(() => {
   const knopf = q('[data-konto="name"]');
   return { wert: q('.konto-name')?.value, nurLesen: !!q('.konto-name')?.readOnly, grau: q('.konto-name')?.classList.contains('gesperrt'),
     haken: sichtbar('.konto-name-haken'), hakenText: q('.konto-name-haken')?.textContent.trim(),
-    knopfDa: sichtbar('.konto-name-knoepfe'), knopfAn: !!knopf && !knopf.disabled,
+    knopfDa: sichtbar('.konto-name-knopf'), knopfAn: !!knopf && !knopf.disabled,
     pruef: q('.konto-name-pruef')?.textContent.trim() || '', pruefArt: q('.konto-name-pruef')?.dataset.art || '',
     sperre: sichtbar('.konto-name-sperre') ? q('.konto-name-sperre').textContent.trim() : '' };
 });
@@ -107,7 +107,7 @@ async function browserTeil() {
     // 2) Tippen: ungueltig, vergeben, frei
     await tippe(p.s, 'ab');
     z = await stand(p.s);
-    pruefe('Zu kurz: Regel-Hinweis, Knopf aus, kein Haken', /3 bis 20 Zeichen/.test(z.pruef) && z.pruefArt === 'fehler' && z.knopfDa && !z.knopfAn && !z.haken, z);
+    pruefe('Zu kurz: Regel-Hinweis, kein Knopf im Feld, kein Haken', /3 bis 20 Zeichen/.test(z.pruef) && z.pruefArt === 'fehler' && !z.knopfDa && !z.knopfAn && !z.haken, z);
     pruefe('Zu kurz: der Server wird nicht gefragt', p.freiFragen.length === 0, p.freiFragen);
     await p.k.close();
     p = await seite(browser, { profil: [{ user_id: ID, benutzername: 'anna_eins', name_bestaetigt: true, name_geaendert_am: null }],
@@ -118,7 +118,7 @@ async function browserTeil() {
     pruefe('Vergeben: "schon vergeben", Knopf aus', z.pruef === 'Dieser Benutzername ist schon vergeben.' && !z.knopfAn, z);
     await tippe(p.s, 'ganz_neu');
     z = await stand(p.s);
-    pruefe('Frei: "Der Name ist frei.", Knopf an', z.pruef === 'Der Name ist frei.' && z.knopfAn, z);
+    pruefe('Frei: "Der Name ist frei" mit Haken, Knopf im Feld an', z.pruef === 'Der Name ist frei' && z.knopfDa && z.knopfAn, z);
 
     // 3) Rueckfrage: Abbrechen schickt nichts
     await p.s.locator('[data-konto="name"]').click();
@@ -127,9 +127,9 @@ async function browserTeil() {
     const text = await dialog.innerText();
     pruefe('Rueckfrage in der App nennt Namen und 30 Tage', /ganz_neu/.test(text) && /30 Tage nicht ändern/.test(text), text);
     pruefe('Kein Browser-Dialog (alert/confirm)', !(await p.s.evaluate(() => window.__browserDialog)), '');
-    await p.s.locator('.dialog-knoepfe button', { hasText: 'Abbrechen' }).click({ timeout: 5000 });
+    await p.s.locator('.dialog-knoepfe button', { hasText: 'Zurück' }).click({ timeout: 5000 });
     await warte(600);
-    pruefe('Abgebrochen (Knopf Abbrechen): kein POST', p.posts.length === 0, p.posts);
+    pruefe('Abgebrochen (Knopf Zurück): kein POST', p.posts.length === 0, p.posts);
 
     // 4) Bestaetigen: genau ein POST mit Haken, danach Haken und Sperre mit Tagen, Feld grau
     await p.s.locator('[data-konto="name"]').click();
