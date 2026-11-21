@@ -775,8 +775,13 @@ async function testeEnglischMitSw(browser) {
     pruefe('Englisch ohne Umlaute', !/[äöüÄÖÜß]/.test(text), text.match(/[^\n]*[äöüÄÖÜß][^\n]*/g));
     const knoepfe = await seite.evaluate(() => [...document.querySelectorAll('.bericht-blatt .sheet-knoepfe button')].map((b) => b.textContent));
     pruefe('Knoepfe auf Englisch', knoepfe.includes('Copy') && knoepfe.includes('Clear error list') && knoepfe.includes('Close'), knoepfe);
-    // leere Fehlerliste: "Clear error list" ist schon beim Oeffnen aus, Tab springt von Copy darueber hinweg
+    // leere Fehlerliste: "Clear error list" ist schon beim Oeffnen aus, Tab springt von Copy darueber hinweg.
+    // sheet() setzt den Fokus erst im naechsten Bild (Leistung F3); WebKit unter CI-Last brauchte dafuer laenger als die
+    // Pruefungen davor (CI #266 zweimal rot, fokus fehlte). Darum erst auf den Fokus im Blatt warten, dann messen
+    await seite.waitForFunction(() => !!(document.activeElement && document.activeElement.closest('.bericht-blatt')), null, { timeout: 3000 })
+      .catch(() => { /* die Pruefung unten meldet, wo der Fokus liegt */ });
     const vorTab = await seite.evaluate(() => ({ fokus: document.activeElement && document.activeElement.dataset.knopf,
+      wo: document.activeElement ? document.activeElement.tagName + '.' + document.activeElement.className : null,
       aus: document.querySelector('.bericht-blatt [data-knopf="leeren"]').disabled, teilen: typeof navigator.share === 'function' }));
     await seite.keyboard.press('Tab');
     const nachTab = await seite.evaluate(() => document.activeElement && document.activeElement.dataset.knopf);
