@@ -203,4 +203,10 @@
 .konto-gruppe .konto-name-pruef:empty { display: none; }
 .konto-gruppe .konto-name-pruef[data-art="fehler"] { color: var(--warn); }
 .konto-gruppe .konto-name.gesperrt { background: var(--flaeche-3); color: var(--text-2); border-style: dashed; }
+/* Flo 21.11.: "Bestaetigen" gruen wie der Haken. Weiss auf --k-bester (#2F7D5B) 4,99:1, die Flaeche gegen den Grund hell
+   4,99:1 und dunkel 3,23:1. Hover und Druck: Ring in --kt-bester statt dunklerer Flaeche (eine dunklere Flaeche fiele im
+   dunklen Modus unter 3:1 zum Grund). Gesperrt gilt die gemeinsame Regel (.knopf:disabled). */
+.konto-gruppe .konto-name-knoepfe .knopf { color: var(--kg-bester); background: var(--k-bester); border-color: transparent; box-shadow: none; font-weight: 800; }
+@media (hover: hover) { .konto-gruppe .konto-name-knoepfe .knopf:not(:disabled):hover { box-shadow: 0 0 0 2px var(--kt-bester); } }
+.konto-gruppe .konto-name-knoepfe .knopf:not(:disabled):active { box-shadow: 0 0 0 2px var(--kt-bester); }
 
