@@ -38,11 +38,11 @@ const MERKER = 'schach-arena:konto:name';
 
 // profil: Antwort auf GET /rest/v1/profile (Liste); nach einem POST antwortet GET mit profilDanach. frei: Name -> boolean
 // fuer rpc/name_frei. modus: 'hell' oder 'dunkel'.
-async function seite(browser, { profil, profilDanach = null, frei = {}, modus = 'hell', breite = 390 }) {
+async function seite(browser, { profil, profilDanach = null, frei = {}, modus = 'hell', breite = 390, hakenNamen = [] }) {
   const k = await browser.newContext({ viewport: { width: breite, height: 844 }, serviceWorkers: 'block', timezoneId: 'Europe/Berlin',
     colorScheme: modus === 'dunkel' ? 'dark' : 'light', locale: 'de-DE' });
   const s = await k.newPage();
-  const fehler = []; const posts = []; const freiFragen = [];
+  const fehler = []; const posts = []; const freiFragen = []; const hakenFragen = [];
   let gepostet = false;
   s.on('pageerror', (e) => fehler.push(e.message));
   await s.route(SUPA + '/**', async (r) => {
@@ -52,7 +52,7 @@ async function seite(browser, { profil, profilDanach = null, frei = {}, modus = 
       const n = JSON.parse(r.request().postData() || '{}').name; freiFragen.push(n);
       return json(n in frei ? frei[n] : true);
     }
-    if (u.includes('/rest/v1/rpc/bestaetigte_namen')) return json([]);
+    if (u.includes('/rest/v1/rpc/bestaetigte_namen')) { hakenFragen.push(JSON.parse(r.request().postData() || '{}').namen); return json(hakenNamen); }
     if (u.includes('/rest/v1/profile') && r.request().method() === 'POST') {
       posts.push(JSON.parse(r.request().postData() || '{}')); gepostet = true;
       return r.fulfill({ status: 201, contentType: 'application/json', body: '' });
@@ -76,7 +76,7 @@ async function seite(browser, { profil, profilDanach = null, frei = {}, modus = 
   await s.evaluate(() => window.__app.gehe('einstellungen', { seite: 'konto' }));
   await s.waitForSelector('.konto-name', { timeout: 30000 });
   await warte(1500);
-  return { k, s, fehler, posts, freiFragen };
+  return { k, s, fehler, posts, freiFragen, hakenFragen };
 }
 const stand = (s) => s.evaluate(() => {
   const q = (x) => document.querySelector(x);
@@ -159,6 +159,23 @@ async function browserTeil() {
     await warte(1200);
     pruefe('Ohne SQL: POST ohne name_bestaetigt (PostgREST kennte die Spalte nicht)', p.posts.length === 1 && !('name_bestaetigt' in p.posts[0]), p.posts);
     pruefe('Ohne SQL: keine Seitenfehler', p.fehler.length === 0, p.fehler.join(' | '));
+    await p.k.close();
+
+    // 6b) Kaltreview #268: "kein Haken" eines Gegners gilt nur 10 Minuten, ein Haken bleibt
+    const namen = [];
+    p = await seite(browser, { profil: [{ user_id: ID, benutzername: 'anna_eins', name_bestaetigt: true, name_geaendert_am: null }], hakenNamen: namen });
+    const frage = () => p.s.evaluate(async () => [...(await (await import('/js/konto.js')).bestaetigteNamen(['gegner_x']))]);
+    const vorher = p.hakenFragen.length;
+    const r1 = await frage();
+    const r2 = await frage();
+    pruefe('Haken fremder Namen: ohne Haken einmal gefragt, dann gemerkt', !r1.includes('gegner_x') && !r2.includes('gegner_x') && p.hakenFragen.length === vorher + 1, { r1, r2, n: p.hakenFragen.length });
+    namen.push('gegner_x');
+    await p.s.evaluate(() => { const echt = Date.now; Date.now = () => echt() + 11 * 60 * 1000; });
+    const r3 = await frage();
+    pruefe('Nach 10 Minuten neu gefragt: der inzwischen bestaetigte Gegner hat den Haken', r3.includes('gegner_x') && p.hakenFragen.length === vorher + 2, { r3, n: p.hakenFragen.length });
+    await p.s.evaluate(() => { const echt = Date.now; Date.now = () => echt() + 60 * 60 * 1000; });
+    await frage();
+    pruefe('Ein Haken bleibt ohne neue Frage', p.hakenFragen.length === vorher + 2, p.hakenFragen.length);
     await p.k.close();
 
     // 7) Bilder fuer den Bericht, hell und dunkel: gesperrt mit Haken

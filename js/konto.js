@@ -260,8 +260,12 @@ function merkeName(name, s = sitzung(), bestaetigt) {
 }
 // Hat der Server die Spalte name_bestaetigt? Erst dann schickt die App den Haken mit (sonst lehnt PostgREST die Spalte ab)
 let hakenSpalte = false;
-// Haken fremder Namen (bestaetigte_namen): kleingeschriebener Name -> true/false, je Seite einmal gefragt
+// Haken fremder Namen (bestaetigte_namen): kleingeschriebener Name -> true/false. Ein Haken gilt fuer die ganze Seite;
+// "kein Haken" nur 10 Minuten (Kaltreview #268), damit ein Gegner, der waehrend der Sitzung bestaetigt, den Haken ohne
+// Neuladen bekommt. keinHakenSeit: Name -> Zeitpunkt der Antwort ohne Haken.
 const hakenStand = new Map();
+const keinHakenSeit = new Map();
+const KEIN_HAKEN_MS = 10 * 60 * 1000;
 export async function speichereCloudStand(stand = cloudStand()) {
   const e0 = epoche;
   const s = await aktiveSitzung(); const id = userId(s); if (!id) throw new Error(K('keineId'));
@@ -316,14 +320,15 @@ export async function nameFrei(name) {
 // Aufruf, wie der Server). Ohne Sitzung, offline oder ohne SQL: die bisher bekannten, nie ein Fehler.
 export async function bestaetigteNamen(namen) {
   const offen = [...new Set((namen || []).map((n) => String(n || '').trim()).filter((n) => NAME.test(n)).map((n) => n.toLowerCase()))]
-    .filter((n) => !hakenStand.has(n)).slice(0, 100);
+    .filter((n) => !hakenStand.has(n) || (hakenStand.get(n) === false && Date.now() - (keinHakenSeit.get(n) || 0) >= KEIN_HAKEN_MS)).slice(0, 100);
   if (offen.length && sitzung()?.access_token) {
     try {
       const s = await aktiveSitzung();
       const d = await anfrage('/rest/v1/rpc/bestaetigte_namen', { methode: 'POST', token: s.access_token, daten: { namen: offen } });
       // setof text kommt als Liste von Texten (aeltere PostgREST-Fassungen: Objekte mit dem Funktionsnamen)
       const ja = new Set((Array.isArray(d) ? d : []).map((x) => String(typeof x === 'string' ? x : x?.bestaetigte_namen || '').toLowerCase()));
-      for (const n of offen) hakenStand.set(n, ja.has(n));
+      const jetzt = Date.now();
+      for (const n of offen) { hakenStand.set(n, ja.has(n)); if (ja.has(n)) keinHakenSeit.delete(n); else keinHakenSeit.set(n, jetzt); }
     } catch (e) { /* beim naechsten Mal neu fragen */ }
   }
   return new Set([...hakenStand].filter(([, v]) => v).map(([n]) => n));
