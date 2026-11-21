@@ -33,7 +33,7 @@
       "id": "uhrwerk",
       "art": "figuren",
       "name": "Uhrwerk",
-      "name_en": "Clockwork",
+      "name_en": "Gearwork",
       "seltenheit": "Episch",
       "text": "Kupfer und Bronze mit einem Zahnrad in jeder Figur.",
       "ordner": "assets/shop/figuren/uhrwerk",
@@ -60,13 +60,13 @@
       "figuren": 12
     },
     {
-      "id": "kronjuwel",
+      "id": "rubinkrone",
       "art": "figuren",
-      "name": "Kronjuwel",
-      "name_en": "Crown Jewel",
+      "name": "Rubinkrone",
+      "name_en": "Ruby Crown",
       "seltenheit": "Exklusiv",
       "text": "Sonder-Set: Gold mit Rubin, Onyx mit Smaragd. Im Shop mit Goldrahmen.",
-      "ordner": "assets/shop/figuren/kronjuwel",
+      "ordner": "assets/shop/figuren/rubinkrone",
       "figuren": 12
     },
     {
@@ -104,13 +104,13 @@
       "rand": "#12152B"
     },
     {
-      "id": "kirschbluete",
+      "id": "bluetenhain",
       "art": "brett",
-      "name": "Kirschblüte",
-      "name_en": "Cherry Blossom",
+      "name": "Blütenhain",
+      "name_en": "Blossom Grove",
       "seltenheit": "Selten",
       "text": "Zartrosa mit kleinen Blueten.",
-      "datei": "assets/shop/bretter/kirschbluete.svg",
+      "datei": "assets/shop/bretter/bluetenhain.svg",
       "hell": "#FBE8EC",
       "dunkel": "#D98AA0",
       "rand": "#6B2E3E"
@@ -128,25 +128,25 @@
       "rand": "#154747"
     },
     {
-      "id": "schiefer",
+      "id": "nebelstein",
       "art": "brett",
-      "name": "Schiefer",
-      "name_en": "Slate",
+      "name": "Nebelstein",
+      "name_en": "Mist Stone",
       "seltenheit": "Selten",
       "text": "Kuehles Grau mit Schichtlinien.",
-      "datei": "assets/shop/bretter/schiefer.svg",
+      "datei": "assets/shop/bretter/nebelstein.svg",
       "hell": "#D7DADF",
       "dunkel": "#59606B",
       "rand": "#23262B"
     },
     {
-      "id": "ahorn",
+      "id": "honigholz",
       "art": "brett",
-      "name": "Ahorn",
-      "name_en": "Maple",
+      "name": "Honigholz",
+      "name_en": "Honeywood",
       "seltenheit": "Selten",
       "text": "Helles Holz mit Maserung.",
-      "datei": "assets/shop/bretter/ahorn.svg",
+      "datei": "assets/shop/bretter/honigholz.svg",
       "hell": "#F3DDB4",
       "dunkel": "#C98A4B",
       "rand": "#5A3418"
@@ -167,7 +167,7 @@
       "id": "aurora",
       "art": "brett",
       "name": "Aurora",
-      "name_en": "Aurora",
+      "name_en": "Aurora Veil",
       "seltenheit": "Episch",
       "text": "Nordlicht zieht als Schleier um das Brett.",
       "datei": "assets/shop/bretter/aurora.svg",

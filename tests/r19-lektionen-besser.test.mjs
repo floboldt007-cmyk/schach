@@ -11,6 +11,7 @@
 import * as M from '../js/pakete/lernen/mattbilder.js';
 import { pruefeLektion } from '../js/pakete/lernen/mattbilder.js';
 import { stockfish, spiele, mattIn, mattform, gut, artVon, Chess } from './lektion-engine.mjs';
+import { mattZuege } from './mattbilder-tablebase.mjs';
 import { setzeSprache, t } from '../js/sprache.js';
 import '../js/pakete/lernen/texte.js';
 
@@ -94,7 +95,9 @@ try {
       if (i > 0) {
         pruefe(`${tag}: dieselben Figurenarten wie Runde 1`, figuren(r.fen) === figuren(l.fen), `${figuren(r.fen)} gegen ${figuren(l.fen)}`);
         pruefe(`${tag}: andere Stellung als die Runden davor`, rs.slice(0, i).every((x) => x.fen.split(' ')[0] !== r.fen.split(' ')[0]));
-        pruefe(`${tag}: nicht kuerzer als Runde 1 (Ziel ${r.ziel} >= ${l.ziel})`, r.ziel >= l.ziel);
+        // ausser bei Tablebase-Zielen: dort ist die Zahl die Wahrheit, die Reihenfolge der Runden eine Geschmacksfrage
+        // (fc-08:15, 20.11.2026: turm, zwei-laeufer, laeufer-springer haben kuerzere Runden 2 und 3 als Runde 1)
+        if (mattZuege(r.fen) == null) pruefe(`${tag}: nicht kuerzer als Runde 1 (Ziel ${r.ziel} >= ${l.ziel})`, r.ziel >= l.ziel);
       }
       const s = await spiele(sf, r, r.fen, { go: GO, goGegner: GO_GEGNER });
       const matt = artVon(l) === 'matt' ? await mattIn(sf, r.fen, MATT_SUCHE) : null;
@@ -110,13 +113,17 @@ try {
       // das Selbstspiel nur eine Obergrenze (Stockfish eilt nicht zum Ziel), also muss die Engine selbst drei Sterne holen
       // (mattbilder.js sterne: zuege <= ziel + ziel/4) und das Ziel darf nicht ueber ihrer Zugzahl liegen
       const a = artVon(l);
+      // Bis 7 Steine entscheidet die Tablebase (tests/mattbilder-tablebase.mjs, fc-08:15): Stockfish verteidigt nicht
+      // perfekt, sein Selbstspiel ist dort oft kuerzer als das wahre Matt und die Mattsuche findet lange Matts nicht
+      const tb = a === 'matt' ? mattZuege(r.fen) : null;
       // (findet die Mattsuche nichts, gilt bei Matt dieselbe Obergrenzen-Regel wie beim Umwandeln)
       // (und ist das gefundene Matt laenger als das Selbstspiel, war die Suche zu kurz: dann ebenfalls die Obergrenze)
-      const passt = a === 'matt' && matt != null && matt <= s.zuege ? r.ziel === matt
-        : a === 'halten' ? r.ziel === s.zuege
-          : r.ziel <= s.zuege && s.zuege <= r.ziel + Math.floor(r.ziel / 4);
-      pruefe(`${tag}: Ziel ${r.ziel} passt zur Engine`, s.ende === 'geschafft' && passt,
-        `Text/Daten sagen ${r.ziel}, Engine sagt ${a === 'matt' ? `Matt in ${matt ?? '-'}` : `${s.zuege} Zuege`} (Selbstspiel ${s.zuege})`);
+      const passt = tb != null ? r.ziel === tb
+        : a === 'matt' && matt != null && matt <= s.zuege ? r.ziel === matt
+          : a === 'halten' ? r.ziel === s.zuege
+            : r.ziel <= s.zuege && s.zuege <= r.ziel + Math.floor(r.ziel / 4);
+      pruefe(`${tag}: Ziel ${r.ziel} passt zur ${tb != null ? 'Tablebase' : 'Engine'}`, s.ende === 'geschafft' && passt,
+        `Text/Daten sagen ${r.ziel}, ${tb != null ? `Tablebase sagt Matt in ${tb}` : `Engine sagt ${a === 'matt' ? `Matt in ${matt ?? '-'}` : `${s.zuege} Zuege`}`} (Selbstspiel ${s.zuege})`);
       for (const sprache of ['de', 'en']) {
         for (const { key, text } of texte(id, i + 1, sprache)) {
           const fehlt = !text || text === 'p-lernen.' + key;

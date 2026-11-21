@@ -14,6 +14,7 @@
 //   schaetzeWertung(fortschritt, bots?) -> Zahl    aus dem staerksten besiegten Bot (gerundet, 400 bis 2800)
 //   passenderBot(wertung, fortschritt, bots?) -> Bot   freier Bot (kein Endgegner) mit der naechsten Staerke
 //   modusLeiste(app, aktiv) -> HTMLElement | null  Umschalter Welten | Online (null ohne Labor)
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { laborFrei } from '../../labor.js';
 import { BOTS } from '../../bots.js';
@@ -59,15 +60,10 @@ export function passenderBot(wertung, f = ladeFortschritt(), bots = BOTS) {
 
 
 export function ladeLobbyCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-paket="lobby"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../../css/pakete/lobby.css', import.meta.url).href;
-    l.dataset.paket = 'lobby';
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles bedienbar */ }
+  return ladePaketCss('lobby', { screens: ['lobby'] });
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladeLobbyCss());
 
 // Umschalter oben auf der Startseite und in der Lobby (zwei echte Knoepfe, aria-pressed; 44 px hoch)
 export function modusLeiste(app, aktiv = 'welten') {

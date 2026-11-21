@@ -98,6 +98,8 @@ export const DE = {
   'stufe.schwer': 'Schwer',
   'stufe.meister': 'Meister',
   ziel: 'Matt in {n} Zügen ist möglich',
+  // lange Grundmatts (mattbilder.js zielAlsFrage): das Ziel ist der Tablebase-Wert, also nur mit bestem Spiel zu schaffen
+  zielFrage: 'Schaffst du es in {n} Zügen?',
   zielEins: 'Matt in einem Zug ist möglich',
   zug: 'Zug {n}',
   los: 'Los geht’s',
@@ -526,6 +528,7 @@ export const EN = {
   'stufe.schwer': 'Hard',
   'stufe.meister': 'Master',
   ziel: 'Mate in {n} moves is possible',
+  zielFrage: 'Can you do it in {n} moves?',
   zielEins: 'Mate in one is possible',
   zug: 'Move {n}',
   los: 'Let’s go',

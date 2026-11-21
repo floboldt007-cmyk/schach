@@ -20,8 +20,12 @@
 //        Lehr-Stellungen mit chess.js pruefen und die Tage aus einer festen Liste verteilen, Ergebnis als JSON
 //   Optionen: --partien=N (Standard 600, nur Partien 0..N-1 zaehlen), --aus=<datei> (Standard
 //   daten/tagesraetsel/raetsel.json), --stand=JJJJ-MM-TT, --start=JJJJ-MM-TT (ein Montag), --wochen=<max>.
+//   node werkzeuge/raetsel-fabrik.mjs --schluss[=<nodes>] [--aus=<datei>] [--teil=k/n] [--ids=tr-0001,...]
+//        Schlusspruefung der fertigen Datei (Standard SCHLUSS_NODES 4.000.000), prueft nur, Exit 1 bei Ausfall;
+//        nicht in CI. Gemessen 20.11.2026 siehe SCHLUSS_NODES.
 //   Rechenlast: jeder Prozess ist eine Engine mit nice -n 19. Erst klein probieren (--partien=4), dann gross.
 //   Stand 24.10.2026: 600 Partien in rund 50 Minuten mit zwei Prozessen (etwa 10 s je Partie), Auswerten 3 s.
+//   Seit 20.11.2026 PRUEF_NODES x4: laut Messung von Fenster 19 rund 2 s statt 0,5 s je Pruef-Suche.
 //
 // Ein Kandidat zaehlt, wenn alles stimmt (PRUEF_NODES Knoten je Suche):
 //   - die Stellung ist legal (chess.js, je ein Koenig, die Seite ohne Zugrecht steht nicht im Schach)
@@ -67,10 +71,17 @@ const HIER = path.dirname(fileURLToPath(import.meta.url));
 const WURZEL = path.resolve(HIER, '..');
 
 // ---------- Einstellungen (aendert sich hier etwas, FABRIK_STAND hochzaehlen: alte Cache-Zeilen gelten dann nicht) ----------
-export const FABRIK_STAND = 1;
+export const FABRIK_STAND = 2;        // 2 (20.11.2026): PRUEF_NODES 250.000 -> 1.000.000
 export const BOT_NODES = 60000;       // Deckel je Bot-Zug (die Bots rechnen ausserdem nur bis zu ihrer Tiefe)
 export const SCAN_NODES = 20000;      // Vorfilter: jede Stellung der Partie, MultiPV 2
-export const PRUEF_NODES = 250000;    // Pruefung der Kandidaten, MultiPV 2 (eigener Zug) bzw. 1 (Antwort)
+// Pruefung der Kandidaten, MultiPV 2 (eigener Zug) bzw. 1 (Antwort). Bis 20.11.2026 250.000: bei x4 und x16 nachgerechnet
+// fiel tr-0101 durch (drei gleich gute erste Zuege), Messung R20-Kritik/fabrik-tiefe (Fenster 19), Auftrag fc-08:15
+export const PRUEF_NODES = 1_000_000;
+// Schlusspruefung (--schluss, nur auf Aufruf, nicht in CI): die fertige Datei noch einmal tiefer und in frischem
+// Engine-Zustand, denn schon gleiche Knotenzahl streut mit dem Speicher aus der Partie davor. Gemessen 20.11.2026 ueber
+// die 208 Aufgaben von Stand 2026-10-24: 29 min mit zwei Prozessen (--teil=0/2 und 1/2), 176 bestanden, 32 durchgefallen
+// (18 andere beste Antwort, 12 Abstand unter ABSTAND, 2 erster Zug ohne Gewinn); Liste R20-Kritik/r24-flo-ja/bericht.md
+export const SCHLUSS_NODES = 4_000_000;
 export const ABSTAND = 0.15;          // Mindestabstand bester zu zweitbestem Zug (Gewinnchance)
 const VOR_ABSTAND = 0.10;             // Vorfilter lockerer (Rauschen der kurzen Suche; streng prueft erst PRUEF_NODES)
 const FEHLER_SCHWELLE = 0.08;         // so viel Gewinnchance gab der letzte Gegnerzug mindestens ab
@@ -576,6 +587,45 @@ export async function loesungSuchen(engine, fen0, matRef) {
   return { ok: false, grund: 'zu-lang' };
 }
 
+// Schlusspruefung einer fertigen Datei: je Aufgabe eine frische Engine, jeder eigene Zug der beste mit Abstand ABSTAND
+// (nach einem Matt entfaellt der Abstand), der erste gewinnt, jede Antwort der beste Zug. Prueft nur, schreibt nichts.
+// -> [{ id, ok, grund }]
+export async function schlusspruefung(aufgaben, nodes, melde = () => {}) {
+  const aus = [];
+  for (const auf of aufgaben) {
+    const engine = await neueEngine();
+    let grund = null;
+    try {
+      const c = new Chess(auf.fen);
+      const flo = c.turn();
+      for (let i = 0; i < auf.loesung.length && !grund; i++) {
+        const zug = auf.loesung[i];
+        if (i % 2 === 0) {
+          const a = await analyse(engine, c.fen(), 2, nodes);
+          const l1 = a.lines[0]; const l2 = a.lines[1];
+          if (!l1 || !l1.pv || !l1.pv.length) { grund = `zug ${i + 1}: engine`; break; }
+          if (!spiele(c, zug)) { grund = `zug ${i + 1}: ${zug} illegal`; break; }
+          const matt = c.isCheckmate();
+          const w2 = l2 ? wc(l2.eval, flo) : 0;
+          if (l1.pv[0] !== zug && !matt) grund = `zug ${i + 1}: engine ${l1.pv[0]} statt ${zug}`;
+          else if (!matt && wc(l1.eval, flo) - w2 < ABSTAND - 1e-9) grund = `zug ${i + 1}: abstand ${(wc(l1.eval, flo) - w2).toFixed(3)} (${l2 && l2.pv[0]})`;
+          else if (i === 0 && !gewinnt(l1.eval, flo)) grund = 'zug 1: kein gewinn';
+        } else {
+          const b = await analyse(engine, c.fen(), 1, nodes);
+          const best = b.bestmove || (b.lines[0] && b.lines[0].pv[0]);
+          if (best !== zug) grund = `antwort ${i + 1}: engine ${best} statt ${zug}`;
+          if (!spiele(c, zug)) grund = grund || `antwort ${i + 1}: ${zug} illegal`;
+        }
+      }
+    } finally {
+      engine.terminate();
+    }
+    aus.push({ id: auf.id, ok: !grund, grund });
+    melde(aus[aus.length - 1]);
+  }
+  return aus;
+}
+
 function partieVon(nr) {
   const paar = PAARE[nr % PAARE.length];
   const tausch = Math.floor(nr / PAARE.length) % 2 === 1;
@@ -843,6 +893,21 @@ if (istHaupt) {
   try {
     if (arg('probe', false) === true) {
       process.stdout.write(JSON.stringify(probe(), null, 1) + '\n');
+    } else if (arg('schluss', false) !== false) {
+      const s = arg('schluss');
+      const nodes = s === true ? SCHLUSS_NODES : Number(s);
+      const [teilK, teilN] = String(arg('teil', '0/1')).split('/').map(Number);
+      if (!Number.isInteger(nodes) || nodes < 1 || !(teilN >= 1) || !(teilK >= 0 && teilK < teilN)) throw new Error('--schluss oder --teil ungueltig');
+      const datei = path.resolve(WURZEL, arg('aus', 'daten/tagesraetsel/raetsel.json'));
+      const ids = arg('ids') ? String(arg('ids')).split(',') : null;
+      const alle = JSON.parse(fs.readFileSync(datei, 'utf8')).tage.flatMap((t) => t.aufgaben)
+        .filter((a) => !ids || ids.includes(a.id)).filter((_, i) => i % teilN === teilK);
+      const t0 = Date.now();
+      const r = await schlusspruefung(alle, nodes, (x) => { if (!x.ok) console.log(`DURCHGEFALLEN ${x.id}: ${x.grund}`); });
+      const raus = r.filter((x) => !x.ok);
+      console.log(`Schlusspruefung ${nodes} Knoten: ${r.length - raus.length}/${r.length} bestanden in ${((Date.now() - t0) / 60000).toFixed(1)} min`
+        + (raus.length ? ` · durchgefallen: ${raus.map((x) => x.id).join(', ')}` : ''));
+      process.exitCode = raus.length ? 1 : 0;
     } else {
       const cache = String(arg('cache', '')).split(',').filter(Boolean);
       if (!cache.length) {

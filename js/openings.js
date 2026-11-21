@@ -331,10 +331,12 @@ export function stellungsSchluessel(fen) {
 }
 
 let INDEX = null;
+let bau = null;   // laufender Aufbau (Generator), bis INDEX steht
 
-// Baut einmalig (lazy) Buch-Stellungen und Namen ueber einen Zugbaum auf.
-function index() {
-  if (INDEX) return INDEX;
+// Baut einmalig (lazy) Buch-Stellungen und Namen ueber einen Zugbaum auf. Als Generator: ein Schritt je Buchzug, damit
+// eroeffnungVorbereiten() ihn in Stuecken bauen kann; index() baut den Rest auf einmal.
+// R25 F1 (fc-11:00): in einem Zug kostete das beim Start der Bot-Partie bei 6x Drossel rund 465 ms (R20-Kritik/leistung)
+function* baue() {
   const wurzel = { kinder: new Map(), name: null };
   for (const e of EROEFFNUNGEN) {
     let k = wurzel;
@@ -349,8 +351,9 @@ function index() {
   const geerbt = new Map();  // Stellung -> Name des naechsten benannten Vorgaengers
   const fehler = [];
   const chess = new Chess();
-  const lauf = (knoten, pfad, erbe) => {
+  const lauf = function* (knoten, pfad, erbe) {
     for (const [san, kind] of knoten.kinder) {
+      yield;
       let zug = null;
       try { zug = chess.move(san); } catch (e) { zug = null; }
       if (!zug) {
@@ -362,13 +365,47 @@ function index() {
       if (kind.name && !namen.has(s)) namen.set(s, kind.name);
       const n = kind.name || erbe;
       if (n && !geerbt.has(s)) geerbt.set(s, n);
-      lauf(kind, [...pfad, san], n);
+      yield* lauf(kind, [...pfad, san], n);
       chess.undo();
     }
   };
-  lauf(wurzel, [], null);
+  yield* lauf(wurzel, [], null);
   INDEX = { buch, namen, geerbt, fehler };
+}
+
+function index() {
+  if (INDEX) return INDEX;
+  bau ||= baue();
+  for (let r = bau.next(); !r.done; r = bau.next()) { /* weiter bis zum Ende */ }
   return INDEX;
+}
+
+export function eroeffnungBereit() {
+  return !!INDEX;
+}
+
+// Baut den Index in Stuecken von hoechstens ~30 ms (je ein setTimeout, dazwischen malt der Browser; unter der
+// Long-Task-Grenze von 50 ms), das erste Stueck erst nach dem Aufruf. Fragt eroeffnung() vorher, baut index() den Rest
+// sofort. -> Promise, erfuellt mit dem Index.
+// Nicht requestIdleCallback und keine kleinen Stuecke: beim Partie-Start (Engines laden, Animationen) gab es kaum
+// Leerlauf, und je Bild kam nur ein Stueck dran; bei 6x Drossel war der Index mit 8-ms-Stuecken nach 2,5 s noch nicht
+// fertig, und der erste Zug baute den Rest im Tipp.
+// beiStueck, stueckMs: nur fuer Tests (Stuecke zaehlen, kleinere Stuecke).
+export function eroeffnungVorbereiten({ beiStueck, stueckMs = 30 } = {}) {
+  if (INDEX) return Promise.resolve(INDEX);
+  const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const spaeter = (f) => setTimeout(f, 0);
+  return new Promise((fertig) => {
+    const stueck = () => {
+      if (INDEX) { fertig(INDEX); return; }
+      bau ||= baue();
+      if (beiStueck) beiStueck();
+      const ende = jetzt() + stueckMs;
+      while (jetzt() < ende) if (bau.next().done) { fertig(INDEX); return; }
+      spaeter(stueck);
+    };
+    spaeter(stueck);
+  });
 }
 
 // Fuer Tests: ungueltige Tabellenzeilen (sollte leer sein)
@@ -380,10 +417,12 @@ export function tabellenFehler() {
 // name: tiefste erkannte benannte Stellung (null, wenn keine); buch[i]: Halbzug i ist ein
 // Theoriezug; namen[i]: Name nach Halbzug i (Zusatzfeld fuer die Live-Anzeige).
 export function eroeffnung(sanListe) {
-  const idx = index();
   const liste = Array.isArray(sanListe)
     ? sanListe
     : String(sanListe || '').trim().split(/\s+/).filter(Boolean);
+  // ohne Zuege braucht es keinen Index (Kopf der Partie beim Start: "Grundstellung")
+  if (!liste.length) return { name: null, buch: [], namen: [] };
+  const idx = index();
   const buch = liste.map(() => false);
   const namen = liste.map(() => null);
   let name = null;

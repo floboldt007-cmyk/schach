@@ -470,7 +470,9 @@ async function testePartie(seite, h, fehler) {
   pruefe('Overlay: Knopf "Zur Analyse"', await seite.locator('.erg-knoepfe [data-ziel="analyse"]').count() === 1);
   // R12-W1: nach einer Niederlage bleibt die Analyse der leuchtende Hauptknopf (Lernen hilft dann mehr)
   pruefe('Niederlage: „Zur Analyse“ bleibt der Hauptknopf', await seite.locator('.erg-knoepfe .knopf.primaer[data-ziel="analyse"]').count() === 1);
-  pruefe('Overlay: Knopf "Nochmal"', await seite.locator('.erg-knoepfe [data-ziel="nochmal"]').count() === 1);
+  // nach der Niederlage heisst der Knopf "Revanche" (Flos Antwort 1, 20.11.2026; tests/r26-antworten-a.test.mjs)
+  const nochmalKnopf = await seite.locator('.erg-knoepfe [data-ziel="nochmal"]').allTextContents();
+  pruefe('Overlay: Knopf "Revanche" (data-ziel nochmal)', nochmalKnopf.length === 1 && nochmalKnopf[0].trim() === 'Revanche', JSON.stringify(nochmalKnopf));
   const liste = await h.gespeichert();
   const p = liste[0] || {};
   pruefe('Partie gespeichert (localStorage)', liste.length === 1 && p.ergebnis === 'niederlage' && p.grund === 'aufgabe', JSON.stringify(p).slice(0, 160));
@@ -2573,7 +2575,8 @@ async function testeSpielFundament(browser) {
       chip: document.querySelector('.ergebnis-overlay .erg-kopf .chip.uebung').textContent, modus: document.querySelector('.ergebnis-overlay .erg-kopf .chip').dataset.modus,
       sterne: document.querySelectorAll('.ergebnis-overlay .erg-stern').length, knopf: document.querySelector('.ergebnis-overlay [data-ziel="ab-hier"]').textContent.trim(),
     }));
-    pruefe('Boss: Ergebnis mit Chip BOSS, ohne Sterne, Knopf "Nochmal"', erg.chip === 'BOSS' && erg.modus === 'boss' && erg.sterne === 0 && erg.knopf === 'Nochmal', JSON.stringify(erg));
+    // nach dem Aufgeben (Niederlage) heisst der Knopf "Revanche" (Flos Antwort 1, 20.11.2026; tests/r26-antworten-a.test.mjs)
+    pruefe('Boss: Ergebnis mit Chip BOSS, ohne Sterne, Knopf "Revanche"', erg.chip === 'BOSS' && erg.modus === 'boss' && erg.sterne === 0 && erg.knopf === 'Revanche', JSON.stringify(erg));
     const d = (await h.gespeichert())[0];
     const sterneNachher = await seite.evaluate(async () => (await import('./js/storage.js')).gesamtSterne());
     pruefe('Boss: Datensatz mit modus, boss und seed; keine Sterne, Fortschritt unverändert', d.modus === 'boss' && d.boss.id === 'test-boss' && d.seed === k.gest.seed

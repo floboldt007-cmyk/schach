@@ -96,7 +96,19 @@ async function testeDaten(browser) {
     testseite.leere();
     testseite.app.setzeEinstellungen({ tiefe: 12 });
     const oper = await testseite.opernpartie({ mitReview: true, tiefe: 12 });
-    const r = testseite.speicher.ladeReview(oper.id);
+    let r = testseite.speicher.ladeReview(oper.id);
+    // Seit a4efdc58 (Flos JA 20.11., Untergrenze in klar verlorener Lage hoechstens "ungenau") hat die Opernpartie keinen
+    // Verlust-Moment mehr: Schwarz steht frueh verloren, uebrig bleiben die starken Zuege von Weiss ohne besseren Zug. Diese
+    // Suite prueft die Karten, nicht die Einstufung (die prueft tests/r24-coach-verloren.test.mjs): ein schwarzer Zug mit
+    // anderem besten Zug wird darum als Patzer-Moment gesetzt, damit die Zeile "Besser ..." etwas zu zeigen hat. Der letzte
+    // solche Zug, damit der erste Moment (Halt beim Abspielen, Leertaste) derselbe bleibt.
+    const fehlgriff = r.zuege.findLast((z) => z.farbe === 'b' && z.besterZug && z.besterZug !== z.uci && (z.besteLinie || []).length);
+    if (fehlgriff && !r.zuege.some((z) => r.schluesselmomente.includes(z.ply) && ['patzer', 'fehler', 'verpasst'].includes(z.klasse))) {
+      fehlgriff.klasse = 'patzer';
+      r.schluesselmomente = [...new Set([...r.schluesselmomente, fehlgriff.ply])].sort((a, b) => a - b);
+      testseite.speicher.speichereReview(oper.id, r);
+      r = testseite.speicher.ladeReview(oper.id);
+    }
     return { oper: oper.id, momente: r.schluesselmomente || [], zuege: r.zuege.length };
   });
   pruefe('Opernpartie mit Review und Schluesselmomenten', d.oper && d.momente.length >= 2, JSON.stringify(d));

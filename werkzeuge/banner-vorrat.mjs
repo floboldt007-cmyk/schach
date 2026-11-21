@@ -152,7 +152,9 @@ const BANNER = [
     motiv: () => ({ defs: '<radialGradient id="au" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFF3A0"/><stop offset=".7" stop-color="#F5A623"/><stop offset="1" stop-color="#8A3B00"/></radialGradient>', akzent: '#7FE0A8',
       inhalt: '<g fill="none" stroke="rgba(150,240,190,.16)" stroke-width="3">' + Array.from({ length: 7 }, (_, r) => Array.from({ length: 21 }, (_, c) => `<path d="M${c * 60 + (r % 2) * 30 - 30} ${r * 48}a30 30 0 0 0 60 0"/>`).join('')).join('') + '</g>'
         + '<ellipse cx="310" cy="150" rx="120" ry="62" fill="url(#au)" stroke="#05200F" stroke-width="6"/><ellipse cx="310" cy="150" rx="11" ry="54" fill="#05200F"/><circle cx="282" cy="128" r="9" fill="#fff" opacity=".8"/>' }) },
-  { id: 'shop-kronjuwel', art: 'shop', name: 'Kronjuwel', seltenheit: 'Exklusiv', kaeuflich: true, text: 'Sonder-Banner zum Set Kronjuwel: Rubin auf Onyx mit Goldrand.', bg: ['#2A2230', '#0E0B12'],
+  // Flo 20.11.2026 (Antwort 6): Name wie das Shop-Set Rubinkrone, nicht wie das Sammlungs-Brett Kronjuwel; die Kennung
+  // bleibt (supabase/karte-rls-test.sql, tests/karte.test.mjs)
+  { id: 'shop-kronjuwel', art: 'shop', name: 'Rubinkrone', nameEn: 'Ruby Crown', seltenheit: 'Exklusiv', kaeuflich: true, text: 'Sonder-Banner zum Set Rubinkrone: Rubin auf Onyx mit Goldrand.', textEn: 'Special banner for the Ruby Crown set: ruby on onyx with a gold rim.', bg: ['#2A2230', '#0E0B12'],
     motiv: () => ({ defs: metall('r', '#FF6B81', '#8A0F25') + glut('gl', '#FF4D6D'), akzent: '#D9A93B',
       inhalt: '<circle cx="310" cy="150" r="170" fill="url(#gl)"/><g fill="none" stroke="#D9A93B" stroke-width="2" opacity=".5"><path d="M0 40C200 70 420 10 620 40S1000 70 1200 40M0 260C200 230 420 290 620 260S1000 230 1200 260"/></g>'
         + '<g transform="translate(310 150)"><path d="M-95-40L-55-100H55L95-40 0 105z" fill="url(#r)" stroke="#D9A93B" stroke-width="7" stroke-linejoin="round"/>'
@@ -189,7 +191,9 @@ const groessen = [];
 const liste = BANNER.map((b) => {
   const rel = `assets/banner/${b.id}.svg`;
   groessen.push([rel, schreibe(rel, bannerSvg(b))]);
-  return { id: b.id, art: b.art, name: b.name, seltenheit: b.seltenheit, kaeuflich: b.kaeuflich, text: b.text, datei: rel };
+  // englischer Name und Text nur, wo das Banner einen hat (Felder wie in assets/shop/vorrat.json)
+  return { id: b.id, art: b.art, name: b.name, ...(b.nameEn ? { name_en: b.nameEn } : {}), seltenheit: b.seltenheit, kaeuflich: b.kaeuflich,
+    text: b.text, ...(b.textEn ? { text_en: b.textEn } : {}), datei: rel };
 });
 const vorrat = {
   stand: '2026-11-06',

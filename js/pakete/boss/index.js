@@ -1,4 +1,5 @@
 // Wochen-Bosse und Spielplan: vier eigene Gegner, ruhige Karten und erspielbare Trophäen.
+import { ladePaketCss } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { hoere, sende } from '../../ereignisse.js';
 import { registriereBot, BOTS, botNachId } from '../../bots.js';
@@ -82,9 +83,7 @@ function heimEvent(k) {
   return z;
 }
 function ladeCss() {
-  if (typeof document === 'undefined' || document.querySelector('link[data-paket="boss"]')) return;
-  const l = document.createElement('link'); l.rel = 'stylesheet'; l.dataset.paket = 'boss';
-  l.href = new URL('../../../css/pakete/boss.css', import.meta.url).href; document.head.append(l);
+  ladePaketCss('boss');
 }
 function registriere() {
   IDS.forEach((id, i) => registriereBot(profil(id, i)));

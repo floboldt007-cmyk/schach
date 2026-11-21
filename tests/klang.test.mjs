@@ -381,6 +381,31 @@ async function testeLogik() {
   pruefe('einstellen: gewaehltes Paket holz', klang.vorrat().paket === 'holz' && klang.vorrat().gewaehlt === 'holz');
   klang.einstellen({ klang: true, klangpaket: 'gibtsnicht' });
   pruefe('einstellen: unbekanntes Paket -> Standard der Ansicht', klang.vorrat().paket === 'arcade' && klang.vorrat().gewaehlt === '');
+  // R26 AC-04 (Flo 20.11.2026): die Klangwahl gilt nur im Spiel; Lobby, Menues und Shop klingen immer arcade. Der Ort
+  // kommt aus app:screen (wie die Lobby-Musik, js/pakete/musik/index.js)
+  {
+    const { sende } = await import('../js/ereignisse.js');
+    const { ortVonScreen } = await import('../js/sounds.js');
+    klang.einstellen({ klang: true, klangpaket: 'holz' });
+    const vorher = klang.vorrat();
+    sende('app:screen', { name: 'heim', params: {} });
+    const lobby = klang.vorrat();
+    sende('app:screen', { name: 'partie', params: { botId: 'b1' } });
+    const spiel = klang.vorrat();
+    sende('app:screen', { name: 'online', params: {} });
+    const onLobby = klang.vorrat();
+    sende('app:screen', { name: 'online', params: { partieId: 'p1' } });
+    const onSpiel = klang.vorrat();
+    pruefe('R26: ohne Screen gilt die Wahl (holz), Lobby spielt arcade, Partie holz, Online-Liste arcade, Online-Partie holz',
+      vorher.aktiv === 'holz' && lobby.aktiv === 'arcade' && lobby.ort === 'lobby' && lobby.paket === 'holz' && spiel.aktiv === 'holz' && spiel.ort === 'spiel'
+        && onLobby.aktiv === 'arcade' && onSpiel.aktiv === 'holz', { vorher, lobby, spiel, onLobby, onSpiel });
+    pruefe('R26: ortVonScreen kennt Spiel-Screens (Partie, Lektion, Raetsel, Duell, Analyse) und das Zu-zweit-Startblatt als Lobby',
+      ['partie', 'lektion', 'raetsel', 'raetsel-duell', 'analyse'].every((n) => ortVonScreen(n, {}) === 'spiel')
+        && ['heim', 'arena', 'einstellungen', 'ich', 'lobby', 'verlauf', 'lernen'].every((n) => ortVonScreen(n, {}) === 'lobby')
+        && ortVonScreen('partie', { modus: 'zuzweit' }) === 'lobby' && ortVonScreen('partie', { modus: 'zuzweit', zuzweit: { weiss: 'A' } }) === 'spiel');
+    klang.setzeOrt(null);
+    klang.einstellen({ klang: true, klangpaket: 'gibtsnicht' });
+  }
 
   // Stimmen: hoechstens 4, Vorrang 3 nie abgebrochen, Vorrang 0 zuerst geopfert
   uhr.t = 200;
@@ -542,9 +567,12 @@ async function testeBrowser(browser) {
   }, p);
   let r = await spieleAlle('arcade');
   pruefe('arcade: jede der 40 Dateien spielt aus der Datei', r.n === 40 && r.falsch.length === 0, r.falsch.slice(0, 3));
-  // Vorrat im selben Schritt wie die Wahl lesen: dazwischen koennte schon die erste Datei fertig dekodiert sein
+  // Vorrat im selben Schritt wie die Wahl lesen: dazwischen koennte schon die erste Datei fertig dekodiert sein.
+  // R26: die Seite steht auf der Arena (Lobby, dort klingt immer arcade); fuer die Pruefung des gewaehlten Pakets
+  // gilt der Ort Spiel, als stuende eine Partie offen
   const wechsel = await seite.evaluate(async () => {
     const { klang } = await import('./js/sounds.js');
+    klang.setzeOrt('spiel');
     window.__app.setzeEinstellungen({ klangpaket: 'holz' });
     return klang.vorrat();
   });
@@ -577,6 +605,31 @@ async function testeBrowser(browser) {
     && zurueck.dekodiert === 4, zurueck);
   await warteDekodiert(seite);
   await seite.evaluate(async () => { (await import('./js/sounds.js')).klang.stille(); });
+  await warte(300);
+
+  // R26 AC-04: gewaehltes Holz-Set, in der Lobby spielt der Zug-Klang aus arcade, in der Partie aus holz (echte Dateien)
+  gruppe = 'Ort (R26)';
+  const ort = await seite.evaluate(async () => {
+    const { klang } = await import('./js/sounds.js');
+    const { sende } = await import('./js/ereignisse.js');
+    const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+    const zuletzt = () => { const e = klang.protokoll().slice(-1)[0] || {}; return `${e.name}:${e.paket}:${e.quelle}`; };
+    window.__app.setzeEinstellungen({ klangpaket: 'holz' });
+    sende('app:screen', { name: 'heim', params: {} });
+    klang.stille(); klang.spiele('zug', { stufe: 0 });   // die erste Lobby-Anfrage holt die arcade-Datei nach
+    for (let i = 0; i < 100 && !klang.vorrat().fremd; i++) await pause(50);
+    klang.stille(); klang.spiele('zug', { stufe: 0 });
+    const lobby = zuletzt();
+    sende('app:screen', { name: 'partie', params: { botId: 'b1' } });
+    for (let i = 0; i < 200 && klang.vorrat().dekodiert < 40; i++) await pause(50);
+    klang.stille(); klang.spiele('zug', { stufe: 0 });
+    const spiel = zuletzt();
+    klang.stille(); klang.setzeOrt(null);
+    window.__app.setzeEinstellungen({ klangpaket: '' });
+    return { lobby, spiel, v: klang.vorrat() };
+  });
+  pruefe('Holz gewaehlt: Lobby spielt arcade aus der Datei, Partie holz aus der Datei', ort.lobby === 'zug:arcade:datei' && ort.spiel === 'zug:holz:datei', ort);
+  await warteDekodiert(seite);
   await warte(300);
 
   gruppe = 'Einstellungen';
@@ -812,6 +865,50 @@ async function testeBrowser(browser) {
     const echt = f2.filter((t) => !/Failed to load resource|404|ERR_FAILED/.test(t));
     pruefe('kein Seitenfehler, keine Konsolenfehler außer der Netzmeldung des Browsers', echt.length === 0, echt.join(' | '));
     await k2.close();
+  }
+
+  // Ohne Netz (Kaltreview fc-08:50, 20.11.2026): navigator.onLine sagt false, die Dateien kommen aber noch (aus dem Cache
+  // des Service Workers). Dann muss vorgeladen werden. Scheitert ein Abruf ohne Netz, zaehlt die Datei nicht als fehlend,
+  // und wieder online laedt sie nach.
+  // Nachpruefung 19 (20.11.2026, sounds.js "daten || !ohneNetz()"): ohne Cache-Speicher ('ohne-caches') oder wenn
+  // caches.match wirft ('match-wirft') prueft die Vorpruefung nichts aus, jeder Abruf geht ins Leere. Auch dann wird
+  // nichts als fehlend gemerkt, und wieder online laedt alles nach.
+  gruppe = 'Ohne Netz';
+  for (const fall of ['cache', 'leer', 'ohne-caches', 'match-wirft']) {
+    let netzDa = fall === 'cache';
+    const { kontext: k3, seite: s3 } = await neueSeite(browser, { routen: [
+      ['**/assets/klang/arcade/*.mp3', (r) => (netzDa ? r.continue() : r.abort('internetdisconnected'))],
+    ] });
+    await k3.addInitScript((f) => {
+      window.__netz = false;
+      Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => window.__netz === true });
+      if (f === 'ohne-caches') Object.defineProperty(window, 'caches', { configurable: true, value: undefined });
+      if (f === 'match-wirft') CacheStorage.prototype.match = () => { throw new Error('Cache gesperrt'); };
+    }, fall);
+    await s3.goto(BASIS + '#arena');
+    await s3.waitForSelector('.screen.arena');
+    if (fall === 'cache') {
+      // wie der Cache des Service Workers: die 40 Dateien liegen im Cache Storage, dann laedt klang ohne Netz vor
+      const mp3 = readdirSync(path.join(WURZEL, 'assets/klang/arcade')).filter((d) => d.endsWith('.mp3'));
+      await s3.evaluate(async (namen) => {
+        const { klang } = await import('./js/sounds.js');
+        const c = await caches.open('probe-klang');
+        await Promise.all(namen.map((d) => fetch(`assets/klang/arcade/${d}`).then((a) => c.put(`assets/klang/arcade/${d}`, a)))); // INTENTIONAL-SLOP[F6]: Abruf beim eigenen Testserver; scheitert er, bricht die Probe rot ab
+        await klang.vorladen();
+      }, mp3);
+    }
+    const v3 = await warteDekodiert(s3, fall === 'cache' ? 40 : 1, fall === 'cache' ? 20000 : 3000);
+    if (fall === 'cache') {
+      pruefe('ohne Netz, alles im Cache: alle 40 Dateien dekodiert', v3.dekodiert === 40 && v3.fehlt === 0, v3);
+    } else {
+      const wie = { leer: 'nichts im Cache', 'ohne-caches': 'ohne Cache-Speicher', 'match-wirft': 'caches.match wirft' }[fall];
+      pruefe(`ohne Netz, ${wie}: keine Datei als fehlend gemerkt`, v3.dekodiert === 0 && v3.fehlt === 0, v3);
+      netzDa = true;
+      await s3.evaluate(() => { window.__netz = true; window.dispatchEvent(new Event('online')); });
+      const v4 = await warteDekodiert(s3);
+      pruefe(`${wie}, wieder online: alle 40 Dateien nachgeladen`, v4.dekodiert === 40 && v4.fehlt === 0, v4);
+    }
+    await k3.close();
   }
 }
 

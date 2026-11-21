@@ -158,10 +158,12 @@
     {
       "id": "shop-kronjuwel",
       "art": "shop",
-      "name": "Kronjuwel",
+      "name": "Rubinkrone",
+      "name_en": "Ruby Crown",
       "seltenheit": "Exklusiv",
       "kaeuflich": true,
-      "text": "Sonder-Banner zum Set Kronjuwel: Rubin auf Onyx mit Goldrand.",
+      "text": "Sonder-Banner zum Set Rubinkrone: Rubin auf Onyx mit Goldrand.",
+      "text_en": "Special banner for the Ruby Crown set: ruby on onyx with a gold rim.",
       "datei": "assets/banner/shop-kronjuwel.svg"
     },
     {

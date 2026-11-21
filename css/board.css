@@ -97,11 +97,27 @@
 /* Feld unten rechts: das Brett-Eck ist abgerundet (--brett-radius), der Buchstabe rueckt nur nach oben ins Rund. Nicht
    nach links: dort stuende er hinter dem Fuss der Figur (Turm auf h1), auf dem Handy unsichtbar. */
 .brett .feld .koord.buchst.ecke { bottom: calc(1px + var(--brett-radius) * .15); }
-/* Handy-Runde K (08.11.2026): in der Farbe des anderen Feldes waren die Buchstaben auf dunklen Feldern kaum lesbar
-   (Brett "nacht" 2,8:1). Jetzt eine Spur dunkler auf hellen Feldern und weiss mit leichtem Schatten auf dunklen
-   (nacht 4,6:1 und 3,5:1), der Schatten traegt sie auch ueber den Fuss einer Figur. */
-.brett .feld.h .koord { color: color-mix(in srgb, var(--b-dunkel) 72%, #000); }
+/* Dunkle Schrift (Flos Wahl 20.11.2026, Variante 3 aus R20-Kritik/zustaende/koordinaten; ersetzt Handy-Runde K vom
+   08.11.: weiss mit Schatten auf dunklen Feldern, nacht 3,5:1, holz 3,15:1). Mindestens 4,5:1 auf jedem Brett
+   (tests/r24-koord-kontrast.test.mjs). Helle Felder: dunkle Mischung der dunklen Feldfarbe. Dunkle Felder: dunkle Schrift
+   in der Feldfarbe (1 % ihres Lichts), wo das Feld hell genug ist (Leuchtdichte nach WCAG ab 0,185, aus den linearen
+   Kanaelen gerechnet), sonst weiss; dunkle Schrift kann auf einem sehr dunklen Feld 4,5:1 nicht erreichen (ahorn,
+   mondschein: hoechstens 3,2:1). Gemessen liegt kein dunkles Feld in der Luecke 0,174 bis 0,195, auf beiden Seiten
+   bleiben ueber 4,6:1. Ohne relative Farben (aeltere Browser) gilt die alte Regel. */
+.brett .feld.h .koord { color: color-mix(in srgb, var(--b-dunkel) 55%, #000); }
 .brett .feld.d .koord { color: #fff; text-shadow: 0 0 2px rgba(0, 0, 0, .3); }
+@supports (color: color(from red srgb-linear r g b)) {
+  .brett .feld.d .koord {
+    color: color(from var(--b-dunkel) srgb-linear
+      calc(1 - clamp(0, (0.2126 * r + 0.7152 * g + 0.0722 * b - 0.185) * 100000, 1) * (1 - r * 0.01))
+      calc(1 - clamp(0, (0.2126 * r + 0.7152 * g + 0.0722 * b - 0.185) * 100000, 1) * (1 - g * 0.01))
+      calc(1 - clamp(0, (0.2126 * r + 0.7152 * g + 0.0722 * b - 0.185) * 100000, 1) * (1 - b * 0.01)));
+    /* der Schatten wie in der alten Regel nur unter weisser Schrift (Halt ueber dem Fuss einer Figur); unter dunkler
+       Schrift waere er ein Schleier, darum dieselbe Weiche als Deckkraft (Kaltreview 7b, Befund 4) */
+    text-shadow: 0 0 2px color(from var(--b-dunkel) srgb-linear 0 0 0
+      / calc((1 - clamp(0, (0.2126 * r + 0.7152 * g + 0.0722 * b - 0.185) * 100000, 1)) * 0.3));
+  }
+}
 
 /* Koordinaten, Lage "rand": ausserhalb der Felder im Sockel (der Sockel bekommt links und unten --koord-rand Platz,
    css/app.css .brett-rahmen:has(> .brett.koord-rand)) */
@@ -250,6 +266,11 @@
   outline: var(--fokus, 2.5px solid #CC4820);
   outline-offset: -4px;
   border-radius: 2px;
+  /* Die Akzentfarbe allein hatte gegen manche Felder nur 1,01:1 bis 1,99:1 (f2, R20-Kritik/zustaende-kontrast F1). Darum
+     liegt sie zwischen einem weissen Band aussen (0 bis 1,5 px) und einem fast schwarzen innen (4 bis 5,5 px): eines der
+     beiden hat gegen jedes Feld mehr als 4:1, gemessen mindestens 4,3:1 (tests/r25-brett-fokus.test.mjs, Grenze 3:1).
+     Der obere Schatten deckt den unteren. */
+  box-shadow: inset 0 0 0 1.5px #fff, inset 0 0 0 5.5px #141414;
 }
 
 /* ---------- W0+a: Striche (Mattnetz) und Koenigsfall ---------- */

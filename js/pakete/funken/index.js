@@ -23,6 +23,7 @@
 // Register: Icon "funke", Saetze "funken-level" fuer die 10 Leiter-Bots (angemeldet beim ersten Gruss, in der Sprache der
 //          App; Texte in texte.js).
 // Testmodus (?test): window.__funken = { stand(), speichere(st), plan(), setzePlan(p), S, R, L }.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { EREIGNISSE, hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { melde } from '../../feier.js';
@@ -391,13 +392,10 @@ function anbieterSpielplan(k) {
 
 // ---------- Registrieren ----------
 function cssLaden() {
-  if (typeof document === 'undefined' || document.querySelector('link[data-paket="funken"]')) return;
-  const l = document.createElement('link');
-  l.rel = 'stylesheet';
-  l.href = new URL('../../../css/pakete/funken.css', import.meta.url).href;
-  l.dataset.paket = PAKET;
-  document.head.append(l);
+  return ladePaketCss('funken');
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(cssLaden());
 
 // Gruss zum neuen Level (Saetze 'funken-level', Texte 'gruss.<bot>' in texte.js). Angemeldet wird erst, wenn ein Gruss
 // gebraucht wird, in der Sprache, die dann gilt (nie beim Laden des Moduls); wechselt die Sprache, kommen die Saetze neu.

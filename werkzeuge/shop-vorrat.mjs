@@ -108,7 +108,7 @@ const SCHMUCK = {
   uhrwerk: (m, [x, y, w]) => { const r = Math.min(w * 0.7, 6); return `<path d="${zahnrad(x, y, r)}" fill="${m.deko}" stroke="${m.l}" stroke-width=".8"/><circle cx="${x}" cy="${y}" r="${n(r * 0.34)}" fill="${m.d}"/>`; },
   kristall: (m, [x, y, w]) => `<path d="${raute(x, y, w * 0.6, 8)}M${x} ${y - 8}V${y + 8}" fill="none" stroke="${m.deko}" stroke-width="1.3" stroke-linejoin="round"/><path d="${funkel(x + w * 0.75, y - 7, 2.6)}" fill="${m.deko}"/>`,
   origami: (m, [x, y, w]) => `<path d="M${x - w} ${y - 6}L${x + w} ${y + 6}" stroke="${m.deko}" stroke-width="1.4"/><path d="M${n(x + w * 0.15)} ${y + 2}L${n(x + w * 0.8)} ${y + 7}H${n(x + w * 0.15)}z" fill="${m.akz}"/>`,
-  kronjuwel: (m, [x, y]) => `<path d="${raute(x, y, 4.2, 5.6)}" fill="${m.akz}" stroke="${m.l}" stroke-width="1.2" stroke-linejoin="round"/><path d="M${x - 1.6} ${y - 2}l1.6-2" stroke="#fff" stroke-width="1" opacity=".75" stroke-linecap="round"/>`,
+  rubinkrone: (m, [x, y]) => `<path d="${raute(x, y, 4.2, 5.6)}" fill="${m.akz}" stroke="${m.l}" stroke-width="1.2" stroke-linejoin="round"/><path d="M${x - 1.6} ${y - 2}l1.6-2" stroke="#fff" stroke-width="1" opacity=".75" stroke-linecap="round"/>`,
 };
 
 // Farben: rund mit Verlauf (h hell, m mitte, d dunkel), kantig flach (f) mit Schliff-Schatten; l Umriss
@@ -120,7 +120,7 @@ const SETS = [
   { id: 'sternwarte', name: 'Sternwarte', nameEn: 'Observatory', seltenheit: 'Episch', rund: true, text: 'Mondsilber gegen Nachthimmel, mit goldenen Funkelsternen.',
     w: { h: '#FFFFFF', m: '#E3E8F4', d: '#A9B4CF', l: '#27304F', deko: '#C79A2E' },
     b: { h: '#33437A', m: '#1C2650', d: '#0A1030', l: '#9FB2E8', deko: '#F2C84B' } },
-  { id: 'uhrwerk', name: 'Uhrwerk', nameEn: 'Clockwork', seltenheit: 'Episch', rund: true, text: 'Kupfer und Bronze mit einem Zahnrad in jeder Figur.',
+  { id: 'uhrwerk', name: 'Uhrwerk', nameEn: 'Gearwork', seltenheit: 'Episch', rund: true, text: 'Kupfer und Bronze mit einem Zahnrad in jeder Figur.',
     w: { h: '#FFE2B8', m: '#E3A462', d: '#A9612A', l: '#4A2408', deko: '#7A3F14' },
     b: { h: '#6A5A4A', m: '#3E332A', d: '#1E1813', l: '#C9A27A', deko: '#D9A65C' } },
   { id: 'kristall', name: 'Kristall', nameEn: 'Crystal', seltenheit: 'Episch', rund: false, text: 'Geschliffene Figuren aus Eis und Amethyst.',
@@ -130,7 +130,8 @@ const SETS = [
   { id: 'origami', name: 'Origami', nameEn: 'Origami', seltenheit: 'Episch', rund: false, text: 'Gefaltetes Papier, hell und kohlegrau, mit rotem Siegel.',
     w: { f: '#FBF6EC', l: '#3A3328', deko: '#B9AA8E', akz: '#E2553B' },
     b: { f: '#34363D', l: '#B9BCC7', deko: '#6A6D76', akz: '#E2553B' } },
-  { id: 'kronjuwel', name: 'Kronjuwel', nameEn: 'Crown Jewel', seltenheit: 'Exklusiv', rund: false, text: 'Sonder-Set: Gold mit Rubin, Onyx mit Smaragd. Im Shop mit Goldrahmen.',
+  // Flo 20.11.2026 (Antwort 6): Kennung und Name eigen, frueher kronjuwel wie das Sammlungs-Brett (tests/r26-antworten-b.test.mjs)
+  { id: 'rubinkrone', name: 'Rubinkrone', nameEn: 'Ruby Crown', seltenheit: 'Exklusiv', rund: false, text: 'Sonder-Set: Gold mit Rubin, Onyx mit Smaragd. Im Shop mit Goldrahmen.',
     w: { f: '#F4D27A', l: '#7A5410', deko: '#FFF1C2', akz: '#C8243E' },
     b: { f: '#1E1A22', l: '#D9A93B', deko: '#3A3340', akz: '#2FB37A' } },
 ];
@@ -165,21 +166,23 @@ const BRETTER = [
   // Kennung bleibt mitternacht; der sichtbare Name weicht der Edition "Mitternacht & Gold" aus (Freigabe 18.11.2026)
   { id: 'mitternacht', name: 'Nachtblau', nameEn: 'Night Blue', seltenheit: 'Selten', hell: '#C9CFE6', dunkel: '#46549B', rand: '#12152B', text: 'Kräftiges Blau mit winzigen Sternen.',
     muster: () => je(DUNKEL, (x, y) => `<circle cx="${x + 3}" cy="${y + 3}" r=".55"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".4"/>`).replace(/<circle/g, '<circle fill="rgba(255,255,255,.7)"') },
-  { id: 'kirschbluete', name: 'Kirschblüte', nameEn: 'Cherry Blossom', seltenheit: 'Selten', hell: '#FBE8EC', dunkel: '#D98AA0', rand: '#6B2E3E', text: 'Zartrosa mit kleinen Blueten.',
+  // Flo 20.11.2026 (Antwort 6): bluetenhain, nebelstein, honigholz hiessen wie Sammlungs-Bretter mit anderem Bild (kirschbluete,
+  // schiefer, ahorn); niemand besitzt Shop-Stuecke (kein Kauf-Weg), Kennung und Name sind darum neu
+  { id: 'bluetenhain', name: 'Blütenhain', nameEn: 'Blossom Grove', seltenheit: 'Selten', hell: '#FBE8EC', dunkel: '#D98AA0', rand: '#6B2E3E', text: 'Zartrosa mit kleinen Blueten.',
     muster: () => je(HELL, (x, y) => [0, 1, 2, 3, 4].map((i) => { const w = -Math.PI / 2 + (i * 2 * Math.PI) / 5; return `<circle fill="rgba(217,138,160,.4)" cx="${n(x + 5.5 + 1.5 * Math.cos(w))}" cy="${n(y + 5.5 + 1.5 * Math.sin(w))}" r="1"/>`; }).join('')) },
   { id: 'lagune', name: 'Lagune', nameEn: 'Lagoon', seltenheit: 'Selten', hell: '#E6F4EF', dunkel: '#3E9C9A', rand: '#154747', text: 'Tuerkis mit sanften Wellen.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x + 1} ${y + 6}q2.25-2 4.5 0t4.5 0" fill="none" stroke="rgba(255,255,255,.35)" stroke-width=".7"/>`) },
-  { id: 'schiefer', name: 'Schiefer', nameEn: 'Slate', seltenheit: 'Selten', hell: '#D7DADF', dunkel: '#59606B', rand: '#23262B', text: 'Kuehles Grau mit Schichtlinien.',
+  { id: 'nebelstein', name: 'Nebelstein', nameEn: 'Mist Stone', seltenheit: 'Selten', hell: '#D7DADF', dunkel: '#59606B', rand: '#23262B', text: 'Kuehles Grau mit Schichtlinien.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x} ${y + 4}l4-4M${x} ${y + 9}l9-9M${x + 5} ${y + 11}l6-6" stroke="rgba(0,0,0,.16)" stroke-width=".6"/>`)
       + je(HELL, (x, y) => `<path d="M${x + 1} ${y + 10}l9-9" stroke="rgba(0,0,0,.06)" stroke-width=".6"/>`) },
-  { id: 'ahorn', name: 'Ahorn', nameEn: 'Maple', seltenheit: 'Selten', hell: '#F3DDB4', dunkel: '#C98A4B', rand: '#5A3418', text: 'Helles Holz mit Maserung.',
+  { id: 'honigholz', name: 'Honigholz', nameEn: 'Honeywood', seltenheit: 'Selten', hell: '#F3DDB4', dunkel: '#C98A4B', rand: '#5A3418', text: 'Helles Holz mit Maserung.',
     muster: () => je([...HELL, ...DUNKEL], (x, y) => `<path d="M${x} ${y + 3}q5.5 2 11 0M${x} ${y + 7.5}q5.5-2 11 0" fill="none" stroke="rgba(90,52,24,.16)" stroke-width=".5"/>`) },
   { id: 'kupfer', name: 'Kupfer', nameEn: 'Copper', seltenheit: 'Selten', hell: '#F2D3B8', dunkel: '#B4643A', rand: '#4A2412', text: 'Gehaemmertes Kupfer mit Nieten im Rahmen.',
     muster: () => '', rahmen: () => '<g fill="#D99A6C">' + [[3, 3], [97, 3], [3, 97], [97, 97], [50, 3], [50, 97], [3, 50], [97, 50]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3"/>`).join('') + '</g>' },
   // G-002 (Ausreisser 07.11.): Felder waren unter dem Schleier schlecht zu unterscheiden; jetzt hellere helle und dunklere
   // dunkle Felder, das Nordlicht liegt nur im Rahmen und als feine Kante um das Feld
   // 18.11.2026: dunkel bei Aurora, Nachtblau und Kronsaal aufgehellt, schwarze Figuren brauchen dort mindestens 3:1
-  { id: 'aurora', name: 'Aurora', nameEn: 'Aurora', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#375994', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
+  { id: 'aurora', name: 'Aurora', nameEn: 'Aurora Veil', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#375994', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
     muster: () => '', defs: '<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3BE8B0"/><stop offset=".5" stop-color="#4C6EF5"/><stop offset="1" stop-color="#B565F0"/></linearGradient>',
     ueber: '<path d="M0 6a6 6 0 0 1 6-6h88a6 6 0 0 1 6 6v88a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6zM6 6v88h88V6z" fill="url(#a)" fill-rule="evenodd" opacity=".85"/>'
       + '<rect x="6" y="6" width="88" height="88" fill="none" stroke="url(#a)" stroke-width=".8"/>' },

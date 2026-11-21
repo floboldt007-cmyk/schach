@@ -23,6 +23,7 @@
 //   einstufung-seite, wiederholen, arena, raus).
 // Optik: css/pakete/start.css (link[data-paket="start"], vom Paket oder hier eingehaengt). Nur Tokens.
 // Test: zustand() -> { offen, seite } (mit ?test auch window.__start.zustand()).
+import { ladePaketCss } from '../paket-css.js';
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
 import { miniBrett } from './bauteile.js';
@@ -60,15 +61,11 @@ export function zustand() {
 if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '')) window.__start = { zustand };
 
 function ladeCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-paket="start"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../css/pakete/start.css', import.meta.url).href;
-    l.dataset.paket = 'start';
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles bedienbar */ }
+  return ladePaketCss('start', { screens: ['start'] });
 }
+// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js); nur mit Paket-Einstieg, ohne ihn geht zeige() still zur
+// Arena und das CSS bleibt weg (tests/start.test.mjs "#start ohne Paket-Einstieg")
+if (D.paketGeladen()) await ladeCss();
 
 // Zusatz (klein) mit Leerzeichen davor: der Name des Knopfs liest sich dann "... Laeufer wertet nicht" (Screenreader);
 // im Flex-Knopf zeichnet das Leerzeichen nichts

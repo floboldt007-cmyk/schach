@@ -27,6 +27,7 @@
 //          Formel. Fehlt die Datei, stehen nur Freunde auf den Tafeln.
 // Register: Icon "code", Saetze "tafel-platz1" (der Bot, den du von Platz 1 verdraengt hast).
 // Testmodus (?test): window.__punkte = { stand(), speichere(st), umzug, ladeBotLaeufe, fastZeigen, S, T, C, F }.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { melde } from '../../feier.js';
@@ -289,6 +290,9 @@ function anbieterAbrechnung(k) {
   const p = k && k.erg && k.erg.partie ? k.erg.partie : null;
   if (!p || typeof p.id !== 'string') return null;
   if ((k.modus || p.modus) === 'uebung') return null;
+  // Flos Antwort 2 (20.11.2026): die freie Partie zaehlt fuer keine Tafel, also keine Punktezeile; neben einer Niederlage
+  // wirkten 100 bis 800 Punkte wie eine Belohnung
+  if ((k.modus || p.modus) === 'frei') return null;
   // ohne eigenen Zug (z. B. sofort aufgegeben) gibt es keine Spielanalyse und also keine Punkte: keine Zeile
   if (!(eigeneZuege(p) > 0)) return null;
   const roh = S.ergebnisVon(S.lade(), p.id);
@@ -359,13 +363,10 @@ function anbieterReiter(id, baue) {
 
 // ---------- Registrieren ----------
 function cssLaden() {
-  if (typeof document === 'undefined' || document.querySelector('link[data-paket="punkte"]')) return;
-  const l = document.createElement('link');
-  l.rel = 'stylesheet';
-  l.href = new URL('../../../css/pakete/punkte.css', import.meta.url).href;
-  l.dataset.paket = PAKET;
-  document.head.append(l);
+  return ladePaketCss('punkte');
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(cssLaden());
 
 function registriere() {
   cssLaden();

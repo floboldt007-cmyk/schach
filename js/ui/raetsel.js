@@ -37,6 +37,7 @@
 // DOM: section.screen.rs-screen > header.haupt-kopf, .rs-rumpf > .rs-inhalt (.rs-fortschritt, .rs-brettzone mit
 // .brett-rahmen.rs-rahmen > .brett, .rs-seite mit .rs-status, .rs-meldung[data-art], .rs-aktionen) bzw. .rs-ende.
 // Optik: css/pakete/raetsel.css (haengt sich selbst als link[data-screen="raetsel"] ein, nur Tokens).
+import { ladePaketCss, beimStart } from '../paket-css.js';
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { Chess } from '../../vendor/chess/chess.js';
@@ -102,15 +103,10 @@ export function pruefeAufgabe(a) {
 }
 
 function ladeCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-screen="raetsel"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../css/pakete/raetsel.css', import.meta.url).href;
-    l.dataset.screen = 'raetsel';
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles bedienbar */ }
+  return ladePaketCss('raetsel', { screens: ['raetsel'], marke: { screen: 'raetsel' } });
 }
+// hoechstens kurz warten: ui/raetsel.js laedt schon beim Start (js/paket-css.js)
+await beimStart(ladeCss());
 
 const spielKlang = (name, ...a) => { try { klang.spiele(name, ...a); } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ } };
 
@@ -134,7 +130,6 @@ export function zeige(root, params, app) {
     return { verlasse() { weg = true; } };
   }
 
-  ladeCss();
   const aufgaben = (Array.isArray(roh) ? roh : []).slice(0, MAX_AUFGABEN).map(pruefeAufgabe).filter(Boolean);
   if (Array.isArray(roh) && aufgaben.length < Math.min(roh.length, MAX_AUFGABEN)) console.warn('Rätsel: ungültige Aufgaben übersprungen');
   const titel = kurz(quelle ? quelle.titel : p.titel, 60) || t('raetsel.titel');
