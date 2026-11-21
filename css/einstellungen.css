@@ -195,4 +195,12 @@
 .konto-gruppe .konto-status { font-size: .9rem; }
 /* R16 A1: --gefahr gab es in keinem Thema, das feste Dunkelrot stand dunkel bei 2,2:1; Warnfarbe wie css/daten.css */
 .konto-gruppe .konto-status[data-fehler="ja"] { color: var(--warn); }
+/* Gruener Haken am Benutzernamen (Flo 21.11.2026, Zeichen: css/bauteile.css .name-haken): das Wort
+   in Textfarbe, weil --gut als Schrift hell unter 4,5:1 laege. Gesperrt: graues, nur lesbares Feld. */
+.konto-gruppe .konto-name-haken { display: flex; align-items: center; gap: .35rem; margin: -.35rem 0 .5rem; font-weight: 700; color: var(--text); }
+.konto-gruppe .konto-name-haken[hidden], .konto-gruppe .konto-name-knoepfe[hidden] { display: none; }
+.konto-gruppe .konto-name-haken .name-haken { margin: 0; }
+.konto-gruppe .konto-name-pruef:empty { display: none; }
+.konto-gruppe .konto-name-pruef[data-art="fehler"] { color: var(--warn); }
+.konto-gruppe .konto-name.gesperrt { background: var(--flaeche-3); color: var(--text-2); border-style: dashed; }
 

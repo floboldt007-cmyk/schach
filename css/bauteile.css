@@ -248,3 +248,11 @@
 .sy-turniere, .sy-liga { --sy-hell: var(--sp-turniere-hell); --sy-mitte: var(--sp-turniere); --sy-rand: var(--sp-turniere-rand); }
 .sy-raetsel, .sy-ich { --sy-hell: var(--sp-raetsel-hell); --sy-mitte: var(--sp-raetsel); --sy-rand: var(--sp-raetsel-rand); }
 .sy-heim { --sy-hell: var(--sp-heim-hell); --sy-mitte: var(--akzent); --sy-rand: var(--sp-heim-rand); }
+
+/* Gruener Haken am bestaetigten Benutzernamen (js/konto.js hakenHtml, Flo 21.11.2026): ein gruener Kreis mit Haken in
+   Flaechenfarbe, damit er auf Seite, Leiste und Banner gleich lesbar ist (hell Weiss auf #2E9E63 3,4:1, dunkel #1E2126 auf
+   #4CC488 rund 8:1; Nicht-Text braucht 3:1). Steht immer hinter dem Namen, nie davor. */
+.name-haken { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 1.05em; height: 1.05em;
+  margin-inline-start: .3em; vertical-align: -.12em; border-radius: 50%; background: var(--gut); color: var(--flaeche); }
+.name-haken svg { width: 72%; height: 72%; }
+.pr-name-zeile { display: flex; align-items: center; min-width: 0; }

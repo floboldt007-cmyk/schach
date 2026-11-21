@@ -231,7 +231,8 @@ export async function ladeCloudStand() {
 export async function ladeProfil() {
   const s = await aktiveSitzung(); const d = await anfrage('/rest/v1/profile?select=*', { token: s.access_token });
   const p = Array.isArray(d) ? (d[0] || null) : d;
-  if (p && p.benutzername) merkeName(p.benutzername, s);
+  if (p && typeof p.name_bestaetigt === 'boolean') hakenSpalte = true;
+  if (p && p.benutzername) merkeName(p.benutzername, s, p.name_bestaetigt);
   return p;
 }
 // Eigener Benutzername der angemeldeten Nutzer-ID (aus dem Merker), sonst null; meinName() faellt auf "Du" / "You" zurueck.
@@ -243,9 +244,24 @@ export function eigenerName(s = sitzung()) {
   return d && d.konto === id && NAME.test(String(d.name || '')) ? d.name : null;
 }
 export function meinName() { return eigenerName() || t('allgemein.du'); }
-function merkeName(name, s = sitzung()) {
-  try { const id = userId(s); if (id && NAME.test(String(name || ''))) lager().setItem(NAME_SCHLUESSEL, JSON.stringify({ konto: id, name })); } catch (e) { /* nur Komfort */ }
+// Gruener Haken am eigenen Namen (supabase/benutzername-bestaetigt-schema.sql): true/false wie vom Server, null = unbekannt
+// (SQL nicht eingespielt oder noch nicht gefragt). Gilt nur fuer genau den gemerkten Namen.
+export function eigenerNameBestaetigt(s = sitzung()) {
+  const id = userId(s); const d = id ? jsonLies(NAME_SCHLUESSEL) : null;
+  return d && d.konto === id && typeof d.bestaetigt === 'boolean' ? d.bestaetigt : null;
 }
+// bestaetigt: nur ein Wahrheitswert wird gemerkt; ohne (z. B. ohne SQL) faellt ein alter Haken weg statt falsch zu bleiben
+function merkeName(name, s = sitzung(), bestaetigt) {
+  try {
+    const id = userId(s);
+    if (id && NAME.test(String(name || ''))) lager().setItem(NAME_SCHLUESSEL, JSON.stringify({ konto: id, name, ...(typeof bestaetigt === 'boolean' ? { bestaetigt } : {}) }));
+  } catch (e) { /* nur Komfort */ }
+  if (bestaetigt === true) hakenStand.set(String(name).toLowerCase(), true);
+}
+// Hat der Server die Spalte name_bestaetigt? Erst dann schickt die App den Haken mit (sonst lehnt PostgREST die Spalte ab)
+let hakenSpalte = false;
+// Haken fremder Namen (bestaetigte_namen): kleingeschriebener Name -> true/false, je Seite einmal gefragt
+const hakenStand = new Map();
 export async function speichereCloudStand(stand = cloudStand()) {
   const e0 = epoche;
   const s = await aktiveSitzung(); const id = userId(s); if (!id) throw new Error(K('keineId'));
@@ -260,9 +276,11 @@ export async function speichereBenutzername(benutzername) {
   benutzername = String(benutzername || '').trim();
   if (!NAME.test(benutzername)) throw new Error(K('nameRegel'));
   const s = await aktiveSitzung();
+  // Mit dem Haken-SQL zaehlt jede eigene Eingabe als Bestaetigen (Haken und 30-Tage-Frist setzt der Server); mitgeschickt
+  // wird er, damit auch ein vom Server vergebener, gleicher Name bestaetigt werden kann
+  const daten = { user_id: userId(s), benutzername, ...(hakenSpalte ? { name_bestaetigt: true } : {}) };
   try {
-    await anfrage('/rest/v1/profile', { methode: 'POST', token: s.access_token,
-      daten: { user_id: userId(s), benutzername }, prefer: 'resolution=merge-duplicates' });
+    await anfrage('/rest/v1/profile', { methode: 'POST', token: s.access_token, daten, prefer: 'resolution=merge-duplicates' });
   } catch (e) {
     if (e.status === 409 || e.code === '23505') throw new Error(K('nameVergeben'));
     // Monats-Sperre des Servers (supabase/benutzername-sperre-schema.sql): detail ist der Zeitpunkt der naechsten Aenderung
@@ -272,8 +290,55 @@ export async function speichereBenutzername(benutzername) {
     }
     throw e;
   }
-  merkeName(benutzername, s);
+  merkeName(benutzername, s, hakenSpalte ? true : undefined);
   return benutzername;
+}
+// Rueckfrage vor dem Bestaetigen (Flo 21.11.2026: in der App, kein Browser-Fenster). true = bestaetigt. Ohne app.frage
+// (nur in Tests ohne App) geht es ohne Rueckfrage weiter; die Frist setzt ohnehin der Server.
+export async function frageNameBestaetigen(app, name) {
+  if (!app?.frage) return true;
+  const w = await app.frage({ titel: K('nameTitel'), text: K('nameFrage', { name, tage: NAME_SPERRE_TAGE }),
+    knoepfe: [{ text: K('nameAbbrechen'), wert: 'nein' }, { text: K('nameBestaetigen'), wert: 'ja', art: 'primaer' }], abbrechen: 'nein' });
+  return w === 'ja';
+}
+// Ist der Name frei (beim Tippen)? true/false vom Server; null = unbekannt (offline, Haken-SQL fehlt): dann entscheidet
+// der Server erst beim Speichern. Der eigene Name zaehlt als frei.
+export async function nameFrei(name) {
+  name = String(name || '').trim();
+  if (!NAME.test(name)) return false;
+  try {
+    const s = await aktiveSitzung();
+    const d = await anfrage('/rest/v1/rpc/name_frei', { methode: 'POST', token: s.access_token, daten: { name } });
+    return typeof d === 'boolean' ? d : null;
+  } catch (e) { return null; }
+}
+// Welche Namen tragen den Haken? Set kleingeschriebener Namen. Fragt nur, was noch nicht bekannt ist (hoechstens 100 je
+// Aufruf, wie der Server). Ohne Sitzung, offline oder ohne SQL: die bisher bekannten, nie ein Fehler.
+export async function bestaetigteNamen(namen) {
+  const offen = [...new Set((namen || []).map((n) => String(n || '').trim()).filter((n) => NAME.test(n)).map((n) => n.toLowerCase()))]
+    .filter((n) => !hakenStand.has(n)).slice(0, 100);
+  if (offen.length && sitzung()?.access_token) {
+    try {
+      const s = await aktiveSitzung();
+      const d = await anfrage('/rest/v1/rpc/bestaetigte_namen', { methode: 'POST', token: s.access_token, daten: { namen: offen } });
+      // setof text kommt als Liste von Texten (aeltere PostgREST-Fassungen: Objekte mit dem Funktionsnamen)
+      const ja = new Set((Array.isArray(d) ? d : []).map((x) => String(typeof x === 'string' ? x : x?.bestaetigte_namen || '').toLowerCase()));
+      for (const n of offen) hakenStand.set(n, ja.has(n));
+    } catch (e) { /* beim naechsten Mal neu fragen */ }
+  }
+  return new Set([...hakenStand].filter(([, v]) => v).map(([n]) => n));
+}
+export function hatHaken(name) {
+  const n = String(name || '').toLowerCase();
+  if (!n) return false;
+  const eigen = eigenerNameBestaetigt();
+  if (n === String(eigenerName() || '').toLowerCase() && eigen !== null) return eigen;
+  return hakenStand.get(n) === true;
+}
+// Gruener Haken neben einem Namen; die Beschriftung "Bestaetigt" lesen Bildschirmleser vor
+export function hakenHtml() {
+  const b = escapeHtml(K('bestaetigt'));
+  return `<span class="name-haken" role="img" aria-label="${b}" title="${b}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 }
 // Bis wann der Name gesperrt ist (Date) oder null. Ohne eingespieltes SQL fehlt name_geaendert_am: dann null, nie ein Fehler.
 export const NAME_SPERRE_TAGE = 30;
@@ -523,9 +588,12 @@ export function kontoGruppe({ app } = {}) {
     // R16 A2: ohne Sitzung steht die Statuszeile direkt unter "Code senden" (dort entstehen ihre Meldungen), vor "oder"
     const status = `<p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>`;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
-      <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
+      <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+      <p class="konto-name-haken" hidden>${hakenHtml()}<span>${K('bestaetigt')}</span></p>
+      <p class="es-hilfe konto-name-pruef" aria-live="polite"></p>
       <p class="es-hilfe konto-name-hinweis" hidden>${K('nameWaehlen')}</p>
       <p class="es-hilfe konto-name-sperre" hidden></p>
+      <div class="es-knoepfe konto-name-knoepfe" hidden><button class="knopf" type="button" data-konto="name" disabled>${K('nameBestaetigen')}</button></div>
       <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>${verdraengtZeile()}` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <div class="konto-botschutz" hidden></div><button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
@@ -558,13 +626,56 @@ export function kontoGruppe({ app } = {}) {
     const hinweis = el.querySelector('.konto-name-hinweis'); if (hinweis) hinweis.hidden = !!name || profilFuer !== id;
     const bis = profilFuer === id ? sperreBis : null;
     const sperre = el.querySelector('.konto-name-sperre');
-    if (sperre) { sperre.hidden = !bis; sperre.textContent = bis ? K('nameAb', { datum: bis.toLocaleDateString(locale()) }) : ''; }
-    if (feld) feld.readOnly = !!bis;
+    const tage = bis ? Math.max(1, Math.ceil((bis.getTime() - Date.now()) / 86400000)) : 0;
+    if (sperre) { sperre.hidden = !bis; sperre.textContent = bis ? K(tage === 1 ? 'nameAbEinTag' : 'nameAb', { datum: bis.toLocaleDateString(locale()), tage }) : ''; }
+    if (feld) { feld.readOnly = !!bis; feld.classList.toggle('gesperrt', !!bis); }
+    pruefeEingabe();
     if (profilFuer === id || profilLaeuft === id) return;
     profilLaeuft = id;
     // offline oder Serverfehler: kein Hinweis (der Name koennte existieren), beim naechsten Zeichnen neu fragen
     ladeProfil().then((p) => { if (userId(sitzung()) === id) { profilFuer = id; sperreBis = nameSperreBis(p); zeigeName(); } }, () => {})
       .finally(() => { if (profilLaeuft === id) profilLaeuft = null; });
+  };
+  // Flo 21.11.2026: beim Tippen pruefen, ob der Name frei ist; "Bestaetigen" erst, wenn er gueltig und frei ist. Gruener
+  // Haken, solange im Feld der eigene, bestaetigte Name steht. Gesperrt: kein Knopf, nur das Datum (zeigeName).
+  let pruefUhr = null; let pruefNr = 0;
+  const pruefZeile = (text = '', art = '') => {
+    const z = el.querySelector('.konto-name-pruef'); if (!z) return;
+    z.textContent = text; z.dataset.art = art;
+  };
+  const pruefeEingabe = () => {
+    const feld = el.querySelector('.konto-name'); const knoepfe = el.querySelector('.konto-name-knoepfe');
+    const knopf = knoepfe?.querySelector('[data-konto="name"]'); if (!feld || !knopf) return;
+    clearTimeout(pruefUhr); const nr = ++pruefNr;
+    const wert = feld.value.trim(); const eigen = eigenerName(); const haken = eigenerNameBestaetigt();
+    const istEigen = !!eigen && wert === eigen;
+    const h = el.querySelector('.konto-name-haken'); if (h) h.hidden = !(istEigen && haken === true);
+    knopf.disabled = true;
+    // gesperrt, leer oder der eigene, schon bestaetigte (bzw. ohne Haken-SQL gespeicherte) Name: nichts zu bestaetigen
+    if (feld.readOnly || !wert || (istEigen && haken !== false)) { knoepfe.hidden = true; pruefZeile(); return; }
+    knoepfe.hidden = false;
+    if (istEigen) { knopf.disabled = false; pruefZeile(); return; }   // vom Server vergeben: selbst bestaetigen
+    if (!NAME.test(wert)) { pruefZeile(K('nameRegel'), 'fehler'); return; }
+    pruefZeile(K('namePruefe'));
+    pruefUhr = setTimeout(async () => {
+      const frei = await nameFrei(wert);
+      if (nr !== pruefNr) return;
+      if (frei === false) { pruefZeile(K('nameVergeben'), 'fehler'); return; }
+      // null = unbekannt (offline oder ohne SQL): bestaetigen geht, der Server entscheidet
+      knopf.disabled = false; pruefZeile(frei ? K('nameIstFrei') : '', frei ? 'gut' : '');
+    }, 350);
+  };
+  el.addEventListener('input', (e) => { if (e.target.classList?.contains('konto-name')) pruefeEingabe(); });
+  // true = gespeichert; false = abgebrochen. Fehler (vergeben, gesperrt) gehen an den Aufrufer.
+  const bestaetigeName = async () => {
+    const name = el.querySelector('.konto-name')?.value.trim() || '';
+    if (!NAME.test(name)) { pruefZeile(K('nameRegel'), 'fehler'); return false; }
+    if (!(await frageNameBestaetigen(app, name))) return false;
+    await speichereBenutzername(name);
+    profilFuer = null; sperreBis = null;
+    melden(K('nameGespeichert', { name }));
+    zeigeName();
+    return true;
   };
   const verdraengtZeile = () => {
     const d = verdraengterStand(); if (!d) return '';
@@ -602,13 +713,15 @@ export function kontoGruppe({ app } = {}) {
         el.querySelector('.konto-code').hidden = false; melden(K('codeGesendet') + ' ' + K(alsApp() ? 'linkNichtInApp' : 'linkHier')); }
       if (a === 'pruefen') { const code = [...el.querySelectorAll('.konto-ziffern input')].map((x) => x.value).join(''); await pruefeCode(email, code); const abgleich = await gleicheNachAnmeldung(); render(); meldeAbgleich(abgleich); }
       if (a === 'sichern') {
-        // nur ein geaenderter Name geht an den Server; danach das Profil neu fragen (die Sperre beginnt mit der Aenderung)
+        // nur ein geaenderter Name geht an den Server, und nur mit Rueckfrage (Haken und 30-Tage-Sperre ab jetzt);
+        // abgebrochen: der Name bleibt, der Spielstand wird trotzdem gesichert
         const name = el.querySelector('.konto-name').value.trim();
-        if (name && name !== eigenerName()) { await speichereBenutzername(name); profilFuer = null; }
+        if (name && name !== eigenerName()) await bestaetigeName();
         // Nie blind hochladen (02.11.2026): Hat ein anderes Geraet inzwischen mehr geschafft, laedt "Jetzt sichern" dessen Stand
         const abgleich = await gleicheNachAnmeldung(); if (abgleich === 'geraet' || abgleich === 'gleich') zuletzt = new Date().toLocaleString(locale());
         render(); meldeAbgleich(abgleich);
       }
+      if (a === 'name') await bestaetigeName();
       if (a === 'abmelden') { await abmelden(); render(); }
       if (a === 'zurueckholen') {
         const d = verdraengterStand(); if (!d) { render(); return; }
