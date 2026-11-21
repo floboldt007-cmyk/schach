@@ -216,17 +216,17 @@ async function testeAnalyse(browser, d) {
   // Entwurf "Analyse ruhig": der Kopf nennt Gegner und Eroeffnung, Ergebnis und Grund nur die Karte (vorher doppelt)
   pruefe('Kopf: Gegner und Eröffnung, kein Ergebnis', unter.includes('Ritter Thorsten') && unter.includes('Philidor') && !unter.includes('1:0'), unter);
   const karte = await seite.locator('.an-genau').innerText();
-  pruefe('Karte: Ergebnis und Grund, „Genauigkeit“, Du und Thorsten', karte.includes('1:0') && /Matt im 17\.\sZug/.test(karte)
-    && /Genauigkeit/.test(karte) && /\bDu\b/.test(karte) && /Thorsten/.test(karte), karte);
+  pruefe('Karte: Ergebnis und Grund, „Genauigkeit“ (Name der Karte), Du und Thorsten', karte.includes('1:0') && /Matt im 17\.\sZug/.test(karte)
+    && /Genauigkeit/.test(await seite.locator('.an-genau').getAttribute('aria-label')) && /\bDu\b/.test(karte) && /Thorsten/.test(karte), karte);
   pruefe('Karte: Flos Profilbild statt „F“', await seite.locator('.an-genau .an-avatar.an-ich svg[data-figur]').count() === 1);
   pruefe('Kein langer Gedankenstrich in den Texten', await seite.evaluate(() => !/[—–]/.test(document.querySelector('.screen').innerText)));
   pruefe('Startstellung, Stand "Start / 17"', (await stand(seite)) === 'Start / 17', await stand(seite));
   const chips = await seite.locator('.an-g-chips').textContent();
   pruefe('Chip "Leistung ≈ …"', /Leistung ≈ \d+/.test(chips), chips);
   pruefe('Genauigkeit beider Seiten', (await seite.locator('.an-g-wert.zahl').count()) === 2);
-  // Flo 30.10. abends: "Das kann immer aufgeklappt sein, wenn man die Analyse macht"
-  pruefe('Zugklassen gleich aufgeklappt (Zeile „Alle Zugklassen“ zum Zuklappen)', await seite.locator('details.an-klassen[open]').count() === 1
-    && /Alle Zugklassen/.test(await seite.locator('.an-kl-auf').innerText()));
+  // R27 A1 (Flo 21.11.: "man muss sehen, wie viele von welcher Art von Zuegen man hatte"): immer offen, nichts zum Zuklappen
+  pruefe('Zugklassen immer offen (kein Zuklappen)', await seite.locator('.an-klassen details, .an-kl-auf').count() === 0
+    && await seite.locator('.an-kl[data-klasse]').first().isVisible());
   pruefe('Elf Klassen-Zeilen plus "Züge gesamt"', (await seite.locator('.an-kl[data-klasse]').count()) === 11
     && (await seite.locator('.an-kl-gesamt').textContent()).includes('Züge gesamt'));
   const gesamt = await seite.locator('.an-kl-gesamt .an-n').allTextContents();
@@ -577,7 +577,7 @@ async function testeTouch(browser, d) {
     const y = e.getBoundingClientRect().top; setTimeout(() => fertig(e.getBoundingClientRect().top === y), 600);
   }), null, { timeout: 8000 }).catch(() => {});
   await stehtStill();
-  // Zugklassen sind seit 30.10. abends gleich aufgeklappt
+  // Zugklassen sind immer offen
   await seite.locator('.an-kl[data-klasse="brillant"]').scrollIntoViewIfNeeded();
   await stehtStill();
   await seite.locator('.an-kl[data-klasse="brillant"]').tap();
@@ -904,11 +904,12 @@ async function testeViewports(browser, d) {
         const ok = brett.x >= 0 && brett.x + brett.width <= breite + 0.5 && brett.width >= Math.min(breite, hoehe) * anteil;
         pruefe(`${name} analyse: Brett ganz sichtbar und groß`, ok, JSON.stringify(brett));
         if (breite > hoehe) {
+          // R27 A1: rechts stehen Ergebnis und Schluesselmomente zuerst, der Coach folgt darunter (die Seite rollt)
           const unten = await seite.evaluate(() => {
-            const c = document.querySelector('.an-coach').getBoundingClientRect();
-            return c.bottom <= innerHeight + 1;
+            const m = document.querySelector('.an-moment, .an-momente-leer').getBoundingClientRect();
+            return m.top < innerHeight - 40;
           });
-          pruefe(`${name} analyse: Coach-Karte ohne Scrollen sichtbar`, unten);
+          pruefe(`${name} analyse: Schluesselmomente ohne Scrollen im Bild`, unten);
         }
       }
       await bild(seite, `${screen}-${name}`);

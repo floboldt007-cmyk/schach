@@ -23,7 +23,10 @@ const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Mindestbreite des Bretts in Pixeln je Groesse (Name aus GROESSEN)
-const ANALYSE_MIN = { 'handy-klein': 360, handy: 386, 'ipad-hoch': 760, 'ipad-quer': 680, 'ipad-browser': 470, pc: 700 };
+// R27 A1 "Buehne" (Plan R27 Analyse, Abschnitt Kosten): Balken und Navigation stehen im Querformat unter dem Brett, dafuer
+// rollt die rechte Spalte nicht mehr in sich. Das kostet im Querformat Brett (gemessen 21.11.: iPad quer 620 statt 680,
+// iPad mit Browserleisten 390 statt 470); Flo entscheidet zwischen A1/A2/A3 auf der Auswahlseite.
+const ANALYSE_MIN = { 'handy-klein': 360, handy: 386, 'ipad-hoch': 760, 'ipad-quer': 610, 'ipad-browser': 380, pc: 700 };
 const PARTIE_MIN = { handy: 384, 'ipad-hoch': 780, 'ipad-quer': 720, 'ipad-browser': 500, pc: 760 };
 // Zu zweit (Flo 07.11.2026: "Das ganze Bild kann das Schachbrett sein"), vorher 343 / 358 / 266 / 672 / 512 / 282 / 592 px.
 // Gemessen nach dem Umbau 323 / 390 / 281 / 780 / 724 / 494 / 804 px. Dazu: kein Knopf ausserhalb des Fensters, nichts scrollt.

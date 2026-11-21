@@ -254,7 +254,7 @@ try {
   pruefe('Analyse zeigt Namen und Genauigkeit beider Seiten', genau.includes('Anna') && genau.includes('Ben') && werte.length === 2
     && werte.every(w => Number.isFinite(Number(w.replace(',', '.'))) && Number(w.replace(',', '.')) >= 0 && Number(w.replace(',', '.')) <= 100), { genau, werte });
   pruefe('Analyse spricht neutral', !/\b(du|dein|deine|deinen)\b/i.test(await seite.locator('.an-screen').innerText()));
-  // Zugklassen sind seit 30.10. abends gleich aufgeklappt
+  // Zugklassen sind immer offen
   const klasse = seite.locator('.an-kl:not([aria-disabled="true"])').first();
   // Seit 30.10. abends steht der Name als eigenes Schild neben dem Zug (.an-c-wer), deshalb der ganze Kopf
   await klasse.click(); const erster = await seite.locator('.an-c-kopf').innerText();

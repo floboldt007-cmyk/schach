@@ -35,13 +35,13 @@
    SPIELANALYSE
    ============================================================ */
 .an-screen {
-  --an-balken: 26px;  /* Balken 18 px + Abstand 8 px */
+  --an-balken: 0px;   /* R27 A1: der Balken liegt unter dem Brett (14 px + 8 px Abstand), nicht mehr daneben */
   --an-sicher: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
   /* Mindestbreite der rechten Spalte: 420 px ab 1313 px Fensterbreite, in kleinen Querfenstern bis 280 px (sonst blieben
      dem Brett bei 590 x 580 nur 80 px). Jedes iPad quer ist nach der Hoehe begrenzt, dort aendert sich nichts. */
   --an-rechts-min: clamp(280px, 32vw, 420px);
-  --an-brett: min(calc(100vh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
-  --an-brett: min(calc(100dvh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+  --an-brett: min(calc(100vh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 8px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+  --an-brett: min(calc(100dvh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 8px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
 }
 .an-screen.ohne-balken { --an-balken: 0px; }
 .an-screen.ohne-balken .an-evalbalken { display: none; }
@@ -57,10 +57,14 @@
 .an-rechts.mehr { -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent); mask-image: linear-gradient(#000 calc(100% - 36px), transparent); }
 
 /* ---------- Brett ---------- */
-.an-brettzone { position: relative; display: flex; gap: 8px; align-items: stretch; flex: none; }
+.an-brettzone { position: relative; display: flex; flex-direction: column; gap: 8px; align-items: stretch; flex: none; }
 .an-brett-rahmen { position: relative; flex: none; width: calc(var(--an-brett) + 8px); padding: 4px; border-radius: 18px; background-color: var(--sockel);
   background-image: var(--textur-sockel, none); box-shadow: var(--s-brett), var(--kante); transition: box-shadow .3s ease; }
-.an-brett-rahmen::after { content: ""; position: absolute; inset: 3px; border-radius: 15px; box-shadow: 0 0 0 1px var(--linie); pointer-events: none; }
+.an-brett-rahmen::after { content: ""; position: absolute; inset: 3px; border-radius: 15px; box-shadow: 0 0 0 1px var(--linie-2); pointer-events: none; }
+/* R27 A1: feine Gold-Kante am Brettrahmen (Rueckfall ohne color-mix: die Linie darueber) */
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .an-brett-rahmen::after { box-shadow: 0 0 0 1px color-mix(in srgb, var(--metall) 38%, transparent); }
+}
 .an-brett-rahmen .brett { --brett-radius: 14px; touch-action: pan-y; }
 .an-screen .brett > .figur { filter: drop-shadow(0 2px 1.5px rgba(10, 12, 30, .28)); }
 .an-screen .brett > .abzeichen-ort { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .3)); }
@@ -75,33 +79,38 @@
 .an-c-eval.an-c-variante { background: var(--flaeche-3); color: var(--kt-bester); box-shadow: inset 0 0 0 1.5px var(--k-bester); }
 
 /* ---------- Bewertungsbalken ---------- */
-.an-evalbalken { position: relative; flex: none; width: 18px; border-radius: 10px; overflow: hidden; background: var(--balken-schwarz);
+/* R27 A1: waagrecht unter dem Brett in allen Formaten (vorher 18 px schmal daneben, Zahl 10 px um 90 Grad gedreht).
+   Weiss waechst von links (data-unten = Farbe auf der linken Seite); die Zahl steht auf der Seite der fuehrenden Farbe
+   in einem eigenen Feld, damit sie auch auf der Grenze lesbar bleibt. */
+.an-evalbalken { position: relative; flex: none; height: 14px; margin-inline: 4px; border-radius: 7px; overflow: hidden; background: var(--balken-schwarz);
   border: 1px solid var(--linie-2); box-shadow: var(--s1); }
 .an-evalbalken[data-unten="b"] { background: var(--eval-weiss); }
-.an-eb-unten { position: absolute; left: 0; right: 0; bottom: 0; height: var(--w, 50%); background: var(--eval-weiss);
-  transition: height .7s cubic-bezier(.2, .9, .2, 1); }
+.an-eb-unten { position: absolute; top: 0; bottom: 0; left: 0; width: var(--w, 50%); background: var(--eval-weiss);
+  transition: width .7s cubic-bezier(.2, .9, .2, 1); }
 .an-evalbalken[data-unten="b"] .an-eb-unten { background: var(--eval-schwarz); }
-.an-eb-unten::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: rgba(128, 128, 128, .5); }
-.an-eb-mitte { position: absolute; z-index: 2; left: 0; right: 0; top: 50%; height: 1px; background: rgba(128, 128, 128, .55); }
-.an-eb-wert { position: absolute; z-index: 3; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 10px; font-weight: 800; line-height: 1;
-  writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: .02em; color: var(--balken-schwarz); }
-.an-eb-wert[data-seite="oben"] { bottom: auto; top: 6px; }
-.an-eb-wert[data-farbe="b"] { color: var(--balken-weiss); }
+.an-eb-unten::before { content: ""; position: absolute; top: 0; bottom: 0; right: -1px; width: 2px; background: rgba(128, 128, 128, .5); }
+.an-eb-mitte { position: absolute; z-index: 2; top: 0; bottom: 0; left: 50%; width: 1px; background: rgba(128, 128, 128, .55); }
+.an-eb-wert { position: absolute; z-index: 3; top: 0; bottom: 0; left: 0; display: flex; align-items: center; padding: 0 6px; border-radius: 6px;
+  font-size: 11.5px; font-weight: 800; line-height: 1; letter-spacing: .02em; background: var(--eval-weiss); color: var(--balken-schwarz); }
+.an-eb-wert:empty { display: none; }
+.an-eb-wert[data-seite="oben"] { left: auto; right: 0; }
+.an-eb-wert[data-farbe="b"] { background: var(--eval-schwarz); color: var(--balken-weiss); }
 
 /* ---------- Navigation ---------- */
 /* R19 Analyse neu: Play/Pause zwischen den Pfeilen, das Tempo als Wort dahinter (reihum Normal, Ruhig, Zuegig) */
-.an-navi { flex: none; display: grid; grid-template-columns: repeat(5, minmax(44px, 1fr)) auto auto; gap: 6px; align-items: center; }
+.an-navi { flex: none; display: grid; grid-template-columns: repeat(5, minmax(44px, 1fr)) auto; gap: 6px; align-items: center; }
 .an-navi .knopf { padding: 0; min-height: 52px; min-width: 44px; }
 /* Abspielen ist die Hauptaktion der Leiste: gefuellt in der Textfarbe (hell dunkel, dunkel hell), laufend gold mit
    dunklem Zeichen und Textfarben-Kante (design-beweis: Flaeche >= 3:1 gegen die Umgebung) */
 .an-navi .an-abspielen { background: var(--text); color: var(--flaeche); box-shadow: none; }
-.an-navi .an-abspielen.laeuft { background: var(--gold); color: #1C1B19; box-shadow: inset 0 0 0 2px var(--text); }
-.an-navi .an-tempo { padding: 0 12px; font-size: 13.5px; font-weight: 750; color: var(--text-2); }
-/* der Zugstand darf in schmalen Spalten zweizeilig stehen ("Zug 17 / 17"), damit die Knoepfe 44 px behalten */
-.an-stand { min-width: 0; padding: 0 2px; font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--text-2); text-align: right; }
+.an-navi .an-abspielen.laeuft { background: var(--metall); color: #1C1B19; box-shadow: inset 0 0 0 2px var(--text); }
+/* R27 A1: der Zugstand steht im Tempo-Knopf zweizeilig ("Zug 9 / 10" ueber "Normal"), vorher brach er auf dem iPad um */
+.an-navi .an-tempo { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 84px; padding: 0 12px; line-height: 1.15; }
+.an-stand { font-size: 13px; font-weight: 750; color: var(--text); white-space: nowrap; }
+.an-tempo-wort { font-size: 12px; font-weight: 700; color: var(--text-2); }
 
 /* ---------- Coach-Karte ---------- */
-.an-coach { --kf: var(--k-bester); --kt: var(--text); position: relative; flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: center;
+.an-coach { --kf: var(--k-bester); --kt: var(--text); position: relative; flex: none; min-height: 96px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: center;
   padding: 14px 16px; border-radius: var(--radius); background: var(--flaeche); color: var(--text); border: 1.5px solid var(--linie);
   box-shadow: var(--s2); }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
@@ -178,8 +187,6 @@
 .an-seite { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .an-seite.an-re { flex-direction: row-reverse; text-align: right; }
 .an-seite-text { min-width: 0; }
-.an-g-kopf { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 26px; }
-.an-g-titel { font-size: 12.5px; font-weight: 650; color: var(--text-2); }
 .an-g-wert { font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .an-ich-wert { color: var(--text); }
 .an-g-leer { font-size: 16px; color: var(--text-2); }
@@ -198,14 +205,14 @@
 .an-g-mess[data-band="schwach"] > i { background: var(--k-patzer); }
 /* R19 Analyse neu (Massstab Premium-Seite): ruhige Karte mit feiner Gold-Kante, oben mittig ein Schein in der Farbe des
    Ergebnisses, grosse runde Bilder mit Ring, das Ergebnis gross in der Display-Schrift */
-.an-genau { border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--linie));
-  background: radial-gradient(120% 95% at 50% 0%, color-mix(in srgb, var(--erg-f, var(--gold)) 16%, var(--flaeche)), var(--flaeche) 68%); }
-.an-genau .an-avatar { --g: 60px; border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 28%, transparent), var(--s1); }
+.an-genau { border: 1px solid color-mix(in srgb, var(--metall) 45%, var(--linie));
+  background: radial-gradient(120% 95% at 50% 0%, color-mix(in srgb, var(--erg-f, var(--metall)) 16%, var(--flaeche)), var(--flaeche) 68%); }
+.an-genau .an-avatar { --g: 60px; border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--metall) 28%, transparent), var(--s1); }
 .an-avatar img[src$=".svg"] { width: 100%; height: 100%; image-rendering: auto; }
 .an-genau .an-g-wert { font-size: 40px; }
 .an-genau .an-g-wert.an-g-leer { font-size: 16px; }
 .an-genau .an-vs b { font-size: 30px; }
-.an-genau[data-ergebnis="sieg"] { --erg-f: var(--gold); } .an-genau[data-ergebnis="niederlage"] { --erg-f: var(--warn); }
+.an-genau[data-ergebnis="sieg"] { --erg-f: var(--metall); --erg-t: var(--gold-text); } .an-genau[data-ergebnis="niederlage"] { --erg-f: var(--warn); }
 .an-genau[data-ergebnis="remis"] { --erg-f: var(--k-gut); }
 .an-g-label { font-size: 13px; font-weight: 800; color: var(--text); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-vs { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px; min-width: 64px; }
@@ -226,11 +233,12 @@
 @media (prefers-reduced-motion: reduce) { .an-vs-sterne .neu { animation: none; } }
 .an-vs b { font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); line-height: 1.1; }
 .an-vs-grund { font-size: 12px; color: var(--text-2); max-width: 120px; }
-.an-g-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.an-g-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 4px; }
+.an-genau .an-vs .an-g-chips b { font-family: inherit; font-size: inherit; line-height: inherit; }
 .an-g-chips .chip { height: 26px; padding: 0 10px; font-size: 12.5px; }
 .an-chip-staerke { color: var(--text-2); background: var(--flaeche-2); }
 .an-chip-staerke b { font-weight: 800; color: var(--text); }
-.an-chip-rekord { color: var(--text); border-color: var(--gold); background: var(--gold-weich); }
+.an-chip-rekord { color: var(--text); border-color: var(--metall); background: var(--metall-weich); }
 .an-g-hinweis { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--text-2); }
 
 /* ---------- Bewertungskurve ---------- */
@@ -270,7 +278,9 @@
 /* R19 Analyse neu (Flo 15.11.: "richtig haesslich", Leitlinie R19): jeder Moment eine grosse Karte im Stil der
    Premium-Seite (ruhige dunkle Flaeche, Kante in der Klassenfarbe) mit deckendem Symbol, Fehlerart, Zug, besserem Zug
    und dem Absturz der Bewertung. Breit ein Raster, am Handy eine Reihe zum Wischen. */
-.an-momente-titel { margin: 0 0 8px 2px; font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); letter-spacing: -.01em; color: var(--text); }
+.an-momente-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; margin: 0 2px 8px; }
+.an-momente-notiz { font-size: 12.5px; font-weight: 650; color: var(--text-2); }
+.an-momente-titel { margin: 0; font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); letter-spacing: -.01em; color: var(--text); }
 .an-momente { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; padding: 2px; }
 .an-moment.knopf { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; justify-content: stretch; gap: 4px 12px;
   min-height: 76px; height: auto; padding: 12px 14px; border-radius: 16px; text-align: left; white-space: normal;
@@ -292,10 +302,11 @@
 .an-moment.an { box-shadow: 0 0 0 2px var(--kt), var(--s1); }
 @media (hover: hover) { .an-moment.knopf:hover { box-shadow: 0 0 0 1px var(--kt), var(--s1); } }
 .an-momente-leer { font-size: 14px; color: var(--text-2); padding: 4px 2px; }
-/* Kompakte Momente-Zeile ueber dem Brett, nur auf kurzen Hochformaten (Entscheidung A, e7 16.11.): je Moment Symbol und
+/* Kompakte Momente-Zeile ueber dem Brett, auf kurzen Hochformaten (Entscheidung A, e7 16.11.) und seit R27 A1 auch auf dem
+   iPad hoch (dort fuellt das Brett die Breite, die Karten stehen erst unter dem ersten Bild): je Moment Symbol und
    Zug, Kante in der Klassen-Textfarbe wie die Karten, mindestens 44 px hoch; nur die Zeile wischt, nie die Seite */
 .an-momente-zeile { display: none; }
-@media (orientation: portrait) and (max-height: 700px) {
+@media (orientation: portrait) and (max-height: 700px), (orientation: portrait) and (min-width: 600px) {
   .an-momente-zeile { order: 1; display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
     scrollbar-width: none; margin-inline: -10px; padding: 3px 10px; }
   .an-momente-zeile::-webkit-scrollbar { display: none; }
@@ -312,17 +323,25 @@
 }
 
 /* ---------- Klassen-Zaehler ---------- */
-.an-klassen { padding: 8px 16px 6px; }
-/* zugeklappt (Entwurf "aufgeraeumt"): eine ruhige Zeile, aufgeklappt die ganze Tabelle */
-.an-kl-auf { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: var(--tipp); font-weight: var(--gw-stark);
-  cursor: pointer; list-style: none; }
+/* R27 A1: Titel, je Klasse mit eigenen Zuegen ein Chip (Kante in der Klassen-Textfarbe wie die Momente), die Tabelle
+   zugeklappt darunter, einspaltig und ohne 0/0-Zeilen */
+.an-klassen { padding: 12px 16px 6px; }
+.an-kl-oben { margin-bottom: 10px; }
+.an-kl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.an-kl-chip.knopf { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; height: auto; padding: 0 12px 0 6px; border-radius: var(--r-pille);
+  background: var(--flaeche-2); color: var(--text); border: 1.5px solid var(--kt); box-shadow: none; font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+.an-kl-chip .an-sym { width: 30px; height: 30px; flex: none; }
+.an-kl-chip .an-sym svg { display: block; width: 100%; height: 100%; }
+.an-kl-chip b { font-weight: 850; color: var(--kt); font-variant-numeric: tabular-nums; }
+.an-kl-auf { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: var(--tipp); font-size: 14px; font-weight: var(--gw-stark);
+  color: var(--text-2); cursor: pointer; list-style: none; }
 .an-kl-auf::-webkit-details-marker { display: none; }
 .an-kl-auf svg { width: 18px; height: 18px; flex: none; color: var(--text-2); transition: transform .2s; }
-.an-klassen[open] .an-kl-auf svg { transform: rotate(90deg); }
-.an-klassen[open] .an-kl-auf { margin-bottom: 4px; }
+.an-kl-tabelle[open] .an-kl-auf svg { transform: rotate(90deg); }
+.an-kl-tabelle[open] .an-kl-auf { margin-bottom: 4px; }
 .an-kl-auf:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) { .an-kl-auf svg { transition: none; } }
-.an-kl-raster { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: repeat(7, auto) auto; grid-auto-flow: column; column-gap: 18px; }
+.an-kl-raster { display: flex; flex-direction: column; }
 .an-kl-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 24px; font-size: 12px; font-weight: 750; letter-spacing: .1em;
   text-transform: uppercase; color: var(--text-2); }
 .an-kl-kopf span:first-child { flex: none; width: 34px; text-align: center; }
@@ -346,10 +365,9 @@
 .an-kl-balken.rechts > i { left: 0; width: calc(var(--b, 0) * 100%); opacity: .6; }
 .an-kl-gesamt { grid-template-columns: 30px minmax(0, 1fr) 30px; }
 .an-kl.null .an-kl-mitte svg { opacity: .7; }
-.an-kl-gesamt { grid-column: 1 / -1; grid-row: 8; cursor: default; border-bottom: 0; border-top: 1px solid var(--linie-2); min-height: 40px;
+.an-kl-gesamt { cursor: default; border-bottom: 0; border-top: 1px solid var(--linie-2); min-height: 40px;
   grid-template-columns: 34px minmax(0, 1fr) 34px; }
 .an-kl-gesamt .an-kl-mitte { justify-content: center; font-size: 13px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
-.an-kl-platz { border-bottom: 1px solid var(--linie); }
 
 /* ---------- Kopf-Knoepfe unten (Handy) ---------- */
 .an-aktionsleiste { display: none; }
@@ -374,8 +392,8 @@
 /* ---------- Niedriges Querformat (Handy quer): Brett nach der Hoehe, linke Spalte scrollt ---------- */
 @media (orientation: landscape) and (max-height: 560px) {
   .an-screen { --tap: 44px;
-    --an-brett: min(calc(100vh - 56px - 12px - 8px - var(--an-sicher)), calc(100vw - 20px - 20px - 34px - 300px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
-    --an-brett: min(calc(100dvh - 56px - 12px - 8px - var(--an-sicher)), calc(100vw - 20px - 20px - 34px - 300px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
+    --an-brett: min(calc(100vh - 56px - 12px - 8px - var(--an-sicher)), calc(100vw - 20px - 20px - 8px - 300px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    --an-brett: min(calc(100dvh - 56px - 12px - 8px - var(--an-sicher)), calc(100vw - 20px - 20px - 8px - 300px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
   .an-screen .kopf { height: 56px; padding: 0 10px; }
   .an-inhalt { padding: 0 10px 12px; gap: 16px; }
   .an-kopf-knoepfe .knopf { padding: 0 12px; font-size: 14px; }
@@ -383,12 +401,12 @@
 
 /* ---------- Hochformat (iPad hoch, Handy): eine Spalte, die Seite scrollt ---------- */
 @media (orientation: portrait) {
-  .an-screen { --an-brett: min(calc(100vw - 36px - 34px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 720px); }
+  .an-screen { --an-brett: min(calc(100vw - 36px - 8px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 720px); }
   .an-koerper { flex: none; display: block; }
   .an-inhalt { display: flex; flex-direction: column; gap: 12px; width: calc(var(--an-brett) + 8px + var(--an-balken)); max-width: 100%; padding: 0 0 18px; }
   .an-links, .an-rechts { display: contents; }
-  /* Kundenblick 09.11. (Befund 10): das Brett direkt unter die Genauigkeit, Freischaltung, Teilen und Verlauf danach.
-     Vorher stand es auf dem iPhone 13 nur zu 45 %, auf dem SE zu 16 % im Bild. */
+  /* Ergebnis, Brett, Navigation, Schluesselmomente, Coach, Freischaltung, Verlauf, Zugklassen. Die Momente stehen bewusst
+     unter dem Brett: darueber schoben sie es auf dem iPad hoch aus dem Bild (tests/screens.test.mjs "Brett frei"). */
   .an-genau { order: 1; } .an-brettzone { order: 2; } .an-navi { order: 3; } .an-momente-box, .an-momente-leer { order: 4; } .an-coach { order: 5; }
   .an-banner, .an-ort-oben { order: 6; } .an-kurve-box { order: 7; }
   .an-klassen { order: 8; }
@@ -403,12 +421,10 @@
   .an-kopf-knoepfe { display: none; }
   .an-inhalt { gap: 10px; padding-bottom: 6px; }
   .an-brettzone { gap: 6px; align-self: center; } /* mittig, wenn passeBrett() es ueber der Knopfleiste kleiner macht */
-  .an-evalbalken { width: 14px; }
   .an-brett-rahmen { width: calc(var(--an-brett) + 6px); padding: 3px; border-radius: 14px; }
   .an-brett-rahmen::after { inset: 2px; border-radius: 12px; }
   .an-brett-rahmen .brett { --brett-radius: 11px; }
-  .an-navi { grid-template-columns: repeat(5, minmax(44px, 1fr)) auto; }
-  .an-stand { display: none; }
+  .an-chip-staerke { display: none; }
   .an-genau { padding: 12px; gap: 8px 6px; }
   .an-genau .an-avatar { --g: 44px; }
   .an-seite { gap: 8px; }
@@ -427,9 +443,7 @@
   .an-c-zug { font-size: 15px; }
   .an-c-text { font-size: 14px; }
   .an-c-linie { font-size: 13px; }
-  .an-klassen { padding: 6px 12px; }
-  .an-kl-raster { display: flex; flex-direction: column; }
-  .an-kl-kopf2, .an-kl-platz { display: none; }
+  .an-klassen { padding: 10px 12px 4px; }
   .an-aktionsleiste { order: 99; display: grid; grid-template-columns: auto 1fr; gap: 8px; position: sticky; bottom: 0; z-index: 20;
     padding: 12px 10px calc(10px + env(safe-area-inset-bottom, 0px)); margin-top: auto;
     background: linear-gradient(var(--grund-0), var(--grund) 34%); }
@@ -447,11 +461,10 @@
 .an-c-zuege span { white-space: nowrap; }
 @media (orientation: landscape) and (min-height: 561px) {
   .an-screen {
-    --an-brett: min(calc(100vh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
-    --an-brett: min(calc(100dvh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+    --an-brett: min(calc(100vh - 200px - var(--an-sicher)), calc(100vw - 36px - 20px - 8px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+    --an-brett: min(calc(100dvh - 200px - var(--an-sicher)), calc(100vw - 36px - 20px - 8px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
   }
   .an-navi .knopf { min-height: 48px; }
-  .an-coach { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 14px; }
 }
 
 /* ============================================================
@@ -474,9 +487,7 @@
   .an-vs-wort { font-size: 12px; }
   .an-vs-grund { font-size: 12px; max-width: 84px; }
   .an-kurve-wrap { height: 84px; }
-  .an-klassen { padding: 6px 12px; }
-  .an-kl-raster { display: flex; flex-direction: column; }
-  .an-kl-kopf2, .an-kl-platz { display: none; }
+  .an-klassen { padding: 10px 12px 4px; }
 }
 /* unter 330 px traegt die Zeile die Portraets nicht mehr, die Beschriftung nennt die Seiten */
 @container an-rechts (max-width: 330px) {
@@ -506,33 +517,24 @@
 }
 
 /* ============================================================
-   Etappe A (Flo 06.11.2026: "bei der Analyse ist das Schachbrett zu klein"), gemessen in tests/brettgroesse.test.mjs.
-   Querformat ab 561 px Hoehe: nur das Brett steht links und ist so hoch wie der Bildschirm; Navigation, Coach und die
-   rechte Spalte stehen rechts untereinander (vorher lagen Navigation und Coach unter dem Brett und kosteten 336 px Hoehe).
-   Hochformat: iPad mit schmalerem Rand, Handy von Rand zu Rand mit waagrechtem Bewertungsbalken ueber dem Brett.
-   Erst ab 920 px Breite: die rechte Spalte ist mindestens --an-rechts-min (32vw) breit, und die Navigation braucht dort
-   4 x 44 px + Zugstand 84 px + Luecken = 292 px (32vw >= 292 ab 913 px). Darunter (590 x 580) bleibt die alte Lage, dort
-   blendet @container an-links den Zugstand aus; mit .an-links als display: contents greift das nicht mehr.
-   Der Coach hat eine feste Hoehe und scrollt: wuchs er mit dem Text jedes Zuges, rutschte die Kurve darunter beim
-   Ziehen unter dem Finger weg.
+   R27 A1 "Buehne" (Plan R27 Analyse, ersetzt Etappe A vom 06.11.): Querformat ab 561 px Hoehe und 920 px Breite.
+   Links das Brett mit Balken und Navigation darunter, sticky beim Rollen; rechts eine Spalte OHNE eigenes Rollen
+   (vorher scrollte sie in sich, oben abgeschnitten, mit Maske, und der Verlauf wirkte doppelt). Die Seite rollt als
+   Ganzes (.screen.scrollt). Das Brett ist dafuer rund 60 px kleiner als bei Etappe A (Grenzen in
+   tests/brettgroesse.test.mjs). Sticky haelt nur, weil zwischen .an-links und .screen kein Vorfahr overflow setzt.
+   Der Coach waechst mit dem Text (keine feste Hoehe mehr), die Kurve rutscht dabei nach unten, nicht unter den Finger,
+   denn gezogen wird auf der Kurve selbst.
    ============================================================ */
 @media (orientation: landscape) and (min-height: 561px) and (min-width: 920px) {
   .an-screen {
-    --an-brett: min(calc(100vh - var(--kopf-hoehe) - 32px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
-    --an-brett: min(calc(100dvh - var(--kopf-hoehe) - 32px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
+    --an-brett: min(calc(100vh - var(--kopf-hoehe) - 32px - 22px - 64px - var(--an-sicher)), calc(100vw - 36px - 20px - 8px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
+    --an-brett: min(calc(100dvh - var(--kopf-hoehe) - 32px - 22px - 64px - var(--an-sicher)), calc(100vw - 36px - 20px - 8px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
   }
-  .an-inhalt { grid-template-rows: auto auto minmax(0, 1fr); row-gap: 12px; }
-  .an-links { display: contents; }
-  .an-brettzone { grid-column: 1; grid-row: 1 / 4; align-self: start; }
-  .an-navi { grid-column: 2; grid-row: 1; }
-  .an-coach { grid-column: 2; grid-row: 2; height: clamp(120px, 24dvh, 220px); max-height: none; }
-  .an-rechts { grid-column: 2; grid-row: 3; }
-}
-/* Klassen zweispaltig erst ab 480 px Spaltenbreite: neben dem grossen Brett ist die Spalte auf dem iPad Pro (1366 x 1024)
-   426 px breit, und die zweite Spalte ragte rechts aus dem Fenster */
-@container an-rechts (max-width: 480px) {
-  .an-kl-raster { display: flex; flex-direction: column; }
-  .an-kl-kopf2, .an-kl-platz { display: none; }
+  .an-koerper { flex: none; }
+  .an-inhalt { align-items: start; }
+  .an-links { position: sticky; top: 12px; overflow: visible; }
+  .an-rechts { overflow: visible; overscroll-behavior: auto; margin: 0; padding: 0 0 8px; }
+  .an-rechts.mehr { -webkit-mask-image: none; mask-image: none; }
 }
 @media (orientation: portrait) and (min-width: 521px) {
   .an-screen { --an-brett: min(calc(100vw - 32px - var(--an-balken) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 880px); }
@@ -546,16 +548,162 @@
   .an-brett-rahmen::after { display: none; }
   .an-brett-rahmen .brett { --brett-radius: 0px; }
   /* Balken waagrecht: Weiss waechst von links (data-unten = Farbe auf der linken Seite) */
-  .an-evalbalken { width: auto; height: 12px; margin-inline: 10px; border-radius: 6px; }
-  .an-eb-unten { top: 0; bottom: 0; right: auto; width: var(--w, 50%); height: auto; }
-  .an-eb-unten::before { top: 0; bottom: 0; left: auto; right: -1px; width: 2px; height: auto; }
-  .an-eb-mitte { top: 0; bottom: 0; left: 50%; right: auto; width: 1px; height: auto; }
-  /* die Zahl liegt mit dem Balken waagrecht (fable-check 19.11. Nr 10: Schreibrichtung und Drehung kamen aus der senkrechten Fassung) */
-  .an-eb-wert, .an-eb-wert[data-seite="oben"] { top: 1px; bottom: auto; left: 6px; right: auto; text-align: left; writing-mode: horizontal-tb; transform: none; }
-  .an-eb-wert[data-seite="oben"] { left: auto; right: 6px; text-align: right; }
+  .an-evalbalken { margin-inline: 10px; }
   /* R19 Analyse neu: die Momente-Karten als Reihe zum Wischen, die naechste Karte schaut rechts herein */
   .an-momente { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 10px; overscroll-behavior-x: contain;
     scrollbar-width: none; margin-inline: -10px; padding: 2px 10px 4px; }
   .an-momente::-webkit-scrollbar { display: none; }
   .an-moment.knopf { flex: 0 0 min(250px, 76vw); scroll-snap-align: start; }
+}
+
+/* ============================================================
+   R27 A1, ruhige Optik mit echtem Gold (Flo 21.11.: "uebersichtlich, clean und elegant", "Gold richtig, kein Kackgelb",
+   "der Verlauf sieht billig aus"). Gold ist ein gedeckter Metallton mit Verlauf und nur Akzent: Kanten, Ringe, Sterne, die
+   Marke im Verlauf; nie eine grosse gelbe Flaeche, und das globale --gold kommt hier nicht mehr vor.
+   Die Metall-Tokens sind dieselben wie in ads Juwel-Bauteilen (so/R27-online-arena, css/themes/modern.css), gleiche Namen
+   und Werte, damit sie beim Sammeln zusammenfallen. Raster 8 px, Ecken 24 (Karten) und 16 (Momente).
+   color-mix nur mit @supports, Rueckfall ist die schlichte Flaeche.
+   ============================================================ */
+:root { --metall-hell: #F3DEA2; --metall: #C9A14A; --metall-tief: #8A6A26; --metall-weich: rgba(201, 161, 74, .14); --gold-text: #75561A; }
+:root[data-modus="dunkel"] { --gold-text: #DCC07A; }
+@media (prefers-color-scheme: dark) { :root:not([data-modus="hell"]) { --gold-text: #DCC07A; } }
+.an-screen { --an-metall: linear-gradient(135deg, var(--metall-hell), var(--metall) 48%, var(--metall-tief));
+  --an-karte: inset 0 0 0 1px var(--linie), inset 0 1px 0 rgba(255, 255, 255, .06), var(--s1); }
+
+/* Karten: gleiche Ecken, feine helle Innenkante, weicher Schatten, Abstaende im 8er-Raster */
+.an-rechts { gap: 16px; }
+.an-rechts > .flaeche:not(.an-genau), .an-rechts > .an-coach { border: 0; border-radius: var(--r-l); box-shadow: var(--an-karte); }
+.an-k-titel, .an-momente-titel { font-family: var(--display); font-weight: var(--gw-titel); font-size: 18px; letter-spacing: -.015em; }
+
+/* Brett: dunkler Goldrahmen mit weichem Schatten statt grauer Kante (das Brett selbst bleibt das Standardbrett) */
+.an-brett-rahmen { background: var(--metall-tief); box-shadow: 0 24px 48px -20px rgba(0, 0, 0, .55), 0 2px 6px rgba(0, 0, 0, .25); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .an-brett-rahmen { background: linear-gradient(160deg, color-mix(in srgb, var(--metall) 70%, #000), color-mix(in srgb, var(--metall-tief) 55%, #000)); }
+}
+.an-brett-rahmen::after { box-shadow: inset 0 0 0 1px rgba(243, 222, 162, .35); inset: 0; border-radius: inherit; }
+
+/* Bewertungsbalken: 10 px, weicher Verlauf, Zahl daneben gut lesbar */
+.an-evalbalken { height: 10px; border-radius: 5px; overflow: visible; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
+.an-eb-unten { border-radius: 5px 0 0 5px; background: linear-gradient(180deg, #FFFFFF, #E4E1DA); }
+.an-evalbalken[data-unten="b"] .an-eb-unten { background: linear-gradient(180deg, #3E4148, #24262B); }
+.an-evalbalken { background: linear-gradient(180deg, #3E4148, #24262B); }
+.an-evalbalken[data-unten="b"] { background: linear-gradient(180deg, #FFFFFF, #E4E1DA); }
+.an-eb-unten::before { display: none; }
+.an-eb-mitte { background: rgba(128, 128, 128, .45); }
+.an-eb-wert { top: 50%; bottom: auto; height: 22px; margin-top: -11px; left: -4px; padding: 0 8px; border-radius: 11px; font-size: 12px; font-weight: 800;
+  background: var(--flaeche); color: var(--text); box-shadow: inset 0 0 0 1px var(--linie-2), var(--s1); }
+.an-eb-wert[data-seite="oben"] { left: auto; right: -4px; }
+.an-eb-wert[data-farbe="b"] { background: #24262B; color: #F3F1EC; }
+
+/* Ergebnis-Kopf: Goldkante als Verlauf, ruhiger Grund, ein Hauch Ergebnisfarbe oben */
+.an-genau { position: relative; isolation: isolate; overflow: hidden; padding: 24px; border: 1px solid transparent; border-radius: var(--r-xl);
+  background: linear-gradient(var(--flaeche), var(--flaeche)) padding-box, var(--an-metall) border-box; box-shadow: var(--s2); }
+.an-genau::before { content: ''; position: absolute; z-index: -1; left: 50%; top: -70%; width: 110%; aspect-ratio: 1; transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(255, 255, 255, .05), transparent 72%); pointer-events: none; }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .an-genau::before { background: radial-gradient(closest-side, color-mix(in srgb, var(--erg-f, var(--metall)) 12%, transparent), transparent 72%); }
+}
+.an-genau .an-avatar, .an-genau .an-avatar.an-ich { --g: 56px; border-radius: 50%; border: 0; box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 4px var(--metall), var(--s1); }
+.an-genau .an-g-wert { font-size: 34px; letter-spacing: -.02em; }
+.an-genau .an-g-wert small { font-size: .5em; color: var(--text-2); }
+.an-genau .an-vs { gap: 4px; }
+.an-genau .an-vs b { font-size: 40px; letter-spacing: -.03em; line-height: 1; }
+.an-genau .an-vs-wort { padding: 4px 12px; border-radius: var(--r-pille); font-size: 12px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--erg-t, var(--text)); background: var(--flaeche-2); box-shadow: inset 0 0 0 1px var(--linie-2); }
+.an-genau .an-vs-grund { font-size: 13px; color: var(--text-2); }
+/* Sterne: Metall mit Glanz statt Gelb */
+.an-vs-sterne { gap: 4px; margin-top: 8px; font-size: 17px; }
+.an-vs-sterne .an { color: var(--metall); filter: drop-shadow(0 -1px 0 var(--metall-hell)) drop-shadow(0 1px 1px rgba(0, 0, 0, .35)); }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .an-vs-sterne .an { background: var(--an-metall); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+
+/* Schluesselmomente: gleich hohe Karten im Raster (2 nebeneinander, 3 in einer Reihe, 4 als 2 x 2), nie eine allein */
+@media (min-width: 521px), (orientation: landscape) {
+  .an-momente { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+  .an-momente[data-n="1"] { grid-template-columns: minmax(0, 1fr); }
+  .an-momente[data-n="3"], .an-momente[data-n="5"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container an-rechts (max-width: 460px) {
+  .an-momente[data-n="3"], .an-momente[data-n="5"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .an-momente[data-n="3"] > .an-moment:first-child, .an-momente[data-n="5"] > .an-moment:first-child { grid-column: 1 / -1; }
+}
+.an-moment.knopf, .an-moment.knopf:not(.du) { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px; height: 100%;
+  min-height: 0; padding: 16px; border: 0; border-radius: 16px; text-align: left; background: var(--flaeche); box-shadow: var(--an-karte); }
+.an-moment .an-m-kopf { display: flex; align-items: center; gap: 8px; }
+.an-moment .an-m-klasse { display: inline-flex; align-items: center; gap: 6px; padding: 2px 12px 2px 2px; border-radius: var(--r-pille); font-size: 13px;
+  font-weight: 800; color: var(--kt); background: var(--flaeche-2); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .an-moment .an-m-klasse { background: color-mix(in srgb, var(--kf) 14%, var(--flaeche)); }
+}
+.an-moment .an-m-klasse .an-sym { grid-row: auto; width: 36px; height: 36px; }
+.an-moment .an-m-wer { margin-left: auto; font-size: 12px; }
+.an-m-zug { font-size: 22px; }
+.an-m-fuss { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-top: auto; font-size: 12.5px; }
+.an-m-fuss .an-m-eval { padding: 0; background: none; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.an-m-fuss .an-m-besser { font-size: 12.5px; }
+.an-moment.an { box-shadow: 0 0 0 2px var(--kt), var(--s1); }
+@media (hover: hover) { .an-moment.knopf:hover { box-shadow: 0 0 0 1px var(--kt), var(--s1); } }
+
+/* Coach: ruhige Karte, die Klassenfarbe als feine Kante oben, in der Startstellung Metall */
+.an-coach { padding: 16px 24px; }
+.an-coach::before { content: ''; position: absolute; left: 24px; right: 24px; top: 0; height: 2px; border-radius: 0 0 2px 2px; background: var(--kf); opacity: .9; }
+.an-coach.start::before { background: var(--an-metall); }
+.an-coach.brillant { box-shadow: var(--an-karte), 0 0 0 1px var(--k-brillant); }
+
+/* Verlauf wie ein Finanz-Chart: dunkle ruhige Flaeche, glatte feine Linie, weicher Verlauf darunter, keine Gitter,
+   Momente als leuchtende Punkte mit feinem Ring, die aktuelle Stelle als goldene Senkrechte */
+.an-kurve-box { padding: 16px 16px 8px; }
+.an-kurve-wrap { height: 152px; }
+.an-kurve, .an-kurve-wrap::after { border-radius: 12px; }
+.an-kurve-wrap::after { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+.an-kurve > .an-k-grund, .an-kurve > .an-k-grund { fill: #17191D; }
+.an-k-flaeche { fill: url(#an-k-weiss); }
+.an-k-w1 { stop-color: #F3F1EC; stop-opacity: .34; } .an-k-w2 { stop-color: #F3F1EC; stop-opacity: .03; }
+.an-k-mitte { stroke: rgba(255, 255, 255, .14); stroke-width: 1; stroke-dasharray: none; }
+.an-k-phase { stroke: rgba(255, 255, 255, .05); }
+.an-k-linie { stroke: #F3F1EC; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.an-k-cursor { stroke: var(--metall); stroke-width: 1.5; }
+.an-k-punkte i, .an-k-punkte i.du { width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; opacity: 1; border: 0; background: var(--kf);
+  box-shadow: 0 0 0 2px rgba(23, 25, 29, .9), 0 0 0 3px var(--kf), 0 0 10px 2px var(--kf); }
+.an-k-punkte i.du { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+.an-k-marke { width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; background: #17191D; border: 2px solid var(--metall-hell); box-shadow: 0 0 0 1px var(--metall-tief), 0 0 12px var(--metall-weich); }
+.an-phasen span { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: var(--text-2); }
+
+/* Zugklassen: ruhige Tabelle, immer offen; Symbol und Name, dann die Zahl fuer dich und fuer den Gegner, Nullen leise */
+.an-klassen { padding: 16px 16px 8px; }
+.an-kl-kopf, .an-kl { display: grid; grid-template-columns: minmax(0, 1fr) 72px 72px; align-items: center; column-gap: 8px; }
+.an-kl-kopf { height: auto; margin: 0 0 8px; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.an-kl-kopf span.an-k-titel { width: auto; text-align: left; text-transform: none; letter-spacing: -.015em; color: var(--text); }
+.an-kl-kopf span:not(.an-k-titel) { width: auto; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-kl { min-height: 44px; padding: 0 0 0 4px; border: 0; border-top: 1px solid var(--linie); border-radius: 0; background: none; text-align: left; color: var(--text); font: inherit; }
+.an-kl-mitte .an-sym, .an-kl-mitte svg { width: 32px; height: 32px; }
+.an-kl .an-n { justify-self: center; min-width: 32px; padding: 2px 8px; border-radius: var(--r-pille); text-align: center; font-size: 15px; font-weight: 800;
+  font-variant-numeric: tabular-nums; color: var(--text); }
+.an-kl .an-n.du:not(.nul) { color: var(--kt); background: var(--flaeche-2); }
+.an-kl .an-n.nul { font-weight: 600; color: var(--text-3); }
+.an-kl.null .an-kl-mitte { opacity: .5; }
+.an-kl-gesamt { grid-template-columns: minmax(0, 1fr) 72px 72px; }
+.an-kl-gesamt .an-kl-mitte { justify-content: flex-start; }
+@media (hover: hover) { .an-kl:not(.leer):not(.an-kl-gesamt):hover { background: var(--flaeche-2); } }
+
+/* schmale Spalten und Handy: kleinere Werte, sonst ueberlappten 98,7 und 1:0 */
+@media (orientation: portrait) and (max-width: 520px) {
+  .an-genau { padding: 16px 12px; }
+  .an-genau .an-g-wert { font-size: 26px; }
+  .an-genau .an-vs b { font-size: 28px; }
+  .an-genau .an-avatar, .an-genau .an-avatar.an-ich { --g: 40px; }
+  .an-moment.knopf, .an-moment.knopf:not(.du) { padding: 12px 16px; }
+  .an-coach { padding: 16px; }
+  .an-kurve-wrap { height: 96px; }
+}
+@container an-rechts (max-width: 400px) {
+  .an-genau { padding: 16px 12px; }
+  .an-genau .an-g-wert { font-size: 26px; }
+  .an-genau .an-vs b { font-size: 28px; }
+}
+@container an-rechts (max-width: 360px) {
+  .an-kl-kopf, .an-kl, .an-kl-gesamt { grid-template-columns: minmax(0, 1fr) 56px 56px; column-gap: 4px; }
+  .an-kl-kopf span:not(.an-k-titel) { font-size: 11px; letter-spacing: 0; text-transform: none; }
+  .an-kl-mitte { gap: 6px; }
 }

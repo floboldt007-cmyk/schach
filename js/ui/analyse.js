@@ -485,14 +485,16 @@ export function zeige(root, params = {}, app) {
     st.zuege.forEach((z, i) => { if (z.klasse === 'buch') buchEnde = i + 1; });
     st.phasen = spielphasen(st.fens, buchEnde);
 
+    // R27 A1 "Buehne" (Plan R27, Flo waehlt noch zwischen A1/A2/A3): links das Brett mit Balken und Navigation darunter
+    // (im Querformat sticky), rechts eine Spalte ohne eigenes Rollen: Ergebnis, Schluesselmomente, Coach, Verlauf, Zugklassen
     koerper.innerHTML = `
       <div class="an-inhalt">
         <div class="an-links">
           <div class="an-brettzone">
-            <div class="an-evalbalken" data-unten="${st.sf}" aria-hidden="true"><div class="an-eb-mitte"></div><div class="an-eb-unten"></div><span class="an-eb-wert zahl"></span></div>
             <div class="an-brett-rahmen">
               <div class="an-brett" aria-label="${esc(t('analyse.an.brett'))}"></div>
             </div>
+            <div class="an-evalbalken" data-unten="${st.sf}" aria-hidden="true"><div class="an-eb-mitte"></div><div class="an-eb-unten"></div><span class="an-eb-wert zahl"></span></div>
           </div>
           <div class="an-navi">
             <button class="knopf" type="button" data-aktion="anfang" aria-label="${esc(t('analyse.an.navi.anfang'))}">${icon('anfang')}</button>
@@ -500,16 +502,15 @@ export function zeige(root, params = {}, app) {
             <button class="knopf an-abspielen" type="button" data-aktion="abspielen" aria-pressed="false" aria-label="${esc(t('analyse.an.navi.abspielen'))}">${icon('play')}</button>
             <button class="knopf" type="button" data-aktion="vor-zug" aria-label="${esc(t('analyse.an.navi.vor'))}">${icon('vor')}</button>
             <button class="knopf" type="button" data-aktion="ende" aria-label="${esc(t('analyse.an.navi.ende'))}">${icon('ende')}</button>
-            <button class="knopf an-tempo" type="button" data-aktion="tempo"></button>
-            <span class="an-stand zahl" aria-live="polite"></span>
+            <button class="knopf an-tempo" type="button" data-aktion="tempo"><span class="an-stand zahl" aria-live="polite"></span><span class="an-tempo-wort"></span></button>
           </div>
-          <div class="an-coach" aria-live="polite"></div>
         </div>
         <div class="an-rechts">
           ${genauHtml()}
           ${momenteHtml()}
           ${bannerHtml()}
           <div class="an-ort-oben" hidden></div>
+          <div class="an-coach" aria-live="polite"></div>
           ${kurveHtml()}
           ${klassenHtml()}
         </div>
@@ -637,16 +638,18 @@ export function zeige(root, params = {}, app) {
       return `<div class="an-g-wert zahl${ich ? ' an-ich-wert' : ''}" data-band="${band}">${komma1(g)}<small>%</small></div>`
         + `<span class="an-g-mess" data-band="${band}" aria-hidden="true"><i style="transform:scaleX(${(Math.max(0, Math.min(100, g)) / 100).toFixed(3)})"></i></span>`;
     };
+    // R27 A1: eine ruhige Ergebnis-Zeile ohne eigenen Titel (das Ergebnis steht nur hier, die Startkarte nennt es nicht
+    // mehr); Leistung und Bestwert unter dem Grund
+    const chips = (!zuKurz && Number.isFinite(staerke)) || rekord ? `<span class="an-g-chips">${!zuKurz && Number.isFinite(staerke)
+      ? `<span class="chip an-chip-staerke">${esc(t('analyse.an.genau.leistung'))} <b class="zahl">${staerke}</b></span>` : ''}${rekord
+      ? `<span class="chip an-chip-rekord">${icon('pokal')} ${esc(t('analyse.an.genau.bestwert'))}</span>` : ''}</span>` : '';
     return `
-      <div class="an-genau flaeche" data-ergebnis="${esc(info.art)}">
-        <div class="an-g-kopf"><span class="an-g-titel">${esc(t('analyse.an.genau.genauigkeit'))}</span><span class="an-g-chips">${!zuKurz && Number.isFinite(staerke)
-          ? `<span class="chip an-chip-staerke">${esc(t('analyse.an.genau.leistung'))} <b class="zahl">${staerke}</b></span>` : ''}${rekord
-          ? `<span class="chip an-chip-rekord">${icon('pokal')} ${esc(t('analyse.an.genau.bestwert'))}</span>` : ''}</span></div>
+      <div class="an-genau flaeche" data-ergebnis="${esc(info.art)}" aria-label="${esc(t('analyse.an.genau.genauigkeit'))}">
         <div class="an-seite">
           ${floBild()}
           <div class="an-seite-text">${wert(eigen, true)}<div class="an-g-label">${esc(t('analyse.an.genau.du'))}</div></div>
         </div>
-        <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span>${sterneHtml()}</div>
+        <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span>${chips}${sterneHtml()}</div>
         <div class="an-seite an-re">
           ${gegnerBild()}
           <div class="an-seite-text">${wert(gegner, false)}<div class="an-g-label">${esc(kurz)}</div></div>
@@ -662,7 +665,18 @@ export function zeige(root, params = {}, app) {
     const pkt = st.kurve.map((p, i) => [kx(i), ky(p)]);
     if (pkt.length === 1) pkt.push([KW, pkt[0][1]]);
     if (pkt.length === 2 && st.kurve.length === 1) pkt[0][0] = 0;
-    const linie = pkt.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+    // R27 A1 (Flo: "der Verlauf sieht billig aus"): eine glatte, feine Linie wie in Finanz-Charts. Catmull-Rom als Bezier,
+    // die Stuetzpunkte auf den Rand geklemmt, damit die Glaettung nie ueber das Feld hinausschwingt
+    const klemme = (y) => Math.max(KR, Math.min(KH - KR, y));
+    const linie = pkt.map(([x, y], i) => {
+      if (!i) return `M${x.toFixed(1)} ${y.toFixed(1)}`;
+      const [x0, y0] = pkt[i - 2] || pkt[i - 1];
+      const [x1, y1] = pkt[i - 1];
+      const [x3, y3] = pkt[i + 1] || [x, y];
+      const c1 = [x1 + (x - x0) / 6, klemme(y1 + (y - y0) / 6)];
+      const c2 = [x - (x3 - x1) / 6, klemme(y - (y3 - y1) / 6)];
+      return `C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(' ');
     const flaeche = `${linie} L${KW} ${KH} L0 ${KH} Z`;
     const trenner = st.phasen.slice(1).map((ph) => `<line class="an-k-phase" x1="${kx(ph.von).toFixed(1)}" x2="${kx(ph.von).toFixed(1)}" y1="0" y2="${KH}" vector-effect="non-scaling-stroke"/>`).join('');
     const etiketten = st.phasen.map((ph) => {
@@ -723,13 +737,9 @@ export function zeige(root, params = {}, app) {
       const besserText = besser ? t('analyse.an.momente.besser', { zug: besser }) : '';
       return `<button class="knopf an-moment${du ? ' du' : ''}" type="button" data-aktion="moment" data-ply="${p}" data-klasse="${esc(z.klasse)}" style="--kf:var(--k-${esc(z.klasse)})"
         aria-label="${esc(zugText(z))}, ${esc(KLASSEN_NAME[z.klasse])}, ${esc(wer)}${besserText ? ', ' + esc(besserText) : ''}">
-        ${symbolDeckend(z.klasse)}
-        <span class="an-m-text">
-          <span class="an-m-kopf"><span class="an-m-klasse">${esc(KLASSEN_NAME[z.klasse])}</span><span class="an-m-wer">${esc(wer)}</span></span>
-          <span class="an-m-zug">${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span>
-          ${besserText ? `<span class="an-m-besser">${esc(besserText)}</span>` : ''}
-        </span>
-        ${sturz ? `<span class="an-m-eval zahl">${esc(sturz)}</span>` : ''}
+        <span class="an-m-kopf"><span class="an-m-klasse">${symbolDeckend(z.klasse)}<span>${esc(KLASSEN_NAME[z.klasse])}</span></span><span class="an-m-wer">${esc(wer)}</span></span>
+        <span class="an-m-zug">${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span>
+        ${sturz || besserText ? `<span class="an-m-fuss">${sturz ? `<span class="an-m-eval zahl">${esc(sturz)}</span>` : ''}${besserText ? `<span class="an-m-besser">${esc(besserText)}</span>` : ''}</span>` : ''}
       </button>`;
     }).join('');
     const titel = esc(t('analyse.an.momente.titel'));
@@ -743,7 +753,7 @@ export function zeige(root, params = {}, app) {
       return `<button class="knopf an-mz${z.farbe === st.sf ? ' du' : ''}" type="button" tabindex="-1" data-aktion="moment" data-ply="${p}" data-klasse="${esc(z.klasse)}">`
         + `${symbolDeckend(z.klasse)}<span class="an-mz-zug">${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
     }).join('');
-    return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}">${karten}</div></div>`
+    return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}" data-n="${Math.min(plies.length, 5)}">${karten}</div></div>`
       + `<div class="an-momente-zeile" aria-hidden="true">${zeile}</div>`;
   }
 
@@ -752,32 +762,26 @@ export function zeige(root, params = {}, app) {
     const du = (r.anzahl && r.anzahl[st.sf]) || {};
     const gegner = (r.anzahl && r.anzahl[st.bf]) || {};
     const kurz = zuzweit() ? personenName(st.bf) : gegnerKurz();
-    // Flo 30.10. abends ("kann aufgeklappt sein, aber muss angepasst werden"): links du, rechts der Gegner, je ein Balken
-    // in der Farbe der Klasse (Laenge relativ zur haeufigsten Klasse der Partie)
-    const hoechstens = Math.max(1, ...KLASSEN.map((k) => Math.max(du[k] || 0, gegner[k] || 0)));
+    // R27 A1 (Flo 21.11.: "man muss sehen, wie viele von welcher Art von Zuegen man hatte"): eine ruhige Tabelle, immer
+    // offen, je Klasse Symbol und Name, dann die Zahl fuer dich und fuer den Gegner; Klassen ohne Zuege bleiben stehen,
+    // aber leise. Tippen auf eine Zeile springt zum naechsten Zug dieser Klasse.
     const zeile = (k) => {
       const a = du[k] || 0;
       const b = gegner[k] || 0;
       const aktiv = a || (zuzweit() && b);
-      return `<button class="an-kl${aktiv ? '' : ' leer'}${a || b ? '' : ' null'}" type="button" data-aktion="klasse" data-klasse="${k}" style="--kf:var(--k-${k});--a:${(a / hoechstens).toFixed(3)};--b:${(b / hoechstens).toFixed(3)}"
+      return `<button class="an-kl${aktiv ? '' : ' leer'}${a || b ? '' : ' null'}" type="button" data-aktion="klasse" data-klasse="${k}" style="--kf:var(--k-${k})"
         aria-label="${esc(KLASSEN_NAME[k])}: ${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.du'))} ${a}, ${esc(kurz)} ${b}${aktiv ? ', ' + esc(t(zuzweit() ? 'analyse.an.klassen.springen' : 'analyse.an.klassen.springenDu')) : ''}"${aktiv ? '' : ' aria-disabled="true"'}>
-        <span class="an-n du${a ? '' : ' nul'}">${a}</span><span class="an-kl-balken links" aria-hidden="true"><i></i></span><span class="an-kl-mitte">${symbolDeckend(k)}<span>${esc(KLASSEN_NAME[k])}</span></span><span class="an-kl-balken rechts" aria-hidden="true"><i></i></span><span class="an-n${b ? '' : ' nul'}">${b}</span></button>`;
+        <span class="an-kl-mitte">${symbolDeckend(k)}<span>${esc(KLASSEN_NAME[k])}</span></span><span class="an-n du zahl${a ? '' : ' nul'}">${a}</span><span class="an-n zahl${b ? '' : ' nul'}">${b}</span></button>`;
     };
-    const kopf = `<div class="an-kl-kopf"><span>${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.kopf'))}</span><span>${esc(kurz)}</span></div>`;
-    const links = KLASSEN.slice(0, 6).map(zeile).join('');
-    const rechts = KLASSEN.slice(6).map(zeile).join('');
     const summe = (o) => Object.values(o).reduce((s, x) => s + (x || 0), 0);
-    // Flo 30.10. abends: "Das kann immer aufgeklappt sein, wenn man die Analyse macht" (vorher zugeklappt, Entwurf
-    // "Crownmate aufgeraeumt"); zuklappen geht weiter
     return `
-      <details class="an-klassen flaeche" open>
-        <summary class="an-kl-auf"><span>${esc(t('analyse.an.klassen.auf'))}</span>${icon('vor')}</summary>
+      <div class="an-klassen flaeche">
+        <div class="an-kl-kopf"><span class="an-k-titel">${esc(t('analyse.an.klassen.titel'))}</span><span>${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.kopf'))}</span><span>${esc(kurz)}</span></div>
         <div class="an-kl-raster">
-          ${kopf}${links}
-          ${kopf.replace('an-kl-kopf', 'an-kl-kopf an-kl-kopf2')}${rechts}<div class="an-kl-platz" aria-hidden="true"></div>
-          <div class="an-kl an-kl-gesamt"><span class="an-n zahl">${summe(du)}</span><span class="an-kl-mitte"><span>${esc(t('analyse.an.klassen.gesamt'))}</span></span><span class="an-n zahl">${summe(gegner)}</span></div>
+          ${KLASSEN.map(zeile).join('')}
+          <div class="an-kl an-kl-gesamt"><span class="an-kl-mitte"><span>${esc(t('analyse.an.klassen.gesamt'))}</span></span><span class="an-n zahl">${summe(du)}</span><span class="an-n zahl">${summe(gegner)}</span></div>
         </div>
-      </details>`;
+      </div>`;
   }
 
   // ---------- Navigation ----------
@@ -916,6 +920,17 @@ export function zeige(root, params = {}, app) {
   }
 
   // ---------- Coach-Karte ----------
+  function entscheidenderMoment() {
+    let best = -1;
+    let max = -1;
+    for (const p of st.review.schluesselmomente || []) {
+      if (!st.zuege[p]) continue;
+      const v = Math.abs((st.kurve[p + 1] ?? 0.5) - (st.kurve[p] ?? 0.5));
+      if (v > max + 1e-9) { max = v; best = p; }
+    }
+    return best;
+  }
+
   function zeigeCoach() {
     const el = koerper.querySelector('.an-coach');
     if (!el) return;
@@ -933,10 +948,18 @@ export function zeige(root, params = {}, app) {
       const knapp = warKnapp(st.kurve, st.sf);
       const s = startSatz({ art: info.art, zuzweit: zuzweit(), kurz: istKurz(), knapp, momente: anzahlMomente });
       const satz = t(s.schluessel, s.werte);
+      // R27 A1: das Ergebnis steht schon in der Ergebnis-Karte; die Startkarte nennt den entscheidenden Moment (groesster
+      // Ausschlag der Gewinnchance unter den Schluesselmomenten) und fuehrt mit einem Knopf dorthin
+      const ziel = zuzweit() ? -1 : entscheidenderMoment();
+      const zz = ziel >= 0 ? st.zuege[ziel] : null;
       el.innerHTML = `
         <div class="an-c-symbol an-c-start">${icon('ziel')}</div>
-        <div class="an-c-kopf"><span class="an-c-klasse">${esc(info.wort)}</span><span class="an-c-zug">${esc(t('analyse.an.startstellung'))}</span></div>
-        <p class="an-c-text">${esc(satz)}</p>`;
+        <div class="an-c-kopf"><span class="an-c-klasse">${esc(t('analyse.an.startstellung'))}</span></div>
+        <p class="an-c-text">${esc(satz)}</p>${zz ? `
+        <div class="an-c-fuss">
+          <p class="an-c-linie an-c-ziel"><span>${esc(t('analyse.an.start.entscheidend'))}</span> <b class="an-c-zuege">${esc(zugText(zz))}${ZEICHEN[zz.klasse] || ''}</b></p>
+          <div class="an-c-knoepfe"><button class="knopf" type="button" data-aktion="moment" data-ply="${ziel}"><span>${esc(t('analyse.an.start.zumMoment'))}</span>${icon('vor')}</button></div>
+        </div>` : ''}`;
       neuAnimieren(el);
       return;
     }
@@ -1117,7 +1140,8 @@ export function zeige(root, params = {}, app) {
     const k = koerper.querySelector('[data-aktion="tempo"]');
     if (!k) return;
     const stufe = t(`analyse.an.tempo.${st.tempo}`);
-    k.textContent = stufe;
+    const wort = k.querySelector('.an-tempo-wort');
+    if (wort) wort.textContent = stufe;
     k.dataset.tempo = st.tempo;
     k.setAttribute('aria-label', t('analyse.an.tempo.aria', { stufe }));
   }
