@@ -142,3 +142,59 @@ export function spielSymbol(name, klasse = '') {
     + `<radialGradient id="${id}g"><stop offset="0" style="stop-color:var(--sy-glut);stop-opacity:.7"/><stop offset="1" style="stop-color:var(--sy-glut);stop-opacity:0"/></radialGradient>`
     + `</defs>${SY[name](teile)}</svg>`;
 }
+
+// Saphir im Brillantschliff (R27 Online Arena, Symbol fuer das Raetsel-Duell): Gegenstueck zur Kronjuwel-Krone, gleiche Bauart
+// (Verlauf, dunkle Kante, Glanz), Farben aus den Saphir-Tokens per Klasse (css/bauteile.css .kj-saphir)
+export function saphirSymbol() {
+  const id = 'sa' + (++syZaehler);
+  return `<svg class="kj kj-saphir" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><defs>`
+    + `<linearGradient id="${id}" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" class="kj-g0"/><stop offset=".5" class="kj-g1"/><stop offset="1" class="kj-g2"/></linearGradient>`
+    + `</defs><g class="kj-figur" style="--kj-verlauf:url(#${id})">`
+    + '<path class="kj-gold" d="M7 18.5 15.5 8.5h17l8.5 10L24 42z"/>'
+    + '<path class="kj-facette" d="M7 18.5h34M15.5 8.5l4.5 10 4-10 4 10 4.5-10M20 18.5 24 42l4-23.5"/>'
+    + '<path class="kj-glanz-strich" d="M13 17.5 17.5 11"/><circle class="kj-glanz" cx="27" cy="12.6" r="1.4"/></g></svg>';
+}
+
+// ---------- Design-Probe Leiste R27 (nur ?test&design=k1|k2|k3, R19-Auswahl leiste-symbole-r27; NICHT live) ----------
+// Flo 21.11.2026: W1 a/b/c gefallen nicht, Vorbild ist das Premium-Wappen (js/ui/premium.js emblem): gefuellte Krone in Gold
+// mit dunklerem Band, Rubin in der Mitte, Scheibe mit gepunktetem Ring, Strahlenkranz, Funkel. Alle vier Reiter-Symbole in
+// dieser Bildsprache; Scheibe, Strahlen und Funkel stehen immer im SVG, css/navigation.css zeigt je Variante, was dazugehoert.
+// Farben nur aus den Tokens (--gold, --akzent, --flaeche) per Klasse, kein light-dark().
+const KJ = {
+  heim: `<path class="kj-gold" d="M7 22.5 24 8.5l17 14V40a3 3 0 0 1-3 3H10a3 3 0 0 1-3-3z"/>`
+    + `<path class="kj-band" d="M2.6 22.2 24 4.4l21.4 17.8-3.2 3.4L24 10.4 5.8 25.6z"/>`
+    + `<rect class="kj-band" x="18.5" y="29" width="11" height="14" rx="5.5"/>`
+    + `<circle class="kj-rubin" cx="24" cy="20.5" r="3.3"/><circle class="kj-glanz" cx="22.9" cy="19.4" r="1"/>`
+    + `<path class="kj-glanz-strich" d="M11 26v11"/>`,
+  bots: `<path class="kj-kante-strich" d="M24 11V6.5"/><circle class="kj-rubin" cx="24" cy="5.2" r="3"/>`
+    + `<rect class="kj-band" x="2.5" y="20" width="6" height="11" rx="2.5"/><rect class="kj-band" x="39.5" y="20" width="6" height="11" rx="2.5"/>`
+    + `<rect class="kj-gold" x="6.5" y="10.5" width="35" height="30" rx="10"/>`
+    + `<rect class="kj-band" x="11.5" y="17" width="25" height="15.5" rx="6.5"/>`
+    + `<circle class="kj-rubin" cx="18.3" cy="24.7" r="3.4"/><circle class="kj-rubin" cx="29.7" cy="24.7" r="3.4"/>`
+    + `<circle class="kj-glanz" cx="17.2" cy="23.6" r="1.1"/><circle class="kj-glanz" cx="28.6" cy="23.6" r="1.1"/>`
+    + `<rect class="kj-gold" x="19" y="35" width="10" height="2.6" rx="1.3"/><path class="kj-glanz-strich" d="M11 14.5h9"/>`,
+  liga: `<path class="kj-gold" d="M10 33 7.4 15.5l9.3 7.6L24 10.5l7.3 12.6 9.3-7.6L38 33z"/>`
+    + `<rect class="kj-band" x="9.6" y="32.4" width="28.8" height="6.4" rx="1.6"/>`
+    + `<circle class="kj-gold" cx="7.4" cy="14.6" r="2.7"/><circle class="kj-gold" cx="24" cy="9.4" r="3"/><circle class="kj-gold" cx="40.6" cy="14.6" r="2.7"/>`
+    + `<circle class="kj-stein-mitte" cx="24" cy="26.6" r="3.4"/><circle class="kj-rubin" cx="16" cy="28.6" r="2"/><circle class="kj-rubin" cx="32" cy="28.6" r="2"/>`
+    + `<path class="kj-glanz-strich" d="M12 29.5 10.8 21"/>`,
+  ich: `<circle class="kj-gold" cx="24" cy="15" r="9.3"/><path class="kj-gold" d="M5.5 44c0-10 8.3-16 18.5-16s18.5 6 18.5 16z"/>`
+    + `<path class="kj-band" d="M17 28.9 24 36l7-7.1c-2.1-.6-4.5-.9-7-.9s-4.9.3-7 .9z"/>`
+    + `<circle class="kj-rubin" cx="24" cy="36.6" r="3"/><circle class="kj-glanz" cx="23" cy="35.6" r="1"/>`
+    + `<circle class="kj-glanz" cx="20.6" cy="11.5" r="2.4"/><path class="kj-glanz-strich" d="M10.5 40.5c.7-3.8 2.6-6.4 5.4-8"/>`,
+};
+
+export function kronSymbol(name) {
+  if (!Object.prototype.hasOwnProperty.call(KJ, name)) return spielSymbol(name);
+  const id = 'kj' + (++syZaehler);
+  const strahlen = Array.from({ length: 12 }, (_, i) => {
+    const w = (i * 30 + 15) * Math.PI / 180;
+    return `<path d="M${(24 + Math.cos(w) * 24.5).toFixed(1)} ${(24 + Math.sin(w) * 24.5).toFixed(1)}L${(24 + Math.cos(w) * 29).toFixed(1)} ${(24 + Math.sin(w) * 29).toFixed(1)}"/>`;
+  }).join('');
+  const funkel = (x, y, s) => `<path d="M${x} ${y - s}Q${x} ${y} ${x + s} ${y}Q${x} ${y} ${x} ${y + s}Q${x} ${y} ${x - s} ${y}Q${x} ${y} ${x} ${y - s}z"/>`;
+  return `<svg class="kj kj-${name}" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><defs>`
+    + `<linearGradient id="${id}" x1="0" y1="0" x2=".25" y2="1"><stop offset="0" class="kj-g0"/><stop offset=".5" class="kj-g1"/><stop offset="1" class="kj-g2"/></linearGradient>`
+    + `</defs><g class="kj-strahlen">${strahlen}</g><circle class="kj-scheibe" cx="24" cy="24" r="23"/><circle class="kj-ring" cx="24" cy="24" r="19.6"/>`
+    + `<g class="kj-figur" style="--kj-verlauf:url(#${id})">${KJ[name]}</g>`
+    + `<g class="kj-funkel">${funkel(5, 6, 4)}${funkel(43.5, 8, 3)}</g></svg>`;
+}

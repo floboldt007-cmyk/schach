@@ -248,3 +248,105 @@
 .sy-turniere, .sy-liga { --sy-hell: var(--sp-turniere-hell); --sy-mitte: var(--sp-turniere); --sy-rand: var(--sp-turniere-rand); }
 .sy-raetsel, .sy-ich { --sy-hell: var(--sp-raetsel-hell); --sy-mitte: var(--sp-raetsel); --sy-rand: var(--sp-raetsel-rand); }
 .sy-heim { --sy-hell: var(--sp-heim-hell); --sy-mitte: var(--akzent); --sy-rand: var(--sp-heim-rand); }
+
+/* ---------- Juwel-Bauteile (R27, Flo 21.11.2026: Online, Analyse und Raetsel "sehen zu billig aus"; Vorbild ist die
+   Premium-Seite mit der goldenen Krone, css/premium.css). Wiederverwendbar fuer jede Seite: zuerst Online (js/ui/online.js),
+   danach das Raetsel-Duell. Farben nur aus Tokens (css/themes/modern.css "Juwel-Bauteile"), kein light-dark(), color-mix nur
+   mit @supports-Rueckfall. Die Kronjuwel-Figur (js/ui/icons.js kronSymbol) bekommt hier ihre Farben auch ausserhalb der Leiste.
+   .juwel-karte     Schmuck-Karte: Goldkante, weicher tiefer Schatten, Licht oben links, Glanzkante; data-ton gold|saphir|ruhig
+   .juwel-medaille  runde Goldmedaille mit Strahlenkranz um die Kronjuwel-Krone
+   .juwel-plakette  Symbol-Kachel (56 px) in Gold oder Saphir
+   .juwel-zahl      grosse Zahl als Goldverlauf (Elo, Punkte)
+   .juwel-knopf     Knopf: gold (gefuellt), saphir (Kante), rand (Goldkante)
+   .juwel-stein     kleiner Edelstein fuer Ergebnisse (data-erg s|n|r) */
+.kj .kj-g0 { stop-color: var(--gold-licht); }
+.kj .kj-g1 { stop-color: var(--stern-an); }
+.kj .kj-g2 { stop-color: var(--gold-tief); }
+.kj .kj-gold { fill: var(--kj-verlauf); stroke: var(--gold-kante); stroke-width: 1.5; stroke-linejoin: round; }
+.kj .kj-band { fill: var(--gold-band); stroke: var(--gold-kante); stroke-width: 1.5; stroke-linejoin: round; }
+.kj .kj-rubin { fill: var(--rubin-tief); }
+.kj .kj-stein-mitte { fill: var(--flaeche); stroke: var(--rubin-tief); stroke-width: 2.4; }
+.kj .kj-glanz { fill: var(--glanz); fill-opacity: .6; }
+.kj .kj-glanz-strich { fill: none; stroke: var(--glanz); stroke-opacity: .5; stroke-width: 2.2; stroke-linecap: round; }
+.kj .kj-kante-strich { fill: none; stroke: var(--gold-kante); stroke-width: 2.6; stroke-linecap: round; }
+.kj .kj-figur { transform-origin: 24px 24px; }
+.kj .kj-scheibe, .kj .kj-ring, .kj .kj-strahlen, .kj .kj-funkel { display: none; }
+.kj .kj-strahlen path { stroke: var(--gold); stroke-width: 2.2; stroke-linecap: round; opacity: .75; }
+.kj .kj-funkel path { fill: var(--gold); }
+@supports (color: color-mix(in srgb, red, blue)) {
+  .kj .kj-g0 { stop-color: color-mix(in srgb, var(--stern-an) 55%, var(--gold-licht)); }
+  .kj .kj-g2 { stop-color: color-mix(in srgb, var(--stern-an) 70%, var(--gold-tief)); }
+  .kj .kj-gold, .kj .kj-band, .kj .kj-kante-strich { stroke: color-mix(in srgb, var(--gold) 40%, var(--gold-kante)); }
+  .kj .kj-band { fill: color-mix(in srgb, var(--stern-an) 60%, var(--gold-band)); }
+  .kj .kj-rubin { fill: color-mix(in srgb, var(--akzent) 70%, var(--rubin-tief)); }
+  .kj .kj-stein-mitte { stroke: color-mix(in srgb, var(--akzent) 70%, var(--rubin-tief)); }
+}
+
+/* Saphir im Brillantschliff (js/ui/icons.js saphirSymbol): dieselbe Bauart wie die Krone in Saphirtoenen */
+.kj-saphir .kj-g0 { stop-color: var(--saphir-licht); }
+.kj-saphir .kj-g1 { stop-color: var(--saphir-mitte); }
+.kj-saphir .kj-g2 { stop-color: var(--saphir-tief); }
+.kj.kj-saphir .kj-gold { stroke: var(--saphir-kante); }
+.kj-saphir .kj-facette { fill: none; stroke: var(--saphir-kante); stroke-width: 1.2; stroke-linejoin: round; stroke-opacity: .55; }
+
+.juwel-karte { position: relative; isolation: isolate; overflow: hidden; border-radius: var(--r-xl);
+  background-color: var(--flaeche); background-image: linear-gradient(165deg, var(--juwel-grund), var(--flaeche) 62%);
+  box-shadow: 0 0 0 1px var(--juwel-kante), 0 2px 6px var(--juwel-tief), 0 18px 40px -16px var(--juwel-tief); }
+.juwel-karte::before { content: ''; position: absolute; z-index: -1; left: -18%; top: -55%; width: 78%; aspect-ratio: 1;
+  background: radial-gradient(closest-side, var(--juwel-licht), transparent 72%); pointer-events: none; }
+.juwel-karte::after { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 1px 0 var(--juwel-glanzkante); }
+.juwel-karte[data-ton="saphir"] { box-shadow: 0 0 0 1px var(--juwel-kante-saphir), 0 2px 6px var(--juwel-tief), 0 18px 40px -16px var(--juwel-tief); }
+.juwel-karte[data-ton="saphir"]::before { background: radial-gradient(closest-side, var(--juwel-licht-saphir), transparent 72%); }
+.juwel-karte[data-ton="ruhig"] { box-shadow: 0 0 0 1px var(--linie-2), 0 2px 6px var(--juwel-tief), 0 18px 40px -18px var(--juwel-tief); }
+.juwel-karte[data-ton="ruhig"]::before { opacity: .6; }
+
+.juwel-medaille { --m: 68px; position: relative; flex: none; display: grid; place-items: center; width: var(--m); height: var(--m);
+  border-radius: 50%; background-color: var(--juwel-grund);
+  background-image: radial-gradient(circle at 34% 26%, var(--juwel-licht), transparent 62%), linear-gradient(160deg, var(--juwel-grund), var(--flaeche));
+  box-shadow: 0 0 0 2px var(--gold), 0 0 0 5px var(--gold-weich), 0 8px 22px -4px var(--juwel-schein); }
+.juwel-medaille > .kj { position: absolute; left: 50%; top: 50%; width: 150%; height: 150%; transform: translate(-50%, -50%); overflow: visible; }
+.juwel-medaille > .kj .kj-figur { transform: scale(.54); }
+.juwel-medaille > .kj .kj-strahlen { display: inline; transform-origin: 24px 24px; transform: scale(.78); }
+.juwel-medaille > .kj .kj-strahlen path { opacity: .55; }
+
+.juwel-plakette { flex: none; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 18px; color: var(--gold-text);
+  background-color: var(--gold-weich); background-image: radial-gradient(circle at 30% 22%, var(--juwel-licht), transparent 70%);
+  box-shadow: inset 0 0 0 1px var(--juwel-kante), inset 0 1px 0 var(--juwel-glanzkante); }
+.juwel-plakette > .kj { width: 44px; height: 44px; overflow: visible; }
+.juwel-plakette > .ico { width: 28px; height: 28px; }
+.juwel-plakette[data-ton="saphir"] { color: var(--saphir-text); background-color: var(--saphir-weich);
+  background-image: radial-gradient(circle at 30% 22%, var(--juwel-licht-saphir), transparent 70%);
+  box-shadow: inset 0 0 0 1px var(--juwel-kante-saphir), inset 0 1px 0 var(--juwel-glanzkante); }
+
+.juwel-zahl { font-family: var(--display); font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; color: var(--gold-text);
+  font-variant-numeric: tabular-nums; }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .juwel-zahl { background-image: linear-gradient(180deg, var(--juwel-zahl-oben), var(--juwel-zahl-unten)); -webkit-background-clip: text;
+    background-clip: text; color: transparent; }
+}
+@media (forced-colors: active) { .juwel-zahl { background: none; color: CanvasText; } }
+
+.knopf.juwel-knopf { min-height: 52px; justify-content: center; border: 0; border-radius: var(--r-l); font-weight: 800; letter-spacing: .005em;
+  transition: filter var(--d-s) var(--sanft), transform var(--d-s) var(--sanft), box-shadow var(--d-s) var(--sanft); }
+.knopf.juwel-knopf[data-ton="gold"] { color: var(--auf-gold); background-color: var(--gold);
+  background-image: linear-gradient(180deg, var(--juwel-knopf-licht), transparent 58%);
+  box-shadow: inset 0 1px 0 var(--juwel-knopf-licht), inset 0 -2px 0 var(--juwel-knopf-tief), 0 10px 24px -8px var(--juwel-schein); }
+.knopf.juwel-knopf[data-ton="saphir"] { color: var(--saphir-text); background-color: transparent;
+  background-image: linear-gradient(180deg, var(--saphir-weich), transparent);
+  box-shadow: inset 0 0 0 2px var(--saphir), 0 10px 24px -14px var(--juwel-licht-saphir); }
+.knopf.juwel-knopf[data-ton="rand"] { color: var(--gold-text); background-color: transparent; box-shadow: inset 0 0 0 2px var(--gold); }
+@media (hover: hover) { .knopf.juwel-knopf:not(:disabled):hover { filter: brightness(1.05) saturate(1.05); } }
+.knopf.juwel-knopf:not(:disabled):active { transform: translateY(1px); }
+.knopf.juwel-knopf:focus-visible { outline: var(--fokus); outline-offset: 3px; }
+.knopf.juwel-knopf:disabled { opacity: .55; }
+
+.juwel-stein { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-style: normal; font-size: 11px;
+  font-weight: 900; color: var(--auf-gold); background-color: var(--stein, var(--linie-2));
+  background-image: radial-gradient(circle at 34% 28%, var(--juwel-knopf-licht), transparent 52%);
+  box-shadow: inset 0 -1px 0 var(--juwel-knopf-tief), 0 2px 5px var(--juwel-tief); }
+.juwel-stein[data-erg="s"] { --stein: var(--gut); }
+.juwel-stein[data-erg="n"] { --stein: var(--warn); }
+.juwel-stein[data-erg="r"] { --stein: var(--flaeche-3, var(--linie-2)); color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .knopf.juwel-knopf { transition: none; } }
+html[data-bewegung="aus"] .knopf.juwel-knopf { transition: none; }
