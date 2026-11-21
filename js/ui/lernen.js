@@ -24,6 +24,8 @@ import { istPremium, premiumHinweis } from '../abo.js';
 import { BEREICHE, ANSICHT, artVon, stand, summe, merke, kursPartieSterne } from '../pakete/lernen/mattbilder.js';
 import { istOffen, istGratis, istProbe, istImTrainer, inWillkommenswoche, willkommenBis } from '../pakete/lernen/zugang.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
+// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js)
+await ladeLernenCss();
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 
@@ -57,7 +59,6 @@ export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen ms-screen';
   root.append(s);
-  ladeLernenCss();
   kursPartieAbgleich();
   const st = stand(ladeModul(PAKET, {}));
   // Kurs Erste Schritte (19.11.2026) steht als Karte vorn; geoeffnet wird er gezielt (params { bereich: 'erste' }, Start

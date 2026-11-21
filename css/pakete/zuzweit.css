@@ -207,3 +207,18 @@
   .zz-start > .zz-los { grid-row: 10; }
   .zz-start > .zz-hinweis { grid-row: 12; }
 }
+/* Flo 20.11.2026 (Antwort 8): quer ab 900 px zwei Spalten, die Buehne links ueber die ganze Hoehe, Einstellungen und Los rechts.
+   Vorher stand das Startblatt 560 px schmal in der Mitte, am iPad quer blieb etwa ein Drittel leer. */
+@media (min-width: 900px) and (orientation: landscape) {
+  .zz-startblatt .zz-start { display: grid; max-width: 1040px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: clamp(24px, 3vw, 44px);
+    row-gap: var(--a4); align-content: start; }
+  .zz-start > .zz-buehne { grid-column: 1; grid-row: 1 / span 5; align-self: stretch; grid-template-columns: minmax(0, 1fr); justify-items: center;
+    align-content: center; text-align: center; padding: var(--a5); }
+  .zz-start > .zz-buehne .zz-buehne-text { align-items: center; }
+  .zz-start > .zz-buehne .zz-paar img { width: 96px; height: 96px; padding: 12px; }
+  .zz-start > :not(.zz-buehne) { grid-column: 2; }
+}
+/* wie die Startseite (R9-StartQuer): am Tablet quer mit genug Hoehe steht das Blatt senkrecht mittig, der PC bleibt oben */
+@media (min-width: 900px) and (orientation: landscape) and (min-height: 700px) and (pointer: coarse) {
+  .zz-startblatt .zz-rumpf { display: grid; align-content: safe center; }
+}

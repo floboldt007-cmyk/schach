@@ -441,3 +441,10 @@ html[data-bewegung="aus"] *, html[data-bewegung="aus"] *::before, html[data-bewe
   animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important;
   transition-duration: .01ms !important; transition-delay: 0s !important;
 }
+/* R25 (fc-11:00): ohne eigenen Uebergang ist transition-property "all", und die .01ms oben liessen dann JEDE Aenderung
+   ein Bild lang gleiten, auch Breite, Abstand und flex-grow. layout() in js/ui/online.js mass so die Spielflaeche mit
+   10 px Hoehe und setzte das Brett ein Bild lang auf 280 px (tests/r25-brett-start.test.mjs). Spezifitaet 0: jede Regel
+   und jeder style, die selbst einen Uebergang nennen, gewinnen und behalten ihr transitionend (tests/thema.test.mjs). */
+:where(html[data-bewegung="aus"]) *, :where(html[data-bewegung="aus"]) *::before, :where(html[data-bewegung="aus"]) *::after {
+  transition-property: none;
+}

@@ -43,6 +43,8 @@ import { t } from '../sprache.js';
 import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand, rundenVon,
   ladeSammeln, weissWieder, sternGeschafft, sterneSammeln, zaehlerSichtbar } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
+// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js)
+await ladeLernenCss();
 import { istOffen, naechsteOffene } from '../pakete/lernen/zugang.js';
 import { sterneHtml, kursPartieAbgleich } from './lernen.js';
 import { BOTS } from '../bots.js';
@@ -104,7 +106,6 @@ export function zeige(root, params, app) {
     setTimeout(() => { if (!weg) app.gehe('lernen', l ? { bereich: bereichVon(l).id } : {}, { ersetzen: true }); }, 0);
     return { verlasse() { weg = true; } };
   }
-  ladeLernenCss();
   const ber = bereichVon(l);
   const art = artVon(l);
   if (art === 'partie') return zeigeKursPartie(s, l, ber, app);
@@ -130,7 +131,7 @@ export function zeige(root, params, app) {
   const zielVon = (z) => (folge ? (ber.kurs && l.kapitel !== 5 ? S('zielRegel') : S('zielFolge', { n: z }))
     : sammeln ? S('zielSammeln', { n: z }) : art === 'schach' ? S('zielSchach') : art === 'umwandeln' ? S('zielUmwandeln', { n: z }) : art === 'gewinnen' ? S('zielGewinnen', { n: z })
     : art === 'taktik' ? S('zielTaktik', { n: z, p: l.gewinn })
-    : art === 'halten' ? S('zielHalten', { n: z }) : z === 1 ? S('zielEins') : S('ziel', { n: z }));
+    : art === 'halten' ? S('zielHalten', { n: z }) : z === 1 ? S('zielEins') : S(l.zielAlsFrage ? 'zielFrage' : 'ziel', { n: z }));
   const ideeVon = (n) => (n > 1 ? S(`runde.${l.id}.${n}`) : S('idee.' + l.id));
   const rundenHtml = !mitRunden ? '' : `<span class="ls-runden" role="group" aria-label="${esc(S('runden'))}">${rs.map((_, i) =>
     `<button class="ls-runde" type="button" data-a="runde" data-r="${i + 1}" aria-label="${esc(S('rundeName.' + (i + 1)))}">${i + 1}</button>`).join('')}</span>`;

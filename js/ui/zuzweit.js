@@ -55,11 +55,18 @@ const sanText = (san) => sanAnzeige(san);
 // Ohne detail kein Wechsel: figurenPfad({}) waere der Standardsatz, auch fuer ein Erfinder-Konto.
 const satzPfad = (d) => { const p = figurenPfad(d); return p ? new URL(p, WURZEL).href : null; };
 
+// R25 (fc-11:00): data-geladen, sobald das Stylesheet da ist (oder fehlschlug); bis dahin haelt partie() den Screen
+// unsichtbar, sonst stand das Brett ein Bild lang ohne Raster (PC 1272 statt 638 px, tests/r25-brett-start.test.mjs)
 function stil() {
-  if (document.querySelector('link[data-zuzweit]')) return;
+  const da = document.querySelector('link[data-zuzweit]');
+  if (da) return da;
   const link = document.createElement('link');
   link.rel = 'stylesheet'; link.href = new URL('css/pakete/zuzweit.css', WURZEL).href;
-  link.dataset.zuzweit = ''; document.head.append(link);
+  link.dataset.zuzweit = '';
+  const fertig = () => { link.dataset.geladen = ''; };
+  link.addEventListener('load', fertig, { once: true }); link.addEventListener('error', fertig, { once: true });
+  document.head.append(link);
+  return link;
 }
 
 export function zeige(root, params, app) {
@@ -188,6 +195,12 @@ function partie(root, quelle, app, fortgesetzt) {
       <div class="zz-aktionen">${zzKnopf('zugzurueck', 'undo', Z('zugZurueck'))}${zzKnopf('remis', 'personen', Z('remisAnbieten'))}${zzKnopf('aufgeben', 'flagge', Z('aufgeben'))}</div>
       <div class="zz-zuege zugbox" role="region" aria-label="${Z('zuege')}"><div class="zb-kopf"><span class="zb-titel">${esc(Z('zuege'))}</span></div><div class="zugliste"></div><div class="zugleiste"></div></div>
     </div></div>`;
+  const css = stil();
+  if (!('geladen' in css.dataset)) {
+    s.style.visibility = 'hidden';
+    const zeigen = () => s.style.removeProperty('visibility');
+    css.addEventListener('load', zeigen, { once: true }); css.addEventListener('error', zeigen, { once: true });
+  }
   root.append(s);
   const brettEl = s.querySelector('.brett');
   const brett = new Brett(brettEl, { figurenPfad: new URL(figurenPfad(), WURZEL).href, beiZug,
@@ -268,7 +281,7 @@ function partie(root, quelle, app, fortgesetzt) {
     const ausrichtung = namen.drehen ? chess.turn() : 'w';
     const dreht = brett.ausrichtung !== ausrichtung;
     brett.setzeAusrichtung(ausrichtung);
-    const m = chess.history({ verbose: true }).at(-1);
+    const verlauf = chess.history({ verbose: true }), m = verlauf[verlauf.length - 1];
     brett.setzeStellung(chess.fen(), { animieren, letzterZug: m ? [m.from, m.to] : null, schach: chess.inCheck() ? true : null });
     brett.erlaubeZuege(z.phase === 'spiel' && !fragt ? zielKarte(chess, { turmRochade: einst.turmRochade === true }) : null);
     if (dreht && animieren) {

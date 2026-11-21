@@ -85,6 +85,7 @@ import { uebernimmEinladungsLink } from './online.js';
 import { pruefeUmzug } from './umzug.js';
 import { wechselNeuLaden, NEU_GELADEN_MERKER } from './sw-wechsel.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
+import { cssFehlerFuerScreen } from './paket-css.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
@@ -435,7 +436,7 @@ export function reiterVon(screen, liste = reiterListe(), params = {}) {
 }
 
 const leiste = { el: null, pille: null, lage: null, sichtbar: false, gezeigt: false, wegAnim: null, pilleLage: null, pilleV: null, pilleB: null,
-  ro: null, rahmen: 0, fokusFolgt: false };
+  ro: null, rahmen: 0, pilleRahmen: 0, fokusFolgt: false };
 
 function baueReiter(liste) {
   if (leiste.el) return;
@@ -464,7 +465,7 @@ function baueReiter(liste) {
   // damit die Messung selbst keine Schleife ausloest
   const spaeter = () => {
     if (leiste.rahmen) return;
-    leiste.rahmen = requestAnimationFrame(() => { leiste.rahmen = 0; if (leiste.sichtbar) platziereReiter(); });
+    leiste.rahmen = requestAnimationFrame(() => { leiste.rahmen = 0; if (leiste.sichtbar) platziereReiter({ imBild: true }); });
   };
   if (typeof ResizeObserver === 'function') {
     leiste.ro = new ResizeObserver(spaeter);
@@ -481,7 +482,7 @@ function baueReiter(liste) {
 }
 
 // unten (schwebende Glas-Kapsel) oder seite (Seitenleiste links im Querformat ab 1021 px); die Leiste haengt immer am body
-function platziereReiter() {
+function platziereReiter({ imBild = false } = {}) {
   const nav = leiste.el;
   if (!nav) return;
   let seite = false;
@@ -490,7 +491,11 @@ function platziereReiter() {
   leiste.lage = seite ? 'seite' : 'unten';
   nav.dataset.lage = leiste.lage;
   document.documentElement.dataset.reiter = leiste.lage;
-  setzePille();
+  // die Pille misst den aktiven Reiter: im naechsten Bild, nicht mitten im Aufbau des neuen Screens (Leistung F2, fc-11:15;
+  // dort kostete das Messen auf schwachen Geraeten ein eigenes Layout von 200 ms). Mehrere Aufrufe je Bild: einmal messen.
+  // Laeuft der Aufruf schon im Bild (Drehen, Groesse), sofort: sonst stand die Pille ein gemaltes Bild lang daneben (f2)
+  if (imBild || typeof requestAnimationFrame !== 'function') { setzePille(); return; }
+  if (!leiste.pilleRahmen) leiste.pilleRahmen = requestAnimationFrame(() => { leiste.pilleRahmen = 0; setzePille(); });
 }
 
 // Pille hinter den aktiven Reiter; gleitet mit der weichen Feder vom alten Platz, unten waagrecht, in der Seitenleiste
@@ -798,6 +803,14 @@ async function zeigeScreen(name, params, hash, { wiederherstellen = false } = {}
     // zusammen): einmal neu laden, der Verlauf steht schon auf dem Ziel. Liegt eine neue Version bereit, uebernimmt sie dabei.
     // Hoechstens einmal je Minute; danach wie bisher zur Arena, der Tester-Bericht nennt den Grund.
     const echterFehler = !!ladeFehler && !/zeige\(\) fehlt/.test(String(ladeFehler.message || ladeFehler));
+    // Ohne Netz (fc-14:00, 20.11.2026): direkt nach einem Update liegt nur der Kern im Cache. Neu laden hilft dann nicht, und
+    // still zur Arena zu springen sieht aus wie ein Fehler der App: der Platzhalter sagt, was fehlt und was hilft.
+    if (echterFehler && ohneNetz()) {
+      protokolliere('skript', ladeFehler, { vorsatz: 'Screen ' + name + ' (ohne Netz)' });
+      aktuell.handle = zeigePlatzhalter(root, name, 'ohneNetz');
+      zeigeReiter(null);
+      return;
+    }
     if (PAKET_SCREENS.has(name) && echterFehler) {
       protokolliere('skript', ladeFehler, { vorsatz: 'Screen ' + name });
       let zuletzt = 0;
@@ -823,6 +836,12 @@ async function zeigeScreen(name, params, hash, { wiederherstellen = false } = {}
     zeigeReiter(null);
     return;
   }
+  // Ohne Netz und ohne das CSS seines Pakets (js/paket-css.js) waere der Screen ungestaltet: derselbe Satz wie oben
+  if (ohneNetz() && cssFehlerFuerScreen(name)) {
+    aktuell.handle = zeigePlatzhalter(root, name, 'ohneNetz');
+    zeigeReiter(null);
+    return;
+  }
   // Leiste VOR dem Zeichnen: Sie bestimmt die Hoehe des Screens (html[data-reiter]). Danach gesetzt, rechnete die Partie
   // ihr Brett im 88 px kuerzeren Screen und alles wuchs sichtbar nach (R11 Pixel 10.11.2026, iPhone 13: CLS 0,109)
   zeigeReiter(name, params || {});
@@ -832,7 +851,7 @@ async function zeigeScreen(name, params, hash, { wiederherstellen = false } = {}
     console.error(e);
     protokolliere('fehler', e, { vorsatz: 'Screen ' + name });
     root.replaceChildren();
-    aktuell.handle = zeigePlatzhalter(root, name, true);
+    aktuell.handle = zeigePlatzhalter(root, name, 'kaputt');
     zeigeReiter(null);
     return;
   }
@@ -865,9 +884,27 @@ function richteSprunglinkEin(root) {
   }
 }
 
+const ohneNetz = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
+// Scheitert das Paket-CSS erst NACH dem Zeigen (Frist oder Fehler, js/paket-css.js meldet immer asynchron), ersetzt
+// ohne Netz der Platzhalter den offenen Screen; mit Netz bleibt er, wie er ist
+function beiPaketFehler(e) {
+  const d = (e && e.detail) || {};
+  if (!ohneNetz() || !aktuell || ladeFertig !== ladeNr || !(d.screens || []).includes(aktuell.name)) return;
+  const root = document.getElementById('app');
+  if (root.querySelector(':scope > .screen.platzhalter')) return;
+  if (aktuell.handle) {
+    try { aktuell.handle.verlasse(); } catch (f) { console.error(f); }
+  }
+  root.replaceChildren();
+  aktuell.handle = zeigePlatzhalter(root, aktuell.name, 'ohneNetz');
+  zeigeReiter(null);
+}
+
 // Freundlicher Ersatz, wenn ein Screen-Modul nicht laedt (Netz) oder abstuerzt. Ein gescheiterter
 // Modul-Import bleibt bis zum Neuladen im Browser haengen, deshalb der Knopf "Neu laden".
-function zeigePlatzhalter(root, name, kaputt = false) {
+// art: 'nichtGeladen' (Vorgabe), 'kaputt' (zeige() warf) oder 'ohneNetz' (der Teil liegt noch nicht im Cache)
+function zeigePlatzhalter(root, name, art = 'nichtGeladen') {
   const s = document.createElement('section');
   s.className = 'screen platzhalter';
   const titel = titelVon(name);
@@ -887,9 +924,7 @@ function zeigePlatzhalter(root, name, kaputt = false) {
       </div>
     </div>`;
   s.querySelector('h2').textContent = titel || t('rahmen.bereich');
-  s.querySelector('p').textContent = kaputt
-    ? t('rahmen.platzhalter.kaputt')
-    : t('rahmen.platzhalter.nichtGeladen', { name: titel || name });
+  s.querySelector('p').textContent = t('rahmen.platzhalter.' + art, { name: titel || name });
   s.querySelector('[data-aktion="zurueck"]').addEventListener('click', () => zurueck());
   s.querySelector('[data-aktion="neu-laden"]').addEventListener('click', () => location.reload());
   s.querySelector('[data-aktion="arena"]').addEventListener('click', () => gehe('arena', {}, { ersetzen: true }));
@@ -1219,6 +1254,7 @@ function pruefeName() {
 }
 
 function ersterStart() {
+  window.addEventListener('schach:paket-fehler', beiPaketFehler);
   window.addEventListener('popstate', beiVerlauf);
   window.addEventListener('hashchange', () => {
     if (aktuell && location.hash === aktuell.hash) return;  // schon ueber popstate erledigt

@@ -22,6 +22,7 @@
 //          siegeslauf (Zeile 44 bei 3, 5, 10, 15). Nichts davon, wenn die Serie ausgeblendet ist.
 // Register: Icons se-bauer, se-flamme, se-ring, se-mond, se-liege.
 // Testmodus (?test): window.__serie = { stand(), speichere(st), einstellungen(), setzeUhr(ms | null), heute(), T, LA, S }.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { EREIGNISSE, hoere, sende } from '../../ereignisse.js';
 import { anbieten, angeboten } from '../../orte.js';
 import { melde } from '../../feier.js';
@@ -381,13 +382,10 @@ function anbieterEinstellungen() {
 
 // ---------- Registrieren ----------
 function cssLaden() {
-  if (typeof document === 'undefined' || document.querySelector('link[data-paket="serie"]')) return;
-  const l = document.createElement('link');
-  l.rel = 'stylesheet';
-  l.href = new URL('../../../css/pakete/serie.css', import.meta.url).href;
-  l.dataset.paket = PAKET;
-  document.head.append(l);
+  return ladePaketCss('serie');
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(cssLaden());
 
 const ICONS = {
   'se-bauer': '<path fill="currentColor" stroke="none" d="M12 3.2a3.3 3.3 0 0 0-2 5.9c-1.3.6-2.1 1.7-2.1 3h8.2c0-1.3-.8-2.4-2.1-3a3.3 3.3 0 0 0-2-5.9zM9.2 13.3c-.2 2.4-1.2 4.2-2.7 5.5h11c-1.5-1.3-2.5-3.1-2.7-5.5zM5.6 19.9h12.8v1.7H5.6z"/>',

@@ -403,6 +403,13 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .shf-regal-reihe { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(132px, 150px); gap: 12px; min-width: 0;
   overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; padding: 2px 2px 8px; scrollbar-width: thin; }
 .shf-rk { scroll-snap-align: start; }
+/* Flo 20.11.2026 (Antwort 8): quer ab 900 px fuellt ein Regal mit wenigen Stuecken die Reihe (iPad quer: drei Finisher
+   standen in drei von vier Spalten). Passen nicht alle hinein, bleibt es der Streifen zum Wischen wie bisher. Das Bild bleibt so
+   hoch wie in einer Viertel-Reihe (wie die vier Plaetze darueber), die Karte wird nur breiter. */
+@media (min-width: 900px) and (orientation: landscape) {
+  .shf-regal-reihe { grid-auto-columns: minmax(132px, 1fr); container-type: inline-size; }
+  .shf-rk .shf-bild { aspect-ratio: auto; height: max(112px, (100cqw - 3 * 12px) / 4 - 20px); }
+}
 @media (prefers-reduced-motion: reduce) { .shf-gross *, .shf-bild * { animation: none !important; } }
 /* Effekt-Vorschau (R20, effekt-vorschau.js): liegt ueber dem Brett, nimmt keinen Platz und faengt keine Tipps ab */
 .shf-effekt-buehne { position: relative; width: 100%; }
