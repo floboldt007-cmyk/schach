@@ -68,7 +68,7 @@ import { SYMBOLE } from './symbole.js';
 import {
   ladeEinstellungen, speichereEinstellungen, ladeLaufendePartie, ladePartien, dauerhaftAnfragen, duenneAnalysenAus,
 } from './storage.js';
-import { icon, spielSymbol } from './ui/icons.js';
+import { icon, spielSymbol, kronSymbol } from './ui/icons.js';
 import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
@@ -458,6 +458,11 @@ function baueReiter(liste) {
     leiste.fokusFolgt = e.detail === 0;
     gehe(ziel, {}, { ersetzen: true });
   });
+  // Design-Probe Leiste R27 (nur ?test&design=k1|k2|k3, R19-Auswahl leiste-symbole-r27): Symbole im Stil des Premium-Wappens
+  // statt der Spiel-Symbole; ohne Probe bleibt die Leiste wie oben gebaut
+  if (document.documentElement.dataset.designLeiste) {
+    for (const [n, , ic] of REITER_ALLE) { const sy = nav.querySelector(`[data-reiter="${n}"] > .sy`); if (sy) sy.outerHTML = kronSymbol(ic); }
+  }
   leiste.el = nav;
   leiste.pille = nav.querySelector('.reiter-pille');
   document.body.append(nav);
@@ -1170,6 +1175,8 @@ function ladeScreenTexte() {
 }
 
 function starte() {
+  // Design-Probe Leiste R27 (nur im Testmodus): ?design=k1|k2|k3 setzt html[data-design-leiste]
+  if (TEST) { const m = /^k([123])$/.exec(new URLSearchParams(location.search).get('design') || ''); if (m) document.documentElement.dataset.designLeiste = 'k' + m[1]; }
   setzeSymbole(SYMBOLE);
   spracheAusAdresse();
   wendeEinstellungenAn(ladeEinstellungen());

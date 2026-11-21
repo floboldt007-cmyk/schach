@@ -241,3 +241,52 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   .haupt-kopf .kopf-premium { width: var(--tipp); padding: 0; }
   .haupt-kopf .kopf-premium span { display: none; }   /* der Name steht im aria-label */
 }
+
+/* ---------- Design-Probe Leiste R27 (nur ?test&design=k1|k2|k3, R19-Auswahl leiste-symbole-r27; NICHT live) ----------
+   Flo 21.11.2026: W1 a/b/c gefallen nicht; Vorbild ist das Premium-Wappen (css/premium.css .pm-emblem): gefuellte Krone in
+   Gold, dunkleres Band, Rubin, Scheibe mit gepunktetem Ring, Strahlenkranz, Funkel. Symbole aus js/ui/icons.js kronSymbol().
+   k1 Kronjuwel: nur die goldene Figur mit Rubin, der aktive Reiter glueht warm und funkelt
+   k2 Medaillon: jede Figur auf einer Goldscheibe mit gepunktetem Ring (wie das Wappen), der aktive bekommt den Strahlenkranz
+   k3 Strahlenkranz: alle Figuren in vollem Gold wie k1, der aktive Reiter traegt statt Glut den drehenden Strahlenkranz */
+html[data-design-leiste] .reiter-leiste .kj { --kj-kante: color-mix(in srgb, var(--gold) 40%, var(--gold-kante));
+  --kj-rubin: color-mix(in srgb, var(--akzent) 70%, var(--rubin-tief)); width: 28px; height: 28px; flex: none; overflow: visible;
+  transition: transform var(--d-m) var(--feder), filter var(--d-s) var(--sanft), opacity var(--d-s) var(--sanft); }
+html[data-design-leiste] .kj .kj-g0 { stop-color: color-mix(in srgb, var(--stern-an) 55%, var(--gold-licht)); }
+html[data-design-leiste] .kj .kj-g1 { stop-color: var(--stern-an); }
+html[data-design-leiste] .kj .kj-g2 { stop-color: color-mix(in srgb, var(--stern-an) 70%, var(--gold-tief)); }
+html[data-design-leiste] .kj .kj-gold { fill: var(--kj-verlauf); stroke: var(--kj-kante); stroke-width: 1.5; stroke-linejoin: round; }
+html[data-design-leiste] .kj .kj-band { fill: color-mix(in srgb, var(--stern-an) 60%, var(--gold-band)); stroke: var(--kj-kante); stroke-width: 1.5; stroke-linejoin: round; }
+html[data-design-leiste] .kj .kj-rubin { fill: var(--kj-rubin); }
+html[data-design-leiste] .kj .kj-stein-mitte { fill: var(--flaeche); stroke: var(--kj-rubin); stroke-width: 2.4; }
+html[data-design-leiste] .kj .kj-glanz { fill: var(--glanz); fill-opacity: .6; }
+html[data-design-leiste] .kj .kj-glanz-strich { fill: none; stroke: var(--glanz); stroke-opacity: .5; stroke-width: 2.2; stroke-linecap: round; }
+html[data-design-leiste] .kj .kj-kante-strich { fill: none; stroke: var(--kj-kante); stroke-width: 2.6; stroke-linecap: round; }
+html[data-design-leiste] .kj .kj-figur { transform-origin: 24px 24px; }
+html[data-design-leiste] .kj .kj-scheibe, html[data-design-leiste] .kj .kj-ring,
+html[data-design-leiste] .kj .kj-strahlen, html[data-design-leiste] .kj .kj-funkel { display: none; }
+html[data-design-leiste] .kj .kj-strahlen { transform-origin: 24px 24px; animation: kj-dreh 40s linear infinite; }
+html[data-design-leiste] .kj .kj-strahlen path { stroke: var(--gold); stroke-width: 2.2; stroke-linecap: round; opacity: .75; }
+html[data-design-leiste] .kj .kj-funkel path { fill: var(--gold); transform-box: fill-box; transform-origin: center; animation: kj-funkeln 2.6s ease-in-out infinite; }
+html[data-design-leiste] .kj .kj-funkel path + path { animation-delay: 1.3s; }
+html[data-design-leiste] .reiter-leiste .reiter.an .kj { transform: scale(1.08); }
+@keyframes kj-dreh { to { transform: rotate(360deg); } }
+@keyframes kj-funkeln { 0%, 100% { transform: scale(.4); opacity: .3; } 50% { transform: scale(1); opacity: 1; } }
+
+/* k1 Kronjuwel */
+html[data-design-leiste="k1"] .reiter-leiste .reiter.an .kj { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--gold) 60%, transparent)); }
+html[data-design-leiste="k1"] .reiter-leiste .reiter.an .kj .kj-funkel { display: inline; }
+/* k2 Medaillon: Scheibe, Ring und Strahlen innen kleiner, damit der Kranz in der Pille bleibt */
+html[data-design-leiste="k2"] .reiter-leiste .kj { width: 34px; height: 34px; }
+html[data-design-leiste="k2"] .kj .kj-scheibe { display: inline; fill: color-mix(in srgb, var(--gold) 16%, var(--flaeche)); stroke: var(--stern-an); stroke-width: 2; }
+html[data-design-leiste="k2"] .kj .kj-ring { display: inline; fill: none; stroke: var(--stern-an); stroke-width: 1.2; stroke-dasharray: 1.2 2.6; opacity: .8; }
+html[data-design-leiste="k2"] .kj .kj-scheibe, html[data-design-leiste="k2"] .kj .kj-ring { transform-origin: 24px 24px; transform: scale(.8); }
+html[data-design-leiste="k2"] .kj .kj-figur { transform: scale(.56); }
+html[data-design-leiste="k2"] .reiter-leiste .reiter.an .kj .kj-strahlen { display: inline; animation-name: kj-dreh-klein; }
+html[data-design-leiste="k2"] .reiter-leiste .reiter.an .kj .kj-scheibe { fill: color-mix(in srgb, var(--gold) 28%, var(--flaeche)); }
+/* k3 Strahlenkranz: alle Figuren in vollem Gold, nur der aktive Reiter traegt den drehenden Kranz und die Funkel */
+html[data-design-leiste="k3"] .reiter-leiste .kj { width: 34px; height: 34px; }
+html[data-design-leiste="k3"] .kj .kj-figur { transform: scale(.8); }
+html[data-design-leiste="k3"] .reiter-leiste .reiter.an .kj .kj-strahlen { display: inline; animation-name: kj-dreh-klein; }
+html[data-design-leiste="k3"] .reiter-leiste .reiter.an .kj .kj-funkel { display: inline; }
+@keyframes kj-dreh-klein { from { transform: scale(.82); } to { transform: scale(.82) rotate(360deg); } }
+html[data-bewegung="aus"] .kj .kj-strahlen, html[data-bewegung="aus"] .kj .kj-funkel path { animation-play-state: paused; }

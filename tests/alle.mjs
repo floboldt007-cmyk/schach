@@ -163,6 +163,7 @@ const SUITEN = [
   { name: 'r26-antworten-b', datei: 'r26-antworten-b.test.mjs', args: [], was: 'Flos Antworten 6-9 (20.11.): Shop-Namen eigen, Google offline gesperrt, iPad quer gefuellt (Handy/PC gleich), Auge nach dem Startfokus' },
   { name: 'r26-konto-rest', datei: 'r26-konto-rest.test.mjs', args: [], was: 'Konto-Rest R26: Loeschseite Google offline gesperrt mit Hinweis, online frei; Einstellungen stapeln keine Netz-Listener (Browser)' },
   { name: 'r26-antworten-a', datei: 'r26-antworten-a.test.mjs', args: [], was: 'Flos Antworten 20.11.: Revanche nach Niederlage, freie Partie ohne Punktezeile, Lernen ein Hauptknopf, lange Grundmatts als Frage, Engine-Text ohne Internet (DE/EN)' },
+  { name: 'r27-leiste-symbole', datei: 'r27-leiste-symbole.test.mjs', args: [], was: 'Design-Probe R27: Leisten-Symbole im Stil des Premium-Wappens nur hinter ?test&design=k1|k2|k3, ohne Schalter wie heute (Browser)' },
   { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
   { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },

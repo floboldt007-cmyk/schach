@@ -36,6 +36,9 @@
   --vorzug-start: rgba(70, 87, 120, .34); --vorzug-ziel: rgba(204, 72, 32, .36);
   --pfeil-nutzer: rgba(230, 126, 34, .82); --marke-nutzer: rgba(230, 126, 34, .45);
   --gold: #E0A22B; --gold-weich: rgba(224, 162, 43, .16);
+  /* Goldschmiede (Design-Probe Leiste R27, css/navigation.css): feste Toene fuer Verlauf, Band, Kante, Rubin und Glanz der
+     Wappen-Symbole; in beiden Modi gleich, die Modus-Farbe kommt ueber --stern-an und --gold dazu */
+  --gold-licht: #FFF3CC; --gold-tief: #6A3A00; --gold-band: #5C3300; --gold-kante: #3A2200; --rubin-tief: #6B0A18; --glanz: #FFFFFF;
   /* Sterne (R19): verdient 70 % Gold mit Textfarbe wie die Marke Exklusiv (hell ~3,9:1 statt 2,24:1), nicht verdient als
      Umriss in --text-2 (statt --linie-2, 1,33:1); WCAG 1.4.11 verlangt 3:1 fuer Grafik mit Information */
   --stern-an: color-mix(in srgb, var(--gold) 70%, var(--text)); --stern-aus: var(--text-2);
