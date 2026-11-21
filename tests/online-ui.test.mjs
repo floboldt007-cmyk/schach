@@ -267,6 +267,9 @@ try {
   await knopf('teilen').click();
   pruefe('Einladung zeigt Code, Link, 24 Stunden und Kopieren als Rueckfall', await seite.evaluate(() => window.__kopiert?.endsWith('#online/DEF567'))
     && (await seite.locator('.on-einladung').innerText()).includes('Die Einladung gilt 24 Stunden.'));
+  // R26 AC-04 (Flo 20.11.2026): die wartende Einladung ist noch keine Partie, sie klingt wie die Lobby (Klangset arcade)
+  const ortEinladung = await seite.evaluate(async () => (await import(new URL('js/sounds.js', location.href).href)).klang.vorrat().ort);
+  pruefe('Klang: wartende Einladung klingt wie die Lobby (Ort lobby)', ortEinladung === 'lobby', ortEinladung);
   await seite.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: async d => { window.__geteilt = d; } }));
   await knopf('teilen').click();
   pruefe('Teilen nutzt navigator.share, wenn vorhanden', await seite.evaluate(() => window.__geteilt?.url?.endsWith('#online/DEF567')));
