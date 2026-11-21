@@ -57,11 +57,15 @@ export function weltLage(d) {
   return { ab: d.ab, abStart: ganz(d.ab_start) ? d.ab_start : null, teilnahme: d.teilnahme, liste, ich: stand };
 }
 
+// js/konto.js, erst nach der Liste geladen (bestaetigteNamen): bis dahin ohne Haken
+let H = null;
+const haken = (name) => (H && H.hatHaken(name) ? H.hakenHtml() : '');
+
 function zeile(z) {
   return `<li class="lg-welt-zeile${z.ich ? ' ich' : ''}" data-rang="${esc(z.rang)}" data-banner="${esc(z.banner)}">
     <span class="lg-welt-streifen" aria-hidden="true" style="background-image:url('${B.bannerUrl(z.banner)}')"></span>
     <span class="lg-welt-rang" aria-label="${esc(T('rang', { rang: zahl(z.rang) }))}">${esc(zahl(z.rang))}</span>
-    <span class="lg-welt-name"><b>${esc(z.name)}</b>${z.ich ? `<span class="lg-welt-du">${esc(T('du'))}</span>` : ''}</span>
+    <span class="lg-welt-name"><b>${esc(z.name)}</b>${haken(z.name)}${z.ich ? `<span class="lg-welt-du">${esc(T('du'))}</span>` : ''}</span>
     <span class="lg-welt-elo" aria-label="${esc(T('eloLang', { elo: zahl(z.elo) }))}"><small aria-hidden="true">${esc(T('elo'))}</small>${esc(zahl(z.elo))}</span>
   </li>`;
 }
@@ -98,7 +102,7 @@ function platzKarte(lage, stand) {
     <span class="lg-welt-platz-banner" aria-hidden="true" style="background-image:url('${B.bannerUrl(mein.banner)}')"></span>
     <p class="lg-welt-stand sr" data-status="dabei">${esc(stand)}</p>
     <div class="lg-welt-platz-kopf" aria-hidden="true"><span class="lg-welt-platz-rang">#${esc(zahl(i.rang))}</span>
-      <span class="lg-welt-platz-wer">${mein.name ? `<b>${esc(mein.name)}</b>` : ''}<span>${esc(T('elo'))} ${esc(zahl(i.elo))}</span></span></div>
+      <span class="lg-welt-platz-wer">${mein.name ? `<b>${esc(mein.name)}${haken(mein.name)}</b>` : ''}<span>${esc(T('elo'))} ${esc(zahl(i.elo))}</span></span></div>
     ${ziel}
   </article>`;
 }
@@ -185,6 +189,12 @@ export function reiterWelt() {
       if (weg) return;
       lage = l;
       zeichne(lage);
+      // gruener Haken (supabase/benutzername-bestaetigt-schema.sql): nach der Liste fragen, dann neu zeichnen; ohne SQL
+      // bleibt die Liste, wie sie ist
+      import('../../konto.js').then((kt) => kt.bestaetigteNamen(l.liste.map((z) => z.name).concat(l.ich?.name || [])).then(() => {
+        H = kt;
+        if (!weg && lage === l) zeichne(lage);
+      })).catch(() => {});
     });
   }).catch(() => {
     if (weg) return;
