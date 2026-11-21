@@ -253,44 +253,43 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
   .raetsel-duell[data-phase="beendet"] .rd-rumpf { align-content: safe center; padding-bottom: 6px; }
 }
 
-/* ---------- R27 Juwel-Look Start (Flo 21.11.2026: "sieht zu billig aus"; Vorbild Premium-Seite, Bauteile .juwel-* aus
-   css/bauteile.css): Saphir-Karte statt flacher Buehne, Edelstein mit Lichthof, grosse Frage mit Goldwort, die Uhr als
-   Goldzahl zwischen den Avataren, Regeln als Pillen, Saphir-Knopf wie "Duell suchen" auf der Online-Seite ---------- */
-.rd-buehne.juwel-karte { gap: 12px; padding: 26px 20px 20px; color: var(--text); background-color: var(--flaeche); }
-.rd-stein { position: relative; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%;
-  background: radial-gradient(circle at 50% 45%, var(--saphir-weich), transparent 70%); }
+/* ---------- R27 Juwel-Look Start (Flo 21.11.2026: "sieht zu billig aus"; Bauteile .juwel-* aus css/premium.css, wie die
+   Raetsel-Karte der Online-Seite): Nachtblau-Karte mit Blitz im Lichthof, grosse Frage mit Metallgold-Wort, die Uhr als
+   Goldzahl zwischen den Koepfen, Regeln als Pillen, EIN goldener Hauptknopf (Flos Regel: einer je Seite) ---------- */
+.rd-buehne.juwel-karte { gap: 12px; padding: 26px 20px 20px; color: var(--text); }
+.rd-stein { position: relative; isolation: isolate; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, var(--nacht-licht), transparent 70%); }
 .rd-stein::before { content: ''; position: absolute; inset: -14px; border-radius: 50%; z-index: -1;
-  background: repeating-conic-gradient(from 0deg, var(--juwel-licht-saphir) 0 4deg, transparent 4deg 22.5deg);
+  background: repeating-conic-gradient(from 0deg, var(--nacht-linie) 0 3deg, transparent 3deg 22.5deg);
   -webkit-mask: radial-gradient(closest-side, transparent 58%, #000 60%, transparent 100%); mask: radial-gradient(closest-side, transparent 58%, #000 60%, transparent 100%); }
-.rd-stein > .kj { width: 60px; height: 60px; overflow: visible; filter: drop-shadow(0 6px 14px var(--juwel-licht-saphir)); }
-.rd-ueber { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--saphir-text); }
+.rd-stein > .kj { width: 56px; height: 56px; overflow: visible; filter: drop-shadow(0 6px 14px var(--nacht-licht)); }
+.rd-ueber { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--metall-hell); }
 .rd-frage { margin: -4px 0 2px; font-family: var(--display); font-size: clamp(26px, 7.4cqw, 34px); font-weight: var(--gw-titel, 800); line-height: 1.12;
   letter-spacing: -.02em; text-wrap: balance; color: var(--text); }
-.rd-gold { color: var(--gold-text); }
+.rd-gold { color: var(--metall-hell); }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .rd-gold { background-image: linear-gradient(180deg, var(--juwel-zahl-oben), var(--juwel-zahl-unten)); -webkit-background-clip: text;
+  .rd-gold { background-image: linear-gradient(180deg, var(--metall-hell), var(--metall)); -webkit-background-clip: text;
     background-clip: text; color: transparent; }
 }
 .rd-buehne.juwel-karte .rd-paar { gap: 14px; margin-top: 4px; }
-.rd-buehne.juwel-karte .rd-av { width: 64px; height: 64px; box-shadow: 0 0 0 2px var(--metall), 0 0 0 6px var(--metall-weich), 0 10px 22px -8px var(--juwel-schein); }
-.rd-buehne.juwel-karte .rd-av-frage { background: var(--saphir-weich); color: var(--saphir-text);
-  box-shadow: 0 0 0 2px var(--saphir), 0 0 0 6px var(--saphir-weich), 0 10px 22px -8px var(--juwel-licht-saphir); }
+.rd-buehne.juwel-karte .rd-av { width: 64px; height: 64px; box-shadow: 0 0 0 2px var(--metall), 0 0 0 6px var(--metall-weich), 0 10px 22px -8px rgba(0, 0, 0, .5); }
+.rd-buehne.juwel-karte .rd-av-frage { background: var(--nacht-oben); color: var(--text-2);
+  box-shadow: 0 0 0 2px var(--nacht-linie), 0 0 0 6px var(--nacht-licht), 0 10px 22px -8px rgba(0, 0, 0, .5); }
 .rd-mitte { display: grid; justify-items: center; gap: 2px; min-width: 0; }
-.rd-buehne.juwel-karte .rd-vs { font-size: 12px; font-weight: 800; letter-spacing: .16em; color: var(--text-3); }
+.rd-buehne.juwel-karte .rd-vs { font-size: 12px; font-weight: 800; letter-spacing: .16em; color: var(--text-2); }
 .rd-buehne.juwel-karte .rd-gross { font-size: 46px; }
 .rd-buehne.juwel-karte .rd-regeln { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .rd-buehne.juwel-karte .rd-regeln li { flex-direction: row; min-height: 0; gap: 6px; padding: 7px 12px; border-radius: var(--r-pille);
-  background: var(--flaeche-2); box-shadow: inset 0 0 0 1px var(--linie-2); color: var(--text-2); font-size: 13px; font-weight: 700; }
-.rd-buehne.juwel-karte .rd-kachel-bild { height: auto; color: var(--saphir-text); font-size: 13px; }
+  background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1px var(--linie-2); color: var(--text-2); font-size: 13px; font-weight: 700; }
+.rd-buehne.juwel-karte .rd-kachel-bild { height: auto; color: var(--metall-hell); font-size: 13px; }
 .rd-buehne.juwel-karte .rd-kachel-bild .ico { width: 16px; height: 16px; }
-.rd-buehne.juwel-karte .rd-los.rd-suchen { margin-top: 6px; min-height: 54px; border-radius: var(--r-l); color: #fff;
-  background-color: var(--saphir-mitte); background-image: linear-gradient(180deg, var(--juwel-knopf-licht), transparent 55%),
-    linear-gradient(180deg, var(--saphir-mitte), var(--saphir-tief));
-  box-shadow: inset 0 1px 0 var(--juwel-knopf-licht), inset 0 -2px 0 rgba(0, 0, 0, .25), 0 12px 26px -10px var(--saphir); }
-.rd-buehne.juwel-karte .rd-los.rd-suchen:active { background-color: var(--saphir-tief); }
-.rd-buehne.juwel-karte .rd-los.rd-suchen:focus-visible { outline: 3px solid var(--saphir-text); outline-offset: 3px; }
 /* "3 Minuten" doppelt die grosse 3:00: nur noch fuer Bildschirmleser (weniger Zahlen, Flo 21.11.) */
 .rd-buehne.juwel-karte .rd-regeln li:nth-child(2) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.rd-buehne.juwel-karte .rd-los.rd-suchen { margin-top: 6px; min-height: 54px; }
+/* die alte Regel .rd-los:is(.rd-suchen, .rd-nochmal):active setzte den Grund auf --akzent-tief (dunkle Schrift 2,8:1): gedrueckt bleibt Gold */
+.rd-buehne.juwel-karte .rd-los.rd-suchen:active { color: var(--auf-gold); background-color: var(--metall);
+  background-image: linear-gradient(180deg, var(--metall), var(--metall-tief) 135%); }
+.rd-buehne.juwel-karte .rd-los.rd-suchen:focus-visible { outline: 3px solid var(--metall-hell); outline-offset: 3px; }
 .rd-freund.juwel-karte { padding: 18px; }
 .rd-freund-kopf { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; }
 .rd-freund-kopf h2 { margin: 0 0 2px; }

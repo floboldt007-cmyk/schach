@@ -21,7 +21,7 @@ import { figurenPfad } from '../figurensatz.js';
 import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
-import { icon, raetselSymbol } from './icons.js';
+import { icon, raetselBlitz } from './icons.js';
 import { spieleDuell } from './duell.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { anim, tempo } from '../bewegung.js';
@@ -159,8 +159,8 @@ export function zeige(root, params, app) {
     // R27 Juwel-Look (Flo 21.11.2026 "sieht zu billig aus"; Bauteile .juwel-* aus css/bauteile.css): Saphir-Karte mit
     // Edelstein, grosse Frage mit Goldwort, Kopf an Kopf mit der Uhr in der Mitte, Regeln als Pillen
     rumpf.innerHTML = `<div class="rd-start">
-      <section class="rd-buehne juwel-karte" data-ton="saphir" aria-labelledby="rd-regeln-t"><h2 id="rd-regeln-t" class="sr">${esc(D('regeln.titel'))}</h2>
-        <span class="rd-stein" aria-hidden="true">${raetselSymbol()}</span>
+      <section class="rd-buehne juwel-karte" data-ton="nacht" aria-labelledby="rd-regeln-t"><h2 id="rd-regeln-t" class="sr">${esc(D('regeln.titel'))}</h2>
+        <span class="rd-stein" aria-hidden="true">${raetselBlitz()}</span>
         <p class="rd-ueber" aria-hidden="true">${esc(D('buehne.ueber'))}</p>
         <p class="rd-frage" aria-hidden="true">${goldWort(D('buehne.frage'))}</p>
         <div class="rd-paar">${ichBild()}<span class="rd-mitte"><b class="rd-vs" aria-label="${esc(D('vs'))}">VS</b>`
@@ -170,7 +170,7 @@ export function zeige(root, params, app) {
           <li><span class="rd-kachel-bild" aria-hidden="true">${icon('verlauf')}</span><span aria-hidden="true">${esc(D('kachel.zeit'))}</span><span class="sr">${esc(D('regeln.2'))}</span></li>
           <li><b class="rd-kachel-bild zahl" aria-hidden="true">${esc(D('kachel.strafe'))}</b><span aria-hidden="true">${esc(D('kachel.fehler'))}</span><span class="sr">${esc(D('regeln.3'))}</span></li>
         </ul>
-        <button type="button" class="rd-los dr rd-suchen">${esc(D('suchen.gewertet'))}</button>
+        <button type="button" class="knopf juwel-knopf rd-los dr rd-suchen" data-ton="gold">${esc(D('suchen.gewertet'))}</button>
       </section>
       <section class="rd-karte rd-freund juwel-karte" data-ton="ruhig" aria-labelledby="rd-fr-t">
         <div class="rd-freund-kopf"><span class="juwel-plakette" aria-hidden="true">${icon('person')}</span>
