@@ -147,7 +147,7 @@ html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: s
 .rd-meldung { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-weight: 750; color: var(--text); }
 .rd-meldung:is([data-art="richtig"], [data-art="falsch"]) { padding: 4px 12px; border-radius: var(--r-pille); background: var(--flaeche-2); }
 .rd-meldung:is([data-art="richtig"], [data-art="falsch"])::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gut); }
-.rd-meldung[data-art="falsch"]::before { background: var(--warn); }
+.rd-meldung:is([data-art="falsch"], [data-art="fehler"])::before { background: var(--warn); }
 
 /* Reihe der eigenen Raetsel: gruen geloest, rot Fehler, leer noch offen */
 .rd-reihe { display: grid; grid-template-columns: repeat(auto-fill, minmax(24px, 1fr)); gap: 6px; width: 100%; margin: 0; padding: 0; list-style: none; }

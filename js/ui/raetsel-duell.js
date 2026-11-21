@@ -470,7 +470,14 @@ export function zeige(root, params, app) {
       if (weg || d.id !== id) return false;
       d.wartet = false;
       if (e && e.kennung === 'DUELL_ZEIT_UM') { brett.erlaubeZuege(null); zeigeMeldung('', D('zeit.um')); }
-      else { d.schritt = -1; hole(); }
+      else {
+        // Codex 21.11.2026: ohne Edge Function (404) oder ohne Verbindung (Netz, 5xx) ging der Zug still zurueck. Jetzt
+        // eine ruhige Meldung; Kennungen des Duells (veraltet, illegal) bleiben still, dort holt hole() nur den Stand
+        const status = Number(e?.status) || 0;
+        if (status === 404) zeigeMeldung('fehler', D('zug.einrichtung'));
+        else if (!e?.kennung || e.kennung === 'DUELL_SERVER' || status >= 500) zeigeMeldung('fehler', D('zug.netz'));
+        d.schritt = -1; hole();
+      }
       return false;
     });
   }

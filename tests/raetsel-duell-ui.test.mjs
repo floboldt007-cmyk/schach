@@ -525,6 +525,33 @@ async function nebenwege(browser) {
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }
+  // Codex 21.11.: fehlt die Edge Function (404) oder ist der Server weg (5xx), ging der Zug still zurueck. Jetzt eine
+  // ruhige Meldung: 404 = noch nicht eingerichtet, 5xx = Verbindung, nochmal versuchen
+  {
+    gruppe = 'Zug ohne Server';
+    const srv = neuerServer({ art: 'freundschaft', vorlaufMs: 300 });
+    const p = await seite(browser, { breite: 390, hoehe: 844, hash: 'raetsel-duell/ABC234', srv, rpc: (name) => {
+      if (name === 'duell_beitreten') { srv.anlegen(); return { duell: DUELL }; }
+      return undefined;
+    } });
+    try {
+      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"]', { timeout: 30000 });
+      const echt = srv.zug;
+      const meldung = () => p.s.evaluate(() => document.querySelector('.rd-meldung')?.textContent || '');
+      srv.zug = () => ({ status: 404, body: { code: 'NOT_FOUND', message: 'Requested function was not found' } });
+      await zieh(p.s, 'a1a8');
+      await warteBis(p.s, () => /eingerichtet/.test(document.querySelector('.rd-meldung')?.textContent || ''), null, 5000).catch(() => {});
+      pruefe('404: Meldung "noch nicht eingerichtet"', /noch nicht eingerichtet/.test(await meldung()), await meldung());
+      srv.zug = () => ({ status: 503, body: { message: 'upstream down' } });
+      await zieh(p.s, 'a1a8');
+      await warteBis(p.s, () => /Verbindung/.test(document.querySelector('.rd-meldung')?.textContent || ''), null, 5000).catch(() => {});
+      pruefe('503: Meldung "Verbindung, nochmal versuchen"', /Verbindung.*nochmal/.test(await meldung()), await meldung());
+      srv.zug = echt;
+      await zieh(p.s, 'a1a8');
+      await warteBis(p.s, () => /^1 /.test(document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent), null, 5000).catch(() => {});
+      pruefe('Danach zaehlt der naechste Zug wieder', /^1 /.test(await p.s.evaluate(() => document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent)));
+    } finally { await p.k.close(); }
+  }
   // Falscher Code: verstaendliche Meldung, Eingabe bleibt
   {
     gruppe = 'Falscher Code';
