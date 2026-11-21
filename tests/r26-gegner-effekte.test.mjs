@@ -85,6 +85,7 @@ function bediener(z) {
     if (rpc === 'online_meine') return antwort([...z.partien.values()].filter((q) => q.status !== 'beendet'));
     if (rpc === 'online_pruefe_zeit' && p) return antwort(p);
     if (rpc === 'karte_der_partie') {
+      if (z.ohneKarte) return antwort({ code: 'PGRST202', message: 'Could not find the function public.karte_der_partie' }, 404);
       const karte = (u) => ({ name: NAMEN[u], banner: 'start', titel: null, vitrine: [], motiv: 'P', grund: 'standard', rahmen: 'ohne', kronen_stufe: 3 });
       return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
     }
@@ -92,7 +93,9 @@ function bediener(z) {
     if (rpc === 'effekte_der_partie') {
       z.fxAnfragen++;
       if (z.fx === 'fehlt') return antwort({ code: 'PGRST202', message: 'Could not find the function public.effekte_der_partie' }, 404);
-      return antwort(p ? { w: { figuren: null, zug: null, finisher: null }, s: z.fx } : {});
+      // spaet: die erste Antwort kennt die Wahl des Gegners noch nicht, erst die zweite (online.js fragt nach 6 s erneut)
+      const s = z.spaet && z.fxAnfragen === 1 ? { figuren: null, zug: null, finisher: null } : z.fx;
+      return antwort(p ? { w: { figuren: null, zug: null, finisher: null }, s } : {});
     }
     if (rpc === 'kronen_mein_stand') return antwort({ stufe: 3, kronen: 40, platz: 9, ziel: 120, n: 30, woche: '2026-11-16' });
     return antwort(rpc === 'karte_melde_stufen' ? {} : []);
@@ -140,8 +143,8 @@ const sammleEffekte = (s, ms) => s.evaluate((ms) => new Promise((fertig) => {
 const GEGNER = { figuren: 'blaupause', zug: 'wellenring', finisher: 'blitzschlag' };
 const seitenfehler = [];
 
-async function fall(browser, { name, fx = GEGNER, einstellungen = {}, ruhig = false, erwartet }) {
-  const z = { partien: new Map(), treffer: false, sucheSeit: Date.now(), fx, fxAnfragen: 0, gemeldet: [] };
+async function fall(browser, { name, fx = GEGNER, einstellungen = {}, ruhig = false, ohneKarte = false, erwartet }) {
+  const z = { partien: new Map(), treffer: false, sucheSeit: Date.now(), fx, fxAnfragen: 0, gemeldet: [], ohneKarte };
   const k = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
     locale: 'de-DE', timezoneId: 'Europe/Berlin', reducedMotion: ruhig ? 'reduce' : 'no-preference' });
   await k.route('**/*.supabase.co/**', bediener(z));
@@ -164,6 +167,12 @@ async function fall(browser, { name, fx = GEGNER, einstellungen = {}, ruhig = fa
     const sK = await koenig(s, 'bK'), wK = await koenig(s, 'wK');
     pruefe(`${name}: schwarzer Koenig (Gegner) ${erwartet.gegnerSatz}`, typeof sK === 'string' && erwartet.gegnerSatzPruef(sK), sK);
     pruefe(`${name}: weisser Koenig (ich) im eigenen Satz`, typeof wK === 'string' && /assets\/pieces\/wK\.svg$/.test(wK), wK);
+    // Altbefund 6e (21.11.): ohne Karte zeigte der Gegnerplatz das EIGENE Bild (floAvatar)
+    const bilder = await s.evaluate(() => ({ gegner: document.querySelector('.spieler.gegner .av')?.innerHTML || '',
+      ich: document.querySelector('.spieler.ich .av')?.innerHTML || '' }));
+    // mit Karte zeigt der Platz das Motiv des Gegners (hier wie meins ein Bauer, also kein Vergleich)
+    if (ohneKarte) pruefe(`${name}: ohne Karte neutrales Bild am Gegnerplatz, nicht meins`,
+      bilder.gegner !== bilder.ich && bilder.gegner.includes('class="ico"'), bilder.gegner.slice(0, 120));
     pruefe(`${name}: Brett, Klang und eigene Wahl bleiben (Effekt-Anfrage ${erwartet.anfrage ? 'ja' : 'egal'})`, !erwartet.anfrage || z.fxAnfragen > 0, z.fxAnfragen);
 
     // Narrenmatt mit Schwarz: f3 e5 g4 Dh4#; die Zuege des Gegners kommen vom Server
@@ -185,6 +194,44 @@ async function fall(browser, { name, fx = GEGNER, einstellungen = {}, ruhig = fa
       erwartet.finisher ? endeGesehen.includes('finisher:' + erwartet.finisher) : !endeGesehen.some((x) => x.startsWith('finisher:')), endeGesehen);
     if (erwartet.meldet) pruefe(`${name}: eigene Wahl an den Server gemeldet (nur Kennungen)`, z.gemeldet.length > 0
       && z.gemeldet.every((g) => Object.keys(g).sort().join() === 'figuren,finisher,zug'), z.gemeldet);
+  } catch (e) {
+    pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
+  }
+  await k.close().catch(() => {});
+}
+
+// Kaltreview ad (21.11.): die Wahl des Gegners kommt erst mit der zweiten Abfrage (nach 6 s), waehrend ich eine Figur
+// angetippt habe. Die Saetze wechseln ohne Neubau: die Auswahl bleibt, der naechste Tipp zieht.
+async function spaeteWahl(browser) {
+  const name = 'G Wahl kommt mitten im Tipp';
+  const z = { partien: new Map(), treffer: false, sucheSeit: Date.now(), fx: GEGNER, fxAnfragen: 0, gemeldet: [], spaet: true };
+  const k = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block',
+    locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  await k.route('**/*.supabase.co/**', bediener(z));
+  await k.addInitScript(initSkript, { sitzung: SITZUNG, einstellungen: {} });
+  const s = await k.newPage(); s.setDefaultTimeout(15000);
+  s.on('pageerror', (e) => seitenfehler.push(`${name}: ${e.message}`));
+  try {
+    await s.goto(`http://127.0.0.1:${PORT}/index.html?test#online`);
+    await sichtbar(s, '[data-online="suchen"]:not([disabled])', 30000);
+    await warte(300);
+    await s.locator('[data-online="suchen"]').filter({ visible: true }).first().click();
+    z.treffer = true;
+    await s.waitForFunction(() => window.__online?.brett() && !window.__online.busy(), null, { timeout: 20000 });
+    await s.waitForFunction(() => !document.querySelector('.duell'), null, { timeout: 12000 }).catch(() => {});
+    await s.waitForFunction(() => document.querySelector('.on-brett img[data-figur="bK"]'), null, { timeout: 5000 });
+    pruefe(`${name}: erst eigener Satz am Gegner`, eigener(await koenig(s, 'bK')), await koenig(s, 'bK'));
+    const vorher = await s.evaluate(() => { window.__brettVorher = window.__online.brett(); return true; });
+    // f2 antippen und liegen lassen, bis die zweite Abfrage die Blaupause bringt
+    const r = await s.locator('.on-brett .feld[data-feld="f2"]').first().boundingBox();
+    await s.touchscreen.tap(r.x + r.width / 2, r.y + r.height / 2);
+    const kam = await s.waitForFunction(() => /\/blaupause\/bK\.svg$/.test(document.querySelector('.on-brett img[data-figur="bK"]')?.getAttribute('src') || ''),
+      null, { timeout: 12000 }).then(() => true).catch(() => false);
+    pruefe(`${name}: Blaupause kommt mit der zweiten Abfrage`, vorher && kam, z.fxAnfragen);
+    pruefe(`${name}: dasselbe Brett (kein Neubau)`, await s.evaluate(() => window.__online.brett() === window.__brettVorher));
+    const r2 = await s.locator('.on-brett .feld[data-feld="f3"]').first().boundingBox();
+    await s.touchscreen.tap(r2.x + r2.width / 2, r2.y + r2.height / 2);
+    pruefe(`${name}: der naechste Tipp zieht f3`, await zuegeSind(s, 1));
   } catch (e) {
     pruefe(`${name}: Ablauf ohne Abbruch`, false, e.message.split('\n')[0]);
   }
@@ -239,8 +286,9 @@ try {
     erwartet: { gegnerSatz: 'im Standard', gegnerSatzPruef: eigener, zug: null, finisher: null, anfrage: true } });
   await fall(browser, { name: 'D weniger Bewegung', ruhig: true,
     erwartet: { gegnerSatz: 'in Blaupause', gegnerSatzPruef: blaupause, zug: null, finisher: null, anfrage: true } });
-  await fall(browser, { name: 'E Funktion fehlt (404)', fx: 'fehlt',
+  await fall(browser, { name: 'E Funktion fehlt (404)', fx: 'fehlt', ohneKarte: true,
     erwartet: { gegnerSatz: 'im eigenen Satz', gegnerSatzPruef: eigener, zug: null, finisher: null, anfrage: true } });
+  await spaeteWahl(browser);
   await schalterProbe(browser, 'light');
   await schalterProbe(browser, 'dark');
 } finally {

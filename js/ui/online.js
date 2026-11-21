@@ -41,6 +41,8 @@ const WURZEL = new URL('../../', import.meta.url);
 // das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js)
 await ladePaketCss('online', { screens: ['online'], href: new URL('css/online.css', WURZEL).href, marke: { online: '' } });
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// neutrales Bild fuer den Gegner, solange keine Karte da ist (die Leiste zieht jedes svg auf 100 %: Rand im Stil)
+const GEGNER_STANDARD = icon('person').replace('<svg ', '<svg style="box-sizing:border-box;padding:24%;color:var(--text-3)" ');
 const andere = f => f === 'w' ? 'b' : 'w';
 const TEMPI = { ohne: [null, 0], '5': [300, 0], '10': [600, 0], '15': [900, 10] };
 const uhrText = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -501,6 +503,13 @@ export function zeige(root, params, app) {
   // Tipp liesse den Zug ins Leere gehen)
   const brettStil = (e) => { const je = fremdePfade(e) || {}, eigen = skinPfad(e); return (je.w || eigen) + '|' + (je.b || eigen); };
   let gebautMit = null;
+  // Kaltreview ad (21.11.): kein Neubau, nur die Bilder tauschen, sonst verliert ein laufender Tipp seine Auswahl
+  function tauscheSaetze(e) {
+    const stil = brettStil(e);
+    if (stil === gebautMit) return;
+    gebautMit = stil;
+    brett.setzeFigurenPfade(skinPfad(e), fremdePfade(e));
+  }
   function holeGegnerFx() {
     if (!p || p.status === 'offen' || !p.weiss || !p.schwarz || gegnerFxFuer === p.id) return;
     const id = gegnerFxFuer = p.id;
@@ -510,7 +519,7 @@ export function zeige(root, params, app) {
     const frage = () => effekteDerPartie(id).then((fx) => {
       if (weg || !p || p.id !== id || !fx) return;
       gegnerFx = fx;
-      if (brett && !blockiert && brettStil(app.einstellungen()) !== gebautMit) { bauBrett(); zeichne(); }
+      if (brett && !blockiert) tauscheSaetze(app.einstellungen());
     });
     frage().then(() => { if (!weg && p && p.id === id && p.status === 'laeuft') setTimeout(() => { if (!weg) frage(); }, 6000); });
   }
@@ -698,8 +707,7 @@ export function zeige(root, params, app) {
     const e = ev?.detail || app.einstellungen();
     for (const b of s.querySelectorAll('.brettwahl button[data-brett]')) b.setAttribute('aria-checked', String(b.dataset.brett === e.brett));
     if (!brett || blockiert) return;
-    if (brettStil(e) === gebautMit) return;
-    bauBrett(); zeichne();
+    tauscheSaetze(e);
   }
   window.addEventListener('schach:einstellungen', beiEinstellungen);
   window.addEventListener('online', netzStand); window.addEventListener('offline', netzStand);
@@ -1005,7 +1013,8 @@ export function zeige(root, params, app) {
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
       const { k, name, elo, liga } = spielerDaten(f);
       const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
-      const avatar = k?.avatar || floAvatar(f);
+      // Gegner ohne Karte (noch nicht geladen oder kein Profil): neutrales Bild statt kurz des eigenen (Altbefund 6e, 21.11.)
+      const avatar = k?.avatar || (ort === 'oben' ? GEGNER_STANDARD : floAvatar(f));
       // R19 online ruhig (Flos Wahl A): die Leiste zeigt den Namen, ohne Titel; unter dem Namen die geschlagenen Figuren.
       // Flo 15.11. 12:50 ("die elo soll man schon sehen koennen"): beim GEGNER davor seine Elo, nur die vom Server
       // (spielerDaten, 100 bis 4000), ohne sie die Liga als Wort, ohne beides nichts. Die eigene Elo steht in der Lobby.

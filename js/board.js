@@ -866,6 +866,19 @@ export class Brett {
 
   // ----- Figuren -----
 
+  // Saetze tauschen ohne Neubau (Online R26: die Wahl des Gegners kommt spaeter an): Auswahl, Geste und Pfeile bleiben,
+  // nur die Bilder der stehenden Figuren wechseln. Gleiche Regeln wie im Konstruktor.
+  setzeFigurenPfade(figurenPfad = this.figurenPfad, figurenPfadJe = null) {
+    const mitStrich = (x) => (x.endsWith('/') ? x : x + '/');
+    this.figurenPfad = mitStrich(figurenPfad);
+    this.figurenPfadJe = Object.freeze({ w: typeof figurenPfadJe?.w === 'string' ? mitStrich(figurenPfadJe.w) : this.figurenPfad,
+      b: typeof figurenPfadJe?.b === 'string' ? mitStrich(figurenPfadJe.b) : this.figurenPfad });
+    for (const img of this.el.querySelectorAll('img.figur[data-figur]')) {
+      const src = this._bild(img.dataset.figur);
+      if (img.getAttribute('src') !== src) img.src = src;
+    }
+  }
+
   _bild(code) {
     return (code[0] === 'b' ? this.figurenPfadJe.b : this.figurenPfadJe.w) + code + '.svg';
   }
