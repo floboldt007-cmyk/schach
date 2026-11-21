@@ -31,7 +31,7 @@ import { kronSymbol, duellSchwerter, raetselBlitz } from './icons.js';
 import { holeSaison } from '../kronen.js';
 import { sheet } from './bauteile.js';
 import { paket2Frei } from '../freigaben.js';
-import { floAvatar } from '../thema.js';
+import { floAvatar, profilAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { spieleDuell } from './duell.js';
 import { jetzt as serverJetzt, anzeigeJetzt, seit as zeitSeit } from '../serverzeit.js';
@@ -334,7 +334,7 @@ export function zeige(root, params, app) {
     el.innerHTML = `<span class="on-liga-schild juwel-medaille" aria-hidden="true">${kronSymbol('liga')}</span>`
       + `<span class="on-held-stand"><span class="on-gross">${elo != null
         ? `<b class="on-gross-wert juwel-zahl zahl">${esc(String(elo))}</b><small class="on-gross-text">${esc(O('held.elo'))}</small>`
-        : `<b class="on-gross-wert on-held-wort">${esc(stufe)}</b>`}</span>`
+        : `<b class="on-gross-wert on-held-wort">${esc(stufe)}</b><small class="on-gross-text">${esc(O('ruhig.deineLiga'))}</small>`}</span>`
       + '<span class="on-held-zeile"></span></span>';
     el.hidden = false;
     zeigeHeld();
@@ -350,8 +350,11 @@ export function zeige(root, params, app) {
     const zahl = (z) => (formZeichen || []).filter((x) => x === z).length;
     const formText = formZeichen?.length ? O('form.label', { n: formZeichen.length, s: zahl('s'), nn: zahl('n'), r: zahl('r') }) : '';
     form.hidden = !formZeichen?.length;
-    form.innerHTML = formZeichen?.length ? `<small aria-hidden="true">${esc(O('form.titel'))}${icon('vor')}</small><span class="on-form-steine" aria-hidden="true">`
-      + formZeichen.map((z) => `<i class="juwel-stein" data-erg="${z}">${esc(O('form.' + z))}</i>`).join('') + '</span>' : '';
+    // Flo 21.11.: den Eingang zu "Letzte Partien" nicht gefunden, darum die ganze Flaeche (Pillen samt Titel) als Knopf und
+    // darunter ein deutlicher Hinweis "Alle ansehen" mit Pfeil
+    form.innerHTML = formZeichen?.length ? `<small aria-hidden="true">${esc(O('form.titel'))}</small><span class="on-form-steine" aria-hidden="true">`
+      + formZeichen.map((z) => `<i class="juwel-stein" data-erg="${z}">${esc(O('form.' + z))}</i>`).join('') + '</span>'
+      + `<span class="on-form-alle" aria-hidden="true">${esc(O('form.alle'))}${icon('vor')}</span>` : '';
     if (formText) form.setAttribute('aria-label', `${formText}. ${O('form.oeffnen')}`);
     const gross = held.elo != null ? `${O('ruhig.elo')}: ${held.elo}` : `${O('ruhig.deineLiga')}: ${held.stufe}`;
     el.setAttribute('aria-label', [gross, ...teile].filter(Boolean).join(', '));
@@ -386,7 +389,7 @@ export function zeige(root, params, app) {
     const ort = document.createElement('ol');
     ort.className = 'on-letzte';
     ort.innerHTML = zeilen.map((r, n) => `<li class="on-letzte-zeile"><i class="juwel-stein" data-erg="${ergVon(r)}" aria-hidden="true">${esc(O('form.' + ergVon(r)))}</i>`
-      + `<span class="on-letzte-wer"><button class="on-letzte-name" type="button" data-n="${n}">${esc(O('letzte.gegner'))}</button>`
+      + `<span class="juwel-kopf on-letzte-kopf" style="--k:36px" aria-hidden="true"></span><span class="on-letzte-wer"><button class="on-letzte-name" type="button" data-n="${n}">${esc(O('letzte.gegner'))}</button>`
       + `<span class="on-letzte-datum">${esc(datum(r.aktualisiert_am))}</span></span>`
       + `<button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-n="${n}" data-letzte="analyse">${icon('analyse')} ${esc(O('letzte.analyse'))}</button></li>`).join('');
     let ziel = null;
@@ -407,6 +410,9 @@ export function zeige(root, params, app) {
         karten[n] = k;
         const b = ort.querySelector(`.on-letzte-name[data-n="${n}"]`);
         if (b && k.name) { b.textContent = k.name; b.setAttribute('aria-label', profilText('oeffnen', { name: k.name })); }
+        // Avatar des Gegners aus karte_der_partie (fremdeKarte: SVG aus Motiv, Grund, Rahmen; nur gepruefte Werte)
+        const kopf = ort.querySelectorAll('.on-letzte-kopf')[n];
+        if (kopf && k.avatar) { kopf.innerHTML = k.avatar; kopf.dataset.da = ''; }
       }).catch(() => {});
     });
     sheet({ titel: O('letzte.titel'), inhalt: ort, klasse: 'on-letzte-blatt', abbrechen: null,
@@ -431,7 +437,11 @@ export function zeige(root, params, app) {
       rangZeilen = [...l.liste.slice(0, 3), ...um];
       const name = (z) => (z.ich ? O('rang.du') : z.name);
       const kopf = (z, k) => (z.ich ? `<span class="juwel-kopf" data-ich style="--k:${k}px"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''}>${floAvatar('w')}</span>`
-        : `<span class="juwel-kopf"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px;background-image:url('${bannerUrl(z.banner)}')">${esc((z.name[0] || '?').toUpperCase())}</span>`);
+        // Profilbild nur mit supabase/weltrang-karte-schema.sql (motiv/grund/rahmen; profilAvatar prueft jeden Wert gegen die
+        // festen Listen), sonst Banner mit Schleier und Anfangsbuchstabe
+        : typeof z.motiv === 'string'
+          ? `<span class="juwel-kopf"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px">${profilAvatar({ figur: z.motiv, grund: z.grund, rahmen: z.rahmen }, 'w')}</span>`
+          : `<span class="juwel-kopf mit-banner"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px;--banner:url('${bannerUrl(z.banner)}')">${esc((z.name[0] || '?').toUpperCase())}</span>`);
       const label = (z) => ` aria-label="${esc(profilText('oeffnen', { name: name(z) }))}"`;
       const podest = [1, 0, 2].filter((n) => rangZeilen[n]).map((n) => { const z = rangZeilen[n];
         return `<button class="on-podest-platz${z.ich ? ' ich' : ''}" type="button" data-online="rang-profil" data-n="${n}" data-platz="${z.rang}"${label(z)}>`
@@ -1333,7 +1343,8 @@ export function zeige(root, params, app) {
     if (a === 'rang-profil') {
       const z = rangZeilen[Number(knopf.dataset.n)];
       if (!z) return;
-      zeigeGegnerProfil({ karte: z.ich ? eigeneKarte() : { name: z.name, banner: z.banner, titel: null, ki: false, kronenStufe: null, orden: [] } })
+      zeigeGegnerProfil({ karte: z.ich ? eigeneKarte() : { name: z.name, banner: z.banner, titel: null, ki: false, kronenStufe: null, orden: [],
+        ...(typeof z.motiv === 'string' ? { avatar: profilAvatar({ figur: z.motiv, grund: z.grund, rahmen: z.rahmen }, 'w') } : {}) } })
         .then(() => { if (!weg && knopf.isConnected) knopf.focus({ preventScroll: true }); });
       return;
     }

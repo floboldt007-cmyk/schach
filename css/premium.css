@@ -212,7 +212,8 @@
 .knopf.juwel-knopf { min-height: 52px; justify-content: center; border: 0; border-radius: var(--r-l); font-weight: 800; letter-spacing: .005em;
   transition: filter var(--d-s) var(--sanft), transform var(--d-s) var(--sanft), box-shadow var(--d-s) var(--sanft); }
 .knopf.juwel-knopf[data-ton="gold"] { color: var(--auf-gold); background-color: var(--metall);
-  background-image: linear-gradient(180deg, var(--metall-hell) -10%, var(--metall) 52%, var(--metall-tief) 135%);
+  /* nur hell -> Metallgold: die Schrift (--auf-gold) braucht ueberall 4,5:1, das dunkle Gold traegt nur die Unterkante (design-beweis R27) */
+  background-image: linear-gradient(180deg, var(--metall-hell) -10%, var(--metall) 70%);
   box-shadow: inset 0 1px 0 var(--juwel-knopf-licht), inset 0 -2px 0 var(--juwel-knopf-tief), 0 10px 24px -8px var(--juwel-schein); }
 .knopf.juwel-knopf[data-ton="saphir"] { color: var(--saphir-text); background-color: transparent;
   background-image: linear-gradient(180deg, var(--saphir-weich), transparent);
@@ -236,6 +237,9 @@
 .juwel-kopf[data-platz="2"] { --ring: var(--silber); }
 .juwel-kopf[data-platz="3"] { --ring: var(--bronze); }
 .juwel-kopf[data-ich] { --ring: var(--metall); }
+/* Buchstabe auf einem Banner: ein Schleier macht jedes Banner dunkel genug fuer die helle Schrift (Weiss auf Weiss-Banner mit
+   Schleier .56 = 4,7:1); die Grundfarbe darunter ist dunkel, falls das Bild fehlt */
+.juwel-kopf.mit-banner { background-color: var(--nacht-unten); background-image: linear-gradient(var(--kopf-schleier), var(--kopf-schleier)), var(--banner); --kopf-schleier: rgba(0, 0, 0, .56); }
 @media (hover: hover) { .knopf.juwel-knopf:not(:disabled):hover { filter: brightness(1.05) saturate(1.05); } }
 .knopf.juwel-knopf:not(:disabled):active { transform: translateY(1px); }
 .knopf.juwel-knopf:focus-visible { outline: var(--fokus); outline-offset: 3px; }
@@ -244,8 +248,8 @@
 .juwel-stein { display: inline-grid; place-items: center; min-width: 26px; height: 20px; padding: 0 6px; border-radius: 999px;
   font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--stein, var(--text-2));
   background-color: var(--flaeche-2); box-shadow: inset 0 0 0 1px var(--linie); }
-.juwel-stein[data-erg="s"] { --stein: var(--gut); }
-.juwel-stein[data-erg="n"] { --stein: var(--warn); }
+.juwel-stein[data-erg="s"] { --stein: var(--stein-s, var(--gut)); }
+.juwel-stein[data-erg="n"] { --stein: var(--stein-n, var(--warn)); }
 @supports (color: color-mix(in srgb, red, blue)) {
   .juwel-stein[data-erg="s"], .juwel-stein[data-erg="n"] { background-color: color-mix(in srgb, var(--stein) 14%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--stein) 30%, transparent); }

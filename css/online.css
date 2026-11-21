@@ -274,14 +274,15 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-held-zeile { font-size: 14px; font-weight: 650; line-height: 1.35; color: var(--text-2); }
 .on-held-zeile:empty { display: none; }
 .on-held-zeile > span { white-space: nowrap; }
-.on-form { display: grid; justify-items: end; gap: 8px; margin: -8px -10px; padding: 8px 10px; border: 0; border-radius: 14px; background: transparent;
+.on-form { display: grid; justify-items: end; align-content: center; gap: 8px; min-height: 44px; margin: -8px -10px; padding: 8px 10px; border: 0; border-radius: 14px; background: transparent;
   color: inherit; font: inherit; cursor: pointer; transition: background-color var(--d-s) var(--sanft); }
 @media (hover: hover) { .on-form:hover { background: var(--flaeche-2); } }
 .on-form[hidden] { display: none; }
 .on-form small { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
   color: var(--text-2); }
-.on-form small .ico { width: 13px; height: 13px; }
 .on-form-steine { display: flex; gap: 5px; }
+.on-form-alle { display: inline-flex; align-items: center; gap: 2px; font-size: 13.5px; font-weight: 750; color: var(--gold-text); }
+.on-form-alle .ico { width: 15px; height: 15px; }
 /* Platzhalter waehrend der Pruefung: die beiden ruhigen Balken stehen im Stand-Teil */
 .on-held .on-liga[data-laedt] .on-held-stand { gap: 10px; }
 .on-held .on-liga[data-laedt] .on-held-stand b, .on-held .on-liga[data-laedt] .on-held-stand > span { display: block; height: 30px; width: 40%;
@@ -291,8 +292,10 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 
 /* Letzte Partien (Blatt): Ergebnis, Gegner (Tipp: Visitenkarte), Datum, Analysieren */
 .on-letzte { display: grid; gap: 6px; margin: 4px 0 8px; padding: 0; list-style: none; }
-.on-letzte-zeile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 56px; padding: 6px 6px 6px 12px;
+.on-letzte-zeile { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 56px; padding: 6px 6px 6px 12px;
   border-radius: 14px; background: var(--flaeche-2); }
+.on-letzte-kopf { background-color: var(--flaeche); }
+.on-letzte-kopf > svg { width: 100%; height: 100%; display: block; border-radius: 50%; }
 .on-letzte-wer { display: grid; justify-items: start; min-width: 0; }
 .on-letzte-name { max-width: 100%; min-height: 28px; padding: 0 4px; border: 0; background: none; color: var(--text); font: inherit; font-size: 15.5px;
   font-weight: 750; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
@@ -309,8 +312,8 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-tuer[data-ton="gold"] .on-tuer-ueber { color: var(--gold-text); }
 .on-tuer[data-ton="nacht"] .on-tuer-ueber { color: var(--metall-hell); }
 .on-tuer h2 { font-family: var(--display); font-weight: var(--gw-titel); }
-.online-screen:not(.im-spiel) .on-tuer-knopf { min-height: 52px; font-size: 16.5px; }
-.on-tuer[data-ton="gold"] .on-tuer-knopf[data-ton="gold"] { min-height: 56px; font-size: 17.5px; }
+/* beide Knoepfe gleich hoch, damit sie nebeneinander auf einer Linie am Kartenfuss sitzen (online-ui W-lobby) */
+.online-screen:not(.im-spiel) .on-tuer-knopf { min-height: 54px; font-size: 16.5px; }
 /* ohne Konto: reine Erklaerung, flach und ohne Knopf, damit nichts tippbar aussieht (Befund V 6) */
 .online-screen .on-tueren[data-zustand="ohne"] .on-tuer.juwel-karte { background: transparent; box-shadow: none; border: 1px dashed var(--linie-2); }
 .online-screen .on-tueren[data-zustand="ohne"] .on-tuer.juwel-karte::before,
@@ -372,17 +375,20 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .on-held .on-gross-wert { font-size: 38px; }
   .on-held .on-held-wort { font-size: 25px; }
   .on-held-zeile { font-size: 13px; }
-  .on-form { display: flex; align-items: center; justify-self: start; gap: 8px; margin: -6px -10px -8px 64px; }
+  .on-form { display: flex; flex-wrap: wrap; align-items: center; justify-self: start; gap: 8px; margin: -6px -10px -8px 64px; }
+  .on-form-alle { margin-left: 2px; }
   .on-form .juwel-stein { min-width: 22px; height: 18px; padding: 0 5px; font-size: 10px; }
   .online-screen:not(.im-spiel) .on-tuer.juwel-karte { padding: 14px; gap: 10px; }
   .online-screen:not(.im-spiel) .on-tueren, .online-screen .on-held, .on-freunde-karte { margin-bottom: var(--a3); }
   .on-freunde-karte { padding: 14px; }
-  /* die Mittelreihe des R9-Rasters (bis 36 px Luft zwischen den Tueren) bleibt zu: die Schmuck-Karten sind hoeher */
-  .on-inhalt > .on-tueren[data-zustand] { grid-template-rows: auto 0 auto; row-gap: 6px; }
 }
-/* Handy hoch: die Arena fuellt den Schirm, die Luft-Reihen des R9-Rasters (mittig) bleiben zu */
+/* Handy hoch: zwischen den Karten keine Luft-Reihen (die Schmuck-Karten sind hoeher), der Block bleibt aber mittig wie im
+   R9-Raster (Flo: Lobby mittig; Rest teilen sich oben und unten, tests/layout-r8 LM) */
 @media (orientation: portrait) and (min-height: 740px) and (max-width: 759px) {
-  .on-rumpf > .on-inhalt:has(> .on-tueren[data-zustand="konto"]) { grid-template-rows: auto 0 auto auto 0 auto 0 auto minmax(0, 1fr); }
+  .on-rumpf > .on-inhalt:has(> .on-tueren[data-zustand="konto"]) { grid-template-rows: auto minmax(0, 1fr) auto auto minmax(0, 48px) auto 0 auto minmax(0, 1fr); }
+  /* die Mittelreihe des R9-Rasters (bis 36 px Luft zwischen den Tueren) bleibt zu: die Schmuck-Karten sind hoeher. Nur hier,
+     wo die Tueren feste Reihen 1 und 3 haben; auf dem iPhone SE fiele die zweite Tuer sonst in die 0-Reihe (online-ui W-lobby) */
+  .on-inhalt > .on-tueren[data-zustand] { grid-template-rows: auto 0 auto; row-gap: 6px; }
 }
 /* Hochformat-Raster (R9 Lobby mittig, oben): die Freunde-Karte steht an der Stelle der Klapp-Zeile, das aufgeklappte Formular darunter */
 @media (orientation: portrait) and (min-height: 740px) {
