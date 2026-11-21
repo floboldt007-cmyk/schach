@@ -143,16 +143,15 @@ export function spielSymbol(name, klasse = '') {
     + `</defs>${SY[name](teile)}</svg>`;
 }
 
-// Saphir im Brillantschliff (R27 Online Arena, Symbol fuer das Raetsel-Duell): Gegenstueck zur Kronjuwel-Krone, gleiche Bauart
-// (Verlauf, dunkle Kante, Glanz), Farben aus den Saphir-Tokens per Klasse (css/bauteile.css .kj-saphir)
-export function saphirSymbol() {
-  const id = 'sa' + (++syZaehler);
+// Raetsel-Puzzleteil (R27 Online Arena, Symbol fuer das Raetsel-Duell; Flo 21.11.2026: der Saphir "sieht haesslich aus"):
+// Bauart der Kronjuwel-Krone (Verlauf, dunkle Kante, Glanz), Farben aus den Saphir-Tokens per Klasse (css/premium.css .kj-saphir)
+export function raetselSymbol() {
+  const id = 'rs' + (++syZaehler);
   return `<svg class="kj kj-saphir" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><defs>`
     + `<linearGradient id="${id}" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" class="kj-g0"/><stop offset=".5" class="kj-g1"/><stop offset="1" class="kj-g2"/></linearGradient>`
     + `</defs><g class="kj-figur" style="--kj-verlauf:url(#${id})">`
-    + '<path class="kj-gold" d="M7 18.5 15.5 8.5h17l8.5 10L24 42z"/>'
-    + '<path class="kj-facette" d="M7 18.5h34M15.5 8.5l4.5 10 4-10 4 10 4.5-10M20 18.5 24 42l4-23.5"/>'
-    + '<path class="kj-glanz-strich" d="M13 17.5 17.5 11"/><circle class="kj-glanz" cx="27" cy="12.6" r="1.4"/></g></svg>';
+    + '<path class="kj-gold" d="M8 15h9a5 5 0 1 1 10 0h9v8a5 5 0 1 1 0 10v9H8z"/>'
+    + '<path class="kj-glanz-strich" d="M12.5 26v-6.5h4"/><circle class="kj-glanz" cx="20" cy="11.5" r="1.3"/></g></svg>';
 }
 
 // ---------- Design-Probe Leiste R27 (nur ?test&design=k1|k2|k3, R19-Auswahl leiste-symbole-r27; NICHT live) ----------

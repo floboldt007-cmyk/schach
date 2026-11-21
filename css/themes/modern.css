@@ -36,13 +36,15 @@
   --vorzug-start: rgba(70, 87, 120, .34); --vorzug-ziel: rgba(204, 72, 32, .36);
   --pfeil-nutzer: rgba(230, 126, 34, .82); --marke-nutzer: rgba(230, 126, 34, .45);
   --gold: #E0A22B; --gold-weich: rgba(224, 162, 43, .16);
-  /* Juwel-Bauteile (R27 Online Arena, css/bauteile.css .juwel-*): Goldschrift, Saphir fuer das Raetsel-Duell, Kanten,
+  /* Juwel-Bauteile (R27 Online Arena, css/bauteile.css .juwel-*): Metallgold statt des gelben --gold (Flo 21.11.2026: "Gold
+     richtig, kein Gelb"), Verlauf hell/mitte/tief, Goldschrift, Saphir fuer das Raetsel-Duell, Kanten,
      Licht und Tiefe der Schmuck-Karten; die Zahl als Goldverlauf (oben/unten) */
-  --gold-text: #8A5E0C; --auf-gold: #1C1B19; --saphir: #2F5FB7; --saphir-text: #24479A; --saphir-weich: rgba(47, 95, 183, .12);
-  --juwel-kante: rgba(200, 140, 30, .55); --juwel-kante-saphir: rgba(47, 95, 183, .42); --juwel-licht: rgba(255, 214, 120, .34);
-  --juwel-licht-saphir: rgba(120, 160, 240, .2); --juwel-grund: #FFFDF8; --juwel-tief: rgba(110, 72, 8, .14);
-  --juwel-zahl-oben: #B98216; --juwel-zahl-unten: #6E4A08; --juwel-schein: rgba(224, 162, 43, .34);
-  --juwel-glanzkante: rgba(255, 255, 255, .9); --juwel-knopf-licht: rgba(255, 255, 255, .45); --juwel-knopf-tief: rgba(90, 55, 0, .22);
+  --metall-hell: #F3DEA2; --metall: #C9A14A; --metall-tief: #8A6A26; --metall-weich: rgba(201, 161, 74, .16); --silber: #B9BEC7; --bronze: #B98457;
+  --gold-text: #75561A; --auf-gold: #1C1B19; --saphir: #2F5FB7; --saphir-text: #24479A; --saphir-weich: rgba(47, 95, 183, .12);
+  --juwel-kante: rgba(160, 124, 50, .5); --juwel-kante-saphir: rgba(47, 95, 183, .42); --juwel-licht: rgba(243, 222, 162, .42);
+  --juwel-licht-saphir: rgba(120, 160, 240, .2); --juwel-grund: #FFFDF8; --juwel-tief: rgba(80, 60, 20, .13);
+  --juwel-zahl-oben: #A8873F; --juwel-zahl-unten: #5E4615; --juwel-schein: rgba(201, 161, 74, .32);
+  --juwel-glanzkante: rgba(255, 255, 255, .9); --juwel-knopf-licht: rgba(255, 255, 255, .45); --juwel-knopf-tief: rgba(70, 50, 10, .25);
   --saphir-licht: #D8E6FF; --saphir-mitte: #3F72C4; --saphir-tief: #142F66; --saphir-kante: #0C1F47;
   /* Goldschmiede (Design-Probe Leiste R27, css/navigation.css): feste Toene fuer Verlauf, Band, Kante, Rubin und Glanz der
      Wappen-Symbole; in beiden Modi gleich, die Modus-Farbe kommt ueber --stern-an und --gold dazu */
@@ -165,10 +167,10 @@
   --vorzug-start: rgba(166, 177, 202, .30); --vorzug-ziel: rgba(255, 106, 66, .34);
   --pfeil-nutzer: rgba(255, 150, 60, .82); --marke-nutzer: rgba(255, 150, 60, .45);
   --gold: #F2BE4A; --gold-weich: rgba(242, 190, 74, .14);
-  --gold-text: #F2BE4A; --auf-gold: #1C1B19; --saphir: #4F86E8; --saphir-text: #9DBDFF; --saphir-weich: rgba(79, 134, 232, .16);
-  --juwel-kante: rgba(242, 190, 74, .45); --juwel-kante-saphir: rgba(79, 134, 232, .45); --juwel-licht: rgba(242, 190, 74, .16);
+  --metall-weich: rgba(201, 161, 74, .14); --silber: #C9CED6; --bronze: #C48E5E; --gold-text: #DCC07A; --auf-gold: #1C1B19; --saphir: #4F86E8; --saphir-text: #9DBDFF; --saphir-weich: rgba(79, 134, 232, .16);
+  --juwel-kante: rgba(201, 161, 74, .42); --juwel-kante-saphir: rgba(79, 134, 232, .45); --juwel-licht: rgba(201, 161, 74, .12);
   --juwel-licht-saphir: rgba(79, 134, 232, .14); --juwel-grund: #262A31; --juwel-tief: rgba(0, 0, 0, .5);
-  --juwel-zahl-oben: #FFE7A3; --juwel-zahl-unten: #E0A132; --juwel-schein: rgba(242, 190, 74, .3);
+  --juwel-zahl-oben: #F3DEA2; --juwel-zahl-unten: #C9A14A; --juwel-schein: rgba(201, 161, 74, .26);
   --juwel-glanzkante: rgba(255, 255, 255, .07); --juwel-knopf-licht: rgba(255, 255, 255, .38); --juwel-knopf-tief: rgba(0, 0, 0, .25);
   --stern-an: var(--gold); --stern-aus: var(--text-2);
   --stern-auf-tinte: color-mix(in srgb, var(--gold) 55%, var(--auf-tinte));
@@ -247,10 +249,10 @@
     --vorzug-start: rgba(166, 177, 202, .30); --vorzug-ziel: rgba(255, 106, 66, .34);
     --pfeil-nutzer: rgba(255, 150, 60, .82); --marke-nutzer: rgba(255, 150, 60, .45);
     --gold: #F2BE4A; --gold-weich: rgba(242, 190, 74, .14);
-    --gold-text: #F2BE4A; --auf-gold: #1C1B19; --saphir: #4F86E8; --saphir-text: #9DBDFF; --saphir-weich: rgba(79, 134, 232, .16);
-    --juwel-kante: rgba(242, 190, 74, .45); --juwel-kante-saphir: rgba(79, 134, 232, .45); --juwel-licht: rgba(242, 190, 74, .16);
+    --metall-weich: rgba(201, 161, 74, .14); --silber: #C9CED6; --bronze: #C48E5E; --gold-text: #DCC07A; --auf-gold: #1C1B19; --saphir: #4F86E8; --saphir-text: #9DBDFF; --saphir-weich: rgba(79, 134, 232, .16);
+    --juwel-kante: rgba(201, 161, 74, .42); --juwel-kante-saphir: rgba(79, 134, 232, .45); --juwel-licht: rgba(201, 161, 74, .12);
     --juwel-licht-saphir: rgba(79, 134, 232, .14); --juwel-grund: #262A31; --juwel-tief: rgba(0, 0, 0, .5);
-    --juwel-zahl-oben: #FFE7A3; --juwel-zahl-unten: #E0A132; --juwel-schein: rgba(242, 190, 74, .3);
+    --juwel-zahl-oben: #F3DEA2; --juwel-zahl-unten: #C9A14A; --juwel-schein: rgba(201, 161, 74, .26);
     --juwel-glanzkante: rgba(255, 255, 255, .07); --juwel-knopf-licht: rgba(255, 255, 255, .38); --juwel-knopf-tief: rgba(0, 0, 0, .25);
     --stern-an: var(--gold); --stern-aus: var(--text-2);
     --stern-auf-tinte: color-mix(in srgb, var(--gold) 55%, var(--auf-tinte));

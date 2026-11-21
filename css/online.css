@@ -273,7 +273,7 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-form { display: grid; justify-items: end; gap: 8px; }
 .on-form[hidden] { display: none; }
 .on-form small { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
-.on-form-steine { display: flex; gap: 6px; }
+.on-form-steine { display: flex; gap: 5px; }
 /* Platzhalter waehrend der Pruefung: die beiden ruhigen Balken stehen im Stand-Teil */
 .on-liga.on-held[data-laedt] .on-held-stand { gap: 10px; }
 .on-liga.on-held[data-laedt] .on-held-stand b, .on-liga.on-held[data-laedt] .on-held-stand > span { display: block; height: 30px; width: 40%;
@@ -313,15 +313,19 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-rang { display: grid; gap: 10px; align-content: start; padding: 16px; }
 .on-rang h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; font-family: var(--display);
   font-size: 17px; font-weight: var(--gw-titel); }
-.on-rang h2 small { font-family: var(--schrift); font-size: 12.5px; font-weight: 650; color: var(--text-2); }
-.on-rang-liste { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.on-rang-zeile { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; padding: 0 10px;
-  border-radius: 12px; font-size: 14.5px; font-weight: 650; }
-.on-rang-zeile b { font-variant-numeric: tabular-nums; }
-.on-rang-platz { color: var(--text-2); font-weight: 800; }
+.on-rang-liste { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.on-rang-zeile { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 44px;
+  padding: 0 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font: inherit; font-size: 15px; font-weight: 650;
+  text-align: start; cursor: pointer; transition: background-color var(--d-s) var(--sanft); }
+@media (hover: hover) { .on-rang-zeile:hover { background: var(--flaeche-2); } }
+.on-rang-zeile:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.on-rang-zeile b { font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.on-rang-zeile .juwel-rang { justify-self: center; }
+.on-rang-platz { justify-self: center; font-size: 13px; color: var(--text-2); font-weight: 700; }
 .on-rang-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.on-rang-zeile.ich { background: var(--gold-weich); box-shadow: inset 0 0 0 1px var(--juwel-kante); font-weight: 800; }
+.on-rang-zeile.ich { background: var(--metall-weich); box-shadow: inset 0 0 0 1px var(--juwel-kante); font-weight: 800; }
 .on-rang-zeile.ich .on-rang-platz, .on-rang-zeile.ich b { color: var(--gold-text); }
+.on-rang-luecke { height: 1px; margin: 6px 12px; background: var(--linie); }
 .on-rang .knopf.juwel-knopf { min-height: 46px; font-size: 15px; }
 @media (min-width: 1100px) and (orientation: landscape) {
   .online-screen:not(.im-spiel) .on-inhalt:has(> .on-rang:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) 320px;
@@ -338,7 +342,7 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .on-held .on-held-wort { font-size: 25px; }
   .on-held-zeile { font-size: 13px; }
   .on-form { grid-column: 2; display: flex; align-items: center; gap: 8px; }
-  .on-form .juwel-stein { width: 18px; height: 18px; font-size: 10px; }
+  .on-form .juwel-stein { min-width: 22px; height: 18px; padding: 0 5px; font-size: 10px; }
   .online-screen:not(.im-spiel) .on-tuer.juwel-karte { padding: 14px; gap: 10px; }
   .online-screen:not(.im-spiel) .on-tueren, .online-screen .on-liga.on-held, .on-freunde-karte { margin-bottom: var(--a3); }
   .on-freunde-karte { padding: 14px; }

@@ -21,13 +21,13 @@ import { sanAnzeige, materialBilanz } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
-import { fremdeKarte, bannerUrl } from './visitenkarte.js';
+import { fremdeKarte, eigeneKarte, bannerUrl } from './visitenkarte.js';
 import { zeigeGegnerProfil, profilText } from './gegner-profil.js';
 import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
 import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
 // R27 Online Arena: Medaille und Partie-Symbol als Kronjuwel, Season-Rest und Weltrangliste aus vorhandenen Quellen
-import { kronSymbol, saphirSymbol } from './icons.js';
+import { kronSymbol, raetselSymbol } from './icons.js';
 import { holeSaison } from '../kronen.js';
 import { paket2Frei } from '../freigaben.js';
 import { floAvatar } from '../thema.js';
@@ -199,15 +199,15 @@ export function zeige(root, params, app) {
   // nie ein Platzhalter. Passt ohne Scrollen auf das iPhone 13 (tests/online-ui.test.mjs). Ohne Konto sind die Karten nur
   // Erklaerung, ohne Knopf und ohne Schatten, damit nichts tippbar aussieht; der einzige Knopf ist "Zum Konto".
   const symbol = art => `<span class="juwel-plakette on-symbol" data-ton="${art === 'duell' ? 'saphir' : 'gold'}" aria-hidden="true">`
-    + `${art === 'duell' ? saphirSymbol() : kronSymbol('liga')}</span>`;
+    + `${art === 'duell' ? raetselSymbol() : kronSymbol('liga')}</span>`;
   const tuer = (art, rumpf) => `<section class="on-art on-tuer juwel-karte" data-art="${art}" data-ton="${art === 'duell' ? 'saphir' : 'gold'}" aria-labelledby="on-${art}-t">
       <div class="on-tuer-kopf">${symbol(art)}<div class="on-tuer-text"><span class="on-tuer-ueber">${esc(O(`tuer.${art}.ueber`))}</span>
         <h2 id="on-${art}-t">${esc(O(art === 'duell' ? 'ruhig.duellTitel' : `tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
   const freundeKarte = () => `<section class="on-freunde-karte juwel-karte" data-ton="ruhig" aria-labelledby="on-freunde-t">`
     + `<span class="on-freunde-paar" aria-hidden="true">${['wK', 'bK'].map((f) => `<img src="${new URL(`assets/pieces/${f}.svg`, WURZEL).href}" alt="">`).join('')}</span>`
     + `<div class="on-freunde-text"><h2 id="on-freunde-t">${esc(O('freunde.titel'))}</h2><p>${esc(O('freunde.zeileText'))}</p></div>`
-    + `<div class="on-freunde-knoepfe"><button class="knopf juwel-knopf dr" data-ton="gold" type="button" data-online="freunde-einladen">${esc(O('einladen'))}</button>`
-    + `<button class="knopf juwel-knopf dr" data-ton="rand" type="button" data-online="freunde-code">${esc(O('codeEingeben'))}</button></div></section>`;
+    + `<div class="on-freunde-knoepfe"><button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-online="freunde-einladen">${esc(O('einladen'))}</button>`
+    + `<button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-online="freunde-code">${esc(O('codeEingeben'))}</button></div></section>`;
   const RING = 2 * Math.PI * 44;
   function start() {
     const kopfHtml = seitenKopf({ titel: O('titel'), text: O('kurz') });
@@ -369,6 +369,7 @@ export function zeige(root, params, app) {
   }
   // Weltrangliste rechts (nur quer ab 1100 px, nur mit Paket 2 und nur, wenn das Konto in der Liste steht): fuenf Plaetze um
   // den eigenen, der eigene in Gold; der Knopf oeffnet die ganze Weltrangliste. Ohne Antwort bleibt die Karte weg.
+  let rangZeilen = [];
   async function zeigeRang() {
     const el = inhalt.querySelector('.on-rang');
     if (!el || !paket2Frei() || !matchMedia('(min-width: 1100px) and (orientation: landscape)').matches) return;
@@ -378,11 +379,18 @@ export function zeige(root, params, app) {
       if (weg || !l || l.ich.status !== 'dabei') return;
       const i = l.liste.findIndex((z) => z.ich);
       if (i < 0) return;
-      const von = Math.max(0, Math.min(i - 2, l.liste.length - 5));
-      el.innerHTML = `<h2 id="on-rang-t">${esc(O('rang.titel'))}<small>${esc(O('rang.unter'))}</small></h2><ol class="on-rang-liste">`
-        + l.liste.slice(von, von + 5).map((z) => `<li class="on-rang-zeile${z.ich ? ' ich' : ''}"><span class="on-rang-platz zahl">${esc(String(z.rang))}</span>`
-          + `<span class="on-rang-name">${esc(z.ich ? O('rang.du') : z.name)}</span><b class="zahl">${esc(String(z.elo))}</b></li>`).join('')
-        + `</ol><button class="knopf juwel-knopf dr" data-ton="rand" type="button" data-online="rang">${esc(O('rang.knopf'))}</button>`;
+      // die ersten drei mit Medaille, dann dein Platz mit je einem Nachbarn (stehst du selbst oben, schliessen die Plaetze an)
+      const um = i <= 3 ? l.liste.slice(3, 6) : l.liste.slice(i - 1, i + 2);
+      rangZeilen = [...l.liste.slice(0, 3), ...um];
+      const zeile = (z, n) => `<li><button class="on-rang-zeile${z.ich ? ' ich' : ''}" type="button" data-online="rang-profil" data-n="${n}"`
+        + ` aria-label="${esc(profilText('oeffnen', { name: z.ich ? O('rang.du') : z.name }))}">`
+        + (z.rang <= 3 ? `<span class="juwel-rang zahl" data-platz="${z.rang}">${z.rang}</span>` : `<span class="on-rang-platz zahl">${esc(String(z.rang))}</span>`)
+        + `<span class="on-rang-name">${esc(z.ich ? O('rang.du') : z.name)}</span><b class="zahl">${esc(String(z.elo))}</b></button></li>`;
+      el.innerHTML = `<h2 id="on-rang-t">${esc(O('rang.titel'))}</h2><ol class="on-rang-liste">`
+        + rangZeilen.slice(0, 3).map((z, n) => zeile(z, n)).join('')
+        + (um.length && um[0].rang > 4 ? '<li class="on-rang-luecke" aria-hidden="true"></li>' : '')
+        + um.map((z, n) => zeile(z, n + 3)).join('')
+        + `</ol><button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-online="rang">${esc(O('rang.knopf'))}</button>`;
       el.hidden = false;
     } catch (e) { /* ohne Rangliste fehlt die Karte */ }
   }
@@ -1268,6 +1276,15 @@ export function zeige(root, params, app) {
     if (a === 'duell') { app.gehe('raetsel-duell', { suchen: true }); return; }
     if (a === 'liga') { app.gehe('bestenliste'); return; }
     if (a === 'rang') { app.gehe('bestenliste', { reiter: 'welt' }); return; }
+    // R27: eine Zeile der Weltrangliste zeigt die vorhandene Visitenkarte (Name, Banner aus der Liste; die eigene aus dem Profil),
+    // ohne neue Server-Abfrage; der Fokus kehrt danach auf die Zeile zurueck
+    if (a === 'rang-profil') {
+      const z = rangZeilen[Number(knopf.dataset.n)];
+      if (!z) return;
+      zeigeGegnerProfil({ karte: z.ich ? eigeneKarte() : { name: z.name, banner: z.banner, titel: null, ki: false, kronenStufe: null, orden: [] } })
+        .then(() => { if (!weg && knopf.isConnected) knopf.focus({ preventScroll: true }); });
+      return;
+    }
     // R27: die Freunde-Karte oeffnet das passende Formular darunter und setzt den Fokus hinein
     if (a === 'freunde-einladen' || a === 'freunde-code') {
       const fr = s.querySelector('.on-freunde');
