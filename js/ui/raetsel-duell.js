@@ -21,7 +21,7 @@ import { figurenPfad } from '../figurensatz.js';
 import { brettOptionen, wendeBrettEinstellungenAn } from './brett-einstellungen.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
-import { icon } from './icons.js';
+import { icon, saphirSymbol } from './icons.js';
 import { spieleDuell } from './duell.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { anim, tempo } from '../bewegung.js';
@@ -37,6 +37,8 @@ import '../sprachen/allgemein.js';
 
 const D = (k, w) => t('p-duell.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// "Wer loest mehr *Raetsel*?": das Wort zwischen den Sternen wird Gold (Text ist escaped, die Sterne setzt nur der Text)
+const goldWort = (text) => esc(text).replace(/\*([^*]+)\*/, '<span class="rd-gold">$1</span>');
 const WURZEL = new URL('../../', import.meta.url);
 const testZahl = (n, std) => (typeof window !== 'undefined' && Number.isFinite(window[n]) ? window[n] : std);
 const RING = 2 * Math.PI * 44;
@@ -154,10 +156,15 @@ export function zeige(root, params, app) {
     }
     phase('start');
     const codeOffen = !!(meldung || (params && params.code));
+    // R27 Juwel-Look (Flo 21.11.2026 "sieht zu billig aus"; Bauteile .juwel-* aus css/bauteile.css): Saphir-Karte mit
+    // Edelstein, grosse Frage mit Goldwort, Kopf an Kopf mit der Uhr in der Mitte, Regeln als Pillen
     rumpf.innerHTML = `<div class="rd-start">
-      <section class="rd-buehne" aria-labelledby="rd-regeln-t"><h2 id="rd-regeln-t" class="sr">${esc(D('regeln.titel'))}</h2>
-        <div class="rd-paar">${ichBild()}<b class="rd-vs" aria-label="${esc(D('vs'))}">VS</b><span class="rd-av rd-av-frage" aria-hidden="true">?</span></div>
-        <b class="rd-gross zahl" aria-hidden="true">${uhrText(DAUER_MS)}</b>
+      <section class="rd-buehne juwel-karte" data-ton="saphir" aria-labelledby="rd-regeln-t"><h2 id="rd-regeln-t" class="sr">${esc(D('regeln.titel'))}</h2>
+        <span class="rd-stein" aria-hidden="true">${saphirSymbol()}</span>
+        <p class="rd-ueber" aria-hidden="true">${esc(D('buehne.ueber'))}</p>
+        <p class="rd-frage" aria-hidden="true">${goldWort(D('buehne.frage'))}</p>
+        <div class="rd-paar">${ichBild()}<span class="rd-mitte"><b class="rd-vs" aria-label="${esc(D('vs'))}">VS</b>`
+        + `<b class="rd-gross juwel-zahl zahl" aria-hidden="true">${uhrText(DAUER_MS)}</b></span><span class="rd-av rd-av-frage" aria-hidden="true">?</span></div>
         <ul class="rd-regeln">
           <li><span class="rd-kachel-bild" aria-hidden="true">${icon('ziel')}</span><span aria-hidden="true">${esc(D('kachel.gleich'))}</span><span class="sr">${esc(D('regeln.1'))}</span></li>
           <li><span class="rd-kachel-bild" aria-hidden="true">${icon('verlauf')}</span><span aria-hidden="true">${esc(D('kachel.zeit'))}</span><span class="sr">${esc(D('regeln.2'))}</span></li>
@@ -165,9 +172,11 @@ export function zeige(root, params, app) {
         </ul>
         <button type="button" class="rd-los dr rd-suchen">${esc(D('suchen.gewertet'))}</button>
       </section>
-      <section class="rd-karte rd-freund" aria-labelledby="rd-fr-t"><h2 id="rd-fr-t">${esc(D('freund.titel'))}</h2><p class="rd-text">${esc(D('freund.text'))}</p>
-        <div class="rd-knoepfe"><button type="button" class="knopf dr rd-einladen">${esc(D('einladen.kurz'))}</button>
-          <button type="button" class="knopf dr rd-code-zeigen" aria-expanded="${codeOffen}" aria-controls="rd-code-form">${esc(D('code.zeigen'))}</button></div>
+      <section class="rd-karte rd-freund juwel-karte" data-ton="ruhig" aria-labelledby="rd-fr-t">
+        <div class="rd-freund-kopf"><span class="juwel-plakette" aria-hidden="true">${icon('person')}</span>
+          <div><h2 id="rd-fr-t">${esc(D('freund.titel'))}</h2><p class="rd-text">${esc(D('freund.text'))}</p></div></div>
+        <div class="rd-knoepfe"><button type="button" class="knopf juwel-knopf dr rd-einladen" data-ton="gold">${esc(D('einladen.kurz'))}</button>
+          <button type="button" class="knopf juwel-knopf dr rd-code-zeigen" data-ton="rand" aria-expanded="${codeOffen}" aria-controls="rd-code-form">${esc(D('code.zeigen'))}</button></div>
         <form class="rd-code" id="rd-code-form" novalidate${codeOffen ? '' : ' hidden'}><label for="rd-code-feld">${esc(D('code.label'))}</label>
           <div class="rd-code-zeile"><input id="rd-code-feld" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9"
             inputmode="text" value="${esc(params && params.code ? params.code : '')}">
