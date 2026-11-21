@@ -300,6 +300,10 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
       regeln: document.querySelectorAll('.rd-regeln li').length, hash: location.hash,
       reiter: document.querySelector('.reiter-leiste .reiter[aria-current="page"]')?.dataset.reiter || null,
     }));
+    // R26 AC-04 (Flo 20.11.2026): Start und Suche sind Lobby (Klangset arcade), erst das Duell klingt im gewaehlten Set
+    const klangOrt = () => s.evaluate(async () => (await import(new URL('js/sounds.js', location.href).href)).klang.vorrat().ort);
+    const ortStart = await klangOrt();
+    pruefe('Klang: Start des Raetsel-Duells klingt wie die Lobby (Ort lobby, Set arcade)', ortStart === 'lobby', ortStart);
     const g0 = await geometrie(s);
     pruefe('Start: Titel, drei Regeln, Hash #raetsel-duell, Reiter Heim, nichts breiter, Tippflaechen ab 44 px',
       /Rätsel-Duell/.test(start.titel) && start.regeln === 3 && start.hash === '#raetsel-duell' && g0.breit && g0.klein.length === 0, { ...start, ...g0 });
@@ -313,6 +317,8 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
 
     await s.locator('.rd-suchen').click();
     await s.waitForSelector('.screen.raetsel-duell[data-phase="suche"] .rd-abbrechen', { timeout: 3000 });
+    const ortSuche = await klangOrt();
+    pruefe('Klang: Suche klingt wie die Lobby (Ort lobby)', ortSuche === 'lobby', ortSuche);
     pruefe('Suche: Radar und Abbrechen, Fokus auf Abbrechen', await s.evaluate(() => !!document.querySelector('.rd-radar') && document.activeElement?.classList.contains('rd-abbrechen')));
     await bild(s, bildName(geraet, schema, '2-suche'));
 
@@ -331,6 +337,8 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
 
     await s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"]', { timeout: 5000 });
     await warteBis(s, () => document.querySelector('.rd-nr')?.textContent.length > 0);
+    const ortLaeuft = await klangOrt();
+    pruefe('Klang: das laufende Duell klingt im gewaehlten Set (Ort spiel)', ortLaeuft === 'spiel', ortLaeuft);
     pruefe('Laeuft: Raetsel 1, Weiss am Zug, Brett von Weiss aus', await s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.seite === 'w'
       && /1/.test(document.querySelector('.rd-nr').textContent) && /Weiß/.test(document.querySelector('.rd-amzug').textContent)));
     const leer = await leereImSpiel(s);

@@ -312,7 +312,9 @@ const fremdLaden = new Map(); // 'paket/datei' -> Promise
 // R26 AC-04 (Flo 20.11.2026): die Klangwahl gilt nur im Spiel, Lobby, Menues und Shop klingen immer arcade. Das gewaehlte
 // Paket bleibt vorgeladen (paket); die Lobby holt ihre arcade-Dateien bei Bedarf in fremd nach
 export const LOBBY_PAKET = 'arcade';
-const SPIEL_SCREENS = new Set(['lektion', 'raetsel', 'raetsel-duell', 'analyse']);
+// Das Raetsel-Duell fehlt hier mit Absicht: es beginnt mit Start oder Suche (Lobby) und schaltet selbst ins Spiel, sobald
+// das Duell laeuft (klang.setzeOrt in js/ui/raetsel-duell.js; Kaltreview 20.11.: Start und Suche klangen im gewaehlten Set)
+const SPIEL_SCREENS = new Set(['lektion', 'raetsel', 'analyse']);
 let ort = null;            // 'spiel' | 'lobby' | null (noch kein Screen: die Wahl gilt ueberall)
 export function ortVonScreen(name, params = {}) {
   const p = params && typeof params === 'object' ? params : {};
