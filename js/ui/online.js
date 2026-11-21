@@ -21,7 +21,7 @@ import { sanAnzeige, materialBilanz } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
-import { fremdeKarte, eigeneKarte, bannerUrl } from './visitenkarte.js';
+import { fremdeKarte, eigeneKarte, bannerUrl, fremderAvatar } from './visitenkarte.js';
 import { zeigeGegnerProfil, profilText } from './gegner-profil.js';
 import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
 import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
@@ -31,7 +31,7 @@ import { kronSymbol, duellSchwerter, raetselBlitz } from './icons.js';
 import { holeSaison } from '../kronen.js';
 import { sheet } from './bauteile.js';
 import { paket2Frei } from '../freigaben.js';
-import { floAvatar, profilAvatar } from '../thema.js';
+import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { spieleDuell } from './duell.js';
 import { jetzt as serverJetzt, anzeigeJetzt, seit as zeitSeit } from '../serverzeit.js';
@@ -437,10 +437,10 @@ export function zeige(root, params, app) {
       rangZeilen = [...l.liste.slice(0, 3), ...um];
       const name = (z) => (z.ich ? O('rang.du') : z.name);
       const kopf = (z, k) => (z.ich ? `<span class="juwel-kopf" data-ich style="--k:${k}px"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''}>${floAvatar('w')}</span>`
-        // Profilbild nur mit supabase/weltrang-karte-schema.sql (motiv/grund/rahmen; profilAvatar prueft jeden Wert gegen die
+        // Profilbild nur mit supabase/weltrang-karte-schema.sql (motiv/grund/rahmen; fremderAvatar prueft jeden Wert gegen die
         // festen Listen), sonst Banner mit Schleier und Anfangsbuchstabe
         : typeof z.motiv === 'string'
-          ? `<span class="juwel-kopf"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px">${profilAvatar({ figur: z.motiv, grund: z.grund, rahmen: z.rahmen }, 'w')}</span>`
+          ? `<span class="juwel-kopf"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px">${fremderAvatar(z)}</span>`
           : `<span class="juwel-kopf mit-banner"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px;--banner:url('${bannerUrl(z.banner)}')">${esc((z.name[0] || '?').toUpperCase())}</span>`);
       const label = (z) => ` aria-label="${esc(profilText('oeffnen', { name: name(z) }))}"`;
       const podest = [1, 0, 2].filter((n) => rangZeilen[n]).map((n) => { const z = rangZeilen[n];
@@ -1344,7 +1344,7 @@ export function zeige(root, params, app) {
       const z = rangZeilen[Number(knopf.dataset.n)];
       if (!z) return;
       zeigeGegnerProfil({ karte: z.ich ? eigeneKarte() : { name: z.name, banner: z.banner, titel: null, ki: false, kronenStufe: null, orden: [],
-        ...(typeof z.motiv === 'string' ? { avatar: profilAvatar({ figur: z.motiv, grund: z.grund, rahmen: z.rahmen }, 'w') } : {}) } })
+        ...(typeof z.motiv === 'string' ? { avatar: fremderAvatar(z) } : {}) } })
         .then(() => { if (!weg && knopf.isConnected) knopf.focus({ preventScroll: true }); });
       return;
     }
