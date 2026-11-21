@@ -272,7 +272,7 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
     background-clip: text; color: transparent; }
 }
 .rd-buehne.juwel-karte .rd-paar { gap: 14px; margin-top: 4px; }
-.rd-buehne.juwel-karte .rd-av { width: 64px; height: 64px; box-shadow: 0 0 0 2px var(--gold), 0 0 0 6px var(--gold-weich), 0 10px 22px -8px var(--juwel-schein); }
+.rd-buehne.juwel-karte .rd-av { width: 64px; height: 64px; box-shadow: 0 0 0 2px var(--metall), 0 0 0 6px var(--metall-weich), 0 10px 22px -8px var(--juwel-schein); }
 .rd-buehne.juwel-karte .rd-av-frage { background: var(--saphir-weich); color: var(--saphir-text);
   box-shadow: 0 0 0 2px var(--saphir), 0 0 0 6px var(--saphir-weich), 0 10px 22px -8px var(--juwel-licht-saphir); }
 .rd-mitte { display: grid; justify-items: center; gap: 2px; min-width: 0; }
@@ -288,7 +288,9 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
     linear-gradient(180deg, var(--saphir-mitte), var(--saphir-tief));
   box-shadow: inset 0 1px 0 var(--juwel-knopf-licht), inset 0 -2px 0 rgba(0, 0, 0, .25), 0 12px 26px -10px var(--saphir); }
 .rd-buehne.juwel-karte .rd-los.rd-suchen:active { background-color: var(--saphir-tief); }
-.rd-buehne.juwel-karte .rd-los.rd-suchen:focus-visible { outline: var(--fokus, 3px solid var(--saphir)); outline-offset: 3px; }
+.rd-buehne.juwel-karte .rd-los.rd-suchen:focus-visible { outline: 3px solid var(--saphir-text); outline-offset: 3px; }
+/* "3 Minuten" doppelt die grosse 3:00: nur noch fuer Bildschirmleser (weniger Zahlen, Flo 21.11.) */
+.rd-buehne.juwel-karte .rd-regeln li:nth-child(2) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .rd-freund.juwel-karte { padding: 18px; }
 .rd-freund-kopf { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; }
 .rd-freund-kopf h2 { margin: 0 0 2px; }
