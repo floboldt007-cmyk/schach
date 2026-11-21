@@ -99,8 +99,21 @@ const startBereit = (s) => s.waitForFunction(() => !!document.querySelector('.sc
 // Wartet auf den Endzustand nach einem Wechsel des Service Workers, statt einmal zu pruefen: die Zielversion steuert
 // die Seite, keine Fassung wartet mehr, nur ihr Cache ist uebrig (activate hat den alten geloescht), und die Seite laedt
 // nicht mehr neu (zweimal hintereinander dieselbe fertig geladene Seite, performance.timeOrigin).
+// Zuletzt gesehene Lage, damit ein Fehlschlag zeigt, woran es hing (CI 44657402343: Runde 2 rot unter Linux-WebKit,
+// nur die Versionsnummer im Detail; lokal 3 von 3 gruen)
+let letzteLage = null;
+async function frischerBlick(s) {
+  const f = await s.context().newPage();
+  try {
+    await f.goto(new URL('/__frischer-blick', s.url()).href).catch(() => {});
+    return await begrenzt('Frischer Blick', () => f.evaluate(async () => {
+      const r = await navigator.serviceWorker.getRegistration(); return r && r.active ? r.active.state : null;
+    }), AUSWERTUNG_MS);
+  } catch (e) { return 'fehler: ' + e.message.slice(0, 80); } finally { await f.close().catch(() => {}); }
+}
 async function warteAufVersion(s, version, ms = 60000) {
   const ende = Date.now() + ms;
+  letzteLage = null;
   const soll = JSON.stringify(['schach-arena-v' + version]);
   let zuletzt = null;
   while (Date.now() < ende) {
@@ -110,8 +123,22 @@ async function warteAufVersion(s, version, ms = 60000) {
       const lage = await auswerten(s, async () => {
         const r = await navigator.serviceWorker.getRegistration();
         return { seite: document.readyState === 'complete' ? performance.timeOrigin : null, caches: await caches.keys(),
-          ruhig: !!r && !r.waiting && !r.installing && !!r.active && r.active.state === 'activated' };
+          ruhig: !!r && !r.waiting && !r.installing && !!r.active && r.active.state === 'activated',
+          worker: r ? { installing: r.installing && r.installing.state, waiting: r.waiting && r.waiting.state, active: r.active && r.active.state } : null,
+          controller: !!navigator.serviceWorker.controller };
       });
+      letzteLage = { version: v, ...lage };
+      // WebKit meldet den Schritt activating -> activated nicht an eine Seite, die WAEHREND activating geladen wurde: deren
+      // Bild bleibt auf "activating", obwohl activate laengst fertig ist (20.11.2026, Linux-CI 44663587812 und lokal unter
+      // Last 2 von 12: activate lief in 12 ms durch, eine frische Seite und ein Neuladen sahen "activated", die alte Seite
+      // 60 s lang "activating"). Die App wartet nach dem Neuladen auf keinen dieser Zustaende. Darum bestaetigt dann eine
+      // frische Seite (404-Adresse: startet die App nicht und landet nicht im Cache) den Zustand des Workers.
+      if (v === version && lage.seite && !lage.ruhig && lage.worker && lage.worker.active === 'activating'
+        && !lage.worker.waiting && !lage.worker.installing && JSON.stringify(lage.caches) === soll) {
+        lage.frisch = await frischerBlick(s);
+        lage.ruhig = lage.frisch === 'activated';
+        letzteLage.frisch = lage.frisch;
+      }
       if (v === version && lage.seite && lage.ruhig && JSON.stringify(lage.caches) === soll) jetzt = lage.seite;
     } catch (e) { if (fristAbgelaufen(e)) throw e; /* sonst: die Seite laedt gerade neu */ }
     if (jetzt && jetzt === zuletzt) { await startBereit(s).catch(() => {}); return true; }
@@ -130,7 +157,21 @@ async function main() {
   await k.addInitScript((schl) => { if (!localStorage.getItem(schl)) localStorage.setItem(schl, JSON.stringify({ gesehen: '2026-01-01' })); }, P + 'modul:start');
   const s = await k.newPage();
   const fehler = [];
-  s.on('pageerror', (e) => fehler.push(e.message));
+  // wie tests/e2e.test.mjs: WebKit meldet einen beim Neuladen abgebrochenen Abruf der eigenen Seite (ein Klang, der gerade
+  // laedt) als "<Adresse> due to access control checks."; hier gemessen 19.11.2026 in 8 von 10 WebKit-Laeufen, mit und ohne
+  // sw.js ohneFrische, nur in den Teilen mit Neuladen. Abrufe anderer Adressen bleiben ein Fehler: die eigene Adresse muss
+  // am ANFANG stehen (WebKit schreibt "/127.0.0.1:<port>/..." bzw. mit http:), nicht irgendwo, etwa im Abfrage-Teil.
+  const eigenerAbbruch = (m) => new RegExp(`^(https?:/)?/127\\.0\\.0\\.1:${server.address().port}/\\S* due to access control checks\\.?$`).test(m);
+  const port = server.address().port;
+  pruefe('Ausnahme "access control checks" nur fuer die eigene Adresse am Anfang (fremde Adresse mit der eigenen im Abfrage-Teil bleibt ein Fehler)',
+    eigenerAbbruch(`/127.0.0.1:${port}/assets/klang/arcade/combo.mp3 due to access control checks.`)
+    && eigenerAbbruch(`http://127.0.0.1:${port}/assets/klang/arcade/combo.mp3 due to access control checks.`)
+    && !eigenerAbbruch(`https://fremd.example/x.mp3?von=127.0.0.1:${port}/ due to access control checks.`)
+    && !eigenerAbbruch(`/127.0.0.1:${port + 1}/x.mp3 due to access control checks.`));
+  s.on('pageerror', (e) => {
+    if (eigenerAbbruch(e.message)) return;
+    fehler.push(e.message);
+  });
   // offene Anfragen der Seite: haengt eine davon im alten Service Worker, wartet die neue Fassung nach skipWaiting
   const offen = new Map();
   s.on('request', (q) => offen.set(q, Date.now()));
@@ -173,6 +214,10 @@ async function main() {
       && JSON.stringify(lage.caches) === JSON.stringify([`schach-arena-v${VERSION + 1}`]), JSON.stringify(lage));
     const probe = await werte(s, (x) => fetch('js/ui/heim.js').then((r) => r.text()).then((t) => t.includes(x)), PROBE);
     pruefe('Übernahme: die geänderte Datei kommt in der neuen Fassung aus dem Cache (keine alte Datei im neuen Cache)', probe);
+    // nicht nur der Cache, auch der laufende Code: WebKit lud Module beim Neuladen aus dem eigenen Speicher (max-age des
+    // Servers) am Worker vorbei, die Seite lief mit heim.js aus Fassung 0 (19.11.2026, sw.js ohneFrische)
+    const lauf1 = await werte(s, () => globalThis.__swFassung);
+    pruefe('Übernahme: die Seite läuft mit dem Code der neuen Fassung (nicht alter Code unter neuem Worker)', lauf1 === 1, String(lauf1));
     pruefe('Übernahme: die App läuft (Start sichtbar), keine Seitenfehler', await werte(s, () => document.querySelectorAll('#app > .screen').length) > 0 && fehler.length === 0, fehler.join(' | '));
 
     // Runde 2 (CI 44472043484 und 44367424082): Nach skipWaiting uebernimmt die neue Fassung erst, wenn der alte Worker
@@ -196,9 +241,22 @@ async function main() {
     await s.goto(basis.replace('?test&sw', '?test&sw&swnot=3000')); await startBereit(s);
     const da = await warteAufVersion(s, VERSION + 2);
     schritt('Runde 2: Endzustand pruefen');
-    pruefe(`Runde 2: Version ${VERSION + 2} steuert die Seite, nur ihr Cache bleibt`, da, JSON.stringify(await swVersion(s)));
+    pruefe(`Runde 2: Version ${VERSION + 2} steuert die Seite, nur ihr Cache bleibt`, da, JSON.stringify({ jetzt: await swVersion(s), zuletzt: letzteLage }));
+    // Herkunft von js/ui/heim.js, falls die Seite alten Code hat: im Cache der neuen Fassung, ueber den Worker, laut Timing
+    const herkunft = () => werte(s, async (v) => {
+      const fassungIn = (t) => (t.match(/__swFassung = (\d+)/) || [])[1] || '0';
+      const c = await caches.open('schach-arena-v' + v);
+      const imCache = await c.match('js/ui/heim.js');
+      const ueberSW = await fetch('js/ui/heim.js').then((r) => r.text()).catch((e) => 'Fehler ' + e.message);
+      const t = performance.getEntriesByType('resource').filter((e) => e.name.includes('js/ui/heim.js'))
+        .map((e) => `${e.deliveryType || '-'}/${e.transferSize}/${e.workerStart > 0 ? 'sw' : 'ohne-sw'}`);
+      const nav = performance.getEntriesByType('navigation')[0];
+      return JSON.stringify({ cache: imCache ? fassungIn(await imCache.text()) : 'fehlt', ueberSW: fassungIn(ueberSW), timing: t,
+        nav: nav && `${nav.type}/${nav.workerStart > 0 ? 'sw' : 'ohne-sw'}`, laeuft: String(globalThis.__swFassung) });
+    }, VERSION + 2);
+    const fassungJetzt = await werte(s, () => globalThis.__swFassung);
     pruefe('Runde 2: die Seite läuft mit dem Code der neuen Fassung (nicht alter Code unter neuem Worker)',
-      await werte(s, () => globalThis.__swFassung) === 2, String(await werte(s, () => globalThis.__swFassung)));
+      fassungJetzt === 2, fassungJetzt === 2 ? '' : await herkunft());
     pruefe('Runde 2: höchstens dreimal geladen (Aufruf, Notbremse, Wechsel), keine Schleife', ladungen <= 3, `${ladungen} Ladungen`);
     pruefe('Runde 2: keine Seitenfehler', fehler.length === 0, fehler.join(' | '));
   } catch (e) {

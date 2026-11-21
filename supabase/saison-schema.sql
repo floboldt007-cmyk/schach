@@ -72,6 +72,14 @@ alter table public.saison_abrechnungen enable row level security;
 alter table public.saison_abzeichen enable row level security;
 alter table public.saison_titel enable row level security;
 alter table public.saison_wahl enable row level security;
+-- Schalter in den Einstellungen (Flo 18.11.2026): false = der Gegner bekommt weder Abzeichen noch Titel. Anfangs aus,
+-- jeder schaltet selbst ein (Flo 19.11.2026, Datenschutz durch Voreinstellung, Art. 25 Abs. 2 DSGVO). Die zweite Zeile
+-- stellt die Vorgabe auch dort um, wo eine aeltere Fassung dieser Datei die Spalte schon mit true angelegt hat.
+alter table public.saison_wahl add column if not exists sichtbar boolean not null default false;
+alter table public.saison_wahl alter column sichtbar set default false;
+-- Einschalten ist eine Einwilligung und geht erst ab 16 (Art. 6 Abs. 1 lit. a, Art. 8 Abs. 1 DSGVO, Flo 19.11.2026): Zeitpunkt
+-- der Bestaetigung "mindestens 16 Jahre alt". Ohne Zeitpunkt zaehlt sichtbar nicht, auch nicht bei einer aelteren Zeile.
+alter table public.saison_wahl add column if not exists alter_bestaetigt_am timestamptz;
 -- keine Policies und keine Tabellenrechte: gelesen und geschrieben wird nur ueber die Funktionen unten
 revoke all on table public.saison_abrechnungen, public.saison_abzeichen, public.saison_titel, public.saison_wahl
   from anon, authenticated, public;
@@ -214,7 +222,8 @@ begin
       from public.saison_abzeichen a where a.user_id = uid), '[]'::jsonb),
     'titel', coalesce((select jsonb_agg(t.art || '-s' || t.saison order by t.saison, t.art)
       from public.saison_titel t where t.user_id = uid), '[]'::jsonb),
-    'gewaehlt', (select w.titel from public.saison_wahl w where w.user_id = uid)
+    'gewaehlt', (select w.titel from public.saison_wahl w where w.user_id = uid),
+    'sichtbar', coalesce((select w.sichtbar and w.alter_bestaetigt_am is not null from public.saison_wahl w where w.user_id = uid), false)
   );
 end;
 $$;
@@ -242,8 +251,36 @@ begin
 end;
 $$;
 
+-- Sichtbarkeit fuer den Gegner an oder aus, nur fuer das eigene Konto; die Titelwahl bleibt davon unberuehrt.
+-- an = true nur mit alter_bestaetigt = true (sonst SAISON_ALTER), speichert den Zeitpunkt; an = false geht immer und
+-- loescht den Zeitpunkt (Widerruf, Art. 7 Abs. 3 DSGVO).
+drop function if exists public.saison_sichtbar_setzen(boolean);
+create or replace function public.saison_sichtbar_setzen(an boolean, alter_bestaetigt boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'SAISON_ANMELDUNG';
+  end if;
+  if an is null then
+    raise exception 'SAISON_SICHTBAR';
+  end if;
+  if an and alter_bestaetigt is not true then
+    raise exception 'SAISON_ALTER';
+  end if;
+  insert into public.saison_wahl (user_id, sichtbar, alter_bestaetigt_am) values (uid, an, case when an then now() end)
+  on conflict (user_id) do update set sichtbar = excluded.sichtbar, alter_bestaetigt_am = excluded.alter_bestaetigt_am;
+  return jsonb_build_object('sichtbar', an);
+end;
+$$;
+
 -- Was der Gegner sieht: bestes Abzeichen (hoechste Stufe, bei Gleichstand die juengste Saison) und der gewaehlte Titel,
--- solange er verdient ist. Nur intern.
+-- solange er verdient ist; mit ausgeschaltetem Schalter beide Felder null. Nur intern.
 create or replace function public.saison_karte_von(uid uuid)
 returns jsonb
 language sql
@@ -251,11 +288,13 @@ stable
 security definer
 set search_path = ''
 as $$
-  select jsonb_build_object(
+  select case when coalesce((select v.sichtbar and v.alter_bestaetigt_am is not null from public.saison_wahl v where v.user_id = uid), false)
+  then jsonb_build_object(
     'abzeichen', (select jsonb_build_object('saison', a.saison, 'stufe', a.stufe) from public.saison_abzeichen a
       where a.user_id = uid order by a.stufe desc, a.saison desc limit 1),
     'titel', (select w.titel from public.saison_wahl w where w.user_id = uid and exists (
-      select 1 from public.saison_titel t where t.user_id = uid and t.art || '-s' || t.saison = w.titel)));
+      select 1 from public.saison_titel t where t.user_id = uid and t.art || '-s' || t.saison = w.titel)))
+  else jsonb_build_object('abzeichen', null, 'titel', null) end;
 $$;
 
 -- Saison-Teil beider Karten einer Online-Partie, nur fuer ihre beiden Spieler (wie karte_der_partie in karte-schema.sql)
@@ -354,9 +393,9 @@ revoke all on function public.liga_abrechnen() from public, anon, authenticated;
 
 revoke all on function public.saison_konstanten(), public.saison_nummer(date), public.saison_beginn(integer),
   public.saison_abrechnen(), public.saison_karte_von(uuid) from public, anon, authenticated, service_role;
-revoke all on function public.saison_mein_stand(), public.saison_titel_waehle(text), public.saison_karte_der_partie(uuid)
+revoke all on function public.saison_mein_stand(), public.saison_titel_waehle(text), public.saison_sichtbar_setzen(boolean, boolean), public.saison_karte_der_partie(uuid)
   from public, anon, authenticated;
-grant execute on function public.saison_mein_stand(), public.saison_titel_waehle(text), public.saison_karte_der_partie(uuid)
+grant execute on function public.saison_mein_stand(), public.saison_titel_waehle(text), public.saison_sichtbar_setzen(boolean, boolean), public.saison_karte_der_partie(uuid)
   to authenticated;
 
 -- Datenauskunft (Kaltreview 14.11.2026): live ist meine_daten() die Fassung OHNE Saison. Damit "nur diese Datei" stimmt,
@@ -385,7 +424,7 @@ declare
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
   duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
-  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null);
+  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null, 'sichtbar', false, 'alter_bestaetigt_am', null);
   raetsel jsonb;
   verwaltung jsonb := jsonb_build_object('verwalter', null, 'protokoll', '[]'::jsonb); -- [verwaltung]
 begin
@@ -513,7 +552,8 @@ begin
   end if;
   -- Weltrangliste (weltrang-schema.sql, 14.11.2026): ob und seit wann du in der Weltrangliste gezeigt werden willst
   if to_regclass('public.weltrang_teilnahme') is not null then
-    execute 'select jsonb_build_object(''teilnahme'', t.user_id is not null, ''seit'', t.seit)
+    execute 'select jsonb_build_object(''teilnahme'', (to_jsonb(t) ->> ''alter_bestaetigt_am'') is not null, ''seit'', t.seit,
+               ''alter_bestaetigt_am'', to_jsonb(t) -> ''alter_bestaetigt_am'')
              from (select 1) x left join public.weltrang_teilnahme t on t.user_id = $1'
       into raetsel using uid;
     kronen := kronen || jsonb_build_object('weltrang', raetsel);
@@ -538,7 +578,10 @@ begin
                  from public.saison_abzeichen a where a.user_id = $1), ''[]''::jsonb),
                ''titel'', coalesce((select jsonb_agg(jsonb_build_object(''saison'', t.saison, ''art'', t.art) order by t.saison, t.art)
                  from public.saison_titel t where t.user_id = $1), ''[]''::jsonb),
-               ''gewaehlt'', (select w.titel from public.saison_wahl w where w.user_id = $1))'
+               ''gewaehlt'', (select w.titel from public.saison_wahl w where w.user_id = $1),
+               ''sichtbar'', coalesce((select (to_jsonb(w) ->> ''sichtbar'')::boolean and (to_jsonb(w) ->> ''alter_bestaetigt_am'') is not null
+                 from public.saison_wahl w where w.user_id = $1), false),
+               ''alter_bestaetigt_am'', (select to_jsonb(w) -> ''alter_bestaetigt_am'' from public.saison_wahl w where w.user_id = $1))'
       into saison using uid;
   end if;
   -- Raetsel-Duell (raetsel-duell-schema.sql): die eigenen Duelle mit dem eigenen Stand darin und die laufende Suche.

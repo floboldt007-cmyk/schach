@@ -71,6 +71,7 @@
 import { BOTS, botNachId, endgegnerDerWelt } from './bots.js';
 import { sende } from './ereignisse.js';
 import { kompaktReview, ergaenzeReviewFelder, begrenzeLeistung } from './review.js';
+import { t as uebersetze } from './sprache.js';
 
 // Zug-Klassen (wie review.js KLASSEN), zum Pruefen gespeicherter Daten
 const KLASSEN_LISTE = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen'];
@@ -548,6 +549,12 @@ export function pruefeZuzweit(z) {
   const name = (wert, standard) => typeof wert === 'string'
     ? [...wert.replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, 20).join('') || standard : standard;
   return { weiss: name(z?.weiss, 'Weiß'), schwarz: name(z?.schwarz, 'Schwarz'), drehen: z?.drehen === true };
+}
+// Nur zur Anzeige: die Standardnamen oben zeigt die Oberflaeche in der gewaehlten Sprache, eigene Namen bleiben; gespeichert
+// bleibt der Name immer unveraendert (fable-check 19.11. Nr 14: Startseite, Verlauf und Analyse zeigten "Weiß vs. Schwarz").
+// Die Aufrufer laden js/sprachen/allgemein.js.
+export function zuzweitName(n) {
+  return n === 'Weiß' ? uebersetze('allgemein.weiss') : n === 'Schwarz' ? uebersetze('allgemein.schwarz') : n;
 }
 // verbrauchte Bedenkzeit je Halbzug in Zehntelsekunden (kompakt: ganze Zahlen)
 export function pruefeZeiten(z, maxLaenge = 2000) {

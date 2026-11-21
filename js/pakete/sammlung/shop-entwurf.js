@@ -141,11 +141,29 @@ function stueckKarte(k, s, beiWahl) {
   k.addEventListener('click', () => beiWahl(s));
   return k;
 }
-// Edition fuer einen Gast wie im alten Shop (.sh-karte[data-gast], shop.js gastKarte): ausgegraut, kein Knopf, "Mit Konto"
+// Edition fuer einen Gast wie im alten Shop (.sh-karte[data-gast], shop.js gastKarte): ausgegraut, "Mit Konto". Ein Tipp
+// (oder Enter/Leertaste) oeffnet ein kleines Blatt mit dem Grund (shop.anmelden) und "Zum Konto" (fable-check 19.11. Nr 6:
+// die Karte reagierte auf nichts). "Zum Konto" fuehrt nur zur Konto-Seite der Einstellungen; die Testbereiche schaltet es
+// nicht frei (anders als kontoFreigeschaltet im alten Shop-Weg). "Schliessen" fuehrt zurueck in den Shop wie die Vorschau.
 function gastKarte(k, s) {
   k.dataset.gast = '';
-  k.setAttribute('role', 'group');
+  k.setAttribute('role', 'button');
+  k.tabIndex = 0;
   stueckInhalt(k, s, S('entwurf.mitKonto'));
+  const oeffne = async () => {
+    const bereich = k.closest('.sa-bereich');
+    const wahl = await sheet({ titel: s.name, text: S('shop.anmelden'), klasse: 'shf-sheet',
+      knoepfe: [{ text: S('shop.zumKonto'), wert: 'konto', art: 'primaer' }, { text: t('allgemein.schliessen'), wert: false }], abbrechen: false })
+      .catch(() => false);
+    if (wahl === 'konto') { location.hash = '#einstellungen/konto'; return; }
+    if (bereich && bereich.isConnected) bereich.dispatchEvent(new CustomEvent('sa:oeffne', { bubbles: true }));
+  };
+  k.addEventListener('click', oeffne);
+  k.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    oeffne();
+  });
   return k;
 }
 

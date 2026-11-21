@@ -40,6 +40,8 @@
     border: 1px solid var(--text-2); text-decoration: none; font-weight: var(--gw-stark); }
   .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
   .fuss a { margin-right: var(--a3); }
+  /* einzeln stehende Links: Tippflaeche 44 px (fable-check 19.11. Nr 15); Links im Fliesstext bleiben Text (WCAG 2.5.8) */
+  .stand a, .fuss a, dd > a, a.kl-mail { display: inline-flex; align-items: center; min-height: var(--tipp); }
   .kl-feld { display: grid; gap: var(--a1); margin: 0 0 var(--a3); font-weight: var(--gw-stark); }
   .kl-feld input { width: 100%; min-height: var(--tipp); padding: 0 12px; border-radius: var(--r-m, 10px); border: 1px solid var(--text-2);
     background: var(--grund); color: var(--text); font: inherit; font-weight: normal; }
@@ -77,7 +79,8 @@
       <li>your cloud progress</li>
       <li>shared games and usage data</li>
       <li>the sign-in log</li>
-      <li>your player card with achievements and thalers, your league with crowns and weekly groups, your puzzle duels
+      <li>your player card with achievements and thalers, your league with crowns and weekly groups, your season badges and
+      season titles, your participation in the world ranking, your puzzle duels
       (for both players), your online games, your data in school mode and the age statement for the shop</li>
     </ul>
     <p>What stays: the progress on your devices. Supabase server logs and backups are deleted automatically after at

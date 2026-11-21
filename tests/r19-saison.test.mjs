@@ -127,8 +127,10 @@ const LAUF = { saison: 2, start: '2027-03-01', woche: 3, wochen: 8, ende: '2027-
   abzeichen: [{ saison: 1, stufe: 17 }], titel: ['crownmaster-s1', 'top100-s1'], gewaehlt: null };
 
 // stand: Antwort auf saison_mein_stand ('offline' bricht ab, { __status } ist eine Absage); konto: angemeldet
-async function neueSeite(browser, { stand, konto = true, titelAbsage = false } = {}) {
-  const kontext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+// Haupthandlung (Leiste, Titelwahl, Season-Ende-Blatt) auf beiden Geraeten (fc-05:20), der Rest in Handygroesse
+const GERAETE = [['iPhone 13', { width: 390, height: 844 }], ['PC', { width: 1280, height: 800 }]];
+async function neueSeite(browser, { stand, konto = true, titelAbsage = false, viewport = GERAETE[0][1] } = {}) {
+  const kontext = await browser.newContext({ viewport, serviceWorkers: 'block' });
   const seite = await kontext.newPage();
   const fehler = [];
   const gesendet = [];
@@ -143,6 +145,10 @@ async function neueSeite(browser, { stand, konto = true, titelAbsage = false } =
       if (stand === 'offline') return r.abort('failed');
       if (stand && stand.__status) return r.fulfill({ status: stand.__status, contentType: 'application/json', body: JSON.stringify({ message: 'nein' }) });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stand) });
+    }
+    if (url.includes('/rpc/saison_sichtbar_setzen')) {
+      gesendet.push('saison_sichtbar_setzen:' + r.request().postData());
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sichtbar: JSON.parse(r.request().postData()).an }) });
     }
     if (url.includes('/rpc/saison_titel_waehle')) {
       gesendet.push('saison_titel_waehle:' + r.request().postData());
@@ -169,14 +175,17 @@ const leiste = (seite) => seite.evaluate(() => {
     knoepfe: el ? [...el.querySelectorAll('.ss-titel')].map((b) => [b.textContent.trim(), b.getAttribute('aria-pressed')]) : [],
     blatt: document.querySelectorAll('.sheet-karte.ss-blatt').length, blattText: document.querySelector('.ss-blatt')?.textContent.replace(/\s+/g, ' ').trim() || '' };
 });
-const warteLeiste = (seite) => seite.waitForFunction(() => { const el = document.querySelector('.ss-leiste'); return el && !el.hidden; }, null, { timeout: 8000 })
+// sichtbar heisst: nicht hidden UND mit Flaeche (ein display:none nur am PC liess die Probe sonst gruen, Mutant fc-05:20)
+const warteLeiste = (seite) => seite.waitForFunction(() => { const el = document.querySelector('.ss-leiste'); return el && !el.hidden && el.getClientRects().length > 0; }, null, { timeout: 8000 })
   .then(() => true, () => false);
 const ohneUnsinn = (x) => !/NaN|undefined|null|\{[a-z]+\}/.test(x);
 
 const browser = await browserTyp(pw).launch({ headless: true });
 try {
-  { // laufende Season mit Abzeichen und Titeln, Season 1 gerade vorbei
-    const { kontext, seite, fehler, gesendet } = await neueSeite(browser, { stand: LAUF });
+  const pruefeAlle = pruefe;
+  for (const [g, viewport] of GERAETE) { // laufende Season mit Abzeichen und Titeln, Season 1 gerade vorbei
+    const pruefe = (name, ...r) => pruefeAlle(`${g}: ${name}`, ...r);
+    const { kontext, seite, fehler, gesendet } = await neueSeite(browser, { stand: LAUF, viewport });
     pruefe('Leiste erscheint im Profil "Ich"', await warteLeiste(seite));
     await seite.waitForSelector('.ss-blatt', { timeout: 5000 }).catch(() => {});
     let l = await leiste(seite);
@@ -190,14 +199,17 @@ try {
       && l.blattText.includes('Dein Abzeichen: Crownmate I') && l.blattText.includes('Neue Titel') && l.blattText.includes('Crownmaster Season 1')
       && l.blattText.includes('Top 100 Season 1') && l.blattText.includes('Season 2 startet für dich bei Sovereign I'), l.blattText);
     pruefe('keine Platzhalter oder NaN', ohneUnsinn(l.text) && ohneUnsinn(l.blattText), l.text + ' | ' + l.blattText);
-    await seite.click('.ss-blatt .sheet-knoepfe button');
-    await seite.waitForFunction(() => !document.querySelector('.ss-blatt'), null, { timeout: 4000 }).catch(() => {});
-    await seite.click('.ss-titel[data-titel="crownmaster-s1"]');
+    // ein Klick, der nicht geht, zeigt sich in den Pruefungen danach statt als Absturz
+    await seite.click('.ss-blatt .sheet-knoepfe button', { timeout: 5000 }).catch(() => {});
+    const blattZu = await seite.waitForFunction(() => !document.querySelector('.ss-blatt'), null, { timeout: 4000 }).then(() => true, () => false);
+    // Hinweis 43 (fc-05:20): bisher nur ueber die Titelwahl danach geprueft (offenes Blatt macht den Hintergrund inert)
+    pruefe('Season-Ende: der Knopf im Blatt schliesst es', blattZu);
+    await seite.click('.ss-titel[data-titel="crownmaster-s1"]', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => document.querySelector('.ss-titel[data-titel="crownmaster-s1"]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 4000 }).catch(() => {});
     l = await leiste(seite);
     pruefe('Titelwahl: Tipp auf Crownmaster sendet ihn und drueckt den Knopf', gesendet.includes('saison_titel_waehle:{"titel":"crownmaster-s1"}')
-      && l.knoepfe[1][1] === 'true' && l.knoepfe[0][1] === 'false', [gesendet, l.knoepfe]);
-    await seite.click('.ss-titel[data-titel=""]');
+      && l.knoepfe[1]?.[1] === 'true' && l.knoepfe[0]?.[1] === 'false', [gesendet, l.knoepfe]);
+    await seite.click('.ss-titel[data-titel=""]', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => document.querySelector('.ss-titel[data-titel=""]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 4000 }).catch(() => {});
     pruefe('Titelwahl: "Keinen zeigen" sendet titel null', gesendet.includes('saison_titel_waehle:{"titel":null}'), gesendet);
     await seite.reload();
@@ -213,12 +225,13 @@ try {
     const { kontext, seite, fehler } = await neueSeite(browser, { stand: { ...LAUF, abzeichen: [{ saison: 1, stufe: 9 }], titel: ['top10-s1'] }, titelAbsage: true });
     await warteLeiste(seite);
     await seite.waitForTimeout(400);
-    if (await seite.$('.ss-blatt')) { await seite.click('.ss-blatt .sheet-knoepfe button'); await seite.waitForTimeout(300); }
-    await seite.click('.ss-titel[data-titel="top10-s1"]');
+    if (await seite.$('.ss-blatt')) { await seite.click('.ss-blatt .sheet-knoepfe button', { timeout: 5000 }).catch(() => {}); await seite.waitForTimeout(300); }
+    // Hinweis 43 (fc-05:20): fehlt die Leiste, zeigt sich das als FEHLER der Pruefung darunter, nicht als Absturz
+    await seite.click('.ss-titel[data-titel="top10-s1"]', { timeout: 5000 }).catch(() => {});
     await seite.waitForFunction(() => !!document.querySelector('.ss-fehler')?.textContent, null, { timeout: 4000 }).catch(() => {});
     const l = await leiste(seite);
-    pruefe('Titel-Absage: Fehlerhinweis, "Keinen zeigen" bleibt gedrueckt', l.text.includes('Das hat gerade nicht geklappt') && l.knoepfe[0][1] === 'true'
-      && l.knoepfe[1][1] === 'false', [l.text, l.knoepfe]);
+    pruefe('Titel-Absage: Fehlerhinweis, "Keinen zeigen" bleibt gedrueckt', l.text.includes('Das hat gerade nicht geklappt') && l.knoepfe[0]?.[1] === 'true'
+      && l.knoepfe[1]?.[1] === 'false', [l.text, l.knoepfe]);
     pruefe('Titel-Absage: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -242,6 +255,64 @@ try {
     if (!opt.konto && opt.konto !== undefined) pruefe('ohne Konto: kein Aufruf saison_mein_stand', !gesendet.includes('saison_mein_stand'), gesendet);
     pruefe(`${name}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
     await kontext.close();
+  }
+  { // Schalter in den Einstellungen: anfangs aus (Flo 19.11.2026, Art. 25 Abs. 2 DSGVO), an und wieder aus gehen an den Server;
+    // altes SQL zeigt keinen Schalter
+    const { kontext, seite, gesendet } = await neueSeite(browser, { stand: { ...LAUF, sichtbar: false } });
+    await warteLeiste(seite);
+    const s = await seite.evaluate(async () => {
+      const { fuelleSaisonSchalter } = await import('/js/pakete/liga/saison.js');
+      const el = document.createElement('section');
+      el.hidden = true;
+      document.body.append(el);
+      await fuelleSaisonSchalter(el);
+      const k = el.querySelector('.ss-sichtbar');
+      const haken = el.querySelector('.ss-alter input');
+      const block = el.querySelector('.ss-einwilligung');
+      const warte = async (w) => { for (let i = 0; i < 40 && k?.getAttribute('aria-checked') !== w; i++) await new Promise((r) => setTimeout(r, 50)); };
+      const vorher = { an: k?.getAttribute('aria-checked'), gesperrt: !!k?.disabled, haken: haken?.checked, block: !!block && !block.hidden,
+        hinweisVorHaken: !!block && block.textContent.indexOf('Gegner') >= 0 && block.textContent.indexOf('Gegner') < block.textContent.indexOf('mindestens 16'),
+        hakenVorSchalter: !!haken && !!(haken.compareDocumentPosition(k) & Node.DOCUMENT_POSITION_FOLLOWING),
+        link: block?.querySelector('a')?.getAttribute('href'), haken_text: el.querySelector('.ss-alter')?.textContent.trim() };
+      k?.click();
+      await new Promise((r) => setTimeout(r, 200));
+      const ohneHaken = k?.getAttribute('aria-checked');
+      haken.checked = true;
+      haken.dispatchEvent(new Event('change', { bubbles: true }));
+      const freigegeben = !k.disabled;
+      k.click();
+      await warte('true');
+      const an = { an: k.getAttribute('aria-checked'), block: !block.hidden };
+      k.click();
+      await warte('false');
+      return { sichtbar: !el.hidden, rolle: k.getAttribute('role'), vorher, ohneHaken, freigegeben, an,
+        aus: { an: k.getAttribute('aria-checked'), block: !block.hidden, haken: haken.checked, gesperrt: k.disabled },
+        text: el.querySelector('#es-t-season')?.textContent };
+    });
+    pruefe('Schalter: Vorgabe aus, gesperrt, Haken nie vorab gesetzt, Hinweis sichtbar',
+      s.sichtbar && s.rolle === 'switch' && s.vorher.an === 'false' && s.vorher.gesperrt && s.vorher.haken === false && s.vorher.block, s.vorher);
+    pruefe('Schalter: Hinweis (wer sieht was) vor dem Haken, Haken vor dem Schalter, Link zur Datenschutzerklaerung',
+      s.vorher.hinweisVorHaken && s.vorher.hakenVorSchalter && s.vorher.link === 'datenschutz.html#seasons', s.vorher);
+    pruefe('Schalter: Haken "Ich bin mindestens 16 Jahre alt."', s.vorher.haken_text === 'Ich bin mindestens 16 Jahre alt.', s.vorher.haken_text);
+    pruefe('Schalter: ohne Haken geht er nicht an', s.ohneHaken === 'false', s.ohneHaken);
+    pruefe('Schalter: mit Haken an, Hinweis weg; Ausschalten wirkt sofort, Haken wieder leer, Schalter wieder gesperrt',
+      s.freigegeben && s.an.an === 'true' && !s.an.block && s.aus.an === 'false' && s.aus.block && s.aus.haken === false && s.aus.gesperrt, s);
+    pruefe('Schalter: an (mit Bestaetigung) und aus gehen an den Server, in dieser Reihenfolge',
+      gesendet.filter((g) => g.startsWith('saison_sichtbar_setzen:')).join()
+        === 'saison_sichtbar_setzen:{"an":true,"alter_bestaetigt":true},saison_sichtbar_setzen:{"an":false}', gesendet);
+    pruefe('Schalter: Text sagt, dass er anfangs aus ist', /Anfangs aus\.$/.test(s.text || ''), s.text);
+    await kontext.close();
+    const alt = await neueSeite(browser, { stand: LAUF });
+    await warteLeiste(alt.seite);
+    const leer = await alt.seite.evaluate(async () => {
+      const { fuelleSaisonSchalter } = await import('/js/pakete/liga/saison.js');
+      const el = document.createElement('section');
+      el.hidden = true;
+      await fuelleSaisonSchalter(el);
+      return { versteckt: el.hidden, knopf: !!el.querySelector('.ss-sichtbar') };
+    });
+    pruefe('Schalter: altes SQL ohne das Feld zeigt keinen Schalter', leer.versteckt && !leer.knopf, leer);
+    await alt.kontext.close();
   }
   { // englisch: dieselbe Leiste in der App-Sprache
     const { kontext, seite } = await neueSeite(browser, { stand: { ...LAUF, abzeichen: [], titel: [] } });

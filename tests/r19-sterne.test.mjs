@@ -11,7 +11,7 @@
 //   node tests/r19-sterne.test.mjs
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { BOTS } from '../js/bots.js';
@@ -90,11 +90,19 @@ async function bildVergleich(s, a, b) {
     const mittel = ['r', 'g', 'b'].map((c) => stark.reduce((s, p) => s + p[c], 0) / stark.length);
     const [r, g, bl] = mittel, mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), dd = mx - mn;
     const ton = dd < 12 ? null : Math.round(((mx === r ? ((g - bl) / dd) % 6 : mx === g ? (bl - r) / dd + 2 : (r - g) / dd + 4) * 60 + 360) % 360);
-    // Mitte des Sterns: der Schwerpunkt liegt beim Stern etwas unter der Mitte des Rahmens (Spitze oben)
-    const cx = Math.round((x0 + x1) / 2), cy = Math.round(y0 + (y1 - y0) * 0.55);
-    let hohl = true;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (gemalt(((cy + dy) * m.w + cx + dx) * 4)) hohl = false;
-    return { kontrast: Math.round(kontrast * 100) / 100, ton, farbe: mittel.map(Math.round), hohl, n: px.length, groesse: [x1 - x0 + 1, y1 - y0 + 1] };
+    // hohl = der Umriss schliesst ungemalte Pixel ein, die vom Bildrand aus nicht erreichbar sind (Flutung ueber ungemalte
+    // Pixel). Bis 19.11. pruefte ein 3x3-Fleck bei 55 % der Hoehe: das Loch eines 13-px-Sterns ist auf dem iPhone nur wenige
+    // Bildpixel breit, in der CI (Linux, Stern #3 einen Unterpixel versetzt) traf der Fleck den Rand (CI 44591682763, Bilder).
+    const frei = new Uint8Array(m.w * m.h), stapel = [];
+    const rein = (x, y) => { const k = y * m.w + x; if (frei[k] || gemalt(k * 4)) return; frei[k] = 1; stapel.push(k); };
+    for (let x = 0; x < m.w; x++) { rein(x, 0); rein(x, m.h - 1); }
+    for (let y = 0; y < m.h; y++) { rein(0, y); rein(m.w - 1, y); }
+    while (stapel.length) { const k = stapel.pop(), x = k % m.w, y = (k - x) / m.w;
+      if (x > 0) rein(x - 1, y); if (x < m.w - 1) rein(x + 1, y); if (y > 0) rein(x, y - 1); if (y < m.h - 1) rein(x, y + 1); }
+    let loch = 0;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const k = y * m.w + x; if (!frei[k] && !gemalt(k * 4)) loch++; }
+    const hohl = loch >= 3;
+    return { kontrast: Math.round(kontrast * 100) / 100, ton, farbe: mittel.map(Math.round), hohl, loch, n: px.length, groesse: [x1 - x0 + 1, y1 - y0 + 1] };
   }, [a.toString('base64'), b.toString('base64')]);
 }
 
@@ -123,18 +131,46 @@ async function messeOrte(s, gruppe, gesehen) {
       const an = await el.evaluate(verdient);
       const clip = { x: Math.max(0, box.x - 2), y: Math.max(0, box.y - 2), width: Math.min(vp.width - Math.max(0, box.x - 2), box.width + 4),
         height: Math.min(vp.height - Math.max(0, box.y - 2), box.height + 4) };
-      const mit = await s.screenshot({ clip, animations: 'disabled' });
-      await el.evaluate((e) => e.style.setProperty('visibility', 'hidden', 'important'));
-      const ohne = await s.screenshot({ clip, animations: 'disabled' });
-      await el.evaluate((e) => e.style.removeProperty('visibility'));
-      const x = await bildVergleich(s, mit, ohne);
+      let bilder = null;
+      const messe = async () => {
+        const mit = await s.screenshot({ clip, animations: 'disabled' });
+        await el.evaluate((e) => e.style.setProperty('visibility', 'hidden', 'important'));
+        const ohne = await s.screenshot({ clip, animations: 'disabled' });
+        await el.evaluate((e) => e.style.removeProperty('visibility'));
+        bilder = { mit, ohne };
+        return bildVergleich(s, mit, ohne);
+      };
+      const passt = (m) => !m.fehler && m.kontrast >= 3 && (an ? m.ton !== null && m.ton >= 30 && m.ton <= 55 : m.hohl);
+      let x = await messe();
       gesehen.add(ort);
       const name = `${gruppe} ${ort} #${i + 1} ${an ? 'verdient' : 'nicht verdient'}`;
+      // ein Ausreisser wird einmal nachgemessen (CI 44530528156: ein Umriss-Stern einmal als gefuellt gemessen, lokal mit
+      // demselben Zustand 24/24 hohl); ein echter Darstellungsfehler faellt auch beim zweiten Mal durch und bleibt rot
+      if (!passt(x)) {
+        const erst = x;
+        await warte(300);
+        x = await messe();
+        console.log(`     zweite Messung ${name}: erst ${JSON.stringify(erst)}, dann ${JSON.stringify(x)}`);
+        // faellt auch die zweite durch: beide Aufnahmen und der Rahmen ins CI-Artefakt (BILDER setzt tests.yml), damit man sieht, was gemalt wurde
+        if (!passt(x) && process.env.BILDER) {
+          const datei = name.replace(/[^A-Za-z0-9#-]+/g, '_').replace('#', 'n');
+          mkdirSync(process.env.BILDER, { recursive: true });
+          writeFileSync(path.join(process.env.BILDER, `${datei}-mit.png`), bilder.mit);
+          writeFileSync(path.join(process.env.BILDER, `${datei}-ohne.png`), bilder.ohne);
+          const rahmen = await el.evaluate((e) => { const r = e.getBoundingClientRect(), st = getComputedStyle(e);
+            return { box: [r.x, r.y, r.width, r.height].map(Math.round), schrift: st.fontFamily, groesse: st.fontSize, text: e.textContent,
+              nach: e.nextSibling ? (e.nextSibling.outerHTML || e.nextSibling.textContent || '').slice(0, 120) : null,
+              zeile: e.parentElement.parentElement.outerHTML.slice(0, 400) }; });
+          console.log(`     Bilder ${datei}-mit/ohne.png, Rahmen ${JSON.stringify(rahmen)}`);
+        }
+      }
       if (x.fehler) { pruefe(`${name}: messbar`, false, x); continue; }
       if (an && !gesehen.has(ort + ':an')) { gesehen.add(ort + ':an'); console.log(`     Messwert ${name}: ${x.kontrast}:1, Farbton ${x.ton}, rgb(${x.farbe})`); }
       if (!an && !gesehen.has(ort + ':aus')) { gesehen.add(ort + ':aus'); console.log(`     Messwert ${name}: ${x.kontrast}:1, hohl ${x.hohl}, rgb(${x.farbe})`); }
       pruefe(`${name}: mind. 3:1 gegen den Grund`, x.kontrast >= 3, x);
       if (an) pruefe(`${name}: golden (Farbton 30 bis 55 Grad)`, x.ton !== null && x.ton >= 30 && x.ton <= 55, x);
+      // Gegenprobe zur Loch-Messung: ein gefuellter Stern schliesst nichts ein
+      if (an) pruefe(`${name}: gefuellt (kein eingeschlossenes Loch)`, !x.hohl, x);
       else pruefe(`${name}: als Umriss (Mitte bleibt Grund)`, x.hohl, x);
     }
   }
@@ -214,6 +250,14 @@ try {
         await s.waitForSelector('.vl-sterne', { timeout: 20000 });
         await warte(500);
         await messeOrte(s, gruppe + ' Verlauf', gesehen);
+        // fest: jeder Verlauf-Stern einmal verdient und einmal nicht, unabhaengig vom Partieausgang (Stockfish, nicht fest:
+        // "alle drei aus" kam vorher nur bei einer Partie mit 0 Sternen vor). Gemessen wird dieselbe CSS-Regel
+        // (css/app.css :is(.an-vs-sterne, .vl-sterne) > .aus, css/verlauf.css .vl-sterne .an), die Klassen wie js/ui/verlauf.js:286
+        for (const zustand of ['an', 'aus']) {
+          await s.evaluate((z) => document.querySelectorAll('.vl-sterne > span').forEach((e) => { e.className = z; }), zustand);
+          await warte(300);
+          await messeOrte(s, `${gruppe} Verlauf fest ${zustand}`, gesehen);
+        }
         await s.goto(`http://127.0.0.1:${PORT}/tests/screens.html?screen=analyse&partieId=${id}&neueSterne=1,0,0`);
         await s.waitForFunction(() => window.testseiteBereit === true, null, { timeout: 30000 });
         await s.evaluate((m) => { document.documentElement.dataset.modus = m; }, farbe);

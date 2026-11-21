@@ -5,6 +5,8 @@
 --                             2800 und 15 Niederlagen stehen noch bei 2200 und waeren sonst Platz 1
 --   nur mit Benutzername      ohne Zeile in profile kein Eintrag
 --   Banner nur im Besitz      sonst 'start', dieselbe Regel wie karte_von (karte-schema.sql)
+--   Altersbestaetigung        (Flo 18.11.2026) Mitmachen nur ab 16, mit Haken "mindestens 16 Jahre alt" (Flo 19.11.2026); der Server
+--                             prueft ihn und speichert den Zeitpunkt, eine Zeile ohne Zeitpunkt zaehlt nicht als Teilnahme
 -- Gezeigt werden Rang, Name, Banner und Elo. Keine Kennung, keine Mail, keine Liga-Stufe, kein Titel.
 -- Voraussetzung: schema.sql, kronen-schema.sql und karte-schema.sql sind eingespielt. Diese Datei bringt meine_daten()
 -- zeichengleich mit daten-schema.sql mit (ganz unten), damit die Datenauskunft die Zustimmung auch dann nennt, wenn nur diese
@@ -19,6 +21,8 @@ create table if not exists public.weltrang_teilnahme (
   user_id uuid primary key references auth.users (id) on delete cascade,
   seit timestamptz not null default now()
 );
+-- Zeitpunkt der Altersbestaetigung; eine aeltere Zeile ohne Zeitpunkt zaehlt erst nach dem Haken
+alter table public.weltrang_teilnahme add column if not exists alter_bestaetigt_am timestamptz;
 alter table public.weltrang_teilnahme enable row level security;
 -- Keine Policies und keine Tabellenrechte: lesen und schreiben nur ueber die beiden Funktionen unten
 revoke all on table public.weltrang_teilnahme from public, anon, authenticated;
@@ -50,7 +54,7 @@ begin
   if uid is null then
     raise exception 'WELTRANG_OHNE_KONTO';
   end if;
-  dabei := exists (select 1 from public.weltrang_teilnahme t where t.user_id = uid);
+  dabei := exists (select 1 from public.weltrang_teilnahme t where t.user_id = uid and t.alter_bestaetigt_am is not null);
   hat_name := exists (select 1 from public.profile p where p.user_id = uid);
   select coalesce(s.elo_n, 0), s.start_gesetzt into partien, selbst from public.kronen_stand s where s.user_id = uid;
   partien := coalesce(partien, 0);
@@ -66,7 +70,8 @@ begin
     join public.profile p on p.user_id = t.user_id
     join public.kronen_stand s on s.user_id = t.user_id
     left join public.karte_wahl w on w.user_id = t.user_id
-    where s.elo_n >= case when s.start_gesetzt then ab_start else ab end
+    where t.alter_bestaetigt_am is not null
+      and s.elo_n >= case when s.start_gesetzt then ab_start else ab end
   ),
   oben as (
     select * from wertung order by rang, lower(name), name limit n
@@ -89,8 +94,10 @@ begin
 end;
 $$;
 
--- Zustimmung geben (an = true) oder zuruecknehmen (an = false), nur fuer das eigene Konto. Antwort wie weltrang_liste().
-create or replace function public.weltrang_mitmachen(an boolean)
+-- Zustimmung geben (an = true, nur mit alter_bestaetigt = true, sonst WELTRANG_ALTER) oder zuruecknehmen (an = false, geht
+-- immer und loescht die Zeile samt Zeitpunkt), nur fuer das eigene Konto. Antwort wie weltrang_liste().
+drop function if exists public.weltrang_mitmachen(boolean);
+create or replace function public.weltrang_mitmachen(an boolean, alter_bestaetigt boolean default false)
 returns jsonb
 language plpgsql
 security definer
@@ -103,7 +110,11 @@ begin
     raise exception 'WELTRANG_OHNE_KONTO';
   end if;
   if an is true then
-    insert into public.weltrang_teilnahme (user_id) values (uid) on conflict (user_id) do nothing;
+    if alter_bestaetigt is not true then
+      raise exception 'WELTRANG_ALTER';
+    end if;
+    insert into public.weltrang_teilnahme (user_id, alter_bestaetigt_am) values (uid, now())
+    on conflict (user_id) do update set alter_bestaetigt_am = excluded.alter_bestaetigt_am;
   else
     delete from public.weltrang_teilnahme t where t.user_id = uid;
   end if;
@@ -112,9 +123,9 @@ end;
 $$;
 
 revoke all on function public.weltrang_liste(integer) from public, anon, authenticated;
-revoke all on function public.weltrang_mitmachen(boolean) from public, anon, authenticated;
+revoke all on function public.weltrang_mitmachen(boolean, boolean) from public, anon, authenticated;
 grant execute on function public.weltrang_liste(integer) to authenticated;
-grant execute on function public.weltrang_mitmachen(boolean) to authenticated;
+grant execute on function public.weltrang_mitmachen(boolean, boolean) to authenticated;
 
 -- Datenauskunft (Art. 15): meine_daten() zeichengleich mit daten-schema.sql (Wache: tests/server-weltrang.test.mjs). Live laeuft
 -- die Fassung ohne Weltrangliste; ohne diese Kopie fehlte die Zustimmung in der Auskunft, wenn nur diese Datei eingespielt
@@ -143,7 +154,7 @@ declare
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
   duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
-  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null);
+  saison jsonb := jsonb_build_object('abzeichen', '[]'::jsonb, 'titel', '[]'::jsonb, 'gewaehlt', null, 'sichtbar', false, 'alter_bestaetigt_am', null);
   raetsel jsonb;
   verwaltung jsonb := jsonb_build_object('verwalter', null, 'protokoll', '[]'::jsonb); -- [verwaltung]
 begin
@@ -271,7 +282,8 @@ begin
   end if;
   -- Weltrangliste (weltrang-schema.sql, 14.11.2026): ob und seit wann du in der Weltrangliste gezeigt werden willst
   if to_regclass('public.weltrang_teilnahme') is not null then
-    execute 'select jsonb_build_object(''teilnahme'', t.user_id is not null, ''seit'', t.seit)
+    execute 'select jsonb_build_object(''teilnahme'', (to_jsonb(t) ->> ''alter_bestaetigt_am'') is not null, ''seit'', t.seit,
+               ''alter_bestaetigt_am'', to_jsonb(t) -> ''alter_bestaetigt_am'')
              from (select 1) x left join public.weltrang_teilnahme t on t.user_id = $1'
       into raetsel using uid;
     kronen := kronen || jsonb_build_object('weltrang', raetsel);
@@ -296,7 +308,10 @@ begin
                  from public.saison_abzeichen a where a.user_id = $1), ''[]''::jsonb),
                ''titel'', coalesce((select jsonb_agg(jsonb_build_object(''saison'', t.saison, ''art'', t.art) order by t.saison, t.art)
                  from public.saison_titel t where t.user_id = $1), ''[]''::jsonb),
-               ''gewaehlt'', (select w.titel from public.saison_wahl w where w.user_id = $1))'
+               ''gewaehlt'', (select w.titel from public.saison_wahl w where w.user_id = $1),
+               ''sichtbar'', coalesce((select (to_jsonb(w) ->> ''sichtbar'')::boolean and (to_jsonb(w) ->> ''alter_bestaetigt_am'') is not null
+                 from public.saison_wahl w where w.user_id = $1), false),
+               ''alter_bestaetigt_am'', (select to_jsonb(w) -> ''alter_bestaetigt_am'' from public.saison_wahl w where w.user_id = $1))'
       into saison using uid;
   end if;
   -- Raetsel-Duell (raetsel-duell-schema.sql): die eigenen Duelle mit dem eigenen Stand darin und die laufende Suche.

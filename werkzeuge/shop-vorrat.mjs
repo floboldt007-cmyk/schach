@@ -113,24 +113,24 @@ const SCHMUCK = {
 
 // Farben: rund mit Verlauf (h hell, m mitte, d dunkel), kantig flach (f) mit Schliff-Schatten; l Umriss
 const SETS = [
-  { id: 'lampion', name: 'Lampion', seltenheit: 'Episch', rund: true, text: 'Gedrechselte Laternen mit warmem Glimmen in der Mitte.',
+  { id: 'lampion', name: 'Lampion', nameEn: 'Lantern', seltenheit: 'Episch', rund: true, text: 'Gedrechselte Laternen mit warmem Glimmen in der Mitte.',
     w: { h: '#FFF3D6', m: '#FFC86B', d: '#E0782E', l: '#5C2408', deko: '#B5461B', akz: '#FFE9A8' },
     // dunkle Seite dunkler (G-002, Ausreisser 07.11.: lila Figuren mit zu wenig Kontrast)
     b: { h: '#382B70', m: '#1E1648', d: '#0B0722', l: '#A894FF', deko: '#FF9E5E', akz: '#FFB36B' } },
-  { id: 'sternwarte', name: 'Sternwarte', seltenheit: 'Episch', rund: true, text: 'Mondsilber gegen Nachthimmel, mit goldenen Funkelsternen.',
+  { id: 'sternwarte', name: 'Sternwarte', nameEn: 'Observatory', seltenheit: 'Episch', rund: true, text: 'Mondsilber gegen Nachthimmel, mit goldenen Funkelsternen.',
     w: { h: '#FFFFFF', m: '#E3E8F4', d: '#A9B4CF', l: '#27304F', deko: '#C79A2E' },
     b: { h: '#33437A', m: '#1C2650', d: '#0A1030', l: '#9FB2E8', deko: '#F2C84B' } },
-  { id: 'uhrwerk', name: 'Uhrwerk', seltenheit: 'Episch', rund: true, text: 'Kupfer und Bronze mit einem Zahnrad in jeder Figur.',
+  { id: 'uhrwerk', name: 'Uhrwerk', nameEn: 'Clockwork', seltenheit: 'Episch', rund: true, text: 'Kupfer und Bronze mit einem Zahnrad in jeder Figur.',
     w: { h: '#FFE2B8', m: '#E3A462', d: '#A9612A', l: '#4A2408', deko: '#7A3F14' },
     b: { h: '#6A5A4A', m: '#3E332A', d: '#1E1813', l: '#C9A27A', deko: '#D9A65C' } },
-  { id: 'kristall', name: 'Kristall', seltenheit: 'Episch', rund: false, text: 'Geschliffene Figuren aus Eis und Amethyst.',
+  { id: 'kristall', name: 'Kristall', nameEn: 'Crystal', seltenheit: 'Episch', rund: false, text: 'Geschliffene Figuren aus Eis und Amethyst.',
     w: { f: '#DDF6FF', l: '#1F4F6E', deko: '#5FAFD6' },
     // dunkle Seite dunkler (G-002, Ausreisser 07.11.)
     b: { f: '#2C1650', l: '#C8A8FF', deko: '#B98AFF' } },
-  { id: 'origami', name: 'Origami', seltenheit: 'Episch', rund: false, text: 'Gefaltetes Papier, hell und kohlegrau, mit rotem Siegel.',
+  { id: 'origami', name: 'Origami', nameEn: 'Origami', seltenheit: 'Episch', rund: false, text: 'Gefaltetes Papier, hell und kohlegrau, mit rotem Siegel.',
     w: { f: '#FBF6EC', l: '#3A3328', deko: '#B9AA8E', akz: '#E2553B' },
     b: { f: '#34363D', l: '#B9BCC7', deko: '#6A6D76', akz: '#E2553B' } },
-  { id: 'kronjuwel', name: 'Kronjuwel', seltenheit: 'Exklusiv', rund: false, text: 'Sonder-Set: Gold mit Rubin, Onyx mit Smaragd. Im Shop mit Goldrahmen.',
+  { id: 'kronjuwel', name: 'Kronjuwel', nameEn: 'Crown Jewel', seltenheit: 'Exklusiv', rund: false, text: 'Sonder-Set: Gold mit Rubin, Onyx mit Smaragd. Im Shop mit Goldrahmen.',
     w: { f: '#F4D27A', l: '#7A5410', deko: '#FFF1C2', akz: '#C8243E' },
     b: { f: '#1E1A22', l: '#D9A93B', deko: '#3A3340', akz: '#2FB37A' } },
 ];
@@ -159,31 +159,31 @@ function figurSvg(set, farbe, fig) {
 const HELL = [[0, 0], [11, 11]], DUNKEL = [[11, 0], [0, 11]];
 const je = (felder, f) => felder.map(([x, y]) => f(x, y)).join('');
 const BRETTER = [
-  { id: 'sandstein', name: 'Sandstein', seltenheit: 'Selten', hell: '#F1E1C2', dunkel: '#C4935E', rand: '#6E4A2A', text: 'Warmer Stein mit feiner Koernung.',
+  { id: 'sandstein', name: 'Sandstein', nameEn: 'Sandstone', seltenheit: 'Selten', hell: '#F1E1C2', dunkel: '#C4935E', rand: '#6E4A2A', text: 'Warmer Stein mit feiner Koernung.',
     muster: () => je(HELL, (x, y) => `<circle cx="${x + 3}" cy="${y + 4}" r=".7"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".5"/>`).replace(/<circle/g, '<circle fill="rgba(120,80,40,.28)"')
       + je(DUNKEL, (x, y) => `<circle fill="rgba(80,40,10,.25)" cx="${x + 4}" cy="${y + 7}" r=".8"/>`) },
   // Kennung bleibt mitternacht; der sichtbare Name weicht der Edition "Mitternacht & Gold" aus (Freigabe 18.11.2026)
   { id: 'mitternacht', name: 'Nachtblau', nameEn: 'Night Blue', seltenheit: 'Selten', hell: '#C9CFE6', dunkel: '#46549B', rand: '#12152B', text: 'Kräftiges Blau mit winzigen Sternen.',
     muster: () => je(DUNKEL, (x, y) => `<circle cx="${x + 3}" cy="${y + 3}" r=".55"/><circle cx="${x + 8}" cy="${y + 7.5}" r=".4"/>`).replace(/<circle/g, '<circle fill="rgba(255,255,255,.7)"') },
-  { id: 'kirschbluete', name: 'Kirschblüte', seltenheit: 'Selten', hell: '#FBE8EC', dunkel: '#D98AA0', rand: '#6B2E3E', text: 'Zartrosa mit kleinen Blueten.',
+  { id: 'kirschbluete', name: 'Kirschblüte', nameEn: 'Cherry Blossom', seltenheit: 'Selten', hell: '#FBE8EC', dunkel: '#D98AA0', rand: '#6B2E3E', text: 'Zartrosa mit kleinen Blueten.',
     muster: () => je(HELL, (x, y) => [0, 1, 2, 3, 4].map((i) => { const w = -Math.PI / 2 + (i * 2 * Math.PI) / 5; return `<circle fill="rgba(217,138,160,.4)" cx="${n(x + 5.5 + 1.5 * Math.cos(w))}" cy="${n(y + 5.5 + 1.5 * Math.sin(w))}" r="1"/>`; }).join('')) },
-  { id: 'lagune', name: 'Lagune', seltenheit: 'Selten', hell: '#E6F4EF', dunkel: '#3E9C9A', rand: '#154747', text: 'Tuerkis mit sanften Wellen.',
+  { id: 'lagune', name: 'Lagune', nameEn: 'Lagoon', seltenheit: 'Selten', hell: '#E6F4EF', dunkel: '#3E9C9A', rand: '#154747', text: 'Tuerkis mit sanften Wellen.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x + 1} ${y + 6}q2.25-2 4.5 0t4.5 0" fill="none" stroke="rgba(255,255,255,.35)" stroke-width=".7"/>`) },
-  { id: 'schiefer', name: 'Schiefer', seltenheit: 'Selten', hell: '#D7DADF', dunkel: '#59606B', rand: '#23262B', text: 'Kuehles Grau mit Schichtlinien.',
+  { id: 'schiefer', name: 'Schiefer', nameEn: 'Slate', seltenheit: 'Selten', hell: '#D7DADF', dunkel: '#59606B', rand: '#23262B', text: 'Kuehles Grau mit Schichtlinien.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x} ${y + 4}l4-4M${x} ${y + 9}l9-9M${x + 5} ${y + 11}l6-6" stroke="rgba(0,0,0,.16)" stroke-width=".6"/>`)
       + je(HELL, (x, y) => `<path d="M${x + 1} ${y + 10}l9-9" stroke="rgba(0,0,0,.06)" stroke-width=".6"/>`) },
-  { id: 'ahorn', name: 'Ahorn', seltenheit: 'Selten', hell: '#F3DDB4', dunkel: '#C98A4B', rand: '#5A3418', text: 'Helles Holz mit Maserung.',
+  { id: 'ahorn', name: 'Ahorn', nameEn: 'Maple', seltenheit: 'Selten', hell: '#F3DDB4', dunkel: '#C98A4B', rand: '#5A3418', text: 'Helles Holz mit Maserung.',
     muster: () => je([...HELL, ...DUNKEL], (x, y) => `<path d="M${x} ${y + 3}q5.5 2 11 0M${x} ${y + 7.5}q5.5-2 11 0" fill="none" stroke="rgba(90,52,24,.16)" stroke-width=".5"/>`) },
-  { id: 'kupfer', name: 'Kupfer', seltenheit: 'Selten', hell: '#F2D3B8', dunkel: '#B4643A', rand: '#4A2412', text: 'Gehaemmertes Kupfer mit Nieten im Rahmen.',
+  { id: 'kupfer', name: 'Kupfer', nameEn: 'Copper', seltenheit: 'Selten', hell: '#F2D3B8', dunkel: '#B4643A', rand: '#4A2412', text: 'Gehaemmertes Kupfer mit Nieten im Rahmen.',
     muster: () => '', rahmen: () => '<g fill="#D99A6C">' + [[3, 3], [97, 3], [3, 97], [97, 97], [50, 3], [50, 97], [3, 50], [97, 50]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3"/>`).join('') + '</g>' },
   // G-002 (Ausreisser 07.11.): Felder waren unter dem Schleier schlecht zu unterscheiden; jetzt hellere helle und dunklere
   // dunkle Felder, das Nordlicht liegt nur im Rahmen und als feine Kante um das Feld
   // 18.11.2026: dunkel bei Aurora, Nachtblau und Kronsaal aufgehellt, schwarze Figuren brauchen dort mindestens 3:1
-  { id: 'aurora', name: 'Aurora', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#375994', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
+  { id: 'aurora', name: 'Aurora', nameEn: 'Aurora', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#375994', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
     muster: () => '', defs: '<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3BE8B0"/><stop offset=".5" stop-color="#4C6EF5"/><stop offset="1" stop-color="#B565F0"/></linearGradient>',
     ueber: '<path d="M0 6a6 6 0 0 1 6-6h88a6 6 0 0 1 6 6v88a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6zM6 6v88h88V6z" fill="url(#a)" fill-rule="evenodd" opacity=".85"/>'
       + '<rect x="6" y="6" width="88" height="88" fill="none" stroke="url(#a)" stroke-width=".8"/>' },
-  { id: 'kronsaal', name: 'Kronsaal', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#A52A3E', rand: '#B8862B', text: 'Sonder-Brett: Karminrot und Gold mit Kronen im Feld.',
+  { id: 'kronsaal', name: 'Kronsaal', nameEn: 'Crown Hall', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#A52A3E', rand: '#B8862B', text: 'Sonder-Brett: Karminrot und Gold mit Kronen im Feld.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x + 3} ${y + 7.5}V${y + 4}l1.5 1.5 1-2 1 2 1.5-1.5v3.5z" fill="rgba(232,190,90,.5)"/>`),
     rahmen: () => '<rect x="3.2" y="3.2" width="93.6" height="93.6" rx="4" fill="none" stroke="#F3D27A" stroke-width=".9"/><rect x="6" y="6" width="88" height="88" fill="none" stroke="#5A3A08" stroke-width=".7"/>' },
 ];
@@ -205,33 +205,33 @@ const KRONE_KLEIN = 'M-7 4v-8l3.5 4L0-6l3.5 4L7-4v8z';
 // G-002 (Ausreisser 07.11.: zu bunt): nur Gold- und Akzentfarben der App
 const KONFETTI_FARBEN = ['#FFC233', '#E9B949', '#C9461F', '#F3D27A', '#A97B1F'];
 const EFFEKTE = [
-  { id: 'wellenring', name: 'Wellenring', art: 'zug', seltenheit: 'Häufig', text: 'Zwei Ringe laufen vom Zielfeld nach aussen.',
+  { id: 'wellenring', name: 'Wellenring', nameEn: 'Ripple Ring', art: 'zug', seltenheit: 'Häufig', text: 'Zwei Ringe laufen vom Zielfeld nach aussen.',
     svg: () => '<g fill="none" stroke="#5B8CFF" stroke-width="3">' + [0, -0.7].map((s) => `<circle cx="50" cy="50" r="6">${anim('r', '6;42', 1.4, s)}${anim('opacity', '1;0', 1.4, s)}</circle>`).join('') + '</g><circle cx="50" cy="50" r="4" fill="#5B8CFF"/>' },
-  { id: 'funkenspur', name: 'Funkenspur', art: 'zug', seltenheit: 'Häufig', text: 'Funken folgen dem Weg der Figur.',
+  { id: 'funkenspur', name: 'Funkenspur', nameEn: 'Spark Trail', art: 'zug', seltenheit: 'Häufig', text: 'Funken folgen dem Weg der Figur.',
     svg: () => '<g fill="#FF9F1C" stroke="#8A4B00" stroke-width="1">' + [0, 1, 2, 3, 4, 5].map((i) => `<circle cx="${n(18 + i * 12.8)}" cy="${n(82 - i * 12.8)}" r="2">${anim('r', '1;4;1', 1, -1 + i * 0.12)}${anim('opacity', '0;1;0', 1, -1 + i * 0.12)}</circle>`).join('') + '</g>' },
-  { id: 'blattwirbel', name: 'Blattwirbel', art: 'zug', seltenheit: 'Häufig', text: 'Vier Blaetter drehen sich um das Zielfeld.',
+  { id: 'blattwirbel', name: 'Blattwirbel', nameEn: 'Leaf Swirl', art: 'zug', seltenheit: 'Häufig', text: 'Vier Blaetter drehen sich um das Zielfeld.',
     svg: () => `<g>${bewegt('rotate', '0 50 50;360 50 50', 2.4)}` + [0, 90, 180, 270].map((w) => `<g transform="rotate(${w} 50 50) translate(50 30) rotate(30)"><path d="M0-7Q6 0 0 7Q-6 0 0-7z" fill="#52B35A" stroke="#1F5E24" stroke-width="1"/><path d="M0-6V6" stroke="#1F5E24" stroke-width=".7"/></g>`).join('') + '</g>' },
-  { id: 'pixelstaub', name: 'Pixelstaub', art: 'zug', seltenheit: 'Häufig', text: 'Kleine Pixel stieben auseinander.',
+  { id: 'pixelstaub', name: 'Pixelstaub', nameEn: 'Pixel Dust', art: 'zug', seltenheit: 'Häufig', text: 'Kleine Pixel stieben auseinander.',
     svg: () => '<g stroke="#2B1A66" stroke-width=".8">' + Array.from({ length: 10 }, (_, i) => { const w = (i * 2 * Math.PI) / 10, dx = n(34 * Math.cos(w)), dy = n(34 * Math.sin(w)), s = -i * 0.11;
       return `<rect x="47.5" y="47.5" width="5" height="5" fill="${i % 2 ? '#5BD1FF' : '#9C6BFF'}">${bewegt('translate', `0 0;${dx} ${dy}`, 1.2, s)}${anim('opacity', '1;0', 1.2, s)}</rect>`; }).join('') + '</g>' },
-  { id: 'konfetti', name: 'Konfetti', art: 'sieg', seltenheit: 'Selten', text: 'Goldene Schnipsel regnen ueber das Brett.',
+  { id: 'konfetti', name: 'Konfetti', nameEn: 'Confetti', art: 'sieg', seltenheit: 'Selten', text: 'Goldene Schnipsel regnen ueber das Brett.',
     svg: () => '<g stroke="#22223A" stroke-width=".6">' + Array.from({ length: 14 }, (_, i) => { const x = 6 + ((i * 37) % 88), d = 1.8 + (i % 4) * 0.35, s = -((i * 0.53) % d);
       return `<rect x="${x}" y="-4" width="4" height="8" rx="1" fill="${KONFETTI_FARBEN[i % 5]}">${bewegt('translate', `0 -12;${(i % 3) * 6 - 6} 112`, d, s)}${bewegt('rotate', `0 ${x + 2} 0;${i % 2 ? 360 : -360} ${x + 2} 0`, d, s, true)}</rect>`; }).join('') + '</g>' },
-  { id: 'lichtsaeule', name: 'Lichtsäule', art: 'sieg', seltenheit: 'Selten', text: 'Ein Lichtstrahl steigt ueber dem Koenig auf.',
+  { id: 'lichtsaeule', name: 'Lichtsäule', nameEn: 'Light Pillar', art: 'sieg', seltenheit: 'Selten', text: 'Ein Lichtstrahl steigt ueber dem Koenig auf.',
     // Freigabe 18.11.2026 (wirkte wie ein dicker Balken): schmaler Kegel, feiner Kern, Ring am Fuss, aufsteigende Funkel
     svg: () => '<defs><linearGradient id="s" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFC233" stop-opacity="0"/><stop offset=".16" stop-color="#FFC233" stop-opacity=".7"/><stop offset="1" stop-color="#FFC233" stop-opacity="0"/></linearGradient>'
       + '<linearGradient id="k" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFF1C2" stop-opacity="0"/><stop offset=".16" stop-color="#FFF1C2"/><stop offset="1" stop-color="#FFF1C2" stop-opacity="0"/></linearGradient></defs>'
       + `<path d="M43 92L49 6h2L57 92z" fill="url(#s)">${anim('opacity', '.4;1;.4', 1.6)}</path><rect x="49.2" y="10" width="1.6" height="82" rx=".8" fill="url(#k)">${anim('opacity', '.6;1;.6', 1.6)}</rect>`
       + `<ellipse cx="50" cy="92" rx="6" ry="2" fill="none" stroke="#FFC233" stroke-width="1.2">${anim('rx', '6;20', 1.6)}${anim('ry', '2;5', 1.6)}${anim('opacity', '1;0', 1.6)}</ellipse>`
       + '<g fill="#FFC233" stroke="#8A6100" stroke-width=".6">' + [[40, 84, 0], [60, 78, -0.6], [46, 70, -1.2]].map(([x, y, s]) => `<path d="${funkel(x, y, 3.2)}">${bewegt('translate', '0 0;0 -56', 1.8, s)}${anim('opacity', '0;1;0', 1.8, s)}</path>`).join('') + '</g>' },
-  { id: 'sternschnuppe', name: 'Sternschnuppe', art: 'sieg', seltenheit: 'Selten', text: 'Ein Stern zieht mit Schweif ueber das Brett.',
+  { id: 'sternschnuppe', name: 'Sternschnuppe', nameEn: 'Shooting Star', art: 'sieg', seltenheit: 'Selten', text: 'Ein Stern zieht mit Schweif ueber das Brett.',
     svg: () => '<defs><linearGradient id="t" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="-32" y2="19"><stop offset="0" stop-color="#FFC233"/><stop offset="1" stop-color="#FFC233" stop-opacity="0"/></linearGradient></defs>'
       + `<g>${bewegt('translate', '14 82;86 18', 1.6, -0.6)}${anim('opacity', '0;1;1;0', 1.6, -0.6, ' keyTimes="0;.15;.8;1"')}<path d="M0 0L-32 19" stroke="url(#t)" stroke-width="5" stroke-linecap="round"/><path d="${STERN5(8)}" fill="#FFC233" stroke="#8A6100" stroke-width="1.2" stroke-linejoin="round"/></g>`
       + '<g fill="#FFC233" stroke="#8A6100" stroke-width=".6">' + [[22, 24, 0], [76, 70, -0.5], [60, 30, -1]].map(([x, y, s]) => `<path d="${funkel(x, y, 3.2)}">${anim('opacity', '.2;1;.2', 1.5, s)}</path>`).join('') + '</g>' },
-  { id: 'kronenregen', name: 'Kronenregen', art: 'sieg', seltenheit: 'Episch', text: 'Goldene Kronen fallen nach dem Matt.',
+  { id: 'kronenregen', name: 'Kronenregen', nameEn: 'Crown Rain', art: 'sieg', seltenheit: 'Episch', text: 'Goldene Kronen fallen nach dem Matt.',
     svg: () => '<g fill="#FFC233" stroke="#7A5200" stroke-width="1.2" stroke-linejoin="round">' + Array.from({ length: 6 }, (_, i) => { const x = 12 + i * 15, d = 2 + (i % 3) * 0.4, s = -((i * 0.7) % d);
       return `<path d="${KRONE_KLEIN}">${bewegt('translate', `${x} -12;${x + (i % 2 ? 5 : -5)} 112`, d, s)}${bewegt('rotate', `${i % 2 ? -14 : 14};${i % 2 ? 14 : -14}`, d, s, true)}</path>`; }).join('') + '</g>' },
-  { id: 'goldkranz', name: 'Goldkranz', art: 'sieg', seltenheit: 'Exklusiv', text: 'Sonder-Effekt: ein Lorbeerkranz waechst Blatt fuer Blatt, oben die Krone.',
+  { id: 'goldkranz', name: 'Goldkranz', nameEn: 'Golden Wreath', art: 'sieg', seltenheit: 'Exklusiv', text: 'Sonder-Effekt: ein Lorbeerkranz waechst Blatt fuer Blatt, oben die Krone.',
     svg: () => { const blaetter = []; let i = 0;
       for (const seite of [1, -1]) for (let k = 0; k < 8; k++) { const w = ((seite === 1 ? 100 + k * 19 : 80 - k * 19) * Math.PI) / 180;
         const x = 50 + 30 * Math.cos(w), y = 52 + 30 * Math.sin(w), dreh = (w * 180) / Math.PI - 180 + seite * 20, s = (k * 0.12) - 1.9;
@@ -250,19 +250,20 @@ for (const set of SETS) {
     groessen.push([rel, schreibe(rel, figurSvg(set, farbe, fig))]);
     dateien.push(rel);
   }
-  stuecke.push({ id: set.id, art: 'figuren', name: set.name, seltenheit: set.seltenheit, text: set.text, ordner: `assets/shop/figuren/${set.id}`, figuren: 12 });
+  // name_en: englischer Name je Stueck (shop-entwurf.js vorratName); jedes Stueck braucht einen (tests/r20-vorrat-en.test.mjs, Fund 19 20.11.)
+  stuecke.push({ id: set.id, art: 'figuren', name: set.name, name_en: set.nameEn, seltenheit: set.seltenheit, text: set.text, ordner: `assets/shop/figuren/${set.id}`, figuren: 12 });
 }
 // Fertiger Satz aus assets/pieces (Flos Wahl 18.11.2026): steht im Vorrat, wird hier nicht gezeichnet
 stuecke.push({ id: 'goldelfenbein', art: 'figuren', name: 'Gold und Elfenbein', name_en: 'Gold and Ivory', seltenheit: 'Episch', text: 'Klassische Formen in Gold und Elfenbein.', ordner: 'assets/pieces/goldelfenbein', figuren: 12 });
 for (const b of BRETTER) {
   const rel = `assets/shop/bretter/${b.id}.svg`;
   groessen.push([rel, schreibe(rel, brettSvg(b))]);
-  stuecke.push({ id: b.id, art: 'brett', name: b.name, ...(b.nameEn ? { name_en: b.nameEn } : {}), seltenheit: b.seltenheit, text: b.text, datei: rel, hell: b.hell, dunkel: b.dunkel, rand: b.rand });
+  stuecke.push({ id: b.id, art: 'brett', name: b.name, name_en: b.nameEn, seltenheit: b.seltenheit, text: b.text, datei: rel, hell: b.hell, dunkel: b.dunkel, rand: b.rand });
 }
 for (const e of EFFEKTE) {
   const rel = `assets/shop/effekte/${e.id}.svg`;
   groessen.push([rel, schreibe(rel, effektSvg(e))]);
-  stuecke.push({ id: e.id, art: 'effekt', anlass: e.art, name: e.name, seltenheit: e.seltenheit, text: e.text, datei: rel });
+  stuecke.push({ id: e.id, art: 'effekt', anlass: e.art, name: e.name, name_en: e.nameEn, seltenheit: e.seltenheit, text: e.text, datei: rel });
 }
 const vorrat = {
   stand: '2026-11-18',

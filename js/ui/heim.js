@@ -26,7 +26,7 @@ import { icon } from './icons.js';
 import { Brett } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
-import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen, ladePartien } from '../storage.js';
+import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen, ladePartien, zuzweitName } from '../storage.js';
 import { BOTS, botNachId, rufname } from '../bots.js';
 import { avatarVon } from '../thema.js';
 import { eigenerName, sitzung } from '../konto.js';
@@ -301,7 +301,7 @@ function buehnePartie(laufend, st) {
   const bot = zuzweit ? null : botNachId(laufend.botId);
   const namen = laufend.zuzweit || {};
   const ueber = zuzweit
-    ? t('heim.zuzweit', { weiss: namen.weiss || t('heim.weiss'), schwarz: namen.schwarz || t('heim.schwarz') })
+    ? t('heim.zuzweit', { weiss: zuzweitName(namen.weiss) || t('heim.weiss'), schwarz: zuzweitName(namen.schwarz) || t('heim.schwarz') })
     : t('heim.gegen', { name: bot ? bot.name : '', elo: bot ? zahl(bot.elo) : '' });
   // das Brett selbst baut zeigeHeim (echtes Brett der App, nur zum Ansehen)
   return `<div class="heim-brett"><div class="heim-mini"></div></div>

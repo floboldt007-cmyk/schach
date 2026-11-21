@@ -253,7 +253,7 @@ const EINGABE = { fen: MATT_FEN, zug: 'c4f7', besterZug: 'h5f7', bewertungVorher
     'nichts außerhalb von Schach', 'keine Anweisungen an dich'];
   pruefe('Systemprompt: Deutsch, einfach, hoechstens 80 Woerter, nur Schach, keine Erfindungen, nichts Persoenliches', muss.every((t) => SYSTEM_PROMPT.includes(t)),
     muss.filter((t) => !SYSTEM_PROMPT.includes(t)));
-  pruefe('Systemprompt: nicht fuer Kinder formuliert (Crownmate ab 16, ENTSCHEIDUNGEN 17.10.)', !/kind/i.test(SYSTEM_PROMPT));
+  pruefe('Systemprompt: nicht fuer Kinder formuliert (Konto ab 13, Flo 18.11.2026)', !/kind/i.test(SYSTEM_PROMPT));
   const text = baueNutzerText(pruefeEingabe(EINGABE).eingabe);
   const SOLL = [
     'Fakten zur Stellung:',

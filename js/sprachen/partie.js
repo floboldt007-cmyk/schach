@@ -83,6 +83,8 @@ registriereTexte('partie', {
     'coach.liveAus': 'Live-Bewertung aus',
     'coach.liveAusText': 'Die Bewertung jedes Zugs siehst du nach der Partie in der Analyse.',
     'coach.dein': 'Dein Coach',
+    // kurze Zeile unter "Dein Coach", wenn die Coach-Leiste eng ist (css/partie.css .coach-eng, content: attr(data-kurz))
+    'coach.kurz': 'Ich bewerte deine Züge',
     'coach.weiterText': 'Weiter geht’s! Ich bewerte jeden deiner Züge.',
     'coach.startText': 'Ich bewerte jeden deiner Züge, sobald du ziehst.',
     'coach.rechnet': 'Coach rechnet …',
@@ -166,6 +168,7 @@ registriereTexte('partie', {
     'erg.lobby': 'Zu den Bots',
     'erg.abHier': 'Nochmal ab hier',
     'erg.nochmal': 'Nochmal',
+    'erg.zumKurs': 'Zurück zum Kurs',
     'erg.naechster': 'Nächster Gegner',
     'erg.freundHerausfordern': 'Freund herausfordern',
     // Chip nicht wertender Partien
@@ -246,6 +249,7 @@ registriereTexte('partie', {
     'coach.liveAus': 'Live rating off',
     'coach.liveAusText': 'You’ll see the rating of every move in the analysis after the game.',
     'coach.dein': 'Your coach',
+    'coach.kurz': 'I rate your moves',
     'coach.weiterText': 'Let’s keep going! I’ll rate every move you make.',
     'coach.startText': 'I’ll rate each of your moves as soon as you play it.',
     'coach.rechnet': 'Coach is thinking…',
@@ -324,6 +328,7 @@ registriereTexte('partie', {
     'erg.lobby': 'To the bots',
     'erg.abHier': 'Retry from here',
     'erg.nochmal': 'Play again',
+    'erg.zumKurs': 'Back to the course',
     'erg.naechster': 'Next opponent',
     'erg.freundHerausfordern': 'Challenge a friend',
     'chip.uebung': 'PRACTICE',

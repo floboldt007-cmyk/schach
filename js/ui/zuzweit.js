@@ -9,7 +9,7 @@ import { klang, zugKlangName } from '../sounds.js';
 import { sanAnzeige, materialBilanz } from '../review.js';
 import { sende } from '../ereignisse.js';
 import {
-  pruefeZuzweit, pruefeTempo, ladeModulEinstellungen, speichereModulEinstellungen,
+  pruefeZuzweit, zuzweitName, pruefeTempo, ladeModulEinstellungen, speichereModulEinstellungen,
   ladeLaufendePartie, speichereLaufendePartie, loescheLaufendePartie, speicherePartie,
 } from '../storage.js';
 import { t, sprache } from '../sprache.js';
@@ -43,10 +43,8 @@ function farbwort(farbe) {
   return farbe === 'w' ? t('allgemein.weiss') : t('allgemein.schwarz');
 }
 // Die Standardnamen aus storage.pruefeZuzweit ('Weiß', 'Schwarz') zeigt die Oberflaeche in der gewaehlten Sprache;
-// gespeichert bleibt der Name, wie er ist
-function anzeigeName(n) {
-  return n === 'Weiß' ? t('allgemein.weiss') : n === 'Schwarz' ? t('allgemein.schwarz') : n;
-}
+// gespeichert bleibt der Name, wie er ist (storage.zuzweitName, auch fuer Startseite, Verlauf und Analyse)
+const anzeigeName = zuzweitName;
 // Zugliste: in der eingestellten Sprache wie in Partie und Analyse (review.sanAnzeige: Deutsch K D T L S, Englisch
 // K Q R B N, Rochade mit Nullen)
 const sanText = (san) => sanAnzeige(san);

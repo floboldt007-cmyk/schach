@@ -20,6 +20,7 @@
 import { anim, tempo } from '../../bewegung.js';
 import { klang } from '../../sounds.js';
 import { icon } from '../../ui/icons.js';
+import { schluckeFolgeKlick } from '../../ui/bauteile.js';
 import { t, sprache, zahl } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
 import * as L from './level.js';
@@ -162,6 +163,8 @@ function postenListe(e, botName) {
     if (e.th) p.push([tx('abr.theorie'), e.th]);
     if (e.e) p.push([e.hilfe ? tx('abr.halbiert', { name: ergebnisName(e.erg) }) : ergebnisName(e.erg), e.e]);
     // ohne Ergebnis-Funken sagt die Zeile, warum (auch wenn die Zuege Funken brachten, z. B. ein Schaefermatt)
+    // INTENTIONAL-SPECIAL-CASE: 'kurz' ist der gespeicherte Grund (stand.js gr); ohne Sieg ist die ganze Partie 0, eigener Satz
+    else if (e.gr === 'kurz' && e.erg !== 'sieg') p.push([tx('abr.kurzOhneSieg'), null]);
     else if (e.gr === 'kurz' || e.erg === 'sieg' || e.erg === 'remis') p.push([tx('abr.kurz'), null]);
     else if (e.erg === 'niederlage') p.push([tx('abr.kampfgeist', { n: R.KAMPFGEIST_ZUEGE }), null]);
     if (e.v) p.push([tx('abr.verwertung'), e.v]);
@@ -679,7 +682,7 @@ export function oeffneSpiegel(inhalt, { titel = tx('spiegel.titel') } = {}) {
     }
     if (vorher && vorher.isConnected && typeof vorher.focus === 'function') { try { vorher.focus({ preventScroll: true }); } catch (f) { /* egal */ } }
   }
-  schleier.addEventListener('pointerdown', schliesse);
+  schleier.addEventListener('pointerdown', () => { schliesse(); schluckeFolgeKlick(); });
   ort.querySelector('.fk-schliessen').addEventListener('click', schliesse);
   document.addEventListener('keydown', taste, true);
   document.body.append(ort);

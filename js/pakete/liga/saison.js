@@ -6,13 +6,16 @@
 //   saisonLeiste() -> section.ss-leiste[hidden bis zur Antwort]
 //   fuelleSaison(el)  zeichnet in eine vorhandene Leiste (js/pakete/liga/index.js laedt diese Datei erst beim Oeffnen von
 //     "Ich" nach: sheet und Visitenkarte ziehen Thema, Profil und Konto mit, das Paket selbst bleibt davon frei)
+//   fuelleSaisonSchalter(el)  Gruppe "Season" der Einstellungen: zeigt der Gegner Abzeichen und Titel? Bleibt ohne Konto,
+//     offline oder mit altem SQL verborgen; der Schalter zeigt immer die Antwort des Servers. Anfangs aus; Einschalten ist
+//     eine Einwilligung ab 16: Hinweis und Haken stehen davor, der Schalter bleibt bis zum Haken gesperrt (Flo 19.11.2026)
 //   saisonDatum(iso) -> '20. Juni 2027' (Sprache der App)
 //   zeigeLigen(aktuell) oeffnet "Alle Ligen": 18 Stufen mit Symbol, die aktuelle markiert, dazu die Season-Regel
 //     (Flo 15.11.2026: "man muss auch irgendwo die Ligen nachschlagen koennen"); auch aus der Liga (gruppe.js)
-import { t, locale } from '../../sprache.js';
+import { t, locale, sprache } from '../../sprache.js';
 import { sheet } from '../../ui/bauteile.js';
 import { sitzung, userId } from '../../konto.js';
-import { angemeldet, holeSaison, waehleSaisonTitel } from '../../kronen.js';
+import { angemeldet, holeSaison, waehleSaisonTitel, setzeSaisonSichtbar } from '../../kronen.js';
 import { saisonText, saisonTitelText, ligaSymbolUrl, visitenkarte, eigeneKarte } from '../../ui/visitenkarte.js';
 import { LIGEN, STUFEN_JE_LIGA, AUFSTIEG_PLAETZE, ABSTIEG_PLAETZE } from './kronen.js';
 import { stufenName } from './texte.js';
@@ -141,6 +144,49 @@ export async function fuelleSaison(el) {
   zeichne(el, st);
   el.hidden = false;
   zeigeEnde(st);
+}
+
+export async function fuelleSaisonSchalter(el) {
+  if (!angemeldet()) return;
+  const st = await holeSaison();
+  if (!st || st.sichtbar === null) return;
+  el.setAttribute('aria-labelledby', 'es-g-season');
+  el.innerHTML = `<h3 class="es-titel" id="es-g-season">${esc(T('schalter.titel'))}</h3>
+    <div class="ss-einwilligung"${st.sichtbar ? ' hidden' : ''}>
+      <p class="es-hilfe">${esc(T('schalter.einwilligung'))} <a href="${sprache() === 'en' ? 'datenschutz-en.html#seasons' : 'datenschutz.html#seasons'}"
+        target="_blank" rel="noopener">${esc(T('schalter.datenschutz'))}</a></p>
+      <label class="ss-alter"><input type="checkbox"><span>${esc(T('schalter.alter'))}</span></label>
+    </div>
+    <div class="es-zeile">
+      <div class="es-text"><b id="es-l-season">${esc(T('schalter.an'))}</b><span id="es-t-season">${esc(T('schalter.text'))}</span></div>
+      <button class="es-schalter ss-sichtbar" type="button" role="switch" aria-labelledby="es-l-season" aria-describedby="es-t-season"
+        aria-checked="${st.sichtbar}"${st.sichtbar ? '' : ' disabled'}><i></i></button>
+    </div>
+    <p class="es-hilfe ss-sichtbar-fehler" role="alert" hidden></p>`;
+  const k = el.querySelector('.ss-sichtbar');
+  const fehler = el.querySelector('.ss-sichtbar-fehler');
+  const block = el.querySelector('.ss-einwilligung');
+  const haken = el.querySelector('.ss-alter input');
+  const ist = () => k.getAttribute('aria-checked') === 'true';
+  haken.addEventListener('change', () => { if (!ist()) k.disabled = !haken.checked; });
+  k.addEventListener('click', async () => {
+    const an = !ist();
+    if (an && !haken.checked) return;
+    k.disabled = true;
+    fehler.hidden = true;
+    try {
+      const d = await setzeSaisonSichtbar(an);
+      k.setAttribute('aria-checked', String(d?.sichtbar === true));
+    } catch (e) {
+      fehler.textContent = T('schalter.fehler');
+      fehler.hidden = false;
+    }
+    // aus: Hinweis und leerer Haken wieder davor, der Schalter bleibt bis zum naechsten Haken gesperrt
+    if (!ist()) haken.checked = false;
+    block.hidden = ist();
+    k.disabled = !ist() && !haken.checked;
+  });
+  el.hidden = false;
 }
 
 export function saisonLeiste() {

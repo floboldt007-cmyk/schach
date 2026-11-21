@@ -468,11 +468,12 @@ export function lernKarte(st, d, ctx = {}) {
   return b;
 }
 
-// Lektion (lektion:beendet): 40 beim ersten Abschluss, Ring "Sicher" +20, "Gemeistert" +40, je einmal; eine Einheit
+// Lektion (lektion:beendet): 40 beim ersten Abschluss, Ring "Sicher" +20, "Gemeistert" +40, je einmal; eine Einheit.
+// Kurs "Erste Schritte" (id erste-...): 10 beim ersten Abschluss, sonst nichts (rechnung.js lektionFunken)
 export function lernLektion(st, d, ctx = {}) {
   if (!d || typeof d.id !== 'string' || !d.id) return [];
   const id = d.id.slice(0, 40);
-  const r = R.lektionFunken({ alt: st.lernen.lek[id] || '', ringe: d.ringe });
+  const r = R.lektionFunken({ alt: st.lernen.lek[id] || '', ringe: d.ringe, id });
   if (!r.funken) return [];
   st.lernen.lek[id] = r.neu;
   return lernBuchung(st, r.funken, { ...ctx, einheit: true });

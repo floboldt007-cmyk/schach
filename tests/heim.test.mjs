@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { eigenerZugriffsAbbruch } from './seitenfehler-stelle.mjs';
 import { neuerStand } from '../js/pakete/liga/wertung.js';
 import { addiereTage } from '../js/tag.js';
 
@@ -91,7 +92,7 @@ async function neueSeite(browser, { w = 390, h = 844, schema = 'light', speicher
   // WebKit meldet einen beim Neuladen abgebrochenen Abruf der eigenen Seite (z. B. ein Klang) als "... due to access
   // control checks." (wie tests/e2e.test.mjs): kein Fehler; Abrufe anderer Adressen bleiben einer
   seite.on('pageerror', (e) => {
-    if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
+    if (eigenerZugriffsAbbruch(e.message, `http://127.0.0.1:${PORT}/`)) return;
     fehler.push('pageerror: ' + e.message);
   });
   seite.on('console', (m) => { if (m.type() === 'error' && !/favicon|404/.test(m.text())) fehler.push('console: ' + m.text()); });
@@ -258,7 +259,7 @@ async function kontoSeite(browser, { stand = null, speicher = {}, w = 390, h = 8
   const seite = await kontext.newPage();
   const fehler = [];
   seite.on('pageerror', (e) => {
-    if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
+    if (eigenerZugriffsAbbruch(e.message, `http://127.0.0.1:${PORT}/`)) return;
     fehler.push('pageerror: ' + e.message);
   });
   // ein absichtlich abgebrochener Abruf meldet der Browser selbst als Ladefehler: kein Fehler der App
@@ -490,7 +491,9 @@ async function testeTagesziele(browser, heute) {
   });
   pruefe('"Als Naechstes" steht unter den drei Wegen', r.sichtbar && r.unterWegen, JSON.stringify(r));
   pruefe('Reihenfolge: Bauernmarsch (Tageswerk), Tagesraetsel, dann die Liga', r.reihe.join() === 'serie,tagesraetsel,heim-liga', r.reihe.join());
-  pruefe('Bauernmarsch: "Heute: 1 Partie oder 3 Rätsel spielen"', r.marsch === 'Bauernmarsch | Heute: 1 Partie oder 3 Rätsel spielen', r.marsch);
+  // sichtbar die Kurzform (einzeilig, passt aufs iPhone SE), der ganze Satz steht im Label (fable-check 19.11. Nr 9)
+  pruefe('Bauernmarsch: "Heute: Partie/3 Rätsel", Label mit dem ganzen Satz', r.marsch === 'Bauernmarsch | Heute: Partie/3 Rätsel'
+    && r.aria.some((a) => /Heute: 1 Partie oder 3 Rätsel spielen/.test(a || '')), r.marsch);
   pruefe('Tagesraetsel: Nummer und Zuege', /^Tagesrätsel \| Rätsel \d+, in \d+ (Zug|Zügen)$/.test(r.raetsel || ''), r.raetsel);
   pruefe('jede Zeile ein Knopf ab 44 px mit Beschriftung', r.knoepfe && r.aria.every((a) => a && !/undefined|NaN/.test(a)), JSON.stringify(r.aria));
   await seite.locator('.heim-naechstes [data-paket="serie"]').click();
