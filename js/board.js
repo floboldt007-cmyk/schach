@@ -23,7 +23,7 @@
 // (WebKit rundete anders als Chromium). Animiert werden nur transform und opacity.
 //
 // Oeffentliche API (Vertrag, ARCHITEKTUR.md "Brett"):
-//   new Brett(el, { ausrichtung, figurenPfad, beiZug, koordinaten, koordLage, animation (ms, Standard 150),
+//   new Brett(el, { ausrichtung, figurenPfad, figurenPfadJe ({ w, b }: je Farbe ein Satz, sonst figurenPfad), beiZug, koordinaten, koordLage, animation (ms, Standard 150),
 //                   fen, beiAbgelehnt, beiLeer, beiVorschau, beiPfeil, autoDame, bestaetigen, steuerung, turmRochade, pfeile })
 //   beiPfeil(von, nach): Flo hat einen eigenen Pfeil gezeichnet (nicht beim Wegnehmen, nicht bei Marken)
 //   beiVorschau(von, nach): Zug bestaetigen hat die Vorschau gezeigt (die Partie erklaert den zweiten Tipp);
@@ -304,12 +304,16 @@ function pfeilElement(von, nach, [x1, y1], [x2, y2], breite) {
 // ---------- Brett ----------
 
 export class Brett {
-  constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug = null,
+  constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', figurenPfadJe = null, beiZug = null,
     koordinaten = true, koordLage = 'ecke', animation = STANDARD_DAUER, fen = null, beiAbgelehnt = null, beiLeer = null,
     beiVorschau = null, beiPfeil = null, autoDame = false, bestaetigen = false, steuerung = 'beides', turmRochade = false, pfeile = true } = {}) {
     if (!element) throw new Error('Brett braucht ein Element');
     this.el = element;
-    this.figurenPfad = figurenPfad.endsWith('/') ? figurenPfad : figurenPfad + '/';
+    const mitStrich = (x) => (x.endsWith('/') ? x : x + '/');
+    this.figurenPfad = mitStrich(figurenPfad);
+    // Online (R26): die Figuren des Gegners in seinem Satz; nur Zeichenketten, sonst der gemeinsame Satz
+    this.figurenPfadJe = Object.freeze({ w: typeof figurenPfadJe?.w === 'string' ? mitStrich(figurenPfadJe.w) : this.figurenPfad,
+      b: typeof figurenPfadJe?.b === 'string' ? mitStrich(figurenPfadJe.b) : this.figurenPfad });
     this.beiZug = beiZug;
     this.beiAbgelehnt = typeof beiAbgelehnt === 'function' ? beiAbgelehnt : null;
     this.beiLeer = typeof beiLeer === 'function' ? beiLeer : null;
@@ -863,7 +867,7 @@ export class Brett {
   // ----- Figuren -----
 
   _bild(code) {
-    return this.figurenPfad + code + '.svg';
+    return (code[0] === 'b' ? this.figurenPfadJe.b : this.figurenPfadJe.w) + code + '.svg';
   }
 
   _neueFigur(code, feld) {

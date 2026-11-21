@@ -16,7 +16,9 @@ import '../sprachen/partie.js';
 const O = (k, w) => t('online.' + k, w);
 import { Brett, zielKarte } from '../board.js';
 import { icon } from './icons.js';
-import { figurenPfad } from '../figurensatz.js';
+import { figurenPfad, satzPfad } from '../figurensatz.js';
+import { meldeEffekte, effekteDerPartie, gegnerEffekteAn } from '../gegner-effekte.js';
+import { spieleZugEffekt, eigenerZugEffekt } from '../zug-effekt.js';
 import { sanAnzeige, materialBilanz } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
@@ -438,6 +440,7 @@ export function zeige(root, params, app) {
     p = neu; chess = r.chess; widerspruch = !r.passt;
     klingt(alt);
     merkeKronen(alt);
+    holeGegnerFx();
     if (neuerWiderspruch && p.status === 'laeuft') { melde(O('stellungFehler')); strittigFaellig = true; }
     if (p.status === 'offen') {
       inhalt.innerHTML = `<section class="on-karte on-einladung flaeche"><h3>${esc(O('einladungTitel'))}</h3><p class="on-code zahl">${esc(p.code)}</p>
@@ -485,10 +488,43 @@ export function zeige(root, params, app) {
   // Einstellungen). Aendert sich der Satz waehrend der Partie (Erfinder-Status kommt erst nach dem Aufbau vom Server,
   // js/app.js pruefeSonderstuecke, oder Wahl in den Einstellungen), wird das Brett mit der Stellung neu gebaut.
   const skinPfad = (e = app.einstellungen()) => new URL(figurenPfad(e), WURZEL).href;
+  // R26 Effekte vom Gegner (js/gegner-effekte.js): seine Figuren in seinem Satz, wenn der Server ihn belegt (sonst der
+  // Standard); ohne Antwort des Servers oder mit Schalter aus alles im eigenen Satz wie bisher
+  let gegnerFx = null, gegnerFxFuer = null;
+  const fremdAn = (e = app.einstellungen()) => gegnerEffekteAn(e) && !!gegnerFx;
+  const fremdePfade = (e) => {
+    if (!fremdAn(e)) return null;
+    const ich = online.meineFarbe(p), er = andere(ich);
+    return { [ich]: skinPfad(e), [er]: new URL(satzPfad(gegnerFx[er]?.figuren) || satzPfad('cburnett'), WURZEL).href };
+  };
+  // die Bilder je Farbe, die das Brett zeigen wuerde: neu gebaut wird nur, wenn sich eines aendert (ein Neubau mitten im
+  // Tipp liesse den Zug ins Leere gehen)
+  const brettStil = (e) => { const je = fremdePfade(e) || {}, eigen = skinPfad(e); return (je.w || eigen) + '|' + (je.b || eigen); };
+  let gebautMit = null;
+  function holeGegnerFx() {
+    if (!p || p.status === 'offen' || !p.weiss || !p.schwarz || gegnerFxFuer === p.id) return;
+    const id = gegnerFxFuer = p.id;
+    gegnerFx = null;
+    meldeEffekte(app.einstellungen());
+    // zweimal: meldet der Gegner seine Wahl erst beim Oeffnen derselben Partie, steht sie beim zweiten Mal da
+    const frage = () => effekteDerPartie(id).then((fx) => {
+      if (weg || !p || p.id !== id || !fx) return;
+      gegnerFx = fx;
+      if (brett && !blockiert && brettStil(app.einstellungen()) !== gebautMit) { bauBrett(); zeichne(); }
+    });
+    frage().then(() => { if (!weg && p && p.id === id && p.status === 'laeuft') setTimeout(() => { if (!weg) frage(); }, 6000); });
+  }
+  function zugFx(m) {
+    if (!m || !brett) return;
+    const e = app.einstellungen();
+    const id = m.color === online.meineFarbe(p) ? eigenerZugEffekt(e) : (fremdAn(e) ? gegnerFx[m.color]?.zug : null);
+    if (id && id !== 'aus') spieleZugEffekt({ ebene: inhalt.querySelector('.on-effekte'), brett, id, von: m.from, nach: m.to }).catch(() => {});
+  }
   function bauBrett() {
     const e = app.einstellungen();
     brett?.zerstoere();
-    brett = new Brett(inhalt.querySelector('.on-brett'), { beiZug, figurenPfad: skinPfad(e),
+    gebautMit = brettStil(e);
+    brett = new Brett(inhalt.querySelector('.on-brett'), { beiZug, figurenPfad: skinPfad(e), figurenPfadJe: fremdePfade(e),
       koordinaten: e.koordinaten !== false, koordLage: e.koordLage, autoDame: e.autoDame !== false, turmRochade: e.turmRochade === true,
       steuerung: e.steuerung, pfeile: e.pfeile !== false });
     brett.setzeAusrichtung(online.meineFarbe(p)); brett.setzeDauer(300);
@@ -662,7 +698,7 @@ export function zeige(root, params, app) {
     const e = ev?.detail || app.einstellungen();
     for (const b of s.querySelectorAll('.brettwahl button[data-brett]')) b.setAttribute('aria-checked', String(b.dataset.brett === e.brett));
     if (!brett || blockiert) return;
-    if (skinPfad(e) === brett.figurenPfad) return;
+    if (brettStil(e) === gebautMit) return;
     bauBrett(); zeichne();
   }
   window.addEventListener('schach:einstellungen', beiEinstellungen);
@@ -774,12 +810,16 @@ export function zeige(root, params, app) {
     if (n > gehoert && p.status === 'laeuft' && !widerspruch) {
       const verlauf = chess.history({ verbose: true }), m = verlauf[verlauf.length - 1];
       ton(zugKlangName(m, chess.inCheck()));
+      zugFx(m);
     }
     gehoert = n;
     if (alt.status !== 'laeuft' || p.status !== 'beendet' || !p.ergebnis || p.grund === 'strittig') return;
     if (widerspruch || !endePasst(p, chess)) return;
     try { klang.ende(p.ergebnis === '1/2-1/2' ? null : (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p)); } catch (e) { /* still */ }
-    if (p.grund === 'matt' && (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p)) finisher();
+    const sieger = p.ergebnis === '1-0' ? 'w' : 'b';
+    if (p.grund === 'matt' && sieger === online.meineFarbe(p)) finisher();
+    // R26: gewinnt der Gegner per Matt, sein Finisher (vom Server belegt), nie bei Schalter aus oder weniger Bewegung
+    else if (p.grund === 'matt' && fremdAn() && gegnerFx[sieger]?.finisher && gegnerFx[sieger].finisher !== 'aus') finisher(gegnerFx[sieger].finisher);
   }
   // Matt-Finisher wie in der Bot-Partie (Ort partie:matt, js/pakete/finisher): nur beim eigenen Matt, das diese Ansicht
   // selbst erlebt hat (klingt oben); ein Tipp oder das Verlassen beendet ihn. Die Buehne ist nur, was der Finisher braucht:
@@ -787,9 +827,10 @@ export function zeige(root, params, app) {
   // feier: solange ein Finisher laeuft, wartet das Ergebnisblatt darauf (baueBlatt), hoechstens BRETT_FEIER.dauerMs, ein Tipp
   // beendet beides sofort; wie die Bot-Partie (partie.js: erst der Finisher, dann das Blatt; Kaltreview de 17.11.2026)
   let mattOrt = null, feier = null;
-  function finisher() {
+  function finisher(fremd) {
     const effekte = inhalt.querySelector('.on-effekte');
     if (!effekte || !brett) return;
+    if (fremd !== undefined && (!!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || tempo() === 0)) return;
     const verbose = chess.history({ verbose: true }), m = verbose[verbose.length - 1] || null;
     let koenigFeld = null;
     for (const reihe of chess.board()) for (const f of reihe) if (f && f.type === 'k' && f.color === chess.turn()) koenigFeld = f.square;
@@ -805,7 +846,7 @@ export function zeige(root, params, app) {
     mattOrt = fuelle('partie:matt', null, {
       app, buehne, partieId: p.id, ergebnis: 'sieg', gewinner: 'flo', koenigFeld, fen: chess.fen(), reduziert,
       letzterZug: m ? Object.freeze({ von: m.from, nach: m.to, san: m.san, figur: m.color + m.piece.toUpperCase() }) : null,
-      signal: ctrl.signal, dauerMs: BRETT_FEIER.dauerMs, kurzMs: BRETT_FEIER.kurzMs,
+      signal: ctrl.signal, dauerMs: BRETT_FEIER.dauerMs, kurzMs: BRETT_FEIER.kurzMs, ...(fremd === undefined ? {} : { fremd }),
     });
     const tipp = new Promise((r) => ctrl.signal.addEventListener('abort', r, { once: true }));
     feier = mattOrt.wartend > 0 ? Promise.race([mattOrt.fertig, tipp, new Promise((r) => setTimeout(r, BRETT_FEIER.dauerMs))]) : null;
@@ -1177,6 +1218,7 @@ export function zeige(root, params, app) {
     // der eigene Zug klingt sofort; endet die Partie mit ihm, kommt nur der Ende-Klang, sobald der Server bestaetigt
     gehoert = chess.history().length;
     if (!chess.isGameOver()) ton(zugKlangName(m, chess.inCheck()));
+    try { zugFx(m); } catch (e) { console.error(e); }
     queueMicrotask(() => {
       if (weg) return;
       try { zeichne(); } catch (e) { console.error(e); }

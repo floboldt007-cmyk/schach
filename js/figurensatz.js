@@ -1,9 +1,10 @@
 // Figurensatz der eigenen Ansicht (Einstellung figuren). "cburnett" fuer alle; "blaupause" (Flos Erfinder-Profil) nur,
 // solange das angemeldete Konto das Sonderstueck besitzt (js/sonderstuecke.js), sonst still der Standard.
-// Flo, 30.10.2026: online jede Seite in ihrem Skin (ohne Skin Standardfiguren), mit Schalter "Gegner-Skins zeigen";
-// das kommt mit den Online-Profilen vom Server. Gegen Bots alle Figuren im eigenen Satz (so wie hier).
+// Flo, 30.10.2026: online jede Seite in ihrem Skin (ohne Skin Standardfiguren), mit Schalter "Effekte vom Gegner zeigen"
+// (seit R26 21.11.2026: js/gegner-effekte.js, den Besitz belegt der Server). Gegen Bots alle Figuren im eigenen Satz.
 //   figurenSatz(einstellungen?) -> 'cburnett' | 'blaupause' | Labor-Satz (js/labor.js, nur Erfinder)
 //   figurenPfad(einstellungen?) -> Pfad relativ zur App-Wurzel, mit Schraegstrich am Ende
+//   satzPfad(id) -> Pfad eines bekannten Satzes oder null, OHNE Besitzpruefung (nur fuer vom Server belegte Saetze)
 import { ladeEinstellungen } from './storage.js';
 import { hatSonderstueck, ERFINDER } from './sonderstuecke.js';
 import { istLabor, laborFrei } from './labor.js';
@@ -26,3 +27,4 @@ export function figurenSatz(e = ladeEinstellungen()) {
   return 'cburnett';
 }
 export function figurenPfad(e) { return PFADE[figurenSatz(e)]; }
+export const satzPfad = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(PFADE, id) ? PFADE[id] : null);

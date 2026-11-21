@@ -16,11 +16,12 @@
 // eigene Seite (params.seite, Hash #einstellungen/<seite>, Zurueck fuehrt zur Liste); iPad: Menue links, alles untereinander.
 import { klang } from '../sounds.js';
 import { wischKanten } from './bauteile.js';
-import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
+import { setzeZurueck, statistik, gesamtSterne, EINSTELLUNG_WERTE } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import { sitzung, istAbgeglichen } from '../konto.js';
+import { istErfinder } from '../sonderstuecke.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 import '../sprachen/bericht.js';
@@ -202,6 +203,8 @@ export function zeige(root, params = {}, app) {
           ${segment('koordLage',E('anzeige.koordLage'),[['ecke',E('anzeige.ecke')],['rand',E('anzeige.rand')]])}
           ${schalter('balken',E('anzeige.balken'),E('anzeige.balkenText'))}${schalter('liveBewertung',E('anzeige.live'),E('anzeige.liveText'))}
           ${schalter('pfeile',E('anzeige.pfeile'),E('anzeige.pfeileText'))}
+          ${schalter('gegnerEffekte',E('anzeige.gegnerEffekte'),E('anzeige.gegnerEffekteText'))}
+          ${istErfinder() ? segment('zugEffekt',E('anzeige.zugEffekt'),EINSTELLUNG_WERTE.zugEffekt.map((w) => [w, w === 'aus' ? t('allgemein.aus') : w[0].toUpperCase() + w.slice(1)]),E('anzeige.zugEffektText')) : ''}
           ${segment('duellIntro',E('anzeige.duellIntro'),[['immer',E('spiel.immer')],['besondere',E('anzeige.besondere')],['aus',t('allgemein.aus')]])}
           ${schalter('lebensleiste',E('anzeige.lebensleiste'),E('anzeige.lebensleisteText'))}${schalter('zaehlwerk',E('anzeige.zaehlwerk'),E('anzeige.spielmodus'))}${schalter('funkenlinie',E('anzeige.funkenlinie'),E('anzeige.spielmodus'))}
         </section>

@@ -22,7 +22,8 @@ const feldMitte = (feld) => [feld.charCodeAt(0) - 97 + 0.5, 8 - Number(feld[1]) 
 const prozent = (n) => Number((n * 12.5).toFixed(3)) + '%';
 
 let zaehler = 0;
-async function ladeEffekt(datei) {
+// auch fuer die Zug-Animation in der Online-Partie (js/zug-effekt.js)
+export async function ladeEffekt(datei) {
   const antwort = await fetch(datei).catch(() => null);
   if (!antwort || !antwort.ok) return null;
   // Verlaufs-Ids gelten im ganzen Dokument: je Aufruf eindeutig, Karte und Vorschau teilen sich keine
@@ -38,7 +39,7 @@ async function ladeEffekt(datei) {
 }
 
 // Ein Durchgang: die laengste Animation samt spaeterem Beginn (negative Beginne laufen schon)
-function dauerSek(svg) {
+export function dauerSek(svg) {
   const zahl = (w) => parseFloat(w) || 0;
   return Math.max(...[...svg.querySelectorAll('animate, animateTransform')]
     .map((a) => zahl(a.getAttribute('dur')) + Math.max(0, zahl(a.getAttribute('begin')))), 0);
