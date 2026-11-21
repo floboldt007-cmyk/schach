@@ -27,8 +27,9 @@ import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
 import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
 // R27 Online Arena: Medaille und Partie-Symbol als Kronjuwel, Season-Rest und Weltrangliste aus vorhandenen Quellen
-import { kronSymbol, raetselSymbol } from './icons.js';
+import { kronSymbol, duellSchwerter, raetselBlitz } from './icons.js';
 import { holeSaison } from '../kronen.js';
+import { sheet } from './bauteile.js';
 import { paket2Frei } from '../freigaben.js';
 import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
@@ -198,9 +199,10 @@ export function zeige(root, params, app) {
   // Partien darunter auf), quer ab 1100 px rechts die Weltrangliste um den eigenen Platz. Jeder Block ohne Daten fehlt ganz,
   // nie ein Platzhalter. Passt ohne Scrollen auf das iPhone 13 (tests/online-ui.test.mjs). Ohne Konto sind die Karten nur
   // Erklaerung, ohne Knopf und ohne Schatten, damit nichts tippbar aussieht; der einzige Knopf ist "Zum Konto".
-  const symbol = art => `<span class="juwel-plakette on-symbol" data-ton="${art === 'duell' ? 'saphir' : 'gold'}" aria-hidden="true">`
-    + `${art === 'duell' ? raetselSymbol() : kronSymbol('liga')}</span>`;
-  const tuer = (art, rumpf) => `<section class="on-art on-tuer juwel-karte" data-art="${art}" data-ton="${art === 'duell' ? 'saphir' : 'gold'}" aria-labelledby="on-${art}-t">
+  // Partie in Gold mit Schwertern, Raetsel-Duell in Nachtblau mit Blitz; die einzige Krone der Seite traegt die Medaille oben
+  const symbol = art => `<span class="juwel-plakette on-symbol" data-ton="${art === 'duell' ? 'nacht' : 'gold'}" aria-hidden="true">`
+    + `${art === 'duell' ? raetselBlitz() : duellSchwerter()}</span>`;
+  const tuer = (art, rumpf) => `<section class="on-art on-tuer juwel-karte" data-art="${art}" data-ton="${art === 'duell' ? 'nacht' : 'gold'}" aria-labelledby="on-${art}-t">
       <div class="on-tuer-kopf">${symbol(art)}<div class="on-tuer-text"><span class="on-tuer-ueber">${esc(O(`tuer.${art}.ueber`))}</span>
         <h2 id="on-${art}-t">${esc(O(art === 'duell' ? 'ruhig.duellTitel' : `tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
   const freundeKarte = () => `<section class="on-freunde-karte juwel-karte" data-ton="ruhig" aria-labelledby="on-freunde-t">`
@@ -223,6 +225,9 @@ export function zeige(root, params, app) {
       inhalt.innerHTML = `<p>${esc(O('ladePartie'))}</p>`;
       aktion(() => online.ladePartie(params.partieId), neu => {
         uebernehme(neu);
+        if (params.analyse && neu.status === 'beendet') {
+          karteDerPartie(neu.id).then((d) => { if (d && !weg) kartenDaten = d; }).catch(() => {}).finally(() => { if (!weg) zurAnalyse(); });
+        }
         if (!blockiert && neu.status !== 'beendet') beobachter = online.beobachte(neu.id, {
           seit: neu.aktualisiert_am,
           beiAenderung: stand => { if (busy) wartend = stand; else uebernehme(stand); },
@@ -238,8 +243,8 @@ export function zeige(root, params, app) {
     // Kein Springen beim Laden (G-005 AC-06): Liga-Streifen, feste Bedenkzeit und Suchknopf stehen schon waehrend der Pruefung
     // in voller Hoehe da, Streifen als leerer Platzhalter, Knopf gesperrt; "kommt bald" blendet den Platzhalter aus
     inhalt.innerHTML = `${kopfHtml}
-      <button class="on-liga on-held juwel-karte dr" type="button" data-online="liga" data-laedt disabled aria-hidden="true"><span class="on-liga-schild juwel-medaille">${kronSymbol('liga')}</span>
-        <span class="on-liga-text on-held-stand"><b></b><span></span></span></button>
+      <div class="on-held juwel-karte"><button class="on-liga on-held-knopf dr" type="button" data-online="liga" data-laedt disabled aria-hidden="true"><span class="on-liga-schild juwel-medaille">${kronSymbol('liga')}</span>
+        <span class="on-liga-text on-held-stand"><b></b><span></span></span></button><button class="on-form dr" type="button" data-online="form" hidden></button></div>
       <div class="on-tueren" data-zustand="konto">
       ${tuer('partie', `<p class="on-suche-text" hidden>${esc(O('suche.pruefen'))}</p>
         <p class="on-zeit-fest">${esc(O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) }))}</p>
@@ -254,7 +259,7 @@ export function zeige(root, params, app) {
           <small class="on-ki-hinweis">${esc(O('suche.kiHinweis'))}</small>
           <button class="knopf dr" type="button" data-online="suche-stopp">${esc(O('suche.abbrechen'))}</button>
         </div>`)}
-      ${tuer('duell', `<button class="knopf primaer juwel-knopf dr on-tuer-knopf" data-ton="saphir" type="button" data-online="duell">${esc(O('tuer.duell.knopf'))}</button>
+      ${tuer('duell', `<button class="knopf primaer juwel-knopf dr on-tuer-knopf" data-ton="nacht" type="button" data-online="duell">${esc(O('tuer.duell.knopf'))}</button>
         <p class="on-tuer-hinweis on-netz-hinweis" hidden>${esc(O('netz.fehlt'))}</p>`)}
       </div>${freundeKarte()}
       <details class="on-freunde"${code || params.freunde ? ' open' : ''}>
@@ -288,7 +293,7 @@ export function zeige(root, params, app) {
     k.querySelector('[data-online="suchen"]').hidden = zustand !== 'bereit';
     k.querySelector('[data-online="suchen"]').disabled = zustand !== 'bereit';
     k.querySelector('[data-online="fortsetzen"]').hidden = zustand !== 'laufend';
-    if (zustand === 'bald') { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) l.hidden = true; }
+    if (zustand === 'bald') { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) { l.hidden = true; l.closest('.on-held').hidden = true; } }
     k.querySelector('.on-suche').hidden = zustand !== 'sucht';
     if (zustand !== 'sucht') { clearInterval(restUhr); restUhr = null; }
   }
@@ -319,7 +324,7 @@ export function zeige(root, params, app) {
     const st = Array.isArray(d) ? d[0] : d;
     const el = inhalt.querySelector('.on-liga');
     if (!el) return;
-    if (!st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) { el.hidden = true; return; }
+    if (!st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) { el.hidden = true; el.closest('.on-held').hidden = true; return; }
     delete el.dataset.laedt; el.disabled = false; el.removeAttribute('aria-hidden');
     const stufe = stufenName(Math.min(17, Math.max(0, Math.trunc(Number(st.stufe)) || 0)));
     const n = Number.isInteger(st.n) && st.n > 0 ? st.n : 30;
@@ -330,25 +335,26 @@ export function zeige(root, params, app) {
       + `<span class="on-held-stand"><span class="on-gross">${elo != null
         ? `<b class="on-gross-wert juwel-zahl zahl">${esc(String(elo))}</b><small class="on-gross-text">${esc(O('held.elo'))}</small>`
         : `<b class="on-gross-wert on-held-wort">${esc(stufe)}</b>`}</span>`
-      + '<span class="on-held-zeile"></span></span><span class="on-form" hidden></span>';
+      + '<span class="on-held-zeile"></span></span>';
     el.hidden = false;
     zeigeHeld();
   }
   // Zeile, Form und Vorlesetext der Kopfkarte; laeuft nach jeder der drei Antworten (Stand, Season, Partien) erneut
   function zeigeHeld() {
-    const el = inhalt.querySelector('.on-liga.on-held');
+    const el = inhalt.querySelector('.on-liga.on-held-knopf');
     if (!el || !held || weg) return;
     const teile = [held.elo != null ? held.stufe : null, held.platz, saisonRest].filter(Boolean);
     // jeder Teil bricht nur als Ganzes um (css/online.css .on-held-zeile > span)
     el.querySelector('.on-held-zeile').innerHTML = teile.map((x) => `<span>${esc(x)}</span>`).join(' · ');
-    const form = el.querySelector('.on-form');
+    const form = inhalt.querySelector('.on-held .on-form');
     const zahl = (z) => (formZeichen || []).filter((x) => x === z).length;
     const formText = formZeichen?.length ? O('form.label', { n: formZeichen.length, s: zahl('s'), nn: zahl('n'), r: zahl('r') }) : '';
     form.hidden = !formZeichen?.length;
-    form.innerHTML = formZeichen?.length ? `<small aria-hidden="true">${esc(O('form.titel'))}</small><span class="on-form-steine" aria-hidden="true">`
+    form.innerHTML = formZeichen?.length ? `<small aria-hidden="true">${esc(O('form.titel'))}${icon('vor')}</small><span class="on-form-steine" aria-hidden="true">`
       + formZeichen.map((z) => `<i class="juwel-stein" data-erg="${z}">${esc(O('form.' + z))}</i>`).join('') + '</span>' : '';
+    if (formText) form.setAttribute('aria-label', `${formText}. ${O('form.oeffnen')}`);
     const gross = held.elo != null ? `${O('ruhig.elo')}: ${held.elo}` : `${O('ruhig.deineLiga')}: ${held.stufe}`;
-    el.setAttribute('aria-label', [gross, ...teile, formText].filter(Boolean).join(', '));
+    el.setAttribute('aria-label', [gross, ...teile].filter(Boolean).join(', '));
   }
   // Season-Rest (Paket 2, supabase/saison-schema.sql): "Season endet in 4 Tagen", nur waehrend einer laufenden Season
   async function ladeSaison() {
@@ -362,10 +368,50 @@ export function zeige(root, params, app) {
     zeigeHeld();
   }
   // Form: die letzten fuenf beendeten gewerteten Partien mit gueltigem Ergebnis, aelteste links (s/n/r aus eigener Sicht)
+  const ergVon = (r) => (r.ergebnis === '1/2-1/2' ? 'r' : (r.ergebnis === '1-0') === (online.meineFarbe(r) === 'w') ? 's' : 'n');
+  let letzte = [];
   function formAus(liste) {
-    return (Array.isArray(liste) ? liste : [])
+    letzte = (Array.isArray(liste) ? liste : [])
       .filter((r) => r && r.status === 'beendet' && r.gewertet === true && ['1-0', '0-1', '1/2-1/2'].includes(r.ergebnis) && online.meineFarbe(r))
-      .slice(0, 5).map((r) => (r.ergebnis === '1/2-1/2' ? 'r' : (r.ergebnis === '1-0') === (online.meineFarbe(r) === 'w') ? 's' : 'n')).reverse();
+      .slice(0, 5);
+    return letzte.map(ergVon).reverse();
+  }
+  // Letzte Partien (Tipp auf die Form): Ergebnis, Gegner (Tipp: seine Visitenkarte), Datum, "Analysieren" oeffnet die Partie
+  // und von dort die vorhandene Analyse (params.analyse). Namen und Karten aus karte_der_partie, nur fuer die eigenen Partien.
+  function zeigeLetzte() {
+    if (!letzte.length) return;
+    const zeilen = letzte.slice();
+    const karten = new Array(zeilen.length).fill(null);
+    const datum = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(document.documentElement.lang === 'en' ? 'en-GB' : 'de-DE', { day: 'numeric', month: 'short' }); };
+    const ort = document.createElement('ol');
+    ort.className = 'on-letzte';
+    ort.innerHTML = zeilen.map((r, n) => `<li class="on-letzte-zeile"><i class="juwel-stein" data-erg="${ergVon(r)}" aria-hidden="true">${esc(O('form.' + ergVon(r)))}</i>`
+      + `<span class="on-letzte-wer"><button class="on-letzte-name" type="button" data-n="${n}">${esc(O('letzte.gegner'))}</button>`
+      + `<span class="on-letzte-datum">${esc(datum(r.aktualisiert_am))}</span></span>`
+      + `<button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-n="${n}" data-letzte="analyse">${icon('analyse')} ${esc(O('letzte.analyse'))}</button></li>`).join('');
+    let ziel = null;
+    ort.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-n]');
+      if (!b) return;
+      const n = Number(b.dataset.n), r = zeilen[n];
+      if (!r) return;
+      if (b.dataset.letzte === 'analyse') { ziel = r.id; ort.closest('.sheet-karte')?.querySelector('[data-knopf="zu"]')?.click(); return; }
+      zeigeGegnerProfil({ karte: karten[n], name: b.textContent });
+    });
+    zeilen.forEach((r, n) => {
+      const f = andere(online.meineFarbe(r));
+      karteDerPartie(r.id).then((d) => {
+        const roh = d && (f === 'w' ? d.w : d.s);
+        const k = roh ? fremdeKarte(roh) : null;
+        if (!k || !ort.isConnected) return;
+        karten[n] = k;
+        const b = ort.querySelector(`.on-letzte-name[data-n="${n}"]`);
+        if (b && k.name) { b.textContent = k.name; b.setAttribute('aria-label', profilText('oeffnen', { name: k.name })); }
+      }).catch(() => {});
+    });
+    sheet({ titel: O('letzte.titel'), inhalt: ort, klasse: 'on-letzte-blatt', abbrechen: null,
+      knoepfe: [{ text: O('letzte.zu'), wert: null, name: 'zu' }] })
+      .then(() => { if (ziel && !weg) app.gehe('online', { partieId: ziel, analyse: true }); });
   }
   // Weltrangliste rechts (nur quer ab 1100 px, nur mit Paket 2 und nur, wenn das Konto in der Liste steht): fuenf Plaetze um
   // den eigenen, der eigene in Gold; der Knopf oeffnet die ganze Weltrangliste. Ohne Antwort bleibt die Karte weg.
@@ -379,17 +425,22 @@ export function zeige(root, params, app) {
       if (weg || !l || l.ich.status !== 'dabei') return;
       const i = l.liste.findIndex((z) => z.ich);
       if (i < 0) return;
-      // die ersten drei mit Medaille, dann dein Platz mit je einem Nachbarn (stehst du selbst oben, schliessen die Plaetze an)
-      const um = i <= 3 ? l.liste.slice(3, 6) : l.liste.slice(i - 1, i + 2);
+      // Podest der ersten drei (2 | 1 | 3, mit Kopf und Metallring), darunter dein Platz mit je einem Nachbarn; stehst du
+      // selbst oben, schliessen die Plaetze 4 bis 6 an
+      const um = i <= 2 ? l.liste.slice(3, 6) : l.liste.slice(i - 1, i + 2);
       rangZeilen = [...l.liste.slice(0, 3), ...um];
-      const zeile = (z, n) => `<li><button class="on-rang-zeile${z.ich ? ' ich' : ''}" type="button" data-online="rang-profil" data-n="${n}"`
-        + ` aria-label="${esc(profilText('oeffnen', { name: z.ich ? O('rang.du') : z.name }))}">`
-        + (z.rang <= 3 ? `<span class="juwel-rang zahl" data-platz="${z.rang}">${z.rang}</span>` : `<span class="on-rang-platz zahl">${esc(String(z.rang))}</span>`)
-        + `<span class="on-rang-name">${esc(z.ich ? O('rang.du') : z.name)}</span><b class="zahl">${esc(String(z.elo))}</b></button></li>`;
-      el.innerHTML = `<h2 id="on-rang-t">${esc(O('rang.titel'))}</h2><ol class="on-rang-liste">`
-        + rangZeilen.slice(0, 3).map((z, n) => zeile(z, n)).join('')
-        + (um.length && um[0].rang > 4 ? '<li class="on-rang-luecke" aria-hidden="true"></li>' : '')
-        + um.map((z, n) => zeile(z, n + 3)).join('')
+      const name = (z) => (z.ich ? O('rang.du') : z.name);
+      const kopf = (z, k) => (z.ich ? `<span class="juwel-kopf" data-ich style="--k:${k}px"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''}>${floAvatar('w')}</span>`
+        : `<span class="juwel-kopf"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px;background-image:url('${bannerUrl(z.banner)}')">${esc((z.name[0] || '?').toUpperCase())}</span>`);
+      const label = (z) => ` aria-label="${esc(profilText('oeffnen', { name: name(z) }))}"`;
+      const podest = [1, 0, 2].filter((n) => rangZeilen[n]).map((n) => { const z = rangZeilen[n];
+        return `<button class="on-podest-platz${z.ich ? ' ich' : ''}" type="button" data-online="rang-profil" data-n="${n}" data-platz="${z.rang}"${label(z)}>`
+          + `${kopf(z, n === 0 ? 56 : 46)}<span class="juwel-rang zahl" data-platz="${z.rang}">${z.rang}</span>`
+          + `<span class="on-podest-name">${esc(name(z))}</span><b class="zahl">${esc(String(z.elo))}</b></button>`; }).join('');
+      el.innerHTML = `<h2 id="on-rang-t">${esc(O('rang.titel'))}</h2><div class="on-podest">${podest}</div><ol class="on-rang-liste">`
+        + um.map((z, n) => `<li><button class="on-rang-zeile${z.ich ? ' ich' : ''}" type="button" data-online="rang-profil" data-n="${n + 3}"${label(z)}>`
+          + `<span class="on-rang-platz zahl">${esc(String(z.rang))}</span>${kopf(z, 34)}<span class="on-rang-name">${esc(name(z))}</span>`
+          + `<b class="zahl">${esc(String(z.elo))}</b></button></li>`).join('')
         + `</ol><button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-online="rang">${esc(O('rang.knopf'))}</button>`;
       el.hidden = false;
     } catch (e) { /* ohne Rangliste fehlt die Karte */ }
@@ -407,7 +458,7 @@ export function zeige(root, params, app) {
     if (lp) {
       sucheZustand('laufend', O(online.binAmZug(lp) ? 'laufend.du' : 'laufend.gegner'));
       sucheKarte().querySelector('[data-online="fortsetzen"]').dataset.partie = lp.id;
-      if (!liga) { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) l.hidden = true; }
+      if (!liga) { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) { l.hidden = true; l.closest('.on-held').hidden = true; } }
     } else if (liga) sucheZustand('bereit', O('suche.erklaert'));
     else sucheZustand('bald', O('suche.bald'));
   }
@@ -1276,6 +1327,7 @@ export function zeige(root, params, app) {
     if (a === 'duell') { app.gehe('raetsel-duell', { suchen: true }); return; }
     if (a === 'liga') { app.gehe('bestenliste'); return; }
     if (a === 'rang') { app.gehe('bestenliste', { reiter: 'welt' }); return; }
+    if (a === 'form') { zeigeLetzte(); return; }
     // R27: eine Zeile der Weltrangliste zeigt die vorhandene Visitenkarte (Name, Banner aus der Liste; die eigene aus dem Profil),
     // ohne neue Server-Abfrage; der Fokus kehrt danach auf die Zeile zurueck
     if (a === 'rang-profil') {

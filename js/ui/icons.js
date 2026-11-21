@@ -143,15 +143,27 @@ export function spielSymbol(name, klasse = '') {
     + `</defs>${SY[name](teile)}</svg>`;
 }
 
-// Raetsel-Puzzleteil (R27 Online Arena, Symbol fuer das Raetsel-Duell; Flo 21.11.2026: der Saphir "sieht haesslich aus"):
-// Bauart der Kronjuwel-Krone (Verlauf, dunkle Kante, Glanz), Farben aus den Saphir-Tokens per Klasse (css/premium.css .kj-saphir)
-export function raetselSymbol() {
-  const id = 'rs' + (++syZaehler);
-  return `<svg class="kj kj-saphir" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><defs>`
-    + `<linearGradient id="${id}" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" class="kj-g0"/><stop offset=".5" class="kj-g1"/><stop offset="1" class="kj-g2"/></linearGradient>`
-    + `</defs><g class="kj-figur" style="--kj-verlauf:url(#${id})">`
-    + '<path class="kj-gold" d="M8 15h9a5 5 0 1 1 10 0h9v8a5 5 0 1 1 0 10v9H8z"/>'
-    + '<path class="kj-glanz-strich" d="M12.5 26v-6.5h4"/><circle class="kj-glanz" cx="20" cy="11.5" r="1.3"/></g></svg>';
+// Online-Arena R27 (Flo 21.11.2026: nur EINE Krone je Seite, das Puzzle "wirkte nicht"): Symbole in der Bauart der
+// Kronjuwel-Krone (Verlauf, dunkle Kante, Glanz), Farben per Klasse aus css/premium.css.
+//   duellSchwerter()  zwei gekreuzte Klingen in Metallgold, die Partie gegen einen Menschen
+//   raetselBlitz()    ein Blitz in hellem Silberblau, das Raetsel-Duell (Tempo, gleiche Raetsel)
+const kjVerlauf = (id) => `<defs><linearGradient id="${id}" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" class="kj-g0"/>`
+  + `<stop offset=".5" class="kj-g1"/><stop offset="1" class="kj-g2"/></linearGradient></defs>`;
+export function duellSchwerter() {
+  const id = 'ds' + (++syZaehler);
+  return `<svg class="kj kj-schwerter" viewBox="0 0 48 48" aria-hidden="true" focusable="false">${kjVerlauf(id)}`
+    + `<g class="kj-figur" style="--kj-verlauf:url(#${id})">`
+    + '<path class="kj-gold" d="M8 6.5 13 7.5 34.5 29 31 32.5 9.5 11z"/><path class="kj-gold" d="M40 6.5 35 7.5 13.5 29 17 32.5 38.5 11z"/>'
+    + '<path class="kj-griff" d="M28 35.5 35.5 28M20 35.5 12.5 28M34.5 34.5l5 5M13.5 34.5l-5 5"/>'
+    + '<circle class="kj-band" cx="40.5" cy="40.5" r="2.6"/><circle class="kj-band" cx="7.5" cy="40.5" r="2.6"/>'
+    + '<path class="kj-glanz-strich" d="M12 10.2 21 19.2"/></g></svg>';
+}
+export function raetselBlitz() {
+  const id = 'rb' + (++syZaehler);
+  return `<svg class="kj kj-blitz" viewBox="0 0 48 48" aria-hidden="true" focusable="false">${kjVerlauf(id)}`
+    + `<g class="kj-figur" style="--kj-verlauf:url(#${id})">`
+    + '<path class="kj-gold" d="M27.5 4 10 27h12l-3.5 17L38 19.5H25.5z"/>'
+    + '<path class="kj-glanz-strich" d="M24 10.5 16 21.5"/><circle class="kj-glanz" cx="31" cy="22.5" r="1.3"/></g></svg>';
 }
 
 // ---------- Design-Probe Leiste R27 (nur ?test&design=k1|k2|k3, R19-Auswahl leiste-symbole-r27; NICHT live) ----------

@@ -256,10 +256,14 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 }
 .online-screen:not(.online-partie) .on-inhalt .knopf.primaer:not(.juwel-knopf) { box-shadow: none; }
 
-/* Kopfkarte: der Liga-Knopf als Schmuck-Karte */
-.online-screen .on-liga.on-held { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px;
-  min-height: 108px; margin-bottom: var(--a4); padding: 18px 20px; border-radius: var(--r-xl); }
-.on-held:focus-visible { outline: var(--fokus); outline-offset: 3px; }
+/* Kopfkarte: Huelle .on-held mit zwei Knoepfen, links die Liga (Medaille, Elo, Zeile), rechts die Form (oeffnet die letzten
+   Partien); ein Knopf im Knopf waere ungueltig */
+.online-screen .on-held { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 18px; min-height: 108px;
+  margin-bottom: var(--a4); padding: 18px 20px; border-radius: var(--r-xl); }
+.on-held[hidden] { display: none; }
+.online-screen .on-held .on-liga { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 18px; width: auto;
+  min-height: 0; margin: 0; padding: 0; border-radius: 16px; background: none; box-shadow: none; color: inherit; text-align: start; }
+.online-screen .on-held .on-liga:focus-visible, .on-form:focus-visible { outline: var(--fokus); outline-offset: 4px; }
 .online-screen .on-liga-schild.juwel-medaille { width: var(--m); height: var(--m); border-radius: 50%; color: inherit; }
 .on-held .juwel-medaille { --m: 68px; margin: 0 4px; }
 .on-held-stand { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -270,15 +274,32 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-held-zeile { font-size: 14px; font-weight: 650; line-height: 1.35; color: var(--text-2); }
 .on-held-zeile:empty { display: none; }
 .on-held-zeile > span { white-space: nowrap; }
-.on-form { display: grid; justify-items: end; gap: 8px; }
+.on-form { display: grid; justify-items: end; gap: 8px; margin: -8px -10px; padding: 8px 10px; border: 0; border-radius: 14px; background: transparent;
+  color: inherit; font: inherit; cursor: pointer; transition: background-color var(--d-s) var(--sanft); }
+@media (hover: hover) { .on-form:hover { background: var(--flaeche-2); } }
 .on-form[hidden] { display: none; }
-.on-form small { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+.on-form small { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-2); }
+.on-form small .ico { width: 13px; height: 13px; }
 .on-form-steine { display: flex; gap: 5px; }
 /* Platzhalter waehrend der Pruefung: die beiden ruhigen Balken stehen im Stand-Teil */
-.on-liga.on-held[data-laedt] .on-held-stand { gap: 10px; }
-.on-liga.on-held[data-laedt] .on-held-stand b, .on-liga.on-held[data-laedt] .on-held-stand > span { display: block; height: 30px; width: 40%;
+.on-held .on-liga[data-laedt] .on-held-stand { gap: 10px; }
+.on-held .on-liga[data-laedt] .on-held-stand b, .on-held .on-liga[data-laedt] .on-held-stand > span { display: block; height: 30px; width: 40%;
   border-radius: 10px; background: var(--flaeche-2); }
-.on-liga.on-held[data-laedt] .on-held-stand > span { height: 14px; width: 62%; }
+.on-held .on-liga[data-laedt] .on-held-stand > span { height: 14px; width: 62%; }
+.on-held:has(> .on-liga[data-laedt]) .on-liga-schild { min-width: 0; }
+
+/* Letzte Partien (Blatt): Ergebnis, Gegner (Tipp: Visitenkarte), Datum, Analysieren */
+.on-letzte { display: grid; gap: 6px; margin: 4px 0 8px; padding: 0; list-style: none; }
+.on-letzte-zeile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 56px; padding: 6px 6px 6px 12px;
+  border-radius: 14px; background: var(--flaeche-2); }
+.on-letzte-wer { display: grid; justify-items: start; min-width: 0; }
+.on-letzte-name { max-width: 100%; min-height: 28px; padding: 0 4px; border: 0; background: none; color: var(--text); font: inherit; font-size: 15.5px;
+  font-weight: 750; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.on-letzte-name:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: 8px; }
+.on-letzte-datum { padding: 0 4px; font-size: 12.5px; font-weight: 650; color: var(--text-2); white-space: nowrap; }
+.on-letzte-zeile .knopf.juwel-knopf { min-height: 44px; padding: 0 14px; font-size: 14.5px; gap: 6px; }
+.on-letzte-zeile .knopf .ico { width: 17px; height: 17px; }
 
 /* Tueren: Schmuck-Karten, Symbol-Kachel statt Mini-Brett */
 .online-screen:not(.im-spiel) .on-tueren { gap: var(--a4); margin-bottom: var(--a4); }
@@ -286,7 +307,7 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .online-screen:not(.im-spiel) .on-tuer.juwel-karte { gap: 12px; padding: 16px; border-radius: var(--r-xl); }
 .online-screen .on-tuer-kopf { grid-template-columns: 56px minmax(0, 1fr); gap: 14px; align-items: center; }
 .on-tuer[data-ton="gold"] .on-tuer-ueber { color: var(--gold-text); }
-.on-tuer[data-ton="saphir"] .on-tuer-ueber { color: var(--saphir-text); }
+.on-tuer[data-ton="nacht"] .on-tuer-ueber { color: var(--metall-hell); }
 .on-tuer h2 { font-family: var(--display); font-weight: var(--gw-titel); }
 .online-screen:not(.im-spiel) .on-tuer-knopf { min-height: 52px; font-size: 16.5px; }
 .on-tuer[data-ton="gold"] .on-tuer-knopf[data-ton="gold"] { min-height: 56px; font-size: 17.5px; }
@@ -308,24 +329,33 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 .on-freunde-knoepfe .knopf.juwel-knopf { min-height: 48px; padding: 0 10px; font-size: 15px; white-space: nowrap; }
 .on-freunde:not([open]) { margin-bottom: 0; }
 
-/* Weltrangliste rechts: nur quer ab 1100 px (js/ui/online.js zeigeRang laedt sie nur dort) */
+/* Weltrangliste rechts (nur quer ab 1100 px, js/ui/online.js zeigeRang): Podest der ersten drei mit Kopf und Metallring, darunter
+   dein Platz mit Nachbarn; wenig Zahlen, jede Zeile oeffnet die Visitenkarte */
 .on-rang[hidden] { display: none; }
-.on-rang { display: grid; gap: 10px; align-content: start; padding: 16px; }
-.on-rang h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; font-family: var(--display);
-  font-size: 17px; font-weight: var(--gw-titel); }
-.on-rang-liste { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.on-rang-zeile { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 44px;
-  padding: 0 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font: inherit; font-size: 15px; font-weight: 650;
+.on-rang { display: grid; gap: 12px; align-content: start; padding: 16px; }
+.on-rang h2 { margin: 0; font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); }
+.on-podest { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 6px; padding: 6px 0 12px;
+  border-bottom: 1px solid var(--linie); }
+.on-podest-platz { display: grid; justify-items: center; gap: 4px; min-width: 0; padding: 8px 4px 10px; border: 0; border-radius: 16px; background: transparent;
+  color: var(--text); font: inherit; cursor: pointer; transition: background-color var(--d-s) var(--sanft); }
+.on-podest-platz[data-platz="1"] { padding-bottom: 18px; }
+.on-podest-platz .juwel-rang { width: 22px; height: 22px; margin-top: -14px; font-size: 11px; position: relative; }
+.on-podest-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 750; }
+.on-podest-platz b { font-size: 12.5px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.on-podest-platz.ich .on-podest-name, .on-podest-platz.ich b { color: var(--gold-text); }
+@media (hover: hover) { .on-podest-platz:hover { background: var(--flaeche-2); } }
+.on-podest-platz:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.on-rang-liste { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.on-rang-zeile { display: grid; grid-template-columns: 26px auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 48px;
+  padding: 0 10px; border: 0; border-radius: 14px; background: transparent; color: var(--text); font: inherit; font-size: 15px; font-weight: 650;
   text-align: start; cursor: pointer; transition: background-color var(--d-s) var(--sanft); }
 @media (hover: hover) { .on-rang-zeile:hover { background: var(--flaeche-2); } }
 .on-rang-zeile:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .on-rang-zeile b { font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
-.on-rang-zeile .juwel-rang { justify-self: center; }
 .on-rang-platz { justify-self: center; font-size: 13px; color: var(--text-2); font-weight: 700; }
 .on-rang-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.on-rang-zeile.ich { background: var(--metall-weich); box-shadow: inset 0 0 0 1px var(--juwel-kante); font-weight: 800; }
+.on-rang-zeile.ich { background: var(--metall-weich); box-shadow: inset 0 0 0 1px var(--juwel-kante), 0 8px 20px -12px var(--juwel-schein); font-weight: 800; }
 .on-rang-zeile.ich .on-rang-platz, .on-rang-zeile.ich b { color: var(--gold-text); }
-.on-rang-luecke { height: 1px; margin: 6px 12px; background: var(--linie); }
 .on-rang .knopf.juwel-knopf { min-height: 46px; font-size: 15px; }
 @media (min-width: 1100px) and (orientation: landscape) {
   .online-screen:not(.im-spiel) .on-inhalt:has(> .on-rang:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) 320px;
@@ -336,15 +366,16 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 
 /* Handy: Medaille kleiner, die Form unter die Zeile */
 @media (max-width: 759px) {
-  .online-screen .on-liga.on-held { grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; min-height: 96px; padding: 14px 16px; }
-  .on-held .juwel-medaille { --m: 56px; margin: 0 2px; grid-row: span 2; }
+  .online-screen .on-held { grid-template-columns: minmax(0, 1fr); gap: 4px; min-height: 96px; padding: 14px 16px; }
+  .online-screen .on-held .on-liga { gap: 14px; }
+  .on-held .juwel-medaille { --m: 56px; margin: 0 2px; }
   .on-held .on-gross-wert { font-size: 38px; }
   .on-held .on-held-wort { font-size: 25px; }
   .on-held-zeile { font-size: 13px; }
-  .on-form { grid-column: 2; display: flex; align-items: center; gap: 8px; }
+  .on-form { display: flex; align-items: center; justify-self: start; gap: 8px; margin: -6px -10px -8px 64px; }
   .on-form .juwel-stein { min-width: 22px; height: 18px; padding: 0 5px; font-size: 10px; }
   .online-screen:not(.im-spiel) .on-tuer.juwel-karte { padding: 14px; gap: 10px; }
-  .online-screen:not(.im-spiel) .on-tueren, .online-screen .on-liga.on-held, .on-freunde-karte { margin-bottom: var(--a3); }
+  .online-screen:not(.im-spiel) .on-tueren, .online-screen .on-held, .on-freunde-karte { margin-bottom: var(--a3); }
   .on-freunde-karte { padding: 14px; }
   /* die Mittelreihe des R9-Rasters (bis 36 px Luft zwischen den Tueren) bleibt zu: die Schmuck-Karten sind hoeher */
   .on-inhalt > .on-tueren[data-zustand] { grid-template-rows: auto 0 auto; row-gap: 6px; }
@@ -355,6 +386,7 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
 }
 /* Hochformat-Raster (R9 Lobby mittig, oben): die Freunde-Karte steht an der Stelle der Klapp-Zeile, das aufgeklappte Formular darunter */
 @media (orientation: portrait) and (min-height: 740px) {
+  .on-inhalt > .on-held { grid-row: 3; }
   .on-inhalt > .on-freunde-karte { grid-row: 6; margin-bottom: 0; }
   .on-inhalt > .on-freunde { grid-row: 8; }
 }

@@ -73,7 +73,7 @@ function neuerZustand() {
   [['1-0', 'u1'], ['1/2-1/2', 'u1'], ['0-1', 'u2'], ['1-0', 'u2'], ['1-0', 'u1']].forEach(([ergebnis, weiss], i) => {
     const am = iso(Date.now() - (i + 1) * 3600e3);
     z.partien.set('alt-' + i, { id: 'alt-' + i, code: null, weiss, schwarz: weiss === 'u1' ? 'u2' : 'u1', gewertet: true, status: 'beendet',
-      ergebnis, grund: 'matt', zuege: 'e4 e5', bedenkzeit_s: 300, inkrement_s: 3, erstellt_am: am, aktualisiert_am: am });
+      ergebnis, grund: 'matt', zuege: 'e2e4 e7e5 g1f3 b8c6', bedenkzeit_s: 300, inkrement_s: 3, erstellt_am: am, aktualisiert_am: am });
   });
   return z;
 }
@@ -130,7 +130,7 @@ function bediener(z) {
       }
       if (rpc === 'weltrang_liste') {
         const namen = ['Lena', 'Mats', 'Sophie', 'Jonas', 'Ella', 'Tom', 'Mia', 'Ben', 'Lina', 'Paul'];
-        const liste = Array.from({ length: 50 }, (_, i) => ({ rang: i + 1, name: i === 40 ? NAMEN[UID] : namen[i % namen.length], elo: 1980 - i * 18,
+        const liste = Array.from({ length: 50 }, (_, i) => ({ rang: i + 1, name: i === 40 ? NAMEN[UID] : namen[i % namen.length], elo: 1980 - i * 18 - (i >= 40 ? 20 : 0),
           banner: 'start', ich: i === 40 }));
         return antwort({ ab: 15, ab_start: 30, teilnahme: true, ich: { status: 'dabei', rang: 41, elo: liste[40].elo, name: NAMEN[UID], banner: 'start' }, liste });
       }
@@ -219,6 +219,15 @@ async function lauf(browser, [geraet, w, h], [wort, schema, modus]) {
     pruefe(`${gruppe}: Modus ${modus} (Seitengrund ${grund})`, hell === (modus === 'hell'), grund);
     await warte(600);
     await bild('lobby');
+    // R27: Tipp auf die Form zeigt die letzten Partien (Namen aus karte_der_partie)
+    if (await s.locator('.on-held .on-form').isVisible().catch(() => false)) {
+      await s.locator('.on-held .on-form').click();
+      await s.locator('.on-letzte-blatt').waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+      await warte(900);
+      await bild('letzte');
+      await s.locator('.on-letzte-blatt [data-knopf="zu"]').click().catch(() => {});
+      await warte(500);
+    }
     if (NUR_LOBBY) { await k.close().catch(() => {}); return; }
     // 2) Gegnersuche: Ring mit Restzeit, "Jetzt gegen KI", Abbrechen
     await s.locator('[data-online="suchen"]').filter({ visible: true }).first().click();
