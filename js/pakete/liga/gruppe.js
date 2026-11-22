@@ -177,7 +177,8 @@ function buehne(lg) {
   const naechste = naechsteStufe(lg.stufe);
   const zone = lg.platz ? zoneVon(lg.platz, { n: lg.n, stufe: lg.stufe }) : null;
   const zoneText = zone === 'auf' ? T('zone.auf') : zone === 'ab' ? T('zone.ab') : zone ? T('zone.bleib', { stufe: name }) : '';
-  return `<div class="lg-gr-buehne" data-liga="${esc(stufeInfo(lg.stufe).liga)}">
+  // data-platz: nur fuer die Probe-Richtung g2 (css/pakete/liga.css, R27), ohne Schalter ohne Wirkung
+  return `<div class="lg-gr-buehne" data-liga="${esc(stufeInfo(lg.stufe).liga)}"${lg.platz ? ` data-platz="${esc(zahl(lg.platz))}"` : ''}>
     <button type="button" class="lg-alle-ligen lg-gr-wappen-knopf" aria-label="${esc(t('p-liga.season.ligen.oeffnen'))}"><img class="lg-gr-wappen" src="${esc(wappenUrl(lg.stufe))}" alt="" width="64" height="77"></button>
     <div class="lg-gr-titel"><h2>${esc(name)}</h2><p>${lg.platz ? esc(T('platz', { platz: zahl(lg.platz), n: zahl(lg.n) })) : esc(T('leer'))}</p></div>
     ${zone || naechste != null ? `<div class="lg-gr-fuss">

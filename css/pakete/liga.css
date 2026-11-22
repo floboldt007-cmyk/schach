@@ -359,3 +359,98 @@
 .lg-welt-platz-balken { display: block; height: 8px; margin: 0 16px; overflow: hidden; border-radius: 999px; background: var(--flaeche-3); }
 .lg-welt-platz-balken i { display: block; height: 100%; border-radius: inherit;
   background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 60%, var(--flaeche)), var(--gold)); }
+
+/* ---------- R27 Probe "Liga > Gruppe" (22.11.2026, Flo: "das sieht schon billig aus") ----------
+   Drei Richtungen NUR hinter dem Probe-Schalter ?test&design=g1|g2|g3 (html[data-design], js/app.js). Ohne Schalter
+   greift hier keine Regel (Waechter: tests/r27-liga-gruppe.test.mjs). Gold wie die Online-Arena #272 (Metallgold
+   #C9A14A, Text #75561A hell / #DCC07A dunkel), keine Dauerbewegung, kein Schein. Kuehn ist je Richtung genau EINE Stelle:
+   g1 der Brettrand der Platzzahlen, g2 die grosse Metall-Platzzahl, g3 die goldene Aufstiegslinie.
+   Selektoren beginnen mit :root[data-design~="gN"] .lg-gr, damit sie die Modus-Regeln oben (:root[data-modus]) schlagen. */
+:root[data-design~="g1"] .lg-gr .lg-gr-preis-bild > *, :root[data-design~="g2"] .lg-gr .lg-gr-preis-bild > *,
+:root[data-design~="g3"] .lg-gr .lg-gr-preis-bild > * { animation: none; }
+
+/* g1 Brett: die Platzzahlen stehen wie die Koordinaten am Brettrand auf hellen und dunklen Feldern, die Buehne ist der
+   dunkelgruene Rand des Bretts. Sonst ruhig: keine Karte um jede Zeile, nur Linien. */
+:root[data-design~="g1"] .lg-gr { --g-rand: #23352C; --g-auf-rand: #EEF2EC; --g-feld-h: #E3E9E0; --g-feld-d: #C5D1C1; --g-gold: #C9A14A;
+  --g-gold-text: #75561A; --g-text: #1D2420; --g-text-2: #4A564F; --g-flaeche: #FBFCFA; --g-linie: rgba(35, 53, 44, .14); }
+:root[data-design~="g1"][data-modus="dunkel"] .lg-gr { --g-rand: #142019; --g-auf-rand: #E9EEE9; --g-feld-h: #34413A; --g-feld-d: #26302B;
+  --g-gold-text: #DCC07A; --g-text: #E9EEE9; --g-text-2: #AEB9B1; --g-flaeche: #1B221E; --g-linie: rgba(220, 235, 225, .12); }
+@media (prefers-color-scheme: dark) {
+  :root[data-design~="g1"][data-modus="system"] .lg-gr { --g-rand: #142019; --g-auf-rand: #E9EEE9; --g-feld-h: #34413A; --g-feld-d: #26302B;
+    --g-gold-text: #DCC07A; --g-text: #E9EEE9; --g-text-2: #AEB9B1; --g-flaeche: #1B221E; --g-linie: rgba(220, 235, 225, .12); }
+}
+:root[data-design~="g1"] .lg-gr .lg-gr-buehne { border-radius: var(--r-l); background: var(--g-rand); background-image: none; color: var(--g-auf-rand);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g-gold) 55%, transparent); }
+:root[data-design~="g1"] .lg-gr .lg-gr-zone { color: var(--g-auf-rand); border-color: color-mix(in srgb, var(--g-auf-rand) 55%, transparent); }
+:root[data-design~="g1"] .lg-gr .lg-gr-liste { border-radius: var(--r-l); background: var(--g-flaeche); box-shadow: 0 0 0 1px var(--g-linie); }
+:root[data-design~="g1"] .lg-gr .lg-gr-zeile { grid-template-columns: 44px minmax(0, 1fr) auto 44px; padding: 0 12px 0 0; min-height: 60px; }
+:root[data-design~="g1"] .lg-gr .lg-gr-zeile + .lg-gr-zeile { border-top-color: var(--g-linie); }
+:root[data-design~="g1"] .lg-gr .lg-gr-platz, :root[data-design~="g1"] .lg-gr .lg-gr-zeile[data-banner] .lg-gr-platz {
+  align-self: stretch; display: grid; place-items: center; min-width: 0; padding: 0; border-radius: 0; box-shadow: none;
+  background: var(--g-feld-h); color: var(--g-text); font-size: 17px; }
+:root[data-design~="g1"] .lg-gr .lg-gr-zeile:nth-child(even) .lg-gr-platz { background: var(--g-feld-d); }
+:root[data-design~="g1"] .lg-gr .lg-gr-zeile.ich { background: color-mix(in srgb, var(--g-gold) 14%, var(--g-flaeche)); box-shadow: none; }
+:root[data-design~="g1"] .lg-gr .lg-gr-zeile.ich .lg-gr-platz { background: var(--g-gold); color: #1C1B19; }
+:root[data-design~="g1"] .lg-gr .lg-gr-streifen { left: 44px; }
+:root[data-design~="g1"] .lg-gr .lg-gr-abschnitt + .lg-gr-abschnitt { border-top: 2px solid var(--g-rand); }
+:root[data-design~="g1"] .lg-gr .lg-gr-abschnitt h3 { padding-left: 56px; color: var(--g-text-2); }
+:root[data-design~="g1"] .lg-gr .lg-gr-abschnitt[data-zone="auf"] h3 { color: var(--g-gold-text); }
+
+/* g2 Plakette: die Buehne ist eine dunkle Tafel mit Metallkante, darauf die eigene Platzzahl gross in Metallgold neben
+   dem Wappen (Zahl wie #272 von oben hell nach unten tief). Die Liste darunter ganz still, nur die eigene Zeile gerahmt. */
+:root[data-design~="g2"] .lg-gr { --g-nacht: #171B24; --g-auf-nacht: #EEF2FA; --g-auf-nacht-2: rgba(238, 242, 250, .74); --g-metall: #C9A14A;
+  --g-zahl-oben: #F3DEA2; --g-zahl-unten: #C9A14A; --g-kante: rgba(201, 161, 74, .5); --g-weich: rgba(201, 161, 74, .14);
+  --g-gold-text: #75561A; --g-text: #1C1B19; --g-text-2: #5A5650; --g-flaeche: #FFFFFF; --g-linie: rgba(28, 27, 25, .1); }
+:root[data-design~="g2"][data-modus="dunkel"] .lg-gr { --g-nacht: #10131A; --g-gold-text: #DCC07A; --g-text: #EEF0F4; --g-text-2: #A8ADB8;
+  --g-flaeche: #1A1D24; --g-linie: rgba(220, 230, 255, .12); --g-kante: rgba(201, 161, 74, .42); }
+@media (prefers-color-scheme: dark) {
+  :root[data-design~="g2"][data-modus="system"] .lg-gr { --g-nacht: #10131A; --g-gold-text: #DCC07A; --g-text: #EEF0F4; --g-text-2: #A8ADB8;
+    --g-flaeche: #1A1D24; --g-linie: rgba(220, 230, 255, .12); --g-kante: rgba(201, 161, 74, .42); }
+}
+:root[data-design~="g2"] .lg-gr .lg-gr-buehne { grid-template-columns: auto minmax(0, 1fr) auto; padding: 20px; border-radius: var(--r-l);
+  background: var(--g-nacht); background-image: none; color: var(--g-auf-nacht); box-shadow: inset 0 0 0 1px var(--g-kante); }
+:root[data-design~="g2"] .lg-gr .lg-gr-buehne[data-platz]::after { content: attr(data-platz); content: attr(data-platz) / "";
+  grid-column: 3; grid-row: 1; align-self: center; font-family: var(--display); font-weight: 800; font-size: 76px; line-height: .9;
+  font-variant-numeric: tabular-nums; letter-spacing: -.03em; color: var(--g-metall);
+  background: linear-gradient(180deg, var(--g-zahl-oben), var(--g-zahl-unten)); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; }
+:root[data-design~="g2"] .lg-gr .lg-gr-titel p { color: var(--g-auf-nacht-2); opacity: 1; }
+:root[data-design~="g2"] .lg-gr .lg-gr-zone, :root[data-design~="g2"] .lg-gr .lg-gr-zone[data-zone="auf"] { color: var(--g-zahl-oben);
+  border-color: var(--g-kante); }
+:root[data-design~="g2"] .lg-gr .lg-gr-naechste { color: var(--g-auf-nacht-2); opacity: 1; }
+:root[data-design~="g2"] .lg-gr .lg-gr-liste { border-radius: var(--r-l); background: var(--g-flaeche); box-shadow: 0 0 0 1px var(--g-linie); }
+:root[data-design~="g2"] .lg-gr .lg-gr-zeile + .lg-gr-zeile, :root[data-design~="g2"] .lg-gr .lg-gr-abschnitt + .lg-gr-abschnitt { border-top-color: var(--g-linie); }
+:root[data-design~="g2"] .lg-gr .lg-gr-zeile.ich { background: var(--g-weich); box-shadow: inset 0 0 0 1px var(--g-kante); }
+:root[data-design~="g2"] .lg-gr .lg-gr-zeile.ich .lg-gr-platz, :root[data-design~="g2"] .lg-gr .lg-gr-zeile.ich .lg-gr-name b { color: var(--g-gold-text); }
+:root[data-design~="g2"] .lg-gr .lg-gr-zeile.ich .lg-gr-avatar { background: var(--g-metall); color: #1C1B19; }
+:root[data-design~="g2"] .lg-gr .lg-gr-abschnitt h3 { color: var(--g-text-2); }
+:root[data-design~="g2"] .lg-gr .lg-gr-abschnitt[data-zone="auf"] h3 { color: var(--g-gold-text); }
+@media (max-width: 420px) { :root[data-design~="g2"] .lg-gr .lg-gr-buehne[data-platz]::after { font-size: 60px; } }
+
+/* g3 Linien: keine dunkle Buehne, keine Karte. Die Gruppe ist eine offene Tabelle, die von zwei Linien getragen wird: die
+   goldene Aufstiegslinie unter Platz 5 (wer darueber steht, steigt auf) und eine gestrichelte Abstiegslinie. */
+:root[data-design~="g3"] .lg-gr { --g-gold: #C9A14A; --g-gold-text: #75561A; --g-schiefer: #5B6473; --g-text: #1C1B19; --g-text-2: #5C5F66;
+  --g-linie: rgba(28, 27, 25, .1); }
+:root[data-design~="g3"][data-modus="dunkel"] .lg-gr { --g-gold-text: #DCC07A; --g-schiefer: #9AA3B2; --g-text: #EEF0F4; --g-text-2: #A8ADB8;
+  --g-linie: rgba(220, 230, 255, .12); }
+@media (prefers-color-scheme: dark) {
+  :root[data-design~="g3"][data-modus="system"] .lg-gr { --g-gold-text: #DCC07A; --g-schiefer: #9AA3B2; --g-text: #EEF0F4; --g-text-2: #A8ADB8;
+    --g-linie: rgba(220, 230, 255, .12); }
+}
+:root[data-design~="g3"] .lg-gr .lg-gr-buehne { padding: 4px 4px 8px; border-radius: 0; background: none; color: var(--g-text); box-shadow: none; }
+:root[data-design~="g3"] .lg-gr .lg-gr-wappen { width: 52px; }
+:root[data-design~="g3"] .lg-gr .lg-gr-titel p, :root[data-design~="g3"] .lg-gr .lg-gr-naechste { color: var(--g-text-2); opacity: 1; }
+:root[data-design~="g3"] .lg-gr .lg-gr-zone[data-zone="auf"] { color: var(--g-gold-text); }
+:root[data-design~="g3"] .lg-gr .lg-gr-liste { border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+:root[data-design~="g3"] .lg-gr .lg-gr-zeile + .lg-gr-zeile { border-top-color: var(--g-linie); }
+:root[data-design~="g3"] .lg-gr .lg-gr-abschnitt + .lg-gr-abschnitt { border-top: 0; }
+:root[data-design~="g3"] .lg-gr .lg-gr-abschnitt[data-zone="auf"] { border-bottom: 3px solid var(--g-gold); }
+:root[data-design~="g3"] .lg-gr .lg-gr-abschnitt[data-zone="ab"] { border-top: 2px dashed var(--g-schiefer); }
+:root[data-design~="g3"] .lg-gr .lg-gr-abschnitt h3 { padding-left: 4px; color: var(--g-text-2); }
+:root[data-design~="g3"] .lg-gr .lg-gr-abschnitt[data-zone="auf"] h3 { color: var(--g-gold-text); }
+:root[data-design~="g3"] .lg-gr .lg-gr-abschnitt[data-zone="ab"] h3 { color: var(--g-schiefer); }
+:root[data-design~="g3"] .lg-gr .lg-gr-platz { font-size: 20px; color: var(--g-text-2); }
+:root[data-design~="g3"] .lg-gr .lg-gr-abschnitt[data-zone="auf"] .lg-gr-platz { color: var(--g-gold-text); }
+:root[data-design~="g3"] .lg-gr .lg-gr-zeile[data-banner] .lg-gr-platz { background: none; box-shadow: none; }
+:root[data-design~="g3"] .lg-gr .lg-gr-zeile.ich { background: color-mix(in srgb, var(--g-gold) 12%, transparent); box-shadow: none; border-radius: var(--r-m); }
+:root[data-design~="g3"] .lg-gr .lg-gr-zeile.ich .lg-gr-name b { color: var(--g-gold-text); }
