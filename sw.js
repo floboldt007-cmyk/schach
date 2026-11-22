@@ -8,7 +8,7 @@
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
 const VERSION = 384;
-const STAND = '267e2d79b2de';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const STAND = 'f3e4e1ce3e5e';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
