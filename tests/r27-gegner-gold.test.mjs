@@ -79,7 +79,9 @@ try {
         const gold = ['rgb(224, 162, 43)', 'rgb(242, 190, 74)', 'rgb(201, 161, 74)'];
         const golden = [...document.querySelectorAll('button, a, [role="button"]')].filter((e) => e.getClientRects().length
           && getComputedStyle(e).visibility !== 'hidden' && gold.includes(getComputedStyle(e).backgroundColor)).length;
-        return { bg: st.backgroundColor, bild: st.backgroundImage, farbe: st.color, ueber: ueber.color, ring, golden };
+        const r = getComputedStyle(document.documentElement);
+        const tok = ['--metall-hell', '--metall', '--metall-tief', '--auf-gold', '--gold-text'].map((n) => r.getPropertyValue(n).trim().toUpperCase()).join(' ');
+        return { bg: st.backgroundColor, bild: st.backgroundImage, farbe: st.color, ueber: ueber.color, ring, golden, tok };
       });
       pruefe(`${name}: Knopf-Flaeche Metallgold`, k.bg === METALL, k.bg);
       pruefe(`${name}: Knopf-Verlauf von Metall-Hell`, k.bild.includes(METALL_HELL), k.bild);
@@ -87,6 +89,8 @@ try {
       pruefe(`${name}: Ueberschrift in Metall-Hell`, k.ueber === METALL_HELL, k.ueber);
       pruefe(`${name}: Ring ums Portraet Metallgold`, k.ring.includes(METALL), k.ring);
       pruefe(`${name}: genau ein goldener Knopf`, k.golden === 1, k.golden);
+      // Tokens zentral in css/tokens.css, Werte wie #272 (Goldschrift hell #75561A, dunkel #DCC07A)
+      pruefe(`${name}: Metallgold-Tokens wie #272`, k.tok === `#F3DEA2 #C9A14A #8A6A26 #1C1B19 ${schema === 'dark' ? '#DCC07A' : '#75561A'}`, k.tok);
       pruefe(`${name}: keine Seitenfehler`, fehler.length === 0, fehler);
       await kontext.close();
     }

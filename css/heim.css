@@ -63,12 +63,12 @@
 .heim-los:active { transform: scale(.98); }
 .heim-los:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
 /* Gegner-Karte in Metallgold (R27, Flo 22.11.2026: passend zur Online-Arena #272, kein gelbes Gold): Knopf als Verlauf von
-   hell nach mitte mit dunkler Schrift (7,1:1), Ring und Ueberschrift in Metall. Die Tokens stehen in css/themes/modern.css
-   (#272); bis dahin tragen die Rueckfaelle dieselben Werte. Die Buehne ist hell wie dunkel dunkel, darum ueberall gleich. */
-.heim-buehne[data-art="gegner"] .heim-portraet { box-shadow: 0 0 0 3px var(--metall, #C9A14A); }
-.heim-buehne[data-art="gegner"] .heim-ueber { color: var(--metall-hell, #F3DEA2); }
-.heim-buehne[data-art="gegner"] .heim-los { color: var(--auf-gold, #1C1B19); background-color: var(--metall, #C9A14A);
-  background-image: linear-gradient(180deg, var(--metall-hell, #F3DEA2) -10%, var(--metall, #C9A14A) 70%); }
+   hell nach mitte mit dunkler Schrift (7,1:1), Ring und Ueberschrift in Metall. Tokens aus css/tokens.css (Metallgold).
+   Die Buehne ist hell wie dunkel dunkel, darum ueberall gleich. */
+.heim-buehne[data-art="gegner"] .heim-portraet { box-shadow: 0 0 0 3px var(--metall); }
+.heim-buehne[data-art="gegner"] .heim-ueber { color: var(--metall-hell); }
+.heim-buehne[data-art="gegner"] .heim-los { color: var(--auf-gold); background-color: var(--metall);
+  background-image: linear-gradient(180deg, var(--metall-hell) -10%, var(--metall) 70%); }
 
 /* ---------- Als Naechstes ---------- */
 .heim-naechstes h3 { margin: 0 4px var(--a2); font-size: 13.5px; font-weight: 700; color: var(--text-2); }

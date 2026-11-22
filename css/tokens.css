@@ -33,6 +33,18 @@
   :root[data-modus="system"] { color-scheme: dark; }
 }
 
+/* ---------- Metallgold (R27, Flo 21.11.2026: "Gold richtig, kein Gelb"; Design-Buch) ----------
+   Namen und Werte genau wie css/themes/modern.css auf #272 (so/R27-online-arena), dort setzt das Theme sie spaeter
+   nach dieser Datei noch einmal. Hier zentral, damit Startseite (css/heim.css) und Leiste (css/navigation.css) sie ohne
+   feste Hex-Werte nutzen. Nur die Goldschrift wechselt mit dem Modus, alles andere bleibt gleich. */
+:root {
+  --metall-hell: #F3DEA2; --metall: #C9A14A; --metall-tief: #8A6A26; --auf-gold: #1C1B19; --gold-text: #75561A;
+}
+:root[data-modus="dunkel"] { --gold-text: #DCC07A; }
+@media (prefers-color-scheme: dark) {
+  :root[data-modus="system"] { --gold-text: #DCC07A; }
+}
+
 /* ---------- Brettfarben (Flos Einstellung, unabhaengig vom Theme) ----------
    Feldfarben bleiben exakt wie bisher; dazu die Markierungen aus Entwurf A je Brett (--auswahl-kante: die helle
    Innenkante von Auswahl, Vorschau und Zielfeld unter dem Finger, A "Runde 2"). */
