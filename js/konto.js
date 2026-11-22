@@ -45,6 +45,8 @@ export const GELADEN_SCHLUESSEL = 'schach-arena:konto:geladen';
 export const GEPARKT_SCHLUESSEL = 'schach-arena:konto:geparkt:';
 // Tausch-Merker { von, nach }: steht er, ist ein Tausch des Geraets nicht zu Ende gelaufen (Kaltreview a6 B1)
 export const TAUSCH_SCHLUESSEL = 'schach-arena:konto:tausch';
+// Grund, warum eine Anmeldung lokal zurueckgenommen wurde, fuer die Meldung beim ersten Bildschirm (a6 N3, Warnung)
+export const HINWEIS_SCHLUESSEL = 'schach-arena:konto:hinweis';
 // Was beim Kontowechsel auf dem Geraet bleibt: Einstellungen des Geraets (Sprache, Brett, Klang, Namen zu zweit) und
 // die Merker fuer Einfuehrung und Installations-Hinweis
 const GERAET_BLEIBT = /^schach-arena:v1:(einstellungen(?::|$)|hinweis-installieren$|modul:start$)/;
@@ -414,53 +416,88 @@ function legeAufGeraet(stand) {
     return { ok: false, heil };
   }
 }
+// ---------- Tausch des Geraets zwischen zwei Konten (Konto-Trennung R27, Kaltreview a6) ----------
+// Ablauf mit Merker { von, nach, phase }:  Merker 'park' -> parke(von) -> Merker 'geraet' -> Geraet schreiben -> Besitzer = nach
+// -> Park von nach weg -> Merker weg. Ein Abbruch an jeder Stelle ist heilbar (tauschZuEnde):
+//   Besitzer schon nach          -> das Geraet war fertig geschrieben, nur aufraeumen
+//   Phase 'park', Besitzer von   -> das Geraet ist unberuehrt, eine eben geschriebene Park-Kopie faellt weg
+//   Phase 'geraet', Besitzer von -> das Geraet kann ein Teilstand sein, der vollstaendige Park von "von" kommt zurueck
+// INVARIANTE (a6, N3): Parks schreibt nur parke(), und nur in Phase 'park' des eigenen Tauschs, solange das Geraet dem
+// geparkten Konto gehoert und unberuehrt ist. Ein Teilstand entsteht erst in Phase 'geraet', wird also nie geparkt. Ein schon
+// vorhandener Park wird nie ueberschrieben: er wandert unter ':alt' (gibt es den auch, unterbleibt der Tausch).
+const entferne = (...weg) => { try { for (const k of weg) lager().removeItem(k); } catch (e) { /* naechster Start raeumt auf */ } };
+export function tauschOffen() { return !!jsonLies(TAUSCH_SCHLUESSEL); }
+function parke(konto, basis) {
+  const t = jsonLies(TAUSCH_SCHLUESSEL);
+  if (!t || t.phase !== 'park' || t.von !== konto || jsonLies(SYNC_SCHLUESSEL)?.konto !== konto) throw new Error('parke() nur im eigenen Tausch');
+  const schl = GEPARKT_SCHLUESSEL + konto;
+  try {
+    const vorher = lager().getItem(schl);
+    if (vorher !== null) {
+      if (lager().getItem(schl + ':alt') !== null) return false;
+      lager().setItem(schl + ':alt', vorher); lager().removeItem(schl);
+    }
+  } catch (e) { return false; }
+  return jsonSchreib(schl, { datum: new Date().toISOString(), basis: basis || null, stand: lokalerStand() });
+}
 // Kann das Geraet nicht sicher getauscht werden (Speicher voll), wird die Anmeldung des neuen Kontos lokal zurueckgenommen
 // (Kaltreview a6 B4): Es spielt nie auf dem Stand eines anderen weiter, und dessen Stand bleibt unangetastet auf dem Geraet.
+// Der Grund bleibt gemerkt, damit ihn auch ein Start ohne Dialog meldet (kontoHinweis, beim ersten Bildschirm).
+let hinweis = null;
 function nimmAnmeldungZurueck() {
   const s = sitzung();
   meldeLokalAb();
+  hinweis = 'tauschVoll';
+  try { lager().setItem(HINWEIS_SCHLUESSEL, hinweis); } catch (e) { /* im Arbeitsspeicher gemerkt */ }
   if (s?.access_token) anfrage('/auth/v1/logout?scope=local', { methode: 'POST', token: s.access_token }).catch(() => null);
   throw new Error(K('tauschVoll'));
 }
-export function tauschOffen() { return !!jsonLies(TAUSCH_SCHLUESSEL); }
-// Ein Tausch, der nicht zu Ende lief (Seite beim Leeren geschlossen, Kaltreview a6 B1): Ist der Besitzer schon "nach", war das
-// Geraet fertig geschrieben und es bleibt nur Aufraeumen. Sonst ist das Geraet ein Teilstand: dann kommt der vollstaendige Park
-// von "von" zurueck. Ein Teilstand wird nie neu geparkt, sonst ueberschriebe er den guten Park. Liefert true nach dem Zurueckholen.
+// Einmal abholen: Text fuer die Meldung beim ersten Bildschirm oder null
+export function kontoHinweis() {
+  let k = hinweis;
+  try { k = k || lager().getItem(HINWEIS_SCHLUESSEL); lager().removeItem(HINWEIS_SCHLUESSEL); } catch (e) { /* nur Arbeitsspeicher */ }
+  hinweis = null;
+  return k === 'tauschVoll' ? K(k) : null;
+}
+// Liefert true, wenn das Geraet zurueckgeholt wurde (die App muss neu laden); wirft, wenn das Zurueckholen scheitert (der Merker
+// bleibt dann stehen, und solange er steht, parkt und tauscht niemand).
 function tauschZuEnde() {
   const t = jsonLies(TAUSCH_SCHLUESSEL);
   if (!t) return false;
-  const ende = (...weg) => { try { for (const k of weg) lager().removeItem(k); } catch (e) { /* naechster Start raeumt auf */ } };
-  if (typeof t.von !== 'string' || jsonLies(SYNC_SCHLUESSEL)?.konto === t.nach) { ende(GEPARKT_SCHLUESSEL + t.nach, TAUSCH_SCHLUESSEL); return false; }
+  const besitzer = jsonLies(SYNC_SCHLUESSEL)?.konto;
+  if (typeof t.von !== 'string' || typeof t.nach !== 'string') { entferne(TAUSCH_SCHLUESSEL); return false; }
+  if (besitzer === t.nach) { entferne(GEPARKT_SCHLUESSEL + t.nach, TAUSCH_SCHLUESSEL); return false; }
+  if (besitzer !== t.von) { entferne(TAUSCH_SCHLUESSEL); return false; }
+  if (t.phase === 'park') { entferne(GEPARKT_SCHLUESSEL + t.von, TAUSCH_SCHLUESSEL); return false; }
   const park = jsonLies(GEPARKT_SCHLUESSEL + t.von);
-  if (!park || !gueltigerStand(park.stand)) { ende(TAUSCH_SCHLUESSEL); return false; }
-  if (!legeAufGeraet(park.stand).ok) throw new Error(K('cloudLadenFehler'));   // Merker bleibt: der naechste Start versucht es wieder
-  ende(GEPARKT_SCHLUESSEL + t.von, TAUSCH_SCHLUESSEL);
+  if (!park || !gueltigerStand(park.stand)) { entferne(TAUSCH_SCHLUESSEL); return false; }
+  if (!legeAufGeraet(park.stand).ok) throw new Error(K('cloudLadenFehler'));
+  entferne(GEPARKT_SCHLUESSEL + t.von, TAUSCH_SCHLUESSEL);
   andereTabsNeuLaden();
   return true;
 }
-// Den Stand des bisherigen Besitzers parken und den Park von id (sonst einen leeren Spielstand) aufs Geraet legen. Reihenfolge,
-// damit ein Abbruch an jeder Stelle heilbar bleibt: Park von alt, Merker, Geraet schreiben, Besitzer id, Park von id weg, Merker
-// weg. Liefert true, wenn das Geraet getauscht wurde (die App muss danach neu laden).
+// Den Stand des bisherigen Besitzers parken und den Park von id (sonst einen leeren Spielstand) aufs Geraet legen. Liefert true,
+// wenn das Geraet getauscht wurde (die App muss danach neu laden). Bei offenem Merker nie: erst heilen (tauschZuEnde).
 function trenneGeraet(id) {
+  if (tauschOffen()) throw new Error(K('cloudLadenFehler'));
   const alt = jsonLies(SYNC_SCHLUESSEL);
   if (!geraetFremd(id)) return false;
-  const parkAlt = GEPARKT_SCHLUESSEL + alt.konto;
-  if (!jsonSchreib(parkAlt, { datum: new Date().toISOString(), basis: alt.hash || null, stand: lokalerStand() })) nimmAnmeldungZurueck();
-  if (!jsonSchreib(TAUSCH_SCHLUESSEL, { von: alt.konto, nach: id })) { try { lager().removeItem(parkAlt); } catch (e) { /* Kopie */ } nimmAnmeldungZurueck(); }
+  const merker = { von: alt.konto, nach: id };
+  if (!jsonSchreib(TAUSCH_SCHLUESSEL, { ...merker, phase: 'park' })) nimmAnmeldungZurueck();
+  if (!parke(alt.konto, alt.hash)) { entferne(TAUSCH_SCHLUESSEL); nimmAnmeldungZurueck(); }
+  if (!jsonSchreib(TAUSCH_SCHLUESSEL, { ...merker, phase: 'geraet' })) { entferne(GEPARKT_SCHLUESSEL + alt.konto, TAUSCH_SCHLUESSEL); nimmAnmeldungZurueck(); }
   const park = jsonLies(GEPARKT_SCHLUESSEL + id);
   const mitPark = !!park && gueltigerStand(park.stand);
   const r = legeAufGeraet(mitPark ? park.stand : {});
   if (!r.ok) {
-    // Geraet wieder ganz beim alten Besitzer: Merker weg; sonst bleibt er, und der naechste Start holt den Park zurueck
-    if (r.heil) try { lager().removeItem(TAUSCH_SCHLUESSEL); } catch (e) { /* bleibt */ }
+    // Geraet wieder ganz beim alten Besitzer: dessen Park-Kopie und Merker weg; sonst bleibt beides, der naechste Start heilt
+    if (r.heil) entferne(GEPARKT_SCHLUESSEL + alt.konto, TAUSCH_SCHLUESSEL);
     nimmAnmeldungZurueck();
   }
   // Mit Park gilt dessen letzter gemeinsamer Stand als Basis (Weiterspielen vor dem Wechsel zaehlt dann als Geraete-Aenderung).
   // Ohne Park gehoert das leere Geraet jetzt id, noch ohne Abgleich.
-  try {
-    jsonSchreib(SYNC_SCHLUESSEL, { konto: id, hash: mitPark ? park.basis || null : null });
-    lager().removeItem(GEPARKT_SCHLUESSEL + id); lager().removeItem(TAUSCH_SCHLUESSEL);
-  } catch (e) { /* tauschZuEnde raeumt beim naechsten Abgleich auf */ }
+  jsonSchreib(SYNC_SCHLUESSEL, { konto: id, hash: mitPark ? park.basis || null : null });
+  entferne(GEPARKT_SCHLUESSEL + id, TAUSCH_SCHLUESSEL);
   andereTabsNeuLaden();
   return true;
 }
@@ -836,9 +873,13 @@ try { uebernimmLinkSitzung(); kontoFreigeschaltet(); anbieten('einstellungen:gru
 // wurden, koennten den Teilstand im Arbeitsspeicher halten: darum nach dem Heilen einmal neu laden (nur dann, also keine Schleife).
 // N2: Gehoert das Geraet danach (oder ueberhaupt beim Start) einem anderen Konto als dem angemeldeten, wird der Tausch gleich
 // lokal fertig; sonst spielte eine direkt geoeffnete Partie des angemeldeten Kontos auf dem fremden Stand.
+// N3: Scheitert das Heilen, bleibt der Merker stehen; dann parkt und tauscht niemand (trenneGeraet wirft bei offenem Merker).
+// Gehoert das Geraet dann nicht dem Angemeldeten, wird dessen Anmeldung zurueckgenommen: er spielt nie auf fremdem Teilstand.
 {
   let neu = false;
-  try { neu = tauschZuEnde(); } catch (e) { /* Merker bleibt, der Abgleich versucht es wieder */ }
-  try { const id = userId(sitzung()); if (id && trenneGeraet(id)) neu = true; } catch (e) { /* Speicher voll: Anmeldung zurueckgenommen */ }
+  try { neu = tauschZuEnde(); } catch (e) {
+    try { const id = userId(sitzung()); if (id && jsonLies(SYNC_SCHLUESSEL)?.konto !== id) nimmAnmeldungZurueck(); } catch (f) { /* gemerkt */ }
+  }
+  try { const id = userId(sitzung()); if (id && !tauschOffen() && trenneGeraet(id)) neu = true; } catch (e) { /* Speicher voll: Anmeldung zurueckgenommen, Grund gemerkt */ }
   if (neu && globalThis.document) globalThis.location?.reload?.();
 }

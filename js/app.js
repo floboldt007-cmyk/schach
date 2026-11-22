@@ -80,7 +80,7 @@ import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
 import { brettWahl, klangWahl, brettFlaeche } from './labor.js';
 import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderstuecke.js';
-import { sitzung, eigenerName, ladeProfil, userId } from './konto.js';
+import { sitzung, eigenerName, ladeProfil, userId, kontoHinweis } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { pruefeUmzug } from './umzug.js';
 import { wechselNeuLaden, NEU_GELADEN_MERKER } from './sw-wechsel.js';
@@ -1265,6 +1265,8 @@ function ersterStart() {
   pruefeSonderstuecke();
   pruefeName();
   pruefeInstallation();
+  // Konto-Trennung (R27): wurde eine Anmeldung beim Start lokal zurueckgenommen (Speicher voll), sagt es der erste Bildschirm
+  try { const h = kontoHinweis(); if (h) meldung(h, { art: 'fehler', dauer: 9000 }); } catch (e) { /* ohne Konto weiter */ }
   // Umzug auf crownmate.de: schlaeft, bis die neue Adresse die App ausliefert (js/umzug.js). Im Test mit ?test&umzug=alt
   setTimeout(() => {
     pruefeUmzug({ app, test: TEST && new URLSearchParams(location.search).get('umzug') === 'alt' }).catch(() => {});
