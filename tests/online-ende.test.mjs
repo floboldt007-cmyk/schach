@@ -124,6 +124,7 @@ async function bediene(route) {
   if (!uid) return absage(401, 'KRONEN_ANMELDUNG');
   const rpc = url.pathname.split('/').at(-1), p = partien.get(body.partie);
   if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: kronenVon(uid), platz: 3, ziel: 120, n: 30, woche: '2026-11-16' });
+  if (rpc === 'bestaetigte_namen') return antwort([]); // R27 Haken fremder Namen (js/konto.js): hier ohne bestaetigten Namen
   if (rpc === 'online_suche_start') {
     const lauf = sucheLaufende(uid); if (lauf) return antwort({ partie: lauf.id });
     const alt = schlange.get(uid); schlange.set(uid, { zeit: '5+3', seit: alt ? alt.seit : jetzt() });

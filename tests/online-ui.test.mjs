@@ -88,6 +88,7 @@ try {
     if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
     if (rpc === 'online_live_bewertung_frei') return antwort(liveFrei);
+    if (rpc === 'bestaetigte_namen') return antwort([]); // R27 Haken fremder Namen (js/konto.js): hier ohne bestaetigten Namen
     if (rpc === 'online_live_bewertung_nutzen') return antwort(liveFrei.frei ? { ok: true, frei: true, rest: 0, unbegrenzt: liveFrei.unbegrenzt, gebucht: !liveFrei.unbegrenzt }
       : { ok: false, frei: false, rest: 0, unbegrenzt: false, gebucht: false });
     if (rpc === 'online_meine') return antwort([...partien.values()].filter(p => p.status !== 'beendet'));
