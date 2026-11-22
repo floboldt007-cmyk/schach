@@ -59,6 +59,7 @@ async function bild(browser, g, schema, { suche, laufend, datei, partie = false 
   }
   await s.screenshot({ path: path.join(ZIEL, datei) });
   await kontext.close();
+  // INTENTIONAL-SLOP[T4]: die Zeile je Bild ist die Ausgabe des Skripts
   console.log('bild', datei);
 }
 
@@ -69,6 +70,7 @@ let browser = null, fehler = 0;
 try {
   let bereit = false;
   for (let i = 0; i < 60 && !bereit; i++) {
+    // INTENTIONAL-SLOP[F1]: solange der Server startet, schlaegt fetch fehl; nach 60 Versuchen bricht der Lauf mit Meldung ab
     try { const r = await fetch(BASIS); await r.arrayBuffer(); bereit = r.ok; } catch (e) { /* Server startet noch */ }
     if (!bereit) await warte(150);
   }
