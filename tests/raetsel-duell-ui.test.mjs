@@ -20,10 +20,7 @@ import { browserTyp } from './browser.mjs';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
-// RD_FARBE=a|b|c: Probe "Welche Farbe spiele ich?" (R27, nur im Testmodus ?test&rdfarbe=); Bilder bekommen dann den Namen
-// raetsel-duell-farbe-<x>-..., ohne bleibt alles wie bisher und keine Probe darf auftauchen
-const RD_FARBE = /^[abc]$/.test(process.env.RD_FARBE || '') ? process.env.RD_FARBE : '';
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test${RD_FARBE ? '&rdfarbe=' + RD_FARBE : ''}`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : (process.env.BILDER || null);
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -137,6 +134,11 @@ async function seite(browser, { breite, hoehe, schema = 'light', hash = 'raetsel
       const antwort = rpc ? rpc(name, daten) : undefined;
       if (antwort !== undefined) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(antwort) });
       if (name === 'duell_stand' && srv) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(srv.stand()) });
+      // Hinweis 1 (Kaltreview 0b): fertigAbbrechen = so viele Meldungen scheitern am Netz (abgebrochen), fertigKennung = der
+      // Server lehnt mit einer Duell-Kennung ab (PostgREST 400, message DUELL_...)
+      if (name === 'duell_ich_fertig' && srv && srv.fertigAbbrechen > 0) { srv.fertigAbbrechen--; return r.abort('failed'); }
+      if (name === 'duell_ich_fertig' && srv && srv.fertigKennung) return r.fulfill({ status: 400, contentType: 'application/json',
+        body: '{"code":"P0001","message":"DUELL_NICHT_DABEI"}' });
       if (name === 'duell_ich_fertig' && srv && srv.mitFertig) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(srv.fertig()) });
       // altes SQL wie in Supabase: die RPC fehlt, PostgREST antwortet 404 PGRST202
       if (name === 'duell_ich_fertig' && srv && srv.fertigFehlt) return r.fulfill({ status: 404, contentType: 'application/json',
@@ -170,18 +172,18 @@ async function zieh(s, uci) { await tippe(s, uci.slice(0, 2)); await tippe(s, uc
 // textContent: sichtbar ist nur die Zahl, "gelöst" steht fuer Vorleser daneben (Kopf an Kopf, 08.11.2026)
 const geloest = (s, wer) => s.locator(`.rd-seite[data-wer="${wer}"] .rd-geloest`).textContent();
 async function warteBis(s, fn, arg, ms = 6000) { await s.waitForFunction(fn, arg, { timeout: ms }); }
-const bildName = (geraet, schema, teil) => `raetsel-duell-${RD_FARBE ? 'farbe-' + RD_FARBE + '-' : ''}${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-${teil}`;
+const bildName = (geraet, schema, teil) => `raetsel-duell-${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-${teil}`;
 const bilderListe = [];
 async function bild(s, name) {
   if (!BILDER) return;
   const datei = path.join(BILDER, name + '.png');
   await s.screenshot({ path: datei }); bilderListe.push(datei);
 }
-// Farb-Probe (RD_FARBE): da = Zahl der Probe-Elemente, dazu Text, Koenigsbild und ob es zu sehen ist (nicht verborgen,
-// mit Flaeche, im Fenster)
+// "Welche Farbe spiele ich?" (R27, Wahl A + C): Plakette (.rd-farbe) mit Text, Koenigsbild und ob sie zu sehen ist (nicht
+// verborgen, mit Flaeche, im Fenster); dazu die Zahl der Ansagen auf dem Brett (.rd-ansage data-zahl, nur beim Farbwechsel)
+// und die Farbe des eigenen Leistenbilds
 const farbProbe = (s) => s.evaluate(() => {
-  const alle = document.querySelectorAll('.rd-farbe, .rd-farbchip, .rd-ansage');
-  const el = alle[0];
+  const el = document.querySelector('.rd-farbe');
   if (!el) return { da: 0 };
   const r = el.getBoundingClientRect();
   // ueberdeckt: die Probe liegt ueber Zahl oder Uhr der eigenen Leiste (erster Lauf von B: "Du spielst Schwarz1")
@@ -189,14 +191,15 @@ const farbProbe = (s) => s.evaluate(() => {
     const q = z.getBoundingClientRect(); return q.width > 0 && r.left < q.right && q.left < r.right && r.top < q.bottom && q.top < r.bottom;
   }).map((z) => z.className);
   const amzug = document.querySelector('.rd-amzug');
-  return { da: alle.length, text: el.querySelector('.rd-farbe-text')?.textContent || '', bild: el.querySelector('img')?.getAttribute('src') || '',
+  return { da: document.querySelectorAll('.rd-farbe').length, text: el.querySelector('.rd-farbe-text')?.textContent || '',
+    bild: el.querySelector('img')?.getAttribute('src') || '', ansagen: Number(document.querySelector('.rd-ansage')?.dataset.zahl || 0),
+    leiste: document.querySelector('.rd-seite[data-wer="ich"] .rd-av [data-eigen-avatar]')?.dataset.eigenAvatar || '',
     sichtbar: !el.hidden && getComputedStyle(el).visibility !== 'hidden' && r.width > 0 && r.height > 0 && r.bottom <= innerHeight && r.top >= 0,
     ueber, amzugSichtbar: !!amzug && getComputedStyle(amzug).display !== 'none' };
 });
-// erwarteter Text je Richtung: B steht in der schmalen Namensspalte und zeigt nur das Farbwort
-const farbText = (seite) => RD_FARBE === 'b' ? (seite === 'w' ? 'Weiß' : 'Schwarz') : (seite === 'w' ? 'Du spielst Weiß' : 'Du spielst Schwarz');
-const farbeGut = (f, seite) => f.text === farbText(seite) && new RegExp(`/${seite}K\\.svg$`).test(f.bild) && f.sichtbar && f.ueber.length === 0
-  && (RD_FARBE !== 'a' || !f.amzugSichtbar);
+const farbText = (seite) => (seite === 'w' ? 'Du spielst Weiß' : 'Du spielst Schwarz');
+const farbeGut = (f, seite) => f.da === 1 && f.text === farbText(seite) && new RegExp(`/${seite}K\\.svg$`).test(f.bild) && f.sichtbar
+  && f.ueber.length === 0 && !f.amzugSichtbar && f.leiste === seite;
 // Bild am Ende eines Nebenwegs, benannt nach der Gruppe ("Falscher Code" -> raetsel-duell-weg-falscher-code)
 const bildGruppe = (s) => bild(s, 'raetsel-duell-weg-' + gruppe.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
 // B17 (R6 12.11.2026): "Gegner suchen" hat dieselbe Fuellung und Schrift wie ein Hauptknopf (.knopf.primaer, so steht
@@ -376,8 +379,8 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
     pruefe('Laeuft: Raetsel 1, Weiss am Zug, Brett von Weiss aus', await s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.seite === 'w'
       && /1/.test(document.querySelector('.rd-nr').textContent) && /Weiß/.test(document.querySelector('.rd-amzug').textContent)));
     const f1 = await farbProbe(s);
-    if (RD_FARBE) pruefe(`Probe ${RD_FARBE}: "${farbText('w')}" mit weißem König sichtbar, nichts verdeckt, keine doppelte Angabe`, farbeGut(f1, 'w'), f1);
-    else pruefe('ohne Schalter: keine Farb-Probe auf dem Bildschirm', f1.da === 0, f1);
+    pruefe(`Farbe: Plakette "${farbText('w')}" mit weißem König sichtbar, nichts verdeckt, keine doppelte Angabe, Leistenbild weiß`, farbeGut(f1, 'w'), f1);
+    pruefe('Farbe: bei der ersten Aufgabe genau eine Ansage auf dem Brett', f1.ansagen === 1, f1);
     const leer = await leereImSpiel(s);
     console.log(`  ${geraet}: Kopf bis ${leer.kopf} · Spalte ${leer.teile.map((t) => `${t.k} ${t.oben}-${t.unten}`).join(' | ')} · Leiste ${leer.leiste} · Fenster ${leer.fenster}`);
     // Hochkant-Handys: hoechstens 60 px Leere wie die Bot-Partie (tests/partie-hoehe.test.mjs, Kritik R8 LG3/LG5)
@@ -391,9 +394,10 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
     // 2: Schwarz am Zug, das Brett dreht sich
     await warteBis(s, () => document.querySelector('.screen.raetsel-duell').dataset.seite === 'b');
     pruefe('Raetsel 2: Schwarz am Zug, Brett von Schwarz aus', /Schwarz/.test(await s.locator('.rd-amzug').textContent()));
-    if (RD_FARBE) {
+    {
       const f2 = await farbProbe(s);
-      pruefe(`Probe ${RD_FARBE}: bei der neuen Aufgabe "${farbText('b')}" mit schwarzem König, nichts verdeckt`, farbeGut(f2, 'b'), f2);
+      pruefe(`Farbe: beim Wechsel "${farbText('b')}" mit schwarzem König, nichts verdeckt, Leistenbild schwarz`, farbeGut(f2, 'b'), f2);
+      pruefe('Farbe: der Wechsel zu Schwarz bringt die zweite Ansage', f2.ansagen === 2, f2);
       // die Zeile unter dem Brett bleibt einzeilig (eine zweite Zeile schoebe das Brett auf dem Handy nach oben)
       // eine Zeile = Teile, die sich senkrecht ueberlappen (die Plakette ist hoeher als der Text daneben)
       const zeile = await s.evaluate(() => {
@@ -404,8 +408,8 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
         for (const r of h) { if (r.top >= unten - 1) { zeilen++; unten = r.bottom; } else unten = Math.max(unten, r.bottom); }
         return { zeilen, hoehe: Math.round(z.getBoundingClientRect().height) };
       });
-      pruefe(`Probe ${RD_FARBE}: die Zeile unter dem Brett bleibt einzeilig`, zeile.zeilen <= 1, zeile);
-      if (RD_FARBE === 'c') await s.waitForTimeout(400);              // Bild erst nach dem Einblenden der Ansage
+      pruefe('Farbe: die Zeile unter dem Brett bleibt einzeilig', zeile.zeilen <= 1, zeile);
+      await s.waitForTimeout(400);                                     // Bild erst nach dem Einblenden der Ansage
       await bild(s, bildName(geraet, schema, '3b-farbe'));
     }
     await zieh(s, 'b8b1');
@@ -430,6 +434,10 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
 
     // 4: falscher Zug kostet 5 s und fuehrt zum naechsten Raetsel
     await warteBis(s, () => /4/.test(document.querySelector('.rd-nr').textContent));
+    { // Raetsel 3 und 4 sind beide Weiss: die Plakette bleibt, eine Ansage kommt nicht dazu (1 Weiss, 2 Schwarz, 3 wieder Weiss)
+      const f4 = await farbProbe(s);
+      pruefe('Farbe: gleiche Farbe wie zuvor (Raetsel 4), Plakette weiß und keine neue Ansage', farbeGut(f4, 'w') && f4.ansagen === 3, f4);
+    }
     const vorher = await s.evaluate(() => { const [m, x] = document.querySelector('.rd-uhr').textContent.split(':').map(Number); return m * 60 + x; });
     await zieh(s, 'a1a2');
     await warteBis(s, () => document.querySelector('.rd-meldung')?.dataset.art === 'falsch');
@@ -465,6 +473,7 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
         hoch: g.bottom <= b.top + 1 && i.top >= b.bottom - 1, querOk: g.left >= b.right - 1 && i.left >= b.right - 1 && i.top > g.bottom,
         gleichBreit: Math.abs(g.width - i.width) < 1, leisteH: Math.round(g.height),
         zeileSichtbar: z.bottom <= innerHeight + 1 && i.bottom <= innerHeight + 1,
+        unten: { zeile: Math.round(z.bottom), zeileH: Math.round(z.height), ich: Math.round(i.bottom), fenster: innerHeight },
         reiterWeg: !leiste || leiste.hidden || getComputedStyle(leiste).display === 'none' || document.documentElement.dataset.reiter !== 'unten' };
     });
     // iPhone SE (667 hoch) ist knapp hoehenbegrenzt: 373 von 375 px, je Seite 1 px Luft, optisch Rand zu Rand
@@ -836,6 +845,42 @@ async function sofortEnde(browser, { geraet, breite, hoehe, schema, altesSql = f
   } finally { await p.k.close(); }
 }
 
+// Hinweis 1 (Kaltreview 0b, 22.11.2026): scheitert die Fertig-Meldung am Netz, meldet die Seite nach kurzer Pause erneut
+// (sonst gaelte still die alte Wartezeit); lehnt der Server mit einer Duell-Kennung ab, bleibt es bei der einen Meldung
+// (keine Schleife). Netzfehler sind im Browser eine Konsolenzeile, die ist hier erwartet.
+async function fertigWiederholen(browser, stoerung) {
+  gruppe = `Fertig-Meldung ${stoerung}`;
+  const srv = neuerServer({ art: 'freundschaft', vorlaufMs: 300, dauerMs: 5000 });
+  srv.mitFertig = true;
+  if (stoerung === 'netz') srv.fertigAbbrechen = 1; else srv.fertigKennung = true;
+  const p = await seite(browser, { breite: 390, hoehe: 844, schema: 'light', hash: 'raetsel-duell/ABC234', srv,
+    rpc: (name) => (name === 'duell_beitreten' ? (srv.anlegen(), { duell: DUELL }) : undefined) });
+  const fertigAufrufe = () => p.aufrufe.filter((a) => a.name === 'duell_ich_fertig');
+  try {
+    await p.s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"]', { timeout: 30000 });
+    await zieh(p.s, 'a1a8');
+    await warteBis(p.s, () => /^1 /.test(document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent));
+    await p.s.waitForSelector('.screen.raetsel-duell[data-phase="zeit_um"]', { timeout: 15000 });
+    if (stoerung === 'netz') {
+      const bis = Date.now() + 8000;
+      while (fertigAufrufe().length < 2 && Date.now() < bis) await warte(100);
+      await warte(2500);
+      const fa = fertigAufrufe();
+      const m = await p.s.evaluate(() => document.querySelector('.rd-meldung')?.textContent || '');
+      pruefe('Fertig-Meldung: erste scheitert am Netz, die Seite meldet erneut, genau eine Wiederholung, dann das eigene Ergebnis',
+        fa.length === 2 && fa[1].um - fa[0].um >= 1000 && /1 gelöst/.test(m), { n: fa.length, abstand: fa.length > 1 ? fa[1].um - fa[0].um : null, m });
+    } else {
+      await warte(4000);
+      const fa = fertigAufrufe();
+      const phase = await p.s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.phase);
+      pruefe('Fertig-Meldung: Ablehnung mit Duell-Kennung wird nicht wiederholt (keine Schleife), die Seite wartet wie bisher',
+        fa.length === 1 && phase === 'zeit_um', { n: fa.length, phase });
+    }
+    const echte = p.fehlerListe.filter((f) => !/status of 400|ERR_FAILED|Failed to load/.test(f));
+    pruefe('Keine Seitenfehler', echte.length === 0, echte.join(' | '));
+  } finally { await p.k.close(); }
+}
+
 const NUR = (process.argv.find((a) => a.startsWith('--nur=')) || '').slice(6) || null;
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
@@ -857,10 +902,7 @@ try {
   ];
   if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'light' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' });
-  if (RD_FARBE) {
-    // Farb-Probe: nur die Geraete der Auswahlseite (iPhone 13, iPad quer, PC), ohne Nebenwege
-    for (const l of laeufe.filter((x) => ['iphone', 'ipad-quer', 'pc-1440'].includes(x.geraet))) await duellGegenKi(browser, l);
-  } else {
+  {
     if (!NUR) {
       for (const l of laeufe) await duellGegenKi(browser, l);
       await nebenwege(browser);
@@ -871,6 +913,8 @@ try {
       for (const l of [{ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'light' }, { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'dark' },
         { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'light' }]) await sofortEnde(browser, l);
       await sofortEnde(browser, { geraet: 'iphone', breite: 390, hoehe: 844, schema: 'light', altesSql: true });
+      await fertigWiederholen(browser, 'netz');
+      await fertigWiederholen(browser, 'kennung');
     }
   }
 } catch (e) {

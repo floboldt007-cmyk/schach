@@ -39,16 +39,11 @@ const D = (k, w) => t('p-duell.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const WURZEL = new URL('../../', import.meta.url);
 const testZahl = (n, std) => (typeof window !== 'undefined' && Number.isFinite(window[n]) ? window[n] : std);
-// Probe "Welche Farbe spiele ich?" (R27, Flo 22.11.2026: "Man weiss oft nicht, welche Farbe man spielt, das verwirrt"):
-// drei Richtungen nur im Testmodus, ?test&rdfarbe=a|b|c. A: Plakette in der Zeile unter dem Brett, B: Farbe an der eigenen
-// Leiste, C: Ansage gross auf dem Brett bei jeder neuen Aufgabe. Flo waehlt auf der Auswahlseite (R19-Auswahl/
-// raetsel-farbe-r27); ohne Schalter gibt es keine Probe im Dokument. Alle Platz in vorhandenen Flaechen: eine neue Zeile
-// liesse das Brett auf dem Handy schrumpfen (--rd-reserve).
-const RD_FARBE = (() => {
-  try { const q = new URLSearchParams(globalThis.location?.search || ''); const v = q.get('rdfarbe') || ''; return q.has('test') && /^[abc]$/.test(v) ? v : ''; }
-  catch (e) { return ''; }
-})();
-const farbeHtml = (klasse) => `<span class="${klasse}"><img class="rd-farbe-bild" alt="" width="40" height="40"><span class="rd-farbe-text"></span></span>`;
+// "Welche Farbe spiele ich?" (R27, Flo 22.11.2026: "Man weiss oft nicht, welche Farbe man spielt, das verwirrt"; Wahl
+// A + C, B entfaellt): A die Plakette in der Zeile unter dem Brett, immer; C die grosse Ansage auf dem Brett, nur wenn die
+// Farbe wechselt (und bei der ersten Aufgabe). Beides in vorhandenen Flaechen: eine neue Zeile liesse das Brett auf dem
+// Handy schrumpfen (--rd-reserve).
+const farbeHtml = (klasse, extra = '') => `<span class="${klasse}"${extra}><img class="rd-farbe-bild" alt="" width="40" height="40"><span class="rd-farbe-text"></span></span>`;
 const RING = 2 * Math.PI * 44;
 const DAUER_MS = KONST.DAUER_S * 1000;
 
@@ -102,7 +97,6 @@ const ringSvg = (klasse) => `<svg class="${klasse}" viewBox="0 0 100 100" aria-h
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen raetsel-duell';
-  if (RD_FARBE) s.dataset.rdfarbe = RD_FARBE;
   s.setAttribute('aria-label', D('name'));
   root.append(s);
   let weg = false;
@@ -284,7 +278,7 @@ export function zeige(root, params, app) {
     const bild = ich ? floAvatar('w') : '<span class="rd-frage">?</span>';
     return `<div class="spieler ${ich ? 'ich' : 'gegner'} rd-seite" data-wer="${wer}" role="group">
       <span class="av rd-av" aria-hidden="true">${bild}</span>
-      <span class="rd-info"><span class="rd-name"></span>${ich && RD_FARBE === 'b' ? farbeHtml('rd-farbchip') : ''}<small class="rd-fehlerzahl"></small></span>
+      <span class="rd-info"><span class="rd-name"></span><small class="rd-fehlerzahl"></small></span>
       <b class="rd-geloest zahl"></b>${ich ? `<span class="rd-uhr zahl" role="timer" aria-live="off">${uhrText(DAUER_MS)}</span>` : ''}
       <span class="rd-balken" aria-hidden="true"><i></i></span></div>`;
   }
@@ -295,14 +289,14 @@ export function zeige(root, params, app) {
     const alt = ladeLauf();
     const reihe = alt && alt.id === id ? alt.reihe : [];
     Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe, gesehen: false,
-      gemeldet: false });
+      gemeldet: false, meldenAb: 0 });
     merkeLauf(id, reihe);
     phase('vorlauf');
     rumpf.innerHTML = `<div class="rd-spiel">
         ${seiteHtml('gegner')}
-        <div class="rd-brettzone"><div class="brett-rahmen rd-rahmen"><div class="rd-brett" aria-label="${esc(D('brett'))}"></div></div>${RD_FARBE === 'c' ? farbeHtml('rd-ansage') : ''}</div>
+        <div class="rd-brettzone"><div class="brett-rahmen rd-rahmen"><div class="rd-brett" aria-label="${esc(D('brett'))}"></div></div>${farbeHtml('rd-ansage', ' hidden')}</div>
         ${seiteHtml('ich')}
-        <p class="rd-zeile" role="status">${RD_FARBE === 'a' ? farbeHtml('rd-farbe') : ''}<span class="rd-nr"></span><span class="rd-amzug"></span><span class="rd-meldung"></span></p>
+        <p class="rd-zeile" role="status">${farbeHtml('rd-farbe')}<span class="rd-nr"></span><span class="rd-amzug"></span><span class="rd-meldung"></span></p>
         <div class="rd-reihe-ort">${reiheHtml()}</div>
       </div>`;
     brett = new Brett(rumpf.querySelector('.rd-brett'), {
@@ -376,14 +370,15 @@ export function zeige(root, params, app) {
       if (p === 'vorlauf') zeigeMeldung('', D('vorlauf'));
     }
     // R27 Sofort-Ende: ist die eigene Runde vorbei und kein Zug mehr unterwegs, einmal dem Server melden
-    if (p === 'zeit_um' && !d.wartet && !d.gemeldet) meldeFertig();
+    if (p === 'zeit_um' && !d.wartet && !d.gemeldet && !(d.meldenAb > Date.now())) meldeFertig();
     tickGegner(p);
     spaeter(tick, 250);
   }
 
   // R27 Sofort-Ende (raetsel-duell-ki-sofort-schema.sql, duell_ich_fertig): danach nimmt der Server keinen eigenen Zug
   // mehr an und wertet aus, sobald auch der Gegner fertig ist. Altes SQL ohne die RPC (null oder Fehler): nichts aendert
-  // sich, die Seite wartet wie bisher, bis der Server das Duell nach der Uhr beendet.
+  // sich, die Seite wartet wie bisher, bis der Server das Duell nach der Uhr beendet. Scheitert die Meldung nur
+  // voruebergehend (e.nochmal: Netz, Server), meldet der Takt nach 2 s erneut; eine Duell-Kennung ist endgueltig.
   function meldeFertig() {
     d.gemeldet = true;
     const id = d.id;
@@ -394,7 +389,11 @@ export function zeige(root, params, app) {
       if (st.status === 'beendet' || st.status === 'abgebrochen') { zeigeEnde(st); return; }
       zeichneLeiste();
       zeigeWarten();
-    }, () => { /* wie bisher weiter */ });
+    }, (e) => {
+      if (weg || d.id !== id || !e?.nochmal) return;              // Kennung oder anderes Duell: wie bisher weiter
+      d.meldenAb = Date.now() + 2000;
+      d.gemeldet = false;
+    });
   }
 
   // Nur wenn der Server mich als fertig fuehrt (neues SQL) und ein Mensch noch spielt: das eigene Ergebnis in der Zeile
@@ -462,21 +461,26 @@ export function zeige(root, params, app) {
     if (text && tempo() > 0) anim(el, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { d: 280, k: 'weich' });
   }
 
-  // Probe RD_FARBE: Text und Koenig der eigenen Farbe (aus dem gewaehlten Figurensatz); C zeigt die Ansage bei jeder neuen
-  // Aufgabe kurz auf dem Brett (bei "Bewegung aus" ohne Bewegung, nur kurz stehend), danach bleibt die Zeile
+  // Text und Koenig der eigenen Farbe (aus dem gewaehlten Figurensatz) auf Plakette und Ansage, dazu das eigene Leistenbild
+  // in dieser Farbe (vorher immer der weisse Koenig, auch bei Schwarz). Die Ansage kommt nur bei einem Farbwechsel kurz aufs
+  // Brett (bei "Bewegung aus" ohne Bewegung, nur kurz stehend); die zuletzt gezeigte Farbe steht an ihr selbst (data-seite),
+  // ein neues Duell baut sie frisch, die erste Aufgabe zaehlt also als Wechsel. data-zahl zaehlt die Ansagen (Test).
   let ansageUhr = null;
-  function zeigeFarbe(seite, neu) {
+  function zeigeFarbe(seite) {
+    const ansage = rumpf.querySelector('.rd-ansage');
+    const wechsel = !!ansage && ansage.dataset.seite !== seite;
     const bild = new URL(figurenPfad(brettEinst) + seite + 'K.svg', WURZEL).href;
-    for (const el of rumpf.querySelectorAll('.rd-farbe, .rd-farbchip, .rd-ansage')) {
+    for (const el of rumpf.querySelectorAll('.rd-farbe, .rd-ansage')) {
       el.dataset.seite = seite;
-      // B sitzt in der schmalen Namensspalte (iPhone gut 110 px): dort nur das Farbwort neben dem Koenig
-      el.querySelector('.rd-farbe-text').textContent = D((el.classList.contains('rd-farbchip') ? 'farbe.kurz.' : 'farbe.') + seite);
+      el.querySelector('.rd-farbe-text').textContent = D('farbe.' + seite);
       const img = el.querySelector('img');
       if (img.getAttribute('src') !== bild) img.setAttribute('src', bild);
     }
-    const ansage = rumpf.querySelector('.rd-ansage');
-    if (!ansage || !neu) return;
+    const av = rumpf.querySelector('.rd-seite.ich .rd-av');
+    if (av && av.querySelector('[data-eigen-avatar]')?.dataset.eigenAvatar !== seite) av.innerHTML = floAvatar(seite);
+    if (!wechsel) return;
     clearTimeout(ansageUhr);
+    ansage.dataset.zahl = String(Number(ansage.dataset.zahl || 0) + 1);
     ansage.hidden = false;
     if (tempo() > 0) anim(ansage, [{ opacity: 0, transform: 'translate(-50%, -50%) scale(.92)' }, { opacity: 1, transform: 'translate(-50%, -50%)' }], { d: 260, k: 'weich' });
     ansageUhr = setTimeout(() => { ansage.hidden = true; }, 1400);
@@ -505,7 +509,7 @@ export function zeige(root, params, app) {
     // die Farbe des Spielers steht je Aufgabe fest (am Zug in der Ausgangsstellung), nicht der Zug von gerade eben
     rumpf.querySelector('.rd-amzug').textContent = D('amzug.' + lage.seite);
     s.dataset.seite = lage.seite;
-    if (RD_FARBE) zeigeFarbe(lage.seite, anderes);
+    zeigeFarbe(lage.seite);
     if (anderes && tempo() > 0) anim(rumpf.querySelector('.rd-brettzone'), [{ opacity: 0.4, transform: 'translateX(18px)' }, { opacity: 1, transform: 'none' }], { d: 300, k: 'gleiten' });
   }
 
