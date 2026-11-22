@@ -23,6 +23,7 @@ import { sanAnzeige, materialBilanz } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet, bestaetigteNamen, hatHaken, hakenHtml } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
+import { vorzugZiele as vorzugZieleVon, merkeVorzug as merkeInKette, naechsterVorzug } from '../vorzug.js';
 import { fremdeKarte, eigeneKarte, bannerUrl, fremderAvatar } from './visitenkarte.js';
 import { zeigeGegnerProfil, profilText } from './gegner-profil.js';
 import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
@@ -125,6 +126,11 @@ export function zeige(root, params, app) {
   let strittigFaellig = false;
   let profil = null, uhrTimer = null, zeitPruefung = 0, fremdPruefung = 0;
   let kartenDaten = null, kartenPartie = null;
+  // R28 (Flo 22.11.2026 mit Opa: "kein Bild" beim Gegner): eine gescheiterte Karte wird nachgeholt, hoechstens KARTE_NACH.length mal
+  let kartenVersuch = 0, kartenVersuchFuer = null, kartenUhr = null;
+  const KARTE_NACH = [1500, 4000, 10000];
+  // R28 Vorzuege (Flo 22.11.2026 "Premoves gehen?"): wie in der Bot-Partie (js/vorzug.js), nur lokal, nie an den Server
+  const vorzuege = [];
   // introGelaufen: Duell-Intro dieser Ansicht schon entschieden; neuerGeprueft: Partie, fuer die nach einer neueren gefragt wurde
   let introGelaufen = false, introUhr = null, neuerGeprueft = null, layoutRo = null, layoutBild = 0;
   // R19: wann diese Ansicht den jetzigen letzter_zug_am zuerst sah (Schranke fuer die Erstzug-Frist)
@@ -163,7 +169,8 @@ export function zeige(root, params, app) {
     netzStand();
     // Blaettern aendert nichts an der Partie und bleibt auch waehrend einer Server-Antwort frei
     zeigeZugNav();
-    brett?.erlaubeZuege(!busy && !blockiert && !widerspruch && online.binAmZug(p) ? zielKarte(chess, { turmRochade: app.einstellungen().turmRochade === true }) : null);
+    brett?.erlaubeZuege(!busy && !blockiert && !widerspruch && online.binAmZug(p) ? zielKarte(chess, { turmRochade: app.einstellungen().turmRochade === true })
+      : kannVormerken() ? vorzugZiele() : null);
   }
   async function aktion(fn, danach = uebernehme, beiFehler = fehler) {
     if (busy || weg || blockiert) return;
@@ -233,7 +240,7 @@ export function zeige(root, params, app) {
           karteDerPartie(neu.id).then((d) => { if (d && !weg) kartenDaten = d; }).catch(() => {}).finally(() => { if (!weg) zurAnalyse(); });
         }
         if (!blockiert && neu.status !== 'beendet') beobachter = online.beobachte(neu.id, {
-          seit: neu.aktualisiert_am,
+          seit: neu.aktualisiert_am, partie: neu,
           beiAenderung: stand => { if (busy) wartend = stand; else uebernehme(stand); },
           beiFehler: e => { fehler(e); if (e.abgemeldet) { blockiert = true; sperre(); } },
         });
@@ -559,6 +566,7 @@ export function zeige(root, params, app) {
   function uebernehme(neu) {
     if (weg || blockiert) return;
     if (p && (neu.id !== p.id || neu.aktualisiert_am < p.aktualisiert_am)) return;
+    beobachter?.kenne?.(neu); // R28: nach dem eigenen Zug sofort im kurzen Takt auf die Antwort warten
     let r;
     try { r = nachspielen(neu); } catch (e) {
       blockiert = true; beobachter?.stop();
@@ -615,6 +623,9 @@ export function zeige(root, params, app) {
     }
     sperre();
     meldeStrittigVonSelbst();
+    // R28: ist jetzt der eigene Zug dran, laeuft der erste Vorzug; erst nach dem laufenden Ereignis (aktion setzt im
+    // finally die Stellung noch einmal aus dem Serverstand), damit der Zug nicht zwischen Ziehen und Senden verloren geht
+    if (vorzuege.length) queueMicrotask(fuehreVorzugAus);
   }
   // Brett mit dem eigenen Figurensatz (figurenPfad(e) wie alle anderen Ansichten; Befund 4 vom 11.11.: ohne
   // Einstellungen). Aendert sich der Satz waehrend der Partie (Erfinder-Status kommt erst nach dem Aufbau vom Server,
@@ -663,7 +674,7 @@ export function zeige(root, params, app) {
     const e = app.einstellungen();
     brett?.zerstoere();
     gebautMit = brettStil(e);
-    brett = new Brett(inhalt.querySelector('.on-brett'), { beiZug, figurenPfad: skinPfad(e), figurenPfadJe: fremdePfade(e),
+    brett = new Brett(inhalt.querySelector('.on-brett'), { beiZug, beiLeer: () => { if (vorzuege.length) loescheVorzuege(); }, figurenPfad: skinPfad(e), figurenPfadJe: fremdePfade(e),
       koordinaten: e.koordinaten !== false, koordLage: e.koordLage, autoDame: e.autoDame !== false, turmRochade: e.turmRochade === true,
       steuerung: e.steuerung, pfeile: e.pfeile !== false });
     brett.setzeAusrichtung(online.meineFarbe(p)); brett.setzeDauer(300);
@@ -1133,8 +1144,15 @@ export function zeige(root, params, app) {
       kartenPartie = p.id;
       kartenDaten = null;
       const id = p.id;
+      clearTimeout(kartenUhr); kartenUhr = null;
+      if (kartenVersuchFuer !== id) { kartenVersuchFuer = id; kartenVersuch = 0; }
       karteDerPartie(id, { frist: 8000 }).then((d) => {
-        if (!d || weg || !p || p.id !== id) return;
+        if (weg || !p || p.id !== id) return;
+        if (!d) {
+          // gescheitert (Netz, Serverfehler, Frist): spaeter neu fragen, statt die ganze Partie mit Platzhalter zu bleiben
+          if (kartenVersuch < KARTE_NACH.length) kartenUhr = setTimeout(() => { kartenUhr = null; if (!weg && p && p.id === id && !kartenDaten) { kartenPartie = null; karten(); } }, KARTE_NACH[kartenVersuch++]);
+          return;
+        }
         // Name des Gegners auch in der Zeile "<Name> beginnt" (R19)
         kartenDaten = d; karten(); zeichneZugZeile(); intro();
         // gruener Haken (supabase/benutzername-bestaetigt-schema.sql): einmal fragen, dann die Leisten neu zeichnen
@@ -1308,6 +1326,9 @@ export function zeige(root, params, app) {
     if (!brett || weg || blockiert) return;
     const verlauf = chess.history({ verbose: true }), m = verlauf[verlauf.length - 1];
     brett.setzeStellung(chess.fen(), { letzterZug: m ? [m.from, m.to] : null, schach: chess.inCheck() ? true : null });
+    // Ende, Widerspruch oder Schalter aus: die Kette faellt weg (sonst bleibt sie fuer den eigenen Zug stehen)
+    if (vorzuege.length && (p.status !== 'laeuft' || widerspruch || app.einstellungen().vorzuege === false)) loescheVorzuege(false);
+    if (vorzuege.length) { brett.zeigeVorzuege(vorzuege); zeigeVorzugMarken(); }
     karten();
     zeichneGeschlagen();
     zeichneZugZeile();
@@ -1353,11 +1374,67 @@ export function zeige(root, params, app) {
     const grund = p.grund === 'abgebrochen' && p.weiss && p.schwarz ? O('abgebrochen') : GRUND[p.grund] || O('fertig');
     return [titel, grund];
   }
+  // ---------- R28 Vorzuege ----------
+  // Vormerken geht, solange die Partie laeuft und in der eigenen Stellung (chess, auch waehrend der eigene Zug noch
+  // unterwegs ist) der Gegner dran ist. Die Zielkarte gilt auf der gedachten Stellung des Bretts; ob ein Vorzug gilt,
+  // entscheidet erst die echte Stellung, wenn der eigene Zug dran ist.
+  function kannVormerken() {
+    return !!brett && !!p && !!chess && !weg && !blockiert && !widerspruch && p.status === 'laeuft'
+      && app.einstellungen().vorzuege !== false && chess.turn() !== online.meineFarbe(p) && !chess.isGameOver();
+  }
+  function vorzugZiele() { return vorzugZieleVon((f) => brett.figurAuf(f), online.meineFarbe(p)); }
+  function zeigeVorzugMarken() {
+    brett.markiere(vorzuege.map((v) => v.von), 'vorzug-start');
+    brett.markiere(vorzuege.map((v) => v.nach), 'vorzug-ziel');
+    brett.nummern(vorzuege.map((v, i) => ({ feld: v.nach, text: i + 1 })));
+  }
+  function wischeVorzugMarken() {
+    if (!brett) return;
+    brett.markiere(null, 'vorzug-start'); brett.markiere(null, 'vorzug-ziel'); brett.nummern([]);
+  }
+  // neu zeichnen: die echte Stellung zurueck aufs Brett (false: der Aufrufer zeichnet gerade selbst)
+  function loescheVorzuege(neuZeichnen = true) {
+    const hatte = vorzuege.length > 0;
+    vorzuege.length = 0;
+    wischeVorzugMarken();
+    if (hatte && neuZeichnen && brett && chess && !weg) {
+      const verlauf = chess.history({ verbose: true }), m = verlauf[verlauf.length - 1];
+      brett.setzeStellung(chess.fen(), { animieren: false, letzterZug: m ? [m.from, m.to] : null, schach: chess.inCheck() ? true : null });
+      sperre();
+    }
+  }
+  function merkeVorzug(von, nach, umwandlung) {
+    if (!merkeInKette(vorzuege, von, nach, umwandlung)) { ton('zurueck'); return false; }
+    zeigeVorzugMarken();
+    ton('klick');
+    brett.erlaubeZuege(vorzugZiele());
+    return true;
+  }
+  function fuehreVorzugAus() {
+    if (!vorzuege.length || weg || busy || blockiert || widerspruch || !p || p.status !== 'laeuft' || !online.binAmZug(p)
+      || chess.turn() !== online.meineFarbe(p)) return false;
+    const fenVorher = chess.fen();
+    const r = naechsterVorzug(vorzuege, chess);
+    // Der Gegner hat etwas geaendert: dieser Vorzug und alle danach fallen leise weg (kein Fehlertext, wie gegen den Bot)
+    // naechsterVorzug hat den ersten schon herausgenommen: die echte Stellung IMMER neu zeichnen (sonst bliebe beim letzten
+    // Vorzug die gedachte Figur stehen)
+    if (!r || r.verworfen) { vorzuege.length = 0; wischeVorzugMarken(); zeichne(); sperre(); ton('zurueck'); return false; }
+    wischeVorzugMarken();
+    zieheEigenen(r.zug, fenVorher);
+    return true;
+  }
   function beiZug(von, nach, umwandlung) {
-    if (busy || blockiert || widerspruch || weg || !online.binAmZug(p)) return false;
+    if (weg) return false;
+    if (kannVormerken()) return merkeVorzug(von, nach, umwandlung);
+    if (busy || blockiert || widerspruch || !online.binAmZug(p)) return false;
     let m;
     const fenVorher = chess.fen();
     try { m = chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { return false; }
+    zieheEigenen(m, fenVorher);
+    return true;
+  }
+  // der Zug steht schon in chess: bewerten, klingen, zeichnen, an den Server
+  function zieheEigenen(m, fenVorher) {
     // R26 (altes Tablet): Bewertung, Klang und Zeichnen duerfen den Zug nie aufhalten; er steht schon in chess und muss
     // an den Server, sonst nimmt das Brett ihn zurueck oder die naechste Abfrage setzt ihn zurueck
     try { bewerteLive(fenVorher, m); } catch (e) { console.error(e); }
@@ -1372,9 +1449,8 @@ export function zeige(root, params, app) {
       try { zeichne(); } catch (e) { console.error(e); }
       aktion(() => online.sendeZug(p.id, daten));
     });
-    // Sofort sperren, damit auch im selben Ereignis kein zweiter Zug durchkommt.
+    // Sofort sperren, damit auch im selben Ereignis kein zweiter Zug durchkommt (Vorzuege gibt sperre() danach frei).
     brett.erlaubeZuege(null);
-    return true;
   }
   s.addEventListener('submit', e => {
     const form = e.target.closest('form[data-form]'); if (!form) return; e.preventDefault();
@@ -1461,7 +1537,7 @@ export function zeige(root, params, app) {
   });
   if (app.test) window.__online = { partie: () => p, chess: () => chess, brett: () => brett, blockiert: () => blockiert, widerspruch: () => widerspruch, busy: () => busy, rest };
   start();
-  return { verlasse() { weg = true; mattOrt?.verlasse(); live?.stop(); clearInterval(restUhr); clearTimeout(introUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
+  return { verlasse() { weg = true; mattOrt?.verlasse(); live?.stop(); clearInterval(restUhr); clearTimeout(introUhr); clearTimeout(kartenUhr); layoutRo?.disconnect(); cancelAnimationFrame(layoutBild);
     window.removeEventListener('online', netzStand); window.removeEventListener('offline', netzStand);
     window.removeEventListener('schach:einstellungen', beiEinstellungen); document.removeEventListener('keydown', zugTasten); schliesseAnsicht(); if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
 }
