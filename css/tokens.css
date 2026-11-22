@@ -455,3 +455,34 @@ html[data-bewegung="aus"] *, html[data-bewegung="aus"] *::before, html[data-bewe
 :where(html[data-bewegung="aus"]) *, :where(html[data-bewegung="aus"]) *::before, :where(html[data-bewegung="aus"]) *::after {
   transition-property: none;
 }
+
+/* ---------- R27 Probe "Liga > Gruppe" (22.11.2026): Farben der Richtungen g1/g2/g3 ----------
+   Nur hinter dem Probe-Schalter ?test&design=gN (html[data-design], js/app.js); die Regeln dazu stehen in
+   css/pakete/liga.css (dort nur var(), tests/liga.test.mjs). Metallgold wie #272. Nach Flos Wahl bleibt nur die gewaehlte. */
+:root[data-design~="g1"] .lg-gr, :root[data-design~="g2"] .lg-gr, :root[data-design~="g3"] .lg-gr {
+  --gold: #C9A14A; --gold-weich: rgba(201, 161, 74, .16); }
+:root[data-design~="g1"] .lg-gr { --g-auf-gold: #1C1B19; --g-rand: #23352C; --g-auf-rand: #EEF2EC; --g-feld-h: #E3E9E0; --g-feld-d: #C5D1C1; --g-gold: #C9A14A;
+  --g-gold-text: #75561A; --g-text: #1D2420; --g-text-2: #4A564F; --g-flaeche: #FBFCFA; --g-linie: rgba(35, 53, 44, .14); }
+:root[data-design~="g1"][data-modus="dunkel"] .lg-gr { --g-rand: #142019; --g-auf-rand: #E9EEE9; --g-feld-h: #34413A; --g-feld-d: #26302B;
+  --g-gold-text: #DCC07A; --g-text: #E9EEE9; --g-text-2: #AEB9B1; --g-flaeche: #1B221E; --g-linie: rgba(220, 235, 225, .12); }
+@media (prefers-color-scheme: dark) {
+  :root[data-design~="g1"][data-modus="system"] .lg-gr { --g-rand: #142019; --g-auf-rand: #E9EEE9; --g-feld-h: #34413A; --g-feld-d: #26302B;
+    --g-gold-text: #DCC07A; --g-text: #E9EEE9; --g-text-2: #AEB9B1; --g-flaeche: #1B221E; --g-linie: rgba(220, 235, 225, .12); }
+}
+:root[data-design~="g2"] .lg-gr { --g-auf-gold: #1C1B19; --g-nacht: #171B24; --g-auf-nacht: #EEF2FA; --g-auf-nacht-2: rgba(238, 242, 250, .74); --g-metall: #C9A14A;
+  --g-zahl-oben: #F3DEA2; --g-zahl-unten: #C9A14A; --g-kante: rgba(201, 161, 74, .5); --g-weich: rgba(201, 161, 74, .14);
+  --g-gold-text: #75561A; --g-text: #1C1B19; --g-text-2: #5A5650; --g-flaeche: #FFFFFF; --g-linie: rgba(28, 27, 25, .1); }
+:root[data-design~="g2"][data-modus="dunkel"] .lg-gr { --g-nacht: #10131A; --g-gold-text: #DCC07A; --g-text: #EEF0F4; --g-text-2: #A8ADB8;
+  --g-flaeche: #1A1D24; --g-linie: rgba(220, 230, 255, .12); --g-kante: rgba(201, 161, 74, .42); }
+@media (prefers-color-scheme: dark) {
+  :root[data-design~="g2"][data-modus="system"] .lg-gr { --g-nacht: #10131A; --g-gold-text: #DCC07A; --g-text: #EEF0F4; --g-text-2: #A8ADB8;
+    --g-flaeche: #1A1D24; --g-linie: rgba(220, 230, 255, .12); --g-kante: rgba(201, 161, 74, .42); }
+}
+:root[data-design~="g3"] .lg-gr { --g-gold: #C9A14A; --g-gold-text: #75561A; --g-schiefer: #5B6473; --g-text: #1C1B19; --g-text-2: #5C5F66;
+  --g-linie: rgba(28, 27, 25, .1); }
+:root[data-design~="g3"][data-modus="dunkel"] .lg-gr { --g-gold-text: #DCC07A; --g-schiefer: #9AA3B2; --g-text: #EEF0F4; --g-text-2: #A8ADB8;
+  --g-linie: rgba(220, 230, 255, .12); }
+@media (prefers-color-scheme: dark) {
+  :root[data-design~="g3"][data-modus="system"] .lg-gr { --g-gold-text: #DCC07A; --g-schiefer: #9AA3B2; --g-text: #EEF0F4; --g-text-2: #A8ADB8;
+    --g-linie: rgba(220, 230, 255, .12); }
+}
