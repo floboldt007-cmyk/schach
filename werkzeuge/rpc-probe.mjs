@@ -115,7 +115,7 @@ export function probeWert(typ = '') {
   if (/^uuid/.test(t)) return '00000000-0000-0000-0000-000000000000';
   if (/^(int|integer|bigint|smallint|int2|int4|int8|numeric|real|double|float|decimal)/.test(t)) return '0';
   if (/^bool/.test(t)) return 'false';
-  if (/^date$/.test(t)) return '2000-01-01';
+  if (/^date$/.test(t)) return '2000-01-01'; // INTENTIONAL-SPECIAL-CASE: beliebiges gueltiges Datum, nur fuer die Typumwandlung
   if (/^(timestamp|timestamptz)/.test(t)) return '2000-01-01T00:00:00Z';
   if (/^jsonb?$/.test(t)) return '{}';
   return 'x';
