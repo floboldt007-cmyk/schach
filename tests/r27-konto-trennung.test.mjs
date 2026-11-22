@@ -141,6 +141,22 @@ try {
   pruefe('Erfinder-Rahmen mit Besitz bleibt', profilWahl().rahmen === 'erfinder-blatt-0', profilWahl().rahmen);
   await abmelden({ frist: 10 });
 
+  // 7) Fenster "Server-Antwort steht noch aus" (R26 9f, js/profil.js statusOffen): die Ausnahme zeigt nur die gemerkte
+  // Wahl DESSELBEN Kontos. Flos Geraet (Koenig + Erfinder-Rahmen gemerkt), dann ein NEUES Konto: nie Koenig, nie Rahmen.
+  await pruefeCode('haupt@test.de', '123456'); await gleicheNachAnmeldung();
+  localStorage.setItem(SONDER_SCHLUESSEL, JSON.stringify({ konto: 'u-haupt', ids: ['erfinder-banner-blatt-0', 'erfinder-titel'] }));
+  setzeProfilWahl({ figur: 'K', rahmen: 'erfinder-blatt-0' });
+  pruefe('Flos Wahl: Koenig und Erfinder-Rahmen', profilWahl().figur === 'K' && profilWahl().rahmen === 'erfinder-blatt-0', profilWahl());
+  localStorage.removeItem(SONDER_SCHLUESSEL);
+  pruefe('Flos eigenes Konto, Antwort steht noch aus: Koenig und Erfinder-Rahmen bleiben sichtbar', profilWahl().figur === 'K' && profilWahl().rahmen === 'erfinder-blatt-0', profilWahl());
+  localStorage.setItem(SONDER_SCHLUESSEL, JSON.stringify({ konto: 'u-haupt', ids: ['erfinder-banner-blatt-0', 'erfinder-titel'] }));
+  await abmelden({ frist: 10 });
+  await pruefeCode('neub@test.de', '222222');
+  pruefe('neues Konto, Antwort steht noch aus, vor dem Abgleich: nie Koenig, nie Erfinder-Rahmen', profilWahl().figur !== 'K' && profilWahl().rahmen !== 'erfinder-blatt-0', profilWahl());
+  await gleicheNachAnmeldung();
+  pruefe('neues Konto, Antwort steht noch aus, nach dem Abgleich: nie Koenig, nie Erfinder-Rahmen', profilWahl().figur !== 'K' && profilWahl().rahmen !== 'erfinder-blatt-0', profilWahl());
+  await abmelden({ frist: 10 });
+
   // ---------- Kaltreview a6 (22.11.2026): vier Befunde, je zuerst rot ----------
   const leeren = () => { for (const k of [...m.keys()]) m.delete(k); zeilen.clear(); };
   const mitUhr = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r('HAENGT'), ms))]);

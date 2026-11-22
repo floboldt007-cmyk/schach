@@ -22,8 +22,8 @@
 //   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
 //                                      Aufrufs; einmal gemerkt (bleibt beim Speichern der Wahl erhalten)
 import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien, ladeFortschritt } from './storage.js';
-import { istErfinder, sonderstueckeBekannt, hatSonderstueck, ERFINDER } from './sonderstuecke.js';
-import { sitzung } from './konto.js';
+import { istErfinder, sonderstueckeBekannt, hatSonderstueck, ERFINDER, SONDER_SCHLUESSEL } from './sonderstuecke.js';
+import { sitzung, userId, geraetFremd } from './konto.js';
 import { KREATUREN } from './kreaturen-kunst.js';
 
 const MODUL = 'sammeln';
@@ -53,8 +53,21 @@ const rahmenErlaubt = (x) => !!RAHMEN[x] && (x !== 'erfinder-blatt-0' || hatSond
 // langsames Netz): die gespeicherte Erfinder-Figur bleibt sichtbar, statt bis zur Antwort als Bauer zu erscheinen. Erst
 // ein belegter Nicht-Besitz oder die Abmeldung fallen zurueck. Nur fuer die eigene Ansicht: neu waehlen verlangt den
 // Beleg (motivErlaubt), und die Karte fuer andere kennt den Koenig nicht (js/karte.js KARTE_MOTIVE)
-const statusOffen = () => { try { return !!sitzung() && !sonderstueckeBekannt(); } catch (e) { return false; } };
+// Konto-Trennung (22.11.2026, Auftrag claude-code-42): die gemerkte Wahl liegt beim Geraet (einstellungen:sammeln bleibt
+// beim Kontowechsel, js/konto.js GERAET_BLEIBT). Die Ausnahme gilt deshalb nur, solange nichts auf ein ANDERES Konto
+// zeigt: weder der Merker der Sonderstuecke (gehoert einem anderen Konto) noch der Besitzer des Geraets (geraetFremd).
+// Sonst saehe ein neues Konto bis zur Server-Antwort Flos Koenig und Erfinder-Rahmen.
+const statusOffen = () => {
+  try {
+    const s = sitzung(); const id = s ? userId(s) : null;
+    if (!id || sonderstueckeBekannt() || geraetFremd(id)) return false;
+    const m = JSON.parse(globalThis.localStorage.getItem(SONDER_SCHLUESSEL) || 'null');
+    return !(m && typeof m.konto === 'string' && m.konto && m.konto !== id);
+  } catch (e) { return false; }
+};
 const motivSichtbar = (x) => motivErlaubt(x) || (NUR_ERFINDER.includes(x) && statusOffen());
+// dieselbe Ausnahme fuer den Erfinder-Rahmen (CI #276: frisches Geraet zeigte den Koenig, aber den Rahmen 'ohne')
+const rahmenSichtbar = (x) => rahmenErlaubt(x) || (x === 'erfinder-blatt-0' && statusOffen());
 // Ring als Farbe oder Verlauf (SVG-Farben); glanz: zweiter, feiner Innenring
 export const RAHMEN = Object.freeze({
   ohne: Object.freeze({ ring: null }),
@@ -90,7 +103,7 @@ export function profilWahl() {
   return {
     figur: motivSichtbar(e.figur) ? e.figur : STANDARD_FIGUR,
     grund: GRUENDE.includes(e.grund) ? e.grund : 'standard',
-    rahmen: rahmenErlaubt(e.rahmen) ? e.rahmen : 'ohne',
+    rahmen: rahmenSichtbar(e.rahmen) ? e.rahmen : 'ohne',
     vitrine: vitrine.map((x) => (typeof x === 'string' && ID.test(x) ? x : null)),
     titel: typeof e.titel === 'string' && ID.test(e.titel) ? e.titel : null,
     banner: typeof e.banner === 'string' && ID.test(e.banner) ? e.banner : 'start',

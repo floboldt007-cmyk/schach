@@ -43,9 +43,12 @@ pruefe('Status unbekannt: neu waehlen darf den Koenig nicht (nur belegt Erfinder
   localStorage.getItem('schach-arena:v1:einstellungen:sammeln'));
 setzeProfilWahl({ figur: 'P' }); merker([ERFINDER.titel]); setzeProfilWahl({ figur: 'K' }); localStorage.removeItem(SONDER_SCHLUESSEL);
 
-// Merker eines anderen Kontos zaehlt nicht als Antwort fuer dieses
+// Merker eines anderen Kontos zaehlt nicht als Antwort fuer dieses. Seit der Konto-Trennung (22.11.2026, Auftrag
+// claude-code-42) gilt die Ausnahme dann aber auch NICHT: der Merker zeigt, dass zuletzt ein anderes Konto hier war, und die
+// gemerkte Wahl liegt beim Geraet. Lieber kurz der Bauer bis zur Antwort, als dass ein neues Konto Flos Koenig sieht
+// (tests/r27-konto-trennung.test.mjs Abschnitt 7).
 merker([ERFINDER.titel], '22222222-2222-2222-2222-222222222222');
-pruefe('Merker eines anderen Kontos: Status gilt als unbekannt, Figur bleibt', profilWahl().figur === 'K', profilWahl().figur);
+pruefe('Merker eines anderen Kontos: keine Ausnahme, bis zur Antwort der Bauer (Konto-Trennung)', profilWahl().figur === 'P', profilWahl().figur);
 
 // belegter Nicht-Besitz: Antwort ohne erfinder-titel
 merker([]);
