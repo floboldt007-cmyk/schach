@@ -50,8 +50,13 @@
 //   klang.probe(id)               kurze Szene (Zug, Schlagen, präziser Zug, Stern) im Paket id, auch wenn es nicht
 //                                 aktiv ist -> Promise
 //   klang.stille()                alle laufenden Stimmen sanft beenden
-//   klang.vorrat()                { paket, gewaehlt, dateien, dekodiert, fehlt, laedt, fremd, stimmen, master,
-//                                 kontext } (Zustand fuer Einstellungen und Tests)
+//   klang.setzeOrt(ort)           'spiel' | 'lobby' | null (R26); sonst setzt ihn app:screen ueber ortVonScreen.
+//                                 In der Lobby klingt immer LOBBY_PAKET (arcade), die Wahl gilt nur im Spiel;
+//                                 null (noch kein Screen, Node) = die Wahl gilt ueberall -> aktives Paket
+//   ortVonScreen(name, params)    -> 'spiel' | 'lobby' (rein)
+//   klang.vorrat()                { paket, gewaehlt, ort, aktiv, dateien, dekodiert, fehlt, laedt, fremd, stimmen,
+//                                 master, kontext } (Zustand fuer Einstellungen und Tests); paket = gewaehltes und
+//                                 vorgeladenes Paket, aktiv = das, was jetzt klingt
 //   klang.protokoll()             nur mit ?test (oder klang.protokollieren = true): die letzten 50 Eintraege
 //                                 { nr (laufend), name, aktion: 'spielt'|'opfert'|'verworfen'|'still', quelle:
 //                                 'register'|'datei'|'synth', datei, paket, grund, vorrang, stimmen, jetzt, start, t }
@@ -69,6 +74,7 @@
 // nach App-Wechsel oder Anruf unterbricht); zusaetzlich bei visibilitychange (sichtbar). Wo es sie gibt:
 // navigator.audioSession.type = 'ambient' (mischt sich mit Musik, folgt dem Stummschalter).
 import { standardKlangpaket } from './thema.js';
+import { hoere } from './ereignisse.js';
 
 const AC = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
 const OAC = typeof window !== 'undefined' ? (window.OfflineAudioContext || window.webkitOfflineAudioContext) : null;
@@ -303,6 +309,19 @@ const puffer = new Map();  // datei -> AudioBuffer (nur das aktive Paket)
 const fehlt = new Set();   // Dateien des aktiven Pakets, die nicht zu holen oder zu dekodieren waren
 const fremd = new Map();   // 'paket/datei' -> AudioBuffer | null (Probe eines anderen Pakets)
 const fremdLaden = new Map(); // 'paket/datei' -> Promise
+// R26 AC-04 (Flo 20.11.2026): die Klangwahl gilt nur im Spiel, Lobby, Menues und Shop klingen immer arcade. Das gewaehlte
+// Paket bleibt vorgeladen (paket); die Lobby holt ihre arcade-Dateien bei Bedarf in fremd nach
+export const LOBBY_PAKET = 'arcade';
+const SPIEL_SCREENS = new Set(['lektion', 'raetsel', 'raetsel-duell', 'analyse']);
+let ort = null;            // 'spiel' | 'lobby' | null (noch kein Screen: die Wahl gilt ueberall)
+export function ortVonScreen(name, params = {}) {
+  const p = params && typeof params === 'object' ? params : {};
+  // das Zu-zweit-Startblatt gehoert zu Start (wie js/app.js), erst mit Namen laeuft die Partie
+  if (name === 'partie') return p.modus === 'zuzweit' && !p.zuzweit && !p.fortsetzen ? 'lobby' : 'spiel';
+  if (name === 'online') return p.partieId ? 'spiel' : 'lobby';
+  return SPIEL_SCREENS.has(name) ? 'spiel' : 'lobby';
+}
+const ortsPaket = () => (ort === 'lobby' && paket ? LOBBY_PAKET : paket);
 let generation = 0;
 let ladeLauf = null;       // { gen, promise }
 let vorladenAn = false;
@@ -457,15 +476,39 @@ function spaeter(fn, ms) {
   return h;
 }
 
+// Ohne Netz (fc-06:00, 20.11.2026): bei einem neuen Spieler kommen die Klaenge erst nach der Installation in den Cache
+// (sw.js, nachladen). Scheitert ein Abruf, waehrend navigator.onLine false sagt, zaehlt die Datei nicht als fehlend
+// (sonst bliebe sie bis zum Neustart in fehlt), und wieder online laedt es nach. Vorab sperren darf das nicht: wer alles
+// im Cache hat, bekommt die Dateien auch ohne Netz (Kaltreview fc-08:50). Ohne Netz wird nur geholt, was ein Cache hat: jeder
+// Abruf ins Leere waere eine Fehlermeldung in der Konsole (tests/offline-ladeprobe.test.mjs).
+async function imCache(adresse) {
+  try { return !!(await caches.match(adresse)); } catch (e) { return true; } // INTENTIONAL-SLOP[E5]: Cache nicht lesbar heisst: wie bisher abrufen
+}
+let wartetAufNetz = false;
+function ohneNetz() {
+  if (typeof navigator === 'undefined' || navigator.onLine !== false) return false;
+  if (!wartetAufNetz && typeof addEventListener === 'function') {
+    wartetAufNetz = true;
+    addEventListener('online', () => { wartetAufNetz = false; try { vorladen(); } catch (f) { /* egal */ } }, { once: true }); // INTENTIONAL-SLOP[F1]: ein Fehler beim Nachladen der Klaenge bleibt still, wie beim Vorladen in einstellen()
+  }
+  return true;
+}
+
 function vorladen() {
   vorladenAn = true;
   if (!paket || !umgebung()) return Promise.resolve(vorrat());
   if (ladeLauf && ladeLauf.gen === generation) return ladeLauf.promise;
   const gen = generation;
   const p = paket;
-  const offen = DATEIEN.filter((d) => !puffer.has(d) && !fehlt.has(d));
+  let offen = DATEIEN.filter((d) => !puffer.has(d) && !fehlt.has(d));
   const lauf = { gen, promise: null };
   lauf.promise = (async () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false && typeof caches !== 'undefined') {
+      const da = await Promise.all(offen.map((d) => imCache(url(p, d))));
+      if (gen !== generation) return vorrat();
+      if (da.includes(false)) ohneNetz();
+      offen = offen.filter((d, i) => da[i]);
+    }
     const versprechen = [];
     const starte = (i) => {
       if (i < offen.length && !versprechen[i]) versprechen[i] = hole(url(p, offen[i]));
@@ -479,7 +522,7 @@ function vorladen() {
       const b = daten ? await dekodiere(daten) : null;
       if (gen !== generation) return vorrat();
       if (b) puffer.set(offen[i], b);
-      else fehlt.add(offen[i]);
+      else if (daten || !ohneNetz()) fehlt.add(offen[i]);
       await pause();   // in kleinen Bloecken, damit die Arena nicht ruckelt
     }
     if (ladeLauf === lauf) ladeLauf = null;
@@ -529,7 +572,7 @@ function setzePaket(id) {
 
 function vorrat() {
   return {
-    paket, gewaehlt, dateien: DATEIEN.length, dekodiert: puffer.size, fehlt: fehlt.size,
+    paket, gewaehlt, ort, aktiv: ortsPaket(), dateien: DATEIEN.length, dekodiert: puffer.size, fehlt: fehlt.size,
     laedt: !!(ladeLauf && ladeLauf.gen === generation), fremd: fremd.size,
     stimmen: aktiv.length, master: ausgang ? ausgang.gain.value : null, kontext: kontext ? kontext.state : null,
   };
@@ -579,10 +622,12 @@ function quelle(name, args, opt, { weiter = true, tiefe = 0 } = {}) {
   if (r) return { art: 'register', fn: r.fn, args };
   const info = KATALOG[name];
   if (info) {
-    const p = opt.paket && paketVon(opt.paket) ? opt.paket : paket;
+    const p = opt.paket && paketVon(opt.paket) ? opt.paket : ortsPaket();
     if (p) {
       const datei = variante(name, info, opt, weiter);
       const b = p === paket ? puffer.get(datei) : fremd.get(p + '/' + datei);
+      // Lobby-Klang noch nicht geholt: diesmal der Rueckfall, die Datei kommt fuer das naechste Mal
+      if (!b && p !== paket && !fremd.has(p + '/' + datei)) ladeEine(p, datei).catch(() => {});
       if (b) {
         const stufe = info.tonhoehe ? Math.min(6, Math.max(0, Number(args[0]) || 0)) : 0;
         return { art: 'datei', buffer: b, datei, paket: p, rate: Math.pow(2, (2 * stufe) / 12) };
@@ -759,6 +804,7 @@ export const klang = {
     }
   },
   setzePaket(id) { return setzePaket(id); },
+  setzeOrt(o) { ort = o === 'spiel' || o === 'lobby' ? o : null; return ortsPaket(); },
   setzeLautstaerke(v) {
     this.lautstaerke = Math.max(0, Math.min(1, Number(v) || 0));
     setzePegel();
@@ -781,6 +827,8 @@ export const klang = {
   get gruppen() { return { ...gruppen }; },
   protokoll() { return protokollListe.map((e) => ({ ...e })); },
 };
+// R26: der Ort folgt dem Screen, wie die Lobby-Musik (js/pakete/musik/index.js)
+hoere('app:screen', (d) => { ort = ortVonScreen(d && d.name, d && d.params); });
 
 // Rendert einen Klang offline und misst ihn (fuer Tests): { spitze (0..1), dauer (s), quelle, datei }.
 // Reihenfolge wie beim Abspielen; die Datei des Pakets wird bei Bedarf geholt (Optionen wie bei spiele).
@@ -788,7 +836,7 @@ export async function klangProbe(name, ...rest) {
   const { args, opt } = trenne(rest);
   const info = KATALOG[name];
   if (info && !REGISTER.has(name)) {
-    const p = opt.paket && paketVon(opt.paket) ? opt.paket : paket;
+    const p = opt.paket && paketVon(opt.paket) ? opt.paket : ortsPaket();
     if (p) await ladeEine(p, variante(name, info, opt, false));
   }
   const q = quelle(name, args, opt, { weiter: false });

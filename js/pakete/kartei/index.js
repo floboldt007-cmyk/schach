@@ -20,6 +20,7 @@
 //             neueren App (v > RECHENSTAND) wird gelesen, aber nie ueberschrieben.
 // Test:       zustand() -> { modul, stand, letzte }
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { hoere, sende } from '../../ereignisse.js';
 import { melde } from '../../feier.js';
@@ -269,15 +270,10 @@ function heimZeile(app, tag, zeile) {
 
 // ---------- Einhaengen (defensiv) ----------
 function ladeCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-paket="kartei"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../../css/pakete/kartei.css', import.meta.url).href;
-    l.dataset.paket = L.PAKET;
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles lesbar */ }
+  return ladePaketCss('kartei');
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladeCss());
 
 function registriere() {
   ladeCss();

@@ -5,6 +5,7 @@
 // Erfinder-Konto (Sonderstueck vom Server, js/sonderstuecke.js) hat alle frei.
 // Signatur gehoert zu Flos Erfinder-Profil: frei nur mit dem Sonderstueck vom Server.
 // Klang: den Siegesklang spielt die Partie selbst; der Finisher hat einen eigenen Klang in der Gruppe 'finisher'.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen, endgegnerBesiegt } from '../../storage.js';
 import { klang } from '../../sounds.js';
@@ -20,11 +21,8 @@ const MODUL = 'finisher';
 const F = (k, w) => t('p-finisher.' + k, w);
 
 // Paket-CSS nur zusammen mit dem Paket laden; ?test&kern bleibt dadurch wirklich paketfrei.
-if (typeof document !== 'undefined' && !document.querySelector('link[data-paket="finisher"]')) {
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.dataset.paket = 'finisher';
-  css.href = new URL('../../../css/pakete/finisher.css', import.meta.url).href;
-  document.head.appendChild(css);
-}
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladePaketCss('finisher'));
 export const FINISHER = Object.freeze([
   Object.freeze({ id: 'aus', text: 'aus', klang: null }),
   Object.freeze({ id: 'krone', text: 'krone', klang: 'finisher-glocke', welt: 1 }),

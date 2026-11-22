@@ -24,6 +24,8 @@ import { stufenName } from '../pakete/liga/texte.js';
 import { avatarVon, floAvatar } from '../thema.js';
 import { t } from '../sprache.js';
 import { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, modusLeiste, ladeLobbyCss } from '../pakete/lobby/index.js';
+// das CSS steht, bevor app.js zeige() aufruft (js/paket-css.js)
+await ladeLobbyCss();
 import { suche as kronenSuche, angemeldet as kronenAngemeldet, RANKED_ZEIT } from '../kronen.js';
 import { karteDerPartie } from '../karte.js';
 import { visitenkarte, eigeneKarte, fremdeKarte, botKarte, karteVomServer } from './visitenkarte.js';
@@ -62,7 +64,6 @@ export function zeige(root, params, app) {
     setTimeout(() => { if (!weg) app.gehe('arena', {}, { ersetzen: true }); }, 0);
     return { verlasse() { weg = true; } };
   }
-  ladeLobbyCss();
   const f = ladeFortschritt();
   const wertung = schaetzeWertung(f);
   // Rang-Wappen: der gemerkte Liga-Stand desselben Kontos (wie die Startseite), sonst die Start-Liga aus der geschaetzten Wertung

@@ -141,7 +141,10 @@
 .coach:has(.combo) > .c-kopf { padding-right: 104px; }
 /* aufklappbarer Kopf (role="button", js/ui/partie.js): Text ist nur 18 bis 21 px hoch; eine unsichtbare Flaeche
    oben und unten macht die Tippflaeche mindestens 44 px, ohne dass sich etwas verschiebt */
-.coach > .c-kopf[role="button"] { position: relative; }
+/* z-index am Kopf, nicht am ::before: der Kopf blendet mit animation both ein (.coach.neu) und bildet damit eine eigene
+   Stapel-Ebene; ohne Rang malte .c-text (spaeter im Dokument) ueber die Flaeche, gemessen nur 34 bis 37 px (Kaltreview 19,
+   tests/r25-coach-kopf-offen.test.mjs) */
+.coach > .c-kopf[role="button"] { position: relative; z-index: 1; }
 .coach > .c-kopf[role="button"]::before { content: ''; position: absolute; left: 0; right: 0; top: -13px; bottom: -13px; }
 .coach .c-klasse { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; line-height: 1.15; color: var(--kt); }
 .coach .c-zug { font-weight: 800; font-size: 15px; color: var(--text-2); white-space: nowrap; }

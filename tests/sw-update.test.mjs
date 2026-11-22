@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 import { browserTyp } from './browser.mjs';
 import { begrenzt } from './zeitwaechter.mjs';
 
@@ -46,6 +47,12 @@ const TYPEN = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
   '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2',
   '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.md': 'text/plain' };
 const VERSION = Number(readFileSync(path.join(WURZEL, 'sw.js'), 'utf8').match(/const VERSION = (\d+);/)[1]);
+const [DATEIEN_ZAHL, KERN_ZAHL] = (() => {
+  const k = { self: { location: new URL('https://example.org/schach/sw.js'), addEventListener() {} }, URL };
+  vm.createContext(k);
+  vm.runInContext(readFileSync(path.join(WURZEL, 'sw.js'), 'utf8') + '\n;globalThis.__n = [DATEIEN.length, KERN.length];', k);
+  return k.__n;
+})();
 
 // 0 = Ausgangsfassung, 1 und 2 = die naechsten Fassungen; heim.js sagt der laufenden Seite, aus welcher Fassung ihr Code kommt
 let fassung = 0;
@@ -190,6 +197,26 @@ async function main() {
     await auswerten(s, () => navigator.serviceWorker.ready);
     await s.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 30000 });
     pruefe(`Erstbesuch: Version ${VERSION} installiert und steuert die Seite`, await swVersion(s) === VERSION);
+    // Seit fc-06:00 (20.11.2026) legt install nur den Kern ab, den Rest holt der Worker danach, angestossen von Anfragen der
+    // Seite. Der Fall unten ist ein Spieler, der die App schon ganz hat; ohne diesen Schritt holte der alte Worker seinen Rest
+    // genau im Messfenster des Updates voll aus dem Netz
+    schritt('Erstbesuch: Nachladen, bis jede Datei im Cache liegt');
+    let imCache = 0;
+    for (let i = 0; i < 15; i++) {
+      imCache = await auswerten(s, async () => {
+        let n = 0;
+        for (const c of await caches.keys()) n = Math.max(n, (await (await caches.open(c)).keys()).length);
+        return n;
+      });
+      if (imCache >= DATEIEN_ZAHL) break;
+      await warte(2000);
+      await s.reload(); await startBereit(s);
+    }
+    pruefe(`Erstbesuch: das Nachladen legt jede Datei ab (${imCache} von ${DATEIEN_ZAHL})`, imCache >= DATEIEN_ZAHL);
+    // Ruhe vor dem Umschalten: eine Update-Pruefung des Erstbesuchs, die erst danach kommt, faende schon Fassung 1, die
+    // waere beim Neuladen unten bereit und uebernaehme sofort ohne Hinweis (gemessen 20.11.2026: register 16 ms nach dem
+    // Umschalten, seit die Installation nur noch den Kern holt und der Erstbesuch Sekunden schneller ist)
+    await warte(5000);
 
     // die neue Fassung liegt online; der Besucher kommt spaeter wieder (SW_MERKER "kuerzlich" = 15 s abwarten)
     schritt('Update: neue Fassung installieren');
@@ -200,7 +227,10 @@ async function main() {
     pruefe('Update: neue Fassung installiert, der Hinweis "Neu laden" erscheint', hinweis);
     const voll = zaehler.volleDateien.slice().sort();
     pruefe('Update: nur die geänderten Dateien kommen voll (sw.js und js/ui/heim.js), der Rest als 304 aus dem alten Cache',
-      JSON.stringify(voll) === JSON.stringify(['/js/ui/heim.js', '/sw.js']) && zaehler.nicht > 500, JSON.stringify({ voll: voll.slice(0, 12), anzahl: voll.length, nicht: zaehler.nicht }));
+      // die Installation prueft nur den Kern (ohne heim.js, die kommt voll); den Rest prueft das Nachladen nach der Uebernahme,
+      // ebenfalls per 304 aus dem alten Cache (tests/sw-cache.test.mjs, Fall 4)
+      JSON.stringify(voll) === JSON.stringify(['/js/ui/heim.js', '/sw.js']) && zaehler.nicht >= KERN_ZAHL - 1,
+      JSON.stringify({ voll: voll.slice(0, 12), anzahl: voll.length, nicht: zaehler.nicht, kern: KERN_ZAHL }));
 
     // naechster Besuch: die wartende Fassung uebernimmt von selbst
     schritt('Uebernahme: auf die neue Fassung warten');

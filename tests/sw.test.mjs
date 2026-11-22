@@ -31,7 +31,8 @@ export function leseSw(text = readFileSync(SW, 'utf8')) {
     caches: {}, fetch() {}, Response: class {}, Request: class {}, URL,
   };
   vm.createContext(kontext);
-  vm.runInContext(text + '\n;globalThis.__sw = { VERSION, STAND, DATEIEN, CACHE };', kontext);
+  const wenn = (n) => `${n}: typeof ${n} === 'undefined' ? null : ${n}`;
+  vm.runInContext(text + `\n;globalThis.__sw = { VERSION, STAND, DATEIEN, CACHE, ${['KERN', 'ZUERST', 'GLEICHZEITIG', 'HAPPEN_MS'].map(wenn).join(', ')} };`, kontext);
   return kontext.__sw;
 }
 
@@ -162,6 +163,29 @@ function main() {
     && /const KENNUNG = /.test(text));
   pruefe('WebKit-Fix: jedes cache.put legt ueber ohneFrische ab', ablegen.length >= 2 && ablegen.every((z) => z.includes('ohneFrische(')),
     ablegen.map((z) => z.trim()).join(' | '));
+
+  // Erstbesuch (fc-06:00, 20.11.2026): WebKit beendet install nach etwa 30 s, darum legt install nur den KERN ab und
+  // nachladen() holt den Rest in Haeppchen (tests/sw-erstbesuch.test.mjs misst es mit gedrosseltem Netz). Die Grenzen halten
+  // den Kern klein: gemessen 221 Dateien und 4025 KB (roh) am 20.11.2026; ein neuer grosser Brocken im Kern faellt hier auf.
+  // Den Kern erzeugt tests/sw-kern.mjs aus dem Bedarf; ob er passt, zeigt tests/offline-ladeprobe.test.mjs.
+  const kern = Array.isArray(sw.KERN) ? sw.KERN : [];
+  const kernFremd = kern.filter((d) => !menge.has(d));
+  const kernCss = liste.filter((d) => /^css\//.test(d) && readFileSync(path.join(WURZEL, 'index.html'), 'utf8').includes(d));
+  pruefe('Kern: Teilmenge der Liste, mit Startseite, js/app.js und den Stylesheets der Startseite',
+    kern.includes('index.html') && kern.includes('js/app.js') && kernFremd.length === 0 && kernCss.every((d) => kern.includes(d)),
+    kernFremd.slice(0, 5).join(', ') || kernCss.filter((d) => !kern.includes(d)).join(', ') || String(kern.length));
+  pruefe('Kern: kein Stockfish, keine Klaenge, keine Figuren-Skins (die kommen nach der Aktivierung, zuerst Stockfish, dann die Avatare)',
+    kern.length > 0 && !kern.some((d) => /^vendor\/stockfish\/|^assets\/klang\/|^assets\/pieces\/[^/]+\//.test(d))
+    && Array.isArray(sw.ZUERST) && sw.ZUERST.slice(0, 2).every((d) => /^vendor\/stockfish\//.test(d))
+    && sw.ZUERST.slice(2).every((d) => /^assets\/avatare\/modern\//.test(d)), JSON.stringify(sw.ZUERST));
+  const kernBytes = kern.reduce((a, d) => a + (existsSync(path.join(WURZEL, d)) ? statSync(path.join(WURZEL, d)).size : 0), 0);
+  pruefe('Kern: hoechstens 260 Dateien und 4600 KB (roh)', kern.length <= 260 && kernBytes <= 4600 * 1024,
+    `${kern.length} Dateien, ${Math.round(kernBytes / 1024)} KB`);
+  const installTeil = (text.match(/addEventListener\('install'[\s\S]*?\n\}\);/) || [''])[0];
+  pruefe('Installation legt nur den Kern ab, hoechstens 6 Abrufe gleichzeitig', /inStuecken\(KERN,/.test(installTeil) && !/DATEIEN/.test(installTeil)
+    && sw.GLEICHZEITIG > 0 && sw.GLEICHZEITIG <= 6, installTeil.slice(0, 160));
+  pruefe('Nachladen: ein Happen deutlich unter 30 s, angestossen von jeder Anfrage', sw.HAPPEN_MS > 0 && sw.HAPPEN_MS <= 20000
+    && /e\.waitUntil\(nachladen\(\)\)/.test(text), String(sw.HAPPEN_MS));
 
   // Pakete: erst Pflicht, wenn sie in PAKETE (js/erweiterungen.js) stehen
   const pakete = lesePakete(readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8'));

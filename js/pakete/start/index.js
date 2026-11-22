@@ -22,6 +22,7 @@
 //             gerade zuruecktritt), training: letzter training:stand
 // Texte:      t('p-start.x') aus texte.js (Englische Version, Teil 2), erst beim Zeichnen.
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten, angeboten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
 import { melde } from '../../feier.js';
@@ -177,15 +178,10 @@ function sperrAngebot(app) {
 
 // ---------- Einhaengen (defensiv) ----------
 function ladeCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-paket="start"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../../css/pakete/start.css', import.meta.url).href;
-    l.dataset.paket = L.PAKET;
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles bedienbar */ }
+  return ladePaketCss('start', { screens: ['start'] });
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladeCss());
 
 function registriere() {
   // zuerst: Raetsel-Quellen und Rueckweg (dienst.js); ab hier gehoert der Screen "start" einem geladenen Paket

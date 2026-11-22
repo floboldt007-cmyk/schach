@@ -131,7 +131,7 @@ import {
   bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, sanAnzeige, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
   analyseSchluessel,
 } from '../review.js';
-import { eroeffnung, eroeffnungsAnzeige } from '../openings.js';
+import { eroeffnung, eroeffnungsAnzeige, eroeffnungVorbereiten } from '../openings.js';
 import { klang, klassenKlang } from '../sounds.js';
 import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
@@ -428,6 +428,10 @@ export function zeige(root, params, app) {
     if (signal) signal.addEventListener('abort', fertig, { once: true });
   });
   let weg = false;
+  // R25 F1 (fc-11:00): im synchronen Aufbau rechnen layout() (setzeGegnerLeiste, uhr.zeige) und halteCoachHoehe nicht
+  // mit, sondern einmal im ersten Bild-Rueckruf, erst die Hoehen, dann layout(); jeder Aufruf dazwischen erzwang ein
+  // volles Layout des halb fertigen Screens (R20-Kritik/leistung)
+  let aufgebaut = false;
   const endeCtrl = new AbortController();
   const protokoll = [];
   const melde = (eintrag) => { if (app.test) protokoll.push({ t: Math.round(jetzt()), ...eintrag }); };
@@ -678,7 +682,7 @@ export function zeige(root, params, app) {
   }
 
   function zeichneGeschlagen() {
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
+    if (aufgebaut && typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
     const vonFlo = [];
     const vonBot = [];
     for (const m of z.verbose) if (m.captured) (m.color === farbe ? vonFlo : vonBot).push(m.captured);
@@ -800,7 +804,8 @@ export function zeige(root, params, app) {
         if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_NAME[k])}: </span></span>`;  // Vorlesen: Name ohne Satzzeichen (sonst "Solid.:")
         else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
       }
-      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}${i === ansehen.ply ? ' angesehen' : ''}" data-ply="${i}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
+      // .angesehen setzt zeigeZugNav am Ende auf die Knoten, darum nicht im Teil (sonst wiche der Merker vom Knoten ab)
+      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}" data-ply="${i}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
     };
     const zeilen = new Map();
     for (let i = 0; i < z.zuege.length; i++) {
@@ -808,27 +813,53 @@ export function zeige(root, params, app) {
       if (!zeilen.has(n)) zeilen.set(n, { w: null, b: null });
       zeilen.get(n)[farbeVon(i)] = i;
     }
-    let liste = '';
-    for (const [n, r] of zeilen) {
-      liste += `<span class="nr">${n}.</span>${r.w == null && r.b != null ? '<span class="z leer">…</span>' : zelle(r.w)}${zelle(r.b)}`;
-    }
-    if (!z.zuege.length) liste = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
+    const leer = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
+    const liste = [];
+    for (const [n, r] of zeilen) liste.push(`<span class="nr">${n}.</span>`, r.w == null && r.b != null ? '<span class="z leer">…</span>' : zelle(r.w), zelle(r.b));
     const listeEl = $('.zugliste');
-    listeEl.innerHTML = liste;
-    listeEl.scrollTop = listeEl.scrollHeight;
+    setzeTeile(listeEl, liste.length ? liste : [leer]);
 
-    let leiste = '';
+    const leiste = [];
     for (let i = 0; i < z.zuege.length; i++) {
-      if (farbeVon(i) === 'w' || i === 0) leiste += `<span class="nr">${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'}</span>`;
-      leiste += zelle(i);
+      if (farbeVon(i) === 'w' || i === 0) leiste.push(`<span class="nr">${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'}</span>`);
+      leiste.push(zelle(i));
     }
     const leisteEl = $('.zugleiste');
-    // wie bei den Grossen: links und rechts im Streifen die Pfeile zum Blaettern (klebend, die Zuege rollen dazwischen)
-    leisteEl.innerHTML = `<button class="zl-pfeil zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button>`
-      + `<span class="zl-zuege">${leiste || `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`}</span>`
-      + `<button class="zl-pfeil zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button>`;
-    leisteEl.scrollLeft = leisteEl.scrollWidth;
+    // wie bei den Grossen: links und rechts im Streifen die Pfeile zum Blaettern (klebend, die Zuege rollen dazwischen).
+    // Die Pfeile entstehen einmal und bleiben stehen: liegt der Tastatur-Fokus auf einem, ueberlebt er den Zug des Bots (R25 F4)
+    if (!leisteEl.querySelector(':scope > .zl-zuege')) {
+      leisteEl.innerHTML = `<button class="zl-pfeil zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button>`
+        + '<span class="zl-zuege"></span>'
+        + `<button class="zl-pfeil zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button>`;
+    }
+    setzeTeile(leisteEl.querySelector(':scope > .zl-zuege'), leiste.length ? leiste : [leer]);
     zeigeZugNav();
+    // ans Ende rollen im naechsten Bild: scrollHeight/scrollWidth gleich nach dem Schreiben erzwangen mitten im Zug ein
+    // volles Layout (R25 F4, beim ersten Zug bei 6x 75 bis 171 ms); ohne Zuege nichts zu rollen (R25 F1)
+    if (!z.zuege.length || rollBild) return;
+    if (typeof requestAnimationFrame !== 'function') { rolleZuegeAnsEnde(); return; }
+    rollBild = requestAnimationFrame(() => { rollBild = 0; if (!weg) rolleZuegeAnsEnde(); });
+  }
+  let rollBild = 0;
+  function rolleZuegeAnsEnde() {
+    const listeEl = $('.zugliste');
+    const leisteEl = $('.zugleiste');
+    listeEl.scrollTop = listeEl.scrollHeight;
+    // ein angesehener Zug bleibt in der Mitte des Streifens (zeigeZugNav), nur sonst ans Ende
+    if (!leisteEl.querySelector('.z.angesehen')) leisteEl.scrollLeft = leisteEl.scrollWidth;
+  }
+  // Zellen nur ergaenzen und die geaenderten ersetzen, statt den ganzen Inhalt neu zu setzen (R25 F4): je Teil genau ein
+  // Element; der Merker der zuletzt gesetzten Teile haengt am Element und gilt nur, solange die Kinder dazu passen
+  function setzeTeile(el, teile) {
+    const alt = el.__teile && el.children.length === el.__teile.length ? el.__teile : null;
+    if (!alt) el.textContent = '';
+    for (let i = 0; i < teile.length; i++) {
+      if (alt && alt[i] === teile[i]) continue;
+      if (alt && i < alt.length) el.children[i].outerHTML = teile[i];
+      else el.insertAdjacentHTML('beforeend', teile[i]);
+    }
+    while (el.children.length > teile.length) el.lastElementChild.remove();
+    el.__teile = teile;
   }
 
   function zeichneKnoepfe() {
@@ -934,7 +965,7 @@ export function zeige(root, params, app) {
     if (ply == null) delete coachEl.dataset.ply; else coachEl.dataset.ply = String(ply);
     clearTimeout(z.kompaktUhr);
     pruefeCoachRest();
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
+    if (aufgebaut && typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
   }
   // Ruhige Spalte (Flo 30.10.2026: "manchmal flackert mein Bildschirm, wenn der Bot einen Zug macht"): Coach-Karte (wartet,
   // Buch, Kommentar, kompakt), Karte des Gegners (mit und ohne Sprechblase) und Knopfreihe wechselten je Zug ihre Hoehe,
@@ -2166,17 +2197,25 @@ export function zeige(root, params, app) {
     o.querySelector('.erg-zu').addEventListener('click', zeigeBrett);
     // Punkt 30 (Barrierefreiheit 09.11.): das Blatt haelt den Fokus wie ein Dialog. Tab kreist im Blatt, Escape zeigt
     // das Brett (wie das Auge oben rechts); der Bildschirm dahinter ist inert (sperreHintergrund).
+    // Flo 20.11.2026 (Antwort 9): das Auge kommt im Tab-Gang direkt hinter dem Knopf, auf dem der Fokus beim Fuellen landet
+    // (startFokus, die Folgeaktion); vorher kam es nach "Zu den Bots" als letztes. Die Reihe fuehrt deshalb das Blatt selbst.
+    let startFokus = null;
+    const tabReihe = (ziele) => {
+      const auge = o.querySelector('.erg-zu');
+      if (!startFokus || startFokus === auge || !ziele.includes(startFokus) || !ziele.includes(auge)) return ziele;
+      const reihe = ziele.filter((x) => x !== auge);
+      reihe.splice(reihe.indexOf(startFokus) + 1, 0, auge);
+      return reihe;
+    };
     o.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); zeigeBrett(); return; }
       if (e.key !== 'Tab') return;
-      const ziele = [...o.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')]
-        .filter((x) => !x.disabled && x.getClientRects().length);
+      const ziele = tabReihe([...o.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')]
+        .filter((x) => !x.disabled && x.getClientRects().length));
       if (!ziele.length) return;
-      const erst = ziele[0];
-      const letzt = ziele[ziele.length - 1];
-      const jetzt = document.activeElement;
-      if (e.shiftKey && (jetzt === erst || !ziele.includes(jetzt))) { e.preventDefault(); letzt.focus(); }
-      else if (!e.shiftKey && (jetzt === letzt || !ziele.includes(jetzt))) { e.preventDefault(); erst.focus(); }
+      const i = ziele.indexOf(document.activeElement);
+      e.preventDefault();
+      ziele[i < 0 ? (e.shiftKey ? ziele.length - 1 : 0) : (i + (e.shiftKey ? ziele.length - 1 : 1)) % ziele.length].focus();
     });
     // Sieg-Blatt (Flo 09.11., Variante C): Sterne und darunter der Level-Fortschritt; Punkte und Wertung
     // blendet css/ergebnis.css aus, ein Verweis fuehrt in die Liga. Nur bei wertenden Partien, sonst gibt es dort nichts.
@@ -2306,7 +2345,7 @@ export function zeige(root, params, app) {
         const karten = fuelleKarte(erg, review, rechnet, nachtrag, wertet);
         if (revancheFokus && !karteOrtEl.contains(document.activeElement)) {
           const r = karteOrtEl.querySelector('.gd-revanche');
-          if (r) r.focus({ preventScroll: true });
+          if (r) { r.focus({ preventScroll: true }); if (startFokus && !startFokus.isConnected) startFokus = r; }
         }
         const sterne = p.sterne || [false, false, false];
         const neueSterne = erg.neueSterne || [false, false, false];
@@ -2387,6 +2426,9 @@ export function zeige(root, params, app) {
           const naechster = !wertet || bot.stufe == null ? null : neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
           // nicht wertend: "Nochmal ab hier" mit denselben Params (Uebung bzw. eigene Stellung), sonst "Nochmal"
           const abHier = z.modus === 'uebung' || (z.modus === 'normal' && !!startFen);
+          // Flos Antwort 1 (20.11.2026): nach einer Niederlage heisst derselbe Knopf "Revanche", wie die Bots sie anbieten
+          // ("Willst du Revanche?"); nach Sieg und Remis bleibt "Nochmal"
+          const nochmalText = esc(t(ergebnis === 'niederlage' ? 'partie.erg.revanche' : 'partie.erg.nochmal'));
           // R12-W1 (Flo 10.11., Variante C): nach einem Sieg mit naechstem Gegner leuchtet "Nächster Gegner", die Analyse
           // steht klein darunter neben "Zu den Bots"; nach Niederlage und Remis bleibt die Analyse vorne
           const siegVorne = ergebnis === 'sieg' && !!naechster;
@@ -2398,10 +2440,10 @@ export function zeige(root, params, app) {
             ? `<button class="knopf primaer gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>
           <button class="erg-link" type="button" data-ziel="analyse">${icon('analyse')}<span>${esc(t('partie.erg.zurAnalyse'))}</span></button>`
             : `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
-          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${esc(t(abHier ? 'partie.erg.abHier' : 'partie.erg.nochmal'))}</button>`
+          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${abHier ? esc(t('partie.erg.abHier')) : nochmalText}</button>`
             : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>`
               : revanche ? ''
-                : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
+                : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${nochmalText}</button>`}`;
           // steht "Zur Analyse" allein in der zweispaltigen Reihe (neben der Revanche), nimmt es die ganze Breite
           if (!siegVorne && knoepfe.children.length === 1) knoepfe.firstElementChild.style.gridColumn = '1 / -1';
           // Kurs-Partie (Kapitel 6, z.extra.lernen.kurs): "Zurueck zum Kurs" leuchtet ueber die ganze Breite vorn, die
@@ -2449,7 +2491,7 @@ export function zeige(root, params, app) {
           // neben dem orangen Analyse-Knopf (R16-Kritik E3, Auswahl a)
           const folge = knoepfe.querySelector('[data-ziel="kurs"]') || (ergebnis !== 'sieg' && knoepfe.querySelector('[data-ziel="analyse"]'))
             || knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]') || revanche;
-          if (folge) folge.focus({ preventScroll: true });
+          if (folge) { folge.focus({ preventScroll: true }); startFokus = folge; }
         }
         o.classList.add(rechnet ? 'vorlaeufig' : 'gefuellt');
         if (!rechnet) o.classList.remove('vorlaeufig');
@@ -2647,7 +2689,7 @@ export function zeige(root, params, app) {
     el.classList.toggle('ruf', el.textContent !== bot.name);
   }
   function layout() {
-    if (weg || !inhaltEl || !s.isConnected) return;
+    if (weg || !aufgebaut || !inhaltEl || !s.isConnected) return;
     loeseRuhe();
     const handy = istHandy();
     s.classList.toggle('handy', handy);
@@ -2975,7 +3017,13 @@ export function zeige(root, params, app) {
       if (!laufend) await Promise.all([eb.newGame(), ew.newGame()]);
     } catch (err) {
       // dauerhafte Fehler (z. B. iPadOS zu alt) meldet app.js selbst mit genauem Grund
-      if (!weg && !(err && err.dauerhaft)) app.meldung(t('partie.meldung.engineStartet'), { art: 'fehler' });
+      // Flos Antwort 10 (20.11.2026): ohne Internet (erster Besuch, Engine noch nicht im Cache) der freundliche Satz zum
+      // Sparmodus, als ruhige Info statt roter Fehlermeldung; mit Netz bleibt die ehrliche Fehlermeldung, denn dann liegt
+      // es nicht am Internet
+      const ohneNetz = typeof navigator !== 'undefined' && navigator.onLine === false;
+      if (!weg && !(err && err.dauerhaft)) {
+        app.meldung(t(ohneNetz ? 'partie.meldung.engineOffline' : 'partie.meldung.engineStartet'), { art: ohneNetz ? 'info' : 'fehler' });
+      }
       z.engineGemeldet = true;
     }
     if (weg) return;
@@ -2995,6 +3043,10 @@ export function zeige(root, params, app) {
       botAmZug();
     }
   })();
+
+  // R25 F1 (fc-11:00): der Eroeffnungs-Index (erster Zug, Coach-Buch) entsteht nach dem ersten Bild in Stuecken, nicht
+  // im Aufbau (bei 6x Drossel 465 ms im Long Task, R20-Kritik/leistung)
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { if (!weg) eroeffnungVorbereiten(); });
 
   // Flo darf schon ziehen, waehrend die Engines noch laden (sie reihen sich ein)
   if (z.chess.turn() === farbe && !z.chess.isGameOver()) {
@@ -3030,7 +3082,12 @@ export function zeige(root, params, app) {
   }
   pfeilTippPruefen();
 
+  // einmal am Ende des Aufbaus, nicht bei jedem Zwischenschritt (R25 F1). Synchron wie vor F1: im Bild-Rueckruf malte
+  // WebKit bei Bewegung normal ein Bild vorher, und das Brett schrumpfte danach (iPhone SE 375 -> 368, iPhone 13
+  // 390 -> 384, tests/r25-brett-start.test.mjs); die Hoehen haelt halteCoachHoehe wie bisher im naechsten Bild fest
+  aufgebaut = true;
   layout();
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { if (!weg) halteCoachHoehe(); });
 
   // Figurensatz wirkt sofort (R3, 12.11.2026, dieselbe Luecke wie in js/ui/online.js vom 11.11.): kommt der Erfinder-Status
   // erst nach dem Aufbau (js/app.js pruefeSonderstuecke wendet die Einstellungen dann neu an) oder waehlt Flo einen anderen

@@ -90,8 +90,20 @@ function suche(schluessel) {
   return null;
 }
 
+// Ein Intl.NumberFormat je Sprache und Optionen (Leistung F3, fc-11:15): der Bau kostet, das Ergebnisblatt rief zahl()
+// so oft, dass es auf schwachen Geraeten 40 ms waren (Vault R20-Kritik/leistung/bericht.md)
+const zahlFormate = new Map();
 export function zahl(n, opt = {}) {
-  try { return new Intl.NumberFormat(LOCALE[aktuell], opt).format(n); } catch (e) { return String(n); }
+  try {
+    const schluessel = LOCALE[aktuell] + '|' + JSON.stringify(opt);
+    let f = zahlFormate.get(schluessel);
+    if (!f) {
+      if (zahlFormate.size >= 64) zahlFormate.clear();
+      f = new Intl.NumberFormat(LOCALE[aktuell], opt);
+      zahlFormate.set(schluessel, f);
+    }
+    return f.format(n);
+  } catch (e) { return String(n); }
 }
 
 export function datum(d, opt = {}) {

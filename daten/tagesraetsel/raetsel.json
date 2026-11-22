@@ -91,7 +91,7 @@
   {"aufgaben":[{"id":"tr-0098","fen":"r1b1k2r/pp3ppp/2n1pq2/3p4/2p1P1P1/P2P1QP1/P1PN1P2/R1B1KBR1 b Qkq - 2 13","loesung":["f6a1"],"motiv":null,"stufe":2,"matt":null,"titel":"Schwarz am Zug"}]},
   {"aufgaben":[{"id":"tr-0099","fen":"r2qr1k1/pppb1ppp/n4n2/4N3/1bP1P3/1QN4P/PP2BPP1/R1B1K2R b KQ - 2 11","loesung":["e8e5"],"motiv":null,"stufe":3,"matt":null,"titel":"Schwarz am Zug"}]},
   {"aufgaben":[{"id":"tr-0100","fen":"rnb1k1nr/1pp1qppp/8/p1p5/1b2N1P1/8/PP1PPPBP/R1BQK1NR w KQkq - 0 8","loesung":["a2a3"],"motiv":null,"stufe":4,"matt":null,"titel":"Weiß am Zug"}]},
-  {"aufgaben":[{"id":"tr-0101","fen":"8/2k5/1p6/7R/3P3P/p1P2KP1/5P2/4r3 b - - 2 43","loesung":["a3a2","h5h7","c7b8"],"motiv":null,"stufe":5,"matt":null,"titel":"Schwarz am Zug"}]},
+  {"aufgaben":[{"id":"tr-0101","fen":"r2qk2r/ppp1b1pp/2npb3/3N1p2/2B1n3/P4N2/1PP2PPP/R1BQ1RK1 w kq - 0 10","loesung":["d5c7","d8c7","c4e6"],"motiv":"abzug","stufe":5,"matt":null,"titel":"Weiß am Zug"}]},
   {"aufgaben":[{"id":"tr-0102","fen":"2r3k1/1pB1bpp1/p3b3/4P3/3N3p/P7/1P3PPP/2R3K1 b - - 2 24","loesung":["e7d8","d4e6","f7e6"],"motiv":null,"stufe":6,"matt":null,"titel":"Schwarz am Zug"}]},
   {"aufgaben":[{"id":"tr-0103","fen":"r2qk1nr/pp2bpp1/2np4/3Np2p/8/3P1P1P/P1P2PP1/1RBQKBR1 b kq - 2 11","loesung":["d8a5","d5b4","c6b4"],"motiv":null,"stufe":3,"matt":null,"titel":"Schwarz am Zug"},{"id":"tr-0104","fen":"K7/4k3/5p2/1p2p3/3qP1Q1/7p/7P/8 b - - 29 78","loesung":["d4d8","a8a7","d8d7","g4d7","e7d7"],"motiv":null,"stufe":7,"matt":null,"titel":"Schwarz am Zug"}]},
   {"aufgaben":[{"id":"tr-0105","fen":"2bq3k/1p4pp/8/r3p1Pn/2p4P/5P2/2p4K/3R4 w - - 0 42","loesung":["d1d8"],"motiv":"grundreihe","stufe":1,"matt":1,"titel":"Weiß am Zug"}]},

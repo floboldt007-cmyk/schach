@@ -66,6 +66,7 @@
 //   schach-arena:schule:offen     { uid, seit }   eine Meldung steht aus
 //   schach-arena:schule:gemeldet  { uid, inhalt, am }   zuletzt gemeldet (gleiche Meldung geht nicht zweimal)
 //   schach-arena:schule:raetsel   { uid, geloest: { <aufgabeId>: [raetselId, ...] } }
+import { ladePaketCss, beimStart } from './paket-css.js';
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
 import { t, locale } from './sprache.js';
 import './sprachen/schule.js';
@@ -578,13 +579,10 @@ export function sortiereMitglieder(liste, spalte = 'name', richtung = 'auf') {
 
 // ---------- Optik ----------
 export function stelleSchuleCssSicher() {
-  if (typeof document === 'undefined' || document.querySelector('link[data-paket-css="schule"]')) return;
-  const l = document.createElement('link');
-  l.rel = 'stylesheet';
-  l.href = new URL('../css/pakete/schule.css', import.meta.url).href;
-  l.dataset.paketCss = 'schule';
-  document.head.appendChild(l);
+  return ladePaketCss('schule', { screens: ['schule'], marke: { paketCss: 'schule' } });
 }
+// hoechstens kurz warten: js/schule.js laedt auch mit dem Paket schule beim Start (js/paket-css.js)
+await beimStart(stelleSchuleCssSicher());
 
 // Icon des Schulmodus: eine Tafel auf Beinen (Paket-Zeile, Gruppe, Lehrkraft-Ansicht)
 export const ICON = 'tafel';

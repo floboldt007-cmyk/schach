@@ -328,11 +328,20 @@
    ist, die rechte Spalte reicht dafuer ueber beide Zeilen. Hochkant nur, wo unter den Wegen genug Hoehe bleibt (Handy ab
    721 px Hoehe als schmale Zeile); auf kleineren Handys und am iPad hoch faellt sie weg */
 @media (min-width: 900px) and (orientation: landscape) {
-  /* die erste Zeile so hoch wie die linke Spalte, sonst verteilt die rechte (ueber beide Zeilen) ihre Hoehe auf beide */
-  .heim-screen .heim-rumpf:has(> .heim-shop) { grid-template-rows: auto 1fr; }
+  /* die erste Zeile so hoch wie die linke Spalte, sonst verteilt die rechte (ueber beide Zeilen) ihre Hoehe auf beide. Die
+     dritte Zeile (1fr) nimmt den Rest der Hoehe, damit die rechte Spalte buendig mit dem Shop endet statt am Seitenende
+     (Antwort 8 unten); ohne Zeilenabstand, sonst kostete die leere dritte Zeile einen Abstand (Start scrollte 10 px) */
+  .heim-screen .heim-rumpf:has(> .heim-shop) { grid-template-rows: auto auto 1fr; row-gap: 0; }
+  .heim-screen .heim-rumpf:has(> .heim-shop) > .heim-shop { margin-top: var(--a4); }
   .heim-screen .heim-rumpf > .heim-links { grid-column: 1; grid-row: 1; }
   .heim-screen .heim-rumpf > .heim-rechts { grid-column: 2; grid-row: 1 / span 2; }
   .heim-screen .heim-rumpf > .heim-shop { grid-column: 1; grid-row: 2; }
+  /* Flo 20.11.2026 (Antwort 8): ist die rechte Spalte kuerzer als Buehne, Leiter und Shop, blieb rechts unten Luft (iPad quer).
+     Die Liste "Als Naechstes" reicht dann bis zur Unterkante der Shop-Karte, beide Spalten enden buendig. Hoeher als ihr
+     Inhalt oder die linke Spalte wird nichts, der Start scrollt also weiterhin nicht (tests/heim.test.mjs groessen). */
+  .heim-screen .heim-rumpf:has(> .heim-shop) > .heim-rechts { align-self: stretch; }
+  .heim-screen .heim-rumpf:has(> .heim-shop) .heim-naechstes:not([hidden]) { flex: 1; display: flex; flex-direction: column; }
+  .heim-screen .heim-rumpf:has(> .heim-shop) .heim-naechstes .heim-liste { flex: 1; }
   .heim-shop-karten[data-anzahl="1"] .heim-shop-bild { width: 132px; }
 }
 @media (max-width: 560px) and (orientation: portrait) {

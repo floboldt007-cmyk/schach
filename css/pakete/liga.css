@@ -299,6 +299,10 @@
 .lg-welt-alter, .ss-alter { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 15px; font-weight: 600; line-height: 1.45;
   color: var(--text); cursor: pointer; }
 .lg-welt-alter input, .ss-alter input { flex: none; width: 22px; height: 22px; margin: 1px 0 0; }
+/* R25 (fc, 20.11.2026): der Link "Datenschutzerklaerung" vor dem Haken war nur 19 bis 21 px hoch. Senkrechtes Polster an
+   einem Inline-Element vergroessert die Tippflaeche, aendert aber weder Zeilen noch Bild (der Text ist rechtlich abgestimmt).
+   Nach oben mehr als nach unten: bis zum Label darunter sind es nur 11 bis 13 px, 8 px lassen dem Haken noch Luft. */
+.lg-welt-einwilligung a, .ss-einwilligung a { padding: 17px 0 8px; }
 .lg-welt-meldung { margin: 0; font-size: 14px; font-weight: 600; color: var(--warn); }
 .lg-welt-leer { margin: 0; padding: 16px; font-size: 15px; font-weight: 600; color: var(--text-2); }
 .lg-welt-fussnote { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }

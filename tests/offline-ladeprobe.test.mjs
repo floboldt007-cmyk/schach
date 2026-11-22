@@ -17,6 +17,7 @@ import http from 'node:http';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import vm from 'node:vm';
 import { browserTyp } from './browser.mjs';
 import { freierPort } from './freier-port.mjs';
 
@@ -32,6 +33,15 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 if (!pw) { pruefe('Playwright gefunden', false); console.log(`${ok}/${ok + fehler} bestanden`); process.exit(1); } // INTENTIONAL-SLOP[T4]: Ausgabeweg
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+// Der Kern aus sw.js (fc-06:00, 20.11.2026): nur ihn legt die Installation ab, der Rest kommt danach in Haeppchen. Die Probe
+// beschneidet den Cache vor dem Netz-Aus auf genau den Kern und Stockfish (ZUERST, der erste Happen danach), damit sie
+// zeigt, dass das fuer alles unten reicht.
+const KERN = (() => {
+  const k = { self: { location: new URL('https://example.org/schach/sw.js'), addEventListener() {} }, URL };
+  vm.createContext(k);
+  vm.runInContext(readFileSync(path.join(root, 'sw.js'), 'utf8') + '\n;globalThis.__kern = typeof KERN === "undefined" ? null : KERN.concat(typeof ZUERST === "undefined" ? [] : ZUERST);', k);
+  return k.__kern;
+})();
 const PRAEFIX = '/schach/';
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg',
@@ -158,6 +168,20 @@ try {
       // ---------- (a) Netz aus ----------
       offline = true;
       await k.setOffline(true);
+      // erst Netz aus (das Nachladen bricht ab), dann alles ausser dem Kern aus dem Cache: so laeuft der Rest wie bei einem
+      // neuen Spieler, dessen Nachladen noch nicht fertig ist
+      await s.waitForTimeout(500);
+      const beschnitten = Array.isArray(KERN) && await s.evaluate(async (kern) => {
+        const basis = location.pathname.replace(/index\.html$/, '');
+        const behalten = new Set(kern.map((d) => basis + d));
+        let rest = 0;
+        for (const n of await caches.keys()) {
+          const c = await caches.open(n);
+          for (const r of await c.keys()) if (!behalten.has(new URL(r.url).pathname)) { await c.delete(r); rest++; }
+        }
+        return rest;
+      }, KERN);
+      pruefe(`${tag}: Cache auf den Kern beschnitten (${KERN ? KERN.length : 0} Dateien, ${beschnitten || 0} weitere entfernt)`, Array.isArray(KERN) && beschnitten !== false);
       const ohneNetz = await ladeBisHeim(s, START).catch((e) => { throw new Error('Neustart ohne Netz: ' + e.message.split('\n')[0]); });
       console.log(`MESSUNG ${tag} neustart_offline_ms=${ohneNetz}`); // INTENTIONAL-SLOP[T4]: Messwerte sind Ausgabe
       await bild(s, '1-heim-offline');
@@ -220,6 +244,51 @@ try {
       pruefe(`${tag}: Online ohne laufende Partie hat einen eigenen Offline-Text (nicht "die Partie bleibt gespeichert")`, !offen.parteiText && onlineHinweis, offen);
       pruefe(`${tag}: ohne Netz ist "Duell suchen" gesperrt (disabled, aria-disabled) mit sichtbarem Hinweis`,
         offen.da && offen.aus && offen.aria === 'true' && offen.hinweis, offen);
+      // Ohne Stockfish (Kaltreview fc-08:50, 20.11.2026): ein neuer Spieler, dessen Nachladen Stockfish noch nicht abgelegt
+      // hat. Die Bot-Partie startet trotzdem und sagt es (die Meldung ist eine kurze Einblendung, darum ein Beobachter).
+      // Eigene Seite im selben Kontext: ihre gewollt scheiternden Stockfish-Abrufe gehoeren nicht in die Listen von s;
+      // jede ANDERE gescheiterte Anfrage an die eigene App ist rot (wie unten: ausser sw.js, Fremdadressen scheitern offline).
+      const s2 = await k.newPage();
+      const s2fremd = [];
+      s2.on('requestfailed', (r) => {
+        const u = r.url().replace(/\?.*$/, '');
+        if (u.startsWith(EIGEN) && !u.endsWith('/sw.js') && !/\/vendor\/stockfish\//.test(u)) s2fremd.push(u);
+      });
+      await ladeBisHeim(s2, START);
+      const sfWeg = await s2.evaluate(async () => {
+        let n = 0;
+        for (const name of await caches.keys()) {
+          const c = await caches.open(name);
+          for (const r of await c.keys()) if (/\/vendor\/stockfish\//.test(r.url)) { await c.delete(r); n++; }
+        }
+        return n;
+      });
+      await ladeBisHeim(s2, START);
+      await s2.evaluate(() => {
+        // Flos Antwort 10 (20.11.2026): offline sagt ein ruhiger Toast "Sparmodus" (tests/r26-antworten-a.test.mjs); jeder
+        // Toast wird mit seinem Ton gemerkt, damit der rote Fehler "Schach-Engine startet nicht" auffaellt
+        window.__engineHinweis = '';
+        window.__engineToasts = [];
+        new MutationObserver(() => {
+          const t = document.querySelector('.toast-ort .toast');
+          if (!t) return;
+          const eintrag = (t.classList.contains('fehler') ? 'fehler: ' : 'info: ') + t.textContent;
+          if (!window.__engineToasts.includes(eintrag)) window.__engineToasts.push(eintrag);
+          if (/Sparmodus/.test(t.textContent)) window.__engineHinweis = eintrag;
+        }).observe(document.body, { childList: true, subtree: true, characterData: true });
+        localStorage.removeItem('schach-arena:v1:laufend');
+        window.__app.gehe('partie', { botId: 'fridolin', farbe: 'w' });
+      });
+      const ohneSf = await klappt(s2.waitForFunction((sel) => window.__partie && window.__partie.bereit === true && window.__partie.phase() === 'flo'
+        && document.querySelectorAll(sel + ' .brett img.figur').length === 32, SCREEN, { timeout: 40000 }));
+      const hinweis = await klappt(s2.waitForFunction(() => !!window.__engineHinweis, null, { timeout: 15000 }));
+      const { hinweisText, toasts } = await s2.evaluate(() => ({ hinweisText: window.__engineHinweis, toasts: window.__engineToasts.slice() }));
+      pruefe(`${tag}: ohne Stockfish im Cache startet die Bot-Partie und sagt ruhig, dass der Bot im Sparmodus spielt`,
+        sfWeg > 0 && ohneSf && hinweis && hinweisText.startsWith('info: ') && /Sparmodus/.test(hinweisText), { sfWeg, ohneSf, hinweis: hinweisText });
+      pruefe(`${tag}: ohne Stockfish kein roter Fehlerton ("Schach-Engine startet nicht")`,
+        !toasts.some((x) => x.startsWith('fehler: ') || /startet nicht/.test(x)), toasts);
+      pruefe(`${tag}: ohne Stockfish scheitert keine andere Anfrage`, s2fremd.length === 0, [...new Set(s2fremd)].slice(0, 5));
+      await s2.close();
       // (d) Konsole und Server waehrend offline
       // erwartet nur, wenn die Meldung nicht von einer eigenen Adresse stammt (Kaltreview B1c)
       const erwartet = (x) => !x.url.startsWith(EIGEN) && ERWARTET.some((re) => re.test(x.text));

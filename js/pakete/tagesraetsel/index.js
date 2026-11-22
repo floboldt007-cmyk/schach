@@ -18,6 +18,7 @@
 // Texte:      t('p-tagesraetsel.x') aus texte.js (Englische Version, Teil 2), erst beim Zeichnen; der Teilen-Text auf
 //             Englisch "Crownmate · Puzzle 12 · Tuesday ●●○○○○○" (logik.teilText).
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null.
+import { ladePaketCss, beimStart } from '../../paket-css.js';
 import { anbieten } from '../../orte.js';
 import { sende } from '../../ereignisse.js';
 import { ladeModul, speichereModul } from '../../storage.js';
@@ -249,7 +250,7 @@ function fuelleKarte(el, app) {
       ${offenArchiv ? `<button class="knopf dr tr-archiv" type="button">${esc(t('p-tagesraetsel.karte.archiv', { n: offenArchiv }))}</button>` : '<span></span>'}
       ${st.fertig
         ? `<button class="knopf dr tr-teilen" type="button">${esc(t('allgemein.teilen'))}</button>`
-        : `<button class="knopf dr primaer tr-los" type="button">${esc(t('p-tagesraetsel.karte.loesen'))}${icon('vor')}</button>`}
+        : `<button class="knopf dr tr-los" type="button">${esc(t('p-tagesraetsel.karte.loesen'))}${icon('vor')}</button>`}
     </div>`;
   const los = el.querySelector('.tr-los');
   if (los) los.addEventListener('click', (ev) => oeffne(app, ev));
@@ -318,15 +319,10 @@ function letzteTage(tag) {
 
 // ---------- Einhaengen (defensiv) ----------
 function ladeCss() {
-  try {
-    if (typeof document === 'undefined' || document.querySelector('link[data-paket="tagesraetsel"]')) return;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = new URL('../../../css/pakete/tagesraetsel.css', import.meta.url).href;
-    l.dataset.paket = L.PAKET;
-    document.head.append(l);
-  } catch (e) { /* ohne eigenes CSS bleibt alles lesbar */ }
+  return ladePaketCss('tagesraetsel');
 }
+// beim Start hoechstens kurz warten (js/paket-css.js), damit der erste Screen mit Stil malt
+await beimStart(ladeCss());
 
 function registriere() {
   ladeCss();

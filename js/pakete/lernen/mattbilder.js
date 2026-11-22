@@ -4,7 +4,10 @@
 // Weitere Bereiche liefern nur Daten (endspiele.js); Regeln, Sterne und Speicher gelten fuer alle hier.
 //
 //   LEKTIONEN [{ id, stufe, fen, ziel }]   Mattbilder; ziel = Flos Zuege bis Matt bei bester Verteidigung, mit Stockfish
-//                                          nachgerechnet (werkzeuge/mattbilder-pruefen.mjs: kuerzeres aus Suche und Selbstspiel)
+//                                          nachgerechnet (werkzeuge/mattbilder-pruefen.mjs: kuerzeres aus Suche und Selbstspiel);
+//                                          bis 7 Steine gilt die Tablebase (tests/mattbilder-tablebase.mjs)
+//                                          zielAlsFrage: true (lange Grundmatts, Ziel = Tablebase, nur mit bestem Spiel):
+//                                          der Ziel-Text fragt "Schaffst du es in N Zügen?" (Flos Antwort 4, 20.11.2026)
 //   BEREICHE [{ id, lektionen }]           'matt' (Mattbilder), 'taktik' (taktik.js), 'end' (Endspiele, endspiele.js), 'eroeffnung' (Eroeffnungen,
 //                                          eroeffnungen.js); ALLE = alle Lektionen
 //   ARTEN ['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik']; artVon(l) (ohne art: 'matt'); bereichVon(l)
@@ -64,12 +67,14 @@ export const LEKTIONEN = Object.freeze([
     runden: Object.freeze([R('4r2k/6pp/8/3QN3/8/8/5PPP/6K1 w - - 0 1', 4), R('4r1k1/6pp/8/4N3/8/8/5PPP/1Q4K1 w - - 0 1', 5)]) }),
   Object.freeze({ id: 'dame', stufe: 'mittel', fen: '8/8/8/4k3/8/8/8/3QK3 w - - 0 1', ziel: 7,
     runden: Object.freeze([R('1K6/1Q6/8/8/8/8/3k4/8 w - - 0 1', 8), R('6Q1/8/8/2k5/8/8/8/7K w - - 0 1', 9)]) }),
-  Object.freeze({ id: 'turm', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/R3K3 w - - 0 1', ziel: 13,
-    runden: Object.freeze([R('8/8/3R4/8/8/8/2k5/K7 w - - 0 1', 14), R('6R1/8/8/2k5/8/8/8/7K w - - 0 1', 16)]) }),
-  Object.freeze({ id: 'zwei-laeufer', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1', ziel: 19,
-    runden: Object.freeze([R('8/8/4k3/8/8/8/3BK1B1/8 w - - 0 1', 19), R('8/8/5k2/8/8/8/3B1KB1/8 w - - 0 1', 19)]) }),
-  Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 24,
-    runden: Object.freeze([R('8/3B2K1/8/8/8/k2N4/8/8 w - - 0 1', 26), R('8/8/8/7K/8/8/1N6/1B2k3 w - - 0 1', 31)]) }),
+  // Ziele dieser drei laut Tablebase (fc-08:15, 20.11.2026; tests/r24-mattbilder-tablebase.test.mjs), vorher aus Stockfish
+  // geschaetzt und bei allen neun Runden daneben (turm#1 und laeufer-springer#1 zu kurz, gegen beste Verteidigung nicht schaffbar)
+  Object.freeze({ id: 'turm', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/R3K3 w - - 0 1', ziel: 14, zielAlsFrage: true,
+    runden: Object.freeze([R('8/8/3R4/8/8/8/2k5/K7 w - - 0 1', 13), R('6R1/8/8/2k5/8/8/8/7K w - - 0 1', 15)]) }),
+  Object.freeze({ id: 'zwei-laeufer', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1', ziel: 17, zielAlsFrage: true,
+    runden: Object.freeze([R('8/8/4k3/8/8/8/3BK1B1/8 w - - 0 1', 15), R('8/8/5k2/8/8/8/3B1KB1/8 w - - 0 1', 15)]) }),
+  Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 30, zielAlsFrage: true,
+    runden: Object.freeze([R('8/3B2K1/8/8/8/k2N4/8/8 w - - 0 1', 23), R('8/8/8/7K/8/8/1N6/1B2k3 w - - 0 1', 24)]) }),
 ]);
 export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik', 'sammeln', 'schach', 'partie']);
 // Zug-Zaehler: im Kurs vor dem ersten Zug nur der Ziel-Text, kein "Zug 0" (claude-code-60 19.11.); Meisterschule immer
