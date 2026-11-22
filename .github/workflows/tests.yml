@@ -75,6 +75,8 @@ jobs:
         run: node tests/server-karte-besitz.test.mjs
       - name: Gegner-Effekte-Vorschlag pruefen (nicht eingespielt; Besitz, RLS, Rueckweg, Listen wie die App)
         run: node tests/server-gegner-effekte.test.mjs
+      - name: Karte-Titel-Vorschlag pruefen (nicht eingespielt; Gold- und Level-Titel nur mit Beleg, Rueckweg)
+        run: node tests/server-karte-titel.test.mjs
       - name: Benutzername-Monatssperre pruefen (nicht eingespielt; Sperre, Besitzer frei, RLS-Test, Rueckweg)
         run: node tests/server-benutzername-sperre.test.mjs
       - name: Benutzername-Haken pruefen (nicht eingespielt; Haken + Frist beim Bestaetigen, name_frei, Verwaltung, RLS-Test, Rueckweg)
