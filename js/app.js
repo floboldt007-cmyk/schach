@@ -116,6 +116,10 @@ function titelVon(name) {
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
   'werkstatt', 'lobby', 'raetsel-duell', 'schule']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
+// Design-Proben (R27, Flo 22.11.2026): nur im Testmodus setzt ?test&design=a,b das Attribut html[data-design="a b"], CSS
+// waehlt per html[data-design~="a"]. Nur kleine Namen aus a-z, 0-9 und "-"; ohne Parameter bleibt das Attribut weg.
+const DESIGN_PROBE = TEST ? (new URLSearchParams(location.search).get('design') || '').toLowerCase().split(/[,\s]+/)
+  .filter((n) => /^[a-z0-9-]+$/.test(n)).join(' ') : '';
 // Texte aus den Woerterbuechern in HTML einsetzen
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -136,6 +140,7 @@ function wendeEinstellungenAn(e) {
   const html = document.documentElement;
   // Labor-Bretter nur fuer den Erfinder (js/labor.js); andere sehen still das Standardbrett
   html.dataset.brett = brettWahl(e.brett);
+  if (DESIGN_PROBE) html.dataset.design = DESIGN_PROBE;
   // Oberflaeche der seltenen Labor-Bretter (js/brett-flaechen.js, nur dann geladen)
   brettFlaeche(html, html.dataset.brett);
   html.dataset.koordinaten = e.koordinaten ? 'an' : 'aus';
