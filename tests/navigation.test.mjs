@@ -73,10 +73,12 @@ function nodeTeil() {
   const appCss = lies('css/app.css');
   pruefe('alte Leisten-CSS aus W0+a in css/app.css ersetzt', !/\.reiter-leiste\s*\{/.test(appCss) && !/data-reiter="an"/.test(appCss));
   const nav = lies('css/navigation.css');
-  pruefe('Glas nur fuer die Reiter-Pille, mit -webkit- und Ersatz ohne backdrop-filter', /-webkit-backdrop-filter: var\(--glas-filter\)/.test(nav)
-    && /@supports not/.test(nav) && (lies('css/bauteile.css') + lies('css/training.css')).indexOf('backdrop-filter') < 0);
-  const ersatz = (nav.match(/@supports not \(\(backdrop-filter[^{]*\{([\s\S]*?\}\s*)\}/) || [])[1] || '';
-  pruefe('ohne backdrop-filter: Leiste deckend (--flaeche)', /\.reiter-leiste[^{]*\{[^}]*background(-color)?: var\(--flaeche\)/.test(ersatz), ersatz.slice(0, 160));
+  // Leiste L1 "Figurenlinie" (Flos Wahl 22.11.2026) loest die Glas-Kapsel ab: kein Glas mehr, immer deckend
+  pruefe('Leiste L1: kein backdrop-filter, deckender Grund (--flaeche)', nav.indexOf('backdrop-filter') < 0
+    && /\.reiter-leiste \{[^}]*background: var\(--flaeche\)/.test(nav) && (lies('css/bauteile.css') + lies('css/training.css')).indexOf('backdrop-filter') < 0);
+  pruefe('Leiste L1: Figuren als Masken fuer alle vier Reiter, inaktiv Umriss, aktiv massiv', ['heim', 'arena', 'bestenliste', 'ich'].every((n) =>
+    /^\s*--m-voll: url\("data:image\/svg\+xml,[^"]+"\);\s*--m-umriss: url\("data:image\/svg\+xml,[^"]+"\); \}/.test(nav.split(`.reiter-leiste .reiter[data-reiter="${n}"] {`)[1] || ''))
+    && /\.reiter\.an::before \{[^}]*mask-image: var\(--m-voll\)/.test(nav));
   pruefe('Titel im Kopf ohne Auslassungszeichen', /\.marke-titel \{[^}]*text-overflow: clip/.test(nav) && /\.marke-titel \{[^}]*white-space: nowrap/.test(nav));
 }
 
@@ -132,9 +134,9 @@ const lageMessen = (seite) => seite.evaluate(() => {
   const screen = document.querySelector('#app > .screen');
   const kopf = document.querySelector('#app > .screen .haupt-kopf');
   const st = nav ? getComputedStyle(nav) : null;
-  // Akzent: die lesbare Goldfassung des Themes (--kt-stark), aufgeloest ueber ein Probe-Element
+  // Akzent: die lesbare Goldschrift der Leiste L1 (--lm-text), aufgeloest ueber ein Probe-Element
   const probe = document.createElement('span');
-  probe.style.color = 'var(--kt-stark)';
+  probe.style.color = 'var(--lm-text)';
   document.body.append(probe);
   const akzent = getComputedStyle(probe).color;
   probe.remove();
@@ -267,8 +269,8 @@ async function testeLeiste(browser) {
     pruefe('vier Reiter in der Reihenfolge Start, Bots, Liga, Ich; Start aktiv auf heim', m.reiter === 'heim*,arena,bestenliste,ich' && m.worte === 'Start,Bots,Liga,Ich',
       `${m.reiter} | ${m.worte}`);
     pruefe('schwebt: mindestens 12 px ueber dem unteren Rand, seitlich im Bild', m.ih - m.nav.b >= 12 && m.nav.l >= 8 && m.nav.r <= m.iw - 8, JSON.stringify(m.nav));
-    pruefe('Kapsel: Radius mindestens 28 px, backdrop-filter mit Weichzeichner', m.radius >= 28 && /blur/.test(m.filter), JSON.stringify({ r: m.radius, f: m.filter }));
-    pruefe('aktiver Reiter: Klasse an (nur einer), Farbe = Akzent (--kt-stark)', m.aktivAn && m.nurEinAn && m.aktivFarbe === m.akzent, JSON.stringify({ an: m.aktivAn, f: m.aktivFarbe, a: m.akzent }));
+    pruefe('Leiste L1: schmal (hoechstens 340 px), mittig, ohne Glas', m.nav.w <= 340.5 && nah(m.nav.l, m.iw - m.nav.r) && !/blur/.test(m.filter), JSON.stringify({ n: m.nav, f: m.filter }));
+    pruefe('aktiver Reiter: Klasse an (nur einer), Farbe = Goldschrift (--lm-text)', m.aktivAn && m.nurEinAn && m.aktivFarbe === m.akzent, JSON.stringify({ an: m.aktivAn, f: m.aktivFarbe, a: m.akzent }));
     pruefe('Pille hinter dem aktiven Reiter', pilleUnterAktivem(m), JSON.stringify({ p: m.pille, a: m.aktiv }));
     pruefe('Reiter mindestens 44 x 44', m.reiterKlein === 0);
     pruefe('der Screen endet ueber der Leiste (nichts verdeckt)', m.screen.b <= m.nav.t + 0.5, JSON.stringify({ s: m.screen.b, n: m.nav.t }));
@@ -397,19 +399,15 @@ async function testeLeiste(browser) {
     await kontext.close();
   }
 
-  // ---------- ohne backdrop-filter: deckende Flaeche ----------
+  // ---------- Leiste L1 ohne Glas: immer deckend (frueher nur als Ersatz ohne backdrop-filter) ----------
   gruppe = 'Leiste ohne Glas';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
-    // Browser ohne backdrop-filter nachstellen: CSS.supports meldet ihn nicht, die @supports-Regel prueft der Node-Teil
     await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
     await seite.waitForSelector('.heim-screen .heim-buehne');
-    const ersatz = await seite.evaluate(() => {
-      const regeln = [];
-      for (const s of document.styleSheets) { try { for (const r of s.cssRules) if (r.conditionText && /not/.test(r.conditionText) && /backdrop-filter/.test(r.conditionText)) regeln.push(r.cssText); } catch (e) { /* fremd */ } }
-      return regeln.join(' ');
-    });
-    pruefe('@supports not (backdrop-filter): Leiste mit deckender Flaeche (--flaeche)', /\.reiter-leiste\s*\{[^}]*background(-color)?:\s*var\(--flaeche\)/.test(ersatz), ersatz.slice(0, 200));
+    const st = await seite.evaluate(() => { const s = getComputedStyle(document.querySelector('.reiter-leiste'));
+      return { grund: s.backgroundColor, filter: s.backdropFilter || s.webkitBackdropFilter || 'none' }; });
+    pruefe('Leiste deckend (kein Alpha), kein backdrop-filter', /^rgb\(/.test(st.grund) && st.filter === 'none', JSON.stringify(st));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }

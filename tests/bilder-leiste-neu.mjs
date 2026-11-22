@@ -1,10 +1,9 @@
-// Bilder der Design-Probe Leiste neu R27 (R19-Auswahl leiste-neu-r27): Leiste allein und ganze Startseite fuer vorher,
-// l1, l2, l3 auf iPhone 13, iPad quer und PC, hell und dunkel; dazu der gemessene Kontrast jedes Symbols gegen den Grund
-// der Leiste (berechnete Farben, WCAG 1.4.11 verlangt 3:1). Kein Teil von tests/alle.mjs.
+// Bilder der Leiste L1 "Figurenlinie" (Flos Wahl 22.11.2026, R19-Auswahl leiste-neu-r27/L1-final): Leiste allein und ganze
+// Startseite auf iPhone SE, iPhone 13, iPad quer und PC, hell und dunkel; dazu der gemessene Kontrast jedes Symbols und Namens
+// gegen den Grund der Leiste (berechnete Farben, WCAG 1.4.11 verlangt 3:1, 1.4.3 4,5:1). Kein Teil von tests/alle.mjs.
 //
-//   node tests/bilder-leiste-neu.mjs --bilder=<ordner> [--nur=l1,l2] [--schalter=vorlauf]
-// --schalter=vorlauf setzt html[data-design] selbst (solange der Probe-Schalter in js/app.js noch nicht im Zweig ist);
-// sonst kommt der Wert ueber ?test&design=<v>. Exit 0, wenn alle Bilder entstanden sind und keine Seitenfehler auftraten.
+//   node tests/bilder-leiste-neu.mjs --bilder=<ordner> [--name=nachher]
+// Exit 0, wenn alle Bilder entstanden sind und keine Seitenfehler auftraten.
 import http from 'node:http';
 import os from 'node:os';
 import { createRequire } from 'node:module';
@@ -21,8 +20,7 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 if (!pw) throw new Error('Playwright fehlt (PLAYWRIGHT_PFAD setzen)');
 const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : null; };
 const BILDER = arg('bilder') || path.join(os.tmpdir(), 'bilder-leiste-neu');
-const NUR = arg('nur') ? arg('nur').split(',') : ['vorher', 'l1', 'l2', 'l3'];
-const VORLAUF = arg('schalter') === 'vorlauf';
+const NAME = arg('name') || 'nachher';
 mkdirSync(BILDER, { recursive: true });
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -38,22 +36,21 @@ const PORT = Number(process.env.PORT || 8996);
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const GERAETE = [['iphone13', 390, 844, 3], ['ipad-quer', 1180, 820, 2], ['pc', 1280, 800, 1]];
+const GERAETE = [['iphone-se', 320, 568, 2], ['iphone13', 390, 844, 3], ['ipad-quer', 1180, 820, 2], ['pc', 1280, 800, 1]];
 let fehler = 0;
 const kontraste = [];
 const browser = await browserTyp(pw).launch({ headless: true });
 try {
-  for (const v of NUR) for (const [geraet, w, h, dpr] of GERAETE) for (const modus of ['hell', 'dunkel']) {
+  const v = NAME;
+  for (const [geraet, w, h, dpr] of GERAETE) for (const modus of ['hell', 'dunkel']) {
     const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, locale: 'de-DE' });
-    await k.addInitScript(([m, d, vor]) => {
+    await k.addInitScript((m) => {
       localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus', modus: m }));
-      if (vor && d) document.addEventListener('DOMContentLoaded', () => { document.documentElement.dataset.design = d; });
-    }, [modus, v === 'vorher' ? '' : v, VORLAUF]);
+    }, modus);
     const s = await k.newPage();
     const seitenfehler = [];
     s.on('pageerror', (e) => seitenfehler.push(e.message));
-    const suche = v === 'vorher' || VORLAUF ? '?test' : `?test&design=${v}`;
-    await s.goto(`http://127.0.0.1:${PORT}/index.html${suche}#heim`);
+    await s.goto(`http://127.0.0.1:${PORT}/index.html?test#heim`);
     await s.waitForSelector('.reiter-leiste:not([hidden]) .reiter', { timeout: 20000 });
     await s.evaluate(() => document.fonts && document.fonts.ready);
     await warte(700);

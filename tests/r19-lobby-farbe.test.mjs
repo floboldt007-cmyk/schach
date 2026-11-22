@@ -140,14 +140,8 @@ try {
       await warte(500);
       const lage = await p.s.evaluate(() => {
         const gr = (sel) => [...document.querySelectorAll(sel)].map((e) => Math.round(e.getBoundingClientRect().width));
-        const leiste = document.querySelector('.reiter-leiste');
-        const mitte = (e) => getComputedStyle(e).getPropertyValue('--sy-mitte').trim();
-        // Farbanteil der Mitte (groesster minus kleinster Kanal), berechnet vom Browser: ein Grauton liegt nahe 0
-        const bunt = (e) => { const c = document.createElement('canvas').getContext('2d'); c.fillStyle = mitte(e); c.fillRect(0, 0, 1, 1);
-          const [r, g, b] = c.getImageData(0, 0, 1, 1).data; return Math.max(r, g, b) - Math.min(r, g, b); };
-        return { arten: gr('.lb-art > .sy'), zeilen: gr('.lb-modus-karte > .sy'), leiste: leiste && !leiste.hidden,
-          reiter: leiste ? leiste.querySelectorAll('.reiter').length : 0, reiterSy: leiste ? leiste.querySelectorAll('.reiter .sy').length : 0,
-          reiterBunt: leiste && !leiste.hidden ? [...leiste.querySelectorAll('.reiter .sy')].map(bunt) : [], alteIcons: document.querySelectorAll('.lb-art > .ico, .lb-modus-karte > .ico:first-child').length,
+        return { arten: gr('.lb-art > .sy'), zeilen: gr('.lb-modus-karte > .sy'),
+          alteIcons: document.querySelectorAll('.lb-art > .ico, .lb-modus-karte > .ico:first-child').length,
           liga: (document.querySelector('.lb-rang b') || {}).textContent || '' };
       });
       pruefe(`${wer} Lobby: drei Spielarten mit Symbol (mind. 34 px), drei Zeilen mit grossem Symbol (40 bis 48 px)`,
@@ -155,12 +149,9 @@ try {
         && lage.alteIcons === 0, lage);
       pruefe(`${wer} Lobby: Liga-Name nach Satz A (Squire statt Bauer)`, /Squire|Knight|Warden|Baron|Sovereign|Crownmate/.test(lage.liga)
         && !/Bauer|Pawn/.test(lage.liga), lage.liga);
-      if (lage.leiste) {
-        // Flos Wahl 18.11.2026: alle Reiter immer bunt, der aktive faellt ueber die Gold-Flaeche auf
-        pruefe(`${wer} Leiste: jeder Reiter mit Spiel-Symbol, alle in Farbe`, lage.reiter > 0 && lage.reiterSy === lage.reiter
-          && lage.reiterBunt.length === lage.reiter && lage.reiterBunt.every((d) => d >= 60), lage);
-      }
-      const symbole = await p.s.locator('.lb-art > .sy, .lb-modus-karte > .sy, .reiter-leiste:not([hidden]) .reiter .sy').all();
+      // Leiste: die bunten Spiel-Symbole (Flos Wahl 18.11.2026) loest L1 "Figurenlinie" ab (Flos Wahl 22.11.2026);
+      // Figuren, Gold und Kontrast der Leiste prueft tests/r27-leiste-neu.test.mjs
+      const symbole = await p.s.locator('.lb-art > .sy, .lb-modus-karte > .sy').all();
       const schwach = [];
       for (const el of symbole) {
         const r = await pixelKontrast(p.s, el);
