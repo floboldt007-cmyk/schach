@@ -454,6 +454,45 @@ anmelden();
   delete globalThis.document;
 }
 
+// ---------- R28: adaptiver Takt (kurz nur, solange der Gegner in einer laufenden Partie am Zug ist) ----------
+// Flo 22.11.2026 ("online spielen geht, aber noch zeitverzoegert"): gemessen ~1 s Mittel, bis 2 s nur durch den 2-s-Takt.
+{
+  anmelden(); fetchKaputt = null; antworten.length = 0;
+  globalThis.document = { hidden: false, addEventListener() {}, removeEventListener() {} };
+  const { KURZ_MS } = await import('../js/online.js');
+  const ID2 = '1c2d3e4f-0b1f-4a2e-8c3d-5a6b7c8d9e0f';
+  const laeuft = { ...partie, id: ID2, weiss: 'u1', schwarz: 'u2', status: 'laeuft' };
+  const zaehle = () => calls.filter((c) => c.url.includes(ID2)).length;
+  const fenster = async (opt, ms = 210, vorher = null) => {
+    const n0 = zaehle();
+    const b = beobachte(ID2, { alle: 200, kurz: 20, seit: laeuft.aktualisiert_am, ...opt });
+    if (vorher) await vorher(b);
+    await warte(ms); b.stop(); return zaehle() - n0;
+  };
+  const gegner = await fenster({ partie: { ...laeuft, am_zug: 'b' } });
+  pruefe('R28 Takt: Gegner am Zug -> kurzer Abstand (viele Abfragen)', gegner >= 6, gegner);
+  const ich = await fenster({ partie: { ...laeuft, am_zug: 'w' } });
+  pruefe('R28 Takt: ich am Zug -> normaler Abstand (hoechstens 2 Abfragen in 210 ms)', ich <= 2, ich);
+  const offen = await fenster({ partie: { ...laeuft, status: 'offen', schwarz: null, am_zug: 'b' } });
+  pruefe('R28 Takt: offene Einladung -> normaler Abstand', offen <= 2, offen);
+  const ohne = await fenster({});
+  pruefe('R28 Takt: ohne bekannte Partie -> normaler Abstand (nie dauerhaft kurz)', ohne <= 2, ohne);
+  const umschalt = await fenster({ partie: { ...laeuft, am_zug: 'w' } }, 160, async (b) => { await warte(30); b.kenne?.({ ...laeuft, am_zug: 'b' }); });
+  pruefe('R28 Takt: kenne() nach dem eigenen Zug schaltet sofort auf kurz', umschalt >= 4, umschalt);
+  const fremd = await fenster({ partie: { ...laeuft, am_zug: 'w' } }, 160, async (b) => { await warte(30); b.kenne?.({ ...laeuft, id: 'andere', am_zug: 'b' }); });
+  pruefe('R28 Takt: kenne() mit fremder Partie aendert nichts', fremd <= 2, fremd);
+  antworten.push({ status: 200, body: [] }, { status: 200, body: [{ ...laeuft, am_zug: 'w', aktualisiert_am: '2026-10-22T10:00:09.000000+00:00' }] });
+  const zurueck = await fenster({ partie: { ...laeuft, am_zug: 'b' } }, 260);
+  pruefe('R28 Takt: Server meldet "ich am Zug" -> zurueck auf normal', zurueck >= 2 && zurueck <= 5, zurueck);
+  fetchKaputt = new Error('offline');
+  const backoff = await fenster({ partie: { ...laeuft, am_zug: 'b' }, beiFehler: () => {} });
+  fetchKaputt = null;
+  pruefe('R28 Takt: Fehler-Backoff bleibt (rechnet mit alle, nicht mit kurz)', backoff <= 2, backoff);
+  pruefe('R28 Takt: Vorgabe kurz = KURZ_MS (600 ms), alle bleibt 2000', KURZ_MS === 600 && /alle = 2000/.test(quelle('js/online.js')) && /kurz = KURZ_MS/.test(quelle('js/online.js')));
+  antworten.length = 0;
+  delete globalThis.document;
+}
+
 // ---------- Einladungslink ----------
 {
   pruefe('einladungsLink: Basis plus #online/CODE', einladungsLink('abc234', 'https://floboldt007-cmyk.github.io/schach/') === 'https://floboldt007-cmyk.github.io/schach/#online/ABC234');
