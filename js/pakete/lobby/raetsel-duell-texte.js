@@ -48,6 +48,9 @@ export const DE = {
   weiter: 'Gut, weiter so',
   falsch: 'Nicht ganz. 5 Sekunden Abzug, nächstes Rätsel',
   'zeit.um': 'Deine Zeit ist um. Dein Gegner spielt noch.',
+  // R27 Sofort-Ende: eigenes Ergebnis sofort, der Gegner spielt mit seiner Restzeit weiter
+  'fertig.warten': 'Fertig: {n} gelöst. Dein Gegner spielt noch.',
+  'uhr.gegner.aria': 'Zeit deines Gegners: {zeit}',
   'alle': 'Du hast alle Rätsel gespielt.',
   'ende.sieg': 'Gewonnen',
   'ende.remis': 'Unentschieden',
@@ -126,6 +129,8 @@ export const EN = {
   weiter: 'Good, keep going',
   falsch: 'Not quite. 5 seconds off, next puzzle',
   'zeit.um': 'Your time is up. Your opponent is still playing.',
+  'fertig.warten': 'Done: {n} solved. Your opponent is still playing.',
+  'uhr.gegner.aria': 'Your opponent’s time: {zeit}',
   'alle': 'You have played all the puzzles.',
   'ende.sieg': 'You won',
   'ende.remis': 'Draw',

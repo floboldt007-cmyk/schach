@@ -579,11 +579,15 @@ Online-Seite wieder die Liga statt der Elo.
 `daten-auskunft-zurueck.sql` läuft erst nach den Schritten 2 und 3. Vorher bricht die Datei mit einer Meldung ab, damit
 Saison und Weltrangliste nicht still aus der Datenauskunft fallen.
 
-## Rätsel-Duell gegen die KI wertet sofort aus (Stand 20.11.2026, vorbereitet, noch nicht eingespielt)
+## Rätsel-Duell wertet sofort aus, gegen die KI und gegen Menschen (Stand 22.11.2026, vorbereitet, noch nicht eingespielt)
 
 Bisher endete ein Rätsel-Duell gegen die KI erst nach den vollen 180 Sekunden, auch wenn der Spieler längst fertig war.
 Jetzt endet es sofort, wenn alle Rätsel gelöst sind, oder 15 Sekunden nach dem eigenen Ende, wenn die Zeit um ist. Die
 15 Sekunden sind da, damit ein Zug, der kurz vor dem Ende ankam, noch zählt. Das Ergebnis bleibt dasselbe wie bisher.
+
+Neu seit 22.11. (R27): Auch gegen Menschen. Wer fertig ist, sieht sein Ergebnis sofort und den Gegner live mit dessen
+Restzeit. Sind beide fertig, endet das Duell sofort. Der Gegner wird dabei nie angehalten, jeder spielt seine eigene
+Zeit. Dieselbe Datei bringt dafür eine neue Spalte (`fertig_am`) und eine neue Funktion (`duell_ich_fertig`).
 
 1. **SQL Editor** → den ganzen Inhalt von `supabase/raetsel-duell-ki-sofort-schema.sql` → **Run**. Die Datei kommt
    **nach** `zwei-ligen-schema.sql` und lässt sich gefahrlos zweimal einspielen.
@@ -594,7 +598,8 @@ Jetzt endet es sofort, wenn alle Rätsel gelöst sind, oder 15 Sekunden nach dem
 `raetsel-duell-ki-sofort-schema.sql` wieder einspielen. Sonst wartet das KI-Duell wieder die vollen 180 Sekunden.
 
 **Rückweg:** `supabase/raetsel-duell-ki-sofort-zurueck.sql` stellt die alten Fassungen wieder her. Schon beendete
-Duelle bleiben, wie sie sind.
+Duelle bleiben, wie sie sind. Die Spalte `fertig_am` bleibt stehen, sie stört die alten Fassungen nicht. Die App
+spielt ohne die neue Funktion weiter wie bisher (dann wartet sie wieder auf das Ende beider Uhren).
 
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 

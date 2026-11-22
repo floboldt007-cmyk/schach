@@ -66,11 +66,16 @@ const RAETSEL = [
 ];
 
 // Nachgebauter Server: ein Duell, Zeit nach der Uhr dieses Prozesses (die Seite rechnet den Versatz selbst aus)
-function neuerServer({ art = 'ki', vorlaufMs = 1200 } = {}) {
-  const srv = { art, start: null, idx: 0, schritt: 0, geloest: 0, fehler: 0, zuege: 0, beendet: false, aufrufe: [] };
+// R27 Sofort-Ende: dauerMs kuerzt die eigene Uhr; mitFertig = neues SQL mit duell_ich_fertig (sonst antwortet die RPC
+// wie ein altes SQL mit nichts); gegnerFertig setzt der Test. Beide fertig = beendet, ohne auf die Uhr zu warten.
+function neuerServer({ art = 'ki', vorlaufMs = 1200, dauerMs = 180000 } = {}) {
+  const srv = { art, start: null, idx: 0, schritt: 0, geloest: 0, fehler: 0, zuege: 0, beendet: false, aufrufe: [],
+    mitFertig: false, ichFertig: false, gegnerFertig: false };
   const iso = (ms) => new Date(ms).toISOString();
   srv.anlegen = () => { srv.start = Date.now() + vorlaufMs; };
-  const endeAm = () => srv.start + 180000 - srv.fehler * 5000;
+  const endeAm = () => srv.start + dauerMs - srv.fehler * 5000;
+  const ichFertig = () => srv.ichFertig || srv.idx >= RAETSEL.length || Date.now() >= endeAm();
+  srv.fertig = () => { srv.ichFertig = true; return srv.stand(); };
   const anzeige = () => {
     const r = RAETSEL[srv.idx];
     return r ? { nr: srv.idx + 1, fen: r.fen, bisher: r.loesung.slice(0, srv.schritt), rating: r.rating } : null;
@@ -80,11 +85,13 @@ function neuerServer({ art = 'ki', vorlaufMs = 1200 } = {}) {
   srv.stand = () => {
     if (!srv.start) return { fehler: 'DUELL_UNBEKANNT' };
     const g = srv.art === 'ki' ? Math.min(2, kiGeloest()) : 1;
+    if (srv.mitFertig && srv.ichFertig && srv.gegnerFertig) srv.beendet = true;
     const st = {
       duell: DUELL, art: srv.art, status: srv.beendet ? 'beendet' : 'laeuft', jetzt: iso(Date.now()), start_am: iso(srv.start),
-      ich: { geloest: srv.geloest, fehler: srv.fehler, ende_am: iso(endeAm()) },
-      gegner: { geloest: g, fehler: 0, ende_am: iso(srv.start + 180000), ki: srv.art === 'ki', elo: srv.art === 'ki' ? 1200 : null },
-      raetsel: srv.beendet ? null : anzeige(),
+      ich: { geloest: srv.geloest, fehler: srv.fehler, ende_am: iso(endeAm()), ...(srv.mitFertig ? { fertig: srv.beendet || ichFertig() } : {}) },
+      gegner: { geloest: g, fehler: 0, ende_am: iso(srv.start + 180000), ki: srv.art === 'ki', elo: srv.art === 'ki' ? 1200 : null,
+        ...(srv.mitFertig ? { fertig: srv.beendet || srv.gegnerFertig } : {}) },
+      raetsel: srv.beendet || (srv.mitFertig && srv.ichFertig) ? null : anzeige(),
     };
     if (srv.beendet) {
       st.ergebnis = srv.geloest > g ? 'sieg' : srv.geloest < g ? 'niederlage' : 'remis';
@@ -130,6 +137,7 @@ async function seite(browser, { breite, hoehe, schema = 'light', hash = 'raetsel
       const antwort = rpc ? rpc(name, daten) : undefined;
       if (antwort !== undefined) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(antwort) });
       if (name === 'duell_stand' && srv) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(srv.stand()) });
+      if (name === 'duell_ich_fertig' && srv && srv.mitFertig) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(srv.fertig()) });
       return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     }
     return r.fulfill({ status: 200, contentType: 'application/json',
@@ -743,6 +751,75 @@ async function neuladen(browser) {
   } finally { await p.k.close(); }
 }
 
+// R27 Sofort-Ende (Flo 22.11.2026): ist die eigene Runde vorbei, meldet die Seite das dem Server (duell_ich_fertig, genau
+// einmal, nur { duell }), zeigt das eigene Ergebnis sofort und den Gegner live mit seiner Restzeit; sind beide fertig,
+// kommt das Ergebnis, ohne auf die Uhr des Gegners zu warten. Mit altem SQL (RPC antwortet mit nichts) bleibt alles
+// wie bisher: warten, bis der Server das Duell beendet, ohne Seitenfehler.
+async function sofortEnde(browser, { geraet, breite, hoehe, schema, altesSql = false }) {
+  gruppe = `Sofort-Ende ${geraet} ${schema}${altesSql ? ' altes SQL' : ''}`;
+  const srv = neuerServer({ art: 'freundschaft', vorlaufMs: 300, dauerMs: 5000 });
+  srv.mitFertig = !altesSql;
+  const p = await seite(browser, { breite, hoehe, schema, hash: 'raetsel-duell/ABC234', srv,
+    rpc: (name) => (name === 'duell_beitreten' ? (srv.anlegen(), { duell: DUELL }) : undefined) });
+  const fertigAufrufe = () => p.aufrufe.filter((a) => a.name === 'duell_ich_fertig');
+  const gegnerUhr = () => p.s.evaluate(() => {
+    const u = document.querySelector('.rd-seite[data-wer="gegner"] .rd-uhr');
+    if (!u) return null;
+    const r = u.getBoundingClientRect();
+    return { text: u.textContent, sichtbar: !u.hidden && getComputedStyle(u).display !== 'none' && r.width > 0, aria: u.getAttribute('aria-label') };
+  });
+  try {
+    await p.s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"]', { timeout: 30000 });
+    await zieh(p.s, 'a1a8');
+    await warteBis(p.s, () => /^1 /.test(document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent));
+    const vorher = await gegnerUhr();
+    pruefe('Sofort-Ende: waehrend des eigenen Spiels keine Gegner-Uhr (nichts Neues im Bild)', !vorher || !vorher.sichtbar, vorher);
+    await p.s.waitForSelector('.screen.raetsel-duell[data-phase="zeit_um"]', { timeout: 15000 });
+    const bis = Date.now() + 5000;
+    while (!altesSql && fertigAufrufe().length === 0 && Date.now() < bis) await warte(100);
+    await warte(700);
+    const fa = fertigAufrufe();
+    if (altesSql) {
+      pruefe('Altes SQL: die Seite fragt einmal, bleibt bei "Zeit um" und wartet ohne Fehler', fa.length === 1
+        && await p.s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.phase) === 'zeit_um', fa.length);
+      srv.beendet = true;
+      await p.s.waitForSelector('.rd-ende', { timeout: 5000 });
+      pruefe('Altes SQL: das Ergebnis kommt wie bisher, wenn der Server das Duell beendet', true);
+    } else {
+      pruefe('Sofort-Ende: nach dem eigenen Ende meldet die Seite fertig, genau einmal, nur mit { duell }',
+        fa.length === 1 && JSON.stringify(fa[0].daten) === JSON.stringify({ duell: DUELL }), fa.map((a) => a.daten));
+      const m = await p.s.evaluate(() => document.querySelector('.rd-meldung')?.textContent || '');
+      pruefe('Sofort-Ende: das eigene Ergebnis steht sofort da ("1 gelöst", Gegner spielt noch)', /1 gelöst/.test(m) && /spielt noch/.test(m), m);
+      const u1 = await gegnerUhr();
+      await warte(1300);
+      const u2 = await gegnerUhr();
+      const sek = (t) => { const x = /^(\d+):(\d\d)$/.exec(t || ''); return x ? +x[1] * 60 + +x[2] : NaN; };
+      pruefe('Sofort-Ende: Gegner live mit Restzeit (sichtbar, m:ss, zaehlt herunter, mit Vorlesetext)',
+        u1?.sichtbar && u2?.sichtbar && sek(u2.text) < sek(u1.text) && sek(u1.text) > 150 && /Gegner/.test(u2.aria || ''), { u1, u2 });
+      const zuegeVorher = p.aufrufe.filter((a) => a.name === 'zug').length;
+      await bild(p.s, `raetsel-duell-sofort-${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-1-warten`);
+      const geo = await geometrie(p.s);
+      const zeile = await p.s.evaluate(() => {
+        const g = document.querySelector('.rd-seite[data-wer="gegner"]');
+        const kinder = [...g.children].filter((c) => getComputedStyle(c).display !== 'none' && !c.classList.contains('rd-balken'))
+          .map((c) => c.getBoundingClientRect()).filter((r) => r.height > 0);
+        const rg = g.getBoundingClientRect();
+        return { drin: kinder.every((r) => r.left >= rg.left - 1 && r.right <= rg.right + 1), hoehe: Math.round(rg.height) };
+      });
+      pruefe('Sofort-Ende: nichts breiter als das Fenster, Gegner-Uhr bleibt in der Gegnerleiste', geo.breit && zeile.drin, { geo, zeile });
+      srv.gegnerFertig = true;
+      const t0 = Date.now();
+      await p.s.waitForSelector('.rd-ende', { timeout: 5000 });
+      const e = await p.s.evaluate(() => ({ erg: document.querySelector('.rd-ende').dataset.ergebnis, gross: document.querySelector('.rd-ende .rd-gross').textContent }));
+      pruefe('Sofort-Ende: beide fertig, das Ergebnis kommt sofort (lange vor dem Ende der Gegner-Uhr), 1 : 1 remis',
+        Date.now() - t0 < 3000 && e.erg === 'remis' && /1\s*:\s*1/.test(e.gross), { ms: Date.now() - t0, ...e });
+      pruefe('Sofort-Ende: nach dem Fertig-Melden kein Zug mehr an den Server', p.aufrufe.filter((a) => a.name === 'zug').length === zuegeVorher);
+      await bild(p.s, `raetsel-duell-sofort-${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-2-ende`);
+    }
+    pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  } finally { await p.k.close(); }
+}
+
 const NUR = (process.argv.find((a) => a.startsWith('--nur=')) || '').slice(6) || null;
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
@@ -774,6 +851,11 @@ try {
     }
     if (!NUR || NUR === 'gross') await grosserSchirm(browser);
     if (!NUR || NUR === 'laden') await neuladen(browser);
+    if (!NUR || NUR === 'sofort') {
+      for (const l of [{ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'light' }, { geraet: 'ipad-quer', breite: 1180, hoehe: 820, schema: 'dark' },
+        { geraet: 'pc-1440', breite: 1440, hoehe: 900, schema: 'light' }]) await sofortEnde(browser, l);
+      await sofortEnde(browser, { geraet: 'iphone', breite: 390, hoehe: 844, schema: 'light', altesSql: true });
+    }
   }
 } catch (e) {
   fehler++;

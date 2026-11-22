@@ -15,8 +15,20 @@
 -- Fehlern (je 5 s) seine Uhr und damit die KI anhalten und so den Sieg samt Kronen festhalten.
 -- Ersetzt: duell_auswerten (Fassung aus zwei-ligen-schema.sql, nur die Wartebedingung im KI-Zweig neu),
 -- duell_faellige_auswerten und duell_alle_faelligen_auswerten (Fassungen aus raetsel-duell-schema.sql). Neu: ein Helfer.
--- duell_stand bleibt, wie es ist (es zeigt nach dem Ende schon den Verlauf der vollen 180 s). Gewertete Duelle und
--- Freundschaften bleiben unveraendert.
+-- duell_stand zeigt nach dem Ende schon den Verlauf der vollen 180 s.
+--
+-- R27 Sofort-Ende auch gegen Menschen (Flo 22.11.2026): wer fertig ist (alle Raetsel durch, Zeit um oder selbst beendet),
+-- meldet das mit duell_ich_fertig. Ab diesem Zeitpunkt (fertig_am, hoechstens das eigene Ende) nimmt der Server von ihm
+-- keinen Zug mehr an, sein Ergebnis steht also fest und er sieht es sofort; den Gegner sieht er live mit dessen
+-- Restzeit (duell_stand: ich.fertig, gegner.fertig, gegner.ende_am). Sind beide fertig, endet das Duell sofort, statt
+-- bis 180 s + gnade_s zu warten. Wer nicht fertig meldet und nicht wiederkommt, wird wie bisher nach seinem Ende + gnade_s
+-- gewertet. Ein Fertig-Melden haelt den Gegner nie an: er spielt seine eigene Zeit, jeder Spieler hat seine eigene Uhr.
+-- Ersetzt zusaetzlich: duell_zug_verbuchen und duell_stand (Fassungen aus raetsel-duell-schema.sql, je nur um fertig_am
+-- ergaenzt). Neu: Spalte duell_spieler.fertig_am, Helfer duell_spieler_offen_bis, RPC duell_ich_fertig.
+
+-- Neu (R27): Zeitpunkt, ab dem ein Spieler keinen Zug mehr abgibt (null = nicht gemeldet). Additiv, Rueckweg laesst sie
+-- stehen (die alten Funktionen lesen sie nicht).
+alter table public.duell_spieler add column if not exists fertig_am timestamptz;
 
 -- Schluss eines Spielers: alle Raetsel durch -> sein letzter Zug (hoechstens sein Ende), sonst sein eigenes Ende
 -- (Start + 180 s - 5 s je Fehler)
@@ -30,6 +42,23 @@ as $$
   select case when s.idx >= cardinality(d.raetsel)
               then least(coalesce(s.letzter_zug_am, d.start_am), public.duell_ende_am(d.start_am, d.dauer_s, s.fehler))
               else public.duell_ende_am(d.start_am, d.dauer_s, s.fehler) end;
+$$;
+
+-- Bis wann ein Spieler noch einen Zug verbuchen kann (R27): fertig gemeldet -> fertig_am (hoechstens sein Ende, kein
+-- Zug mehr); alle Raetsel durch -> sein letzter Zug; sonst sein Ende + nachfrist fuer spaet verbuchte Zuege, hoechstens
+-- 180 s + gnade_s. Das Duell ist auswertbar, sobald dieser Zeitpunkt fuer jeden Menschen darin vorbei ist.
+create or replace function public.duell_spieler_offen_bis(d public.duelle, s public.duell_spieler, nachfrist interval)
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when s.fertig_am is not null
+              then least(s.fertig_am, public.duell_ende_am(d.start_am, d.dauer_s, s.fehler))
+              when s.idx >= cardinality(d.raetsel) then public.duell_spieler_schluss(d, s)
+              else least(public.duell_spieler_schluss(d, s) + nachfrist,
+                         d.start_am + make_interval(secs => d.dauer_s + (public.duell_konstanten()->>'gnade_s')::integer)) end;
 $$;
 
 -- Duell auswerten (wie zwei-ligen-schema.sql); Kronen gehen ueber kronen_einfach_buchen in die Raetsel-Liga, ein
@@ -75,18 +104,18 @@ begin
     ki := public.duell_ki_verlauf(d.seed, d.ki_elo, public.duell_ratings(d), d.dauer_s);
     gb := (ki->>'geloest')::integer;
     fb := (ki->>'fehler')::integer;
-    -- die Klammer ist noetig: PL/pgSQL beendet die Bedingung sonst am ersten "then" (dem im case)
-    if now() < (case when sa.idx >= cardinality(d.raetsel) then public.duell_spieler_schluss(d, sa)
-                     else least(public.duell_spieler_schluss(d, sa) + ki_gnade,
-                                d.start_am + make_interval(secs => d.dauer_s) + gnade) end) then
+    -- R27: der Helfer rechnet wie bisher (alle durch: letzter Zug; sonst Ende + Nachfrist, hoechstens 180 s + Gnade)
+    -- und nimmt zusaetzlich das Fertig-Melden (fertig_am) als Schluss
+    if now() < public.duell_spieler_offen_bis(d, sa, ki_gnade) then
       return d;
     end if;
   else
     select * into sb from public.duell_spieler s where s.duell = d.id and s.user_id = d.b for update;
     gb := sb.geloest;
     fb := sb.fehler;
-    if now() < public.duell_ende_am(d.start_am, d.dauer_s, sa.fehler) + gnade
-       or now() < public.duell_ende_am(d.start_am, d.dauer_s, sb.fehler) + gnade then
+    -- R27 Sofort-Ende: jeder Mensch ist fertig mit fertig_am, mit allen Raetseln oder nach seinem Ende + gnade_s
+    -- (bisher immer Ende + gnade_s); erst wenn beide fertig sind, wird ausgewertet
+    if now() < public.duell_spieler_offen_bis(d, sa, gnade) or now() < public.duell_spieler_offen_bis(d, sb, gnade) then
       return d;
     end if;
   end if;
@@ -143,8 +172,8 @@ begin
 end;
 $$;
 
--- Wertet alle laufenden Duelle eines Kontos aus, deren Zeit samt Gnadenfrist um ist (wie raetsel-duell-schema.sql).
--- KI-Duelle immer mit: ob der Spieler fertig ist, prueft duell_auswerten selbst (R26 AC-05).
+-- Wertet alle laufenden Duelle eines Kontos aus, die fertig sind (wie raetsel-duell-schema.sql). Jedes gestartete Duell
+-- kommt mit: ob die Spieler fertig sind, prueft duell_auswerten selbst (R26 AC-05 fuer die KI, R27 fuer Menschen).
 create or replace function public.duell_faellige_auswerten(uid uuid)
 returns void
 language plpgsql
@@ -152,14 +181,12 @@ security definer
 set search_path = ''
 as $$
 declare
-  k jsonb := public.duell_konstanten();
   x uuid;
 begin
   for x in
     select d.id from public.duelle d
     where d.status = 'laeuft' and uid in (d.a, d.b)
-      and (d.start_am + make_interval(secs => d.dauer_s + (k->>'gnade_s')::integer) <= now()
-           or (d.art = 'ki' and d.start_am <= now()))
+      and d.start_am <= now()
     order by d.start_am
   loop
     perform public.duell_auswerten(x);
@@ -167,8 +194,8 @@ begin
 end;
 $$;
 
--- Server-Lauf ueber ALLE Konten (pg_cron alle 10 Minuten, wie raetsel-duell-schema.sql). KI-Duelle immer mit, ob der
--- Spieler fertig ist, prueft duell_auswerten selbst (R26 AC-05). Antwort: Zahl der dabei beendeten Duelle.
+-- Server-Lauf ueber ALLE Konten (pg_cron alle 10 Minuten, wie raetsel-duell-schema.sql). Jedes gestartete Duell kommt
+-- mit, ob die Spieler fertig sind, prueft duell_auswerten selbst (R26 AC-05, R27). Antwort: Zahl der beendeten Duelle.
 create or replace function public.duell_alle_faelligen_auswerten()
 returns integer
 language plpgsql
@@ -176,15 +203,13 @@ security definer
 set search_path = ''
 as $$
 declare
-  k jsonb := public.duell_konstanten();
   x uuid;
   n integer := 0;
 begin
   for x in
     select d.id from public.duelle d
     where d.status = 'laeuft'
-      and (d.start_am + make_interval(secs => d.dauer_s + (k->>'gnade_s')::integer) <= now()
-           or (d.art = 'ki' and d.start_am <= now()))
+      and d.start_am <= now()
     order by d.start_am
     limit 500
   loop
@@ -196,7 +221,175 @@ begin
 end;
 $$;
 
+-- Verbucht einen geprueften Zug (wie raetsel-duell-schema.sql). R27: nach dem Fertig-Melden nimmt der Server keinen Zug
+-- mehr an, dessen Ankunft nicht vor fertig_am liegt (DUELL_FERTIG). Antwort und Fehler sonst wie bisher.
+create or replace function public.duell_zug_verbuchen(nutzer uuid, duell uuid, idx_vorher integer, schritt_vorher integer,
+  richtig boolean, fertig boolean, ankunft timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d public.duelle;
+  s public.duell_spieler;
+  zeit timestamptz;
+begin
+  -- for share: eine gleichzeitige Auswertung (for update) wartet, bis dieser Zug verbucht ist, und umgekehrt
+  select * into d from public.duelle x where x.id = duell_zug_verbuchen.duell for share;
+  select * into s from public.duell_spieler x where x.duell = duell_zug_verbuchen.duell and x.user_id = nutzer for update;
+  if d.id is null or s.user_id is null then
+    raise exception 'DUELL_UNBEKANNT';
+  end if;
+  if d.status <> 'laeuft' then
+    raise exception 'DUELL_BEENDET';
+  end if;
+  if now() < d.start_am then
+    raise exception 'DUELL_NICHT_GESTARTET';
+  end if;
+  zeit := least(greatest(coalesce(ankunft, now()), coalesce(s.letzter_zug_am, d.start_am)), now());
+  if zeit >= public.duell_ende_am(d.start_am, d.dauer_s, s.fehler) then
+    raise exception 'DUELL_ZEIT_UM';
+  end if;
+  if s.idx >= cardinality(d.raetsel) or (s.fertig_am is not null and zeit >= s.fertig_am) then
+    raise exception 'DUELL_FERTIG';
+  end if;
+  if s.idx <> idx_vorher or s.schritt <> schritt_vorher then
+    raise exception 'DUELL_STAND_VERALTET';
+  end if;
+  if richtig and not fertig then
+    update public.duell_spieler x set schritt = x.schritt + 2, zuege = x.zuege + 1, letzter_zug_am = zeit
+    where x.duell = s.duell and x.user_id = s.user_id returning * into s;
+  else
+    update public.duell_spieler x
+    set idx = x.idx + 1, schritt = 0, zuege = x.zuege + 1, letzter_zug_am = zeit,
+        geloest = x.geloest + case when richtig then 1 else 0 end,
+        fehler = x.fehler + case when richtig then 0 else 1 end
+    where x.duell = s.duell and x.user_id = s.user_id returning * into s;
+  end if;
+  return jsonb_build_object('idx', s.idx, 'schritt', s.schritt, 'geloest', s.geloest, 'fehler', s.fehler,
+    'ende_am', public.duell_ende_am(d.start_am, d.dauer_s, s.fehler),
+    'naechstes', public.duell_raetsel_anzeige(d, s));
+end;
+$$;
+
+-- Stand eines Duells fuer den Aufrufer (wie raetsel-duell-schema.sql). R27: ich.fertig und gegner.fertig (true, sobald
+-- der Spieler keinen Zug mehr abgeben kann: gemeldet, alle Raetsel durch oder Zeit um; die KI erst mit dem Ende des
+-- Duells); nach dem eigenen Fertig-Melden kein Raetsel mehr.
+create or replace function public.duell_stand(duell uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  d public.duelle;
+  ich public.duell_spieler;
+  er public.duell_spieler;
+  gegner jsonb;
+  ki jsonb;
+  erg text;
+  delta integer;
+  rae jsonb;
+begin
+  if uid is null then
+    raise exception 'DUELL_ANMELDUNG';
+  end if;
+  select * into d from public.duelle x where x.id = duell_stand.duell;
+  if d.id is null or uid not in (d.a, coalesce(d.b, d.a)) then
+    return jsonb_build_object('fehler', 'DUELL_UNBEKANNT');
+  end if;
+  -- auswerten prueft selbst, ob beide fertig sind
+  if d.status = 'laeuft' and now() >= d.start_am then
+    d := public.duell_auswerten(d.id);
+  end if;
+  select * into ich from public.duell_spieler s where s.duell = d.id and s.user_id = uid;
+  if d.art = 'ki' then
+    ki := case when d.status = 'beendet'
+               then public.duell_ki_verlauf(d.seed, d.ki_elo, public.duell_ratings(d), d.dauer_s)
+               when d.start_am is null or now() < d.start_am then '{"geloest": 0, "fehler": 0}'::jsonb
+               else public.duell_ki_jetzt(d) end;
+    gegner := public.duell_spieler_json((ki->>'geloest')::integer, (ki->>'fehler')::integer,
+                public.duell_ende_am(d.start_am, d.dauer_s, (ki->>'fehler')::integer))
+              || jsonb_build_object('ki', true, 'elo', d.ki_elo, 'fertig', d.status = 'beendet');
+  else
+    select * into er from public.duell_spieler s where s.duell = d.id and s.user_id <> uid;
+    gegner := case when er.user_id is null then null
+                   else public.duell_spieler_json(er.geloest, er.fehler, public.duell_ende_am(d.start_am, d.dauer_s, er.fehler))
+                        || jsonb_build_object('ki', false, 'fertig', d.status = 'beendet' or er.fertig_am is not null
+                             or er.idx >= cardinality(d.raetsel)
+                             or now() >= public.duell_ende_am(d.start_am, d.dauer_s, er.fehler)) end;
+  end if;
+  if d.status = 'laeuft' and now() >= d.start_am and now() < public.duell_ende_am(d.start_am, d.dauer_s, ich.fehler)
+     and ich.fertig_am is null then
+    rae := public.duell_raetsel_anzeige(d, ich);
+  end if;
+  if d.status = 'beendet' then
+    erg := case when d.ergebnis = 'remis' then 'remis'
+                when (d.ergebnis = 'a') = (uid = d.a) then 'sieg' else 'niederlage' end;
+    delta := coalesce((select kb.delta from public.kronen_buchungen kb
+                       where kb.user_id = uid and kb.quelle in ('duell', 'duell_ki') and kb.ref = d.id::text), 0);
+  end if;
+  return jsonb_build_object(
+    'duell', d.id, 'art', d.art, 'status', d.status, 'jetzt', now(), 'start_am', d.start_am, 'dauer_s', d.dauer_s,
+    'code', case when d.status = 'offen' then d.code end,
+    'ich', public.duell_spieler_json(ich.geloest, ich.fehler, public.duell_ende_am(d.start_am, d.dauer_s, ich.fehler))
+           || jsonb_build_object('fertig', d.status = 'beendet' or ich.fertig_am is not null
+                or ich.idx >= cardinality(d.raetsel)
+                or (d.start_am is not null and now() >= public.duell_ende_am(d.start_am, d.dauer_s, ich.fehler))),
+    'gegner', gegner, 'raetsel', rae, 'ergebnis', erg, 'kronen_delta', delta);
+end;
+$$;
+
+-- R27: der Aufrufer ist fertig (alle Raetsel durch, Zeit um oder selbst beendet). Ab jetzt (hoechstens ab seinem Ende)
+-- nimmt der Server von ihm keinen Zug mehr an; sein Ergebnis steht fest. Der Gegner spielt seine Zeit weiter. Sind beide
+-- fertig, endet das Duell sofort (duell_auswerten ueber duell_stand). Wiederholbar: ein zweiter Aufruf aendert nichts.
+-- Den Aufruf schickt die App erst, wenn kein eigener Zug mehr unterwegs ist. Antwort: duell_stand.
+-- Fehler (raise): DUELL_ANMELDUNG, DUELL_UNBEKANNT, DUELL_NICHT_GESTARTET.
+create or replace function public.duell_ich_fertig(duell uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  d public.duelle;
+begin
+  if uid is null then
+    raise exception 'DUELL_ANMELDUNG';
+  end if;
+  -- for update wie duell_auswerten (erst Duell, dann Spieler): zwei gleichzeitige Fertig-Meldungen warten aufeinander
+  -- statt sich zu verklemmen; ein Zug (for share) wartet ebenso
+  select * into d from public.duelle x where x.id = duell_ich_fertig.duell for update;
+  if d.id is null or uid not in (d.a, coalesce(d.b, d.a)) then
+    raise exception 'DUELL_UNBEKANNT';
+  end if;
+  if d.status = 'laeuft' then
+    if d.start_am is null or now() < d.start_am then
+      raise exception 'DUELL_NICHT_GESTARTET';
+    end if;
+    update public.duell_spieler s
+    set fertig_am = least(now(), public.duell_ende_am(d.start_am, d.dauer_s, s.fehler))
+    where s.duell = d.id and s.user_id = uid and s.fertig_am is null;
+  elsif d.status <> 'beendet' then
+    raise exception 'DUELL_NICHT_GESTARTET';
+  end if;
+  return public.duell_stand(d.id);
+end;
+$$;
+
 -- ---------- Rechte (wie bisher; der Helfer nur intern) ----------
+revoke all on function public.duell_spieler_offen_bis(public.duelle, public.duell_spieler, interval)
+  from public, anon, authenticated;
+revoke all on function public.duell_zug_verbuchen(uuid, uuid, integer, integer, boolean, boolean, timestamptz)
+  from public, anon, authenticated, service_role;
+grant execute on function public.duell_zug_verbuchen(uuid, uuid, integer, integer, boolean, boolean, timestamptz) to service_role;
+revoke all on function public.duell_stand(uuid) from public, anon, authenticated;
+grant execute on function public.duell_stand(uuid) to authenticated;
+revoke all on function public.duell_ich_fertig(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.duell_ich_fertig(uuid) to authenticated;
 revoke all on function public.duell_spieler_schluss(public.duelle, public.duell_spieler) from public, anon, authenticated;
 revoke all on function public.duell_auswerten(uuid) from public, anon, authenticated;
 revoke all on function public.duell_faellige_auswerten(uuid) from public, anon, authenticated, service_role;

@@ -181,6 +181,126 @@ async function stand(d, u) {
   await db.query('select public.duell_alle_faelligen_auswerten()');
   pruefe('F: duell_alle_faelligen_auswerten beendet ein KI-Duell nach dem eigenen Ende', (await status(d2)) === 'beendet');
 }
+// ---------- R27 Sofort-Ende gegen Menschen (duell_ich_fertig, fertig_am) ----------
+// Ein Duell zwischen zwei Menschen, Start `vor` Sekunden zurueck. Ohne die neue Datei fehlen RPC und Spalte: die Faelle
+// schlagen dann rot an (der Fehlertext steht in der Meldung).
+async function menschDuell({ vor, art = 'gewertet' }) {
+  const neu = async () => {
+    nr++;
+    const u = `00000000-0000-4000-9000-${String(nr).padStart(12, '0')}`;
+    await db.query('insert into auth.users (id, email) values ($1, $2)', [u, `m${nr}@example.invalid`]);
+    return u;
+  };
+  const a = await neu();
+  const b = await neu();
+  const d = (await db.query(`select public.duell_anlegen($1, $2::uuid, $3::uuid, null) as id`, [art, a, b])).rows[0].id;
+  await db.query(`update public.duelle set start_am = now() - make_interval(secs => $2::double precision), status = 'laeuft'
+    where id = $1`, [d, vor]);
+  return { d, a, b };
+}
+async function alsNutzer(u, sql, werte) {
+  await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [u]);
+  try {
+    return { r: (await db.query(sql, werte)).rows[0] };
+  } catch (e) {
+    return { f: e.message };
+  } finally {
+    await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
+  }
+}
+const ichFertig = (u, d) => alsNutzer(u, 'select public.duell_ich_fertig($1) as s', [d]);
+const zug = async (u, d, ankunftNach) => {
+  try {
+    const r = (await db.query(`select public.duell_zug_verbuchen($1, $2, (select idx from public.duell_spieler where duell = $2
+      and user_id = $1), 0, true, true, (select x.start_am from public.duelle x where x.id = $2) + make_interval(secs => $3::double precision)) as z`,
+    [u, d, ankunftNach])).rows[0].z;
+    return { r };
+  } catch (e) {
+    return { f: e.message };
+  }
+};
+// M1) A ist nach 30 s fertig: sein Ergebnis steht sofort, das Duell laeuft fuer B weiter (A haelt B nicht an)
+{
+  const { d, a, b } = await menschDuell({ vor: 30 });
+  await zug(a, d, 10);
+  const x = await ichFertig(a, d);
+  pruefe('M1: duell_ich_fertig gibt es und antwortet mit dem Stand', !!(x.r && x.r.s && x.r.s.ich), x.f || JSON.stringify(x.r));
+  pruefe('M1: A ist fertig, das Duell laeuft fuer B weiter', x.r?.s?.status === 'laeuft' && x.r?.s?.ich?.fertig === true,
+    JSON.stringify(x.r?.s));
+  pruefe('M1: A bekommt kein Raetsel mehr', x.r?.s?.raetsel == null);
+  const sb = await stand(d, b);
+  pruefe('M1: B sieht A als fertig, mit Punkten', sb.gegner?.fertig === true && sb.gegner?.geloest === 1, JSON.stringify(sb.gegner));
+  pruefe('M1: B spielt weiter (eigenes Raetsel, nicht fertig)', sb.raetsel != null && sb.ich?.fertig === false, JSON.stringify(sb.ich));
+  // M2) Zug nach dem Fertig-Melden wird abgelehnt; B spielt weiter
+  // Ankunft nach der Meldung (35 s nach dem Start, auf "jetzt" begrenzt); ein Zug mit Ankunft davor zaehlte noch
+  const spaet = await zug(a, d, 35);
+  pruefe('M2: ein Zug von A nach dem Fertig-Melden wird abgelehnt', /DUELL_FERTIG/.test(spaet.f || ''), JSON.stringify(spaet));
+  const zb = await zug(b, d, 25);
+  pruefe('M2: B kann nach dem Fertig-Melden von A weiter ziehen', zb.r?.geloest === 1, JSON.stringify(zb));
+  // M3) B meldet sich fertig: das Duell endet sofort (bisher erst nach 180 s + Gnade), gewertet wie bisher
+  const y = await ichFertig(b, d);
+  pruefe('M3: beide fertig: das Duell endet sofort', y.r?.s?.status === 'beendet', JSON.stringify(y.r?.s || y.f));
+  pruefe('M3: Ergebnis wie bisher (gleich viele geloest und Fehler: remis)', y.r?.s?.ergebnis === 'remis', y.r?.s?.ergebnis);
+}
+// M4) Fertig-Melden zweimal aendert nichts; nach dem eigenen Ende zaehlt das eigene Ende; vor dem Start und fuer Fremde nie
+{
+  const { d, a, b } = await menschDuell({ vor: 40 });
+  await ichFertig(a, d);
+  const fa = async () => (await db.query('select fertig_am::text as t from public.duell_spieler where duell = $1 and user_id = $2', [d, a])
+    .catch(() => ({ rows: [{}] }))).rows[0]?.t;
+  const erst = await fa();
+  const vorher = await zug(a, d, 20);
+  pruefe('M4: ein Zug, der vor dem Fertig-Melden ankam (spaet verbucht), zaehlt noch', vorher.r?.geloest === 1, JSON.stringify(vorher));
+  await db.query(`update public.duelle set start_am = start_am - interval '5 seconds' where id = $1`, [d]);
+  await ichFertig(a, d);
+  const dann = await fa();
+  pruefe('M4: zweites Fertig-Melden aendert den Zeitpunkt nicht', erst != null && erst === dann, `${erst} / ${dann}`);
+  await db.query(`update public.duelle set start_am = now() - interval '182 seconds' where id = $1`, [d]);
+  const spaet = await ichFertig(b, d);
+  const fb = (await db.query(`select s.fertig_am = public.duell_ende_am(x.start_am, x.dauer_s, s.fehler) as gleich
+    from public.duell_spieler s join public.duelle x on x.id = s.duell where s.duell = $1 and s.user_id = $2`, [d, b])
+    .catch((e) => ({ rows: [{ gleich: e.message }] }))).rows[0]?.gleich;
+  pruefe('M4: nach dem eigenen Ende gemeldet: fertig_am ist das eigene Ende, nicht spaeter', fb === true, String(fb) + (spaet.f || ''));
+  const fremd = await menschDuell({ vor: 10 });
+  const x = await ichFertig(fremd.a, d);
+  pruefe('M4: ein Fremder kann kein Duell fertig melden', /DUELL_UNBEKANNT/.test(x.f || ''), JSON.stringify(x));
+  const zukunft = await menschDuell({ vor: -30 });
+  const z = await ichFertig(zukunft.a, zukunft.d);
+  pruefe('M4: vor dem Start gibt es kein Fertig-Melden', /DUELL_NICHT_GESTARTET/.test(z.f || ''), JSON.stringify(z));
+  const ohne = await alsNutzer('', 'select public.duell_ich_fertig($1) as s', [d]);
+  pruefe('M4: ohne Anmeldung kein Fertig-Melden', /DUELL_ANMELDUNG/.test(ohne.f || ''), JSON.stringify(ohne));
+}
+// M5) Nur A fertig, B kommt nie wieder: wie bisher nach dem Ende von B + Gnade beendet (kein Haengen, keine Abkuerzung)
+{
+  const { d, a } = await menschDuell({ vor: 100 });
+  await ichFertig(a, d);
+  pruefe('M5: nur A fertig, B noch in seiner Zeit: laeuft', (await auswerten(d)) === 'laeuft');
+  await db.query(`update public.duelle set start_am = now() - interval '184 seconds' where id = $1`, [d]);
+  await db.query('select public.duell_alle_faelligen_auswerten()');
+  pruefe('M5: nach dem Ende von B + Gnade beendet die Sammel-Auswertung das Duell', (await status(d)) === 'beendet');
+}
+// M6) Freundschaft: beide fertig -> sofort beendet, auch ueber duell_faellige_auswerten
+{
+  const { d, a } = await menschDuell({ vor: 20, art: 'freundschaft' });
+  await db.query(`update public.duell_spieler set fertig_am = now() where duell = $1`, [d]).catch(() => null);
+  await db.query('select public.duell_faellige_auswerten($1)', [a]);
+  pruefe('M6: Freundschaft, beide fertig: duell_faellige_auswerten beendet sofort', (await status(d)) === 'beendet');
+}
+// M7) Rechte: angemeldete Nutzer duerfen duell_ich_fertig, anon nicht
+{
+  const r = (await db.query(`select has_function_privilege('authenticated', 'public.duell_ich_fertig(uuid)', 'execute') as au,
+    has_function_privilege('anon', 'public.duell_ich_fertig(uuid)', 'execute') as an`).catch((e) => ({ rows: [{ f: e.message }] }))).rows[0];
+  pruefe('M7: authenticated darf duell_ich_fertig, anon nicht', r.au === true && r.an === false, JSON.stringify(r));
+}
+// M8) KI-Duell: Fertig-Melden beendet sofort, die KI zaehlt weiter mit ihren vollen 180 s
+{
+  const { d, u } = await kiDuell({ vor: 30, geloest: 2 });
+  const x = await ichFertig(u, d);
+  const soll = await kiBei(d, 180);
+  pruefe('M8: KI-Duell, fertig gemeldet: sofort beendet, KI mit 180 s', x.r?.s?.status === 'beendet'
+    && x.r?.s?.gegner?.geloest === soll.geloest, JSON.stringify(x.r?.s?.gegner || x.f));
+}
+
 // G) der RLS-Test der zwei Ligen (er prueft die Duelle im Live-Stand) laeuft weiter ohne FEHLER. raetsel-duell-rls-test.sql
 //    gilt nach zwei-ligen-schema.sql nicht mehr (scheitert dort schon ohne diese Datei: "erste Suche wartet nicht")
 for (const datei of ['supabase/zwei-ligen-rls-test.sql']) {
@@ -198,6 +318,20 @@ if (!ohne) {
   const helfer = (await db.query(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'duell_spieler_schluss'`)).rows[0].n;
   pruefe('Rueckweg: der neue Helfer duell_spieler_schluss ist weg', helfer === 0, helfer);
+  const r27 = (await db.query(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname in ('duell_ich_fertig', 'duell_spieler_offen_bis')`)).rows[0].n;
+  pruefe('Rueckweg R27: duell_ich_fertig und duell_spieler_offen_bis sind weg', r27 === 0, r27);
+  {
+    const { d: dm, a: am } = await menschDuell({ vor: 30 });
+    await db.query('update public.duell_spieler set fertig_am = now() - interval \'5 seconds\' where duell = $1 and user_id = $2', [dm, am]);
+    const z = await zug(am, dm, 29);
+    pruefe('Rueckweg R27: alte Fassung nimmt Zuege trotz fertig_am wieder an', z.r?.geloest === 1, JSON.stringify(z));
+    const sm = await stand(dm, am);
+    pruefe('Rueckweg R27: duell_stand ohne fertig, wie in raetsel-duell-schema.sql', sm.ich && !('fertig' in sm.ich), JSON.stringify(sm.ich));
+    await db.query('update public.duell_spieler set fertig_am = now() where duell = $1', [dm]);
+    pruefe('Rueckweg R27: Menschen warten wieder bis zum Ende + Gnade', (await auswerten(dm)) === 'laeuft');
+    globalThis.__dm = dm;
+  }
   const { d } = await kiDuell({ vor: 150, fehler: 10 });
   pruefe('Rueckweg: alte Fassung wartet wieder bis 180 s + Gnade', (await auswerten(d)) === 'laeuft');
   const { d: dv, u: uv } = await kiDuell({ vor: 184, geloest: 3 });
@@ -210,6 +344,8 @@ if (!ohne) {
   f = await lauf(db, `${VORWAERTS} (nach Rueckweg)`, lies(VORWAERTS));
   pruefe(`${VORWAERTS} laeuft nach dem Rueckweg wieder`, f === null, f);
   pruefe('wieder vorwaerts: das Duell von eben endet jetzt sofort', (await auswerten(d)) === 'beendet');
+  pruefe('wieder vorwaerts R27: das Menschen-Duell mit beiden fertig endet jetzt sofort (Spalte blieb stehen)',
+    (await auswerten(globalThis.__dm)) === 'beendet');
 }
 
 await db.close();

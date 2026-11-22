@@ -289,7 +289,8 @@ export function zeige(root, params, app) {
     // dasselbe Duell nach dem Neuladen (oder Link): die Reihe dieses Tabs bleibt, ein neues Duell beginnt leer
     const alt = ladeLauf();
     const reihe = alt && alt.id === id ? alt.reihe : [];
-    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe, gesehen: false });
+    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe, gesehen: false,
+      gemeldet: false });
     merkeLauf(id, reihe);
     phase('vorlauf');
     rumpf.innerHTML = `<div class="rd-spiel">
@@ -325,6 +326,7 @@ export function zeige(root, params, app) {
       if (!d.gesehen) { d.gesehen = true; intro(st); }
       if (!d.wartet) setzeRaetsel(st.raetsel);
       zeichneLeiste();
+      zeigeWarten();
     }
     spaeter(hole, testZahl('__duellAbfrageMs', 1000));
   }
@@ -353,7 +355,7 @@ export function zeige(root, params, app) {
   function tick() {
     if (weg || !d.id || !d.st) { if (!weg && d.id) spaeter(tick, 250); return; }
     const p = phaseAus(d.st, d.versatz, Date.now());
-    const uhr = rumpf.querySelector('.rd-uhr');
+    const uhr = rumpf.querySelector('.rd-seite.ich .rd-uhr');
     if (!uhr) return;
     const rest = p === 'vorlauf' ? DAUER_MS - d.st.ich.fehler * KONST.STRAFE_S * 1000 : restMs(d.st.ich.ende_am, d.versatz, Date.now());
     uhr.textContent = uhrText(rest);
@@ -368,7 +370,54 @@ export function zeige(root, params, app) {
       if (p === 'zeit_um') { brett.erlaubeZuege(null); zeigeMeldung('', D('zeit.um')); }
       if (p === 'vorlauf') zeigeMeldung('', D('vorlauf'));
     }
+    // R27 Sofort-Ende: ist die eigene Runde vorbei und kein Zug mehr unterwegs, einmal dem Server melden
+    if (p === 'zeit_um' && !d.wartet && !d.gemeldet) meldeFertig();
+    tickGegner(p);
     spaeter(tick, 250);
+  }
+
+  // R27 Sofort-Ende (raetsel-duell-ki-sofort-schema.sql, duell_ich_fertig): danach nimmt der Server keinen eigenen Zug
+  // mehr an und wertet aus, sobald auch der Gegner fertig ist. Altes SQL ohne die RPC (null oder Fehler): nichts aendert
+  // sich, die Seite wartet wie bisher, bis der Server das Duell nach der Uhr beendet.
+  function meldeFertig() {
+    d.gemeldet = true;
+    const id = d.id;
+    server.fertig(id).then((st) => {
+      if (weg || d.id !== id || !st) return;
+      d.versatz = versatzAus(st.jetzt, Date.now());
+      d.st = st;
+      if (st.status === 'beendet' || st.status === 'abgebrochen') { zeigeEnde(st); return; }
+      zeichneLeiste();
+      zeigeWarten();
+    }, () => { /* wie bisher weiter */ });
+  }
+
+  // Nur wenn der Server mich als fertig fuehrt (neues SQL) und ein Mensch noch spielt: das eigene Ergebnis in der Zeile
+  function zeigeWarten() {
+    const st = d.st;
+    if (!st || !st.ich.fertig || st.status !== 'laeuft') return;
+    const text = D('fertig.warten', { n: st.ich.geloest });
+    if (rumpf.querySelector('.rd-meldung')?.textContent !== text) zeigeMeldung('', text);
+  }
+
+  // Restzeit des Gegners, sobald ich fertig bin und er (ein Mensch) noch spielt; vorher gibt es diese Uhr nicht
+  function tickGegner(p) {
+    const st = d.st;
+    const gs = rumpf.querySelector('.rd-seite[data-wer="gegner"]');
+    if (!gs) return;
+    let uhr = gs.querySelector('.rd-uhr');
+    const zeigen = p === 'zeit_um' && st.ich.fertig && st.art !== 'ki' && st.gegner && !st.gegner.fertig && !!st.gegner.ende_am;
+    if (!zeigen) { if (uhr) uhr.hidden = true; gs.classList.remove('mit-uhr'); return; }
+    if (!uhr) {
+      gs.querySelector('.rd-geloest').insertAdjacentHTML('afterend', '<span class="rd-uhr zahl" role="timer" aria-live="off"></span>');
+      uhr = gs.querySelector('.rd-uhr');
+    }
+    const rest = restMs(st.gegner.ende_am, d.versatz, Date.now());
+    uhr.hidden = false;
+    gs.classList.add('mit-uhr');
+    uhr.textContent = uhrText(rest);
+    uhr.setAttribute('aria-label', D('uhr.gegner.aria', { zeit: uhrText(rest) }));
+    uhr.classList.toggle('laeuft', rest > 0);
   }
 
   // Name des Gegners wie in der Leiste, auch auf der Ende-Karte

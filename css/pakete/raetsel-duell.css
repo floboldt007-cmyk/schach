@@ -116,7 +116,7 @@ html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: s
 .rd-seite { --av: 46px; position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av info zahl";
   align-items: center; column-gap: 12px; min-height: 66px; padding: 10px 10px 10px 12px; border-radius: 20px;
   background-color: var(--flaeche); background-image: var(--textur-flaeche, none); box-shadow: var(--s1), var(--kante); }
-.rd-seite.ich { grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "av info zahl uhr"; }
+.rd-seite.ich, .rd-seite.gegner.mit-uhr { grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "av info zahl uhr"; }
 .rd-seite > .av { grid-area: av; display: grid; place-items: center; width: var(--av); height: var(--av); border-radius: 15px; overflow: hidden;
   background: var(--flaeche-2); color: var(--text-2); box-shadow: none; }
 .rd-seite.ich > .av { background: var(--flo-grund); }
@@ -136,6 +136,7 @@ html[data-reiter="seite"] .screen.raetsel-duell .haupt-kopf .marke { position: s
   background: var(--flaeche-3); color: var(--text-2); transition: background-color var(--d-m) var(--sanft), color var(--d-m) var(--sanft); }
 .rd-seite .rd-uhr.laeuft { background: var(--tinte); color: var(--auf-tinte); }
 .rd-seite .rd-uhr.warn { background: var(--warn); color: var(--grund); }
+.rd-seite .rd-uhr[hidden] { display: none; }
 .rd-balken { position: absolute; left: 12px; right: 12px; bottom: 5px; height: 3px; border-radius: var(--r-pille); background: var(--linie-2); overflow: hidden; }
 .rd-balken > i { display: block; height: 100%; background: var(--gut); transform: scaleX(0); transform-origin: 0 50%;
   transition: transform var(--d-m, .3s) var(--sanft, ease); }
