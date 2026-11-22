@@ -73,6 +73,8 @@ jobs:
         run: node tests/server-karte-sondertitel.test.mjs
       - name: Karte-Besitz-Vorschlag pruefen (nicht eingespielt; Rahmen nur mit Beleg, Rueckweg)
         run: node tests/server-karte-besitz.test.mjs
+      - name: Karte-Titel-Vorschlag pruefen (nicht eingespielt; Gold- und Level-Titel nur mit Beleg, Rueckweg)
+        run: node tests/server-karte-titel.test.mjs
       - name: Benutzername-Monatssperre pruefen (nicht eingespielt; Sperre, Besitzer frei, RLS-Test, Rueckweg)
         run: node tests/server-benutzername-sperre.test.mjs
       - name: Liga-Bild-SQL ausfuehren (vorbereitet, nicht eingespielt)
