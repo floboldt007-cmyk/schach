@@ -143,7 +143,9 @@ function einstellungen() {
   return el;
 }
 
-anbieten('partie:matt', (ctx) => starteFinisher(ctx), { paket: MODUL });
+// ctx.fremd (Online, R26): der Finisher des Gegners, der gewonnen hat; nur eine bekannte Kennung, sonst keiner
+anbieten('partie:matt', (ctx) => (ctx.fremd === undefined ? starteFinisher(ctx)
+  : (FINISHER.some((x) => x.id === ctx.fremd) ? starteFinisher(ctx, ctx.fremd) : null)), { paket: MODUL });
 anbieten('einstellungen:gruppen', einstellungen, { paket: MODUL, reihenfolge: 45 });
 // Sammlung (Reiter Ich): jeder Finisher, der ausgewaehlte als "Ausgeruestet", Gesperrtes nennt seinen Weg; Schild "Labor" nur beim
 // Erfinder. Bild: der Moment des Finishers mit den echten Figuren des ausgeruesteten Satzes (js/sammlung-kunst.js, Flo 31.10.2026)

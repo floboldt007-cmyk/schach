@@ -19,6 +19,7 @@ import { waehle } from '../orte.js';
 import { t } from '../sprache.js';
 import { floAvatar, profilAvatar, avatarVon } from '../thema.js';
 import { profilWahl } from '../profil.js';
+import { KARTE_MOTIVE, KARTE_RAHMEN } from '../karte.js';
 import { stufeInfo, saisonAbzeichen, saisonTitel } from '../pakete/liga/kronen.js';
 import '../pakete/sammlung/karte-texte.js';
 
@@ -85,6 +86,14 @@ export function botKarte(bot) {
 
 // Server-Karte (supabase/karte-schema.sql karte_von): jeder Wert wird geprueft, bevor er ins Bild kommt.
 // orden(familie, stufe) -> { name, bild } liefert das Paket sammlung (Name und Abzeichen der Familie).
+// Profilbild eines FREMDEN Spielers aus Server-Werten (Karte, Weltrangliste): nur Motive und Rahmen, die die Server-Karte
+// kennen darf (js/karte.js, wie karte_konstanten), alles andere wird zum Standard. Koenig, Kronli, Erfinder- und Labor-Rahmen
+// gibt es nur im eigenen Bild (Review 6e zu #271, Befund 3: der Client verlaesst sich nicht allein auf den Server)
+export function fremderAvatar(o = {}) {
+  return profilAvatar({ figur: KARTE_MOTIVE.includes(o.motiv) ? o.motiv : 'P', grund: o.grund,
+    rahmen: KARTE_RAHMEN.includes(o.rahmen) ? o.rahmen : 'ohne' }, 'w');
+}
+
 export function karteVomServer(d, { orden = () => null, titel = () => null } = {}) {
   const o = d && typeof d === 'object' ? d : {};
   const name = typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 40) : K('karte.gegner');
@@ -99,7 +108,7 @@ export function karteVomServer(d, { orden = () => null, titel = () => null } = {
     // R19 Season (saison_karte_der_partie ueber karteDerPartie): nur das beste Abzeichen und ein selbst gewaehlter Titel
     saison: saisonAbzeichen(o.saison && o.saison.abzeichen),
     saisonTitel: (saisonTitel(o.saison && o.saison.titel) || {}).id || null,
-    avatar: profilAvatar({ figur: o.motiv, grund: o.grund, rahmen: o.rahmen }, 'w'),
+    avatar: fremderAvatar(o),
     orden: vitrine.map((v) => {
       if (!v || typeof v.familie !== 'string' || !Number.isInteger(v.stufe) || v.stufe < 1 || v.stufe > 3) return null;
       const x = orden(v.familie, v.stufe);

@@ -71,7 +71,7 @@ import {
 import { icon, spielSymbol } from './ui/icons.js';
 import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
-import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
+import { wendeThemaAn, themaVon, aktuellesThema, floAvatar } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
 import { toast, toastLeeren, schliesseSheet, schluckeFolgeKlick } from './ui/bauteile.js';
 import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
@@ -80,6 +80,7 @@ import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
 import { brettWahl, klangWahl, brettFlaeche } from './labor.js';
 import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderstuecke.js';
+import { profilWahl } from './profil.js';
 import { sitzung, eigenerName, ladeProfil, userId } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { pruefeUmzug } from './umzug.js';
@@ -115,6 +116,10 @@ function titelVon(name) {
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
   'werkstatt', 'lobby', 'raetsel-duell', 'schule']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
+// Design-Proben (R27, Flo 22.11.2026): nur im Testmodus setzt ?test&design=a,b das Attribut html[data-design="a b"], CSS
+// waehlt per html[data-design~="a"]. Nur kleine Namen aus a-z, 0-9 und "-"; ohne Parameter bleibt das Attribut weg.
+const DESIGN_PROBE = TEST ? (new URLSearchParams(location.search).get('design') || '').toLowerCase().split(/[,\s]+/)
+  .filter((n) => /^[a-z0-9-]+$/.test(n)).join(' ') : '';
 // Texte aus den Woerterbuechern in HTML einsetzen
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -135,6 +140,7 @@ function wendeEinstellungenAn(e) {
   const html = document.documentElement;
   // Labor-Bretter nur fuer den Erfinder (js/labor.js); andere sehen still das Standardbrett
   html.dataset.brett = brettWahl(e.brett);
+  if (DESIGN_PROBE) html.dataset.design = DESIGN_PROBE;
   // Oberflaeche der seltenen Labor-Bretter (js/brett-flaechen.js, nur dann geladen)
   brettFlaeche(html, html.dataset.brett);
   html.dataset.koordinaten = e.koordinaten ? 'an' : 'aus';
@@ -1216,8 +1222,16 @@ function pruefeSonderstuecke() {
   } catch (e) { return; }
   sonderLaeuft = true;
   const vorher = istErfinder();
+  const figurVorher = profilWahl().figur;
   ladeSonderstuecke().then((ids) => {
     if (!ids) { sonderFehlerBis = Date.now() + 60000; return; }
+    // R26 (Befund 9f, 21.11.2026): das eigene Bild hing bis hierher an der gespeicherten Wahl; aendert die Antwort es
+    // (belegt kein Erfinder: Koenig wird Bauer), tauschen alle offenen Bilder, auch in Partie, Duell und VS-Intro
+    if (profilWahl().figur !== figurVorher) {
+      for (const el of document.querySelectorAll('svg[data-eigen-avatar]')) {
+        try { el.outerHTML = floAvatar(el.dataset.eigenAvatar === 'b' ? 'b' : 'w'); } catch (e) { /* naechster */ }
+      }
+    }
     // Labor-Brett und Figurensatz haengen am Erfinder-Status: neu anwenden (Feldfarben am html, schach:einstellungen),
     // damit auch ein Spiel-Screen, der nicht neu gezeigt wird, den eigenen Skin bekommt (Befund 4 vom 11.11.2026)
     if (istErfinder() !== vorher) wendeEinstellungenAn(ladeEinstellungen());

@@ -18,7 +18,7 @@ import { sitzung, userId } from '../../konto.js';
 import { MENSCHEN_BANNER } from '../../ui/visitenkarte.js';
 import '../sammlung/karte-texte.js';
 import './texte.js';
-import { istVerwalter, vergissVerwalter, konten, kaeufe, setzePremium, setzeName, setzeBanner, protokoll } from '../../verwaltung.js';
+import { istVerwalter, vergissVerwalter, konten, kaeufe, setzePremium, setzeName, setzeBanner, protokoll, hebeNamensSperreAuf } from '../../verwaltung.js';
 
 const V = (k, w) => t('p-verwaltung.' + k, w);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -56,7 +56,9 @@ export function kontoAnsicht(k, d) {
       ${sonder.length ? `<p><b>${esc(V('k.sonder'))}:</b> ${sonder.map((s) => esc(s.stueck_id)).join(', ')}</p>` : ''}</section>
     <section class="vw-teil"><h5>${esc(V('k.name'))}</h5>
       <input class="vw-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" value="${esc(k.benutzername || '')}" aria-label="${esc(V('k.name'))}">
-      <button class="knopf" type="button" data-vw="name">${esc(V('k.nameSpeichern'))}</button></section>
+      <button class="knopf" type="button" data-vw="name">${esc(V('k.nameSpeichern'))}</button>
+      <button class="knopf" type="button" data-vw="name-sperre">${esc(V('k.nameSperre'))}</button>
+      <p class="es-hilfe">${esc(V('k.nameSperreHilfe'))}</p></section>
     <section class="vw-teil"><h5>${esc(V('k.banner'))}</h5><div class="vw-banner">${VERGEBBAR.map((b) => {
       const q = verdient.get(b);
       const fest = q && q !== 'verwaltung';
@@ -125,6 +127,7 @@ export function zeigeVerwaltung() {
     else if (art === 'premium') nachAenderung(() => setzePremium(aktuell.user_id, new Date(Date.now() + Number(b.dataset.tage) * TAG_MS)));
     else if (art === 'premium-weg') nachAenderung(() => setzePremium(aktuell.user_id, null));
     else if (art === 'name') nachAenderung(() => setzeName(aktuell.user_id, ort.querySelector('.vw-name')?.value));
+    else if (art === 'name-sperre') nachAenderung(() => hebeNamensSperreAuf(aktuell.user_id));
     else if (art === 'banner') nachAenderung(() => setzeBanner(aktuell.user_id, b.dataset.banner, b.getAttribute('aria-pressed') !== 'true'));
   });
   inhalt.addEventListener('keydown', (e) => {
