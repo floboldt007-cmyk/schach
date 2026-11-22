@@ -249,6 +249,9 @@ const SUITEN = [
   { name: 'r25-offline-rueckfall', datei: 'r25-offline-rueckfall.test.mjs', args: [], was: 'R25 Offline-Rueckfall: ohne Netz direkt nach einem Update startet die App (Browser)' },
   { name: 'r25-paket-css', datei: 'r25-paket-css.test.mjs', args: [], was: 'R25 Paket-CSS vor dem Aufbau des Screens geladen (Browser)' },
   { name: 'r25-zugliste', datei: 'r25-zugliste.test.mjs', args: [], was: 'R25 F4 Leistung: Zugliste nur geaenderte Zeilen neu bauen' },
+  { name: 'r26-erfinder-figur', datei: 'r26-erfinder-figur.test.mjs', args: [], was: 'R26 Befund 9f: Erfinder-Profilfigur bleibt Koenig bis zur Server-Antwort, Bauer erst bei belegtem Nicht-Besitz (Node)' },
+  { name: 'r26-erfinder-figur-app', datei: 'r26-erfinder-figur-app.test.mjs', args: [], was: 'R26 Befund 9f im Browser: frisches Geraet, verzoegerte Antwort, eigenes Bild in der Partie nie der Bauer (Browser)' },
+  { name: 'r26-erfinder-rahmen-app', datei: 'r26-erfinder-rahmen-app.test.mjs', args: [], was: 'R26 eigener Rahmen in jedem Startbild (Bot, Duell-Intro, Online, Raetsel-Duell), auch auf frischem Geraet (Browser)' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten

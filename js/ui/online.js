@@ -972,7 +972,10 @@ export function zeige(root, params, app) {
       const { k, name, elo, liga, echt } = spielerDaten(f);
       const haken = echt && hatHaken(name) ? hakenHtml() : '';
       const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
-      const avatar = k?.avatar || floAvatar(f);
+      // R26 (Flo 21.11.2026: "Mein Rahmen wird nicht angezeigt, wenn die Runde gestartet wird"): die eigene Leiste zeigt
+      // das eigene Bild (Wahl mit Erfinder-Rahmen und Koenig), nicht das der Server-Karte; die kennt beides mit Absicht
+      // nicht (js/karte.js KARTE_RAHMEN/KARTE_MOTIVE). Was der Gegner sieht, bleibt die Server-Karte
+      const avatar = f === eigen ? floAvatar(f) : k?.avatar || floAvatar(f);
       // R19 online ruhig (Flos Wahl A): die Leiste zeigt den Namen, ohne Titel; unter dem Namen die geschlagenen Figuren.
       // Flo 15.11. 12:50 ("die elo soll man schon sehen koennen"): beim GEGNER davor seine Elo, nur die vom Server
       // (spielerDaten, 100 bis 4000), ohne sie die Liga als Wort, ohne beides nichts. Die eigene Elo steht in der Lobby.
