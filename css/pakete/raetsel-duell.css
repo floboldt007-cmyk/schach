@@ -252,3 +252,35 @@ html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > 
 @media (orientation: landscape) and (min-width: 1021px) and (hover: hover) and (pointer: fine) {
   .raetsel-duell[data-phase="beendet"] .rd-rumpf { align-content: safe center; padding-bottom: 6px; }
 }
+
+/* ---------- Probe "Welche Farbe spiele ich?" (R27, nur ?test&rdfarbe=a|b|c, js/ui/raetsel-duell.js RD_FARBE) ----------
+   Die Karte traegt die Farbe, die der Spieler zieht: Elfenbein fuer Weiss, fast Schwarz fuer Schwarz, mit dem Koenig des
+   gewaehlten Figurensatzes. Hell wie dunkel gleich, darum feste Werte (Schrift 15:1 und mehr), dazu eine feine Kante,
+   damit die helle Karte auf hellem und die dunkle auf dunklem Grund nicht verschwindet. */
+.rd-farbe, .rd-farbchip, .rd-ansage { --fk-grund: #F4F1EA; --fk-schrift: #1C1B19; --fk-kante: rgba(28, 27, 25, .28);
+  display: inline-flex; align-items: center; background: var(--fk-grund); color: var(--fk-schrift); box-shadow: 0 0 0 1px var(--fk-kante); }
+:is(.rd-farbe, .rd-farbchip, .rd-ansage)[data-seite="b"] { --fk-grund: #1C1B19; --fk-schrift: #F4F1EA; --fk-kante: rgba(244, 241, 234, .34); }
+:is(.rd-farbe, .rd-farbchip, .rd-ansage):not([data-seite]) { visibility: hidden; }
+.rd-farbe-bild { display: block; flex: none; }
+.rd-farbe-text { font-family: var(--display, inherit); font-weight: var(--gw-titel, 800); line-height: 1.1; white-space: nowrap; }
+/* A: Plakette vorn in der Zeile unter dem Brett, statt der kleinen Angabe "Weiss am Zug" */
+.rd-farbe { gap: 8px; height: 40px; padding: 0 16px 0 6px; border-radius: var(--r-pille, 999px); }
+.rd-farbe .rd-farbe-bild { width: 32px; height: 32px; }
+.rd-farbe .rd-farbe-text { font-size: 17px; }
+.raetsel-duell[data-rdfarbe="a"] .rd-amzug { display: none; }
+/* Plakette, "Raetsel 3" und Meldung passen weder auf dem Handy noch in die Seitenspalte (iPad quer, PC) in eine Zeile; auf dem
+   Handy schoebe die zweite Zeile das Brett nach oben. Die Nummer zeigen die Punkte darunter */
+.raetsel-duell[data-rdfarbe="a"] .rd-nr { display: none; }
+/* B: Chip an der eigenen Leiste neben dem Namen (gleiche Hoehe der Leiste, die Fehlerzahl rutscht darunter) */
+.raetsel-duell[data-rdfarbe="b"] .rd-seite.ich .rd-info { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.raetsel-duell[data-rdfarbe="b"] .rd-seite.ich .rd-fehlerzahl { flex-basis: 100%; }
+.rd-farbchip { gap: 5px; height: 28px; padding: 0 11px 0 3px; border-radius: var(--r-pille, 999px); }
+.rd-farbchip .rd-farbe-bild { width: 24px; height: 24px; }
+.rd-farbchip .rd-farbe-text { font-size: 14px; }
+/* C: Ansage gross mitten auf dem Brett bei jeder neuen Aufgabe (1,4 s), sie faengt keine Zuege ab */
+.rd-brettzone { position: relative; }
+.rd-ansage { position: absolute; left: 50%; top: 50%; z-index: 5; transform: translate(-50%, -50%); flex-direction: column; gap: 8px;
+  padding: 18px 28px 20px; border-radius: 24px; pointer-events: none; box-shadow: 0 0 0 1px var(--fk-kante), 0 18px 48px rgba(0, 0, 0, .35); }
+.rd-ansage[hidden] { display: none; }
+.rd-ansage .rd-farbe-bild { width: 72px; height: 72px; }
+.rd-ansage .rd-farbe-text { font-size: 24px; }

@@ -20,7 +20,10 @@ import { browserTyp } from './browser.mjs';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs')).freierPort();
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// RD_FARBE=a|b|c: Probe "Welche Farbe spiele ich?" (R27, nur im Testmodus ?test&rdfarbe=); Bilder bekommen dann den Namen
+// raetsel-duell-farbe-<x>-..., ohne bleibt alles wie bisher und keine Probe darf auftauchen
+const RD_FARBE = /^[abc]$/.test(process.env.RD_FARBE || '') ? process.env.RD_FARBE : '';
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test${RD_FARBE ? '&rdfarbe=' + RD_FARBE : ''}`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : (process.env.BILDER || null);
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -156,13 +159,33 @@ async function zieh(s, uci) { await tippe(s, uci.slice(0, 2)); await tippe(s, uc
 // textContent: sichtbar ist nur die Zahl, "gelöst" steht fuer Vorleser daneben (Kopf an Kopf, 08.11.2026)
 const geloest = (s, wer) => s.locator(`.rd-seite[data-wer="${wer}"] .rd-geloest`).textContent();
 async function warteBis(s, fn, arg, ms = 6000) { await s.waitForFunction(fn, arg, { timeout: ms }); }
-const bildName = (geraet, schema, teil) => `raetsel-duell-${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-${teil}`;
+const bildName = (geraet, schema, teil) => `raetsel-duell-${RD_FARBE ? 'farbe-' + RD_FARBE + '-' : ''}${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-${teil}`;
 const bilderListe = [];
 async function bild(s, name) {
   if (!BILDER) return;
   const datei = path.join(BILDER, name + '.png');
   await s.screenshot({ path: datei }); bilderListe.push(datei);
 }
+// Farb-Probe (RD_FARBE): da = Zahl der Probe-Elemente, dazu Text, Koenigsbild und ob es zu sehen ist (nicht verborgen,
+// mit Flaeche, im Fenster)
+const farbProbe = (s) => s.evaluate(() => {
+  const alle = document.querySelectorAll('.rd-farbe, .rd-farbchip, .rd-ansage');
+  const el = alle[0];
+  if (!el) return { da: 0 };
+  const r = el.getBoundingClientRect();
+  // ueberdeckt: die Probe liegt ueber Zahl oder Uhr der eigenen Leiste (erster Lauf von B: "Du spielst Schwarz1")
+  const ueber = [...document.querySelectorAll('.rd-seite[data-wer="ich"] :is(.rd-geloest, .rd-uhr)')].filter((z) => {
+    const q = z.getBoundingClientRect(); return q.width > 0 && r.left < q.right && q.left < r.right && r.top < q.bottom && q.top < r.bottom;
+  }).map((z) => z.className);
+  const amzug = document.querySelector('.rd-amzug');
+  return { da: alle.length, text: el.querySelector('.rd-farbe-text')?.textContent || '', bild: el.querySelector('img')?.getAttribute('src') || '',
+    sichtbar: !el.hidden && getComputedStyle(el).visibility !== 'hidden' && r.width > 0 && r.height > 0 && r.bottom <= innerHeight && r.top >= 0,
+    ueber, amzugSichtbar: !!amzug && getComputedStyle(amzug).display !== 'none' };
+});
+// erwarteter Text je Richtung: B steht in der schmalen Namensspalte und zeigt nur das Farbwort
+const farbText = (seite) => RD_FARBE === 'b' ? (seite === 'w' ? 'Weiß' : 'Schwarz') : (seite === 'w' ? 'Du spielst Weiß' : 'Du spielst Schwarz');
+const farbeGut = (f, seite) => f.text === farbText(seite) && new RegExp(`/${seite}K\\.svg$`).test(f.bild) && f.sichtbar && f.ueber.length === 0
+  && (RD_FARBE !== 'a' || !f.amzugSichtbar);
 // Bild am Ende eines Nebenwegs, benannt nach der Gruppe ("Falscher Code" -> raetsel-duell-weg-falscher-code)
 const bildGruppe = (s) => bild(s, 'raetsel-duell-weg-' + gruppe.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
 // B17 (R6 12.11.2026): "Gegner suchen" hat dieselbe Fuellung und Schrift wie ein Hauptknopf (.knopf.primaer, so steht
@@ -333,6 +356,9 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
     await warteBis(s, () => document.querySelector('.rd-nr')?.textContent.length > 0);
     pruefe('Laeuft: Raetsel 1, Weiss am Zug, Brett von Weiss aus', await s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.seite === 'w'
       && /1/.test(document.querySelector('.rd-nr').textContent) && /Weiß/.test(document.querySelector('.rd-amzug').textContent)));
+    const f1 = await farbProbe(s);
+    if (RD_FARBE) pruefe(`Probe ${RD_FARBE}: "${farbText('w')}" mit weißem König sichtbar, nichts verdeckt, keine doppelte Angabe`, farbeGut(f1, 'w'), f1);
+    else pruefe('ohne Schalter: keine Farb-Probe auf dem Bildschirm', f1.da === 0, f1);
     const leer = await leereImSpiel(s);
     console.log(`  ${geraet}: Kopf bis ${leer.kopf} · Spalte ${leer.teile.map((t) => `${t.k} ${t.oben}-${t.unten}`).join(' | ')} · Leiste ${leer.leiste} · Fenster ${leer.fenster}`);
     // Hochkant-Handys: hoechstens 60 px Leere wie die Bot-Partie (tests/partie-hoehe.test.mjs, Kritik R8 LG3/LG5)
@@ -345,7 +371,24 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
 
     // 2: Schwarz am Zug, das Brett dreht sich
     await warteBis(s, () => document.querySelector('.screen.raetsel-duell').dataset.seite === 'b');
-    pruefe('Raetsel 2: Schwarz am Zug, Brett von Schwarz aus', /Schwarz/.test(await s.locator('.rd-amzug').innerText()));
+    pruefe('Raetsel 2: Schwarz am Zug, Brett von Schwarz aus', /Schwarz/.test(await s.locator('.rd-amzug').textContent()));
+    if (RD_FARBE) {
+      const f2 = await farbProbe(s);
+      pruefe(`Probe ${RD_FARBE}: bei der neuen Aufgabe "${farbText('b')}" mit schwarzem König, nichts verdeckt`, farbeGut(f2, 'b'), f2);
+      // die Zeile unter dem Brett bleibt einzeilig (eine zweite Zeile schoebe das Brett auf dem Handy nach oben)
+      // eine Zeile = Teile, die sich senkrecht ueberlappen (die Plakette ist hoeher als der Text daneben)
+      const zeile = await s.evaluate(() => {
+        const z = document.querySelector('.rd-zeile');
+        const h = [...z.children].filter((c) => getComputedStyle(c).display !== 'none').map((c) => c.getBoundingClientRect())
+          .filter((r) => r.height > 0).sort((a, b) => a.top - b.top);
+        let zeilen = 0, unten = -Infinity;
+        for (const r of h) { if (r.top >= unten - 1) { zeilen++; unten = r.bottom; } else unten = Math.max(unten, r.bottom); }
+        return { zeilen, hoehe: Math.round(z.getBoundingClientRect().height) };
+      });
+      pruefe(`Probe ${RD_FARBE}: die Zeile unter dem Brett bleibt einzeilig`, zeile.zeilen <= 1, zeile);
+      if (RD_FARBE === 'c') await s.waitForTimeout(400);              // Bild erst nach dem Einblenden der Ansage
+      await bild(s, bildName(geraet, schema, '3b-farbe'));
+    }
     await zieh(s, 'b8b1');
     await warteBis(s, () => /^2 /.test(document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent));
 
@@ -721,12 +764,17 @@ try {
   ];
   if (BILDER) laeufe.push({ geraet: 'iphone', breite: 390, hoehe: 844, schema: 'dark' }, { geraet: 'iphone-se', breite: 375, hoehe: 667, schema: 'light' },
     { geraet: 'ipad', breite: 820, hoehe: 1180, schema: 'light' }, { geraet: 'pc', breite: 1280, hoehe: 720, schema: 'dark' });
-  if (!NUR) {
-    for (const l of laeufe) await duellGegenKi(browser, l);
-    await nebenwege(browser);
+  if (RD_FARBE) {
+    // Farb-Probe: nur die Geraete der Auswahlseite (iPhone 13, iPad quer, PC), ohne Nebenwege
+    for (const l of laeufe.filter((x) => ['iphone', 'ipad-quer', 'pc-1440'].includes(x.geraet))) await duellGegenKi(browser, l);
+  } else {
+    if (!NUR) {
+      for (const l of laeufe) await duellGegenKi(browser, l);
+      await nebenwege(browser);
+    }
+    if (!NUR || NUR === 'gross') await grosserSchirm(browser);
+    if (!NUR || NUR === 'laden') await neuladen(browser);
   }
-  if (!NUR || NUR === 'gross') await grosserSchirm(browser);
-  if (!NUR || NUR === 'laden') await neuladen(browser);
 } catch (e) {
   fehler++;
   console.log('FEHLER Ablauf ' + (gruppe ? '(' + gruppe + ') ' : '') + (e && e.stack || e));
