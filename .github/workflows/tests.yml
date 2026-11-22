@@ -75,6 +75,8 @@ jobs:
         run: node tests/server-karte-besitz.test.mjs
       - name: Benutzername-Monatssperre pruefen (nicht eingespielt; Sperre, Besitzer frei, RLS-Test, Rueckweg)
         run: node tests/server-benutzername-sperre.test.mjs
+      - name: Benutzername-Haken pruefen (nicht eingespielt; Haken + Frist beim Bestaetigen, name_frei, Verwaltung, RLS-Test, Rueckweg)
+        run: node tests/server-benutzername-bestaetigt.test.mjs
       - name: Liga-Bild-SQL ausfuehren (vorbereitet, nicht eingespielt)
         run: node tests/server-liga-bild.test.mjs
       - name: Raetsel-Duell-SQL ausfuehren

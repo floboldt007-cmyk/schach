@@ -18,7 +18,7 @@ import { Brett, zielKarte } from '../board.js';
 import { icon } from './icons.js';
 import { figurenPfad } from '../figurensatz.js';
 import { sanAnzeige, materialBilanz } from '../review.js';
-import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
+import { sitzung, ladeProfil, kontoFreigeschaltet, bestaetigteNamen, hatHaken, hakenHtml } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
 import { fremdeKarte, bannerUrl } from './visitenkarte.js';
@@ -724,7 +724,9 @@ export function zeige(root, params, app) {
     const name = k && roh.name ? k.name : f === eigen ? profil?.benutzername || O('ich') : p.gewertet ? O('gegnerName') : O('freund');
     const elo = roh && Number.isInteger(roh.elo) && roh.elo >= 100 && roh.elo <= 4000 ? roh.elo : null;
     const liga = k && Number.isInteger(k.kronenStufe) ? stufenName(k.kronenStufe) : '';
-    return { k, name, elo, liga };
+    // echter Benutzername (nicht "Ich"/"Freund"): nur der kann den gruenen Haken tragen
+    const echt = !!(k && roh.name) || (f === eigen && !!profil?.benutzername);
+    return { k, name, elo, liga, echt };
   }
   // Duell-Intro vor gewerteten Partien (Flo 11.11.: "Intro wie bei den Bots", Gegnername, Elo, Liga): einmal je Partie,
   // nur vor dem 2. Halbzug, sobald die Visitenkarten da sind (oder nach 1,5 s ohne sie). R19 (15.11., Flo gegen Opa:
@@ -956,13 +958,17 @@ export function zeige(root, params, app) {
         if (!d || weg || !p || p.id !== id) return;
         // Name des Gegners auch in der Zeile "<Name> beginnt" (R19)
         kartenDaten = d; karten(); zeichneZugZeile(); intro();
+        // gruener Haken (supabase/benutzername-bestaetigt-schema.sql): einmal fragen, dann die Leisten neu zeichnen
+        bestaetigteNamen(['w', 'b'].map((f) => spielerDaten(f)).filter((x) => x.echt).map((x) => x.name))
+          .then(() => { if (!weg && p && p.id === id) karten(); }, () => {});
         // die Namen kamen erst nach dem Ende: in der Ablage fuer die Analyse nachtragen
         if (p.status === 'beendet') { try { sichereFuerAnalyse(); } catch (e) { /* bleibt bei den alten Namen */ } }
       });
     }
     const eigen = online.meineFarbe(p);
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
-      const { k, name, elo, liga } = spielerDaten(f);
+      const { k, name, elo, liga, echt } = spielerDaten(f);
+      const haken = echt && hatHaken(name) ? hakenHtml() : '';
       const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
       const avatar = k?.avatar || floAvatar(f);
       // R19 online ruhig (Flos Wahl A): die Leiste zeigt den Namen, ohne Titel; unter dem Namen die geschlagenen Figuren.
@@ -978,8 +984,8 @@ export function zeige(root, params, app) {
       // R19 M6: ueber der Gegnerleiste liegt ein durchsichtiger Knopf, ein Tipp oeffnet sein Profil (js/ui/gegner-profil.js)
       const profil = `<button class="on-gegner-knopf" type="button" data-online="gegner" aria-label="${esc(profilText('oeffnen', { name }))}"></button>`;
       el.innerHTML = ort === 'oben'
-        ? `${banner}<span class="av">${avatar}</span><div class="info"><div class="name"><b>${esc(name)}</b></div>${unter}</div>${uhr}${profil}`
-        : `${banner}<span class="av">${avatar}</span><div class="name"><b>${esc(name)}</b></div>${unter}${uhr}`;
+        ? `${banner}<span class="av">${avatar}</span><div class="info"><div class="name"><b>${esc(name)}</b>${haken}</div>${unter}</div>${uhr}${profil}`
+        : `${banner}<span class="av">${avatar}</span><div class="name"><b>${esc(name)}</b>${haken}</div>${unter}${uhr}`;
     }
     zeichneGeschlagen();
     zeigeKopfTitel();
