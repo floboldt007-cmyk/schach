@@ -357,7 +357,8 @@ try {
     const nach = await status(s);
     const otpNachWarten = z.aufrufe.otp;
     const frei = !(await s.locator('[data-kl="code"]').isDisabled());
-    await s.waitForTimeout(1500);
+    // erst tippen, wenn der Stub das Token wirklich geliefert hat (Nachpruefung #277: feste 1,5 s waren auf langsamen Runnern knapp)
+    await s.waitForFunction(() => window.turnstile?.n > 0, null, { timeout: 15000 }).catch(() => {});
     await s.locator('[data-kl="code"]').click(); await s.waitForTimeout(600);
     pruefe('Bot-Schutz Loeschseite zu langsam: "prueft", dann Warte-Text ohne /otp, Knopf frei, zweiter Tipp genau ein /otp mit Token',
       !!T.botschutzPrueft && waehrend.text === T.botschutzPrueft && nach.text === T.botschutzWarten && nach.fehler === 'ja' && otpNachWarten === 0
