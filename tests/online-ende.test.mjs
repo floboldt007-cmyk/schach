@@ -173,6 +173,9 @@ async function bediene(route) {
     return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
   }
   if (rpc === 'saison_karte_der_partie') return antwort({ w: { abzeichen: null, titel: null }, s: { abzeichen: null, titel: null } });
+  // Effekte vom Gegner (R26, tests/r26-gegner-effekte.test.mjs): nur Kennungen melden, beide Seiten ohne Besitz
+  if (rpc === 'effekte_waehle') return antwort(true);
+  if (rpc === 'effekte_der_partie') return antwort({ w: { figuren: null, zug: null, finisher: null }, s: { figuren: null, zug: null, finisher: null } });
   unerwartet.push(`${uid} ${req.method()} ${url.pathname}`); return antwort([]);
 }
 

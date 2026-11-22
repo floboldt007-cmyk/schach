@@ -48,7 +48,7 @@ const BISHER = ['supabase/schema.sql', 'supabase/abo-schema.sql', 'supabase/onli
   'supabase/liga-bild-schema.sql', 'supabase/daten-schema.sql', 'supabase/zwei-ligen-schema.sql', 'supabase/daten-schema.sql'];
 // Weitere Schemas mit user_id (Nachpruefung N1 19.11.2026: ohne sie blieb eine ungedeckte Tabelle dort unbemerkt, 26/26)
 const ZUSATZ = ['supabase/freunde-schema.sql', 'supabase/werkstatt-schema.sql', 'supabase/verwaltung-schema.sql',
-  'supabase/coach-schema.sql', 'supabase/schule-schema.sql'];
+  'supabase/coach-schema.sql', 'supabase/schule-schema.sql', 'supabase/gegner-effekte-schema.sql'];
 const GELADEN = [...BISHER, 'supabase/saison-schema.sql', 'supabase/weltrang-schema.sql', ...ZUSATZ];
 // Name der Gegenproben-Tabelle: darf nie eine echte Tabelle sein (sonst "already exists" statt einer Meldung)
 const PROBE = 'kr_probe_tabelle';

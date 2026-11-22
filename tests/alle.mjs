@@ -238,6 +238,7 @@ const SUITEN = [
   { name: 'r20-kopf-chip', datei: 'r20-kopf-chip.test.mjs', args: [], was: 'Feinschliff R20 B3: Kopf-Chips ganz da oder ganz weg, nie ein Stummel; / max nur am PC' },
   { name: 'r20-blatt-fokus', datei: 'r20-blatt-fokus.test.mjs', args: [], was: 'Feinschliff R20 B7: Blatt per Tipp ohne Fokusring, per Tastatur mit; Rueckfrage fokussiert den sicheren Knopf' },
   { name: 'r20-effekt-vorschau', datei: 'r20-effekt-vorschau.test.mjs', args: [], was: 'Feinschliff R20: Regal Effekte im Shop, Vorschau einmal auf dem echten Brett an der richtigen Stelle, Standbild bei weniger Bewegung' },
+  { name: 'r26-gegner-effekte', datei: 'r26-gegner-effekte.test.mjs', args: [], was: 'Feinschliff R26: Effekte vom Gegner online (Figurensatz je Farbe, Zug-Animation, Finisher des Siegers), nur vom Server belegt, Schalter aus, unbekannte Kennungen, weniger Bewegung, Funktion fehlt' },
   { name: 'r20-erste-schritte', datei: 'r20-erste-schritte.test.mjs', args: [], was: 'Feinschliff R20: Kurs Erste Schritte fuer Anfaenger (Stufe A): Sterne sammeln mit Umwandlungs-Falle, gut anfangen, Einstieg ueber "Nein", 10 Funken je Aufgabe' },
   { name: 'r25-leistung', datei: 'r25-leistung.test.mjs', args: [], was: 'Feinschliff R25 Leistung: Fokus und Messen beim Oeffnen im naechsten Bild, Pille nach dem Drehen, schnelles Enter oder Leerzeichen im ersten Bild gibt nicht auf (Browser)' },
   { name: 'online-ende', datei: 'online-ende.test.mjs', args: [], was: 'Funktionsprobe Online-Ende: Revanche, Aufgeben, Remis, Neu laden (Browser)' },
