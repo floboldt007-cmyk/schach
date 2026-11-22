@@ -23,13 +23,6 @@
 /* Knopf am Kartenfuss (R6 B21): nebeneinander sind beide Karten gleich hoch (Grid), so stehen "Partie suchen" und
    "Duell suchen" auf einer Hoehe, auch wenn die Partie-Karte die Zeile mit der Bedenkzeit mehr hat */
 .on-tuer-knopf { min-height: 48px; justify-content: center; margin-top: auto; }
-/* kleines Brett als Bild (nur Deko): 8 x 8 Felder in den Brettfarben, Figuren aus dem Standardsatz */
-.on-bild { position: relative; display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr); width: 76px; aspect-ratio: 1; border-radius: 10px;
-  overflow: hidden; box-shadow: var(--kante);
-  background: repeating-conic-gradient(var(--feld-dunkel) 0 25%, var(--feld-hell) 0 50%) 0 0 / 25% 25%; }
-.on-bild img { width: 100%; height: 100%; }
-.on-bild-uhr { position: absolute; left: 4px; bottom: 4px; padding: 1px 6px; border-radius: 8px; background: var(--tinte); color: var(--auf-tinte);
-  font-size: 13px; font-weight: 800; }
 /* ohne Konto: reine Erklaerung, flach und ohne Knopf, damit nichts tippbar aussieht (Befund V 6) */
 .on-tueren[data-zustand="ohne"] .on-tuer { box-shadow: none; background: transparent; border: 1px dashed var(--linie-2); }
 .on-tuer-hinweis { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); }
@@ -250,37 +243,156 @@ html[data-bewegung="aus"] .on-ring-rest { transition: none; }
   .on-inhalt > .on-tueren[data-zustand="ohne"] { grid-template-rows: auto 0 auto; }
 }
 
-/* ---------- R19 online ruhig (Flo 14.11.2026: "zu viele Zahlen", Wahl 23:00: Entwurf A, js/ui/online.js zeigeLiga,
-   tests/r19-online-ruhig.test.mjs): eine grosse Zahl (Elo vom Server) oder die Liga als Wort, Erklaerungen und Bedenkzeit
-   hinter "Mehr". ---------- */
-@media (orientation: portrait) and (min-height: 740px) { .on-inhalt > .on-ruhig { grid-row: 3; } }
-.on-inhalt > .on-ruhig { margin-bottom: var(--a3); }
-.on-ruhig > .on-liga { margin-bottom: 0; }
-.online-screen .on-liga { min-height: 76px; }
-.on-gross { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.on-gross-wert { font-family: var(--display); font-weight: var(--gw-titel); font-size: 34px; line-height: 1.05; color: var(--text); }
-.on-gross-text { font-size: 13px; color: var(--text-2); }
-.on-mehr { margin-top: 6px; }
-.on-mehr > summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; font-size: 14px; font-weight: 650; color: var(--text-2);
-  cursor: pointer; list-style: none; }
-.on-mehr > summary::-webkit-details-marker { display: none; }
-.on-mehr > summary::after { content: ''; width: 7px; height: 7px; margin-left: 8px; border: solid currentColor; border-width: 0 2px 2px 0;
-  transform: translateY(-2px) rotate(45deg); }
-.on-mehr[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
-.on-mehr > ul { margin: 0 0 4px; padding: 10px 14px 10px 30px; border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--kante);
-  font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
-.online-screen .on-tueren[data-mehr] :is(.on-tuer-text p, .on-zeit-fest, .on-bild-uhr) { display: none; }
-.online-screen .on-tuer-kopf { align-items: center; }
-/* ---------- R19 matt (Flo 15.11.2026 ca. 12:15: "ein bisschen zu hell, die Symbole leuchten zu viel. Cleaner und matt
-   machen", tests/r19-online-ruhig.test.mjs glanzIn): Lobby und Suche ohne farbigen Schein und Glanzlicht am Hauptknopf
-   (app.css .knopf.primaer), Karten flach nur mit Kante und etwas in den Seitengrund gemischt (hell weniger reines Weiss,
-   dunkel eine Spur ruhiger), Symbole in ruhigen Tokenfarben, das Mini-Brett entsaettigt. Die Partie samt Ergebnisblatt ist
-   derselbe Bildschirm (.online-screen.online-partie) und bleibt gleich der Bot-Partie (tests/gleichheit-ansichten.test.mjs,
-   Kaltreview 64 und Hauptfenster 15.11.), darum gilt jede Regel nur fuer :not(.online-partie). Rueckholbar: Block entfernen. */
-.online-screen:not(.online-partie) { --on-karte: color-mix(in srgb, var(--flaeche) 55%, var(--grund)); }
-.online-screen:not(.online-partie) .on-inhalt .knopf.primaer { box-shadow: none; }
-.online-screen:not(.online-partie) :is(.on-tuer, .on-liga, .on-freunde-zeile) { background: var(--on-karte); box-shadow: var(--kante); }
-.online-screen:not(.online-partie) .on-mehr > ul { background: var(--on-karte); }
-.online-screen:not(.online-partie) .on-tueren[data-zustand="ohne"] .on-tuer { background: transparent; box-shadow: none; }
-.online-screen:not(.online-partie) .on-freunde-symbol { color: var(--text-2); }
-.online-screen:not(.online-partie) .on-bild { filter: saturate(.65); }
+/* ---------- R27 Online "Arena" (Flo 21.11.2026: O1 aus dem R27-Plan, Look wie die Premium-Seite, js/ui/online.js start und
+   zeigeLiga, Bauteile .juwel-* in css/bauteile.css). Ersetzt "R19 ruhig" (eine Zahl, "Mehr") und die matten Karten von
+   R19 fuer die Lobby: oben die Kopfkarte (Medaille, Elo in Gold, Liga, Platz, Season-Rest, Form), Partie in Gold und das
+   Raetsel-Duell in Saphir (ab 760 px nebeneinander, Partie breiter), die Freunde-Karte, quer ab 1100 px rechts die
+   Weltrangliste. Die Partie samt Ergebnisblatt ist derselbe Bildschirm (.online-screen.online-partie) und bleibt gleich der
+   Bot-Partie (tests/gleichheit-ansichten.test.mjs), darum gilt jede Regel nur fuer die Lobby (:not(.im-spiel)). ---------- */
+.online-screen:not(.im-spiel) .on-inhalt { max-width: 1040px; }
+.online-screen:not(.online-partie) { --on-karte: var(--flaeche); }
+@supports (color: color-mix(in srgb, red, blue)) {
+  .online-screen:not(.online-partie) { --on-karte: color-mix(in srgb, var(--flaeche) 55%, var(--grund)); }
+}
+.online-screen:not(.online-partie) .on-inhalt .knopf.primaer:not(.juwel-knopf) { box-shadow: none; }
+
+/* Kopfkarte: Huelle .on-held mit zwei Knoepfen, links die Liga (Medaille, Elo, Zeile), rechts die Form (oeffnet die letzten
+   Partien); ein Knopf im Knopf waere ungueltig */
+.online-screen .on-held { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 18px; min-height: 108px;
+  margin-bottom: var(--a4); padding: 18px 20px; border-radius: var(--r-xl); }
+.on-held[hidden] { display: none; }
+.online-screen .on-held .on-liga { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 18px; width: auto;
+  min-height: 0; margin: 0; padding: 0; border-radius: 16px; background: none; box-shadow: none; color: inherit; text-align: start; }
+.online-screen .on-held .on-liga:focus-visible, .on-form:focus-visible { outline: var(--fokus); outline-offset: 4px; }
+.online-screen .on-liga-schild.juwel-medaille { width: var(--m); height: var(--m); border-radius: 50%; color: inherit; }
+.on-held .juwel-medaille { --m: 68px; margin: 0 4px; }
+.on-held-stand { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.on-held .on-gross { display: flex; align-items: baseline; gap: 8px; }
+.on-held .on-gross-wert { font-size: 46px; }
+.on-held .on-held-wort { font-family: var(--display); font-weight: var(--gw-titel); font-size: 30px; line-height: 1.05; color: var(--gold-text); }
+.on-held .on-gross-text { font-size: 14px; font-weight: 750; letter-spacing: .04em; color: var(--text-2); }
+.on-held-zeile { font-size: 14px; font-weight: 650; line-height: 1.35; color: var(--text-2); }
+.on-held-zeile:empty { display: none; }
+.on-held-zeile > span { white-space: nowrap; }
+.on-form { display: grid; justify-items: end; align-content: center; gap: 8px; min-height: 44px; margin: -8px -10px; padding: 8px 10px; border: 0; border-radius: 14px; background: transparent;
+  color: inherit; font: inherit; cursor: pointer; transition: background-color var(--d-s) var(--sanft); }
+@media (hover: hover) { .on-form:hover { background: var(--flaeche-2); } }
+.on-form[hidden] { display: none; }
+.on-form small { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-2); }
+.on-form-steine { display: flex; gap: 5px; }
+.on-form-alle { display: inline-flex; align-items: center; gap: 2px; font-size: 13.5px; font-weight: 750; color: var(--gold-text); }
+.on-form-alle .ico { width: 15px; height: 15px; }
+/* Platzhalter waehrend der Pruefung: die beiden ruhigen Balken stehen im Stand-Teil */
+.on-held .on-liga[data-laedt] .on-held-stand { gap: 10px; }
+.on-held .on-liga[data-laedt] .on-held-stand b, .on-held .on-liga[data-laedt] .on-held-stand > span { display: block; height: 30px; width: 40%;
+  border-radius: 10px; background: var(--flaeche-2); }
+.on-held .on-liga[data-laedt] .on-held-stand > span { height: 14px; width: 62%; }
+.on-held:has(> .on-liga[data-laedt]) .on-liga-schild { min-width: 0; }
+
+/* Letzte Partien (Blatt): Ergebnis, Gegner (Tipp: Visitenkarte), Datum, Analysieren */
+.on-letzte { display: grid; gap: 6px; margin: 4px 0 8px; padding: 0; list-style: none; }
+.on-letzte-zeile { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 56px; padding: 6px 6px 6px 12px;
+  border-radius: 14px; background: var(--flaeche-2); }
+.on-letzte-kopf { background-color: var(--flaeche); }
+.on-letzte-kopf > svg { width: 100%; height: 100%; display: block; border-radius: 50%; }
+.on-letzte-wer { display: grid; justify-items: start; min-width: 0; }
+.on-letzte-name { max-width: 100%; min-height: 28px; padding: 0 4px; border: 0; background: none; color: var(--text); font: inherit; font-size: 15.5px;
+  font-weight: 750; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.on-letzte-name:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: 8px; }
+.on-letzte-datum { padding: 0 4px; font-size: 12.5px; font-weight: 650; color: var(--text-2); white-space: nowrap; }
+.on-letzte-zeile .knopf.juwel-knopf { min-height: 44px; padding: 0 14px; font-size: 14.5px; gap: 6px; }
+.on-letzte-zeile .knopf .ico { width: 17px; height: 17px; }
+
+/* Tueren: Schmuck-Karten, Symbol-Kachel statt Mini-Brett */
+.online-screen:not(.im-spiel) .on-tueren { gap: var(--a4); margin-bottom: var(--a4); }
+@media (min-width: 760px) { .online-screen:not(.im-spiel) .on-tueren[data-zustand="konto"] { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); } }
+.online-screen:not(.im-spiel) .on-tuer.juwel-karte { gap: 12px; padding: 16px; border-radius: var(--r-xl); }
+.online-screen .on-tuer-kopf { grid-template-columns: 56px minmax(0, 1fr); gap: 14px; align-items: center; }
+.on-tuer[data-ton="gold"] .on-tuer-ueber { color: var(--gold-text); }
+.on-tuer[data-ton="nacht"] .on-tuer-ueber { color: var(--metall-hell); }
+.on-tuer h2 { font-family: var(--display); font-weight: var(--gw-titel); }
+/* beide Knoepfe gleich hoch, damit sie nebeneinander auf einer Linie am Kartenfuss sitzen (online-ui W-lobby) */
+.online-screen:not(.im-spiel) .on-tuer-knopf { min-height: 54px; font-size: 16.5px; }
+/* ohne Konto: reine Erklaerung, flach und ohne Knopf, damit nichts tippbar aussieht (Befund V 6) */
+.online-screen .on-tueren[data-zustand="ohne"] .on-tuer.juwel-karte { background: transparent; box-shadow: none; border: 1px dashed var(--linie-2); }
+.online-screen .on-tueren[data-zustand="ohne"] .on-tuer.juwel-karte::before,
+.online-screen .on-tueren[data-zustand="ohne"] .on-tuer.juwel-karte::after { display: none; }
+
+/* Freunde-Karte: zwei Koenige, zwei Knoepfe; die Klapp-Zeile tritt zurueck, das Formular darunter bleibt */
+.online-screen .on-freunde-zeile { display: none; }
+.on-freunde-karte { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px 16px; margin-bottom: var(--a4);
+  padding: 16px; }
+.on-freunde-paar { display: flex; padding-left: 4px; }
+.on-freunde-paar img { width: 44px; height: 44px; filter: drop-shadow(0 3px 4px var(--juwel-tief)); }
+.on-freunde-paar img + img { margin-left: -14px; }
+.on-freunde-text h2 { margin: 0; font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); }
+.on-freunde-text p { margin: 2px 0 0; font-size: 13.5px; color: var(--text-2); }
+.on-freunde-knoepfe { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.on-freunde-knoepfe .knopf.juwel-knopf { min-height: 48px; padding: 0 10px; font-size: 15px; white-space: nowrap; }
+.on-freunde:not([open]) { margin-bottom: 0; }
+
+/* Weltrangliste rechts (nur quer ab 1100 px, js/ui/online.js zeigeRang): Podest der ersten drei mit Kopf und Metallring, darunter
+   dein Platz mit Nachbarn; wenig Zahlen, jede Zeile oeffnet die Visitenkarte */
+.on-rang[hidden] { display: none; }
+.on-rang { display: grid; gap: 12px; align-content: start; padding: 16px; }
+.on-rang h2 { margin: 0; font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); }
+.on-podest { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 6px; padding: 6px 0 12px;
+  border-bottom: 1px solid var(--linie); }
+.on-podest-platz { display: grid; justify-items: center; gap: 4px; min-width: 0; padding: 8px 4px 10px; border: 0; border-radius: 16px; background: transparent;
+  color: var(--text); font: inherit; cursor: pointer; transition: background-color var(--d-s) var(--sanft); }
+.on-podest-platz[data-platz="1"] { padding-bottom: 18px; }
+.on-podest-platz .juwel-rang { width: 22px; height: 22px; margin-top: -14px; font-size: 11px; position: relative; }
+.on-podest-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 750; }
+.on-podest-platz b { font-size: 12.5px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.on-podest-platz.ich .on-podest-name, .on-podest-platz.ich b { color: var(--gold-text); }
+@media (hover: hover) { .on-podest-platz:hover { background: var(--flaeche-2); } }
+.on-podest-platz:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.on-rang-liste { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.on-rang-zeile { display: grid; grid-template-columns: 26px auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 48px;
+  padding: 0 10px; border: 0; border-radius: 14px; background: transparent; color: var(--text); font: inherit; font-size: 15px; font-weight: 650;
+  text-align: start; cursor: pointer; transition: background-color var(--d-s) var(--sanft); }
+@media (hover: hover) { .on-rang-zeile:hover { background: var(--flaeche-2); } }
+.on-rang-zeile:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.on-rang-zeile b { font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.on-rang-platz { justify-self: center; font-size: 13px; color: var(--text-2); font-weight: 700; }
+.on-rang-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.on-rang-zeile.ich { background: var(--metall-weich); box-shadow: inset 0 0 0 1px var(--juwel-kante), 0 8px 20px -12px var(--juwel-schein); font-weight: 800; }
+.on-rang-zeile.ich .on-rang-platz, .on-rang-zeile.ich b { color: var(--gold-text); }
+.on-rang .knopf.juwel-knopf { min-height: 46px; font-size: 15px; }
+@media (min-width: 1100px) and (orientation: landscape) {
+  .online-screen:not(.im-spiel) .on-inhalt:has(> .on-rang:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+    column-gap: var(--a5); align-items: start; max-width: 1240px; }
+  .on-inhalt:has(> .on-rang:not([hidden])) > * { grid-column: 1; }
+  .on-inhalt:has(> .on-rang:not([hidden])) > .on-rang { grid-column: 2; grid-row: 2 / span 4; }
+}
+
+/* Handy: Medaille kleiner, die Form unter die Zeile */
+@media (max-width: 759px) {
+  .online-screen .on-held { grid-template-columns: minmax(0, 1fr); gap: 4px; min-height: 96px; padding: 14px 16px; }
+  .online-screen .on-held .on-liga { gap: 14px; }
+  .on-held .juwel-medaille { --m: 56px; margin: 0 2px; }
+  .on-held .on-gross-wert { font-size: 38px; }
+  .on-held .on-held-wort { font-size: 25px; }
+  .on-held-zeile { font-size: 13px; }
+  .on-form { display: flex; flex-wrap: wrap; align-items: center; justify-self: start; gap: 8px; margin: -6px -10px -8px 64px; }
+  .on-form-alle { margin-left: 2px; }
+  .on-form .juwel-stein { min-width: 22px; height: 18px; padding: 0 5px; font-size: 10px; }
+  .online-screen:not(.im-spiel) .on-tuer.juwel-karte { padding: 14px; gap: 10px; }
+  .online-screen:not(.im-spiel) .on-tueren, .online-screen .on-held, .on-freunde-karte { margin-bottom: var(--a3); }
+  .on-freunde-karte { padding: 14px; }
+}
+/* Handy hoch: zwischen den Karten keine Luft-Reihen (die Schmuck-Karten sind hoeher), der Block bleibt aber mittig wie im
+   R9-Raster (Flo: Lobby mittig; Rest teilen sich oben und unten, tests/layout-r8 LM) */
+@media (orientation: portrait) and (min-height: 740px) and (max-width: 759px) {
+  .on-rumpf > .on-inhalt:has(> .on-tueren[data-zustand="konto"]) { grid-template-rows: auto minmax(0, 1fr) auto auto minmax(0, 48px) auto 0 auto minmax(0, 1fr); }
+  /* die Mittelreihe des R9-Rasters (bis 36 px Luft zwischen den Tueren) bleibt zu: die Schmuck-Karten sind hoeher. Nur hier,
+     wo die Tueren feste Reihen 1 und 3 haben; auf dem iPhone SE fiele die zweite Tuer sonst in die 0-Reihe (online-ui W-lobby) */
+  .on-inhalt > .on-tueren[data-zustand] { grid-template-rows: auto 0 auto; row-gap: 6px; }
+}
+/* Hochformat-Raster (R9 Lobby mittig, oben): die Freunde-Karte steht an der Stelle der Klapp-Zeile, das aufgeklappte Formular darunter */
+@media (orientation: portrait) and (min-height: 740px) {
+  .on-inhalt > .on-held { grid-row: 3; }
+  .on-inhalt > .on-freunde-karte { grid-row: 6; margin-bottom: 0; }
+  .on-inhalt > .on-freunde { grid-row: 8; }
+}

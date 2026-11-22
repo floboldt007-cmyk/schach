@@ -132,7 +132,12 @@ export function zeige(root, params, app) {
   // laufendes Duell; reihe: eigene Raetsel in Reihenfolge, 'g' geloest, 'r' Fehler (nur dieses Geraet, nur Anzeige)
   const d = { id: null, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe: [] };
 
-  const phase = (p) => { s.dataset.phase = p; };
+  // R26 AC-04: Start, Konto, Suche und Einladung klingen wie die Lobby (arcade), ab dem Vorlauf im gewaehlten Set
+  const LOBBY_PHASEN = new Set(['start', 'konto', 'suche', 'einladung']);
+  const phase = (p) => {
+    s.dataset.phase = p;
+    if (!weg) { try { klang.setzeOrt(LOBBY_PHASEN.has(p) ? 'lobby' : 'spiel'); } catch (e) { /* ohne Klang */ } }
+  };
   const endeIntro = () => { if (d.intro) { try { d.intro.ueberspringe(); } catch (e) { /* schon fertig */ } d.intro = null; } };
   function aufraeumen() {
     endeIntro();

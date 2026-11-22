@@ -88,6 +88,7 @@ try {
     if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
     if (rpc === 'online_live_bewertung_frei') return antwort(liveFrei);
+    if (rpc === 'bestaetigte_namen') return antwort([]); // R27 Haken fremder Namen (js/konto.js): hier ohne bestaetigten Namen
     if (rpc === 'online_live_bewertung_nutzen') return antwort(liveFrei.frei ? { ok: true, frei: true, rest: 0, unbegrenzt: liveFrei.unbegrenzt, gebucht: !liveFrei.unbegrenzt }
       : { ok: false, frei: false, rest: 0, unbegrenzt: false, gebucht: false });
     if (rpc === 'online_meine') return antwort([...partien.values()].filter(p => p.status !== 'beendet'));
@@ -144,6 +145,16 @@ try {
     }
     // R19 Season (js/karte.js fragt parallel): ohne Abzeichen und Titel, die Karte bleibt wie bisher (Season prueft r19-saison)
     if (rpc === 'saison_karte_der_partie') return antwort({ w: { abzeichen: null, titel: null }, s: { abzeichen: null, titel: null } });
+    // Effekte vom Gegner (R26): hier wie live vor dem Einspielen (Funktion fehlt, 404), das Brett bleibt im eigenen Satz;
+    // was mit belegtem Besitz geschieht, prueft tests/r26-gegner-effekte.test.mjs
+    if (rpc === 'effekte_waehle') {
+      if (Object.keys(body).sort().join(',') !== 'figuren,finisher,zug') unerwartet.push('effekte_waehle mit anderen Feldern: ' + Object.keys(body).join(','));
+      return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
+    }
+    if (rpc === 'effekte_der_partie') return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
+    // R27 Online Arena: die Kopfkarte fragt den Season-Rest, quer ab 1100 px die Weltrangliste (beides prueft r27-online-arena;
+    // hier ohne Antwort, dann fehlen Season-Zeile und Rangliste ohne Luecke)
+    if (rpc === 'saison_mein_stand' || rpc === 'weltrang_liste') return antwort({});
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {
@@ -264,6 +275,9 @@ try {
   await knopf('teilen').click();
   pruefe('Einladung zeigt Code, Link, 24 Stunden und Kopieren als Rueckfall', await seite.evaluate(() => window.__kopiert?.endsWith('#online/DEF567'))
     && (await seite.locator('.on-einladung').innerText()).includes('Die Einladung gilt 24 Stunden.'));
+  // R26 AC-04 (Flo 20.11.2026): die wartende Einladung ist noch keine Partie, sie klingt wie die Lobby (Klangset arcade)
+  const ortEinladung = await seite.evaluate(async () => (await import(new URL('js/sounds.js', location.href).href)).klang.vorrat().ort);
+  pruefe('Klang: wartende Einladung klingt wie die Lobby (Ort lobby)', ortEinladung === 'lobby', ortEinladung);
   await seite.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: async d => { window.__geteilt = d; } }));
   await knopf('teilen').click();
   pruefe('Teilen nutzt navigator.share, wenn vorhanden', await seite.evaluate(() => window.__geteilt?.url?.endsWith('#online/DEF567')));
@@ -509,19 +523,21 @@ try {
       const rumpf = document.querySelector('.online-screen .on-rumpf');
       const leiste = document.querySelector('.reiter-leiste');
       const unten = leiste && leiste.getClientRects().length ? leiste.getBoundingClientRect().top : innerHeight;
-      const zeile = document.querySelector('.on-freunde-zeile').getBoundingClientRect();
+      // R27 Arena: die Freunde-Karte steht an der Stelle der Freunde-Zeile (die Klapp-Zeile ist ausgeblendet)
+      const zeile = document.querySelector('.on-freunde-karte').getBoundingClientRect();
       const knoepfe = [...document.querySelectorAll('.on-tuer-knopf:not([hidden])')].map((b) => b.textContent.trim());
       return { scroll: rumpf.scrollHeight - rumpf.clientHeight, quer: document.documentElement.scrollWidth <= innerWidth,
         freundeSichtbar: zeile.bottom <= unten + 1, knoepfe, gewertet: knoepfe.length === 2 && knoepfe.every((t) => /gewertet/.test(t)),
         freundeZu: !document.querySelector('.on-freunde').open, liga: document.querySelector('.on-liga').textContent.replace(/\s+/g, ' ').trim(),
-        // R19 online ruhig (A): Platz und Kronen stehen hinter "Mehr" (zu), gross die Elo oder ohne sie die Liga als Wort
-        mehr: document.querySelector('.online-screen details.on-mehr:not([open])')?.textContent.replace(/\s+/g, ' ').trim() || '',
+        // R27 Arena: Stufe und Platz stehen in der Zeile der Kopfkarte (kein "Mehr"), Kronen nicht mehr in der Lobby
+        mehr: document.querySelector('.online-screen .on-held-zeile')?.textContent.replace(/\s+/g, ' ').trim() || '',
+        mehrDa: document.querySelectorAll('.online-screen details.on-mehr').length,
         beispiel: /Beispiel|Turmfalke|Rochade77/.test(document.querySelector('.online-screen').textContent),
         klein: [...document.querySelectorAll('.online-screen .on-inhalt button, .online-screen .on-freunde-zeile')].filter((b) => b.getClientRects().length && b.getBoundingClientRect().height < 44).map((b) => b.className) };
     });
-    pruefe(`iPhone 13 ${modus}: Online passt ohne Scrollen (Liga-Zeile mit "Mehr", zwei Tueren, Freunde-Zeile), Suchen-Knoepfe "gewertet", keine Beispiel-Liga`,
+    pruefe(`iPhone 13 ${modus}: Online passt ohne Scrollen (Kopfkarte mit Stufe und Platz, zwei Tueren, Freunde-Karte), Suchen-Knoepfe "gewertet", keine Beispiel-Liga`,
       handy.scroll <= 1 && handy.quer && handy.freundeSichtbar && handy.gewertet && handy.freundeZu && /Warden II/.test(handy.liga)
-      && /Platz 3 von 30/.test(handy.mehr) && /140/.test(handy.mehr)
+      && /Platz 3 von 30/.test(handy.mehr) && !/140/.test(handy.mehr) && handy.mehrDa === 0
       && !handy.beispiel && handy.klein.length === 0, handy);
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-390-${modus}.png`) });
   }

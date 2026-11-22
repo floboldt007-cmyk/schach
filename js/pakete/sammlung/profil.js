@@ -20,7 +20,7 @@ import { istErfinder, hatSonderstueck, pionierNummer, ERFINDER } from '../../son
 import { WELTEN, botNachId } from '../../bots.js';
 import { istWeltFrei, ladePartien, wertet, ladeModul } from '../../storage.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
-import { meinName, sitzung, userId } from '../../konto.js';
+import { meinName, sitzung, userId, eigenerName, hatHaken, hakenHtml } from '../../konto.js';
 import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
 import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
@@ -161,7 +161,10 @@ function titelStand(erfolge = teileErfolge()) {
       .filter((x) => !koennen.includes(x));
     if (neu.length) { merkeErspielteTitel(neu); koennen = [...koennen, ...neu]; }
   } catch (e) { /* ohne Archiv nur die gemerkten */ }
-  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, taten: koennen, labor: !!schule };
+  // R27: gebuchte Stufen je Familie (Ligakrone, Tiefenlicht nur mit Stufe 3, ./titel.js)
+  let stufen = {};
+  try { stufen = ladeBesitz().stufen || {}; } catch (e) { stufen = {}; }
+  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, taten: koennen, labor: !!schule, stufen };
 }
 // R19 Familie Titeltraeger: wie viele Titel frei sind
 export function titelFreiZahl(erfolge = teileErfolge()) {
@@ -375,7 +378,7 @@ export function profilKarte({ app } = {}) {
   const plaetze = leer ? vitrine.slice(0, 1) : vitrine;
   k.innerHTML = `<div class="pr-kopf"><span class="pr-banner" aria-hidden="true" style="background-image:url('${bannerUrl(banner)}')"></span>
       <span class="pr-av">${floAvatar('w')}</span>
-      <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone"><img class="pr-rang" src="${ligaSymbolUrl(kronenStufe)}" alt="">${esc(krone)}</span>` : ''}</div>
+      <div class="pr-name"><span class="pr-name-zeile"><b>${esc(meinName())}</b>${eigenerName() && hatHaken(eigenerName()) ? hakenHtml() : ''}</span><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone"><img class="pr-rang" src="${ligaSymbolUrl(kronenStufe)}" alt="">${esc(krone)}</span>` : ''}</div>
         <small class="pr-seit">${esc(seitText())}${partienZahl ? ' · ' + esc(S(partienZahl === 1 ? 'profil.partieEine' : 'profil.partien', { zahl: partienZahl })) : ''}</small></div></div>
     <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button></div>
     <div class="pr-vitrine-ort"><h2 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h2>

@@ -526,6 +526,24 @@ Bis Schritt 1 eingespielt ist, zeigt der Reiter „Die Weltrangliste ist gerade 
 **Rückweg:** `supabase/weltrang-zurueck.sql` entfernt beide Funktionen und die Tabelle der Zustimmungen (die
 Zustimmungen gehen dabei verloren, Elo und Liga bleiben). Danach `notify pgrst, 'reload schema';`.
 
+### Profilbild in der Weltrangliste (Stand 21.11.2026, Vorschlag R27, noch nicht eingespielt)
+
+Flo möchte in der Weltrangliste auch die Profilbilder der anderen sehen (die Banner liefert `weltrang_liste` schon).
+`weltrang-karte-schema.sql` ersetzt nur `weltrang_liste`: je Zeile und im eigenen Stand kommen `motiv`, `grund` und
+`rahmen` aus `karte_wahl` dazu, genau das, was `karte_von` jedem Gegner schon zeigt. Nur Werte aus den festen Listen
+(`karte_konstanten`), sonst der Standard. Keine Kennung, keine Mail, keine Werkstatt-Stücke; die Rechte bleiben
+(nur angemeldete Spieler). Ohne diese Datei zeigt die App Banner und Anfangsbuchstaben. **Vorher:** im Abschnitt
+„Weltrangliste“ der Datenschutzerklärung prüfen, ob das Profilbild genannt werden soll (sichtbar wird es dann für
+alle Teilnehmer der Weltrangliste, nicht nur für den Gegner einer Partie).
+
+| Nr. | Was | Datei | Prüfen (Erwartung) |
+| --- | --- | --- | --- |
+| 1 | Profilbild in der Weltrangliste | `weltrang-karte-schema.sql` (nach `weltrang-schema.sql`) | `tests/server-weltrang-karte.test.mjs` grün; im SQL Editor `select public.weltrang_liste(3);` als angemeldeter Spieler: jede Zeile hat `motiv` |
+| 2 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
+
+**Rückweg:** `supabase/weltrang-karte-zurueck.sql` stellt `weltrang_liste` zeichengleich wie in `weltrang-schema.sql`
+wieder her. Danach `notify pgrst, 'reload schema';`.
+
 ## Saison, Weltrangliste und Online-Elo (Stand 19.11.2026, vorbereitet, noch nicht eingespielt)
 
 Diese drei Teile gehören zu Paket 2. Voraussetzung sind die live eingespielten Dateien `kronen-schema.sql`,
@@ -667,6 +685,31 @@ App wie bisher, nur ohne Sperre und ohne Hinweis.
 
 **Rückweg:** `supabase/benutzername-sperre-zurueck.sql`. Die Namen bleiben, nur der Zeitpunkt der letzten Änderung ist
 danach weg, der Name ist wieder beliebig oft änderbar, und das eigene Profil lässt sich wieder selbst löschen.
+
+## Benutzername mit grünem Haken (Stand 21.11.2026, vorbereitet, noch nicht eingespielt)
+
+Wer seinen Namen in der App bestätigt, bekommt einen grünen Haken und „Bestätigt“ neben dem Namen (Profil, Online-Partie,
+Weltrangliste). Ab dem Bestätigen gilt die 30-Tage-Sperre, **auch beim ersten Mal**. Ein Name, den der Server von selbst
+vergibt, hat keinen Haken und sperrt nicht. Den Haken kann sich niemand selbst geben oder wegnehmen. Benennt die
+Verwaltung einen Spieler um, ist der Haken weg (er bestätigt dann neu). Beim ersten Einspielen bekommen alle schon
+gesetzten Namen den Haken, ohne neue Sperre. Ohne diese Datei läuft die App wie bisher, nur ohne Haken.
+
+**Reihenfolge, wichtig:** erst `benutzername-sperre-schema.sql` (Abschnitt darüber, Schritte 1 bis 4), **dann** diese
+Datei. `verwaltung-schema.sql` muss für den Knopf „Sperre aufheben“ ebenfalls eingespielt sein.
+
+1. Vorher müssen `schema.sql` und `benutzername-sperre-schema.sql` eingespielt sein.
+2. Im **SQL Editor** den ganzen Inhalt von `supabase/benutzername-bestaetigt-schema.sql` ausführen. Die Datei darf
+   mehrfach laufen.
+3. `notify pgrst, 'reload schema';` ausführen.
+4. Prüfen: den Inhalt von `supabase/benutzername-bestaetigt-rls-test.sql` ausführen. Am Ende steht
+   „benutzername-bestaetigt-rls-test: alles gruen“, und nichts bleibt zurück. Der Test der Sperr-Datei
+   (`benutzername-sperre-rls-test.sql`) passt danach nicht mehr, weil das erste Setzen jetzt sperrt.
+
+**Sperre für ein Konto aufheben:** in der App unter Verwaltung beim Spieler „Sperre aufheben“ (steht im Protokoll), oder
+im SQL Editor wie im Abschnitt darüber.
+
+**Rückweg:** `supabase/benutzername-bestaetigt-zurueck.sql`. Namen und Sperr-Fristen bleiben, nur der Haken ist weg.
+Danach gilt wieder der Stand der Sperr-Datei (erstes Setzen frei).
 
 ## Google-Anmeldung einrichten
 

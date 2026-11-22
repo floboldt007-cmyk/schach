@@ -71,8 +71,16 @@ jobs:
         run: node tests/server-karte-elo.test.mjs
       - name: Karte-Sondertitel-Vorschlag pruefen (nicht eingespielt)
         run: node tests/server-karte-sondertitel.test.mjs
+      - name: Karte-Besitz-Vorschlag pruefen (nicht eingespielt; Rahmen nur mit Beleg, Rueckweg)
+        run: node tests/server-karte-besitz.test.mjs
+      - name: Gegner-Effekte-Vorschlag pruefen (nicht eingespielt; Besitz, RLS, Rueckweg, Listen wie die App)
+        run: node tests/server-gegner-effekte.test.mjs
+      - name: Karte-Titel-Vorschlag pruefen (nicht eingespielt; Gold- und Level-Titel nur mit Beleg, Rueckweg)
+        run: node tests/server-karte-titel.test.mjs
       - name: Benutzername-Monatssperre pruefen (nicht eingespielt; Sperre, Besitzer frei, RLS-Test, Rueckweg)
         run: node tests/server-benutzername-sperre.test.mjs
+      - name: Benutzername-Haken pruefen (nicht eingespielt; Haken + Frist beim Bestaetigen, name_frei, Verwaltung, RLS-Test, Rueckweg)
+        run: node tests/server-benutzername-bestaetigt.test.mjs
       - name: Liga-Bild-SQL ausfuehren (vorbereitet, nicht eingespielt)
         run: node tests/server-liga-bild.test.mjs
       - name: Raetsel-Duell-SQL ausfuehren
@@ -92,6 +100,8 @@ jobs:
         run: node tests/server-ranked-haengezeit.test.mjs
       - name: Weltrangliste-SQL ausfuehren (vorbereitet, nicht eingespielt; Zustimmung, 15 Partien, Rueckweg)
         run: node tests/server-weltrang.test.mjs
+      - name: Weltrangliste mit Profilbild (Vorschlag R27, PGlite)
+        run: node tests/server-weltrang-karte.test.mjs
       - name: Loeschkette Paket 2 pruefen (konto_loeschen nimmt Season-Daten und Weltrang-Eintrag mit, Gegenprobe)
         run: node tests/server-paket2-loeschen.test.mjs
       - name: Eigene Online-Elo pruefen (vorbereitet, nicht eingespielt; nur die eigene, null ohne Elo, Rueckweg, Gegenprobe)
