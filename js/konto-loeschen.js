@@ -62,7 +62,8 @@ export function starte(doc = document) {
   });
 
   knopf('code', () => versuche(async () => {
-    melde('');
+    // Kaltreview #277: token() wartet bis 8 s, solange steht da, warum nichts passiert
+    melde(schutz ? text('botschutzPrueft') : '');
     const mail = $('.kl-email').value;
     const token = schutz ? await schutz.token() : '';
     // Kaltreview 22 (W2, wie js/konto.js): ohne Token keine Anfrage, sondern sagen warum (Supabase lehnte sie ohnehin ab)

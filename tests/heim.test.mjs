@@ -655,12 +655,19 @@ async function testeRueckkehr(browser, heute) {
     pruefe(`${name}: „${soll.split(' | ')[1]}“`, z && z.text === soll, JSON.stringify(z));
     await kontext.close();
   }
-  // Kaltreview 22 (W1): Datum wenige Stunden in der Zukunft, aber am selben Spieltag (Uhr verstellt): keine Zeitangabe statt "heute"
-  ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -3)),
-    [P + 'partien']: [{ ...partieWilli(heute), datum: new Date(Date.now() + 3 * 36e5).toISOString() }] } }));
+  // Kaltreview 22 (W1): Datum wenige Stunden in der Zukunft, aber am selben Spieltag (Uhr verstellt): keine Zeitangabe statt "heute".
+  // Feste Uhr statt Date.now() (Kaltreview #277): zwischen 1 und 4 Uhr laege "+3 Stunden" sonst schon auf dem naechsten Spieltag
+  // (TAG_GRENZE_STUNDE in js/tag.js), und der Fall bestuende auch ohne den Fix. Gegenprobe 08:00 -> 0 (heute).
+  ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute) } }));
   await istScreen(seite, 'heim');
-  z = await zeile(seite);
-  pruefe('Partie-Datum 3 Stunden in der Zukunft: keine Zeitangabe', z && z.text === 'Willkommen zurück | Sieg gegen Willi', JSON.stringify(z));
+  const w1 = await seite.evaluate(async () => {
+    const { tageSeitPartie } = await import('/js/ui/heim.js');
+    const jetzt = new Date(2026, 10, 22, 10, 0);
+    return { zukunft: tageSeitPartie({ datum: new Date(2026, 10, 22, 13, 0).toISOString() }, jetzt),
+      vorhin: tageSeitPartie({ datum: new Date(2026, 10, 22, 8, 0).toISOString() }, jetzt) };
+  });
+  pruefe('Partie-Datum 3 Stunden in der Zukunft (feste Uhr 10:00, Partie 13:00): keine Zeitangabe, 08:00 bleibt heute',
+    w1.zukunft === null && w1.vorhin === 0, JSON.stringify(w1));
   await kontext.close();
   // Englisch: ganze Zeile mit Gegner und Zeitangabe (Besuch vor 2 Tagen, Partie vor 3 Tagen), Knopf und Vorlese-Text
   ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -2)), [P + 'partien']: [PARTIE_WILLI],

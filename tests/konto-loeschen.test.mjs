@@ -65,7 +65,8 @@ async function umgebung({ otp = null, verify = null, rpc = null, token = null, r
       if (!botschutz) return r.abort();
       return r.fulfill({ status: 200, contentType: 'text/javascript', body: `window.turnstile = { n: 0, opt: null,
         gib() { const o = this.opt; if (/^2x/.test(o.sitekey)) o['error-callback']('600010'); else o.callback('tok-' + (++this.n)); },
-        render(el, o) { this.opt = o; el.dataset.gerendert = '1'; setTimeout(() => this.gib(), 50); return 'w1'; },
+        // 3x...: das Token kommt erst nach 9 s, also nach dem 8-s-Fenster von js/botschutz.js (WARTEN_MS)
+        render(el, o) { this.opt = o; el.dataset.gerendert = '1'; setTimeout(() => this.gib(), /^3x/.test(o.sitekey) ? 9000 : 50); return 'w1'; },
         reset() { setTimeout(() => this.gib(), 50); }, remove() {} };` });
     }
     if (u.pathname === '/auth/v1/otp') { try { z.otpBody.push(r.request().postDataJSON()); } catch (e) { z.otpBody.push(null); } }
@@ -323,8 +324,9 @@ try {
     await s.locator('.kl-email').focus(); await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
     const nachFokus = z.cf.length;
     await s.locator('.kl-email').fill('flo@example.invalid');
-    await s.locator('[data-kl="code"]').click(); await s.waitForTimeout(500);
-    pruefe('Bot-Schutz Loeschseite: Oeffnen laedt nichts, Fokus im Feld genau ein Skript, Code-Anforderung mit Token',
+    // Doppeltipp (Kaltreview #277): der Knopf ist waehrend der Anforderung gesperrt, es geht genau eine Anfrage raus
+    await s.locator('[data-kl="code"]').dblclick(); await s.waitForTimeout(500);
+    pruefe('Bot-Schutz Loeschseite: Oeffnen laedt nichts, Fokus im Feld genau ein Skript, Doppeltipp: genau eine Code-Anforderung mit Token',
       vorher === 0 && nachFokus === 1 && z.cf.length === 1 && z.aufrufe.otp === 1 && z.otpBody[0]?.gotrue_meta_security?.captcha_token === 'tok-1'
         && z.fehler.length === 0, { vorher, nachFokus, cf: z.cf, otp: z.aufrufe.otp, body: z.otpBody, fehler: z.fehler });
     await k.close();
@@ -342,6 +344,26 @@ try {
         { otp: z.aufrufe.otp, st, soll: T.botschutzFehler });
       await k.close();
     }
+  }
+  { // 11d. Bot-Schutz zu langsam (Kaltreview #277): waehrend des Wartens "prueft", nach 8 s ohne Token kein /otp und der
+    // Warte-Text, Knopf wieder frei; ist das Token da, schickt der zweite Tipp genau eine Anforderung mit Token
+    const { k, z } = await umgebung({ botschutz: '3x00000000000000000000FF' });
+    const s = await seite(k, z, DE);
+    const T = await s.evaluate(() => JSON.parse(document.getElementById('kl-texte').textContent));
+    await s.locator('.kl-email').fill('flo@example.invalid');
+    await s.locator('[data-kl="code"]').click(); await s.waitForTimeout(1000);
+    const waehrend = await status(s);
+    await s.waitForFunction((t) => document.querySelector('.kl-status')?.textContent === t, T.botschutzWarten, { timeout: 12000 }).catch(() => {});
+    const nach = await status(s);
+    const otpNachWarten = z.aufrufe.otp;
+    const frei = !(await s.locator('[data-kl="code"]').isDisabled());
+    await s.waitForTimeout(1500);
+    await s.locator('[data-kl="code"]').click(); await s.waitForTimeout(600);
+    pruefe('Bot-Schutz Loeschseite zu langsam: "prueft", dann Warte-Text ohne /otp, Knopf frei, zweiter Tipp genau ein /otp mit Token',
+      !!T.botschutzPrueft && waehrend.text === T.botschutzPrueft && nach.text === T.botschutzWarten && nach.fehler === 'ja' && otpNachWarten === 0
+        && frei && z.aufrufe.otp === 1 && z.otpBody[0]?.gotrue_meta_security?.captcha_token === 'tok-1',
+      { waehrend, nach, otpNachWarten, frei, otp: z.aufrufe.otp, body: z.otpBody, soll: [T.botschutzPrueft, T.botschutzWarten] });
+    await k.close();
   }
   { // 12. Server lehnt ein lokal gueltiges Token ab (401 PGRST301): einmal erneuern, einmal wiederholen
     const abgelehnt = { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } };
