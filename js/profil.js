@@ -22,7 +22,7 @@
 //   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
 //                                      Aufrufs; einmal gemerkt (bleibt beim Speichern der Wahl erhalten)
 import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien, ladeFortschritt } from './storage.js';
-import { istErfinder, sonderstueckeBekannt } from './sonderstuecke.js';
+import { istErfinder, sonderstueckeBekannt, hatSonderstueck, ERFINDER } from './sonderstuecke.js';
 import { sitzung } from './konto.js';
 import { KREATUREN } from './kreaturen-kunst.js';
 
@@ -46,6 +46,9 @@ export function botMotivFrei(x) {
   } catch (e) { return false; }
 }
 const motivErlaubt = (x) => (MOTIVE.includes(x) && (!NUR_ERFINDER.includes(x) || istErfinder())) || botMotivFrei(x);
+// Der Erfinder-Rahmen nur mit dem Sonderstueck (Konto-Trennung 22.11.2026: die gemerkte Wahl wanderte mit einem kopierten
+// Spielstand in ein fremdes Konto); andere Rahmen prueft die Sammlung (Erfolge), hier nur, ob es sie gibt
+const rahmenErlaubt = (x) => !!RAHMEN[x] && (x !== 'erfinder-blatt-0' || hatSonderstueck(ERFINDER.banner));
 // R26 (Befund 9f, 21.11.2026): angemeldet, aber fuer dieses Konto noch keine Server-Antwort gemerkt (frisches Geraet,
 // langsames Netz): die gespeicherte Erfinder-Figur bleibt sichtbar, statt bis zur Antwort als Bauer zu erscheinen. Erst
 // ein belegter Nicht-Besitz oder die Abmeldung fallen zurueck. Nur fuer die eigene Ansicht: neu waehlen verlangt den
@@ -87,7 +90,7 @@ export function profilWahl() {
   return {
     figur: motivSichtbar(e.figur) ? e.figur : STANDARD_FIGUR,
     grund: GRUENDE.includes(e.grund) ? e.grund : 'standard',
-    rahmen: RAHMEN[e.rahmen] ? e.rahmen : 'ohne',
+    rahmen: rahmenErlaubt(e.rahmen) ? e.rahmen : 'ohne',
     vitrine: vitrine.map((x) => (typeof x === 'string' && ID.test(x) ? x : null)),
     titel: typeof e.titel === 'string' && ID.test(e.titel) ? e.titel : null,
     banner: typeof e.banner === 'string' && ID.test(e.banner) ? e.banner : 'start',
