@@ -9,6 +9,10 @@
 //                      Dateien online-ohne-elo-<geraet>-...; sonst nennt sie Elo 1240 (R19 online ruhig: eine Zahl in der Lobby)
 //   --nur-hell         nur das helle Schema (8 Bilder)
 //   --zahlen=<datei>   schreibt je Ansicht alle sichtbaren Zahlen als Markdown-Liste (Brett-Koordinaten zusammengefasst)
+//   --nur-lobby        nur das Lobby-Bild je Geraet und Schema (R27 Arena: schnelle Probe des Looks)
+//   --geraete=a,b      nur diese Geraete (iphone-13, iphone-se, pc, ipad-quer, pc-gross)
+// R27 Arena: die Attrappe kennt fuenf beendete gewertete Partien (Form), eine laufende Season (saison_mein_stand, endet
+// in 4 Tagen) und die Weltrangliste (weltrang_liste, Platz 41); ohne Antwort waeren Form, Season-Rest und Rangliste weg.
 // Exit 0, wenn alle 24 Bilder entstanden sind und jede Ansicht im erwarteten Modus stand; sonst 1.
 import http from 'node:http';
 import os from 'node:os';
@@ -64,7 +68,14 @@ const iso = (ms) => new Date(ms).toISOString();
 
 function neuerZustand() {
   // treffer: false = die Suche wartet (Bild der Gegnersuche); true = der Server meldet die Paarung mit PARTIE
-  return { partien: new Map(), treffer: false, sucheSeit: null, unerwartet: [] };
+  const z = { partien: new Map(), treffer: false, sucheSeit: null, unerwartet: [] };
+  // R27 Form: fuenf beendete gewertete Partien, neueste zuerst: S, R, S, N, S (aus Sicht von u1)
+  [['1-0', 'u1'], ['1/2-1/2', 'u1'], ['0-1', 'u2'], ['1-0', 'u2'], ['1-0', 'u1']].forEach(([ergebnis, weiss], i) => {
+    const am = iso(Date.now() - (i + 1) * 3600e3);
+    z.partien.set('alt-' + i, { id: 'alt-' + i, code: null, weiss, schwarz: weiss === 'u1' ? 'u2' : 'u1', gewertet: true, status: 'beendet',
+      ergebnis, grund: 'matt', zuege: 'e2e4 e7e5 g1f3 b8c6', bedenkzeit_s: 300, inkrement_s: 3, erstellt_am: am, aktualisiert_am: am });
+  });
+  return z;
 }
 function legePartieAn(z) {
   const c = new Chess(), jetzt = iso(Date.now());
@@ -112,6 +123,16 @@ function bediener(z) {
         const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7,
           ...(OHNE_ELO ? {} : { elo: u === UID ? 1240 : 1310 }), du: u === UID }); // Visitenkarte mit Elo (supabase/karte-elo-schema.sql)
         return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
+      }
+      if (rpc === 'saison_mein_stand') {
+        const ende = new Date(Date.now() + 4 * 864e5).toISOString().slice(0, 10);
+        return antwort({ saison: 1, start: '2026-11-02', wochen: 6, woche: 3, ende, abzeichen: [], titel: [], gewaehlt: null, sichtbar: true });
+      }
+      if (rpc === 'weltrang_liste') {
+        const namen = ['Lena', 'Mats', 'Sophie', 'Jonas', 'Ella', 'Tom', 'Mia', 'Ben', 'Lina', 'Paul'];
+        const liste = Array.from({ length: 50 }, (_, i) => ({ rang: i + 1, name: i === 40 ? NAMEN[UID] : namen[i % namen.length], elo: 1980 - i * 18 - (i >= 40 ? 20 : 0),
+          banner: 'start', ich: i === 40 }));
+        return antwort({ ab: 15, ab_start: 30, teilnahme: true, ich: { status: 'dabei', rang: 41, elo: liste[40].elo, name: NAMEN[UID], banner: 'start' }, liste });
       }
       if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09', ...(OHNE_ELO ? {} : { elo: 1240 }) });
       z.unerwartet.push(rpc);
@@ -166,7 +187,9 @@ const sichtbareZahlen = (s) => s.evaluate(() => {
   }
   return { raus, koord };
 });
-const GERAETE = [['iphone-13', 390, 844], ['iphone-se', 375, 667], ['pc', 1280, 720]];
+const ALLE_GERAETE = [['iphone-13', 390, 844], ['iphone-se', 375, 667], ['pc', 1280, 720], ['ipad-quer', 1180, 820], ['pc-gross', 1920, 1080]];
+const GERAETE = arg('geraete') ? ALLE_GERAETE.filter(([n]) => arg('geraete').split(',').includes(n)) : ALLE_GERAETE.slice(0, 3);
+const NUR_LOBBY = process.argv.includes('--nur-lobby');
 const SCHEMATA = [['hell', 'light', 'hell'], ['dunkel', 'dark', 'dunkel']].slice(0, process.argv.includes('--nur-hell') ? 1 : 2);
 const seitenfehler = [];
 
@@ -196,6 +219,16 @@ async function lauf(browser, [geraet, w, h], [wort, schema, modus]) {
     pruefe(`${gruppe}: Modus ${modus} (Seitengrund ${grund})`, hell === (modus === 'hell'), grund);
     await warte(600);
     await bild('lobby');
+    // R27: Tipp auf die Form zeigt die letzten Partien (Namen aus karte_der_partie)
+    if (await s.locator('.on-held .on-form').isVisible().catch(() => false)) {
+      await s.locator('.on-held .on-form').click();
+      await s.locator('.on-letzte-blatt').waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+      await warte(900);
+      await bild('letzte');
+      await s.locator('.on-letzte-blatt [data-knopf="zu"]').click().catch(() => {});
+      await warte(500);
+    }
+    if (NUR_LOBBY) { await k.close().catch(() => {}); return; }
     // 2) Gegnersuche: Ring mit Restzeit, "Jetzt gegen KI", Abbrechen
     await s.locator('[data-online="suchen"]').filter({ visible: true }).first().click();
     pruefe(`${gruppe}: Gegnersuche laeuft`, await sichtbar(s, '.on-suche'));

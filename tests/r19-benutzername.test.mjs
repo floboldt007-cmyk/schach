@@ -128,7 +128,8 @@ async function browserTeil() {
     const ab = new Date(gestern.getTime() + 30 * 86400000).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' });
     p = await seite(browser, { profil: [{ user_id: ID, benutzername: 'alt_name', name_geaendert_am: gestern.toISOString() }], ziel: '#einstellungen' });
     let kn = await konto(p.s);
-    pruefe(`Sperre: Konto zeigt "Nächste Änderung ab ${ab}", Feld nur lesbar`, kn.sperre === `Nächste Änderung ab ${ab}` && kn.nurLesen && kn.wert === 'alt_name', kn);
+    // R27 (Flo 21.11.2026): dazu die verbleibenden Tage
+    pruefe(`Sperre: Konto zeigt "Nächste Änderung ab ${ab} (noch 29 Tage)", Feld nur lesbar`, kn.sperre === `Nächste Änderung ab ${ab} (noch 29 Tage)` && kn.nurLesen && kn.wert === 'alt_name', kn);
     await p.s.locator('[data-konto="sichern"]').click();
     await warte(1200);
     pruefe('Sperre: "Jetzt sichern" schickt den unveraenderten Namen nicht', p.posts.length === 0, p.posts);
@@ -150,6 +151,8 @@ async function browserTeil() {
       post: { status: 400, body: { code: 'P0001', message: 'NAME_GESPERRT', details: '2026-12-15T10:00:00Z', hint: null } } });
     await p.s.locator('.konto-name').fill('ganz_neu');
     await p.s.locator('[data-konto="sichern"]').click();
+    // R27: ein geaenderter Name geht erst nach der Rueckfrage in der App an den Server
+    await p.s.locator('.dialog-knoepfe button', { hasText: 'Bestätigen' }).click({ timeout: 5000 });
     await warte(1200);
     kn = await konto(p.s);
     const datum = new Date('2026-12-15T10:00:00Z').toLocaleDateString('de-DE');

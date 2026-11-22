@@ -86,5 +86,7 @@ export async function setzePremium(id, bis) {
   return rpc('verwaltung_premium', { ziel: id, bis: wann });
 }
 export async function setzeName(id, name) { return rpc('verwaltung_name', { ziel: id, neu: String(name ?? '').trim() }); }
+// Namens-Sperre (30 Tage) eines Spielers aufheben (supabase/benutzername-bestaetigt-schema.sql); der Haken bleibt
+export async function hebeNamensSperreAuf(id) { return rpc('verwaltung_name_sperre_aufheben', { ziel: id }); }
 export async function setzeBanner(id, banner, an) { return rpc('verwaltung_banner', { ziel: id, banner, an: !!an }); }
 export async function protokoll({ grenze = 50 } = {}) { return liste(await rpc('verwaltung_protokoll_lesen', { grenze })); }

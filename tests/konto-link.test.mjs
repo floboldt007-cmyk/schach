@@ -412,7 +412,9 @@ try {
     pruefe('Erstanmeldung Code: neues Konto ohne Namen bekommt den Hinweis „Benutzernamen wählen“, Feld leer',
       /Benutzernamen/.test(await nameHinweis(s)) && (await nameFeld(s)) === '', { hinweis: await nameHinweis(s), feld: await nameFeld(s) });
     await s.locator('.konto-name').fill('Neuling_1');
-    await s.locator('[data-konto="sichern"]').click(); await s.waitForTimeout(1000);
+    await s.locator('[data-konto="sichern"]').click();
+    // R27 (Flo 21.11.2026): ein neuer Name geht erst nach der Rueckfrage in der App an den Server
+    await s.locator('.dialog-knoepfe button', { hasText: 'Bestätigen' }).click({ timeout: 5000 }); await s.waitForTimeout(1000);
     await bild(s, 'erstanmeldung-name-gespeichert');
     pruefe('Erstanmeldung Code: Name gespeichert (POST /rest/v1/profile), Feld zeigt ihn, Hinweis weg, Merker fürs Spiel gesetzt',
       zustand.profilPost[0]?.benutzername === 'Neuling_1' && zustand.profilPost[0]?.user_id === 'u1' && (await nameFeld(s)) === 'Neuling_1'
