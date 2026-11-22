@@ -218,9 +218,13 @@ function wechsleModus(knopf, app) {
   }
 }
 
+// R27 Tempo (gemessen 22.11.: jeder Reiterwechsel spielte die Einblendung des Kopfes neu, 480 bis 640 ms): der Kopf gleitet nur
+// beim ersten Bildschirm nach dem Start ein. Danach steht er wie eine Leiste still, nur der Inhalt wechselt.
+let kopfGezeigt = false;
 export function kopfEintritt(wurzel) {
   const kopf = wurzel && wurzel.querySelector ? wurzel.querySelector('.haupt-kopf') : null;
-  if (!kopf || tempo() === 0) return;
+  if (!kopf || tempo() === 0 || kopfGezeigt) return;
+  kopfGezeigt = true;
   staffel([kopf.querySelector('.marke'), kopf.querySelector('.kopf-premium'), ...kopf.querySelectorAll('.rechts > *')].filter(Boolean),
     { von: 'translateY(-10px)', d: 480, abstand: 40 });
 }

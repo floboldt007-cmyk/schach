@@ -2239,7 +2239,10 @@ export function zeige(root, params, app) {
     s.classList.add('mit-ergebnis');
     const karte = o.querySelector('.ergebnis-karte');
     karte.setAttribute('tabindex', '-1');
-    karte.focus({ preventScroll: true });
+    // R27 Tempo (gemessen 22.11.: 171 ms erzwungenes Layout im Aufbau am iPhone): Fokus erst im naechsten Bild, wie sheet() (F3).
+    // Der Hintergrund ist schon inert; hat Flo den Fokus bis dahin selbst ins Blatt gesetzt, bleibt er dort.
+    const fokusKarte = () => { if (karte.isConnected && !o.contains(document.activeElement)) karte.focus({ preventScroll: true }); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fokusKarte); else fokusKarte();
 
     // ---------- Feier-Zeilen (feier.fuerOverlay) ----------
     // Neue Zeilen gleiten im Abstand von 200 ms ein und spielen ihren Klang (Klangstufe "Nur wichtige":

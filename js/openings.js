@@ -401,7 +401,7 @@ export function eroeffnungVorbereiten({ beiStueck, stueckMs = 30 } = {}) {
       bau ||= baue();
       if (beiStueck) beiStueck();
       const ende = jetzt() + stueckMs;
-      while (jetzt() < ende) if (bau.next().done) { fertig(INDEX); return; }
+      while (jetzt() < ende) if (bau.next().done) { fertig(INDEX); spaeter(namenTabelle); return; }
       spaeter(stueck);
     };
     spaeter(stueck);
@@ -446,8 +446,9 @@ export function eroeffnung(sanListe) {
 // oder einer der Zusatznamen ("Unbekannte Eröffnung", "Eröffnungstheorie"); auch ein englischer Name wird erkannt.
 // Auf Deutsch kommt ein deutscher Name unveraendert zurueck.
 let NAMEN_SCHLUESSEL = null;   // Name (jede Sprache) -> Schluessel im Woerterbuch
-export function eroeffnungsAnzeige(name) {
-  if (typeof name !== 'string' || !name) return name;
+// R27 Tempo (gemessen 22.11.: 62 ms im ersten Zug am iPhone): die Tabelle entsteht nach dem Index in einem eigenen Stueck
+// (eroeffnungVorbereiten), sonst beim ersten Aufruf wie bisher
+function namenTabelle() {
   if (!NAMEN_SCHLUESSEL) {
     NAMEN_SCHLUESSEL = new Map();
     // Deutsch zuletzt: bei gleichem Text gewinnt der deutsche Eintrag
@@ -455,6 +456,10 @@ export function eroeffnungsAnzeige(name) {
       for (const [k, v] of Object.entries(texte(s))) if (k.startsWith('eroeffnungen.')) NAMEN_SCHLUESSEL.set(v, k);
     }
   }
-  const k = NAMEN_SCHLUESSEL.get(name);
+  return NAMEN_SCHLUESSEL;
+}
+export function eroeffnungsAnzeige(name) {
+  if (typeof name !== 'string' || !name) return name;
+  const k = namenTabelle().get(name);
   return k ? t(k) : name;
 }

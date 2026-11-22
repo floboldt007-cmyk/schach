@@ -110,7 +110,10 @@ function zeigeIch(root, params = {}, app) {
   try { kopfOrt = fuelle('ich:kopf', s.querySelector('.sa-kopf-ort'), { app }); } catch (e) { console.error(e); }
   s.querySelector('.sa-kopf-ort').hidden = !kopfOrt.anzahl;
   try { gefuellt = fuelle('sammlung:bereich', ort, { app }); } catch (e) { console.error(e); }
-  const bereiche = () => [...ort.querySelectorAll(':scope > .sa-bereich'), ...(blatt ? blatt.huelle.querySelectorAll(':scope > .sa-bereich') : [])];
+  // heim: Bereiche, die gerade mit einem geschlossenen Blatt wegfahren und gleich nach .sa-ort zurueckkommen (oeffne, holeHeim)
+  let heim = null;
+  const bereiche = () => [...ort.querySelectorAll(':scope > .sa-bereich'), ...(blatt ? blatt.huelle.querySelectorAll(':scope > .sa-bereich') : []),
+    ...(heim ? heim.teile.filter((y) => y.parentNode !== ort) : [])];
 
   // Ausruesten per Tipp: wahl() des Teils, dann Bereiche (und das Profil oben) an Ort und Stelle neu zeichnen; das offene
   // Blatt bekommt den neu gezeichneten Bereich
@@ -189,7 +192,14 @@ function zeigeIch(root, params = {}, app) {
   });
 
   // Blatt eines Bereichs: der Bereich wandert hinein, beim Schliessen zurueck nach .sa-ort
+  function holeHeim() {
+    if (!heim) return;
+    clearTimeout(heim.uhr);
+    for (const y of heim.teile) if (y.parentNode !== ort) { y.hidden = true; ort.append(y); }
+    heim = null;
+  }
   function oeffne(id) {
+    holeHeim();
     const x = [...ort.querySelectorAll(':scope > .sa-bereich')].find((y) => y.dataset.bereich === id);
     if (!x) return;
     const huelle = document.createElement('div');
@@ -202,7 +212,14 @@ function zeigeIch(root, params = {}, app) {
     sheet({ titel: x.dataset.name || id, inhalt: huelle, klasse: 'sa-blatt', knoepfe: [{ text: t('rahmen.sammlung.fertig'), wert: true }], abbrechen: false })
       .then(() => {
         if (!blatt || blatt.huelle !== huelle) return;
-        for (const y of huelle.querySelectorAll(':scope > .sa-bereich')) { y.hidden = true; ort.append(y); }
+        // R27 Tempo (gemessen 22.11.: CLS 0,76 beim Schliessen): die Karte faehrt noch 260 ms weg. Nahm man ihr den Bereich sofort,
+        // schrumpfte sie mitten im Wegfahren. Er faehrt deshalb still mit (inert) und kommt danach zurueck nach .sa-ort, sofort,
+        // falls vorher ein Blatt aufgeht. bereiche() zaehlt ihn solange mit (zeichnePlaetze, zeigeStand).
+        const teile = [...huelle.querySelectorAll(':scope > .sa-bereich')];
+        huelle.inert = true;
+        heim = { teile, uhr: 0 };
+        if (tempo() === 0) holeHeim();
+        else heim.uhr = setTimeout(holeHeim, 300 * tempo());
         blatt = null;
         s.dataset.bereich = '';
         zeichnePlaetze();

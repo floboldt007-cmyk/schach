@@ -160,7 +160,13 @@ function szeneVon(welt, modus) {
 // Ein Fehler hier ist egal, app.js zeigt beim Wechsel selbst den Platzhalter.
 let partieVorab = null;
 function ladePartieScreen() {
-  if (!partieVorab) partieVorab = import('./partie.js').catch(() => { partieVorab = null; });
+  if (!partieVorab) {
+    partieVorab = import('./partie.js').catch(() => { partieVorab = null; });
+    // R27 Tempo (gemessen 22.11.: ueber 300 ms chess.js beim Oeffnen der Partie): den Eroeffnungs-Index und die Namens-Tabelle
+    // schon hier im Leerlauf bauen (in Stuecken, openings.js); die Partie findet sie dann fertig vor
+    const leer = typeof requestIdleCallback === 'function' ? (f) => requestIdleCallback(f, { timeout: 4000 }) : (f) => setTimeout(f, 1500);
+    leer(() => { import('../openings.js').then((o) => o.eroeffnungVorbereiten()).catch(() => {}); });
+  }
   return partieVorab;
 }
 
@@ -1015,16 +1021,19 @@ export function zeige(root, params, app) {
   function eintritt() {
     if (tempo() === 0) return;
     kopfEintritt(s);
-    anim(karte, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { d: 640, v: 40, k: 'weich' });
+    anim(karte, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { d: 300, k: 'weich' });
+    // R27 Tempo (gemessen 22.11.: Bots stand erst nach 1,2 s): ruhig und kurz, der Abstand zwischen den Stationen schrumpft
+    // mit ihrer Zahl, alles steht nach rund 0,6 s
+    const schritt = Math.min(48, 200 / Math.max(1, knoten.length));
     if (!neuId) {
       // Stationen fallen gestaffelt (nur das Portraet und das Schild bewegen sich: die Station selbst bleibt messbar)
       knoten.forEach((el, i) => {
-        anim(el.querySelector('.avatar'), [{ opacity: 0, transform: 'translateY(-18px) scale(.6)' }, { opacity: 1, transform: 'none' }], { d: 560, v: 160 + i * 48, k: 'hupf' });
-        anim(el.querySelector('.k-schild'), [{ opacity: 0, transform: 'translateX(-50%) translateY(6px)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 420, v: 300 + i * 48, k: 'weich' });
+        anim(el.querySelector('.avatar'), [{ opacity: 0, transform: 'translateY(-18px) scale(.6)' }, { opacity: 1, transform: 'none' }], { d: 300, v: 40 + i * schritt, k: 'hupf' });
+        anim(el.querySelector('.k-schild'), [{ opacity: 0, transform: 'translateX(-50%) translateY(6px)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 240, v: 100 + i * schritt, k: 'weich' });
       });
       const fahne = s.querySelector('.knoten .fahne');
-      if (fahne) anim(fahne, [{ opacity: 0, transform: 'translateX(-50%) translateY(10px) scale(.6)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 560, v: 160 + knoten.length * 48, k: 'hupf' });
-      anim(floFigur, [{ opacity: 0, transform: 'translateY(-30px) scale(.5)' }, { opacity: 1, transform: 'none' }], { d: 600, v: 400 + aktuellIdx * 48, k: 'hupf' });
+      if (fahne) anim(fahne, [{ opacity: 0, transform: 'translateX(-50%) translateY(10px) scale(.6)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 300, v: 40 + knoten.length * schritt, k: 'hupf' });
+      anim(floFigur, [{ opacity: 0, transform: 'translateY(-30px) scale(.5)' }, { opacity: 1, transform: 'none' }], { d: 300, v: 80 + aktuellIdx * schritt, k: 'hupf' });
       // der Fortschritts-Pfad zeichnet sich
       const pfad = bild.querySelector('.w-fortschritt');
       if (pfad && pfad.getTotalLength) {
@@ -1032,11 +1041,11 @@ export function zeige(root, params, app) {
         try { laenge = pfad.getTotalLength(); } catch (e) { laenge = 0; }
         if (laenge > 0) {
           pfad.style.strokeDasharray = String(laenge);
-          anim(pfad, [{ strokeDashoffset: laenge }, { strokeDashoffset: 0 }], { d: 900, v: 260, k: 'gleiten' });
+          anim(pfad, [{ strokeDashoffset: laenge }, { strokeDashoffset: 0 }], { d: 420, v: 60, k: 'gleiten' });
         }
       }
     }
-    anim(detail, [{ opacity: 0, transform: 'translateY(22px) scale(.985)' }, { opacity: 1, transform: 'none' }], { d: 700, v: 140, k: 'weich' });
+    anim(detail, [{ opacity: 0, transform: 'translateY(22px) scale(.985)' }, { opacity: 1, transform: 'none' }], { d: 300, v: 40, k: 'weich' });
     staffel([...detail.querySelectorAll(':scope > :not([hidden]):not(.detail-links):not(.detail-rechts), .detail-links > *, .detail-rechts > :not([hidden])')],
       { d: 520, v: 240, abstand: 40, von: 'translateY(10px)' });
   }
