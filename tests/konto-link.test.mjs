@@ -302,9 +302,19 @@ try {
     await s.waitForTimeout(1000);
     pruefe('Bot-Schutz: beim Start der App lädt nichts von Cloudflare', zustand.cf.length === 0, zustand.cf);
     await s.evaluate((h) => { location.hash = h; }, EINST);
+    await s.waitForSelector('.konto-email', { timeout: 5000 }).catch(() => {});
+    await s.waitForTimeout(1500);   // laenger als der Sekundentakt der Konto-Gruppe
+    // Nachbesserung Runde 5 (PR #201): das blosse Oeffnen der Einstellungen laedt nichts (der Datenschutztext stuetzt sich
+    // auf "die Anmeldung, die du selbst aufrufst"); der Hinweis auf den Bot-Schutz steht aber schon vorher da
+    pruefe('Bot-Schutz: Einstellungen öffnen lädt nichts von Cloudflare, kein Widget, Hinweis schon sichtbar',
+      zustand.cf.length === 0 && await s.locator('.konto-botschutz').isHidden() && !(await s.evaluate(() => 'turnstile' in window))
+        && await s.locator('.konto-botschutz-hinweis').isVisible(), zustand.cf);
+    await s.locator('.konto-email').focus();
     await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
-    pruefe('Bot-Schutz: mit der Anmeldung genau ein Skript, nur von challenges.cloudflare.com (explizit gezeichnet)',
+    pruefe('Bot-Schutz: Fokus im E-Mail-Feld lädt genau ein Skript, nur von challenges.cloudflare.com (explizit gezeichnet)',
       zustand.cf.length === 1 && zustand.cf[0] === '/turnstile/v0/api.js?render=explicit', zustand.cf);
+    await s.locator('.konto-email').blur(); await s.locator('.konto-email').focus(); await s.waitForTimeout(300);
+    pruefe('Bot-Schutz: erneuter Fokus lädt kein zweites Skript', zustand.cf.length === 1, zustand.cf);
     // erwartet wird das Farbschema, das der Browser der Seite wirklich meldet (kein App-Thema gesetzt, also System), nicht
     // GERAET.schema: so stimmt die Pruefung auch, wenn das Schema von aussen kommt (fc-02:30, Dunkel-Lauf der Funktionsprobe 371)
     const schema = await s.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
@@ -336,10 +346,24 @@ try {
     pruefe('Bot-Schutz: keine Seitenfehler', zustand.fehler.length === 0, zustand.fehler);
     await k.close();
   }
+  { // 6b. "Code senden" ohne Fokus im E-Mail-Feld (Adresse vom Browser eingetragen): der Klick laedt das Skript und
+    // wartet auf das Token
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: 'ok' });
+    const s = await seite(k, zustand, BASIS + EINST);
+    await s.waitForTimeout(1200);
+    await s.evaluate(() => { document.querySelector('.konto-email').value = 'flo@example.invalid'; });
+    const vorher = zustand.cf.length;
+    await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(900);
+    pruefe('Bot-Schutz: „Code senden“ ohne Fokus im Feld lädt das Skript erst jetzt (genau eines) und schickt das Token mit',
+      vorher === 0 && zustand.cf.length === 1 && zustand.otpBody.length === 1 && zustand.otpBody[0].gotrue_meta_security?.captcha_token === 'tok-1'
+        && zustand.fehler.length === 0, { vorher, cf: zustand.cf, body: zustand.otpBody, fehler: zustand.fehler });
+    await k.close();
+  }
   { // 7. Bot-Schutz schlaegt fehl: kein Code anfordern, eigener Text
     const { k, zustand } = await speicher({ lokal: { 'schach-arena:konto:sichtbar': '1', 'schach-arena:v1:hinweis-installieren': '1' }, botschutz: '2x00000000000000000000AB' });
     const s = await seite(k, zustand, BASIS + EINST);
     await s.waitForTimeout(1200);
+    pruefe('Bot-Schutz (Fehlerfall): vor der ersten Eingabe keine Anfrage an Cloudflare', zustand.cf.length === 0, zustand.cf);
     await s.locator('.konto-email').fill('flo@example.invalid');
     await s.locator('[data-konto="code"]').click(); await s.waitForTimeout(600);
     const st = await status(s);

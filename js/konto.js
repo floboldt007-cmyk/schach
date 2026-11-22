@@ -625,6 +625,8 @@ export function kontoGruppe({ app } = {}) {
       if (f?.serverDetails) console.error('Konto-Serverfehler', f.status, f.kennung || '');
       melden(f.message || t('einstellungen.nichtGeklappt'), true); }
   });
+  // Bot-Schutz erst bei Benutzung laden (Fokus im E-Mail-Feld; "Code senden" startet ihn ueber token() selbst)
+  el.addEventListener('focusin', (e) => { if (e.target.closest?.('.konto-email')) schutz?.starte(); });
   el.addEventListener('input', (e) => {
     const z = e.target.closest('.konto-ziffern input'); if (!z) return;
     z.value = z.value.replace(/\D/g, '').slice(-1);
