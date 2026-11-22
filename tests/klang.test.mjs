@@ -399,8 +399,11 @@ async function testeLogik() {
     pruefe('R26: ohne Screen gilt die Wahl (holz), Lobby spielt arcade, Partie holz, Online-Liste arcade, Online-Partie holz',
       vorher.aktiv === 'holz' && lobby.aktiv === 'arcade' && lobby.ort === 'lobby' && lobby.paket === 'holz' && spiel.aktiv === 'holz' && spiel.ort === 'spiel'
         && onLobby.aktiv === 'arcade' && onSpiel.aktiv === 'holz', { vorher, lobby, spiel, onLobby, onSpiel });
-    pruefe('R26: ortVonScreen kennt Spiel-Screens (Partie, Lektion, Raetsel, Duell, Analyse) und das Zu-zweit-Startblatt als Lobby',
-      ['partie', 'lektion', 'raetsel', 'raetsel-duell', 'analyse'].every((n) => ortVonScreen(n, {}) === 'spiel')
+    // Das Raetsel-Duell beginnt immer mit Start oder Suche (Lobby); ins Spiel schaltet es selbst, sobald das Duell laeuft
+    // (klang.setzeOrt in js/ui/raetsel-duell.js, gemessen in tests/raetsel-duell-ui.test.mjs)
+    pruefe('R26: ortVonScreen kennt Spiel-Screens (Partie, Lektion, Raetsel, Analyse), das Zu-zweit-Startblatt und den Start des Raetsel-Duells als Lobby',
+      ['partie', 'lektion', 'raetsel', 'analyse'].every((n) => ortVonScreen(n, {}) === 'spiel')
+        && ortVonScreen('raetsel-duell', {}) === 'lobby' && ortVonScreen('raetsel-duell', { suchen: true }) === 'lobby'
         && ['heim', 'arena', 'einstellungen', 'ich', 'lobby', 'verlauf', 'lernen'].every((n) => ortVonScreen(n, {}) === 'lobby')
         && ortVonScreen('partie', { modus: 'zuzweit' }) === 'lobby' && ortVonScreen('partie', { modus: 'zuzweit', zuzweit: { weiss: 'A' } }) === 'spiel');
     klang.setzeOrt(null);

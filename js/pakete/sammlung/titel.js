@@ -9,7 +9,10 @@
 // Namen: wie die Level-Titel Dinge statt Personen (gilt fuer jede und jeden), nie "Meister", "Profi", "Experte" oder "Elo"
 // (Fairness 12, tests/fairness.test.mjs).
 //
-//   ERFOLGS_TITEL                 [{ erfolg, id, zeichen, farbe, seltenheit }]
+//   ERFOLGS_TITEL                 [{ erfolg, id, zeichen, farbe, seltenheit, familie? }]
+//                                 familie (R27, Flo 22.11.: "Nur neue Liga zaehlt"): frei NUR mit Stufe 3 dieser Familie
+//                                 (stufen = ladeBesitz().stufen), wie am Server supabase/karte-titel-schema.sql; der alte
+//                                 Erfolg allein reicht nicht (liga-6 = alte lokale Liga, welt-5 = nur Welt 5 statt aller)
 //   KOENNEN_TITEL, koennenFrei(partien, eloVon) -> ['koennen-<id>']   Titel aus den eigenen Partien (Blitzschlag ...)
 //   titelListe({ level, erfolge, erfinder, pionier, koennen, taten }) -> [{ id, art, name, frei, weg, zeichen, farbe, seltenheit, ab? }]
 //                                 art: erfinder | pionier | level | erfolg | koennen | tat (R19, ./taten.js, nie an den Server)
@@ -49,13 +52,13 @@ export const ERFOLGS_TITEL = Object.freeze([
   { erfolg: 'welt-2', id: 'eichenlaub', zeichen: 'welt-2', farbe: ['#A8D8A0', '#2F6B3A', '#1E4826'], seltenheit: 'selten' },
   { erfolg: 'welt-3', id: 'turmzinne', zeichen: 'welt-3', farbe: ['#D4DAE4', '#6A7486', '#434B5A'], seltenheit: 'episch' },
   { erfolg: 'welt-4', id: 'brandung', zeichen: 'welt-4', farbe: ['#9EDCF0', '#2A7A98', '#174E64'], seltenheit: 'episch' },
-  { erfolg: 'welt-5', id: 'tiefenlicht', zeichen: 'welt-5', farbe: ['#5E8CC8', '#14284A', '#0B1830'], seltenheit: 'legende' },
+  { erfolg: 'welt-5', id: 'tiefenlicht', zeichen: 'welt-5', farbe: ['#5E8CC8', '#14284A', '#0B1830'], seltenheit: 'legende', familie: 'welten', wegOhne: 'titel.weg.tiefenlicht' },
   { erfolg: 'alle-bots', id: 'bot-schreck', zeichen: 'krone', farbe: ['#FF9D92', '#B8321F', '#7C1E12'], seltenheit: 'legende' },
   { erfolg: 'alle-sterne', id: 'sternenkrone', zeichen: 'sternenkrone', farbe: ['#E0C8FF', '#5A2FB8', '#3A1C80'], seltenheit: 'legende' },
   // alte Saison-Liga (Flo 08.11.2026, eine Liga): Goldlorbeer sieht nur, wer ihn erspielt hat; die Ligakrone kommt auch
   // ueber die Kronen-Liga (Gold der Familie liga, Koenig III) und zeigt dann diesen Weg
   { erfolg: 'liga-3', id: 'goldlorbeer', zeichen: 'lorbeer', farbe: ['#FFE6A0', '#C8901E', '#86600E'], seltenheit: 'selten', nurErspielt: true },
-  { erfolg: 'liga-6', id: 'ligakrone', zeichen: 'ligakrone', farbe: ['#CFB8FF', '#4E2BA6', '#2E1868'], seltenheit: 'legende', wegOhne: 'titel.weg.ligakrone' },
+  { erfolg: 'liga-6', id: 'ligakrone', zeichen: 'ligakrone', farbe: ['#CFB8FF', '#4E2BA6', '#2E1868'], seltenheit: 'legende', familie: 'liga', wegOhne: 'titel.weg.ligakrone' },
   { erfolg: 'serie-7', id: 'wochenflamme', zeichen: 'serie', n: 7, farbe: ['#FFB27A', '#D2561E', '#8A3410'], seltenheit: 'frei' },
   { erfolg: 'serie-30', id: 'monatsfeuer', zeichen: 'serie', n: 30, farbe: ['#FF9A6A', '#B83A1E', '#7A2412'], seltenheit: 'episch' },
   { erfolg: 'serie-100', id: 'ewige-flamme', zeichen: 'serie', n: 100, farbe: ['#FF8A8A', '#8E1E2A', '#5A1018'], seltenheit: 'legende' },
@@ -113,7 +116,7 @@ export function koennenFrei(partien = [], eloVon = () => 0, daten = {}) {
 
 // labor: die Meisterschule steht im Labor (./index.js schulStand); ihr Titel erscheint nur dann oder wenn er erspielt ist.
 // alle: jeder Titel der festen Liste, auch ausgeblendete (Titel eines anderen Spielers, profil.js titelVonId)
-export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier = null, koennen = [], labor = false, alle = false, taten = [] } = {}) {
+export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier = null, koennen = [], labor = false, alle = false, taten = [], stufen = {} } = {}) {
   const nachId = new Map(erfolge.map((e) => [e.id, e]));
   const lv = LEVEL_TITEL.map(([ab]) => {
     const [zeichen, farbe] = LEVEL_KUNST[ab] || ['funke', LEVEL_KUNST[1][1]];
@@ -122,6 +125,10 @@ export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier 
   });
   const ef = ERFOLGS_TITEL.filter((x) => alle || !(x.labor || x.nurErspielt) || nachId.has('erfolg-' + x.erfolg)).map((x) => {
     const e = nachId.get('erfolg-' + x.erfolg);
+    if (x.familie) {
+      return { id: 'erfolg-' + x.id, art: 'erfolg', name: S('titel.' + x.id), frei: Number((stufen || {})[x.familie]) >= 3, weg: S(x.wegOhne),
+        zeichen: x.zeichen, n: x.n || 0, farbe: x.farbe, seltenheit: x.seltenheit };
+    }
     return { id: 'erfolg-' + x.id, art: 'erfolg', name: S('titel.' + x.id), frei: !!(e && e.frei), weg: e ? S('titel.weg', { erfolg: e.name }) : x.wegOhne ? S(x.wegOhne) : '',
       fortschritt: e && !e.frei && Number.isFinite(e.fortschritt) ? e.fortschritt : undefined, zeichen: x.zeichen, n: x.n || 0, farbe: x.farbe, seltenheit: x.seltenheit };
   });
@@ -136,8 +143,8 @@ export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier 
   return [...er, ...pi, ...lv, ...ef, ...kn, ...tt];
 }
 
-export function aktuellerTitel({ level = 1, erfolge = [], erfinder = false, wahl = null, pionier = null, koennen = [], labor = false, taten = [] } = {}) {
-  const liste = titelListe({ level, erfolge, erfinder, pionier, koennen, labor, taten });
+export function aktuellerTitel({ level = 1, erfolge = [], erfinder = false, wahl = null, pionier = null, koennen = [], labor = false, taten = [], stufen = {} } = {}) {
+  const liste = titelListe({ level, erfolge, erfinder, pionier, koennen, labor, taten, stufen });
   const gewaehlt = wahl ? liste.find((x) => x.id === wahl && x.frei) : null;
   if (gewaehlt) return { ...gewaehlt, gewaehlt: true };
   // ohne Wahl: Erfinder, sonst Pionier, sonst der hoechste Level-Titel

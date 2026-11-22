@@ -138,8 +138,9 @@ export function botFarbe(bot) {
 
 // Profil (js/profil.js, Flo 30.10.2026): gewaehlte Figur und Rahmen; ohne Wahl wie bisher der Koenig ohne Ring
 let portraetNr = 0; // Ausschnitt-Kennungen der Portraets (profilAvatar), eine je Aufruf
+// data-eigen-avatar: js/app.js tauscht damit das eigene Bild, sobald der Erfinder-Status vom Server kommt (auch im Spiel)
 export function floAvatar(farbe = 'w') {
-  return profilAvatar(profilWahl(), farbe);
+  return profilAvatar(profilWahl(), farbe).replace('<svg ', `<svg data-eigen-avatar="${farbe === 'b' ? 'b' : 'w'}" `);
 }
 
 // Dasselbe Bild aus einer fremden Wahl { figur, grund, rahmen } (Etappe 4b: der Gegner auf der Visitenkarte, Werte vom
