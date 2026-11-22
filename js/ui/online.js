@@ -436,6 +436,8 @@ export function zeige(root, params, app) {
     const neuerWiderspruch = !r.passt && !widerspruch;
     const alt = p;
     p = neu; chess = r.chess; widerspruch = !r.passt;
+    // R26 AC-04: eine wartende Einladung ist noch keine Partie und klingt wie die Lobby (arcade), sonst das gewaehlte Set
+    try { klang.setzeOrt(p.status === 'offen' ? 'lobby' : 'spiel'); } catch (e) { /* ohne Klang */ }
     klingt(alt);
     merkeKronen(alt);
     if (neuerWiderspruch && p.status === 'laeuft') { melde(O('stellungFehler')); strittigFaellig = true; }
