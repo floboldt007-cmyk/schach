@@ -138,6 +138,9 @@ async function seite(browser, { breite, hoehe, schema = 'light', hash = 'raetsel
       if (antwort !== undefined) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(antwort) });
       if (name === 'duell_stand' && srv) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(srv.stand()) });
       if (name === 'duell_ich_fertig' && srv && srv.mitFertig) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(srv.fertig()) });
+      // altes SQL wie in Supabase: die RPC fehlt, PostgREST antwortet 404 PGRST202
+      if (name === 'duell_ich_fertig' && srv && srv.fertigFehlt) return r.fulfill({ status: 404, contentType: 'application/json',
+        body: '{"code":"PGRST202","message":"Could not find the function public.duell_ich_fertig(duell) in the schema cache"}' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     }
     return r.fulfill({ status: 200, contentType: 'application/json',
@@ -753,12 +756,13 @@ async function neuladen(browser) {
 
 // R27 Sofort-Ende (Flo 22.11.2026): ist die eigene Runde vorbei, meldet die Seite das dem Server (duell_ich_fertig, genau
 // einmal, nur { duell }), zeigt das eigene Ergebnis sofort und den Gegner live mit seiner Restzeit; sind beide fertig,
-// kommt das Ergebnis, ohne auf die Uhr des Gegners zu warten. Mit altem SQL (RPC antwortet mit nichts) bleibt alles
-// wie bisher: warten, bis der Server das Duell beendet, ohne Seitenfehler.
+// kommt das Ergebnis, ohne auf die Uhr des Gegners zu warten. Mit altem SQL (die RPC fehlt, 404 PGRST202 wie in
+// Supabase) bleibt alles wie bisher: warten, bis der Server das Duell beendet, ohne Seitenfehler.
 async function sofortEnde(browser, { geraet, breite, hoehe, schema, altesSql = false }) {
   gruppe = `Sofort-Ende ${geraet} ${schema}${altesSql ? ' altes SQL' : ''}`;
   const srv = neuerServer({ art: 'freundschaft', vorlaufMs: 300, dauerMs: 5000 });
   srv.mitFertig = !altesSql;
+  srv.fertigFehlt = altesSql;
   const p = await seite(browser, { breite, hoehe, schema, hash: 'raetsel-duell/ABC234', srv,
     rpc: (name) => (name === 'duell_beitreten' ? (srv.anlegen(), { duell: DUELL }) : undefined) });
   const fertigAufrufe = () => p.aufrufe.filter((a) => a.name === 'duell_ich_fertig');
@@ -782,6 +786,8 @@ async function sofortEnde(browser, { geraet, breite, hoehe, schema, altesSql = f
     if (altesSql) {
       pruefe('Altes SQL: die Seite fragt einmal, bleibt bei "Zeit um" und wartet ohne Fehler', fa.length === 1
         && await p.s.evaluate(() => document.querySelector('.screen.raetsel-duell').dataset.phase) === 'zeit_um', fa.length);
+      const m = await p.s.evaluate(() => document.querySelector('.rd-meldung')?.textContent || '');
+      pruefe('Altes SQL (404): kein "Fertig"-Text, keine Fehlermeldung, die Meldung bleibt "Zeit um"', /Zeit ist um/.test(m), m);
       srv.beendet = true;
       await p.s.waitForSelector('.rd-ende', { timeout: 5000 });
       pruefe('Altes SQL: das Ergebnis kommt wie bisher, wenn der Server das Duell beendet', true);
@@ -816,7 +822,9 @@ async function sofortEnde(browser, { geraet, breite, hoehe, schema, altesSql = f
       pruefe('Sofort-Ende: nach dem Fertig-Melden kein Zug mehr an den Server', p.aufrufe.filter((a) => a.name === 'zug').length === zuegeVorher);
       await bild(p.s, `raetsel-duell-sofort-${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-2-ende`);
     }
-    pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+    // altes SQL: die eine 404 der fehlenden RPC meldet der Browser selbst als Netzzeile; das ist erwartet, sonst nichts
+    const echte = p.fehlerListe.filter((f) => !(altesSql && /status of 404/.test(f)));
+    pruefe('Keine Seitenfehler', echte.length === 0, echte.join(' | '));
   } finally { await p.k.close(); }
 }
 
