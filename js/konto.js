@@ -829,3 +829,9 @@ try { uebernimmLinkSitzung(); kontoFreigeschaltet(); anbieten('einstellungen:gru
   globalThis.addEventListener?.('storage', (e) => { if (e.key === GELADEN_SCHLUESSEL && e.newValue && !imSpiel()) neuLaden(); });
   hoere('app:sichtbar', (d) => { if (d?.sichtbar) abgleichImHintergrund(); else { try { if (sitzung() && geraetGeaendert()) abgleichImHintergrund(); } catch (e) { /* egal */ } } });
 } catch (e) { /* App laeuft ohne Konto weiter */ }
+
+// Nach-Review a6 N1: Ein abgebrochener Tausch wird schon beim Laden geheilt, unabhaengig von Anmeldung und Partie. Sonst
+// spielte ein Gast oder eine direkt geoeffnete Partie (laden:false heilt nicht) auf dem Teilstand, und der spaetere Abgleich
+// holte den Park zurueck: das Weiterspielen waere weg. Rein lokal, nie ein Upload. Module, die vor diesem schon ausgewertet
+// wurden, koennten den Teilstand im Arbeitsspeicher halten: darum nach dem Heilen einmal neu laden (nur dann, also keine Schleife).
+try { if (tauschZuEnde() && globalThis.document) globalThis.location?.reload?.(); } catch (e) { /* Merker bleibt, der Abgleich versucht es wieder */ }

@@ -208,6 +208,23 @@ try {
   await pruefeCode('volla@test.de', '555555'); await gleicheNachAnmeldung();
   pruefe('B4: A bekommt Level 25 zurueck und sichert es', level(lokalerStand()) === 25 && level(zeilen.get('u-volla')?.stand) === 25,
     { geraet: level(lokalerStand()), server: level(zeilen.get('u-volla')?.stand) });
+  await abmelden({ frist: 10 });
+
+  // N1 (Nach-Review a6): Abbruch im Tausch, danach Neustart OHNE Abgleich (Gast oder direkt in eine Partie mit laden:false).
+  // Das Geraet muss schon beim Laden der App geheilt sein, bevor jemand auf dem Teilstand spielt.
+  leeren();
+  for (const [k, v] of Object.entries(HAUPT)) localStorage.setItem(k, v);
+  await pruefeCode('neustarta@test.de', '777777'); await gleicheNachAnmeldung();
+  funken(26); netzWeg = true; await abmelden({ frist: 50 }); netzWeg = false;
+  localStorage.setItem(GEPARKT_SCHLUESSEL + 'u-neustarta', JSON.stringify({ datum: 'x', basis: JSON.parse(localStorage.getItem(SYNC_SCHLUESSEL)).hash, stand: lokalerStand() }));
+  localStorage.setItem(TAUSCH_SCHLUESSEL, JSON.stringify({ von: 'u-neustarta', nach: 'u-neustartb' }));
+  localStorage.removeItem(P + 'modul:funken'); localStorage.removeItem(P + 'partien');
+  await import('../js/konto.js?neustart=1');                      // Neustart der App: das Modul wird frisch ausgewertet
+  pruefe('N1: beim Laden der App ist der Teilstand geheilt (Level 26 und 40 Partien wieder auf dem Geraet), ohne Anmeldung',
+    level(lokalerStand()) === 26 && JSON.parse(localStorage.getItem(P + 'partien') || '[]').length === 40, { level: level(lokalerStand()) });
+  pruefe('N1: kein Merker und kein Park bleiben liegen, nichts hochgeladen',
+    localStorage.getItem(TAUSCH_SCHLUESSEL) === null && localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-neustarta') === null
+    && level(zeilen.get('u-neustarta')?.stand) === 22);
 } catch (e) {
   pruefe('Lauf ohne Ausnahme', false, String(e && e.stack || e));
 }
