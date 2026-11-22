@@ -37,6 +37,15 @@ export const VERDRAENGT_SCHLUESSEL = 'schach-arena:konto:verdraengt';
 export const NACH_LADEN_SCHLUESSEL = 'schach-arena:konto:nach-laden';
 // Zeitstempel, wenn ein Tab einen anderen Stand aufs Geraet geladen hat: andere Tabs desselben Browsers laden dann neu
 export const GELADEN_SCHLUESSEL = 'schach-arena:konto:geladen';
+// Konto-Trennung (Flo 22.11.2026, live: ein zweites, neues Konto auf demselben Geraet bekam sofort den ganzen Stand des
+// Hauptkontos). Der Spielstand auf dem Geraet gehoert dem Konto des letzten Abgleichs (SYNC_SCHLUESSEL bleibt beim Abmelden
+// stehen, auch Weiterspielen als Gast danach zaehlt fuer dieses Konto). Meldet sich ein ANDERES Konto an, wird der Stand
+// nie hochgeladen, sondern je Konto-ID hier geparkt ({ datum, basis, stand }) und der Park des neuen Kontos (sonst ein
+// leerer Spielstand) aufs Geraet gelegt. Nur ein Geraet ohne Besitzer (echter Gast) gibt seinen Stand einmal ins Konto.
+export const GEPARKT_SCHLUESSEL = 'schach-arena:konto:geparkt:';
+// Was beim Kontowechsel auf dem Geraet bleibt: Einstellungen des Geraets (Sprache, Brett, Klang, Namen zu zweit) und
+// die Merker fuer Einfuehrung und Installations-Hinweis
+const GERAET_BLEIBT = /^schach-arena:v1:(einstellungen(?::|$)|hinweis-installieren$|modul:start$)/;
 // Eintraege, die ein frischer Start ohne jede Partie anlegt: Sie machen aus einem leeren Browser keinen Spielstand.
 const OHNE_SPIELSTAND = new Set(['schach-arena:v1:hinweis-installieren', 'schach-arena:v1:modul:start',
   'schach-arena:v1:modul:funken', 'schach-arena:v1:modul:punkte']);
@@ -175,6 +184,9 @@ let epoche = 0;
 // Andere Geraete und Browser bleiben angemeldet.
 export async function abmelden({ frist = 5000 } = {}) {
   const s = sitzung();
+  // Noch nicht abgeglichene Aenderungen gehen vorher in DIESES Konto (Konto-Trennung: danach parkt ein Wechsel den Stand nur
+  // noch auf dem Geraet). Nur hochladen, nie laden; offline oder zu langsam: abmelden trotzdem.
+  try { if (istAbgeglichen(s) && geraetGeaendert()) await mitFrist(synchronisiere({ laden: false }), frist); } catch (e) { /* lokal abmelden geht vor */ }
   epoche++;
   try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); lager().removeItem(NAME_SCHLUESSEL); } catch (e) { /* egal */ }
   try { if (s?.access_token) await mitFrist(anfrage('/auth/v1/logout?scope=local', { methode: 'POST', token: s.access_token }), frist); } catch (e) { /* lokal ist schon abgemeldet */ }
@@ -322,7 +334,8 @@ export function hatSpielstand(stand = lokalerStand()) {
 // Liefert null, wenn waehrenddessen abgemeldet oder geloescht wurde: dann schreibt der Abgleich nichts mehr aufs Geraet.
 // Ohne Wahl entscheidet synchronisiere() selbst ('gleich' = beide Seiten hatten schon denselben Stand).
 export async function gleicheNachAnmeldung(wahl) {
-  if (wahl !== 'geraet' && wahl !== 'cloud') {
+  // Gehoert das Geraet einem anderen Konto, gibt es keinen Konflikt zu entscheiden: der Abgleich trennt die Staende
+  if ((wahl !== 'geraet' && wahl !== 'cloud') || geraetFremd(userId(sitzung()))) {
     const r = await synchronisiere();
     return r === 'geladen' ? 'cloud' : r === 'hochgeladen' ? 'geraet' : r;
   }
@@ -361,11 +374,50 @@ export function synchronisiere({ laden = true } = {}) {
   if (!syncLauf) syncLauf = sync(laden).finally(() => { syncLauf = null; });
   return syncLauf;
 }
+// Wem gehoert der Spielstand auf dem Geraet? Ein anderes Konto als id: true (dann nie hochladen, sondern trennen)
+export function geraetFremd(id) { const k = jsonLies(SYNC_SCHLUESSEL)?.konto; return !!id && typeof k === 'string' && !!k && k !== id; }
+// Den Stand des bisherigen Besitzers parken und den Park von id (sonst einen leeren Spielstand) aufs Geraet legen. Die
+// Geraete-Einstellungen bleiben die von jetzt. Scheitert etwas, bleibt das Geraet wie vorher und es wirft (dann laedt
+// der Abgleich nichts hoch). Liefert true, wenn das Geraet getauscht wurde (die App muss danach neu laden).
+function trenneGeraet(id) {
+  const alt = jsonLies(SYNC_SCHLUESSEL);
+  if (!geraetFremd(id)) return false;
+  const jetzt = lokalerStand();
+  if (!jsonSchreib(GEPARKT_SCHLUESSEL + alt.konto, { datum: new Date().toISOString(), basis: alt.hash || null, stand: jetzt })) throw new Error(K('rueckfallFehler'));
+  const park = jsonLies(GEPARKT_SCHLUESSEL + id);
+  const mitPark = !!park && gueltigerStand(park.stand);
+  const neu = Object.fromEntries([...Object.entries(mitPark ? park.stand : {}).filter(([k]) => !GERAET_BLEIBT.test(k)),
+    ...Object.entries(jetzt).filter(([k]) => GERAET_BLEIBT.test(k))]);
+  const roh = rohSpeicher();
+  try {
+    for (const k of roh.schluessel()) roh.entferne(k);
+    for (const [k, v] of Object.entries(neu)) if (!roh.schreib(k, v)) throw new Error('Schreiben fehlgeschlagen.');
+  } catch (e) {
+    for (const k of roh.schluessel()) roh.entferne(k);
+    for (const [k, v] of Object.entries(jetzt)) roh.schreib(k, v);
+    throw new Error(K('cloudLadenFehler'));
+  }
+  // Mit Park gilt dessen letzter gemeinsamer Stand als Basis (Weiterspielen vor dem Wechsel zaehlt dann als Geraete-Aenderung);
+  // der Park selbst ist jetzt das Geraet und faellt weg. Ohne Park hat das Geraet fuer id noch keinen Abgleich.
+  try {
+    if (mitPark) { jsonSchreib(SYNC_SCHLUESSEL, { konto: id, hash: park.basis || null }); lager().removeItem(GEPARKT_SCHLUESSEL + id); }
+    else lager().removeItem(SYNC_SCHLUESSEL);
+  } catch (e) { /* egal */ }
+  andereTabsNeuLaden();
+  return true;
+}
 async function sync(laden = true) {
   const e0 = epoche;
   const id0 = userId(sitzung());
   if (!id0) return null;
   const gilt = () => epoche === e0 && userId(sitzung()) === id0;
+  // Fremder Stand: in einer Partie warten (nie hochladen), sonst trennen; danach muss die App in jedem Fall neu laden
+  if (geraetFremd(id0) && !laden) return 'spaeter';
+  if (trenneGeraet(id0)) { const r = await syncEigen(laden, id0, gilt); return r === null ? null : 'geladen'; }
+  return syncEigen(laden, id0, gilt);
+}
+// Abgleich zwischen Geraet und Cloud desselben Kontos (das Geraet gehoert schon id0)
+async function syncEigen(laden, id0, gilt) {
   const cloud = await ladeCloudStand();
   if (!gilt()) return null;
   const lokal = cloudStand(); const hL = standHash(lokal);
