@@ -145,6 +145,8 @@ async function bediene(route) {
   if (rpc === 'karte_der_partie') return antwort(p && farbeVon(p, uid) ? { w: karte(p.weiss, uid, p), s: karte(p.schwarz, uid, p) } : {});
   // R19 Season: js/karte.js fragt parallel zu karte_der_partie (wie tests/online-ui.test.mjs), hier ohne Abzeichen und Titel
   if (rpc === 'saison_karte_der_partie') return antwort({ w: { abzeichen: null, titel: null }, s: { abzeichen: null, titel: null } });
+  if (rpc === 'effekte_waehle') return antwort(true); // R26 Gegner-Effekte: Wahl melden, hier ohne Wirkung
+  if (rpc === 'effekte_der_partie') return antwort({ w: { figuren: null, zug: null, finisher: null }, s: { figuren: null, zug: null, finisher: null } });
   unerwartet.push(`${uid} ${req.method()} ${url.pathname}`); return antwort([]);
 }
 
