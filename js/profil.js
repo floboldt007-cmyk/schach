@@ -22,7 +22,7 @@
 //   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
 //                                      Aufrufs; einmal gemerkt (bleibt beim Speichern der Wahl erhalten)
 import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien, ladeFortschritt } from './storage.js';
-import { istErfinder } from './sonderstuecke.js';
+import { istErfinder, hatSonderstueck, ERFINDER } from './sonderstuecke.js';
 import { KREATUREN } from './kreaturen-kunst.js';
 
 const MODUL = 'sammeln';
@@ -45,6 +45,9 @@ export function botMotivFrei(x) {
   } catch (e) { return false; }
 }
 const motivErlaubt = (x) => (MOTIVE.includes(x) && (!NUR_ERFINDER.includes(x) || istErfinder())) || botMotivFrei(x);
+// Der Erfinder-Rahmen nur mit dem Sonderstueck (Konto-Trennung 22.11.2026: die gemerkte Wahl wanderte mit einem kopierten
+// Spielstand in ein fremdes Konto); andere Rahmen prueft die Sammlung (Erfolge), hier nur, ob es sie gibt
+const rahmenErlaubt = (x) => !!RAHMEN[x] && (x !== 'erfinder-blatt-0' || hatSonderstueck(ERFINDER.banner));
 // Ring als Farbe oder Verlauf (SVG-Farben); glanz: zweiter, feiner Innenring
 export const RAHMEN = Object.freeze({
   ohne: Object.freeze({ ring: null }),
@@ -80,7 +83,7 @@ export function profilWahl() {
   return {
     figur: motivErlaubt(e.figur) ? e.figur : STANDARD_FIGUR,
     grund: GRUENDE.includes(e.grund) ? e.grund : 'standard',
-    rahmen: RAHMEN[e.rahmen] ? e.rahmen : 'ohne',
+    rahmen: rahmenErlaubt(e.rahmen) ? e.rahmen : 'ohne',
     vitrine: vitrine.map((x) => (typeof x === 'string' && ID.test(x) ? x : null)),
     titel: typeof e.titel === 'string' && ID.test(e.titel) ? e.titel : null,
     banner: typeof e.banner === 'string' && ID.test(e.banner) ? e.banner : 'start',
