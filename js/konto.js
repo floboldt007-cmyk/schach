@@ -834,4 +834,11 @@ try { uebernimmLinkSitzung(); kontoFreigeschaltet(); anbieten('einstellungen:gru
 // spielte ein Gast oder eine direkt geoeffnete Partie (laden:false heilt nicht) auf dem Teilstand, und der spaetere Abgleich
 // holte den Park zurueck: das Weiterspielen waere weg. Rein lokal, nie ein Upload. Module, die vor diesem schon ausgewertet
 // wurden, koennten den Teilstand im Arbeitsspeicher halten: darum nach dem Heilen einmal neu laden (nur dann, also keine Schleife).
-try { if (tauschZuEnde() && globalThis.document) globalThis.location?.reload?.(); } catch (e) { /* Merker bleibt, der Abgleich versucht es wieder */ }
+// N2: Gehoert das Geraet danach (oder ueberhaupt beim Start) einem anderen Konto als dem angemeldeten, wird der Tausch gleich
+// lokal fertig; sonst spielte eine direkt geoeffnete Partie des angemeldeten Kontos auf dem fremden Stand.
+{
+  let neu = false;
+  try { neu = tauschZuEnde(); } catch (e) { /* Merker bleibt, der Abgleich versucht es wieder */ }
+  try { const id = userId(sitzung()); if (id && trenneGeraet(id)) neu = true; } catch (e) { /* Speicher voll: Anmeldung zurueckgenommen */ }
+  if (neu && globalThis.document) globalThis.location?.reload?.();
+}

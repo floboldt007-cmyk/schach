@@ -225,6 +225,25 @@ try {
   pruefe('N1: kein Merker und kein Park bleiben liegen, nichts hochgeladen',
     localStorage.getItem(TAUSCH_SCHLUESSEL) === null && localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-neustarta') === null
     && level(zeilen.get('u-neustarta')?.stand) === 22);
+
+  // N2 (a6 zu cbc5b379): wie N1, aber B ist beim Neustart noch angemeldet. Nach dem Heilen gehoert das Geraet wieder A; B darf
+  // nicht (etwa in einer Partie mit laden:false) auf dem Stand von A spielen: der Tausch wird beim Laden gleich lokal fertig.
+  leeren();
+  for (const [k, v] of Object.entries(HAUPT)) localStorage.setItem(k, v);
+  await pruefeCode('neustartc@test.de', '888888'); await gleicheNachAnmeldung();
+  funken(27); netzWeg = true; await abmelden({ frist: 50 }); netzWeg = false;
+  await pruefeCode('neustartd@test.de', '999999');                // B angemeldet, Abgleich kam nicht mehr dazu
+  localStorage.setItem(GEPARKT_SCHLUESSEL + 'u-neustartc', JSON.stringify({ datum: 'x', basis: JSON.parse(localStorage.getItem(SYNC_SCHLUESSEL)).hash, stand: lokalerStand() }));
+  localStorage.setItem(TAUSCH_SCHLUESSEL, JSON.stringify({ von: 'u-neustartc', nach: 'u-neustartd' }));
+  localStorage.removeItem(P + 'modul:funken'); localStorage.removeItem(P + 'partien');
+  await import('../js/konto.js?neustart=2');
+  let parkC = null; try { parkC = JSON.parse(localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-neustartc')); } catch (e) { /* null */ }
+  pruefe('N2: mit B angemeldet zeigt das Geraet nach dem Laden nicht den Stand von A', level(lokalerStand()) === null
+    && JSON.parse(localStorage.getItem(SYNC_SCHLUESSEL) || '{}').konto === 'u-neustartd', { level: level(lokalerStand()), besitzer: localStorage.getItem(SYNC_SCHLUESSEL) });
+  pruefe('N2: der Stand von A liegt vollstaendig im Park (Level 27, 40 Partien)', level(parkC?.stand || {}) === 27
+    && JSON.parse(parkC?.stand?.[P + 'partien'] || '[]').length === 40, { level: level(parkC?.stand || {}) });
+  const r5 = await synchronisiere({ laden: false });
+  pruefe('N2: eine Partie von B (laden:false) laedt danach nichts von A zu B hoch', level(zeilen.get('u-neustartd')?.stand) !== 27, { r5 });
 } catch (e) {
   pruefe('Lauf ohne Ausnahme', false, String(e && e.stack || e));
 }
