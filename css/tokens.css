@@ -41,6 +41,13 @@
   --zuletzt: rgba(255, 178, 46, .5); --auswahl: rgba(28, 34, 92, .26); --punkt: rgba(28, 30, 60, .2);
   --auswahl-kante: rgba(255, 255, 255, .82);
 }
+/* Probe "brett-warm" (R27, Flo 22.11.2026, nur Probebilder, nicht live): das Standardbrett Nacht in warmem Holz, nur mit
+   ?test&design=brett-warm (js/app.js DESIGN_PROBE). Wer selbst eine andere Brettfarbe gewaehlt hat, behaelt sie. */
+html[data-design~="brett-warm"][data-brett="nacht"] {
+  --feld-hell: #eed8b6; --feld-dunkel: #a8774f;
+  --zuletzt: rgba(255, 178, 46, .5); --auswahl: rgba(84, 46, 14, .24); --punkt: rgba(50, 30, 10, .2);
+  --auswahl-kante: rgba(255, 255, 255, .82);
+}
 html[data-brett="gruen"] {
   --feld-hell: #eeeed2; --feld-dunkel: #769656;
   --zuletzt: rgba(255, 196, 46, .55); --auswahl: rgba(24, 58, 12, .24); --punkt: rgba(20, 30, 10, .2);
