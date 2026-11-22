@@ -1,7 +1,7 @@
 // Bilder Liga > Gruppe (R27, 22.11.2026, Flo: "das sieht schon billig aus"): der Reiter Gruppe heute und je Richtung des
 // Probe-Schalters ?test&design=g1|g2|g3 auf iPhone 13, iPad quer und PC, hell und dunkel, angemeldet, mit erfundener Gruppe.
 // Abgeleitet von tests/bilder-liga-neu.mjs. Kein Teil von tests/alle.mjs. Netzwerk nur simuliert (*.supabase.co).
-// Bis der allgemeine Schalter in js/app.js steht, setzt das Skript html[data-design] selbst (gleicher Wert wie in der Adresse).
+// Den Schalter setzt js/app.js selbst (a48e088c); das Skript prueft nur, dass html[data-design] zum Adresswert passt.
 //
 //   node tests/bilder-liga-gruppe-r27.mjs --bilder=<ordner> [--design=g1]   Bilder <design|heute>-<geraet>-<hell|dunkel>-<teil>.png
 //   ... --nur=iphone13,pc                                                   nur diese Geraete
@@ -156,7 +156,6 @@ try {
           klang: false, duellIntro: 'aus' }));
         localStorage.setItem('schach-arena:v1:hinweis-installieren', '1');
       }, { sitzung: SITZUNG, modus });
-      await k.addInitScript((d) => { if (d) document.documentElement.dataset.design = d; }, DESIGN || '');
       const s = await k.newPage(); s.setDefaultTimeout(15000);
       s.on('pageerror', (e) => seitenfehler.push(`${gruppeName}: ${e.message}`));
       // Diagnose fuer den seltenen Lade-Haenger (15.11.2026, auch im Ausgangsstand): Konsole und offene Anfragen merken

@@ -368,6 +368,12 @@
    Selektoren beginnen mit :root[data-design~="gN"] .lg-gr, damit sie die Modus-Regeln oben (:root[data-modus]) schlagen. */
 :root[data-design~="g1"] .lg-gr .lg-gr-preis-bild > *, :root[data-design~="g2"] .lg-gr .lg-gr-preis-bild > *,
 :root[data-design~="g3"] .lg-gr .lg-gr-preis-bild > * { animation: none; }
+/* Design-Buch "herzlos" (15.11.): der Belohnungs-Satz gilt als technischer Satz; die Probe zeigt nur Bild und kurzen Preis */
+:root[data-design~="g1"] .lg-gr .lg-gr-preis-text > span, :root[data-design~="g2"] .lg-gr .lg-gr-preis-text > span,
+:root[data-design~="g3"] .lg-gr .lg-gr-preis-text > span { display: none; }
+/* Metallgold statt des alten --gold (#E0A22B, Design-Buch "Kackgelb") fuer Kronen, Lohn-Kachel und Preisrahmen der Gruppe */
+:root[data-design~="g1"] .lg-gr, :root[data-design~="g2"] .lg-gr, :root[data-design~="g3"] .lg-gr {
+  --gold: #C9A14A; --gold-weich: rgba(201, 161, 74, .16); max-width: 760px; }
 
 /* g1 Brett: die Platzzahlen stehen wie die Koordinaten am Brettrand auf hellen und dunklen Feldern, die Buehne ist der
    dunkelgruene Rand des Bretts. Sonst ruhig: keine Karte um jede Zeile, nur Linien. */
@@ -382,11 +388,13 @@
 :root[data-design~="g1"] .lg-gr .lg-gr-buehne { border-radius: var(--r-l); background: var(--g-rand); background-image: none; color: var(--g-auf-rand);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g-gold) 55%, transparent); }
 :root[data-design~="g1"] .lg-gr .lg-gr-zone { color: var(--g-auf-rand); border-color: color-mix(in srgb, var(--g-auf-rand) 55%, transparent); }
+/* Fokusring auf dem gruenen Brettrand hell (design-beweis: --akzent nur 2,79:1 gegen #23352C) */
+:root[data-design~="g1"] .lg-gr .lg-gr-buehne :focus-visible { outline-color: var(--g-auf-rand); }
 :root[data-design~="g1"] .lg-gr .lg-gr-liste { border-radius: var(--r-l); background: var(--g-flaeche); box-shadow: 0 0 0 1px var(--g-linie); }
 :root[data-design~="g1"] .lg-gr .lg-gr-zeile { grid-template-columns: 44px minmax(0, 1fr) auto 44px; padding: 0 12px 0 0; min-height: 60px; }
 :root[data-design~="g1"] .lg-gr .lg-gr-zeile + .lg-gr-zeile { border-top-color: var(--g-linie); }
 :root[data-design~="g1"] .lg-gr .lg-gr-platz, :root[data-design~="g1"] .lg-gr .lg-gr-zeile[data-banner] .lg-gr-platz {
-  align-self: stretch; display: grid; place-items: center; min-width: 0; padding: 0; border-radius: 0; box-shadow: none;
+  align-self: stretch; justify-self: stretch; display: grid; place-items: center; min-width: 0; padding: 0; border-radius: 0; box-shadow: none;
   background: var(--g-feld-h); color: var(--g-text); font-size: 17px; }
 :root[data-design~="g1"] .lg-gr .lg-gr-zeile:nth-child(even) .lg-gr-platz { background: var(--g-feld-d); }
 :root[data-design~="g1"] .lg-gr .lg-gr-zeile.ich { background: color-mix(in srgb, var(--g-gold) 14%, var(--g-flaeche)); box-shadow: none; }
@@ -451,6 +459,5 @@
 :root[data-design~="g3"] .lg-gr .lg-gr-abschnitt[data-zone="ab"] h3 { color: var(--g-schiefer); }
 :root[data-design~="g3"] .lg-gr .lg-gr-platz { font-size: 20px; color: var(--g-text-2); }
 :root[data-design~="g3"] .lg-gr .lg-gr-abschnitt[data-zone="auf"] .lg-gr-platz { color: var(--g-gold-text); }
-:root[data-design~="g3"] .lg-gr .lg-gr-zeile[data-banner] .lg-gr-platz { background: none; box-shadow: none; }
 :root[data-design~="g3"] .lg-gr .lg-gr-zeile.ich { background: color-mix(in srgb, var(--g-gold) 12%, transparent); box-shadow: none; border-radius: var(--r-m); }
 :root[data-design~="g3"] .lg-gr .lg-gr-zeile.ich .lg-gr-name b { color: var(--g-gold-text); }
