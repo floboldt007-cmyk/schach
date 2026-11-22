@@ -269,7 +269,6 @@ html[data-modus="dunkel"]:is([data-design~="l1"], [data-design~="l2"], [data-des
 :is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter { color: var(--text-2); font-weight: 600; }
 :is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter.an { color: var(--lm-text); font-weight: 750; }
 :is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter.an::before { background: var(--lm); }
-html[data-bewegung="aus"] .reiter-leiste .reiter::before { transition: none; }
 
 /* l1 Figurenlinie: schmal (340), 56 hoch, feine Goldkante statt Glas; inaktiv Umriss, aktiv massiv (weisse Figur wird Gold) */
 html[data-design~="l1"] { --dock-hoehe: 56px; }

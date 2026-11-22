@@ -102,7 +102,9 @@ try {
       l3: sollLage === 'unten' ? an[0].feld && aus.every((r) => !r.feld) : aus.every((r) => !r.ecken),
     };
     pruefe(`${wer}: Markierung der Richtung nur am aktiven Reiter`, markierung[v], l.reiter);
-    pruefe(`${wer}: Bewegung aus, kein Uebergang am Symbol`, l.reiter.every((r) => /^0s(, 0s)*$/.test(r.uebergang)), l.reiter.map((r) => r.uebergang));
+    // "Bewegung aus" setzt jede Dauer auf .01 ms (css/tokens.css html[data-bewegung="aus"] *::before)
+    pruefe(`${wer}: Bewegung aus, kein sichtbarer Uebergang am Symbol (hoechstens 0,01 ms)`,
+      l.reiter.every((r) => r.uebergang.split(',').every((d) => parseFloat(d) <= 0.00001)), l.reiter.map((r) => r.uebergang));
     pruefe(`${wer}: keine Seitenfehler`, l.fehlerListe.length === 0, l.fehlerListe);
   }
 } finally {
