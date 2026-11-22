@@ -117,7 +117,10 @@ async function ansicht({ w, h, modus, angemeldet, cssText }) {
     const l = document.querySelector('.online-screen .on-liga');
     return !!document.querySelector('.online-screen .on-freunde') && l && !l.hasAttribute('data-laedt');
   }, angemeldet, { timeout: 15000 });
-  await s.waitForTimeout(150);
+  // R27: die Kopfkarte fuellt sich in Schritten (Liga, dann Season-Rest und Form): erst messen, wenn das Netz ruht, sonst
+  // misst die eine Haelfte der Gegenprobe die Karte vor und die andere nach der Form-Zeile
+  await s.waitForLoadState('networkidle').catch(() => {});
+  await s.waitForTimeout(300);
   const m = await messen(s);
   await kontext.close();
   return { ...m, unerwartet };

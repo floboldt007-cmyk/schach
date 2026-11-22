@@ -178,5 +178,28 @@ if (I.teileLokaleStufen && T.titelListe) {
   pruefe('Bretter: Titeltraeger bleibt sichtbar (nur die Bretter-Ziele sind aus)', /titeltraeger/.test(sichtbar), sichtbar);
 }
 
+// R27 Titel-Besitz (Flo 22.11.2026 zu W1: "Nur neue Liga zaehlt"): Ligakrone und Tiefenlicht gibt die App wie der Server
+// (supabase/karte-titel-schema.sql) nur mit Stufe 3 ihrer Familie frei. Der alte Erfolg liga-6 (lokale Liga) bzw. welt-5
+// (nur Welt 5, die Familie welten braucht alle Welten) reicht allein nicht mehr. Sternenkrone und Weltenbezwinger haben
+// dieselbe Bedingung wie ihre Familie (alle Sterne, alle Endgegner) und bleiben am Erfolg.
+{
+  const frei = (id, arg) => !!(T.titelListe(arg).find((x) => x.id === id) || {}).frei;
+  const alt = (...ids) => ids.map((e) => ({ id: 'erfolg-' + e, frei: true, name: e }));
+  pruefe('R27: alte Liga allein (liga-6) -> Ligakrone nicht frei', !frei('erfolg-ligakrone', { erfolge: alt('liga-6') }));
+  pruefe('R27: alte Liga plus Familie liga Stufe 2 -> nicht frei', !frei('erfolg-ligakrone', { erfolge: alt('liga-6'), stufen: { liga: 2 } }));
+  pruefe('R27: Familie liga Stufe 3 -> Ligakrone frei (auch ohne alten Erfolg)', frei('erfolg-ligakrone', { erfolge: [], stufen: { liga: 3 } }));
+  const weg = (T.titelListe({ erfolge: alt('liga-6') }).find((x) => x.id === 'erfolg-ligakrone') || {}).weg;
+  pruefe('R27: Weg der Ligakrone nennt die neue Liga, nicht den alten Erfolg', weg === t('p-sammlung.titel.weg.ligakrone'), weg);
+  pruefe('R27: nur Welt 5 (welt-5) -> Tiefenlicht nicht frei', !frei('erfolg-tiefenlicht', { erfolge: alt('welt-5') }));
+  pruefe('R27: Familie welten Stufe 3 -> Tiefenlicht frei', frei('erfolg-tiefenlicht', { erfolge: [], stufen: { welten: 3 } }));
+  const wegT = (T.titelListe({ erfolge: alt('welt-5') }).find((x) => x.id === 'erfolg-tiefenlicht') || {}).weg;
+  pruefe('R27: Weg von Tiefenlicht nennt alle Welten', wegT === t('p-sammlung.titel.weg.tiefenlicht') && !/^p-sammlung/.test(wegT), wegT);
+  pruefe('R27: Sternenkrone bleibt am Erfolg alle-sterne', frei('erfolg-sternenkrone', { erfolge: alt('alle-sterne') }));
+  pruefe('R27: Weltenbezwinger bleibt am Erfolg alle-endgegner', frei('erfolg-weltenbezwinger', { erfolge: alt('alle-endgegner') }));
+  // gleiche Familie und gleiches Gold wie am Server (stufen.js goldLohn ist die Quelle von karte_konstanten familien)
+  pruefe('R27: Ligakrone ist das Gold der Familie liga', (ST.goldLohn('liga') || {}).titel === 'erfolg-ligakrone');
+  pruefe('R27: Tiefenlicht ist das Gold der Familie welten', (ST.goldLohn('welten') || {}).titel === 'erfolg-tiefenlicht');
+}
+
 console.log(`\n${ok}/${ok + fehler} bestanden`);
 process.exit(fehler ? 1 : 0);
