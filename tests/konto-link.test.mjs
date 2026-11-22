@@ -338,6 +338,9 @@ try {
     await s.evaluate(() => { location.hash = '#arena'; }); await s.waitForTimeout(600);
     const weg = await s.evaluate(() => ({ offen: window.turnstile.offen.slice(), gezeichnet: window.turnstile.gezeichnet }));
     await s.evaluate((h) => { location.hash = h; }, EINST);
+    // seit der Nachbesserung #201 zeichnet erst der Fokus im E-Mail-Feld das Widget, auch beim zweiten Besuch
+    await s.waitForSelector('.konto-email', { timeout: 5000 }).catch(() => {});
+    await s.locator('.konto-email').focus();
     await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
     await s.evaluate(() => { location.hash = '#arena'; }); await s.waitForTimeout(600);
     const weg2 = await s.evaluate(() => ({ offen: window.turnstile.offen.slice(), gezeichnet: window.turnstile.gezeichnet }));
