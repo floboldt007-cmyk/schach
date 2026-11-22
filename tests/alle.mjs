@@ -163,6 +163,7 @@ const SUITEN = [
   { name: 'r26-antworten-b', datei: 'r26-antworten-b.test.mjs', args: [], was: 'Flos Antworten 6-9 (20.11.): Shop-Namen eigen, Google offline gesperrt, iPad quer gefuellt (Handy/PC gleich), Auge nach dem Startfokus' },
   { name: 'r26-konto-rest', datei: 'r26-konto-rest.test.mjs', args: [], was: 'Konto-Rest R26: Loeschseite Google offline gesperrt mit Hinweis, online frei; Einstellungen stapeln keine Netz-Listener (Browser)' },
   { name: 'r26-antworten-a', datei: 'r26-antworten-a.test.mjs', args: [], was: 'Flos Antworten 20.11.: Revanche nach Niederlage, freie Partie ohne Punktezeile, Lernen ein Hauptknopf, lange Grundmatts als Frage, Engine-Text ohne Internet (DE/EN)' },
+  { name: 'r27-online-arena', datei: 'r27-online-arena.test.mjs', args: [], was: 'Online Arena R27: Kopfkarte (Elo, Stufe, Platz, Season), Form antippbar mit Hinweis, Letzte Partien mit Avatar und Analyse-Sprung, Weltrangliste mit Podest, ein goldener Knopf, eine Krone, 44 px' },
   { name: 'r20-shop-gast', datei: 'r20-shop-gast.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Shop-Gastkarte' },
   { name: 'r20-vorrat-en', datei: 'r20-vorrat-en.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): jedes Vorrat-Stueck hat name_en' },
   { name: 'r20-kurs-sterne', datei: 'r20-kurs-sterne.test.mjs', args: [], kommtMit: 'so/R20-fable-rest', was: 'Feinschliff R20 (7b): Sterne im Kurs' },
@@ -231,11 +232,15 @@ const SUITEN = [
   { name: 'r19-effekt-ebene', datei: 'r19-effekt-ebene.mjs', args: [], was: 'Feinschliff R19: mit jedem Motiv-Brett deckt sich die Effekt-Ebene auf 5 Geraeten (ecke/rand) auf 0,5 px mit dem Brett, nie breiter, kein Ueberlauf (Browser)' },
   { name: 'r19-start-naechstes', datei: 'r19-start-naechstes.test.mjs', args: [], was: 'Feinschliff R19: Start "Als Naechstes" mit eigenem Gesicht je Zeile (Farbe, Bildstueck) und wahrem Fortschritt (Marsch, Raetsel-Tage, faellige Fehler, Liga-Wappen und Abstand), Hoehe SE und PC (Browser)' },
   { name: 'r19-benutzername', datei: 'r19-benutzername.test.mjs', args: [], was: 'Feinschliff R19: gemerkter Benutzername wird einmal je Start mit dem Server abgeglichen, ohne Server bleibt er (Browser)' },
+  { name: 'r27-name-haken', datei: 'r27-name-haken.test.mjs', args: [], was: 'Feinschliff R27: Benutzername beim Tippen pruefen, Rueckfrage in der App, gruener Haken, 30-Tage-Sperre grau mit Tagen, ohne SQL wie vorher (Browser)' },
+  { name: 'r27-gegner-gold', datei: 'r27-gegner-gold.test.mjs', args: [], was: 'Feinschliff R27: Gegner-Karte der Startseite in Metallgold, ein goldener Knopf, Metallgold-Tokens, Probe-Schalter ?test&design= und brett-warm (Browser)' },
+  { name: 'functions-probe', datei: 'functions-probe.test.mjs', args: [], was: 'Werkzeug functions-probe: fehlende Edge Functions auf dem Server erkennen (nachgebauter Server, Pflicht-Liste passt zum Repo)' },
   { name: 'r19-analyse-neu', datei: 'r19-analyse-neu.test.mjs', args: [], was: 'Feinschliff R19: Analyse neu (Schluesselmomente als Karten oben, Symbole gross, Verlauf ohne Kleintext, Ergebnis-Karte, Tempo, Auto-Abspielen) (Browser)' },
   { name: 'r19-verlauf-neu', datei: 'r19-verlauf-neu.test.mjs', args: [], was: 'Feinschliff R19: Verlauf neu (Partien ohne Zug als eine Zeile, Ergebniszeichen, Zu-zweit-Bild, leiser Muelleimer, eine Staerke-Zahl, Level-Karte im Rahmen)' },
   { name: 'r20-kopf-chip', datei: 'r20-kopf-chip.test.mjs', args: [], was: 'Feinschliff R20 B3: Kopf-Chips ganz da oder ganz weg, nie ein Stummel; / max nur am PC' },
   { name: 'r20-blatt-fokus', datei: 'r20-blatt-fokus.test.mjs', args: [], was: 'Feinschliff R20 B7: Blatt per Tipp ohne Fokusring, per Tastatur mit; Rueckfrage fokussiert den sicheren Knopf' },
   { name: 'r20-effekt-vorschau', datei: 'r20-effekt-vorschau.test.mjs', args: [], was: 'Feinschliff R20: Regal Effekte im Shop, Vorschau einmal auf dem echten Brett an der richtigen Stelle, Standbild bei weniger Bewegung' },
+  { name: 'r26-gegner-effekte', datei: 'r26-gegner-effekte.test.mjs', args: [], was: 'Feinschliff R26: Effekte vom Gegner online (Figurensatz je Farbe, Zug-Animation, Finisher des Siegers), nur vom Server belegt, Schalter aus, unbekannte Kennungen, weniger Bewegung, Funktion fehlt' },
   { name: 'r20-erste-schritte', datei: 'r20-erste-schritte.test.mjs', args: [], was: 'Feinschliff R20: Kurs Erste Schritte fuer Anfaenger (Stufe A): Sterne sammeln mit Umwandlungs-Falle, gut anfangen, Einstieg ueber "Nein", 10 Funken je Aufgabe' },
   { name: 'r27-tempo-fix', datei: 'r27-tempo-fix.test.mjs', args: [], was: 'R27 Tempo: Ergebnisblatt-Knoepfe sofort, staffel kurz und gedeckelt, Kopf nur beim ersten Bildschirm, Bewegung aus ohne Animation (ohne Browser)' },
   { name: 'r25-leistung', datei: 'r25-leistung.test.mjs', args: [], was: 'Feinschliff R25 Leistung: Fokus und Messen beim Oeffnen im naechsten Bild, Pille nach dem Drehen, schnelles Enter oder Leerzeichen im ersten Bild gibt nicht auf (Browser)' },
@@ -248,6 +253,9 @@ const SUITEN = [
   { name: 'r25-offline-rueckfall', datei: 'r25-offline-rueckfall.test.mjs', args: [], was: 'R25 Offline-Rueckfall: ohne Netz direkt nach einem Update startet die App (Browser)' },
   { name: 'r25-paket-css', datei: 'r25-paket-css.test.mjs', args: [], was: 'R25 Paket-CSS vor dem Aufbau des Screens geladen (Browser)' },
   { name: 'r25-zugliste', datei: 'r25-zugliste.test.mjs', args: [], was: 'R25 F4 Leistung: Zugliste nur geaenderte Zeilen neu bauen' },
+  { name: 'r26-erfinder-figur', datei: 'r26-erfinder-figur.test.mjs', args: [], was: 'R26 Befund 9f: Erfinder-Profilfigur bleibt Koenig bis zur Server-Antwort, Bauer erst bei belegtem Nicht-Besitz (Node)' },
+  { name: 'r26-erfinder-figur-app', datei: 'r26-erfinder-figur-app.test.mjs', args: [], was: 'R26 Befund 9f im Browser: frisches Geraet, verzoegerte Antwort, eigenes Bild in der Partie nie der Bauer (Browser)' },
+  { name: 'r26-erfinder-rahmen-app', datei: 'r26-erfinder-rahmen-app.test.mjs', args: [], was: 'R26 eigener Rahmen in jedem Startbild (Bot, Duell-Intro, Online, Raetsel-Duell), auch auf frischem Geraet (Browser)' },
 ];
 
 // Sekunden aus einem seriellen --schnell-Lauf vom 29.10.2026. Unbekannte/neue Suiten
@@ -262,7 +270,7 @@ const DAUERN = new Map([
   ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
-  ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['bot-grenze', 8],
+  ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['r27-gegner-gold', 25], ['bot-grenze', 8],
   ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24], ['offline-ladeprobe', 28], ['funktion-funken-aufgeben', 45], ['funktion-einstellungen-season', 10],
 ]);
 

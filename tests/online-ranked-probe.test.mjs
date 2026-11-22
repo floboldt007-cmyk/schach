@@ -131,6 +131,7 @@ async function bediene(route) {
   if (!uid) return absage(401, 'KRONEN_ANMELDUNG');
   const rpc = url.pathname.split('/').at(-1), p = partien.get(body.partie);
   if (rpc === 'kronen_mein_stand') return antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-09' });
+  if (rpc === 'bestaetigte_namen') return antwort([]); // R27 Haken fremder Namen (js/konto.js): hier ohne bestaetigten Namen
   if (rpc === 'online_suche_start') {
     const lauf = sucheLaufende(uid); if (lauf) return antwort({ partie: lauf.id });
     const alt = schlange.get(uid); schlange.set(uid, { zeit: '5+3', seit: alt ? alt.seit : jetzt() });
@@ -146,6 +147,7 @@ async function bediene(route) {
   if (rpc === 'online_live_bewertung_frei') return antwort({ frei: true, rest: 1, unbegrenzt: false });
   if (rpc === 'online_live_bewertung_nutzen') return antwort({ ok: true, frei: true, rest: 0, unbegrenzt: false, gebucht: true });
   if (rpc === 'online_meine') return antwort([...partien.values()].filter(q => q.status !== 'beendet' && farbeVon(q, uid)));
+  if (rpc === 'saison_mein_stand' || rpc === 'weltrang_liste') return antwort({}); // R27 Arena: Season-Rest und Weltrangliste (prueft r27-online-arena), hier ohne Antwort
   if (url.pathname === '/functions/v1/online-zug') {
     const q = partien.get(body.partie);
     if (!q || q.status !== 'laeuft') return absage(409, 'ONLINE_PARTIE_BEENDET');
@@ -181,6 +183,10 @@ async function bediene(route) {
   }
   // R19 Season: js/karte.js fragt parallel zu karte_der_partie (wie tests/online-ui.test.mjs), hier ohne Abzeichen und Titel
   if (rpc === 'saison_karte_der_partie') return antwort({ w: { abzeichen: null, titel: null }, s: { abzeichen: null, titel: null } });
+  if (rpc === 'effekte_waehle') return antwort(true); // R26 Gegner-Effekte: Wahl melden, hier ohne Wirkung
+  // ohne Antwort (wie live vor dem Einspielen) bleiben beide Seiten im eigenen Satz; sonst zeigte der Gegner den Standardsatz
+  // und die Skin-Probe (Befund 4) faende "blaupause" nicht. Gegner-Effekte prueft tests/r26-gegner-effekte.test.mjs
+  if (rpc === 'effekte_der_partie') return antwort(null);
   unerwartet.push(`${uid} ${req.method()} ${url.pathname}`); return antwort([]);
 }
 
