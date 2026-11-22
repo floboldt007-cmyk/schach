@@ -161,7 +161,10 @@ function titelStand(erfolge = teileErfolge()) {
       .filter((x) => !koennen.includes(x));
     if (neu.length) { merkeErspielteTitel(neu); koennen = [...koennen, ...neu]; }
   } catch (e) { /* ohne Archiv nur die gemerkten */ }
-  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, taten: koennen, labor: !!schule };
+  // R27: gebuchte Stufen je Familie (Ligakrone, Tiefenlicht nur mit Stufe 3, ./titel.js)
+  let stufen = {};
+  try { stufen = ladeBesitz().stufen || {}; } catch (e) { stufen = {}; }
+  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, taten: koennen, labor: !!schule, stufen };
 }
 // R19 Familie Titeltraeger: wie viele Titel frei sind
 export function titelFreiZahl(erfolge = teileErfolge()) {
