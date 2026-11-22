@@ -146,6 +146,7 @@ async function bediene(route) {
   if (rpc === 'online_live_bewertung_frei') return antwort({ frei: true, rest: 1, unbegrenzt: false });
   if (rpc === 'online_live_bewertung_nutzen') return antwort({ ok: true, frei: true, rest: 0, unbegrenzt: false, gebucht: true });
   if (rpc === 'online_meine') return antwort([...partien.values()].filter(q => q.status !== 'beendet' && farbeVon(q, uid)));
+  if (rpc === 'saison_mein_stand' || rpc === 'weltrang_liste') return antwort({}); // R27 Arena: Season-Rest und Weltrangliste (prueft r27-online-arena), hier ohne Antwort
   if (url.pathname === '/functions/v1/online-zug') {
     const q = partien.get(body.partie);
     if (!q || q.status !== 'laeuft') return absage(409, 'ONLINE_PARTIE_BEENDET');
