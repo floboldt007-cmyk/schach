@@ -233,6 +233,7 @@ const SUITEN = [
   { name: 'r19-start-naechstes', datei: 'r19-start-naechstes.test.mjs', args: [], was: 'Feinschliff R19: Start "Als Naechstes" mit eigenem Gesicht je Zeile (Farbe, Bildstueck) und wahrem Fortschritt (Marsch, Raetsel-Tage, faellige Fehler, Liga-Wappen und Abstand), Hoehe SE und PC (Browser)' },
   { name: 'r19-benutzername', datei: 'r19-benutzername.test.mjs', args: [], was: 'Feinschliff R19: gemerkter Benutzername wird einmal je Start mit dem Server abgeglichen, ohne Server bleibt er (Browser)' },
   { name: 'r27-name-haken', datei: 'r27-name-haken.test.mjs', args: [], was: 'Feinschliff R27: Benutzername beim Tippen pruefen, Rueckfrage in der App, gruener Haken, 30-Tage-Sperre grau mit Tagen, ohne SQL wie vorher (Browser)' },
+  { name: 'r27-gegner-gold', datei: 'r27-gegner-gold.test.mjs', args: [], was: 'Feinschliff R27: Gegner-Karte der Startseite in Metallgold, ein goldener Knopf, Metallgold-Tokens, Probe-Schalter ?test&design= und brett-warm (Browser)' },
   { name: 'functions-probe', datei: 'functions-probe.test.mjs', args: [], was: 'Werkzeug functions-probe: fehlende Edge Functions auf dem Server erkennen (nachgebauter Server, Pflicht-Liste passt zum Repo)' },
   { name: 'r19-analyse-neu', datei: 'r19-analyse-neu.test.mjs', args: [], was: 'Feinschliff R19: Analyse neu (Schluesselmomente als Karten oben, Symbole gross, Verlauf ohne Kleintext, Ergebnis-Karte, Tempo, Auto-Abspielen) (Browser)' },
   { name: 'r19-verlauf-neu', datei: 'r19-verlauf-neu.test.mjs', args: [], was: 'Feinschliff R19: Verlauf neu (Partien ohne Zug als eine Zeile, Ergebniszeichen, Zu-zweit-Bild, leiser Muelleimer, eine Staerke-Zahl, Level-Karte im Rahmen)' },
@@ -268,7 +269,7 @@ const DAUERN = new Map([
   ['teilen', 35], ['gedaechtnis', 58], ['kartei', 62], ['sprache', 156], ['sprache-pakete', 225],
   ['tagesraetsel-daten', 2], ['tagesraetsel', 33], ['start', 151], ['app', 569], ['screens', 63],
   ['e2e', 111], ['native', 0], ['gegnersuche', 2],
-  ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['bot-grenze', 8],
+  ['r19-lektionen-probe', 360], ['r19-lektionen-besser', 570], ['r19-lektionen-runden', 60], ['r27-gegner-gold', 25], ['bot-grenze', 8],
   ['heim', 60], ['brettgroesse', 49], ['e2e-iphone', 24], ['offline-ladeprobe', 28], ['funktion-funken-aufgeben', 45], ['funktion-einstellungen-season', 10],
 ]);
 
