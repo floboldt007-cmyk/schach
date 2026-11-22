@@ -427,6 +427,8 @@ function legeAufGeraet(stand) {
 // vorhandener Park wird nie ueberschrieben: er wandert unter ':alt' (gibt es den auch, unterbleibt der Tausch).
 const entferne = (...weg) => { try { for (const k of weg) lager().removeItem(k); } catch (e) { /* naechster Start raeumt auf */ } };
 export function tauschOffen() { return !!jsonLies(TAUSCH_SCHLUESSEL); }
+// Nur fuer Tests (a6 W1): jede Schutzschicht des Tauschs einzeln pruefbar
+export const _tauschIntern = Object.freeze({ parke: (...a) => parke(...a), trenneGeraet: (...a) => trenneGeraet(...a) });
 function parke(konto, basis) {
   const t = jsonLies(TAUSCH_SCHLUESSEL);
   if (!t || t.phase !== 'park' || t.von !== konto || jsonLies(SYNC_SCHLUESSEL)?.konto !== konto) throw new Error('parke() nur im eigenen Tausch');
@@ -472,7 +474,8 @@ function tauschZuEnde() {
   const park = jsonLies(GEPARKT_SCHLUESSEL + t.von);
   if (!park || !gueltigerStand(park.stand)) { entferne(TAUSCH_SCHLUESSEL); return false; }
   if (!legeAufGeraet(park.stand).ok) throw new Error(K('cloudLadenFehler'));
-  entferne(GEPARKT_SCHLUESSEL + t.von, TAUSCH_SCHLUESSEL);
+  // sauber zurueckgespielt: das Geraet ist wieder der neueste Stand, ein aelterer Park unter ':alt' ist damit ueberholt (a6 W2)
+  entferne(GEPARKT_SCHLUESSEL + t.von, GEPARKT_SCHLUESSEL + t.von + ':alt', TAUSCH_SCHLUESSEL);
   andereTabsNeuLaden();
   return true;
 }
@@ -497,7 +500,8 @@ function trenneGeraet(id) {
   // Mit Park gilt dessen letzter gemeinsamer Stand als Basis (Weiterspielen vor dem Wechsel zaehlt dann als Geraete-Aenderung).
   // Ohne Park gehoert das leere Geraet jetzt id, noch ohne Abgleich.
   jsonSchreib(SYNC_SCHLUESSEL, { konto: id, hash: mitPark ? park.basis || null : null });
-  entferne(GEPARKT_SCHLUESSEL + id, TAUSCH_SCHLUESSEL);
+  // Park von id sauber zurueckgespielt: ein aelterer Park unter ':alt' ist ueberholt und sperrt sonst den naechsten Tausch (a6 W2)
+  entferne(GEPARKT_SCHLUESSEL + id, ...(mitPark ? [GEPARKT_SCHLUESSEL + id + ':alt'] : []), TAUSCH_SCHLUESSEL);
   andereTabsNeuLaden();
   return true;
 }

@@ -75,7 +75,8 @@ const frisch = async (tag) => { const K = await import(`../js/konto.js?m=${++lau
 
 // Vorlauf bis kurz vor dem Tausch: A spielt, gleicht ab (Level 22), spielt offline weiter (23, p-neu), meldet sich offline ab,
 // B meldet sich an. Danach steht der Tausch an.
-async function vorlauf() {
+// variante 'alter-park' (a6 W1): vor dem Tausch liegt schon ein (veralteter) Park von A mit Level 20
+async function vorlauf(variante = 'ohne') {
   m.clear(); zeilen = new Map(); ops = 0; stopNach = Infinity; grenze = null; netzWeg = false;
   const K = await frisch('vorlauf');
   m.set(P + 'modul:funken', JSON.stringify({ level: 22, gesamt: 9000 }));
@@ -86,22 +87,20 @@ async function vorlauf() {
   m.set(P + 'modul:funken', JSON.stringify({ level: 23, gesamt: 9100 }));
   m.set(P + 'partien', JSON.stringify([...json(m.get(P + 'partien')), { id: 'p-neu' }]));
   netzWeg = true; await K.abmelden({ frist: 50 }); netzWeg = false;
+  if (variante === 'alter-park') m.set(PARK + 'u-a', JSON.stringify({ datum: 'alt', basis: null, stand: { [P + 'modul:funken']: JSON.stringify({ level: 20 }) } }));
   await K.pruefeCode('b@test.de', '222222');
   return { K, sitzungA, sitzungB: m.get(SITZUNG) };
 }
 
-// Wie viele Schreibschritte hat der Tausch ohne Abbruch?
-let schritte = 0;
-{
-  const { K } = await vorlauf();
-  ops = 0; await K.gleicheNachAnmeldung(); schritte = ops;
-}
-console.log(`Tausch A -> B: ${schritte} Schreibschritte, je Abbruch 5 Starts`);
-
 const STARTS = ['gast', 'partie', 'als-a', 'als-b', 'voll'];
 try {
+ for (const variante of ['ohne', 'alter-park']) {
+  // Wie viele Schreibschritte hat der Tausch ohne Abbruch?
+  let schritte = 0;
+  { const { K } = await vorlauf(variante); ops = 0; await K.gleicheNachAnmeldung(); schritte = ops; }
+  console.log(`Tausch A -> B (${variante}): ${schritte} Schreibschritte, je Abbruch 5 Starts`);
   for (let n = 0; n <= schritte; n++) {
-    const { K, sitzungA, sitzungB } = await vorlauf();
+    const { K, sitzungA, sitzungB } = await vorlauf(variante);
     ops = 0; stopNach = n;                                              // nach n Schreibschritten stirbt die Seite
     try { await K.gleicheNachAnmeldung(); } catch (e) { /* die Seite ist tot, was sie noch tut, kommt nicht an */ }
     stopNach = Infinity;
@@ -113,7 +112,7 @@ try {
       else m.set(SITZUNG, start === 'als-a' ? sitzungA : sitzungB);
       const voll = start === 'voll' ? belegt() + 200 : null;            // kein Platz fuer eine zweite Kopie des Stands
       grenze = voll;
-      const fall = `Abbruch nach ${n}/${schritte}, Start ${start}`;
+      const fall = `${variante}: Abbruch nach ${n}/${schritte}, Start ${start}`;
       let K2 = null;
       try {
         K2 = await frisch(`${n}-${start}`);                             // Neustart: Heilen beim Laden
@@ -126,6 +125,8 @@ try {
       const orte = { geraet: besitzer === 'u-a' && istA(geraet()), park: istA(json(m.get(PARK + 'u-a'))?.stand),
         parkAlt: istA(json(m.get(PARK + 'u-a:alt'))?.stand), server: istA(zeilen.get('u-a')?.stand) };
       pruefe(`${fall}: A's Stand liegt irgendwo vollstaendig`, Object.values(orte).some(Boolean), { orte, besitzer, merker: m.get(TAUSCH) });
+      pruefe(`${fall}: der veraltete Park (Level 20) landet nie auf dem Geraet oder am Server`, json(geraet()[P + 'modul:funken'])?.level !== 20
+        && json(zeilen.get('u-a')?.stand?.[P + 'modul:funken'])?.level !== 20);
       pruefe(`${fall}: am Server von B nichts von A`, !hatVonA(zeilen.get('u-b')?.stand), json(zeilen.get('u-b')?.stand?.[P + 'modul:funken']));
       pruefe(`${fall}: B spielt nie auf A's Stand`, !(m.get(SITZUNG) === sitzungB && hatVonA(geraet())), { besitzer, angemeldet });
       pruefe(`${fall}: ohne offenen Merker ist das Geraet von A nie ein Teilstand`, m.has(TAUSCH) || besitzer !== 'u-a' || istA(geraet()) || orte.server,
@@ -141,6 +142,7 @@ try {
       }
     }
   }
+ }
 } catch (e) {
   pruefe('Lauf ohne Ausnahme', false, String(e && e.stack || e));
 }

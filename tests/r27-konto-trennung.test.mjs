@@ -10,6 +10,7 @@
 import { setzeSpeicher } from '../js/storage.js';
 import { pruefeCode, abmelden, setzeKontoFetch, gleicheNachAnmeldung, lokalerStand, synchronisiere, GEPARKT_SCHLUESSEL, TAUSCH_SCHLUESSEL,
   SYNC_SCHLUESSEL, sitzung } from '../js/konto.js';
+import * as KONTO from '../js/konto.js';
 import { profilWahl, setzeProfilWahl } from '../js/profil.js';
 import { SONDER_SCHLUESSEL } from '../js/sonderstuecke.js';
 
@@ -244,6 +245,49 @@ try {
     && JSON.parse(parkC?.stand?.[P + 'partien'] || '[]').length === 40, { level: level(parkC?.stand || {}) });
   const r5 = await synchronisiere({ laden: false });
   pruefe('N2: eine Partie von B (laden:false) laedt danach nichts von A zu B hoch', level(zeilen.get('u-neustartd')?.stand) !== 27, { r5 });
+  if (sitzung()) await abmelden({ frist: 10 });
+
+  // ---------- a6 W1: jede Schutzschicht des Tauschs direkt ----------
+  const T = KONTO._tauschIntern;
+  const wirft = (f) => { try { f(); return false; } catch (e) { return true; } };
+  const roh = () => JSON.stringify([...m].sort());
+  leeren();
+  for (const [k, v] of Object.entries(HAUPT)) localStorage.setItem(k, v);
+  localStorage.setItem(SYNC_SCHLUESSEL, JSON.stringify({ konto: 'u-w', hash: null }));
+  let vor = roh();
+  pruefe('W1: parke() wirft ohne Merker und schreibt nichts', !!T && wirft(() => T.parke('u-w', null)) && roh() === vor);
+  localStorage.setItem(TAUSCH_SCHLUESSEL, JSON.stringify({ von: 'u-w', nach: 'u-x', phase: 'geraet' })); vor = roh();
+  pruefe('W1: parke() wirft in Phase "geraet" (Teilstand moeglich)', !!T && wirft(() => T.parke('u-w', null)) && roh() === vor);
+  localStorage.setItem(TAUSCH_SCHLUESSEL, JSON.stringify({ von: 'u-y', nach: 'u-x', phase: 'park' })); vor = roh();
+  pruefe('W1: parke() wirft fuer ein anderes Konto als "von"', !!T && wirft(() => T.parke('u-w', null)) && roh() === vor);
+  localStorage.setItem(TAUSCH_SCHLUESSEL, JSON.stringify({ von: 'u-w', nach: 'u-x', phase: 'geraet' })); vor = roh();
+  pruefe('W1: trenneGeraet() wirft bei offenem Merker und aendert nichts', !!T && wirft(() => T.trenneGeraet('u-x')) && roh() === vor);
+  localStorage.setItem(TAUSCH_SCHLUESSEL, JSON.stringify({ von: 'u-w', nach: 'u-x', phase: 'park' }));
+  localStorage.setItem(GEPARKT_SCHLUESSEL + 'u-w', '"ALTER PARK"');
+  const p1 = !!T && T.parke('u-w', null);
+  pruefe('W1: ein vorhandener Park wird nicht ueberschrieben, er wandert unter :alt', p1 === true
+    && localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-w:alt') === '"ALTER PARK"' && level(JSON.parse(localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-w')).stand) === 22);
+  localStorage.setItem(GEPARKT_SCHLUESSEL + 'u-w', '"ZWEITER PARK"'); vor = roh();
+  pruefe('W1: liegt schon ein :alt, unterbleibt das Parken (weder Park noch :alt ueberschrieben)', !!T && T.parke('u-w', null) === false && roh() === vor);
+
+  // ---------- a6 W2: ein liegengebliebenes :alt sperrt keinen spaeteren Tausch ----------
+  leeren();
+  for (const [k, v] of Object.entries(HAUPT)) localStorage.setItem(k, v);
+  await pruefeCode('altea@test.de', '121212'); await gleicheNachAnmeldung();
+  localStorage.setItem(GEPARKT_SCHLUESSEL + 'u-altea', JSON.stringify({ datum: 'x', basis: null, stand: { [P + 'modul:funken']: JSON.stringify({ level: 20 }) } }));
+  await abmelden({ frist: 10 });
+  await pruefeCode('alteb@test.de', '343434'); await gleicheNachAnmeldung();                 // A -> B: alter Park wandert unter :alt
+  pruefe('W2: beim ersten Wechsel wandert der alte Park unter :alt', localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-altea:alt') !== null);
+  await abmelden({ frist: 10 });
+  await pruefeCode('altea@test.de', '121212'); await gleicheNachAnmeldung();                 // B -> A: Park von A sauber zurueck
+  pruefe('W2: nach dem sauberen Zurueckspielen ist :alt aufgeloest, A hat Level 22', localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-altea:alt') === null
+    && level(lokalerStand()) === 22, { alt: !!localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-altea:alt'), level: level(lokalerStand()) });
+  localStorage.setItem(GEPARKT_SCHLUESSEL + 'u-altea', JSON.stringify({ datum: 'x', basis: null, stand: {} }));   // noch einmal ein liegengebliebener Park
+  await abmelden({ frist: 10 });
+  await pruefeCode('alteb@test.de', '343434');
+  let fehlerW2 = null; try { await gleicheNachAnmeldung(); } catch (e) { fehlerW2 = e.message; }
+  pruefe('W2: der naechste Wechsel A -> B klappt (keine Sperre durch :alt)', !fehlerW2 && sitzung() !== null && level(lokalerStand()) === null
+    && level(JSON.parse(localStorage.getItem(GEPARKT_SCHLUESSEL + 'u-altea') || '{}').stand || {}) === 22, { fehlerW2, level: level(lokalerStand()) });
 } catch (e) {
   pruefe('Lauf ohne Ausnahme', false, String(e && e.stack || e));
 }
