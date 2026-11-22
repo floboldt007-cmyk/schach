@@ -141,6 +141,12 @@ function wendeEinstellungenAn(e) {
   // Labor-Bretter nur fuer den Erfinder (js/labor.js); andere sehen still das Standardbrett
   html.dataset.brett = brettWahl(e.brett);
   if (DESIGN_PROBE) html.dataset.design = DESIGN_PROBE;
+  // R28 Menue + Liga (Proben r1, r2, r3): die Stile liegen in einer eigenen Datei, die nur mit dem Schalter geladen wird
+  if (/(^| )r[1-3]( |$)/.test(DESIGN_PROBE) && !document.getElementById('probe-r28')) {
+    const l = document.createElement('link');
+    l.id = 'probe-r28'; l.rel = 'stylesheet'; l.href = 'css/proben/r28-menue-liga.css';
+    document.head.append(l);
+  }
   // Oberflaeche der seltenen Labor-Bretter (js/brett-flaechen.js, nur dann geladen)
   brettFlaeche(html, html.dataset.brett);
   html.dataset.koordinaten = e.koordinaten ? 'an' : 'aus';

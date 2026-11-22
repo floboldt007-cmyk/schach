@@ -1,0 +1,163 @@
+/* R28 Menue + Liga (Flo 22.11.2026, Vorbilder: Schach-App/Design-Buch Vorbilder/Spiele-Bilder 2026-11-22/).
+   Drei Richtungen NUR als Probe: js/app.js laedt diese Datei allein bei ?test&design=r1|r2|r3, live gibt es sie nicht.
+   Gemeinsam: keine selbst gezeichneten Gold-Symbole in der Leiste (Design-Buch: drei Runden gescheitert), die Wahl
+   erkennt man an einem kraeftigen Akzent statt an einer Pille, die Liga zeigt Platz, Name und Wert gross.
+     r1 Buehne   (Persona 5/3): Woerter auf schwarzem, schraeg geschnittenem Band, die Wahl ein goldener Schnitt; Liga mit Podest
+     r2 Ruhe     (Persona 3, Trackmania): Woerter direkt auf dem Grund, eine Goldlinie; Liga als klare Bestenliste
+     r3 Gemaelde (Metaphor, VALORANT, LoL): gemalter Grund, Figuren Gold und Elfenbein statt Woerter; Liga mit grossem Wappen-Kopf */
+
+/* ================= R1 Buehne ================= */
+html[data-design~="r1"] { --r1-band: #0E0F12; --r1-wort: #D9D4C9; }
+html[data-design~="r1"] .reiter-leiste { background: var(--r1-band); -webkit-backdrop-filter: none; backdrop-filter: none; border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .35); padding: 6px 10px; }
+html[data-design~="r1"] .reiter-leiste:not([data-lage="seite"]) { transform: skewX(-10deg); }
+html[data-design~="r1"] .reiter-leiste:not([data-lage="seite"]) .reiter { transform: skewX(10deg); }
+html[data-design~="r1"] .reiter-leiste .reiter .sy { display: none; }
+html[data-design~="r1"] .reiter-leiste .reiter { font-family: var(--display); font-weight: 800; font-size: 16px; letter-spacing: -.01em;
+  color: var(--r1-wort); border-radius: 0; }
+html[data-design~="r1"] .reiter-leiste .reiter span { transition: transform var(--d-m) var(--feder); }
+html[data-design~="r1"] .reiter-leiste .reiter.an { color: #1C1B19; }
+html[data-design~="r1"] .reiter-leiste .reiter.an span { transform: scale(1.14); }
+/* der Schnitt: das goldene Parallelogramm springt oben und unten ueber das Band hinaus */
+html[data-design~="r1"] .reiter-pille { top: -7px; bottom: -7px; border-radius: 2px;
+  background: linear-gradient(170deg, #F3DEA2, #C9A14A 55%, #8A6A26); box-shadow: 0 6px 16px rgba(0, 0, 0, .4); }
+html[data-design~="r1"] .reiter-leiste .reiter:focus-visible { outline-color: #F3DEA2; }
+html[data-design~="r1"] .reiter-leiste[data-lage="seite"] { padding: 26px 16px; border-radius: 6px; }
+html[data-design~="r1"] .reiter-leiste[data-lage="seite"] .reiter-marke { color: #F3DEA2; }
+html[data-design~="r1"] .reiter-leiste[data-lage="seite"] .reiter { font-size: 21px; justify-content: flex-start; }
+html[data-design~="r1"] .reiter-leiste[data-lage="seite"] .reiter-pille { left: 6px; right: 6px; transform: skewX(-12deg); border-radius: 2px; }
+
+/* Liga: schwarze Buehne, darunter das Podest der ersten drei */
+html[data-design~="r1"] .lg-gr-buehne { background: var(--r1-band); color: #F3F1EC; border-radius: 6px; box-shadow: 0 10px 28px rgba(0, 0, 0, .3);
+  position: relative; overflow: hidden; }
+html[data-design~="r1"] .lg-gr-buehne::before { content: ""; position: absolute; right: -40px; top: -20px; bottom: -20px; width: 46%;
+  background: linear-gradient(170deg, #F3DEA2, #C9A14A 55%, #8A6A26); transform: skewX(-14deg); opacity: .9; pointer-events: none; }
+html[data-design~="r1"] .lg-gr-buehne > * { position: relative; }
+html[data-design~="r1"] .lg-gr-titel h2 { font-size: clamp(30px, 8vw, 44px); letter-spacing: -.03em; }
+html[data-design~="r1"] .lg-gr-titel p { opacity: 1; color: #D9D4C9; }
+html[data-design~="r1"] .lg-gr-naechste { opacity: 1; color: #D9D4C9; }
+html[data-design~="r1"] .lg-gr-zone { background: #0E0F12; color: #9BE3B5; box-shadow: inset 0 0 0 1.5px #9BE3B5; }
+html[data-design~="r1"] .lg-gr-liste { overflow: visible; background: none; box-shadow: none; }
+html[data-design~="r1"] .lg-gr-abschnitt { border-radius: 6px; background: var(--flaeche); box-shadow: var(--kante); overflow: hidden; }
+html[data-design~="r1"] .lg-gr-abschnitt + .lg-gr-abschnitt { margin-top: 12px; border-top: 0; }
+html[data-design~="r1"] .lg-gr-abschnitt:has(.lg-gr-zeile[data-platz="1"]) { background: none; box-shadow: none; overflow: visible; }
+html[data-design~="r1"] .lg-gr-abschnitt ol:has(> .lg-gr-zeile[data-platz="1"]) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 6px; align-items: end; }
+html[data-design~="r1"] .lg-gr-zeile[data-platz="1"] { grid-column: 2; grid-row: 1; --sockel: 84px; }
+html[data-design~="r1"] .lg-gr-zeile[data-platz="2"] { grid-column: 1; grid-row: 1; --sockel: 58px; }
+html[data-design~="r1"] .lg-gr-zeile[data-platz="3"] { grid-column: 3; grid-row: 1; --sockel: 42px; }
+html[data-design~="r1"] ol:has(> .lg-gr-zeile[data-platz="1"]) > .lg-gr-zeile:not([data-platz="1"], [data-platz="2"], [data-platz="3"]) {
+  grid-column: 1 / -1; background: var(--flaeche); }
+html[data-design~="r1"] ol:has(> .lg-gr-zeile[data-platz="1"]) > .lg-gr-zeile[data-platz="4"] { margin-top: 12px; border-radius: 6px 6px 0 0; }
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]) {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; border-top: 0; background: none; box-shadow: none; text-align: center; }
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]) .lg-gr-streifen,
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]) .lg-gr-lohn { display: none; }
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]) .lg-gr-wer {
+  order: 1; flex-direction: column; gap: 6px; padding: 0; max-width: 100%; }
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]) .lg-gr-avatar { width: 56px; height: 56px; }
+html[data-design~="r1"] .lg-gr-zeile[data-platz="1"] .lg-gr-avatar { width: 68px; height: 68px; box-shadow: 0 0 0 3px #C9A14A; }
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]) .lg-gr-name { max-width: 100%; justify-content: center; }
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]) .lg-gr-kronen { order: 2; font-size: 18px; }
+/* der Sockel: der Platz steht gross auf einem schwarzen Block, Platz 1 am hoechsten */
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]) .lg-gr-platz {
+  order: 3; align-self: stretch; display: grid; place-items: start center; min-height: var(--sockel); margin: 0; padding: 8px 0 0; border-radius: 4px 4px 0 0;
+  background: var(--r1-band); color: #F3F1EC; font-size: 30px; transform: none; box-shadow: none; }
+html[data-design~="r1"] .lg-gr-zeile[data-platz="1"] .lg-gr-platz { background: linear-gradient(170deg, #F3DEA2, #C9A14A 55%, #8A6A26); color: #1C1B19; font-size: 38px; }
+html[data-design~="r1"] :is(.lg-gr-zeile[data-platz="1"], .lg-gr-zeile[data-platz="2"], .lg-gr-zeile[data-platz="3"]).ich .lg-gr-platz { box-shadow: inset 0 0 0 3px #C9A14A; }
+
+/* ================= R2 Ruhe ================= */
+/* keine Kapsel: die Woerter stehen auf dem Grund, eine feine Goldlinie traegt sie, die Wahl ist eine kurze Goldlinie */
+html[data-design~="r2"] .reiter-leiste { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; border-radius: 0;
+  isolation: isolate; }
+html[data-design~="r2"] .reiter-leiste:not([data-lage="seite"])::before { content: ""; position: absolute; z-index: -1; left: -16px; right: -16px;
+  top: -26px; bottom: calc(-1 * var(--dock-abstand)); background: linear-gradient(to top, var(--grund) 62%, transparent); pointer-events: none; }
+html[data-design~="r2"] .reiter-leiste:not([data-lage="seite"])::after { content: ""; position: absolute; left: 8px; right: 8px; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--metall) 55%, transparent) 20% 80%, transparent); }
+html[data-design~="r2"] .reiter-leiste .reiter .sy { display: none; }
+html[data-design~="r2"] .reiter-leiste .reiter { font-size: 15px; font-weight: 700; letter-spacing: .01em; color: var(--text-2); border-radius: 0; }
+html[data-design~="r2"] .reiter-leiste .reiter.an { color: var(--gold-text); font-weight: 800; }
+html[data-design~="r2"] .reiter-pille { top: auto; bottom: 8px; height: 3px; border-radius: 2px; background: var(--metall); transform: scaleX(.34); }
+html[data-design~="r2"] .reiter-leiste[data-lage="seite"] { background: var(--grund); box-shadow: inset -1px 0 0 color-mix(in srgb, var(--metall) 45%, transparent);
+  border-radius: 0; top: 0; bottom: 0; left: 0; }
+html[data-design~="r2"] .reiter-leiste[data-lage="seite"] .reiter { font-size: 17px; }
+html[data-design~="r2"] .reiter-leiste[data-lage="seite"] .reiter-pille { left: 14px; right: auto; width: 3px; transform: none; }
+
+/* Liga: nur Platz, Name, Wert, gross; keine Muenzen am Rand (die Belohnung steht weiter in der eigenen Zeile) */
+html[data-design~="r2"] .lg-gr-buehne { background: none; box-shadow: none; padding-inline: 4px; grid-template-columns: auto minmax(0, 1fr); }
+html[data-design~="r2"] .lg-gr-wappen { width: 44px; }
+html[data-design~="r2"] .lg-gr-titel h2 { font-size: 26px; }
+html[data-design~="r2"] .lg-gr-liste { background: none; box-shadow: none; border-radius: 0; }
+html[data-design~="r2"] .lg-gr-abschnitt + .lg-gr-abschnitt { border-top: 1px solid color-mix(in srgb, var(--metall) 40%, transparent); }
+html[data-design~="r2"] .lg-gr-abschnitt h3 { padding-inline: 4px; }
+html[data-design~="r2"] .lg-gr-zeile { grid-template-columns: 44px minmax(0, 1fr) auto 0; padding-inline: 4px; }
+html[data-design~="r2"] .lg-gr-zeile + .lg-gr-zeile { border-top: 0; }
+html[data-design~="r2"] .lg-gr-zeile:not(.ich) .lg-gr-lohn { display: none; }
+html[data-design~="r2"] .lg-gr-zeile.ich { grid-template-columns: 44px minmax(0, 1fr) auto 44px; }
+html[data-design~="r2"] .lg-gr-streifen { display: none; }
+html[data-design~="r2"] .lg-gr-platz { font-size: 24px; font-style: italic; color: var(--text); background: none !important; box-shadow: none !important; }
+html[data-design~="r2"] .lg-gr-avatar { width: 32px; height: 32px; }
+html[data-design~="r2"] .lg-gr-name b { font-size: 17px; font-weight: 750; }
+html[data-design~="r2"] .lg-gr-kronen { font-size: 19px; }
+html[data-design~="r2"] .lg-gr-kronen .ico { display: none; }
+html[data-design~="r2"] .lg-gr-zeile.ich { background: none; box-shadow: inset 0 -2px 0 var(--metall), inset 0 2px 0 var(--metall); }
+html[data-design~="r2"] .lg-gr-zeile.ich .lg-gr-platz, html[data-design~="r2"] .lg-gr-zeile.ich .lg-gr-name b { color: var(--gold-text); }
+
+/* ================= R3 Gemaelde ================= */
+/* gemalter Grund: warme Lasur und feine Leinwand-Koernung; die Reiter sind die Figuren Gold und Elfenbein */
+html[data-design~="r3"] { --r3-korn: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='k'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .4 0 0 0 0 .25 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23k)'/%3E%3C/svg%3E");
+  --r3-grund: #EFE5CF; --r3-lasur: rgba(201, 161, 74, .28); --r3-wort: #4E4230; --r3-wort-an: #2A2216; }
+html[data-design~="r3"][data-modus="dunkel"] { --r3-grund: #1B1712; --r3-lasur: rgba(201, 161, 74, .2); --r3-wort: #CDBF9C; --r3-wort-an: #1C1B19; }
+@media (prefers-color-scheme: dark) {
+  html[data-design~="r3"][data-modus="system"] { --r3-grund: #1B1712; --r3-lasur: rgba(201, 161, 74, .2); --r3-wort: #CDBF9C; --r3-wort-an: #1C1B19; }
+}
+html[data-design~="r3"] .reiter-leiste { -webkit-backdrop-filter: none; backdrop-filter: none; border-radius: 18px 26px 20px 24px / 24px 18px 26px 20px;
+  background: var(--r3-korn), radial-gradient(120% 160% at 15% 0%, var(--r3-lasur), transparent 60%),
+    radial-gradient(100% 140% at 90% 100%, var(--r3-lasur), transparent 55%), var(--r3-grund);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .28), inset 0 0 0 1px color-mix(in srgb, var(--metall) 35%, transparent);
+  --dock-hoehe: 76px; }
+html[data-design~="r3"] .reiter-leiste .reiter .sy { display: none; }
+html[data-design~="r3"] .reiter-leiste .reiter { gap: 1px; font-size: 11.5px; font-weight: 700; color: var(--r3-wort); }
+html[data-design~="r3"] .reiter-leiste .reiter::before { content: ""; width: 40px; height: 40px; background: center / contain no-repeat;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .35)); transition: transform var(--d-m) var(--feder); }
+html[data-design~="r3"] .reiter-leiste .reiter[data-reiter="heim"]::before { background-image: url("../../assets/pieces/goldelfenbein/wK.svg"); }
+html[data-design~="r3"] .reiter-leiste .reiter[data-reiter="arena"]::before { background-image: url("../../assets/pieces/goldelfenbein/wN.svg"); }
+html[data-design~="r3"] .reiter-leiste .reiter[data-reiter="bestenliste"]::before { background-image: url("../../assets/pieces/goldelfenbein/wR.svg"); }
+html[data-design~="r3"] .reiter-leiste .reiter[data-reiter="ich"]::before { background-image: url("../../assets/pieces/goldelfenbein/wP.svg"); }
+html[data-design~="r3"] .reiter-leiste .reiter.an { color: var(--r3-wort-an); }
+html[data-design~="r3"] .reiter-leiste .reiter.an::before { transform: translateY(-3px) scale(1.16); }
+/* die Wahl ist ein Pinselstrich in Gold hinter der Figur */
+html[data-design~="r3"] .reiter-pille { top: 8px; bottom: 6px; border-radius: 46% 54% 40% 60% / 58% 42% 58% 42%; transform: rotate(-3deg);
+  background: var(--r3-korn), linear-gradient(100deg, transparent 0, #C9A14A 12% 84%, transparent 100%),
+    linear-gradient(170deg, #F3DEA2, #C9A14A 60%, #8A6A26); opacity: .95; }
+html[data-design~="r3"] .reiter-leiste[data-lage="seite"] { border-radius: 22px; --dock-hoehe: 64px; }
+html[data-design~="r3"] .reiter-leiste[data-lage="seite"] .reiter-marke { color: var(--r3-wort); }
+html[data-design~="r3"] .reiter-leiste[data-lage="seite"] .reiter { height: 58px; font-size: 15px; gap: 12px; }
+html[data-design~="r3"] .reiter-leiste[data-lage="seite"] .reiter::before { width: 36px; height: 36px; }
+html[data-design~="r3"] .reiter-leiste[data-lage="seite"] .reiter-pille { top: 0; transform: rotate(-1.5deg); }
+
+/* Liga: grosses Wappen auf einer Lasur in der Farbe der Liga (eigene Farbe je Liga, Pracht waechst nach oben) */
+html[data-design~="r3"] .lg-gr-buehne { --liga-farbe: #8A6A26; grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center;
+  padding-top: 22px; border-radius: 18px 26px 20px 24px / 24px 18px 26px 20px; color: var(--text);
+  background: var(--r3-korn), radial-gradient(80% 90% at 50% 18%, color-mix(in srgb, var(--liga-farbe) 55%, transparent), transparent 70%),
+    radial-gradient(120% 120% at 100% 100%, var(--r3-lasur), transparent 60%), var(--r3-grund);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .22), inset 0 0 0 1px color-mix(in srgb, var(--liga-farbe) 45%, transparent); }
+html[data-design~="r3"] .lg-gr-buehne[data-liga="bauer"] { --liga-farbe: #8B6A4A; }
+html[data-design~="r3"] .lg-gr-buehne[data-liga="springer"] { --liga-farbe: #B5713A; }
+html[data-design~="r3"] .lg-gr-buehne[data-liga="laeufer"] { --liga-farbe: #8FA3B8; }
+html[data-design~="r3"] .lg-gr-buehne[data-liga="turm"] { --liga-farbe: #D4A63F; }
+html[data-design~="r3"] .lg-gr-buehne[data-liga="dame"] { --liga-farbe: #4FB3D9; }
+html[data-design~="r3"] .lg-gr-buehne[data-liga="koenig"] { --liga-farbe: #B35AD0; }
+html[data-design~="r3"] .lg-gr-wappen { width: 116px; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .35)); }
+html[data-design~="r3"] .lg-gr-titel h2 { font-size: clamp(28px, 7vw, 40px); }
+html[data-design~="r3"] .lg-gr-titel p { opacity: 1; color: var(--r3-wort); }
+html[data-design~="r3"] .lg-gr-fuss { justify-content: center; }
+html[data-design~="r3"] .lg-gr-naechste { opacity: 1; color: var(--r3-wort); }
+html[data-design~="r3"] .lg-gr-liste { background: none; box-shadow: none; overflow: visible; display: grid; gap: 10px; }
+html[data-design~="r3"] .lg-gr-abschnitt + .lg-gr-abschnitt { border-top: 0; }
+html[data-design~="r3"] .lg-gr-abschnitt ol { display: grid; gap: 6px; }
+html[data-design~="r3"] .lg-gr-zeile { border-radius: 10px 14px 10px 14px / 14px 10px 14px 10px; border-top: 0 !important;
+  background: var(--r3-korn), var(--r3-grund); box-shadow: 0 2px 6px rgba(0, 0, 0, .12), inset 0 0 0 1px color-mix(in srgb, var(--metall) 22%, transparent); }
+html[data-design~="r3"] .lg-gr-zeile.ich { background: var(--r3-korn), linear-gradient(100deg, rgba(201, 161, 74, .55), rgba(201, 161, 74, .12) 70%), var(--r3-grund);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .18), inset 0 0 0 1.5px #C9A14A; }
+html[data-design~="r3"] .lg-gr-zeile .lg-gr-name b { color: var(--text); }
