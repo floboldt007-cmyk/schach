@@ -241,3 +241,99 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   .haupt-kopf .kopf-premium { width: var(--tipp); padding: 0; }
   .haupt-kopf .kopf-premium span { display: none; }   /* der Name steht im aria-label */
 }
+
+/* ---------- Design-Probe Leiste neu R27 (R19-Auswahl leiste-neu-r27, NICHT live) ----------
+   Nur hinter ?test&design=l1|l2|l3 (html[data-design~=...], Probe-Schalter in js/app.js). Ohne Schalter gilt alles oben.
+   Flo 22.11.2026: W1 a/b/c und K1-K3 verworfen ("billig/Clipart, ganze Leiste, zu kitschig, zu wenig besonders").
+   Gemeinsam: Metallgold der Online-Arena (PR #272), kein Glas, kein Schein, keine Pille; die Symbole sind Masken
+   (mask-image je data-reiter), die Spiel-Symbole (.sy) treten zurueck. Bewegung nur beim Wechsel, bei "Bewegung aus" keine.
+   l1 Figurenlinie: schmale schwebende Leiste, Schachfiguren als feine Linie, die aktive Figur wird massiv in Gold.
+   l2 Brettkante:   volle Leiste am Rand, Symbole aus Brettfeldern, der aktive Reiter traegt die Feld-Ecken der Auswahl.
+   l3 Grundreihe:   keine Kapsel, die Figuren stehen auf einer Brettkante, die aktive steht auf ihrem Goldfeld. */
+html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"] {
+  --lm: #8A6A26; --lm-text: #75561A; --lm-linie: rgba(138, 106, 38, .34); --lm-feld: rgba(201, 161, 74, .16); }
+html[data-modus="dunkel"]:is([data-design~="l1"], [data-design~="l2"], [data-design~="l3"]) {
+  --lm: #C9A14A; --lm-text: #DCC07A; --lm-linie: rgba(201, 161, 74, .3); --lm-feld: rgba(201, 161, 74, .14); }
+@media (prefers-color-scheme: dark) {
+  html[data-modus="system"]:is([data-design~="l1"], [data-design~="l2"], [data-design~="l3"]) {
+    --lm: #C9A14A; --lm-text: #DCC07A; --lm-linie: rgba(201, 161, 74, .3); --lm-feld: rgba(201, 161, 74, .14); }
+}
+:is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste {
+  background: var(--flaeche); -webkit-backdrop-filter: none; backdrop-filter: none; }
+:is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter-pille,
+:is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter > .sy { display: none; }
+:is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter::before {
+  content: ""; flex: none; width: 24px; height: 24px; background: var(--text-2);
+  -webkit-mask: var(--m-umriss) center / contain no-repeat; mask: var(--m-umriss) center / contain no-repeat;
+  transition: transform var(--d-m) var(--feder), background-color var(--d-s) var(--sanft); }
+:is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter { color: var(--text-2); font-weight: 600; }
+:is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter.an { color: var(--lm-text); font-weight: 750; }
+:is(html[data-design~="l1"], html[data-design~="l2"], html[data-design~="l3"]) .reiter-leiste .reiter.an::before { background: var(--lm); }
+html[data-bewegung="aus"] .reiter-leiste .reiter::before { transition: none; }
+
+/* l1 Figurenlinie: schmal (340), 56 hoch, feine Goldkante statt Glas; inaktiv Umriss, aktiv massiv (weisse Figur wird Gold) */
+html[data-design~="l1"] { --dock-hoehe: 56px; }
+html[data-design~="l1"] .reiter-leiste { max-width: 340px; padding: 4px 8px; border-radius: 18px; box-shadow: inset 0 0 0 1px var(--lm-linie), var(--s2); }
+html[data-design~="l1"] .reiter-leiste .reiter { font-size: 11px; gap: 2px; border-radius: 14px; }
+html[data-design~="l1"] .reiter-leiste .reiter.an::before { -webkit-mask-image: var(--m-voll); mask-image: var(--m-voll); }
+html[data-design~="l1"] .reiter-leiste[data-lage="seite"] { width: 196px; padding: 24px 12px; border-radius: 20px; }
+html[data-design~="l1"] .reiter-leiste[data-lage="seite"] .reiter { font-size: 15px; gap: 14px; }
+
+/* l2 Brettkante: ueber die ganze Breite am Rand, oben eine neutrale Haarlinie (Gold nur an den Ecken); Feld-Glyphen; der aktive Reiter traegt die vier
+   Ecken eines ausgewaehlten Feldes (wie die Markierung auf dem Brett) */
+html[data-design~="l2"] { --dock-abstand: 0px; --dock-hoehe: calc(60px + env(safe-area-inset-bottom, 0px)); }
+html[data-design~="l2"] .reiter-leiste { left: 0; right: 0; bottom: 0; max-width: none; border-radius: 0;
+  padding: 4px max(12px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(12px, env(safe-area-inset-left, 0px));
+  box-shadow: inset 0 1px 0 var(--linie-2); }
+html[data-design~="l2"] .reiter-leiste .reiter { font-size: 11.5px; gap: 4px; border-radius: 0; max-width: 120px; margin: 0 auto; }
+html[data-design~="l2"] .reiter-leiste .reiter::before { width: 22px; height: 22px; -webkit-mask-image: var(--m-voll); mask-image: var(--m-voll); }
+html[data-design~="l2"] .reiter-leiste .reiter.an::after { content: ""; position: absolute; inset: 5px 14%; pointer-events: none;
+  --e: var(--lm); --l: 9px; --s: 1.5px;
+  background:
+    linear-gradient(var(--e), var(--e)) top left / var(--l) var(--s) no-repeat, linear-gradient(var(--e), var(--e)) top left / var(--s) var(--l) no-repeat,
+    linear-gradient(var(--e), var(--e)) top right / var(--l) var(--s) no-repeat, linear-gradient(var(--e), var(--e)) top right / var(--s) var(--l) no-repeat,
+    linear-gradient(var(--e), var(--e)) bottom left / var(--l) var(--s) no-repeat, linear-gradient(var(--e), var(--e)) bottom left / var(--s) var(--l) no-repeat,
+    linear-gradient(var(--e), var(--e)) bottom right / var(--l) var(--s) no-repeat, linear-gradient(var(--e), var(--e)) bottom right / var(--s) var(--l) no-repeat; }
+html[data-design~="l2"] .reiter-leiste[data-lage="seite"] { top: 0; bottom: 0; left: 0; width: calc(var(--seite-breite) + var(--seite-rand));
+  padding: 28px 14px; border-radius: 0; box-shadow: inset -1px 0 0 var(--linie-2); }
+html[data-design~="l2"] .reiter-leiste[data-lage="seite"] .reiter { max-width: none; margin: 0; height: 52px; font-size: 15px; gap: 14px; padding: 0 14px; }
+html[data-design~="l2"] .reiter-leiste[data-lage="seite"] .reiter.an::after { inset: 2px 0; }
+html[data-design~="l2"] { --reiter-b: calc(var(--seite-breite) + var(--seite-rand)); }
+
+/* l3 Grundreihe: keine Kapsel, Grund wie die Seite; die vier Figuren stehen massiv auf einer Brettkante (Haarlinie),
+   die Namen darunter; die aktive Figur steht in Gold auf ihrem Feld (kurzer Goldbalken auf der Kante);
+   Figuren und Goldfeld stehen auf der Kante (Fuss der Figur bei 35 px) */
+html[data-design~="l3"] { --dock-abstand: 0px; --dock-hoehe: calc(74px + env(safe-area-inset-bottom, 0px)); }
+html[data-design~="l3"] .reiter-leiste { left: 0; right: 0; bottom: 0; max-width: none; border-radius: 0; background: var(--grund);
+  padding: 6px max(10px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(10px, env(safe-area-inset-left, 0px));
+  box-shadow: 0 -14px 18px -6px var(--grund); }
+html[data-design~="l3"] .reiter-leiste::after { content: ""; position: absolute; left: 22px; right: 22px; top: 35px; height: 1px; background: var(--lm-linie); pointer-events: none; }
+html[data-design~="l3"] .reiter-leiste .reiter { justify-content: flex-start; gap: 7px; font-size: 11.5px; border-radius: 10px; padding-top: 2px; }
+html[data-design~="l3"] .reiter-leiste .reiter::before { width: 30px; height: 30px; background: color-mix(in srgb, var(--text-2) 82%, var(--grund));
+  -webkit-mask-image: var(--m-voll); mask-image: var(--m-voll); }
+html[data-design~="l3"] .reiter-leiste .reiter.an::before { background: var(--lm); }
+html[data-design~="l3"] .reiter-leiste .reiter.an::after { content: ""; position: absolute; left: 50%; top: 29px; width: 30px; height: 3px; margin-left: -15px;
+  border-radius: 1px; background: var(--lm); pointer-events: none; }
+html[data-design~="l3"] .reiter-leiste[data-lage="seite"] { top: 0; bottom: 0; left: 0; width: calc(var(--seite-breite) + var(--seite-rand));
+  padding: 28px 12px; box-shadow: inset -1px 0 0 var(--lm-linie); }
+html[data-design~="l3"] .reiter-leiste[data-lage="seite"]::after { display: none; }
+html[data-design~="l3"] .reiter-leiste[data-lage="seite"] .reiter { justify-content: flex-start; height: 56px; font-size: 15px; gap: 14px; padding: 0 12px; }
+html[data-design~="l3"] .reiter-leiste[data-lage="seite"] .reiter.an::after { left: 0; top: 14px; width: 3px; height: 28px; margin: 0; }
+html[data-design~="l3"] { --reiter-b: calc(var(--seite-breite) + var(--seite-rand)); }
+/* Symbole der Probe (Masken, 24er Raster): l1/l3 Koenig, Springer, Turm, Bauer; l2 Feld-Glyphen (Brett, Springerzug, Stufen, Feld) */
+html[data-design~="l1"] .reiter[data-reiter="heim"], html[data-design~="l3"] .reiter[data-reiter="heim"] {
+  --m-voll: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M11 1.6h2v2h2v2h-2v1.6h-2V5.6H9v-2h2Z M6.6 10.2C6.6 8.3 8.9 7.6 12 7.6s5.4.7 5.4 2.6L15.7 16H8.3Z M7.6 16.6h8.8v1.5H7.6Z M5.5 21.5C5.5 19.6 7.2 18.7 12 18.7S18.5 19.6 18.5 21.5Z'/%3E%3C/svg%3E");
+  --m-umriss: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.35' stroke-linejoin='round' d='M11 1.6h2v2h2v2h-2v1.6h-2V5.6H9v-2h2Z M6.6 10.2C6.6 8.3 8.9 7.6 12 7.6s5.4.7 5.4 2.6L15.7 16H8.3Z M7.6 16.6h8.8v1.5H7.6Z M5.5 21.5C5.5 19.6 7.2 18.7 12 18.7S18.5 19.6 18.5 21.5Z'/%3E%3C/svg%3E"); }
+html[data-design~="l1"] .reiter[data-reiter="arena"], html[data-design~="l3"] .reiter[data-reiter="arena"] {
+  --m-voll: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M8.6 18.1C8.6 15.6 10.1 13.9 11.7 12.4 10.3 12.8 8.8 12.9 7.5 14L5.4 12.5C6.3 10 8.2 7.6 10.1 6.5V4.3L11.9 5.8C15.6 5.8 18 9 17.8 13 17.7 15.1 17.2 16.6 16.8 18.1Z M11.7 8.2a.95.95 0 1 0 .01 0Z M5.5 21.5C5.5 19.6 7.2 18.7 12 18.7S18.5 19.6 18.5 21.5Z'/%3E%3C/svg%3E");
+  --m-umriss: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.35' stroke-linejoin='round' d='M8.6 18.1C8.6 15.6 10.1 13.9 11.7 12.4 10.3 12.8 8.8 12.9 7.5 14L5.4 12.5C6.3 10 8.2 7.6 10.1 6.5V4.3L11.9 5.8C15.6 5.8 18 9 17.8 13 17.7 15.1 17.2 16.6 16.8 18.1Z M11.7 8.2a.95.95 0 1 0 .01 0Z M5.5 21.5C5.5 19.6 7.2 18.7 12 18.7S18.5 19.6 18.5 21.5Z'/%3E%3C/svg%3E"); }
+html[data-design~="l1"] .reiter[data-reiter="bestenliste"], html[data-design~="l3"] .reiter[data-reiter="bestenliste"] {
+  --m-voll: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M6.6 3.9H8.8V5.7H10.9V3.9H13.1V5.7H15.2V3.9H17.4V8.1L15.9 9.5V16.5H8.1V9.5L6.6 8.1Z M7.2 16.9h9.6v1.5H7.2Z M5.5 21.5C5.5 19.6 7.2 18.7 12 18.7S18.5 19.6 18.5 21.5Z'/%3E%3C/svg%3E");
+  --m-umriss: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.35' stroke-linejoin='round' d='M6.6 3.9H8.8V5.7H10.9V3.9H13.1V5.7H15.2V3.9H17.4V8.1L15.9 9.5V16.5H8.1V9.5L6.6 8.1Z M7.2 16.9h9.6v1.5H7.2Z M5.5 21.5C5.5 19.6 7.2 18.7 12 18.7S18.5 19.6 18.5 21.5Z'/%3E%3C/svg%3E"); }
+html[data-design~="l1"] .reiter[data-reiter="ich"], html[data-design~="l3"] .reiter[data-reiter="ich"] {
+  --m-voll: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 3.4a3.1 3.1 0 1 1 0 6.2 3.1 3.1 0 0 1 0-6.2Z M9.3 10.3h5.4c.9 0 .9 1.5 0 1.5h-.5c.1 2.4.9 4.4 2.2 6.2H7.6c1.3-1.8 2.1-3.8 2.2-6.2h-.5c-.9 0-.9-1.5 0-1.5Z M5.5 21.5C5.5 19.6 7.2 18.7 12 18.7S18.5 19.6 18.5 21.5Z'/%3E%3C/svg%3E");
+  --m-umriss: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.35' stroke-linejoin='round' d='M12 3.4a3.1 3.1 0 1 1 0 6.2 3.1 3.1 0 0 1 0-6.2Z M9.3 10.3h5.4c.9 0 .9 1.5 0 1.5h-.5c.1 2.4.9 4.4 2.2 6.2H7.6c1.3-1.8 2.1-3.8 2.2-6.2h-.5c-.9 0-.9-1.5 0-1.5Z M5.5 21.5C5.5 19.6 7.2 18.7 12 18.7S18.5 19.6 18.5 21.5Z'/%3E%3C/svg%3E"); }
+html[data-design~="l2"] .reiter[data-reiter="heim"] { --m-voll: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 4h7.2v7.2h-7.2Z M12.8 12.8h7.2v7.2h-7.2Z'/%3E%3Cpath fill='none' stroke='black' stroke-width='1.5' d='M12.8 4h7.2v7.2h-7.2Z M4 12.8h7.2v7.2h-7.2Z'/%3E%3C/svg%3E"); --m-umriss: var(--m-voll); }
+html[data-design~="l2"] .reiter[data-reiter="arena"] { --m-voll: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12.2 2.6h5.6v5.6h-5.6Z'/%3E%3Cpath fill='none' stroke='black' stroke-width='1.5' d='M5.4 2.6h5.6v5.6h-5.6Z M5.4 9.2h5.6v5.6h-5.6Z M5.4 15.8h5.6v5.6h-5.6Z'/%3E%3C/svg%3E"); --m-umriss: var(--m-voll); }
+html[data-design~="l2"] .reiter[data-reiter="bestenliste"] { --m-voll: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15.2 3.5h5v5h-5Z M15.2 8.5h5v12h-5Z'/%3E%3Cpath fill='none' stroke='black' stroke-width='1.5' d='M3.8 13.5h5v7h-5Z M9.5 8.5h5v12h-5Z'/%3E%3C/svg%3E"); --m-umriss: var(--m-voll); }
+html[data-design~="l2"] .reiter[data-reiter="ich"] { --m-voll: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z'/%3E%3Cpath fill='none' stroke='black' stroke-width='1.5' d='M4.5 4.5h15v15h-15Z'/%3E%3C/svg%3E"); --m-umriss: var(--m-voll); }
