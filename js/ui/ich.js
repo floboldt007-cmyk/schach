@@ -141,9 +141,12 @@ function zeigeIch(root, params = {}, app) {
     const alle = bereiche();
     const teile = alle.reduce((n, x) => n + x.querySelectorAll('.sa-teil').length, 0);
     const frei = alle.reduce((n, x) => n + x.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length, 0);
-    stand.textContent = teile ? t('rahmen.sammlung.stand', { frei, alle: teile }) : t('rahmen.sammlung.leer');
+    // unveraendert nicht neu schreiben (R27 Tempo: jedes Schreiben machte den Stil beim Schliessen des Blatts wieder ungueltig)
+    const text = teile ? t('rahmen.sammlung.stand', { frei, alle: teile }) : t('rahmen.sammlung.leer');
+    if (stand.textContent !== text) stand.textContent = text;
     // Fortschritt als Balken unter der Zeile (Flo 30.10.: "21 von 67" sichtbar machen)
-    stand.style.setProperty('--anteil', teile ? (frei / teile).toFixed(3) : '0');
+    const anteil = teile ? (frei / teile).toFixed(3) : '0';
+    if (stand.style.getPropertyValue('--anteil') !== anteil) stand.style.setProperty('--anteil', anteil);
   };
 
   // ein Platz: Bild und Name des Getragenen, "frei / alle", Pfeil
@@ -181,11 +184,17 @@ function zeigeIch(root, params = {}, app) {
     // Bereiche ohne festen Platz (z. B. Erfinder, Lobby-Musik): am Ende von "Am Brett"
     gruppen[1].liste.push(...alle.filter((x) => !vergeben.has(x.dataset.bereich)));
     const gross = GROSS.filter((id) => nachId.has(id)).map((id) => nachId.get(id));
-    platzOrt.innerHTML = gruppen.filter((g) => g.liste.length).map((g) => `<section class="sa-platz-gruppe" data-gruppe="${g.id}">
+    const html = gruppen.filter((g) => g.liste.length).map((g) => `<section class="sa-platz-gruppe" data-gruppe="${g.id}">
         <h3 class="sa-platz-titel">${esc(t('rahmen.sammlung.' + g.id))}</h3>
         <div class="sa-platz-liste">${g.liste.map((x) => platzHtml(x)).join('')}</div></section>`).join('')
       + (gross.length ? `<div class="sa-gross-reihe">${gross.map((x) => platzHtml(x, true)).join('')}</div>` : '');
+    // R27 Tempo (gemessen 22.11.: Schliessen des Shop-Blatts hielt die Taste rund 100 ms): unveraenderte Plaetze nicht neu
+    // bauen. Sonst ersetzte jedes Schliessen alle Kacheln samt Bildern, und der Knopf, der den Fokus zurueckbekam, war weg.
+    if (html === platzHtmlZuletzt && platzOrt.childElementCount) return;
+    platzHtmlZuletzt = html;
+    platzOrt.innerHTML = html;
   }
+  let platzHtmlZuletzt = null;
   platzOrt.addEventListener('click', (ev) => {
     const k = ev.target.closest('[data-bereich]');
     if (k) oeffne(k.dataset.bereich);
@@ -230,6 +239,9 @@ function zeigeIch(root, params = {}, app) {
         // (sheet() gibt ihn an seinem Ende weiter); messen und fokussieren hier rechnete nur das Layout mitten in dessen Aufbau
         if (sheetOffen()) return;
         const f = document.activeElement;
+        // R27 Tempo (Trace 22.11.: getClientRects erzwang hier 30 ms Stil mitten im Wegfahren): steht der Fokus schon auf
+        // einem Platz (zeichnePlaetze hat ihn nicht ersetzt), ist er sichtbar, nichts zu messen
+        if (f && f.isConnected && platzOrt.contains(f)) return;
         if (!f || f === document.body || !f.isConnected || !f.getClientRects().length || f.closest('.weg')) platzOrt.querySelector(`[data-bereich="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
       });
   }

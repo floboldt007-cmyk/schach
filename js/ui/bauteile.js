@@ -301,12 +301,18 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
     document.addEventListener('keydown', taste, true);
     // U4 (Flo 09.11.2026): alles hinter dem Blatt stilllegen, damit auch ein Bildschirmleser nicht dahinter springt.
     // Die Meldungen (role=status) bleiben hoerbar; zurueckgesetzt wird nur, was hier stillgelegt wurde.
-    for (const el of document.body.children) {
-      if (el.inert || el.matches('script, [role="status"], [aria-live]')) continue;
-      el.inert = true;
-      stillgelegt.push(el);
-    }
+    // R27 Tempo (Trace iPhone 13, 22.11.2026: 48 ms Stil fuer 955 Elemente vor dem ersten Bild des Shop-Blatts): erst im
+    // naechsten Bild. Bis dahin faengt der Schleier jeden Zeiger und die Tasten-Falle (taste, capture) jede Taste; die Karte
+    // gleitet als Web Animation weiter (tests/r27-blatt-tempo.test.mjs). Ist das Blatt bis dahin zu, bleibt alles, wie es ist.
     document.body.append(ort);
+    imNaechstenBild(() => {
+      if (fertig) return;
+      for (const el of document.body.children) {
+        if (el === ort || el.inert || el.matches('script, [role="status"], [aria-live]')) continue;
+        el.inert = true;
+        stillgelegt.push(el);
+      }
+    });
     offenesSheet = { ort, vorherFokus, ende: (o) => ende(abbrechen, o) };
     anim(karte, [{ transform: 'translateY(100%)' }, { transform: 'none' }], { d: 480, k: 'gleiten' });
     anim(schleier, [{ opacity: 0 }, { opacity: 1 }], { d: 260, k: 'sanft' });

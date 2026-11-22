@@ -5,6 +5,7 @@
 //   2. Seiten-Einblendung (staffel): kurz und knapp gestaffelt, egal was ein Bildschirm verlangt.
 //   3. Der Kopf blendet nur beim ersten Bildschirm ein, nicht bei jedem Reiterwechsel.
 //   4. Bewegung aus: keine Animation (Dauer 0), auch nicht beim Kopf.
+//   5. Vorladen der Eroeffnungen auf Vorrat nur in Ruhezeit und in kurzen Stuecken (js/openings.js leerlauf).
 //   node tests/r27-tempo-fix.test.mjs
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -69,6 +70,40 @@ animiert.length = 0;
 B.staffel([fakeEl('a'), fakeEl('b')], { d: 500, v: 100, abstand: 50 });
 pruefe('Bewegung aus: staffel ohne Dauer und ohne Verzoegerung', animiert.every((a) => a.duration === 0 && a.delay === 0), JSON.stringify(animiert));
 B.setzeBewegung('normal');
+
+// ---------- 5. Vorladen der Eroeffnungen auf Vorrat (js/openings.js leerlauf, gerufen von der Bots-Seite) ----------
+// gemessen 22.11.: ein 31-ms-Stueck lag im Tipp auf "Liga". In Ruhezeit hoechstens LEER_MS je Stueck, Ergebnis wie im Ganzen.
+{
+  const ref = await import('../js/openings.js?r27ref');
+  const linien = ref.EROEFFNUNGEN.map((e) => e.zuege.trim().split(/\s+/));
+  const soll = linien.map((l) => ref.eroeffnung(l));
+  const sollNamen = ref.EROEFFNUNGEN.slice(0, 40).map((e) => ref.eroeffnungsAnzeige(e.name));
+  const warteschlange = [];
+  const vorher = globalThis.requestIdleCallback;
+  globalThis.requestIdleCallback = (f) => { warteschlange.push(f); return warteschlange.length; };
+  try {
+    const m = await import('../js/openings.js?r27leer');
+    let fertig = false;
+    m.eroeffnungVorbereiten({ leerlauf: true }).then(() => { fertig = true; });
+    const dauern = [];
+    for (let i = 0; i < 20000 && warteschlange.length; i++) {
+      const f = warteschlange.shift();
+      const t0 = performance.now();
+      f({ timeRemaining: () => 50, didTimeout: false });
+      dauern.push(performance.now() - t0);
+      await Promise.resolve();
+    }
+    const laengstes = Math.max(...dauern);
+    pruefe('Vorladen in Ruhezeit: Index und Namen fertig, nichts mehr eingeplant', fertig && !warteschlange.length, { fertig, rest: warteschlange.length });
+    pruefe(`Vorladen in Ruhezeit: kein Stueck laenger als ${m.LEER_MS} ms (+4 ms Spiel)`, laengstes <= m.LEER_MS + 4, { laengstes, stuecke: dauern.length });
+    pruefe('Vorladen in Ruhezeit: mehrere Stuecke (nicht alles in einem)', dauern.length > 3, dauern.length);
+    pruefe('Vorladen in Ruhezeit: dieselben Eroeffnungen wie der Aufbau in einem Zug', JSON.stringify(linien.map((l) => m.eroeffnung(l))) === JSON.stringify(soll));
+    const istNamen = ref.EROEFFNUNGEN.slice(0, 40).map((e) => m.eroeffnungsAnzeige(e.name));
+    pruefe('Vorladen in Ruhezeit: dieselben Namen wie ohne Vorladen', JSON.stringify(istNamen) === JSON.stringify(sollNamen));
+  } finally {
+    if (vorher) globalThis.requestIdleCallback = vorher; else delete globalThis.requestIdleCallback;
+  }
+}
 
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exitCode = ok === gesamt ? 0 : 1;

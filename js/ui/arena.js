@@ -164,8 +164,9 @@ function ladePartieScreen() {
     partieVorab = import('./partie.js').catch(() => { partieVorab = null; });
     // R27 Tempo (gemessen 22.11.: ueber 300 ms chess.js beim Oeffnen der Partie): den Eroeffnungs-Index und die Namens-Tabelle
     // schon hier im Leerlauf bauen (in Stuecken, openings.js); die Partie findet sie dann fertig vor
-    const leer = typeof requestIdleCallback === 'function' ? (f) => requestIdleCallback(f, { timeout: 4000 }) : (f) => setTimeout(f, 1500);
-    leer(() => { import('../openings.js').then((o) => o.eroeffnungVorbereiten()).catch(() => {}); });
+    // leerlauf: nur in echter Ruhezeit und in kleinen Stuecken, sonst lag ein Stueck im Tipp auf den naechsten Reiter (Liga)
+    const leer = typeof requestIdleCallback === 'function' ? (f) => requestIdleCallback(f) : (f) => setTimeout(f, 1500);
+    leer(() => { import('../openings.js').then((o) => o.eroeffnungVorbereiten({ leerlauf: true })).catch(() => {}); });
   }
   return partieVorab;
 }
