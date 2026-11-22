@@ -171,15 +171,21 @@ try {
       const sicht = (e) => e && !e.closest('[hidden]') && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0;
       const unterkante = (sp) => Math.max(...[...sp.querySelectorAll(':scope > *')].filter(sicht).map((e) => e.getBoundingClientRect().bottom));
       const links = document.querySelector('.heim-links'), rechts = document.querySelector('.heim-rechts');
+      const shop = document.querySelector('.heim-rumpf > .heim-shop');
       const leiter = document.querySelector('.heim-leiter');
       const rumpf = document.querySelector('.heim-rumpf');
       const gekuerzt = [...document.querySelectorAll('.heim-leiter-bot b')].filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => b.textContent);
       return { leiter: sicht(leiter), leiterLinks: !!leiter && links.contains(leiter), bots: document.querySelectorAll('.heim-leiter-bot').length, gekuerzt,
-        links: Math.round(unterkante(links)), rechts: Math.round(unterkante(rechts)), ueber: rumpf.scrollHeight - rumpf.clientHeight };
+        // die linke Spalte ist quer die Spalte unter der Buehne: .heim-links und darunter (Zeile 2) die Shop-Karte, soweit da;
+        // seit Flos Antwort 8 (20.11.) endet die rechte Spalte buendig mit dem Shop, nicht mit .heim-links
+        links: Math.round(Math.max(unterkante(links), sicht(shop) ? shop.getBoundingClientRect().bottom : -Infinity)),
+        nurLinks: Math.round(unterkante(links)), shop: sicht(shop) ? Math.round(shop.getBoundingClientRect().bottom) : null,
+        rechts: Math.round(unterkante(rechts)), ueber: rumpf.scrollHeight - rumpf.clientHeight };
     });
     pruefe(`B22 ${w}x${h}: "Deine Leiter" steht unter der Gegner-Karte (links, drei Bots)`, m.leiter && m.leiterLinks && m.bots === 3, m);
     pruefe(`B22 ${w}x${h}: kein Name in der Leiter gekuerzt`, m.gekuerzt.length === 0, m.gekuerzt);
-    // toter Bereich hiess: links endet weit vor rechts (PC 384 gegen 548); laenger als rechts ist kein toter Bereich
+    // toter Bereich hiess: links endet weit vor rechts (PC 384 gegen 548); laenger als rechts ist kein toter Bereich.
+    // Links zaehlt die Shop-Karte unter .heim-links mit (rechts endet buendig mit ihr, css/heim.css Antwort 8)
     pruefe(`B22 ${w}x${h}: linke Spalte endet nicht weit vor der rechten (hoechstens 96 px)`, m.links >= m.rechts - 96, m);
     pruefe(`B22 ${w}x${h}: nichts scrollt`, m.ueber <= 0, m);
     pruefe(`B22 ${w}x${h}: keine Seitenfehler`, fehler.length === 0, fehler);
