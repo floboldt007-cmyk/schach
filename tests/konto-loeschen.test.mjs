@@ -50,13 +50,25 @@ const browser = await browserTyp(pw).launch({ headless: true });
 // token.abbruch: die Verbindung zum Token-Endpunkt bricht ab; rpc.abbruch: dasselbe fuer konto_loeschen;
 // rpcMs: Antwort von konto_loeschen verzoegert;
 // lokal: Eintraege im localStorage vor dem Laden
-async function umgebung({ otp = null, verify = null, rpc = null, token = null, rpcMs = 0, lokal = {}, breite = 390 } = {}) {
+// botschutz: Test-Site-Key wie in tests/konto-link.test.mjs (1x…AA besteht und liefert tok-1, 2x…AB scheitert); z.cf zaehlt
+// die Anfragen an challenges.cloudflare.com, z.otpBody die Koerper der Code-Anforderungen
+async function umgebung({ otp = null, verify = null, rpc = null, token = null, rpcMs = 0, lokal = {}, breite = 390, botschutz = null } = {}) {
   const k = await browser.newContext({ viewport: { width: breite, height: 800 }, serviceWorkers: 'block' });
-  const z = { otp, verify, rpc, token, aufrufe: { otp: 0, verify: 0, loeschen: 0, logout: 0, token: 0 }, google: [], fehler: [] };
+  const z = { otp, verify, rpc, token, aufrufe: { otp: 0, verify: 0, loeschen: 0, logout: 0, token: 0 }, google: [], fehler: [], cf: [], otpBody: [] };
   await k.addInitScript((l) => { for (const [a, b] of Object.entries(l)) localStorage.setItem(a, b); }, lokal);
+  if (botschutz) await k.addInitScript((key) => { window.__botschutzTestKey = key; }, botschutz);
   await k.route('**/*', async (r) => {
     const u = new URL(r.request().url());
     if (u.hostname === '127.0.0.1') return r.continue();
+    if (u.hostname === 'challenges.cloudflare.com') {
+      z.cf.push(u.pathname + u.search);
+      if (!botschutz) return r.abort();
+      return r.fulfill({ status: 200, contentType: 'text/javascript', body: `window.turnstile = { n: 0, opt: null,
+        gib() { const o = this.opt; if (/^2x/.test(o.sitekey)) o['error-callback']('600010'); else o.callback('tok-' + (++this.n)); },
+        render(el, o) { this.opt = o; el.dataset.gerendert = '1'; setTimeout(() => this.gib(), 50); return 'w1'; },
+        reset() { setTimeout(() => this.gib(), 50); }, remove() {} };` });
+    }
+    if (u.pathname === '/auth/v1/otp') { try { z.otpBody.push(r.request().postDataJSON()); } catch (e) { z.otpBody.push(null); } }
     if (!u.hostname.endsWith('supabase.co')) return r.abort();
     const antwort = (body, status = 200) => r.fulfill({ status, contentType: 'application/json', body: body == null ? '' : JSON.stringify(body) });
     if (u.pathname === '/auth/v1/otp') { z.aufrufe.otp++; return z.otp ? antwort(z.otp.body, z.otp.status) : antwort({}); }
@@ -303,6 +315,33 @@ try {
     await s.locator('.kl-bestaetigen').fill('LÖSCHEN');
     pruefe('Nach Serverfehler: Wort wieder getippt gibt den Knopf frei', !(await s.locator('[data-kl="loeschen"]').isDisabled()));
     await k.close();
+  }
+  { // 11b. Bot-Schutz (Kaltreview 22, W2): Oeffnen laedt nichts, Fokus im E-Mail-Feld laedt genau ein Skript, das Token geht mit
+    const { k, z } = await umgebung({ botschutz: '1x00000000000000000000AA' });
+    const s = await seite(k, z, DE);
+    const vorher = z.cf.length;
+    await s.locator('.kl-email').focus(); await s.waitForSelector('.konto-botschutz[data-gerendert]', { timeout: 5000 }).catch(() => {});
+    const nachFokus = z.cf.length;
+    await s.locator('.kl-email').fill('flo@example.invalid');
+    await s.locator('[data-kl="code"]').click(); await s.waitForTimeout(500);
+    pruefe('Bot-Schutz Loeschseite: Oeffnen laedt nichts, Fokus im Feld genau ein Skript, Code-Anforderung mit Token',
+      vorher === 0 && nachFokus === 1 && z.cf.length === 1 && z.aufrufe.otp === 1 && z.otpBody[0]?.gotrue_meta_security?.captcha_token === 'tok-1'
+        && z.fehler.length === 0, { vorher, nachFokus, cf: z.cf, otp: z.aufrufe.otp, body: z.otpBody, fehler: z.fehler });
+    await k.close();
+  }
+  { // 11c. Bot-Schutz scheitert: keine Code-Anforderung ohne Token, eigener Fehlertext (de und en)
+    for (const [name, adresse] of [['de', DE], ['en', EN]]) {
+      const { k, z } = await umgebung({ botschutz: '2x00000000000000000000AB' });
+      const s = await seite(k, z, adresse);
+      const T = await s.evaluate(() => JSON.parse(document.getElementById('kl-texte').textContent));
+      await s.locator('.kl-email').fill('flo@example.invalid');
+      await s.locator('[data-kl="code"]').click(); await s.waitForTimeout(600);
+      const st = await status(s);
+      pruefe(`Bot-Schutz Loeschseite (${name}) scheitert: kein /otp, Fehlertext der Seite`,
+        z.aufrufe.otp === 0 && !!T.botschutzFehler && st.text === T.botschutzFehler && st.fehler === 'ja' && !!T.botschutzWarten,
+        { otp: z.aufrufe.otp, st, soll: T.botschutzFehler });
+      await k.close();
+    }
   }
   { // 12. Server lehnt ein lokal gueltiges Token ab (401 PGRST301): einmal erneuern, einmal wiederholen
     const abgelehnt = { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } };

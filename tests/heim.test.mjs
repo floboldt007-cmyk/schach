@@ -655,6 +655,13 @@ async function testeRueckkehr(browser, heute) {
     pruefe(`${name}: „${soll.split(' | ')[1]}“`, z && z.text === soll, JSON.stringify(z));
     await kontext.close();
   }
+  // Kaltreview 22 (W1): Datum wenige Stunden in der Zukunft, aber am selben Spieltag (Uhr verstellt): keine Zeitangabe statt "heute"
+  ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -3)),
+    [P + 'partien']: [{ ...partieWilli(heute), datum: new Date(Date.now() + 3 * 36e5).toISOString() }] } }));
+  await istScreen(seite, 'heim');
+  z = await zeile(seite);
+  pruefe('Partie-Datum 3 Stunden in der Zukunft: keine Zeitangabe', z && z.text === 'Willkommen zurück | Sieg gegen Willi', JSON.stringify(z));
+  await kontext.close();
   // Englisch: ganze Zeile mit Gegner und Zeitangabe (Besuch vor 2 Tagen, Partie vor 3 Tagen), Knopf und Vorlese-Text
   ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -2)), [P + 'partien']: [PARTIE_WILLI],
     [P + 'einstellungen']: { sprache: 'en' } } }));

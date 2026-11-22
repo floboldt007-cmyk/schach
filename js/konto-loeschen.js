@@ -65,6 +65,8 @@ export function starte(doc = document) {
     melde('');
     const mail = $('.kl-email').value;
     const token = schutz ? await schutz.token() : '';
+    // Kaltreview 22 (W2, wie js/konto.js): ohne Token keine Anfrage, sondern sagen warum (Supabase lehnte sie ohnehin ab)
+    if (schutz && !token) { melde(text(schutz.fehler ? 'botschutzFehler' : 'botschutzWarten'), true); return; }
     try {
       await fordereCodeAn(mail, location.href.split('#')[0], token);
     } finally { schutz?.verbraucht(); }
@@ -77,6 +79,9 @@ export function starte(doc = document) {
     await pruefeCode(email || $('.kl-email').value, $('.kl-code').value);
     melde(''); zeige();
   }));
+  // Bot-Schutz erst bei Benutzung laden (PR #201), wie js/konto.js: Fokus im E-Mail-Feld startet ihn, damit das Token beim
+  // Tipp auf "Code senden" meist schon da ist
+  $('.kl-email').addEventListener('focus', () => schutz?.starte());
   // Flo 20.11.2026 (Antwort 7, wie netzStand in js/konto.js): ohne Netz ist "Mit Google anmelden" gesperrt, ein Hinweis
   // (einstellungen.konto.brauchtNetz) sagt warum, online sofort wieder frei. knopf() gibt den Knopf nach dem Tipp frei, darum dort netz().
   const google = $('[data-kl="google"]');

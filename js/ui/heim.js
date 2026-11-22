@@ -255,6 +255,8 @@ export function tageSeitPartie(p, jetzt = new Date()) {
     if (!p || !p.datum) return null;
     const d = new Date(p.datum);
     if (Number.isNaN(d.getTime())) return null;
+    // Kaltreview 22 (W1): Zukunft heisst der Zeitpunkt, nicht erst der Spieltag (Uhr verstellt oder anderes Geraet)
+    if (d.getTime() > jetzt.getTime()) return null;
     const n = tageZwischen(tagSchluessel(d), tagSchluessel(jetzt));
     return n >= 0 ? n : null;
   } catch (e) { return null; }
