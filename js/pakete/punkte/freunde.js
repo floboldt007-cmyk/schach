@@ -10,7 +10,7 @@
 //   meldeWoche({ jetzt? }) -> Promise<'ok' | 'gleich' | 'abgemeldet' | Fehlergrund>   wirft nie
 //   reiterFreunde({ app, fenster, jetzt }) -> { el, verlasse() }
 // Die bisherigen Freunde-Codes (SA1, ohne Konto) stehen darunter zugeklappt.
-import { sitzung, ladeProfil, speichereBenutzername, kontoFreigeschaltet } from '../../konto.js';
+import { sitzung, ladeProfil, speichereBenutzername, kontoFreigeschaltet, frageNameBestaetigen } from '../../konto.js';
 import * as FR from '../../freunde.js';
 import { sheet, toast } from '../../ui/bauteile.js';
 import { wochenSchluessel } from '../../tag.js';
@@ -195,8 +195,9 @@ export function reiterFreunde({ app, fenster = 'woche', jetzt = new Date() } = {
         autocapitalize="none" spellcheck="false" placeholder="${esc(P('blatt.beispiel'))}"></label>
       <button class="knopf primaer bl-fr-name-ok" type="button">${esc(P('nameSpeichern'))}</button><p class="bl-fr-status" role="status" aria-live="polite"></p>`;
     karte.querySelector('.bl-fr-name-ok').addEventListener('click', async () => {
-      const v = karte.querySelector('.bl-fr-eigen').value;
-      try { const name = await speichereBenutzername(v); if (!weg) zeigeListe(name); }
+      const v = karte.querySelector('.bl-fr-eigen').value.trim();
+      // wie im Konto: Rueckfrage in der App, weil der Name danach 30 Tage feststeht (Flo 21.11.2026)
+      try { if (!(await frageNameBestaetigen(app, v))) return; const name = await speichereBenutzername(v); if (!weg) zeigeListe(name); }
       catch (e) { karte.querySelector('.bl-fr-status').textContent = e && e.message ? e.message : P('fehler.server'); }
     });
   }

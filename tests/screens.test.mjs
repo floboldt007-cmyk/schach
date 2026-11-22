@@ -616,7 +616,8 @@ async function testeVerlauf(browser, d) {
     /Sieg|Niederlage|Remis/.test(erste) && /%/.test(erste) && /Züge/.test(erste) && /(Heute|Gestern|\d{4}),/.test(erste), erste.replace(/\s+/g, ' '));
   pruefe('Sterne je Partie', (await seite.locator('.vl-zeile').first().locator('.vl-sterne span').count()) === 3);
   const stat = await seite.locator('.vl-statistik').textContent();
-  pruefe('Statistik oben', stat.includes('Partien') && stat.includes('Siege') && stat.includes('Genauigkeit'), stat.replace(/\s+/g, ' '));
+  // "1 Sieg" oder "2 Siege": wie viele Testpartien gewonnen sind, haengt vom Lauf ab, darum Einzahl und Mehrzahl
+  pruefe('Statistik oben', stat.includes('Partien') && /Sieg/.test(stat) && stat.includes('Genauigkeit'), stat.replace(/\s+/g, ' '));
   const juwelen = await seite.locator('.vl-juwel').count();
   const brillant = await seite.evaluate(() => testseite.speicher.ladeFortschritt().brillanteZuege.length);
   pruefe('Schatzkiste mit allen Genial-Zügen', juwelen === brillant, `${juwelen} vs ${brillant}`);
