@@ -378,6 +378,8 @@ async function schrittZwei(browser) {
       else if (u.pathname.endsWith('/kronen_mein_stand')) body = { stufe: 0, kronen: 0, platz: null, ziel: null, n: 30, woche: '2026-11-02' };
       // Season-Schalter (Flo 18.11.2026): die Einstellungen fragen mit Konto nach dem eigenen Stand, die Gruppe laeuft so im englischen Lauf mit
       else if (u.pathname.endsWith('/saison_mein_stand')) body = { saison: 0, start: '2027-01-04', abzeichen: [], titel: [], gewaehlt: null, sichtbar: true };
+      // R27 Arena: quer ab 1100 px fragt die Online-Seite die Weltrangliste (Inhalt prueft r27-online-arena), hier ohne Eintraege
+      else if (u.pathname.endsWith('/weltrang_liste')) body = {};
       else if (u.pathname === '/functions/v1/coach') body = { text: 'Develop your knight and protect the center.', rest: 4, modell: 'probe' };
       else { unerwartet.push(u.pathname); body = {}; }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });

@@ -23,11 +23,16 @@ import { sanAnzeige, materialBilanz } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet, bestaetigteNamen, hatHaken, hakenHtml } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
-import { fremdeKarte, bannerUrl } from './visitenkarte.js';
+import { fremdeKarte, eigeneKarte, bannerUrl, fremderAvatar } from './visitenkarte.js';
 import { zeigeGegnerProfil, profilText } from './gegner-profil.js';
 import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
 import { holeStand, suche as kronenSuche, RANKED_ZEIT } from '../kronen.js';
 import { stufenName } from '../pakete/liga/texte.js';
+// R27 Online Arena: Medaille und Partie-Symbol als Kronjuwel, Season-Rest und Weltrangliste aus vorhandenen Quellen
+import { kronSymbol, duellSchwerter, raetselBlitz } from './icons.js';
+import { holeSaison } from '../kronen.js';
+import { sheet } from './bauteile.js';
+import { paket2Frei } from '../freigaben.js';
 import { floAvatar } from '../thema.js';
 import { klang, zugKlangName } from '../sounds.js';
 import { spieleDuell } from './duell.js';
@@ -191,18 +196,24 @@ export function zeige(root, params, app) {
       e => melde(e?.kennung === 'ONLINE_PARTIE_BEENDET' ? e.message : `${e?.message || O('fehler')} ${O('strittigVonHand')}`));
     melde(O('stellungFehler')); // aktion leert die Zeile beim Start; waehrend der Meldung bleibt der Grund sichtbar
   }
-  // Online-Seite "Zwei Tueren" (Flo 08.11.2026, Konzept 1 A mit den Woertern von B): oben der Liga-Streifen, darunter
-  // zwei gleich gebaute Karten Partie und Raetsel-Duell (jeder Suchen-Knopf traegt "gewertet"), unten die Zeile
-  // "Freund einladen oder Code eingeben" als lockerer Weg (klappt Einladen, Code und Meine Partien auf). Passt ohne
-  // Scrollen auf das iPhone 13 (tests/online-ui.test.mjs). Ohne Konto sind die Karten nur Erklaerung, ohne Knopf und
-  // ohne Schatten, damit nichts tippbar aussieht; der einzige Knopf ist "Zum Konto" (wie ueberall in der App).
-  const FIGUREN = { partie: 'bKe8 bQd8 bPd7 bPe5 bPf7 bNc6 wPd2 wPe4 wNf3 wQd1 wKe1', duell: 'bKg8 bPf7 bPg7 bPh7 wRa1 wKg1 wPf2 wPg2 wPh2' };
-  const bild = art => `<span class="on-bild" aria-hidden="true">${FIGUREN[art].split(' ').map(x =>
-    `<img src="${new URL(`assets/pieces/${x[0]}${x[1]}.svg`, WURZEL).href}" alt="" style="grid-area:${9 - Number(x[3])}/${x.charCodeAt(2) - 96}">`).join('')}`
-    + `${art === 'duell' ? '<b class="on-bild-uhr zahl">3:00</b>' : ''}</span>`;
-  const tuer = (art, rumpf) => `<section class="on-art on-tuer" data-art="${art}" aria-labelledby="on-${art}-t">
-      <div class="on-tuer-kopf">${bild(art)}<div class="on-tuer-text"><span class="on-tuer-ueber">${esc(O(`tuer.${art}.ueber`))}</span>
+  // Online-Seite "Zwei Tueren" (Flo 08.11.2026, Konzept 1 A mit den Woertern von B), seit R27 "Arena" (Flo 21.11.2026: O1 aus
+  // dem R27-Plan, Look wie die Premium-Seite, Bauteile .juwel-* in css/bauteile.css): oben die Kopfkarte (der Liga-Knopf als
+  // Schmuck-Karte mit Medaille, Elo in Gold, Liga, Platz, Season-Rest und der Form der letzten fuenf gewerteten Partien),
+  // darunter Partie (Gold) und Raetsel-Duell (Saphir), die Freunde-Karte mit zwei Knoepfen (klappt Einladen, Code und Meine
+  // Partien darunter auf), quer ab 1100 px rechts die Weltrangliste um den eigenen Platz. Jeder Block ohne Daten fehlt ganz,
+  // nie ein Platzhalter. Passt ohne Scrollen auf das iPhone 13 (tests/online-ui.test.mjs). Ohne Konto sind die Karten nur
+  // Erklaerung, ohne Knopf und ohne Schatten, damit nichts tippbar aussieht; der einzige Knopf ist "Zum Konto".
+  // Partie in Gold mit Schwertern, Raetsel-Duell in Nachtblau mit Blitz; die einzige Krone der Seite traegt die Medaille oben
+  const symbol = art => `<span class="juwel-plakette on-symbol" data-ton="${art === 'duell' ? 'nacht' : 'gold'}" aria-hidden="true">`
+    + `${art === 'duell' ? raetselBlitz() : duellSchwerter()}</span>`;
+  const tuer = (art, rumpf) => `<section class="on-art on-tuer juwel-karte" data-art="${art}" data-ton="${art === 'duell' ? 'nacht' : 'gold'}" aria-labelledby="on-${art}-t">
+      <div class="on-tuer-kopf">${symbol(art)}<div class="on-tuer-text"><span class="on-tuer-ueber">${esc(O(`tuer.${art}.ueber`))}</span>
         <h2 id="on-${art}-t">${esc(O(art === 'duell' ? 'ruhig.duellTitel' : `tuer.${art}.titel`))}</h2><p>${esc(O(`tuer.${art}.text`))}</p></div></div>${rumpf}</section>`;
+  const freundeKarte = () => `<section class="on-freunde-karte juwel-karte" data-ton="ruhig" aria-labelledby="on-freunde-t">`
+    + `<span class="on-freunde-paar" aria-hidden="true">${['wK', 'bK'].map((f) => `<img src="${new URL(`assets/pieces/${f}.svg`, WURZEL).href}" alt="">`).join('')}</span>`
+    + `<div class="on-freunde-text"><h2 id="on-freunde-t">${esc(O('freunde.titel'))}</h2><p>${esc(O('freunde.zeileText'))}</p></div>`
+    + `<div class="on-freunde-knoepfe"><button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-online="freunde-einladen">${esc(O('einladen'))}</button>`
+    + `<button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-online="freunde-code">${esc(O('codeEingeben'))}</button></div></section>`;
   const RING = 2 * Math.PI * 44;
   function start() {
     const kopfHtml = seitenKopf({ titel: O('titel'), text: O('kurz') });
@@ -218,6 +229,9 @@ export function zeige(root, params, app) {
       inhalt.innerHTML = `<p>${esc(O('ladePartie'))}</p>`;
       aktion(() => online.ladePartie(params.partieId), neu => {
         uebernehme(neu);
+        if (params.analyse && neu.status === 'beendet') {
+          karteDerPartie(neu.id).then((d) => { if (d && !weg) kartenDaten = d; }).catch(() => {}).finally(() => { if (!weg) zurAnalyse(); });
+        }
         if (!blockiert && neu.status !== 'beendet') beobachter = online.beobachte(neu.id, {
           seit: neu.aktualisiert_am,
           beiAenderung: stand => { if (busy) wartend = stand; else uebernehme(stand); },
@@ -233,13 +247,13 @@ export function zeige(root, params, app) {
     // Kein Springen beim Laden (G-005 AC-06): Liga-Streifen, feste Bedenkzeit und Suchknopf stehen schon waehrend der Pruefung
     // in voller Hoehe da, Streifen als leerer Platzhalter, Knopf gesperrt; "kommt bald" blendet den Platzhalter aus
     inhalt.innerHTML = `${kopfHtml}
-      <button class="on-liga dr" type="button" data-online="liga" data-laedt disabled aria-hidden="true"><span class="on-liga-schild">${icon('liga')}</span>
-        <span class="on-liga-text"><b></b><span></span></span></button>
+      <div class="on-held juwel-karte"><button class="on-liga on-held-knopf dr" type="button" data-online="liga" data-laedt disabled aria-hidden="true"><span class="on-liga-schild juwel-medaille">${kronSymbol('liga')}</span>
+        <span class="on-liga-text on-held-stand"><b></b><span></span></span></button><button class="on-form dr" type="button" data-online="form" hidden></button></div>
       <div class="on-tueren" data-zustand="konto">
       ${tuer('partie', `<p class="on-suche-text" hidden>${esc(O('suche.pruefen'))}</p>
         <p class="on-zeit-fest">${esc(O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) }))}</p>
-        <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="suchen" disabled>${esc(O('tuer.partie.knopf'))}</button>
-        <button class="knopf primaer dr on-tuer-knopf" type="button" data-online="fortsetzen" hidden>${esc(O('laufend.knopf'))}</button>
+        <button class="knopf primaer juwel-knopf dr on-tuer-knopf" data-ton="gold" type="button" data-online="suchen" disabled>${esc(O('tuer.partie.knopf'))}</button>
+        <button class="knopf primaer juwel-knopf dr on-tuer-knopf" data-ton="gold" type="button" data-online="fortsetzen" hidden>${esc(O('laufend.knopf'))}</button>
         <div class="on-suche" hidden>
           <div class="on-ring" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="on-ring-spur" cx="50" cy="50" r="44"/>
             <circle class="on-ring-rest" cx="50" cy="50" r="44" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="0"/></svg>
@@ -249,9 +263,9 @@ export function zeige(root, params, app) {
           <small class="on-ki-hinweis">${esc(O('suche.kiHinweis'))}</small>
           <button class="knopf dr" type="button" data-online="suche-stopp">${esc(O('suche.abbrechen'))}</button>
         </div>`)}
-      ${tuer('duell', `<button class="knopf primaer dr on-tuer-knopf" type="button" data-online="duell">${esc(O('tuer.duell.knopf'))}</button>
+      ${tuer('duell', `<button class="knopf primaer juwel-knopf dr on-tuer-knopf" data-ton="nacht" type="button" data-online="duell">${esc(O('tuer.duell.knopf'))}</button>
         <p class="on-tuer-hinweis on-netz-hinweis" hidden>${esc(O('netz.fehlt'))}</p>`)}
-      </div>
+      </div>${freundeKarte()}
       <details class="on-freunde"${code || params.freunde ? ' open' : ''}>
         <summary class="on-freunde-zeile dr"><span class="on-freunde-symbol" aria-hidden="true">${icon('person')}</span>
           <span><b>${esc(O('freunde.zeile'))}</b><small>${esc(O('freunde.zeileText'))}</small></span></summary>
@@ -262,11 +276,14 @@ export function zeige(root, params, app) {
         <form class="on-karte flaeche" data-form="beitreten"><h3>${esc(O('codeEingeben'))}</h3><label>${esc(O('code'))}<input name="code" value="${esc(code)}" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" required></label>
         <button class="knopf primaer" type="submit">${esc(O('beitreten'))}</button></form></div>
         <section class="on-karte flaeche"><h3>${esc(O('meine'))}</h3><p class="on-liste">${esc(O('ladeListe'))}</p><button class="knopf" type="button" data-online="liste">${esc(O('aktualisieren'))}</button></section>
-      </details>`;
+      </details>
+      <aside class="on-rang juwel-karte" data-ton="ruhig" aria-labelledby="on-rang-t" hidden></aside>`;
     inhalt.querySelector('[name="code"]').addEventListener('input', e => { e.target.value = online.normalisiereCode(e.target.value).slice(0, 6); });
     netzStand();
     ladeListe();
     pruefeSuche();
+    ladeSaison();
+    zeigeRang();
   }
   const sucheKarte = () => inhalt.querySelector('.on-art[data-art="partie"]');
   let restUhr = null;
@@ -280,7 +297,7 @@ export function zeige(root, params, app) {
     k.querySelector('[data-online="suchen"]').hidden = zustand !== 'bereit';
     k.querySelector('[data-online="suchen"]').disabled = zustand !== 'bereit';
     k.querySelector('[data-online="fortsetzen"]').hidden = zustand !== 'laufend';
-    if (zustand === 'bald') { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) l.hidden = true; }
+    if (zustand === 'bald') { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) { l.hidden = true; l.closest('.on-held').hidden = true; } }
     k.querySelector('.on-suche').hidden = zustand !== 'sucht';
     if (zustand !== 'sucht') { clearInterval(restUhr); restUhr = null; }
   }
@@ -301,37 +318,146 @@ export function zeige(root, params, app) {
       hinweis.textContent = O(gewertet ? 'suche.kiGewertet' : 'suche.kiHinweis');
     }
   }
-  // Lobby-Zeile aus kronen_mein_stand: EINE grosse Zahl (Elo vom Server) oder ohne sie die Liga als Wort; Stufe, Platz in
-  // der Wochen-Gruppe, Kronen und die feste Bedenkzeit stehen hinter "Mehr" (zu). Vorgelesen wird, was zu sehen ist, den
-  // Rest liest "Mehr" vor. Der Knopf fuehrt wie bisher zur Liga (data-online="liga"). Unbrauchbare Antwort: keine Zeile.
+  // Kopfkarte aus kronen_mein_stand (R27 Arena; vorher R19 "eine Zahl" mit "Mehr"): gross die Elo vom Server in Gold, ohne
+  // sie die Liga als Wort; darunter Liga, Platz in der Wochen-Gruppe und der Season-Rest (saison_mein_stand, kommt einzeln),
+  // rechts die Form der letzten fuenf gewerteten Partien (aus der Liste "Meine Partien", die die Lobby ohnehin laedt). Der
+  // Knopf fuehrt wie bisher zur Liga (data-online="liga"). Unbrauchbare Antwort: keine Karte.
+  let held = null; // { elo, stufe, platz } der gezeigten Kopfkarte, fuer Zeile, Vorlesen und Nachtraege
+  let saisonRest = null, formZeichen = null;
   function zeigeLiga(d) {
     const st = Array.isArray(d) ? d[0] : d;
     const el = inhalt.querySelector('.on-liga');
     if (!el) return;
-    if (!st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) { el.hidden = true; return; }
+    if (!st || typeof st !== 'object' || !Number.isFinite(Number(st.kronen))) { el.hidden = true; el.closest('.on-held').hidden = true; return; }
     delete el.dataset.laedt; el.disabled = false; el.removeAttribute('aria-hidden');
     const stufe = stufenName(Math.min(17, Math.max(0, Math.trunc(Number(st.stufe)) || 0)));
     const n = Number.isInteger(st.n) && st.n > 0 ? st.n : 30;
-    const zeile = Number.isInteger(st.platz) && st.platz > 0 ? O('liga.platz', { platz: st.platz, n }) : O('liga.ohneGruppe');
-    const zahlKronen = Math.max(0, Math.trunc(Number(st.kronen)));
+    const platz = Number.isInteger(st.platz) && st.platz > 0 ? O('liga.platz', { platz: st.platz, n }) : O('liga.ohneGruppe');
     const elo = serverElo(st);
-    const groesse = O(elo != null ? 'ruhig.elo' : 'ruhig.deineLiga');
-    el.innerHTML = `<span class="on-liga-schild" aria-hidden="true">${icon(elo != null ? 'podest' : 'liga')}</span>`
-      + `<span class="on-gross"><span class="on-gross-wert${elo != null ? ' zahl' : ''}">${esc(elo != null ? String(elo) : stufe)}</span>`
-      + `<span class="on-gross-text">${esc(groesse)}</span></span>`;
-    el.setAttribute('aria-label', `${groesse}: ${elo != null ? elo : stufe}`);
+    held = { elo, stufe, platz };
+    el.innerHTML = `<span class="on-liga-schild juwel-medaille" aria-hidden="true">${kronSymbol('liga')}</span>`
+      + `<span class="on-held-stand"><span class="on-gross">${elo != null
+        ? `<b class="on-gross-wert juwel-zahl zahl">${esc(String(elo))}</b><small class="on-gross-text">${esc(O('held.elo'))}</small>`
+        : `<b class="on-gross-wert on-held-wort">${esc(stufe)}</b><small class="on-gross-text">${esc(O('ruhig.deineLiga'))}</small>`}</span>`
+      + '<span class="on-held-zeile"></span></span>';
     el.hidden = false;
-    const zeitFest = O('suche.zeitFest', { zeit: RANKED_ZEIT.id.replace('+', ' + '), art: O('zeit.' + RANKED_ZEIT.art) });
-    const wrap = document.createElement('div');
-    wrap.className = 'on-ruhig';
-    el.replaceWith(wrap);
-    wrap.append(el);
-    // die Texte JEDER Tuer kommen mit nach "Mehr"; erst dann blendet data-mehr sie an den Tueren aus (css/online.css).
-    // Ohne "Mehr" (Stand kaputt, ohne Konto) bleiben sie an der Tuer stehen (Kaltreview 15.11.).
-    const tuerTexte = [...inhalt.querySelectorAll('.on-tuer-text p')].map(p => p.textContent);
-    wrap.insertAdjacentHTML('beforeend', `<details class="on-mehr"><summary class="dr">${esc(O('ruhig.mehr'))}</summary><ul>`
-      + [stufe, zeile, O('liga.kronen', { n: zahlKronen }), zeitFest, ...tuerTexte].map(x => `<li>${esc(x)}</li>`).join('') + '</ul></details>');
-    inhalt.querySelector('.on-tueren')?.setAttribute('data-mehr', '');
+    zeigeHeld();
+  }
+  // Zeile, Form und Vorlesetext der Kopfkarte; laeuft nach jeder der drei Antworten (Stand, Season, Partien) erneut
+  function zeigeHeld() {
+    const el = inhalt.querySelector('.on-liga.on-held-knopf');
+    if (!el || !held || weg) return;
+    const teile = [held.elo != null ? held.stufe : null, held.platz, saisonRest].filter(Boolean);
+    // jeder Teil bricht nur als Ganzes um (css/online.css .on-held-zeile > span)
+    el.querySelector('.on-held-zeile').innerHTML = teile.map((x) => `<span>${esc(x)}</span>`).join(' · ');
+    const form = inhalt.querySelector('.on-held .on-form');
+    const zahl = (z) => (formZeichen || []).filter((x) => x === z).length;
+    const formText = formZeichen?.length ? O('form.label', { n: formZeichen.length, s: zahl('s'), nn: zahl('n'), r: zahl('r') }) : '';
+    form.hidden = !formZeichen?.length;
+    // Flo 21.11.: den Eingang zu "Letzte Partien" nicht gefunden, darum die ganze Flaeche (Pillen samt Titel) als Knopf und
+    // darunter ein deutlicher Hinweis "Alle ansehen" mit Pfeil
+    form.innerHTML = formZeichen?.length ? `<small aria-hidden="true">${esc(O('form.titel'))}</small><span class="on-form-steine" aria-hidden="true">`
+      + formZeichen.map((z) => `<i class="juwel-stein" data-erg="${z}">${esc(O('form.' + z))}</i>`).join('') + '</span>'
+      + `<span class="on-form-alle" aria-hidden="true">${esc(O('form.alle'))}${icon('vor')}</span>` : '';
+    if (formText) form.setAttribute('aria-label', `${formText}. ${O('form.oeffnen')}`);
+    const gross = held.elo != null ? `${O('ruhig.elo')}: ${held.elo}` : `${O('ruhig.deineLiga')}: ${held.stufe}`;
+    el.setAttribute('aria-label', [gross, ...teile].filter(Boolean).join(', '));
+  }
+  // Season-Rest (Paket 2, supabase/saison-schema.sql): "Season endet in 4 Tagen", nur waehrend einer laufenden Season
+  async function ladeSaison() {
+    const s0 = await holeSaison().catch(() => null);
+    if (weg || !s0 || !s0.ende) return;
+    const [j, m, t0] = s0.ende.split('-').map(Number);
+    const h = new Date();
+    const tage = Math.round((Date.UTC(j, m - 1, t0) - Date.UTC(h.getFullYear(), h.getMonth(), h.getDate())) / 864e5);
+    if (!(tage >= 0)) return;
+    saisonRest = tage === 0 ? O('held.seasonHeute') : tage === 1 ? O('held.seasonMorgen') : O('held.seasonTage', { n: tage });
+    zeigeHeld();
+  }
+  // Form: die letzten fuenf beendeten gewerteten Partien mit gueltigem Ergebnis, aelteste links (s/n/r aus eigener Sicht)
+  const ergVon = (r) => (r.ergebnis === '1/2-1/2' ? 'r' : (r.ergebnis === '1-0') === (online.meineFarbe(r) === 'w') ? 's' : 'n');
+  let letzte = [];
+  function formAus(liste) {
+    letzte = (Array.isArray(liste) ? liste : [])
+      .filter((r) => r && r.status === 'beendet' && r.gewertet === true && ['1-0', '0-1', '1/2-1/2'].includes(r.ergebnis) && online.meineFarbe(r))
+      .slice(0, 5);
+    return letzte.map(ergVon).reverse();
+  }
+  // Letzte Partien (Tipp auf die Form): Ergebnis, Gegner (Tipp: seine Visitenkarte), Datum, "Analysieren" oeffnet die Partie
+  // und von dort die vorhandene Analyse (params.analyse). Namen und Karten aus karte_der_partie, nur fuer die eigenen Partien.
+  function zeigeLetzte() {
+    if (!letzte.length) return;
+    const zeilen = letzte.slice();
+    const karten = new Array(zeilen.length).fill(null);
+    const datum = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(document.documentElement.lang === 'en' ? 'en-GB' : 'de-DE', { day: 'numeric', month: 'short' }); };
+    const ort = document.createElement('ol');
+    ort.className = 'on-letzte';
+    ort.innerHTML = zeilen.map((r, n) => `<li class="on-letzte-zeile"><i class="juwel-stein" data-erg="${ergVon(r)}" aria-hidden="true">${esc(O('form.' + ergVon(r)))}</i>`
+      + `<span class="juwel-kopf on-letzte-kopf" style="--k:36px" aria-hidden="true"></span><span class="on-letzte-wer"><button class="on-letzte-name" type="button" data-n="${n}">${esc(O('letzte.gegner'))}</button>`
+      + `<span class="on-letzte-datum">${esc(datum(r.aktualisiert_am))}</span></span>`
+      + `<button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-n="${n}" data-letzte="analyse">${icon('analyse')} ${esc(O('letzte.analyse'))}</button></li>`).join('');
+    let ziel = null;
+    ort.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-n]');
+      if (!b) return;
+      const n = Number(b.dataset.n), r = zeilen[n];
+      if (!r) return;
+      if (b.dataset.letzte === 'analyse') { ziel = r.id; ort.closest('.sheet-karte')?.querySelector('[data-knopf="zu"]')?.click(); return; }
+      zeigeGegnerProfil({ karte: karten[n], name: b.textContent });
+    });
+    zeilen.forEach((r, n) => {
+      const f = andere(online.meineFarbe(r));
+      karteDerPartie(r.id).then((d) => {
+        const roh = d && (f === 'w' ? d.w : d.s);
+        const k = roh ? fremdeKarte(roh) : null;
+        if (!k || !ort.isConnected) return;
+        karten[n] = k;
+        const b = ort.querySelector(`.on-letzte-name[data-n="${n}"]`);
+        if (b && k.name) { b.textContent = k.name; b.setAttribute('aria-label', profilText('oeffnen', { name: k.name })); }
+        // Avatar des Gegners aus karte_der_partie (fremdeKarte: SVG aus Motiv, Grund, Rahmen; nur gepruefte Werte)
+        const kopf = ort.querySelectorAll('.on-letzte-kopf')[n];
+        if (kopf && k.avatar) { kopf.innerHTML = k.avatar; kopf.dataset.da = ''; }
+      }).catch(() => {});
+    });
+    sheet({ titel: O('letzte.titel'), inhalt: ort, klasse: 'on-letzte-blatt', abbrechen: null,
+      knoepfe: [{ text: O('letzte.zu'), wert: null, name: 'zu' }] })
+      .then(() => { if (ziel && !weg) app.gehe('online', { partieId: ziel, analyse: true }); });
+  }
+  // Weltrangliste rechts (nur quer ab 1100 px, nur mit Paket 2 und nur, wenn das Konto in der Liste steht): fuenf Plaetze um
+  // den eigenen, der eigene in Gold; der Knopf oeffnet die ganze Weltrangliste. Ohne Antwort bleibt die Karte weg.
+  let rangZeilen = [];
+  async function zeigeRang() {
+    const el = inhalt.querySelector('.on-rang');
+    if (!el || !paket2Frei() || !matchMedia('(min-width: 1100px) and (orientation: landscape)').matches) return;
+    try {
+      const [{ weltLage }, d] = await Promise.all([import('../pakete/liga/welt.js'), online.rpc('weltrang_liste', { grenze: 100 })]);
+      const l = weltLage(Array.isArray(d) ? d[0] : d);
+      if (weg || !l || l.ich.status !== 'dabei') return;
+      const i = l.liste.findIndex((z) => z.ich);
+      if (i < 0) return;
+      // Podest der ersten drei (2 | 1 | 3, mit Kopf und Metallring), darunter dein Platz mit je einem Nachbarn; stehst du
+      // selbst oben, schliessen die Plaetze 4 bis 6 an
+      const um = i <= 2 ? l.liste.slice(3, 6) : l.liste.slice(i - 1, i + 2);
+      rangZeilen = [...l.liste.slice(0, 3), ...um];
+      const name = (z) => (z.ich ? O('rang.du') : z.name);
+      const kopf = (z, k) => (z.ich ? `<span class="juwel-kopf" data-ich style="--k:${k}px"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''}>${floAvatar('w')}</span>`
+        // Profilbild nur mit supabase/weltrang-karte-schema.sql (motiv/grund/rahmen; fremderAvatar prueft jeden Wert gegen die
+        // festen Listen), sonst Banner mit Schleier und Anfangsbuchstabe
+        : typeof z.motiv === 'string'
+          ? `<span class="juwel-kopf"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px">${fremderAvatar(z)}</span>`
+          : `<span class="juwel-kopf mit-banner"${z.rang <= 3 ? ` data-platz="${z.rang}"` : ''} style="--k:${k}px;--banner:url('${bannerUrl(z.banner)}')">${esc((z.name[0] || '?').toUpperCase())}</span>`);
+      const label = (z) => ` aria-label="${esc(profilText('oeffnen', { name: name(z) }))}"`;
+      const podest = [1, 0, 2].filter((n) => rangZeilen[n]).map((n) => { const z = rangZeilen[n];
+        return `<button class="on-podest-platz${z.ich ? ' ich' : ''}" type="button" data-online="rang-profil" data-n="${n}" data-platz="${z.rang}"${label(z)}>`
+          + `${kopf(z, n === 0 ? 56 : 46)}<span class="juwel-rang zahl" data-platz="${z.rang}">${z.rang}</span>`
+          + `<span class="on-podest-name">${esc(name(z))}</span><b class="zahl">${esc(String(z.elo))}</b></button>`; }).join('');
+      el.innerHTML = `<h2 id="on-rang-t">${esc(O('rang.titel'))}</h2><div class="on-podest">${podest}</div><ol class="on-rang-liste">`
+        + um.map((z, n) => `<li><button class="on-rang-zeile${z.ich ? ' ich' : ''}" type="button" data-online="rang-profil" data-n="${n + 3}"${label(z)}>`
+          + `<span class="on-rang-platz zahl">${esc(String(z.rang))}</span>${kopf(z, 34)}<span class="on-rang-name">${esc(name(z))}</span>`
+          + `<b class="zahl">${esc(String(z.elo))}</b></button></li>`).join('')
+        + `</ol><button class="knopf juwel-knopf dr" data-ton="ruhig" type="button" data-online="rang">${esc(O('rang.knopf'))}</button>`;
+      el.hidden = false;
+    } catch (e) { /* ohne Rangliste fehlt die Karte */ }
   }
   // Laeuft fuer das Konto eine Partie (online_meine), wird die Partie-Tuer zur Karte "Laufende Partie fortsetzen" und
   // oeffnet die NEUESTE laufende (Befund 3 vom 11.11.: kein Weg zurueck; Befund 2: zwei laufende zugleich). Solange eine
@@ -346,7 +472,7 @@ export function zeige(root, params, app) {
     if (lp) {
       sucheZustand('laufend', O(online.binAmZug(lp) ? 'laufend.du' : 'laufend.gegner'));
       sucheKarte().querySelector('[data-online="fortsetzen"]').dataset.partie = lp.id;
-      if (!liga) { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) l.hidden = true; }
+      if (!liga) { const l = inhalt.querySelector('.on-liga[data-laedt]'); if (l) { l.hidden = true; l.closest('.on-held').hidden = true; } }
     } else if (liga) sucheZustand('bereit', O('suche.erklaert'));
     else sucheZustand('bald', O('suche.bald'));
   }
@@ -409,6 +535,8 @@ export function zeige(root, params, app) {
   }
   async function ladeListe() {
     await aktion(() => online.meinePartien({ beendete: true }), liste => {
+      formZeichen = formAus(liste);
+      zeigeHeld();
       const el = inhalt.querySelector('.on-liste');
       el.innerHTML = liste.length ? liste.map(row => `<button class="knopf on-listeneintrag" type="button" data-partie="${esc(row.id)}"><span>${esc(STATUS[row.status] || O('partie'))} · ${esc(row.code)}</span><span>${row.bedenkzeit_s == null ? O('ohneUhr') : `${Math.round(row.bedenkzeit_s / 60)}+${row.inkrement_s || 0}`}${row.ergebnis ? ' · ' + esc(row.ergebnis) : ''}</span></button>`).join('') : O('keine');
     });
@@ -1270,6 +1398,28 @@ export function zeige(root, params, app) {
     // Raetsel-Duell fuer alle (Flo 08.11.2026): die Tuer startet die gewertete Duell-Suche direkt
     if (a === 'duell') { app.gehe('raetsel-duell', { suchen: true }); return; }
     if (a === 'liga') { app.gehe('bestenliste'); return; }
+    if (a === 'rang') { app.gehe('bestenliste', { reiter: 'welt' }); return; }
+    if (a === 'form') { zeigeLetzte(); return; }
+    // R27: eine Zeile der Weltrangliste zeigt die vorhandene Visitenkarte (Name, Banner aus der Liste; die eigene aus dem Profil),
+    // ohne neue Server-Abfrage; der Fokus kehrt danach auf die Zeile zurueck
+    if (a === 'rang-profil') {
+      const z = rangZeilen[Number(knopf.dataset.n)];
+      if (!z) return;
+      zeigeGegnerProfil({ karte: z.ich ? eigeneKarte() : { name: z.name, banner: z.banner, titel: null, ki: false, kronenStufe: null, orden: [],
+        ...(typeof z.motiv === 'string' ? { avatar: fremderAvatar(z) } : {}) } })
+        .then(() => { if (!weg && knopf.isConnected) knopf.focus({ preventScroll: true }); });
+      return;
+    }
+    // R27: die Freunde-Karte oeffnet das passende Formular darunter und setzt den Fokus hinein
+    if (a === 'freunde-einladen' || a === 'freunde-code') {
+      const fr = s.querySelector('.on-freunde');
+      if (!fr) return;
+      fr.open = true;
+      const ziel = fr.querySelector(a === 'freunde-code' ? '[data-form="beitreten"] [name="code"]' : '[data-form="einladen"] select');
+      ziel?.scrollIntoView({ block: 'center' });
+      ziel?.focus();
+      return;
+    }
     if (a === 'liste-zurueck') { app.gehe('online', { freunde: true }); return; }
     if (a === 'konto') { kontoFreigeschaltet('#konto'); app.gehe('einstellungen', { seite: 'konto' }); return; }
     if (a === 'liste') { ladeListe(); return; }

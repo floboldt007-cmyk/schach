@@ -135,6 +135,7 @@ async function bediene(route) {
   if (rpc === 'online_suche_ende') { schlange.delete(uid); return antwort({}); }
   if (rpc === 'online_live_bewertung_frei') return antwort({ frei: true, rest: 1, unbegrenzt: false });
   if (rpc === 'online_meine') return antwort([...partien.values()].filter(q => q.status !== 'beendet' && farbeVon(q, uid)));
+  if (rpc === 'saison_mein_stand' || rpc === 'weltrang_liste') return antwort({}); // R27 Arena: Season-Rest und Weltrangliste (prueft r27-online-arena), hier ohne Antwort
   if (rpc === 'online_pruefe_zeit' && p) return antwort(p);
   if (rpc === 'karte_melde_stufen' || rpc === 'karte_waehle') return antwort({ taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } });
   if (rpc === 'karte_sondertitel_waehle') {

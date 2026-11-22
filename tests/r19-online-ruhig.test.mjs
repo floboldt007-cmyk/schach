@@ -7,6 +7,11 @@
 //   Ergebnis hoechstens eine Zahl (die Kronen-Aenderung). Lobby und Suche matt, Partie und Ergebnisblatt mit dem Schein der
 //   Bot-Partie (scheinWieBot, Kaltreview 64 vom 15.11.). iPhone 13, SE und PC, hell und dunkel. Netz nur simuliert.
 //
+// R27 Online Arena (Flo 21.11.2026, O1 aus dem R27-Plan): die LOBBY ist seither die Schmuck-Arena (tests/r27-online-arena.test.mjs):
+//   Elo gross in Gold, darunter Stufe und Platz (kein "Mehr" mehr), Tuertexte sichtbar, genau EIN goldener Hauptknopf; Glanz
+//   und Verlauf sind dort gewollt. Hier bleiben aus R19: die Elo kommt nur vom Server, ohne sie keine Elo-Zahl (die Liga als
+//   Wort mit "Deine Liga"), die Spielerleisten, die matte Suche und das Ergebnisblatt.
+//
 //   node tests/r19-online-ruhig.test.mjs
 //   PORT=8976 node tests/r19-online-ruhig.test.mjs   eigener Port (Standard: frei)
 import http from 'node:http';
@@ -254,27 +259,29 @@ async function lauf(browser, [geraet, w, h], kennung = '', farbe = 'light') {
   const { k, s } = await neueSeite(browser, [w, h], z, { gruppe, farbe });
   try {
     await lobbyBereit(s, gruppe, kennung);
-    const glanzLobby = await glanzIn(s, '.online-screen .on-inhalt');
-    pruefe(`${gruppe}: Lobby matt (kein Schein, Glanz, Verlauf)`, glanzLobby.length === 0, glanzLobby);
+    // R27: die Lobby glaenzt gewollt (Juwel-Bauteile); Flos Regel ist EIN goldener Hauptknopf je Seite
+    const gold = await s.evaluate(() => [...document.querySelectorAll('.online-screen .on-inhalt .juwel-knopf[data-ton="gold"]')]
+      .filter((b) => b.checkVisibility()).map((b) => b.dataset.online));
+    pruefe(`${gruppe}: Lobby mit genau einem goldenen Hauptknopf (Partie suchen)`, gold.length === 1 && gold[0] === 'suchen', gold);
     const attr = await s.evaluate(() => document.querySelector('.online-screen')?.dataset.onlineStil ?? null);
     pruefe(`${gruppe}: keine Stil-Kennung am Bildschirm`, attr === null, attr);
     const lobby = await zahlenIn(s, '.online-screen .on-inhalt', '.on-bild img');
-    pruefe(`${gruppe}: Lobby zeigt genau eine Zahl, die Elo`, lobby.length === 1 && lobby[0] === String(ELO), lobby);
+    // R27: Elo, Platz von n, "nach 10 s ein KI-Gegner" und die Bedenkzeit (5 + 3), sonst keine Zahl (keine Kronen, keine Stufen-Nummer)
+    pruefe(`${gruppe}: Lobby zeigt nur Elo, Platz von n, die 10 s bis zur KI und die Bedenkzeit`, [...lobby].sort().join() === [String(ELO), '3', '30', '10', '5', '3'].sort().join(), lobby);
     const gross = await s.evaluate(() => {
       const l = document.querySelector('.online-screen .on-liga');
       return l ? { wert: l.querySelector('.on-gross-wert')?.textContent.trim(), text: l.querySelector('.on-gross-text')?.textContent.trim(),
         label: l.getAttribute('aria-label'), sichtbar: l.checkVisibility() } : null;
     });
-    pruefe(`${gruppe}: gross die Elo mit "Deine Elo", vorgelesen wie zu sehen`, !!gross && gross.sichtbar && gross.wert === String(ELO)
-      && gross.text === 'Deine Elo' && gross.label === `Deine Elo: ${ELO}`, gross);
-    const mehr = await s.evaluate(() => {
-      const d = document.querySelector('.online-screen details.on-mehr');
-      return d ? { offen: d.open, text: d.textContent.replace(/\s+/g, ' ') } : null;
-    });
-    pruefe(`${gruppe}: Stufe, Platz und Kronen hinter "Mehr" (zu)`, !!mehr && !mehr.offen && /Platz 3 von 30/.test(mehr.text) && /140/.test(mehr.text), mehr);
+    pruefe(`${gruppe}: gross die Elo mit "Elo", vorgelesen als "Deine Elo"`, !!gross && gross.sichtbar && gross.wert === String(ELO)
+      && gross.text === 'Elo' && (gross.label || '').startsWith(`Deine Elo: ${ELO}, Warden II, Platz 3 von 30`), gross);
+    const zeile = await s.evaluate(() => ({ text: document.querySelector('.online-screen .on-held-zeile')?.textContent.replace(/\s+/g, ' ').trim() ?? null,
+      mehr: document.querySelectorAll('.online-screen details.on-mehr').length }));
+    pruefe(`${gruppe}: Stufe und Platz in der Zeile der Kopfkarte, kein "Mehr", keine Kronen`, zeile.mehr === 0 && /Warden II/.test(zeile.text || '')
+      && /Platz 3 von 30/.test(zeile.text || '') && !/140/.test(zeile.text || ''), zeile);
     const tuerTexte = await leseTuerTexte(s);
-    pruefe(`${gruppe}: jeder Tuertext sichtbar oder in "Mehr" (auch das Duell)`, tuerTexte.length >= 2
-      && tuerTexte.every((t) => t.sichtbar || t.inMehr) && tuerTexte.some((t) => t.text === 'Gleiche Rätsel für beide, live'), tuerTexte);
+    pruefe(`${gruppe}: jeder Tuertext sichtbar (auch das Duell)`, tuerTexte.length >= 2
+      && tuerTexte.every((t) => t.sichtbar) && tuerTexte.some((t) => t.text === 'Gleiche Rätsel für beide, live'), tuerTexte);
     const alt = await s.evaluate(() => document.querySelectorAll('.online-screen :is(.on-rk, .on-ich-leiste, .on-abzeichen, .on-chip)').length);
     pruefe(`${gruppe}: keine Bausteine der Entwuerfe B und C`, alt === 0, alt);
     const duell = await s.evaluate(() => document.querySelector('#on-duell-t')?.textContent.trim() ?? null);
@@ -346,8 +353,9 @@ async function ohneElo(browser, [name, felder, liga]) {
       return e ? { wert: e.querySelector('.on-gross-wert')?.textContent.trim(), text: e.querySelector('.on-gross-text')?.textContent.trim(),
         label: e.getAttribute('aria-label') } : null;
     });
-    pruefe(`${gruppe}: keine Zahl, gross "Warden II" mit "Deine Liga"`, lobby.length === 0 && !!l && l.wert === 'Warden II'
-      && l.text === 'Deine Liga' && l.label === 'Deine Liga: Warden II', { lobby, l });
+    // R27: ohne Server-Elo keine Elo-Zahl; Platz von n und die Bedenkzeit bleiben (die Bot-Liga-Wertung erscheint nie)
+    pruefe(`${gruppe}: keine Elo-Zahl, gross "Warden II" mit "Deine Liga"`, [...lobby].sort().join() === ['3', '30', '10', '5', '3'].sort().join()
+      && !!l && l.wert === 'Warden II' && l.text === 'Deine Liga' && (l.label || '').startsWith('Deine Liga: Warden II'), { lobby, l });
     const text = await s.evaluate(() => document.querySelector('.online-screen .on-inhalt')?.textContent || '');
     pruefe(`${gruppe}: kein undefined, null oder NaN im Text`, !/undefined|null|NaN/.test(text), text.match(/undefined|null|NaN/g));
   } catch (e) {

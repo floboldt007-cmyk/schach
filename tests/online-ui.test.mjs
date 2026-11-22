@@ -152,6 +152,9 @@ try {
       return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
     }
     if (rpc === 'effekte_der_partie') return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
+    // R27 Online Arena: die Kopfkarte fragt den Season-Rest, quer ab 1100 px die Weltrangliste (beides prueft r27-online-arena;
+    // hier ohne Antwort, dann fehlen Season-Zeile und Rangliste ohne Luecke)
+    if (rpc === 'saison_mein_stand' || rpc === 'weltrang_liste') return antwort({});
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {
@@ -520,19 +523,21 @@ try {
       const rumpf = document.querySelector('.online-screen .on-rumpf');
       const leiste = document.querySelector('.reiter-leiste');
       const unten = leiste && leiste.getClientRects().length ? leiste.getBoundingClientRect().top : innerHeight;
-      const zeile = document.querySelector('.on-freunde-zeile').getBoundingClientRect();
+      // R27 Arena: die Freunde-Karte steht an der Stelle der Freunde-Zeile (die Klapp-Zeile ist ausgeblendet)
+      const zeile = document.querySelector('.on-freunde-karte').getBoundingClientRect();
       const knoepfe = [...document.querySelectorAll('.on-tuer-knopf:not([hidden])')].map((b) => b.textContent.trim());
       return { scroll: rumpf.scrollHeight - rumpf.clientHeight, quer: document.documentElement.scrollWidth <= innerWidth,
         freundeSichtbar: zeile.bottom <= unten + 1, knoepfe, gewertet: knoepfe.length === 2 && knoepfe.every((t) => /gewertet/.test(t)),
         freundeZu: !document.querySelector('.on-freunde').open, liga: document.querySelector('.on-liga').textContent.replace(/\s+/g, ' ').trim(),
-        // R19 online ruhig (A): Platz und Kronen stehen hinter "Mehr" (zu), gross die Elo oder ohne sie die Liga als Wort
-        mehr: document.querySelector('.online-screen details.on-mehr:not([open])')?.textContent.replace(/\s+/g, ' ').trim() || '',
+        // R27 Arena: Stufe und Platz stehen in der Zeile der Kopfkarte (kein "Mehr"), Kronen nicht mehr in der Lobby
+        mehr: document.querySelector('.online-screen .on-held-zeile')?.textContent.replace(/\s+/g, ' ').trim() || '',
+        mehrDa: document.querySelectorAll('.online-screen details.on-mehr').length,
         beispiel: /Beispiel|Turmfalke|Rochade77/.test(document.querySelector('.online-screen').textContent),
         klein: [...document.querySelectorAll('.online-screen .on-inhalt button, .online-screen .on-freunde-zeile')].filter((b) => b.getClientRects().length && b.getBoundingClientRect().height < 44).map((b) => b.className) };
     });
-    pruefe(`iPhone 13 ${modus}: Online passt ohne Scrollen (Liga-Zeile mit "Mehr", zwei Tueren, Freunde-Zeile), Suchen-Knoepfe "gewertet", keine Beispiel-Liga`,
+    pruefe(`iPhone 13 ${modus}: Online passt ohne Scrollen (Kopfkarte mit Stufe und Platz, zwei Tueren, Freunde-Karte), Suchen-Knoepfe "gewertet", keine Beispiel-Liga`,
       handy.scroll <= 1 && handy.quer && handy.freundeSichtbar && handy.gewertet && handy.freundeZu && /Warden II/.test(handy.liga)
-      && /Platz 3 von 30/.test(handy.mehr) && /140/.test(handy.mehr)
+      && /Platz 3 von 30/.test(handy.mehr) && !/140/.test(handy.mehr) && handy.mehrDa === 0
       && !handy.beispiel && handy.klein.length === 0, handy);
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-390-${modus}.png`) });
   }

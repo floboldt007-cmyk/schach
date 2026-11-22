@@ -44,7 +44,9 @@ export function weltLage(d) {
   const banner = (b) => (B && B.MENSCHEN_BANNER.includes(b) ? b : 'start');
   const liste = d.liste
     .filter((z) => z && typeof z === 'object' && ganz(z.rang) && typeof z.name === 'string' && z.name && ganz(z.elo))
-    .map((z) => ({ rang: z.rang, name: z.name.slice(0, 30), elo: z.elo, banner: banner(z.banner), ich: z.ich === true }))
+    .map((z) => ({ rang: z.rang, name: z.name.slice(0, 30), elo: z.elo, banner: banner(z.banner), ich: z.ich === true,
+      // R27: Profilbild nur mit supabase/weltrang-karte-schema.sql; geprueft wird jeder Wert erst in profilAvatar (feste Listen)
+      ...(typeof z.motiv === 'string' ? { motiv: z.motiv.slice(0, 40), grund: String(z.grund ?? '').slice(0, 40), rahmen: String(z.rahmen ?? '').slice(0, 40) } : {}) }))
     .sort((a, b) => a.rang - b.rang);
   const stand = ich.status === 'dabei'
     // Name und Banner auch aus ich: wer nicht unter den besten der Liste steht, fehlt dort (Kaltreview df 15.11.2026)
