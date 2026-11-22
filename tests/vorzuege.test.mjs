@@ -177,6 +177,22 @@ try {
   pruefe('Ungueltig: Flo ist wieder dran, das Brett zeigt die echte Stellung ohne Nummern',
     k3.phase === 'flo' && !Object.keys(k3.nummern).length && (await figur('d2')) === 'wP' && (await figur('e4')) === 'wP');
 
+  // ---------- 3b. R28: der LETZTE Vorzug verfaellt (die Kette ist danach leer) ----------
+  // Verdacht aus der Online-Partie (PR #278): naechsterVorzug nimmt den Vorzug schon heraus; loescheVorzuege zeichnete die
+  // echte Stellung nur, wenn danach noch etwas in der Kette lag, sonst blieb die gedachte Figur stehen
+  await neuePartie(['a7a6', 'e7e5']);
+  await bisBotDenkt();
+  await zug('e2e4');
+  await zug('e4e5');
+  await lasBotLos();
+  await seite.waitForFunction(() => window.__partie.protokoll.some((e) => e.typ === 'vorzug:verworfen' && e.uci === 'e4e5'));
+  await seite.waitForFunction(() => window.__partie.phase() === 'flo');
+  await bildFertig();
+  const k3b = await stand();
+  pruefe('R28 Letzter Vorzug verfaellt: Brett zeigt die echte Stellung (weisser Bauer e4, schwarzer e5), keine Nummern',
+    k3b.zuege === 'g1f3,a7a6,e2e4,e7e5' && k3b.vorzuege === '' && !Object.keys(k3b.nummern).length
+      && (await figur('e4')) === 'wP' && (await figur('e5')) === 'bP', { k3b, e4: await figur('e4'), e5: await figur('e5') });
+
   // ---------- 4. Abbrechen: Tipp ins leere Brett, Tipp auf eine gegnerische Figur ----------
   await neuePartie();
   await bisBotDenkt();
