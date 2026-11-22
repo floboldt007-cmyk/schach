@@ -95,12 +95,14 @@ function sonde({ einstellungen, sitzung }) {
   T.loaf = beob('long-animation-frame', (e) => T.lang.push({ start: e.startTime, dauer: e.duration }));
   if (!T.loaf) beob('longtask', (e) => T.lang.push({ start: e.startTime, dauer: e.duration }));
   beob('layout-shift', (e) => T.shifts.push({ start: e.startTime, wert: e.value }));
-  T.beginne = () => { T.offen = true; T.eingabe = null; T.mutation = null; T.erste = null; T.events.length = 0; T.lang.length = 0; T.shifts.length = 0; T.bilder.length = 0; T.anim = new Set(); T.t0 = performance.now(); };
+  T.beginne = () => { T.offen = true; T.eingabe = null; T.mutation = null; T.erste = null; T.events.length = 0; T.lang.length = 0; T.shifts.length = 0; T.bilder.length = 0; T.anim = new Map(); T.t0 = performance.now(); };
   // ohne Tipp (Kaltstart, Aufruf per app.gehe): Startzeit selbst setzen
   T.setzeStart = (t) => { T.eingabe = t; };
   T.warteFertig = (ziel, frist) => new Promise((ok) => {
     let ruhig = 0; let alt = performance.now();
+    // "!sel" = fertig, wenn sel verschwunden ist (Schliessen: gemessen ab dem Tipp, mit der Weg-Animation)
     const sichtbar = () => {
+      if (ziel && ziel.startsWith('!')) return !document.querySelector(ziel.slice(1));
       const el = ziel ? document.querySelector(ziel) : document.body;
       if (!el) return false;
       const b = el.getBoundingClientRect();
@@ -113,7 +115,9 @@ function sonde({ einstellungen, sitzung }) {
       for (const a of laufend) {
         const n = a.animationName || (a.transitionProperty ? 'uebergang:' + a.transitionProperty : 'animation');
         const zielEl = a.effect?.target;
-        T.anim.add(n + (zielEl?.classList?.[0] ? ' @' + zielEl.classList[0] : ''));
+        // mit Laenge (Verzoegerung + Dauer): daran sieht man, welche Animation das "fertig" bestimmt
+        const k = n + (zielEl?.classList?.[0] ? ' @' + zielEl.classList[0] : '');
+        T.anim.set(k, Math.max(T.anim.get(k) || 0, a.effect.getComputedTiming().endTime));
       }
       ruhig = sichtbar() && !laufend.length ? ruhig + 1 : 0;
       const start = T.eingabe ?? T.t0;
@@ -135,7 +139,7 @@ function sonde({ einstellungen, sitzung }) {
       lang: lang.length, langSumme: lang.reduce((s, x) => s + x.dauer, 0), langMax: lang.length ? Math.max(...lang.map((x) => x.dauer)) : 0,
       ruckler: T.bilder.slice(1).filter((d) => d > 34).length,
       cls: T.shifts.filter(imFenster).reduce((s, x) => s + x.wert, 0),
-      anim: [...T.anim], quelle: T.loaf ? 'long-animation-frame' : 'longtask',
+      anim: [...T.anim].sort((x, y) => y[1] - x[1]).map(([n, d]) => `${n} ${Math.round(d)}ms`), quelle: T.loaf ? 'long-animation-frame' : 'longtask',
     };
   });
 }
@@ -156,14 +160,14 @@ export function schritte() {
     { name: 'Leiste: Ich', wie: 'Reiter', ...reiter('ich'), ziel: '.screen.sa-screen' },
     { name: 'Shop-Blatt oeffnen', wie: 'Tipp in Ich', vorher: (s, h) => h.ueberspringeMomente(),
       tun: (s, h) => h.tippe('.sa-platz[data-bereich="shop"], .sa-gross[data-bereich="shop"]'), ziel: '.sheet-karte.sa-blatt [data-bereich="shop"]' },
-    { name: 'Shop-Blatt schliessen', wie: 'Escape', tun: (s) => s.keyboard.press('Escape'), ziel: null, wegVon: '.sheet-karte.sa-blatt' },
+    { name: 'Shop-Blatt schliessen', wie: 'Escape', tun: (s) => s.keyboard.press('Escape'), ziel: '!.sheet-karte.sa-blatt' },
     { name: 'Leiste: Start', wie: 'Reiter', ...reiter('heim'), ziel: '.screen.heim-screen' },
     { name: 'Online-Start', wie: 'Karte auf Start', tun: (s, h) => h.tippe('[data-aktion="heim-online"]'), ziel: '.screen.online-screen' },
     { name: 'Einstellungen oeffnen', wie: 'Kopf', tun: (s, h) => h.tippe('.haupt-kopf [data-aktion="einstellungen"]'), ziel: '.screen.es-screen' },
     { name: 'Einstellungen zurueck', wie: 'Zurueck', tun: (s) => s.goBack(), ziel: '.screen.online-screen' },
     { name: 'Partie oeffnen', wie: 'app.gehe', tun: (s) => s.evaluate(() => { window.__tempo.setzeStart(performance.now()); window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }); }),
       ziel: '.screen.partie .brett-felder .feld[data-feld="e2"]' },
-    { name: 'Zug ziehen e2-e4', wie: 'zwei Tipps', vorher: (s, h) => h.tippeFeld('e2'), tun: (s, h) => h.tippeFeld('e4'), ziel: '.screen.partie .brett-lagen .lage.zuletzt[data-feld="e4"]' },
+    { name: 'Zug ziehen e2-e4', wie: 'zwei Tipps', vorher: (s, h) => h.tippeFeld('e2'), tun: (s, h) => h.tippeFeld('e4'), ziel: '.screen.partie .brett-lagen .lage.zuletzt' },   // irgendein letzter Zug: der Bot antwortet sofort, die Markierung wandert
     { name: 'Aufgeben-Dialog oeffnen', wie: 'Knopf', vorher: (s) => s.waitForTimeout(2500), tun: (s, h) => h.tippe('.spielknoepfe > [data-aktion="aufgeben"]'), ziel: '.dialog-ort .dialog' },
     { name: 'Dialog bestaetigen -> Ergebnisblatt', wie: 'Knopf', tun: (s, h) => h.tippe('.dialog-ort .dialog-knoepfe button:last-child'), ziel: '[data-ziel="analyse"]' },
     { name: 'Analyse oeffnen', wie: 'Ergebnisblatt', tun: (s, h) => h.tippe('[data-ziel="analyse"]'), ziel: '.screen.an-screen' },
@@ -193,6 +197,8 @@ async function laufeRunde(pw, browser, geraet, basis, { frist = 12000, trace = n
     async tippe(sel) {
       const el = s.locator(sel).first();
       await el.waitFor({ state: 'visible', timeout: frist });
+      // ein Tipp ausserhalb des Bildes trifft am Telefon nichts (Shop-Knopf unten in Ich)
+      await el.scrollIntoViewIfNeeded();
       if (g.hasTouch) { const b = await el.boundingBox(); await s.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); } else await el.click();
     },
     async tippeFeld(feld) { await h.tippe(`.screen.partie .brett-felder .feld[data-feld="${feld}"]`); },
@@ -213,9 +219,7 @@ async function laufeRunde(pw, browser, geraet, basis, { frist = 12000, trace = n
       await s.waitForTimeout(400);
       await s.evaluate(() => window.__tempo.beginne());
       await st.tun(s, h);
-      const ziel = st.wegVon ? null : st.ziel;
-      if (st.wegVon) await s.locator(st.wegVon).first().waitFor({ state: 'detached', timeout: frist }).catch(() => {});
-      const r = await s.evaluate(([z, f]) => window.__tempo.warteFertig(z, f), [ziel, frist]);
+      const r = await s.evaluate(([z, f]) => window.__tempo.warteFertig(z, f), [st.ziel, frist]);
       ergebnis.push({ name: st.name, wie: st.wie, ...r, fehler: r.ok ? '' : r.grund });
     } catch (e) {
       ergebnis.push({ name: st.name, wie: st.wie, fehler: String(e.message || e).split('\n')[0].slice(0, 120) });

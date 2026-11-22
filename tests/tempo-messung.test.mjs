@@ -38,7 +38,8 @@ pruefe('Tabelle: Schritt ohne Animation sagt keine', /\| B \|.*\| keine \|/.test
 const st = schritte();
 pruefe('Runde deckt die Auftrags-Ansichten ab', ['Leiste: Bots', 'Leiste: Liga', 'Leiste: Ich', 'Shop-Blatt oeffnen', 'Shop-Blatt schliessen', 'Online-Start',
   'Einstellungen oeffnen', 'Zug ziehen e2-e4', 'Aufgeben-Dialog oeffnen', 'Dialog bestaetigen -> Ergebnisblatt', 'Analyse oeffnen'].every((n) => st.some((s) => s.name === n)));
-pruefe('jeder Schritt hat ein Ziel oder wartet auf Verschwinden', st.every((s) => s.ziel || s.wegVon));
+pruefe('jeder Schritt hat ein Ziel (Schliessen: "!sel" = bis es weg ist, ab dem Tipp gemessen)', st.every((s) => typeof s.ziel === 'string' && s.ziel.length > 1));
+pruefe('Shop-Blatt schliessen misst bis das Blatt weg ist', st.find((s) => s.name === 'Shop-Blatt schliessen')?.ziel === '!.sheet-karte.sa-blatt');
 pruefe('iPhone 13 mit 4x CPU-Drosselung, PC ohne', GERAETE.iphone13.cpu === 4 && GERAETE.iphone13.viewport.width === 390 && GERAETE.pc.cpu === 1);
 
 pruefe('Last-Probe: ruhige Runden heissen ohne fremde Last', /ohne fremde Last/.test(lastText([{ vor: { ruckler: 0 }, nach: { ruckler: 1 } }])));
