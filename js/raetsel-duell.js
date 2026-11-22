@@ -11,6 +11,10 @@
 //   einladen() -> Promise<{ duell, code }>        Freundschaft per Code (ohne Wertung)
 //   beitreten(code) -> Promise<{ duell }>         Fehler mit e.kennung 'DUELL_CODE' | 'DUELL_ZU_VIELE_VERSUCHE' | ...
 //   stand(duell) -> Promise<Stand | null>         normalisiert (js/pakete/lobby/raetsel-duell.js)
+//   fertig(duell) -> Promise<Stand | null>        R27 Sofort-Ende: meldet dem Server "ich bin fertig" (duell_ich_fertig,
+//     raetsel-duell-ki-sofort-schema.sql); danach nimmt er keinen eigenen Zug mehr an. null = altes SQL ohne die RPC
+//     oder kein lesbarer Stand: dann geht das Duell wie bisher weiter (der Server beendet es nach der Uhr). Fehler mit
+//     e.kennung (DUELL_...) sind endgueltig, Fehler mit e.nochmal voruebergehend (Netz, Server): erneut melden.
 //   zug(duell, uci) -> Promise<{ richtig, fertig, idx, schritt, geloest, fehler, ende_am, naechstes }>
 //     Fehler mit e.kennung (DUELL_ZEIT_UM, DUELL_STAND_VERALTET, DUELL_ZUG_ILLEGAL, ...)
 //   KI_ERSATZ_MS = 10000
@@ -64,6 +68,20 @@ export async function beitreten(code) {
 
 export async function stand(duell) {
   return normalisiereStand(await rpc('duell_stand', { duell }));
+}
+
+export async function fertig(duell) {
+  if (!UUID.test(String(duell || ''))) throw kennungsFehler('DUELL_ANFRAGE');
+  try { return normalisiereStand(await rpc('duell_ich_fertig', { duell })); } catch (e) {
+    // fehlt die RPC (SQL noch nicht eingespielt, PostgREST 404 PGRST202), ist das kein Fehler des Spiels; Duell-Kennungen
+    // gehen weiter nach oben. Alles andere (Netz weg, Server 5xx, Sitzung) ist voruebergehend: e.nochmal, die Seite meldet
+    // spaeter erneut (Kaltreview 0b, Hinweis 1), sonst gaelte still die alte Wartezeit
+    const k = kennungAus(e);
+    if (k) { const f = kennungsFehler(k); f.status = e.status; throw f; }
+    if (e?.status === 404 || e?.code === 'PGRST202') return null;
+    e.nochmal = true;
+    throw e;
+  }
 }
 
 export async function zug(duell, uci) {
