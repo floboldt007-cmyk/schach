@@ -92,14 +92,20 @@ function sonde({ einstellungen, sitzung }) {
     .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
   const beob = (typ, f, extra = {}) => { try { new PerformanceObserver((l) => l.getEntries().forEach(f)).observe({ type: typ, buffered: false, ...extra }); return true; } catch (e) { return false; } };
   beob('event', (e) => T.events.push({ start: e.startTime, dauer: e.duration, id: e.interactionId, name: e.name }), { durationThreshold: 16 });
-  T.loaf = beob('long-animation-frame', (e) => T.lang.push({ start: e.startTime, dauer: e.duration }));
+  // Ursachen: je langem Frame die drei teuersten Skripte (Datei:Funktion, Ausloeser, ms), je Sprung die springenden Elemente
+  const kurz = (u) => String(u || '').replace(/^.*\/(js|css)\//, '$1/').replace(/[?#].*$/, '');
+  T.loaf = beob('long-animation-frame', (e) => T.lang.push({ start: e.startTime, dauer: e.duration,
+    skripte: (e.scripts || []).slice().sort((a, b) => b.duration - a.duration).slice(0, 3)
+      .map((x) => `${kurz(x.sourceURL)}:${x.sourceFunctionName || '?'} [${x.invoker || x.invokerType || ''}] ${Math.round(x.duration)}ms`),
+    stil: Math.round(e.styleAndLayoutStart ? e.startTime + e.duration - e.styleAndLayoutStart : 0) }));
   if (!T.loaf) beob('longtask', (e) => T.lang.push({ start: e.startTime, dauer: e.duration }));
-  beob('layout-shift', (e) => T.shifts.push({ start: e.startTime, wert: e.value }));
+  const wer = (n) => { if (!n || !n.nodeType) return '?'; const el = n.nodeType === 1 ? n : n.parentElement; return el ? el.tagName.toLowerCase() + (el.classList[0] ? '.' + el.classList[0] : '') : '?'; };
+  beob('layout-shift', (e) => T.shifts.push({ start: e.startTime, wert: e.value, quellen: (e.sources || []).map((q) => wer(q.node)) }));
   T.beginne = () => { T.offen = true; T.eingabe = null; T.mutation = null; T.erste = null; T.events.length = 0; T.lang.length = 0; T.shifts.length = 0; T.bilder.length = 0; T.anim = new Map(); T.t0 = performance.now(); };
   // ohne Tipp (Kaltstart, Aufruf per app.gehe): Startzeit selbst setzen
   T.setzeStart = (t) => { T.eingabe = t; };
   T.warteFertig = (ziel, frist) => new Promise((ok) => {
-    let ruhig = 0; let alt = performance.now();
+    let alt = performance.now();
     // "!sel" = fertig, wenn sel verschwunden ist (Schliessen: gemessen ab dem Tipp, mit der Weg-Animation)
     const sichtbar = () => {
       if (ziel && ziel.startsWith('!')) return !document.querySelector(ziel.slice(1));
@@ -108,20 +114,31 @@ function sonde({ einstellungen, sitzung }) {
       const b = el.getBoundingClientRect();
       return b.width > 0 && b.height > 0 && getComputedStyle(el).visibility !== 'hidden';
     };
+    // getAnimations() ist teuer (im Profil bis 224 ms je Schritt am gedrosselten iPhone, 22.11.): darum nur alle 100 ms
+    // fragen und das Ende jeder Animation aus ihrer Startzeit rechnen, statt in jedem Bild auf "keine laeuft mehr" zu warten.
+    let sichtbarAb = null; let probeAm = -Infinity; let spaetestesEnde = 0;
     const schritt = (jetzt) => {
       T.bilder.push(jetzt - alt); alt = jetzt;
       if (T.mutation != null && T.erste == null) T.erste = jetzt;
-      const laufend = document.getAnimations().filter((a) => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming?.().endTime));
-      for (const a of laufend) {
-        const n = a.animationName || (a.transitionProperty ? 'uebergang:' + a.transitionProperty : 'animation');
-        const zielEl = a.effect?.target;
-        // mit Laenge (Verzoegerung + Dauer): daran sieht man, welche Animation das "fertig" bestimmt
-        const k = n + (zielEl?.classList?.[0] ? ' @' + zielEl.classList[0] : '');
-        T.anim.set(k, Math.max(T.anim.get(k) || 0, a.effect.getComputedTiming().endTime));
-      }
-      ruhig = sichtbar() && !laufend.length ? ruhig + 1 : 0;
+      if (sichtbarAb == null && sichtbar()) sichtbarAb = jetzt;
       const start = T.eingabe ?? T.t0;
-      if (ruhig >= 2) { ok({ ok: true, fertig: jetzt - start }); return; }
+      if (jetzt - probeAm >= 100) {
+        probeAm = jetzt;
+        let laeuft = 0;
+        for (const a of document.getAnimations()) {
+          if (a.playState !== 'running' && a.playState !== 'pending') continue;
+          const t = a.effect?.getComputedTiming?.();
+          if (!t || !Number.isFinite(t.endTime)) continue;   // endlos (Schimmer, Puls): zaehlt nicht
+          laeuft++;
+          if (a.startTime != null) spaetestesEnde = Math.max(spaetestesEnde, a.startTime + t.endTime / (a.playbackRate || 1));
+          const n = a.animationName || (a.transitionProperty ? 'uebergang:' + a.transitionProperty : 'animation');
+          const zielEl = a.effect?.target;
+          // mit Laenge (Verzoegerung + Dauer): daran sieht man, welche Animation das "fertig" bestimmt
+          const k = n + (zielEl?.classList?.[0] ? ' @' + zielEl.classList[0] : '');
+          T.anim.set(k, Math.max(T.anim.get(k) || 0, t.endTime));
+        }
+        if (sichtbarAb != null && !laeuft) { ok({ ok: true, fertig: Math.max(sichtbarAb, spaetestesEnde) - start }); return; }
+      }
       if (jetzt - T.t0 > frist) { ok({ ok: false, grund: sichtbar() ? 'Animation endet nicht' : 'Ziel nicht sichtbar: ' + ziel }); return; }
       requestAnimationFrame(schritt);
     };
@@ -139,6 +156,8 @@ function sonde({ einstellungen, sitzung }) {
       lang: lang.length, langSumme: lang.reduce((s, x) => s + x.dauer, 0), langMax: lang.length ? Math.max(...lang.map((x) => x.dauer)) : 0,
       ruckler: T.bilder.slice(1).filter((d) => d > 34).length,
       cls: T.shifts.filter(imFenster).reduce((s, x) => s + x.wert, 0),
+      ursachen: { frames: lang.map((x) => ({ ms: Math.round(x.dauer), stilLayoutMs: x.stil, skripte: x.skripte || [] })),
+        spruenge: T.shifts.filter(imFenster).filter((x) => x.wert > 0.01).map((x) => ({ wert: +x.wert.toFixed(3), quellen: x.quellen })) },
       anim: [...T.anim].sort((x, y) => y[1] - x[1]).map(([n, d]) => `${n} ${Math.round(d)}ms`), quelle: T.loaf ? 'long-animation-frame' : 'longtask',
     };
   });
@@ -218,8 +237,12 @@ async function laufeRunde(pw, browser, geraet, basis, { frist = 12000, trace = n
       if (st.vorher) await st.vorher(s, h);
       await s.waitForTimeout(400);
       await s.evaluate(() => window.__tempo.beginne());
+      // --profil=<Teil des Schrittnamens>: CPU-Profil genau dieses Schritts, Eigenzeit je Funktion (Ursachen langer Frames)
+      const profil = !!PROFIL && PROFIL.split('|').some((p) => st.name.includes(p));
+      if (profil) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
       await st.tun(s, h);
       const r = await s.evaluate(([z, f]) => window.__tempo.warteFertig(z, f), [st.ziel, frist]);
+      if (profil) r.profil = eigenzeit((await cdp.send('Profiler.stop')).profile);
       ergebnis.push({ name: st.name, wie: st.wie, ...r, fehler: r.ok ? '' : r.grund });
     } catch (e) {
       ergebnis.push({ name: st.name, wie: st.wie, fehler: String(e.message || e).split('\n')[0].slice(0, 120) });
@@ -231,6 +254,20 @@ async function laufeRunde(pw, browser, geraet, basis, { frist = 12000, trace = n
   return { ergebnis, seitenfehler, last: { vor: lastVor, nach: lastNach } };
 }
 
+const PROFIL = (process.argv.find((x) => x.startsWith('--profil=')) || '').slice(9);
+// Eigenzeit je Funktion aus einem CDP-Profil (ms, die 15 teuersten; Leerlauf und Programm weggelassen)
+export function eigenzeit(profil) {
+  const knoten = new Map(profil.nodes.map((n) => [n.id, n]));
+  const zeit = new Map();
+  const dt = profil.timeDeltas || [];
+  (profil.samples || []).forEach((id, i) => {
+    const n = knoten.get(id); const f = n.callFrame;
+    if (['(idle)', '(program)', '(root)'].includes(f.functionName)) return;
+    const k = (f.functionName || '(anonym)') + ' ' + String(f.url).replace(/^.*\/(js|css)\//, '$1/') + ':' + (f.lineNumber + 1);
+    zeit.set(k, (zeit.get(k) || 0) + (dt[i + 1] || 0) / 1000);
+  });
+  return [...zeit].sort((x, y) => y[1] - x[1]).slice(0, 15).map(([k, v]) => `${Math.round(v)}ms ${k}`);
+}
 // Last-Probe: 1 s auf einer leeren Seite (gleiche Drosselung). Ein unbelasteter Rechner haelt dort jedes Bild; stockt schon
 // die leere Seite, lief nebenher etwas anderes, und die Zahlen dieser Runde sind unter Last gemessen.
 export const LAST_GRENZE = 2;
