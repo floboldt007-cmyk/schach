@@ -6,6 +6,7 @@
 //   1. Im ersten Bild ist der Hintergrund noch nicht inert (die Kosten liegen nicht vor dem ersten Bild), im naechsten schon.
 //   2. Tipp oder Klick auf einen Knopf hinter dem Blatt trifft den Schleier, nicht den Knopf.
 //   3. Tab bleibt im Blatt; Enter und Leertaste auf dem Knopf, der vor dem Oeffnen den Fokus hatte, loesen ihn nicht aus.
+//      Auch ein eigener keydown-Handler dahinter (wie ein Brettfeld) bekommt die Taste nicht (Codex-Kaltreview 22.11. B1).
 //   4. Nach dem Schliessen ist nichts mehr inert und der Fokus liegt wieder auf dem Ausloeser (wie bisher).
 //   node tests/r27-blatt-tempo.test.mjs   (iPhone 13 mit Touch und PC, Netz nur simuliert)
 import http from 'node:http';
@@ -56,13 +57,16 @@ function initSkript() {
 // Probe-Knopf im Hintergrund (in #app, oben links, gross) und ein festgehaltenes erstes Bild: requestAnimationFrame sammelt
 // die Rueckrufe, bis lasseBilderLos() sie ausfuehrt. Danach laeuft die Seite normal weiter.
 const bereite = (s) => s.evaluate(() => {
-  window.__probe = { klicks: 0 };
+  window.__probe = { klicks: 0, tasten: 0 };
   let b = document.getElementById('probe-hinten');
   if (!b) {
     b = document.createElement('button');
     b.id = 'probe-hinten'; b.type = 'button'; b.textContent = 'Hinten';
     b.style.cssText = 'position:fixed;left:20px;top:200px;width:200px;height:120px;z-index:5';
     b.addEventListener('click', () => { window.__probe.klicks++; });
+    // eigener Tasten-Handler wie ein Brettfeld (js/board.js _feldTaste, Codex-Kaltreview 22.11. B1/B6): preventDefault der
+    // Blatt-Falle haelt nur die Browser-Aktion an, nicht diesen Handler
+    b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') window.__probe.tasten++; });
     document.getElementById('app').append(b);
   }
   const echt = window.__echtesRaf || window.requestAnimationFrame.bind(window);
@@ -82,7 +86,7 @@ const oeffne = (s) => s.evaluate(async () => {
 const stand = (s) => s.evaluate(() => {
   const still = [...document.body.children].filter((el) => !el.classList.contains('sheet-ort') && !el.matches('script, [role="status"], [aria-live]'));
   const a = document.activeElement;
-  return { inert: still.filter((el) => el.inert).length, alle: still.length, klicks: window.__probe.klicks, wert: window.__blattWert,
+  return { inert: still.filter((el) => el.inert).length, alle: still.length, klicks: window.__probe.klicks, tasten: window.__probe.tasten, wert: window.__blattWert,
     blatt: !!document.querySelector('.sheet-ort:not(.weg)'), fokusImBlatt: !!a && !!a.closest('.sheet-ort'), fokusId: a ? a.id : '' };
 });
 const zweiBilder = (s) => s.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -140,6 +144,7 @@ try {
         const t = await stand(s);
         const name = taste === ' ' ? 'Leertaste' : taste;
         pruefe(`${geraet}: ${name} im ersten Bild loest den Knopf hinter dem Blatt nicht aus`, t.klicks === 0, t);
+        pruefe(`${geraet}: ${name} im ersten Bild erreicht den eigenen Tasten-Handler hinter dem Blatt nicht (B1)`, t.tasten === 0, t);
         if (taste === 'Tab') pruefe(`${geraet}: Tab im ersten Bild bleibt im Blatt`, t.fokusImBlatt && t.blatt, t);
         else pruefe(`${geraet}: ${name} im ersten Bild trifft den sicheren Knopf des Blatts`, t.wert === 'fertig', t);
         await zu(s);
