@@ -1,0 +1,32 @@
+name: Server-Probe
+
+# Taeglich (R28, 23.11.2026): stehen alle Edge Functions und Datenbank-Funktionen aus dem Repo auch auf dem Server?
+# Anlass: online_zug_verbuchen fehlte 24 Tage unbemerkt. Rot = GitHub mailt von selbst.
+# Keine Geheimnisse: beide Probes nutzen nur den oeffentlichen Schluessel aus js/konto-config.js und fragen ohne Anmeldung.
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Edge Functions
+        if: always()
+        run: node werkzeuge/functions-probe.mjs
+      - name: Datenbank-Funktionen
+        if: always()
+        run: node werkzeuge/rpc-probe.mjs

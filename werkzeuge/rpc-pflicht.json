@@ -1,0 +1,89 @@
+{
+  "zweck": "Welche supabase/*schema.sql muessen auf dem Server eingespielt sein (werkzeuge/rpc-probe.mjs). Anlass 22.11.2026: online_zug_verbuchen fehlte seit dem 29.10., jeder Online-Zug sprang zurueck.",
+  "stand": "2026-11-23",
+  "regeln": "pflicht jetzt = fehlt/unklar ist ein Fehler; warnung = wird gemeldet, kein Fehler, bis pflicht_ab erreicht ist; ohne pflicht darf die Datei bis pflicht_ab fehlen. jetzt nur fuer Dateien, die am 22.11. live vollstaendig gemessen wurden. Neue Schema-Datei: zuerst warnung, nach dem Einspielen jetzt.",
+  "dateien": {
+    "abo-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "benutzername-bestaetigt-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "benutzername-sperre-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "coach-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "daten-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "freunde-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "gegner-effekte-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "karte-besitz-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "karte-elo-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "karte-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "karte-sondertitel-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "karte-titel-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "kronen-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "liga-bild-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "online-elo-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "online-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "pionier-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "raetsel-duell-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "saison-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "schule-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "verwaltung-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "weltrang-karte-schema.sql": {
+      "pflicht": "warnung",
+      "pflicht_ab": "Weltrang-Karte (Profilbild) freigegeben (live gemessen 23.11.2026: 1 Funktion da, bleibt Warnung bis zur Freigabe)"
+    },
+    "weltrang-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "werkstatt-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "zaehler-schema.sql": {
+      "pflicht": "jetzt"
+    },
+    "zwei-ligen-schema.sql": {
+      "pflicht": "jetzt"
+    }
+  }
+}
