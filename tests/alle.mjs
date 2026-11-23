@@ -101,6 +101,7 @@ const SUITEN = [
   { name: 'funktion-partie', datei: 'funktion-partie.test.mjs', args: [], was: 'Funktionsprobe Bot-Partie: Start, Zug, Hinweis, Sieg, Aufgeben, Ergebnisblatt (iPhone 13 + PC)' },
   { name: 'r19-lektionen-probe', datei: 'r19-lektionen-probe.mjs', args: [], was: 'Funktionsprobe Meisterschule: jede der 65 Lektionen Start, Zug per Klick, Ergebnisblatt (iPhone 13 + PC, hell + dunkel)' },
   { name: 'r19-lektionen-besser', datei: 'r19-lektionen-besser.test.mjs', args: [], was: 'Feinschliff R19: 13 lange Lektionen mit drei Runden, jede Stellung, jedes Ziel und jede Textbehauptung mit Stockfish nachgerechnet (Node)' },
+  { name: 'lektion-engine-tod', datei: 'lektion-engine-tod.test.mjs', args: [], was: 'R28: stirbt Stockfish mitten in einer Lektion, scheitert jede Anfrage mit Grund und der Kind-Lauf meldet ENGINE-TOT mit Ausgang 3 statt still 13 (Node)' },
   { name: 'r19-lektionen-runden', datei: 'r19-lektionen-runden.test.mjs', args: [], was: 'Feinschliff R19: Rundenknoepfe, Runde fuer Runde geschafft, Meisterprobe ohne Hinweis, alter Spielstand, iPhone SE (Browser)' },
   { name: 'ergebnis-einmal', datei: 'ergebnis-einmal.test.mjs', args: [], was: 'Ergebnisblatt der Bot-Partie: Spruch einmal, ein Nochmal-Knopf (Revanche), Knoepfe ab 44 px (iPhone 13 + PC)' },
   { name: 'r17-ende-feinschliff', datei: 'r17-ende-feinschliff.test.mjs', args: [], was: 'R17: Fokus nach Niederlage auf Zur Analyse, Namen auf der Duell-Ende-Karte, kein Streifen unter dem Profilbanner (Browser)' },
@@ -237,6 +238,7 @@ const SUITEN = [
   { name: 'r27-konto-trennung', datei: 'r27-konto-trennung.test.mjs', args: [], was: 'Konto-Trennung R27: neues Konto bekommt nie fremden Stand, Park je Konto, Abmelden lädt vorher hoch, Erfinder-Rahmen nur mit Besitz, Schutzschichten einzeln' },
   { name: 'r27-konto-tausch-matrix', datei: 'r27-konto-tausch-matrix.test.mjs', args: [], was: 'Konto-Tausch R27: Abbruch an jedem Schreibschritt (5 Starts, mit und ohne alten Park), nichts verloren, nichts fremd hochgeladen, keine Schleife' },
   { name: 'functions-probe', datei: 'functions-probe.test.mjs', args: [], was: 'Werkzeug functions-probe: fehlende Edge Functions auf dem Server erkennen (nachgebauter Server, Pflicht-Liste passt zum Repo)' },
+  { name: 'rpc-probe', datei: 'rpc-probe.test.mjs', args: [], was: 'Werkzeug rpc-probe: Datenbank-Funktionen, die live fehlen oder veraltete Parameter haben (nachgebauter PostgREST, Pflicht-Liste passt zum Repo)' },
   { name: 'r19-analyse-neu', datei: 'r19-analyse-neu.test.mjs', args: [], was: 'Feinschliff R19: Analyse neu (Schluesselmomente als Karten oben, Symbole gross, Verlauf ohne Kleintext, Ergebnis-Karte, Tempo, Auto-Abspielen) (Browser)' },
   { name: 'r19-verlauf-neu', datei: 'r19-verlauf-neu.test.mjs', args: [], was: 'Feinschliff R19: Verlauf neu (Partien ohne Zug als eine Zeile, Ergebniszeichen, Zu-zweit-Bild, leiser Muelleimer, eine Staerke-Zahl, Level-Karte im Rahmen)' },
   { name: 'r20-kopf-chip', datei: 'r20-kopf-chip.test.mjs', args: [], was: 'Feinschliff R20 B3: Kopf-Chips ganz da oder ganz weg, nie ein Stummel; / max nur am PC' },
@@ -244,7 +246,11 @@ const SUITEN = [
   { name: 'r20-effekt-vorschau', datei: 'r20-effekt-vorschau.test.mjs', args: [], was: 'Feinschliff R20: Regal Effekte im Shop, Vorschau einmal auf dem echten Brett an der richtigen Stelle, Standbild bei weniger Bewegung' },
   { name: 'r26-gegner-effekte', datei: 'r26-gegner-effekte.test.mjs', args: [], was: 'Feinschliff R26: Effekte vom Gegner online (Figurensatz je Farbe, Zug-Animation, Finisher des Siegers), nur vom Server belegt, Schalter aus, unbekannte Kennungen, weniger Bewegung, Funktion fehlt' },
   { name: 'r20-erste-schritte', datei: 'r20-erste-schritte.test.mjs', args: [], was: 'Feinschliff R20: Kurs Erste Schritte fuer Anfaenger (Stufe A): Sterne sammeln mit Umwandlungs-Falle, gut anfangen, Einstieg ueber "Nein", 10 Funken je Aufgabe' },
+  { name: 'r27-tempo-fix', datei: 'r27-tempo-fix.test.mjs', args: [], was: 'R27 Tempo: Ergebnisblatt-Knoepfe sofort, staffel kurz und gedeckelt, Kopf nur beim ersten Bildschirm, Bewegung aus ohne Animation, Vorrat der Eroeffnungen nur in Ruhe (ohne Browser)' },
+  { name: 'r27-blatt-tempo', datei: 'r27-blatt-tempo.test.mjs', args: [], was: 'R27 Tempo: Blatt ohne Wartezeit, im ersten Bild trifft kein Tipp und keine Taste etwas hinter dem Blatt, auch keinen eigenen Tasten-Handler (Browser)' },
+  { name: 'r27-tempo-befunde', datei: 'r27-tempo-befunde.test.mjs', args: [], was: 'R27 Tempo, Codex-Befunde: Shop-Vorschau schnell schliessen fuehrt zurueck in den Shop, Vorrat der Eroeffnungen nur auf der ruhigen Bots-Seite (Browser)' },
   { name: 'r25-leistung', datei: 'r25-leistung.test.mjs', args: [], was: 'Feinschliff R25 Leistung: Fokus und Messen beim Oeffnen im naechsten Bild, Pille nach dem Drehen, schnelles Enter oder Leerzeichen im ersten Bild gibt nicht auf (Browser)' },
+  { name: 'tempo-messung', datei: 'tempo-messung.test.mjs', args: [], was: 'Werkzeug tempo-messung: Auswertung (Median, Urteil, Rangliste, Last-Probe), ohne Browser' },
   { name: 'online-ende', datei: 'online-ende.test.mjs', args: [], was: 'Funktionsprobe Online-Ende: Revanche, Aufgeben, Remis, Neu laden (Browser)' },
   { name: 'r25-brett-fokus', datei: 'r25-brett-fokus.test.mjs', args: [], was: 'R25 Tastatur-Fokus auf dem Brett sichtbar, Rahmen und Koordinaten (Browser)' },
   { name: 'r25-brett-start', datei: 'r25-brett-start.test.mjs', args: [], was: 'R25 Brett beim Start der Partie sofort in voller Groesse (Browser)' },
@@ -314,9 +320,12 @@ async function lauf(suite) {
     const zeilen = e.text.split(/\r?\n/);
     const zahl = zeilen.map(z => z.match(/(\d+)\s*\/\s*(\d+)\s+bestanden/)).filter(Boolean).pop();
     const fehler = zeilen.filter(z => /^FEHLER/.test(z.trim()));
+    // eine Wiederholung (z. B. r19-lektionen-besser nach Engine-Tod) macht eine Suite gruen, soll aber auch in der
+    // Zusammenfassung sichtbar sein, nicht nur in der Ausgabe der Suite (Kaltreview PR #282, W3)
+    const warnungen = zeilen.filter(z => /^WARNUNG /.test(z.trim()));
     if (e.zeitlimit) fehler.push(`FEHLER Suite ${suite.name} ueberschritt ihr Zeitlimit (20 Minuten)`);
     return { ...suite, code: e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
-      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text };
+      gesamt: zahl ? +zahl[2] : null, fehler, warnungen, ende: zeilen.slice(-15), ausgabe: e.text };
   } finally { clearInterval(puls); }
 }
 
@@ -381,7 +390,9 @@ console.log('Suite         Prüfungen    Zeit   Ergebnis');
 for (const e of ergebnisse) {
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
   const ergebnis = e.kommtNoch ? `kommt noch mit ${e.kommtMit}` : e.code === 0 ? 'bestanden' : 'FEHLGESCHLAGEN';
-  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${ergebnis}`);
+  const warn = (e.warnungen || []).length;
+  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${ergebnis}${warn ? `, ${warn} WARNUNG` : ''}`);
+  for (const w of e.warnungen || []) console.log(`  ${w.trim().slice(0, 200)}`);
 }
 console.log(`\n${gelaufen - schlecht.length}/${gelaufen} Suiten bestanden${noch.length ? `, ${noch.length} kommt noch` : ''}, ${summeOk}/${summe} Prüfungen, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 process.exit(schlecht.length ? 1 : 0);

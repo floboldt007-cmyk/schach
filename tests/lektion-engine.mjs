@@ -21,6 +21,18 @@ export function stockfish() {
   const p = spawn(process.execPath, [SF], { stdio: ['pipe', 'pipe', 'inherit'] });
   let puffer = '';
   const warter = [];
+  // Stirbt die Engine (R28, 23.11.2026, tests/lektion-engine-tod.test.mjs), scheitert jede wartende und jede spaetere
+  // Anfrage mit Grund. Vorher wartete das await auf "bestmove" ewig, Node endete still mit Code 13 und die letzte
+  // Zeile war eine harmlose ok-Zeile (r19-lektionen-besser unter Last, Laufzettel 22.11.)
+  let tot = null;
+  const abbrecher = new Set();
+  const stirb = (grund) => {
+    if (tot) return;
+    tot = Object.assign(new Error(`Stockfish beendet (${grund})`), { engineTot: true });
+    for (const a of [...abbrecher]) a(tot);
+  };
+  p.on('exit', (code, signal) => stirb(`Ausgang ${code}, Signal ${signal}`));
+  p.on('error', (e) => stirb(e.message));
   p.stdout.on('data', (d) => {
     puffer += d;
     let i;
@@ -30,16 +42,21 @@ export function stockfish() {
       for (const w of [...warter]) w(z);
     }
   });
-  const sende = (s) => p.stdin.write(s + '\n');
-  const warte = (pruef) => new Promise((r) => {
-    const w = (z) => { if (pruef(z)) { warter.splice(warter.indexOf(w), 1); r(z); } };
+  // stdin einer toten Engine wirft EPIPE asynchron; das Scheitern meldet schon warte()
+  p.stdin.on('error', () => {});
+  const sende = (s) => { if (!tot) p.stdin.write(s + '\n'); };
+  const warte = (pruef) => new Promise((r, abbruch) => {
+    if (tot) { abbruch(tot); return; }
+    const w = (z) => { if (pruef(z)) { warter.splice(warter.indexOf(w), 1); abbrecher.delete(abbruch); r(z); } };
     warter.push(w);
+    abbrecher.add(abbruch);
   });
   const lies = (z, ziel) => {
     const m = /\bmultipv (\d+) .*score (mate|cp) (-?\d+).* pv (\S+)/.exec(z);
     if (m) ziel[Number(m[1]) - 1] = { uci: m[4], mate: m[2] === 'mate' ? Number(m[3]) : null, cp: m[2] === 'cp' ? Number(m[3]) : null };
   };
   return {
+    pid: p.pid,
     async init() { sende('uci'); await warte((z) => z === 'uciok'); sende('setoption name Hash value 32'); sende('isready'); await warte((z) => z === 'readyok'); },
     async neu() { sende('setoption name MultiPV value 1'); sende('ucinewgame'); sende('isready'); await warte((z) => z === 'readyok'); },
     async suche(fen, go) {
@@ -137,6 +154,17 @@ export function gut(e, art) {
   if (!e) return false;
   if (art === 'halten') return e.mate != null ? e.mate > 0 : e.cp >= -150;
   return e.mate != null ? e.mate > 0 : e.cp >= 400;
+}
+
+// Ein Kind-Lauf von r19-lektionen-besser, bei Ausgang 3 (ENGINE-TOT) einmal neu gerechnet. kind(id) -> { id, aus, code },
+// melde(text) schreibt die WARNUNG. Hier statt im Test selbst, damit tests/lektion-engine-tod.test.mjs (c) es pruefen kann.
+// Wiederholt wird nur ein Lauf ohne FEHLER-Zeile: hat er vor dem Engine-Tod schon FEHLER gedruckt, bleibt er das Ergebnis
+// (Ausgang 3, die Suite wird rot) und der Fehler steht in der Ausgabe (Kaltreview PR #282, W1).
+export async function mitWiederholung(kind, id, melde = console.log) {
+  const e = await kind(id);
+  if (e.code !== 3 || /^FEHLER /m.test(e.aus)) return e;
+  melde(`WARNUNG ${id}: ${(/^ENGINE-TOT .*$/m.exec(e.aus) || ['Engine tot'])[0]}, Lektion einmal neu gerechnet`);
+  return kind(id);
 }
 
 export { artVon, Chess };
