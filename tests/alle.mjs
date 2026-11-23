@@ -101,6 +101,7 @@ const SUITEN = [
   { name: 'funktion-partie', datei: 'funktion-partie.test.mjs', args: [], was: 'Funktionsprobe Bot-Partie: Start, Zug, Hinweis, Sieg, Aufgeben, Ergebnisblatt (iPhone 13 + PC)' },
   { name: 'r19-lektionen-probe', datei: 'r19-lektionen-probe.mjs', args: [], was: 'Funktionsprobe Meisterschule: jede der 65 Lektionen Start, Zug per Klick, Ergebnisblatt (iPhone 13 + PC, hell + dunkel)' },
   { name: 'r19-lektionen-besser', datei: 'r19-lektionen-besser.test.mjs', args: [], was: 'Feinschliff R19: 13 lange Lektionen mit drei Runden, jede Stellung, jedes Ziel und jede Textbehauptung mit Stockfish nachgerechnet (Node)' },
+  { name: 'lektion-engine-tod', datei: 'lektion-engine-tod.test.mjs', args: [], was: 'R28: stirbt Stockfish mitten in einer Lektion, scheitert jede Anfrage mit Grund und der Kind-Lauf meldet ENGINE-TOT mit Ausgang 3 statt still 13 (Node)' },
   { name: 'r19-lektionen-runden', datei: 'r19-lektionen-runden.test.mjs', args: [], was: 'Feinschliff R19: Rundenknoepfe, Runde fuer Runde geschafft, Meisterprobe ohne Hinweis, alter Spielstand, iPhone SE (Browser)' },
   { name: 'ergebnis-einmal', datei: 'ergebnis-einmal.test.mjs', args: [], was: 'Ergebnisblatt der Bot-Partie: Spruch einmal, ein Nochmal-Knopf (Revanche), Knoepfe ab 44 px (iPhone 13 + PC)' },
   { name: 'r17-ende-feinschliff', datei: 'r17-ende-feinschliff.test.mjs', args: [], was: 'R17: Fokus nach Niederlage auf Zur Analyse, Namen auf der Duell-Ende-Karte, kein Streifen unter dem Profilbanner (Browser)' },
@@ -318,9 +319,12 @@ async function lauf(suite) {
     const zeilen = e.text.split(/\r?\n/);
     const zahl = zeilen.map(z => z.match(/(\d+)\s*\/\s*(\d+)\s+bestanden/)).filter(Boolean).pop();
     const fehler = zeilen.filter(z => /^FEHLER/.test(z.trim()));
+    // eine Wiederholung (z. B. r19-lektionen-besser nach Engine-Tod) macht eine Suite gruen, soll aber auch in der
+    // Zusammenfassung sichtbar sein, nicht nur in der Ausgabe der Suite (Kaltreview PR #282, W3)
+    const warnungen = zeilen.filter(z => /^WARNUNG /.test(z.trim()));
     if (e.zeitlimit) fehler.push(`FEHLER Suite ${suite.name} ueberschritt ihr Zeitlimit (20 Minuten)`);
     return { ...suite, code: e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
-      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text };
+      gesamt: zahl ? +zahl[2] : null, fehler, warnungen, ende: zeilen.slice(-15), ausgabe: e.text };
   } finally { clearInterval(puls); }
 }
 
@@ -385,7 +389,9 @@ console.log('Suite         Prüfungen    Zeit   Ergebnis');
 for (const e of ergebnisse) {
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
   const ergebnis = e.kommtNoch ? `kommt noch mit ${e.kommtMit}` : e.code === 0 ? 'bestanden' : 'FEHLGESCHLAGEN';
-  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${ergebnis}`);
+  const warn = (e.warnungen || []).length;
+  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${ergebnis}${warn ? `, ${warn} WARNUNG` : ''}`);
+  for (const w of e.warnungen || []) console.log(`  ${w.trim().slice(0, 200)}`);
 }
 console.log(`\n${gelaufen - schlecht.length}/${gelaufen} Suiten bestanden${noch.length ? `, ${noch.length} kommt noch` : ''}, ${summeOk}/${summe} Prüfungen, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 process.exit(schlecht.length ? 1 : 0);
