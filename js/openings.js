@@ -384,6 +384,13 @@ export function eroeffnungBereit() {
   return !!INDEX;
 }
 
+// Ruhe fuer das Vorladen auf Vorrat (B2, Aufrufer js/ui/arena.js liest die Seite): die Bots-Seite steht, keine Partie ist offen,
+// kein Eingabefeld hat den Fokus und der letzte Tipp oder die letzte Taste liegt mindestens RUHE_NACH_EINGABE_MS zurueck
+export const RUHE_NACH_EINGABE_MS = 400;
+export function ruheFuerVorrat({ seiteDa, partieOffen, eingabeAktiv, seitEingabeMs }) {
+  return !!seiteDa && !partieOffen && !eingabeAktiv && seitEingabeMs >= RUHE_NACH_EINGABE_MS;
+}
+
 // Baut den Index in Stuecken von hoechstens ~30 ms (je ein setTimeout, dazwischen malt der Browser; unter der
 // Long-Task-Grenze von 50 ms), das erste Stueck erst nach dem Aufruf. Fragt eroeffnung() vorher, baut index() den Rest
 // sofort. -> Promise, erfuellt mit dem Index.
@@ -393,16 +400,29 @@ export function eroeffnungBereit() {
 // beiStueck, stueckMs: nur fuer Tests (Stuecke zaehlen, kleinere Stuecke).
 // leerlauf (R27 Tempo, gemessen 22.11.: ein 31-ms-Stueck lag im Tipp auf "Liga"): Vorladen auf Vorrat (Bots-Seite) laeuft nur
 // in echter Ruhezeit, je requestIdleCallback hoechstens LEER_MS und nie laenger, als der Browser Ruhe meldet; danach die
-// Namens-Tabelle genauso in Stuecken. Ein Tipp wartet so hoechstens LEER_MS. Ohne requestIdleCallback (Safari) wie oben.
+// Namens-Tabelle genauso in Stuecken. Ein Tipp wartet so hoechstens LEER_MS.
+// Codex-Kaltreview 22.11. B2: Ruhezeit des Browsers gibt es auch mitten in einer Partie oder beim Tippen. Im Leerlauf fragt
+// deshalb jedes Stueck vorher ruhig() (false: nichts tun, spaeter wieder fragen) und abbrechen() (true: aufhoeren, nichts mehr
+// einplanen, das Versprechen erfuellt sich mit null; die Partie baut dann selbst, wie ohne Vorrat). Ohne requestIdleCallback
+// (Safari) gilt dasselbe mit einem Timer im Abstand LEER_PAUSE_MS und Stuecken von LEER_MS, nicht mehr 30 ms.
 export const LEER_MS = 8;
-export function eroeffnungVorbereiten({ beiStueck, stueckMs = 30, leerlauf = false } = {}) {
+export const LEER_PAUSE_MS = 50;
+export function eroeffnungVorbereiten({ beiStueck, stueckMs = 30, leerlauf = false, ruhig = () => true, abbrechen = () => false } = {}) {
   if (INDEX && (!leerlauf || NAMEN_SCHLUESSEL)) return Promise.resolve(INDEX);
   const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const leer = leerlauf && typeof requestIdleCallback === 'function';
-  const spaeter = leer ? (f) => requestIdleCallback(f) : (f) => setTimeout(f, 0);
-  const frist = (d) => (leer ? Math.min(LEER_MS, d && d.timeRemaining ? d.timeRemaining() : LEER_MS) : stueckMs);
+  const spaeter = leer ? (f) => requestIdleCallback(f) : leerlauf ? (f) => setTimeout(f, LEER_PAUSE_MS) : (f) => setTimeout(f, 0);
+  const frist = (d) => (leer ? Math.min(LEER_MS, d && d.timeRemaining ? d.timeRemaining() : LEER_MS) : leerlauf ? LEER_MS : stueckMs);
+  // im Leerlauf vor jedem Stueck: weg -> aufhoeren, keine Ruhe -> spaeter nochmal fragen; true = jetzt arbeiten
+  const darf = (f, fertig) => {
+    if (!leerlauf) return true;
+    if (abbrechen()) { if (fertig) fertig(null); return false; }
+    if (!ruhig()) { spaeter(f); return false; }
+    return true;
+  };
   return new Promise((fertig) => {
     const namen = (d) => {
+      if (NAMEN_SCHLUESSEL || !darf(namen)) return;
       const ende = jetzt() + frist(d);
       namenBau ||= baueNamen();
       while (jetzt() < ende) if (namenBau.next().done) return;
@@ -410,6 +430,7 @@ export function eroeffnungVorbereiten({ beiStueck, stueckMs = 30, leerlauf = fal
     };
     const stueck = (d) => {
       if (INDEX) { fertig(INDEX); spaeter(namen); return; }
+      if (!darf(stueck, fertig)) return;
       bau ||= baue();
       if (beiStueck) beiStueck();
       const ende = jetzt() + frist(d);

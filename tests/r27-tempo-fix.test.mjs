@@ -105,5 +105,64 @@ B.setzeBewegung('normal');
   }
 }
 
+// ---------- 6. Vorladen nur, solange wirklich Ruhe ist (Codex-Kaltreview 22.11. B2) ----------
+// Partie, Eingabe oder frischer Tipp: kein Stueck Vorladearbeit. Bildschirm verlassen: Vorladen hoert auf, nichts bleibt
+// eingeplant. Ohne requestIdleCallback (Safari) gilt dasselbe, auch mit dem Timer-Ersatz.
+{
+  const vorher = globalThis.requestIdleCallback;
+  const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+  const warteschlange = [];
+  const leeren = async (n, ruheMs = 50) => {
+    for (let i = 0; i < n && warteschlange.length; i++) { warteschlange.shift()({ timeRemaining: () => ruheMs, didTimeout: false }); await Promise.resolve(); }
+  };
+  globalThis.requestIdleCallback = (f) => { warteschlange.push(f); return warteschlange.length; };
+  try {
+    // a) keine Ruhe (Partie laeuft, Eingabe hat den Fokus): nichts gebaut; danach Ruhe: fertig wie sonst
+    const a = await import('../js/openings.js?r27b2a');
+    let ruhig = false, stuecke = 0, fertigA = false;
+    a.eroeffnungVorbereiten({ leerlauf: true, ruhig: () => ruhig, beiStueck: () => { stuecke++; } }).then(() => { fertigA = true; });
+    await leeren(30);
+    pruefe('B2: ohne Ruhe (Partie oder Eingabe) kein Stueck Vorladearbeit', stuecke === 0 && !a.eroeffnungBereit(), { stuecke, bereit: a.eroeffnungBereit() });
+    pruefe('B2: ohne Ruhe bleibt das Vorladen eingeplant (es wartet, statt aufzugeben)', warteschlange.length === 1, warteschlange.length);
+    ruhig = true;
+    await leeren(20000);
+    pruefe('B2: sobald Ruhe ist, wird fertig vorgeladen', fertigA && a.eroeffnungBereit() && !warteschlange.length, { fertigA, rest: warteschlange.length });
+
+    // b) Bildschirm verlassen: aufhoeren, nichts mehr einplanen, auch mitten im Bau
+    warteschlange.length = 0;
+    const b = await import('../js/openings.js?r27b2b');
+    let weg = false, stueckeB = 0;
+    b.eroeffnungVorbereiten({ leerlauf: true, abbrechen: () => weg, beiStueck: () => { stueckeB++; } });
+    await leeren(2);
+    const vorWeg = stueckeB;
+    weg = true;
+    await leeren(50);
+    pruefe('B2: nach dem Verlassen der Seite kein weiteres Stueck', stueckeB === vorWeg && !b.eroeffnungBereit(), { vorWeg, nachher: stueckeB });
+    pruefe('B2: nach dem Verlassen ist nichts mehr eingeplant', !warteschlange.length, warteschlange.length);
+  } finally {
+    if (vorher) globalThis.requestIdleCallback = vorher; else delete globalThis.requestIdleCallback;
+  }
+
+  // c) ohne requestIdleCallback (Safari): der Timer-Ersatz fragt dieselbe Ruhe, ohne Ruhe kein Stueck
+  {
+    const c = await import('../js/openings.js?r27b2c');
+    let stueckeC = 0, weg = false;
+    c.eroeffnungVorbereiten({ leerlauf: true, ruhig: () => false, abbrechen: () => weg, beiStueck: () => { stueckeC++; } });
+    await warte(400);
+    weg = true;
+    await warte(300);
+    pruefe('B2: ohne requestIdleCallback und ohne Ruhe kein Stueck (kein 30-ms-Timer mehr)', stueckeC === 0 && !c.eroeffnungBereit(), stueckeC);
+  }
+
+  // d) Wer ist "Ruhe"? Bots-Seite sichtbar, keine Partie, kein Eingabefeld mit Fokus, letzte Eingabe laenger her
+  const o = await import('../js/openings.js?r27b2d');
+  const basis = { seiteDa: true, partieOffen: false, eingabeAktiv: false, seitEingabeMs: 5000 };
+  pruefe('B2: Ruhe auf der ruhigen Bots-Seite', o.ruheFuerVorrat(basis) === true);
+  pruefe('B2: keine Ruhe, solange eine Partie offen ist', o.ruheFuerVorrat({ ...basis, partieOffen: true }) === false);
+  pruefe('B2: keine Ruhe, solange ein Eingabefeld den Fokus hat', o.ruheFuerVorrat({ ...basis, eingabeAktiv: true }) === false);
+  pruefe(`B2: keine Ruhe kurz nach einem Tipp oder einer Taste (unter ${o.RUHE_NACH_EINGABE_MS} ms)`, o.ruheFuerVorrat({ ...basis, seitEingabeMs: 100 }) === false);
+  pruefe('B2: keine Ruhe, wenn die Seite weg ist', o.ruheFuerVorrat({ ...basis, seiteDa: false }) === false);
+}
+
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exitCode = ok === gesamt ? 0 : 1;
