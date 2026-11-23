@@ -249,12 +249,18 @@ export async function meinePartien({ beendete = false } = {}) {
 // Abfrage statt Websocket: alle 2 s eine kleine Anfrage, die nur dann eine Zeile liefert, wenn sich seit dem
 // letzten bekannten Stand (aktualisiert_am) etwas geaendert hat. Eine Anfrage laeuft nie doppelt.
 const ABSTAND_MAX_MS = 30000;
+// R28 (Flo 22.11.2026 "online spielen geht, aber noch zeitverzoegert"): gemessen kam ein Zug des Gegners im Mittel
+// ~1 s, bis 2 s nach dem Verbuchen an, fast nur durch den 2-s-Takt. Darum fragt beobachte() kurz (KURZ_MS), solange die
+// Partie laeuft und der GEGNER am Zug ist; sonst (ich am Zug, Einladung, Ende, Partie unbekannt) weiter `alle`.
+// Verborgene Seite pausiert wie bisher, Fehler wachsen wie bisher ab `alle`. Realtime bleibt der spaetere Weg.
+export const KURZ_MS = 600;
 // Fehler beim Holen der Sitzung: keine Sitzung oder Erneuern vom Server abgelehnt (4xx) heisst abgemeldet; ein
 // Netzfehler beim Erneuern (ohne Status) ist nur offline.
 function istAnmeldeFehler(e) {
   return e?.message === FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET || (Number.isInteger(e?.status) && e.status >= 400 && e.status < 500);
 }
-export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehler, bisEnde = true, dokument = globalThis.document } = {}) {
+export function beobachte(id, { alle = 2000, kurz = KURZ_MS, partie = null, seit = null, beiAenderung, beiFehler, bisEnde = true, dokument = globalThis.document } = {}) {
+  let letzte = partie && partie.id === id ? partie : null; // letzte bekannte Zeile: entscheidet den Takt
   let aktiv = true;
   let timer = null;
   let stand = seit || null;
@@ -279,7 +285,12 @@ export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehle
     melde(beiFehler, f);
     anhalten('abgemeldet');
   }
-  const abstand = () => (fehlerFolge ? Math.min(alle * 2 ** fehlerFolge, Math.max(alle, ABSTAND_MAX_MS)) : alle);
+  const gegnerAmZug = () => {
+    const f = letzte ? meineFarbe(letzte) : null;
+    return !!f && letzte.status === 'laeuft' && letzte.am_zug !== f;
+  };
+  const abstand = () => (fehlerFolge ? Math.min(alle * 2 ** fehlerFolge, Math.max(alle, ABSTAND_MAX_MS))
+    : gegnerAmZug() ? Math.min(kurz, alle) : alle);
   async function tick() {
     if (!aktiv || unterwegs) return;
     clearTimeout(timer); timer = null;
@@ -303,6 +314,7 @@ export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehle
         const empfang = Date.now();
         zeitProbe(p.aktualisiert_am, empfang, stand != null && davor != null && empfang - davor <= FRISCH_MS);
         stand = p.aktualisiert_am;
+        letzte = p;
         melde(beiAenderung, p);
         if (bisEnde && p.status === 'beendet') anhalten('beendet');
       } else if (!p && !stand) {
@@ -336,6 +348,14 @@ export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehle
   tick();
   return {
     stop() { anhalten(endGrund || 'stop'); },
+    // R28: die Oberflaeche kennt einen neueren Stand (z. B. die Antwort auf den eigenen Zug): der Takt richtet sich sofort
+    // danach; eine wartende Abfrage wird auf den neuen Abstand gesetzt. Der Stand fuer den Filter bleibt unberuehrt.
+    kenne(neu) {
+      if (!aktiv || !neu || neu.id !== id) return;
+      if (letzte && String(neu.aktualisiert_am || '') < String(letzte.aktualisiert_am || '')) return;
+      letzte = neu;
+      if (timer && !unterwegs && !versteckt()) { clearTimeout(timer); timer = setTimeout(tick, abstand()); }
+    },
     laeuft: () => aktiv,
     stand: () => stand,
     grund: () => endGrund,

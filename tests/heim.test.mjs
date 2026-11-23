@@ -18,7 +18,8 @@ import path from 'node:path';
 import { browserTyp } from './browser.mjs';
 import { eigenerZugriffsAbbruch } from './seitenfehler-stelle.mjs';
 import { neuerStand } from '../js/pakete/liga/wertung.js';
-import { addiereTage } from '../js/tag.js';
+import { addiereTage, beginnVon } from '../js/tag.js';
+import { tagDaten } from '../js/pakete/tagesraetsel/logik.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -494,7 +495,14 @@ async function testeTagesziele(browser, heute) {
   // sichtbar die Kurzform (einzeilig, passt aufs iPhone SE), der ganze Satz steht im Label (fable-check 19.11. Nr 9)
   pruefe('Bauernmarsch: "Heute: Partie/3 Rätsel", Label mit dem ganzen Satz', r.marsch === 'Bauernmarsch | Heute: Partie/3 Rätsel'
     && r.aria.some((a) => /Heute: 1 Partie oder 3 Rätsel spielen/.test(a || '')), r.marsch);
-  pruefe('Tagesraetsel: Nummer und Zuege', /^Tagesrätsel \| Rätsel \d+, in \d+ (Zug|Zügen)$/.test(r.raetsel || ''), r.raetsel);
+  // Erwartung aus den Raetseldaten des Tages statt einer festen Form: ein Matt-Raetsel zeigt "Matt in M"
+  // (js/pakete/tagesraetsel/logik.js zuegeText), sonst "in N Zug/Zuegen". Vorher kannte der Test nur die zweite Form
+  // und wurde an jedem Tag mit Matt-Raetsel rot (23.11.2026: Raetsel 36, Matt in 1). Frischer Speicher: erste Aufgabe.
+  const td = tagDaten(JSON.parse(readFileSync(path.join(WURZEL, 'daten/tagesraetsel/raetsel.json'), 'utf8')), heute);
+  const a0 = td?.aufgaben?.[0];
+  const n0 = a0 ? Math.ceil(a0.loesung.length / 2) : 0;
+  const zielRaetsel = !a0 ? null : `Tagesrätsel | Rätsel ${td.nummer}, ${a0.matt ? `Matt in ${a0.matt}` : `in ${n0} ${n0 === 1 ? 'Zug' : 'Zügen'}`}`;
+  pruefe(`Tagesraetsel: Nummer und Zuege aus den Daten des Tages (${zielRaetsel})`, !!zielRaetsel && r.raetsel === zielRaetsel, r.raetsel);
   pruefe('jede Zeile ein Knopf ab 44 px mit Beschriftung', r.knoepfe && r.aria.every((a) => a && !/undefined|NaN/.test(a)), JSON.stringify(r.aria));
   await seite.locator('.heim-naechstes [data-paket="serie"]').click();
   pruefe('Bauernmarsch oeffnet das Training (Klartext: 1 Partie oder 3 Rätsel)', await istScreen(seite, 'training'));
@@ -568,9 +576,12 @@ async function testeWege(browser, heute) {
 // "Willkommen zurueck" (Feinschliff 09.11.): nach mindestens 2 Tagen Pause (Tagesgrenze 4:00) die erste Zeile unter
 // "Als Naechstes" mit der letzten Partie und einem Knopf; taeglich und beim ersten Start nichts; nach dem Antippen weg
 const besuch = (tag, zurueck = null) => ({ [P + 'modul:besuch']: { tag, zurueck } });
-const PARTIE_WILLI = { id: 'pwilli1', datum: new Date(Date.now() - 3 * 864e5).toISOString(), botId: 'fridolin', spielerFarbe: 'w',
-  startFen: null, zuege: ['e2e4'], san: ['e4'], ergebnis: 'sieg', grund: 'matt', hinweise: 0, zuruecknahmen: 0, modus: 'normal' };
+// Partie gegen Willi, gespielt vor `tage` Tagen (12:00 Uhr Ortszeit an diesem Tag nach js/tag.js, Grenze 4:00);
+// tage = null: ohne Datum (alter oder beschaedigter Eintrag)
+const partieWilli = (heute, tage = 3) => ({ id: 'pwilli1', ...(tage == null ? {} : { datum: new Date(beginnVon(addiereTage(heute, -tage)).getTime() + 8 * 36e5).toISOString() }),
+  botId: 'fridolin', spielerFarbe: 'w', startFen: null, zuege: ['e2e4'], san: ['e4'], ergebnis: 'sieg', grund: 'matt', hinweise: 0, zuruecknahmen: 0, modus: 'normal' });
 async function testeRueckkehr(browser, heute) {
+  const PARTIE_WILLI = partieWilli(heute);
   gruppe = 'willkommen-zurueck';
   const zeile = (seite) => seite.evaluate(() => {
     const z = document.querySelector('.heim-liste .heim-zurueck');
@@ -633,12 +644,46 @@ async function testeRueckkehr(browser, heute) {
     if (name === 'Uhr zurückgestellt') pruefe('Uhr zurückgestellt: der spätere gemerkte Tag bleibt', (await gemerkt(seite)).tag === addiereTage(heute, 2));
     await kontext.close();
   }
-  // Englisch
+  // Nachbesserung Runde 5: die Zeitangabe gehoert zur PARTIE, nicht zum letzten Besuch. Partie vor 20 Tagen, zuletzt
+  // vor 3 Tagen hier: "vor 20 Tagen" (vorher stand faelschlich "vor 3 Tagen" da). Gestern/heute gespielt (z. B. ueber
+  // einen Direktlink ohne die Startseite): eigenes Wort. Ohne Datum: keine Zeitangabe statt einer falschen
+  for (const [name, pause, tage, soll, sprache] of [
+    ['Partie vor 20 Tagen, Besuch vor 3 Tagen', 3, 20, 'Willkommen zurück | Sieg gegen Willi vor 20 Tagen'],
+    ['Partie gestern, Besuch vor 2 Tagen', 2, 1, 'Willkommen zurück | Sieg gegen Willi gestern'],
+    ['Partie heute, Besuch vor 2 Tagen', 2, 0, 'Willkommen zurück | Sieg gegen Willi heute'],
+    ['Partie ohne Datum', 3, null, 'Willkommen zurück | Sieg gegen Willi'],
+    ['Partie-Datum in der Zukunft (Uhr verstellt)', 3, -2, 'Willkommen zurück | Sieg gegen Willi'],
+    ['Englisch, Partie vor 20 Tagen, Besuch vor 3 Tagen', 3, 20, 'Welcome back | Win vs Willi, 20 days ago', 'en'],
+    ['Englisch, Partie gestern', 2, 1, 'Welcome back | Win vs Willi, yesterday', 'en'],
+    ['Englisch, Partie ohne Datum', 3, null, 'Welcome back | Win vs Willi', 'en']]) {
+    ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -pause)), [P + 'partien']: [partieWilli(heute, tage)],
+      ...(sprache ? { [P + 'einstellungen']: { sprache } } : {}) } }));
+    await istScreen(seite, 'heim');
+    z = await zeile(seite);
+    pruefe(`${name}: „${soll.split(' | ')[1]}“`, z && z.text === soll, JSON.stringify(z));
+    await kontext.close();
+  }
+  // Kaltreview 22 (W1): Datum wenige Stunden in der Zukunft, aber am selben Spieltag (Uhr verstellt): keine Zeitangabe statt "heute".
+  // Feste Uhr statt Date.now() (Kaltreview #277): zwischen 1 und 4 Uhr laege "+3 Stunden" sonst schon auf dem naechsten Spieltag
+  // (TAG_GRENZE_STUNDE in js/tag.js), und der Fall bestuende auch ohne den Fix. Gegenprobe 08:00 -> 0 (heute).
+  ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute) } }));
+  await istScreen(seite, 'heim');
+  const w1 = await seite.evaluate(async () => {
+    const { tageSeitPartie } = await import('/js/ui/heim.js');
+    const jetzt = new Date(2026, 10, 22, 10, 0);
+    return { zukunft: tageSeitPartie({ datum: new Date(2026, 10, 22, 13, 0).toISOString() }, jetzt),
+      vorhin: tageSeitPartie({ datum: new Date(2026, 10, 22, 8, 0).toISOString() }, jetzt) };
+  });
+  pruefe('Partie-Datum 3 Stunden in der Zukunft (feste Uhr 10:00, Partie 13:00): keine Zeitangabe, 08:00 bleibt heute',
+    w1.zukunft === null && w1.vorhin === 0, JSON.stringify(w1));
+  await kontext.close();
+  // Englisch: ganze Zeile mit Gegner und Zeitangabe (Besuch vor 2 Tagen, Partie vor 3 Tagen), Knopf und Vorlese-Text
   ({ kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), ...besuch(addiereTage(heute, -2)), [P + 'partien']: [PARTIE_WILLI],
     [P + 'einstellungen']: { sprache: 'en' } } }));
   await istScreen(seite, 'heim');
   z = await zeile(seite);
-  pruefe('Englisch: "Welcome back", Knopf "Play"', z && z.text.startsWith('Welcome back | Win vs ') && z.knopf === 'Play', JSON.stringify(z));
+  pruefe('Englisch: "Welcome back | Win vs Willi, 3 days ago", Knopf "Play", Vorlese-Text vollständig', z && z.text === 'Welcome back | Win vs Willi, 3 days ago'
+    && z.knopf === 'Play' && z.label === 'Welcome back. Win vs Willi, 3 days ago. Play', JSON.stringify(z));
   await kontext.close();
 }
 
@@ -651,7 +696,7 @@ async function testeGroessen(browser, heute) {
       // mit Konto und Kronen-Stand: die Liga-Zeile unter "Als Naechstes" ist da (der volle Fall), dazu nach 3 Tagen Pause
       // die Zeile "Willkommen zurueck" (Feinschliff 09.11.)
       const speicher = { ...gesehen(heute), [P + 'einstellungen']: { modus: schema === 'dark' ? 'dunkel' : 'hell' },
-        ...besuch(addiereTage(heute, -3)), [P + 'partien']: [PARTIE_WILLI] };
+        ...besuch(addiereTage(heute, -3)), [P + 'partien']: [partieWilli(heute)] };
       if (partie) speicher[P + 'laufend'] = laufend();
       const { kontext, seite } = await kontoSeite(browser, { w, h, schema, speicher, stand: STAND });
       await istScreen(seite, 'heim');
