@@ -2,7 +2,7 @@
 // Lauf gegen die App (Bericht im Vault, R27-Kritik/tempo.md); hier steht, dass aus den Rohwerten die richtige Rangliste wird
 // und dass ein nicht erreichter Schritt nie still als schnell erscheint.
 //   node tests/tempo-messung.test.mjs
-import { median, urteil, fasseZusammen, rangliste, tabelle, schritte, GERAETE, lastText, spanne, vergleiche, wechselfolge, vergleichTabelle } from '../werkzeuge/tempo-messung.mjs';
+import { vergleichsLauf, miss, median, urteil, fasseZusammen, rangliste, tabelle, schritte, GERAETE, lastText, spanne, vergleiche, wechselfolge, vergleichTabelle } from '../werkzeuge/tempo-messung.mjs';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') {
@@ -64,13 +64,29 @@ pruefe('Vergleich: ein Lauf je Stand reicht nie fuer ein Urteil', vergleiche([14
 pruefe('Vergleich: nicht erreichte Laeufe zaehlen nicht mit', vergleiche([1300, null], [1900, 1950]).urteil === 'zu wenig Laeufe');
 // Probelauf 23.11. mit DEMSELBEN Stand als A und B: zwei Laeufe schaetzen das Rauschen zu klein (Shop 512/497 gegen 493/482,
 // Einstellungen zurueck 527/533 gegen 519/522). Ein Abstand unter 50 ms bzw. 10 % ist darum nie ein Unterschied
-pruefe('Vergleich: gleicher Stand, kleiner Abstand (Shop 17 ms) ist zu klein', vergleiche([512, 497], [493, 482]).urteil === 'zu klein (unter 50 ms bzw. 10 %)');
-pruefe('Vergleich: gleicher Stand, 10 ms bei Einstellungen ist zu klein', vergleiche([527, 533], [519, 522]).urteil === 'zu klein (unter 50 ms bzw. 10 %)');
-pruefe('Vergleich: 10 % zaehlt bei langen Schritten (1500 gegen 1640 ist 140 ms, unter 150)', vergleiche([1500, 1505], [1640, 1642]).urteil === 'zu klein (unter 50 ms bzw. 10 %)');
+pruefe('Vergleich: gleicher Stand, kleiner Abstand (Shop 17 ms) ist im Rauschen', vergleiche([512, 497], [493, 482]).urteil === 'im Rauschen');
+pruefe('Vergleich: gleicher Stand, 10 ms bei Einstellungen ist im Rauschen', vergleiche([527, 533], [519, 522]).urteil === 'im Rauschen');
+pruefe('Vergleich: 10 % zaehlt bei langen Schritten (1500 gegen 1640 ist 140 ms, unter 150)', vergleiche([1500, 1505], [1640, 1642]).urteil === 'im Rauschen');
 pruefe('Wechselfolge A B A B', JSON.stringify(wechselfolge(2)) === '["A","B","A","B"]' && wechselfolge(3).join('') === 'ABABAB');
 const vt = vergleichTabelle('iphone13', { A: [[{ name: 'Kaltstart', fertig: 1850 }], [{ name: 'Kaltstart', fertig: 1317 }]],
   B: [[{ name: 'Kaltstart', fertig: 1349 }], [{ name: 'Kaltstart', fertig: 1930 }]] });
-pruefe('Vergleichstabelle: Schritt, beide Laeufe, Urteil', /\| Kaltstart \| 1850 \/ 1317 \| 1349 \/ 1930 \| 1584 \| 1640 \| 56 \| 581 \| im Rauschen \|/.test(vt), vt);
+pruefe('Vergleichstabelle: Schritt, beide Laeufe, Urteil', /\| Kaltstart \| 1850 \/ 1317 \| 1349 \/ 1930 \| 1583\.5 \| 1639\.5 \| 56\.0 \| 581\.0 \| im Rauschen \|/.test(vt), vt);
+
+// Kaltreview #284 (Fenster 81, 23.11.2026): B1 Eingaben, B2 strengere Regel (Entscheidung Hauptfenster), B3 Anzeige
+const v3 = vergleiche([1000, 1000, 1100], [1050, 1150, 1150]);
+pruefe('B2: Spannen ueberlappen ([1000,1000,1100] gegen [1050,1150,1150]) = im Rauschen', v3.urteil === 'im Rauschen', JSON.stringify(v3));
+pruefe('B2: getrennte Spannen und genug Abstand = Unterschied', vergleiche([1000, 1000, 1050], [1100, 1150, 1150]).urteil === 'Unterschied: B langsamer');
+pruefe('B2: getrennte Spannen, aber unter dem Mindestabstand = im Rauschen', vergleiche([500, 501], [520, 521]).urteil === 'im Rauschen');
+const vt3 = vergleichTabelle('pc', { A: [[{ name: 'X', fertig: 100 }], [{ name: 'X', fertig: 100.4 }]], B: [[{ name: 'X', fertig: 149.6 }], [{ name: 'X', fertig: 150 }]] });
+pruefe('B3: 49.6 ms Abstand erscheint nicht als 50', /\| 49\.6 \|/.test(vt3), vt3);
+const wirft = async (f) => { try { await f(); return 'kein Fehler'; } catch (e) { return e.message; } };
+for (const [was, o] of [['laeufe NaN (abc)', { laeufe: NaN }], ['laeufe 2.5', { laeufe: 2.5 }], ['laeufe 1', { laeufe: 1 }],
+  ['runden NaN', { laeufe: 2, runden: NaN }], ['runden 2.5', { laeufe: 2, runden: 2.5 }], ['runden 0', { laeufe: 2, runden: 0 }]]) {
+  const m = await wirft(() => vergleichsLauf({ wurzelA: 'x', wurzelB: 'y', aus: 'z', ...o }));
+  pruefe('B1: Vergleich lehnt ' + was + ' ab', /^--(laeufe|runden):/.test(m), m);
+}
+const mr = await wirft(() => miss({ wurzel: 'x', aus: 'z', runden: NaN }));
+pruefe('B1: Einzelmessung lehnt runden NaN ab', /^--runden:/.test(mr), mr);
 
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exitCode = ok === gesamt ? 0 : 1;

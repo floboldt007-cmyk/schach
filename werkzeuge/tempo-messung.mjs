@@ -72,8 +72,12 @@ export function spanne(werte) {
 // ---------- Vergleich zweier Staende (R28, 23.11.2026, Auftrag AC) ----------
 // Anlass: Ein Lauf je Stand meldete 1478 -> 1930 ms Kaltstart als Bremse. Zweimal gemessen lag derselbe Stand bei 1850 und
 // 1317 (Vault: Schach-App/Feinschliff 2026-11-11/bremse-seit-2cdfc28c-2026-11-23.md). Darum: jeder Stand mindestens zweimal,
-// abwechselnd A B A B (damit eine Laststufe des PCs beide trifft), und ein Unterschied gilt nur, wenn die Mediane der Laeufe
-// weiter auseinander liegen als die groessere Spanne am selben Stand. Sonst heisst es "im Rauschen".
+// abwechselnd A B A B (damit eine Laststufe des PCs beide trifft), und ein Unterschied gilt nur, wenn die Mediane mindestens
+// 50 ms bzw. 10 % auseinander liegen UND sich die Spannen beider Staende nicht ueberlappen. Sonst heisst es "im Rauschen".
+export const REGEL = 'Unterschied nur, wenn die Mediane mindestens 50 ms bzw. 10 % auseinander liegen und sich die Spannen beider Staende nicht ueberlappen (auch nicht beruehren), sonst im Rauschen.';
+export function pruefeAnzahl(name, n, min) {
+  if (!Number.isInteger(n) || n < min) throw new Error(`--${name}: ganze Zahl ab ${min} noetig, bekommen: ${n}`);
+}
 export const MINDEST_MS = 50;
 export const MINDEST_ANTEIL = 0.1;
 export function wechselfolge(laeufe) { return Array.from({ length: laeufe * 2 }, (_, i) => (i % 2 ? 'B' : 'A')); }
@@ -87,9 +91,11 @@ export function vergleiche(a, b) {
   const abstand = Math.abs(mb - ma), rauschen = Math.max(sa.breite, sb.breite);
   // Mindestabstand: Probelauf 23.11. mit demselben Stand als A und B, zwei Laeufe schaetzten das Rauschen zu klein und meldeten
   // 17 ms (Shop) und 10 ms (Einstellungen) als Unterschied. Unter 50 ms bzw. 10 % ist es fuer den Menschen ohnehin keiner
-  const klein = abstand < Math.max(MINDEST_MS, MINDEST_ANTEIL * Math.min(ma, mb));
-  const urteil = abstand <= rauschen ? 'im Rauschen' : klein ? 'zu klein (unter 50 ms bzw. 10 %)'
-    : `Unterschied: B ${mb > ma ? 'langsamer' : 'schneller'}`;
+  const gross = abstand >= Math.max(MINDEST_MS, MINDEST_ANTEIL * Math.min(ma, mb));
+  // Kaltreview #284 B2 (Entscheidung Hauptfenster 23.11.): bei 3 Laeufen fiel "Unterschied" trotz ueberlappender Spannen
+  // ([1000,1000,1100] gegen [1050,1150,1150]). Darum zusaetzlich: jeder Lauf von B liegt ueber (bzw. unter) jedem Lauf von A
+  const getrennt = sb.min > sa.max || sb.max < sa.min;
+  const urteil = gross && getrennt ? `Unterschied: B ${mb > ma ? 'langsamer' : 'schneller'}` : 'im Rauschen';
   return { urteil, a: ma, b: mb, abstand, rauschen };
 }
 
@@ -101,7 +107,8 @@ export function vergleichTabelle(geraet, laeufe) {
     '|---|---|---|---|---|---|---|---|'];
   for (const name of namen) {
     const a = werte('A', name), b = werte('B', name), v = vergleiche(a, b);
-    z.push(`| ${name} | ${a.map((x) => zahl(x)).join(' / ')} | ${b.map((x) => zahl(x)).join(' / ')} | ${zahl(v.a)} | ${zahl(v.b)} | ${zahl(v.abstand)} | ${zahl(v.rauschen)} | ${v.urteil} |`);
+    // eine Nachkommastelle (Kaltreview B3): 49.6 darf nicht als "50" neben der 50-ms-Grenze stehen
+    z.push(`| ${name} | ${a.map((x) => zahl(x)).join(' / ')} | ${b.map((x) => zahl(x)).join(' / ')} | ${zahl(v.a, 1)} | ${zahl(v.b, 1)} | ${zahl(v.abstand, 1)} | ${zahl(v.rauschen, 1)} | ${v.urteil} |`);
   }
   return z.join('\n');
 }
@@ -352,6 +359,7 @@ function server(wurzel) {
 }
 
 export async function miss({ wurzel, aus, runden = 3, geraete = Object.keys(GERAETE), trace = false, playwright }) {
+  pruefeAnzahl('runden', runden, 1);
   const require = createRequire(import.meta.url);
   let pw = playwright;
   for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright'].filter(Boolean)) { if (pw) break; try { pw = require(p); } catch (e) { /* naechster */ } }
@@ -388,7 +396,9 @@ export async function miss({ wurzel, aus, runden = 3, geraete = Object.keys(GERA
 
 // Vergleich: misst A und B abwechselnd (A B A B ...), jeder Lauf in <aus>/<A|B>-<n>/, Ergebnis <aus>/vergleich.md
 export async function vergleichsLauf({ wurzelA, wurzelB, aus, laeufe = 2, runden = 3, geraete = Object.keys(GERAETE), playwright }) {
-  if (laeufe < 2) throw new Error('--laeufe: mindestens 2 je Stand, ein Lauf ist kein Vergleich');
+  // Kaltreview #284 B1: NaN (Tippfehler) mass sonst still nichts, 2.5 gab ungleich viele Laeufe je Stand
+  pruefeAnzahl('laeufe', laeufe, 2);
+  pruefeAnzahl('runden', runden, 1);
   const laeufeJe = { A: [], B: [] }; const zaehler = { A: 0, B: 0 };
   for (const seite of wechselfolge(laeufe)) {
     const n = ++zaehler[seite];
@@ -403,8 +413,7 @@ export async function vergleichsLauf({ wurzelA, wurzelB, aus, laeufe = 2, runden
   }).join('\n\n');
   writeFileSync(path.join(aus, 'vergleich.md'), `# Tempo-Vergleich\n\nA = ${wurzelA}\nB = ${wurzelB}\n\n`
     + `${laeufe} Laeufe je Stand, abwechselnd ${wechselfolge(laeufe).join(' ')}, je Lauf Median aus ${runden} Runden (fertig, ms).\n`
-    + 'Unterschied nur, wenn der Abstand der Mediane groesser ist als die groessere Spanne am selben Stand UND mindestens '
-    + `${MINDEST_MS} ms bzw. ${MINDEST_ANTEIL * 100} % betraegt.\n\n` + md + '\n');
+    + REGEL + '\n\n' + md + '\n');
   return laeufeJe;
 }
 
