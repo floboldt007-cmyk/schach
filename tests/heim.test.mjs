@@ -19,6 +19,7 @@ import { browserTyp } from './browser.mjs';
 import { eigenerZugriffsAbbruch } from './seitenfehler-stelle.mjs';
 import { neuerStand } from '../js/pakete/liga/wertung.js';
 import { addiereTage, beginnVon } from '../js/tag.js';
+import { tagDaten } from '../js/pakete/tagesraetsel/logik.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -494,7 +495,14 @@ async function testeTagesziele(browser, heute) {
   // sichtbar die Kurzform (einzeilig, passt aufs iPhone SE), der ganze Satz steht im Label (fable-check 19.11. Nr 9)
   pruefe('Bauernmarsch: "Heute: Partie/3 Rätsel", Label mit dem ganzen Satz', r.marsch === 'Bauernmarsch | Heute: Partie/3 Rätsel'
     && r.aria.some((a) => /Heute: 1 Partie oder 3 Rätsel spielen/.test(a || '')), r.marsch);
-  pruefe('Tagesraetsel: Nummer und Zuege', /^Tagesrätsel \| Rätsel \d+, in \d+ (Zug|Zügen)$/.test(r.raetsel || ''), r.raetsel);
+  // Erwartung aus den Raetseldaten des Tages statt einer festen Form: ein Matt-Raetsel zeigt "Matt in M"
+  // (js/pakete/tagesraetsel/logik.js zuegeText), sonst "in N Zug/Zuegen". Vorher kannte der Test nur die zweite Form
+  // und wurde an jedem Tag mit Matt-Raetsel rot (23.11.2026: Raetsel 36, Matt in 1). Frischer Speicher: erste Aufgabe.
+  const td = tagDaten(JSON.parse(readFileSync(path.join(WURZEL, 'daten/tagesraetsel/raetsel.json'), 'utf8')), heute);
+  const a0 = td?.aufgaben?.[0];
+  const n0 = a0 ? Math.ceil(a0.loesung.length / 2) : 0;
+  const zielRaetsel = !a0 ? null : `Tagesrätsel | Rätsel ${td.nummer}, ${a0.matt ? `Matt in ${a0.matt}` : `in ${n0} ${n0 === 1 ? 'Zug' : 'Zügen'}`}`;
+  pruefe(`Tagesraetsel: Nummer und Zuege aus den Daten des Tages (${zielRaetsel})`, !!zielRaetsel && r.raetsel === zielRaetsel, r.raetsel);
   pruefe('jede Zeile ein Knopf ab 44 px mit Beschriftung', r.knoepfe && r.aria.every((a) => a && !/undefined|NaN/.test(a)), JSON.stringify(r.aria));
   await seite.locator('.heim-naechstes [data-paket="serie"]').click();
   pruefe('Bauernmarsch oeffnet das Training (Klartext: 1 Partie oder 3 Rätsel)', await istScreen(seite, 'training'));
