@@ -8,7 +8,7 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { stockfish } from './lektion-engine.mjs';
+import { stockfish, mitWiederholung } from './lektion-engine.mjs';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let ok = 0, gesamt = 0;
@@ -56,6 +56,40 @@ const toeten = (pid) => { try { process.kill(pid, 'SIGKILL'); } catch (e) { /* s
   if (code === 'frist') toeten(p.pid);
   pruefe('(b) Kind-Lauf endet mit Ausgang 3 (Engine tot), nicht 13', code === 3, `Ausgang ${code}`);
   pruefe('(b) Kind-Lauf sagt ENGINE-TOT mit Grund', /^ENGINE-TOT philidor: Stockfish beendet/m.test(aus), aus.slice(-300));
+}
+
+// (c) Wiederholung bei Ausgang 3 (Kaltreview PR #282, W1): nur ein Lauf OHNE FEHLER-Zeile wird neu gerechnet. Hat der erste
+// Lauf vor dem Engine-Tod schon FEHLER gedruckt, bleibt er das Ergebnis (rot), sonst verschwaende der Fehler mit ihm.
+// Nachgebaute Kind-Laeufe, keine Engine.
+{
+  const lauf = (aus, code) => ({ id: 'x', aus, code });
+  const folge = (...l) => { const r = [...l]; let n = 0; const kind = async () => { n++; return r.shift(); }; kind.anzahl = () => n; return kind; };
+  const still = () => {};
+  const OK = lauf('ok     x R1: legale Lektionsstellung\n\n3/3 bestanden\n', 0);
+  {
+    const k = folge(lauf('ok     x R1: legale Lektionsstellung\nFEHLER x R2: geschafft  remis\nENGINE-TOT x: Stockfish beendet\n', 3), OK);
+    const e = await mitWiederholung(k, 'x', still);
+    pruefe('(c) FEHLER vor dem Engine-Tod: keine Wiederholung', k.anzahl() === 1, `${k.anzahl()} Laeufe`);
+    pruefe('(c) FEHLER vor dem Engine-Tod: die FEHLER-Zeile bleibt im Ergebnis, Ausgang 3', /^FEHLER x R2/m.test(e.aus) && e.code === 3, JSON.stringify(e));
+  }
+  {
+    const meldungen = [];
+    const k = folge(lauf('ok     x R1: legale Lektionsstellung\nENGINE-TOT x: Stockfish beendet\n', 3), OK);
+    const e = await mitWiederholung(k, 'x', (m) => meldungen.push(m));
+    pruefe('(c) Engine-Tod ohne FEHLER: einmal neu gerechnet, zweiter Lauf zaehlt', k.anzahl() === 2 && e === OK, `${k.anzahl()} Laeufe`);
+    pruefe('(c) Engine-Tod ohne FEHLER: WARNUNG mit Grund', meldungen.length === 1 && /^WARNUNG x: ENGINE-TOT x: Stockfish beendet/.test(meldungen[0]), meldungen.join(' | '));
+  }
+  {
+    const tot = lauf('ENGINE-TOT x: Stockfish beendet\n', 3);
+    const k = folge(tot, { ...tot });
+    const e = await mitWiederholung(k, 'x', still);
+    pruefe('(c) zweimal tot: genau eine Wiederholung, bleibt Ausgang 3', k.anzahl() === 2 && e.code === 3, `${k.anzahl()} Laeufe, Ausgang ${e.code}`);
+  }
+  {
+    const k = folge(lauf('FEHLER x R1: legale Lektionsstellung\n\n0/1 bestanden\n', 1));
+    const e = await mitWiederholung(k, 'x', still);
+    pruefe('(c) gewoehnlicher FEHLER (Ausgang 1): keine Wiederholung', k.anzahl() === 1 && e.code === 1, `${k.anzahl()} Laeufe`);
+  }
 }
 
 console.log(`\n${ok}/${gesamt} bestanden`);

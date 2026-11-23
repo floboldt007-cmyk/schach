@@ -315,9 +315,12 @@ async function lauf(suite) {
     const zeilen = e.text.split(/\r?\n/);
     const zahl = zeilen.map(z => z.match(/(\d+)\s*\/\s*(\d+)\s+bestanden/)).filter(Boolean).pop();
     const fehler = zeilen.filter(z => /^FEHLER/.test(z.trim()));
+    // eine Wiederholung (z. B. r19-lektionen-besser nach Engine-Tod) macht eine Suite gruen, soll aber auch in der
+    // Zusammenfassung sichtbar sein, nicht nur in der Ausgabe der Suite (Kaltreview PR #282, W3)
+    const warnungen = zeilen.filter(z => /^WARNUNG /.test(z.trim()));
     if (e.zeitlimit) fehler.push(`FEHLER Suite ${suite.name} ueberschritt ihr Zeitlimit (20 Minuten)`);
     return { ...suite, code: e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
-      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15), ausgabe: e.text };
+      gesamt: zahl ? +zahl[2] : null, fehler, warnungen, ende: zeilen.slice(-15), ausgabe: e.text };
   } finally { clearInterval(puls); }
 }
 
@@ -382,7 +385,9 @@ console.log('Suite         Prüfungen    Zeit   Ergebnis');
 for (const e of ergebnisse) {
   const zahl = e.gesamt != null ? `${e.ok}/${e.gesamt}` : '-';
   const ergebnis = e.kommtNoch ? `kommt noch mit ${e.kommtMit}` : e.code === 0 ? 'bestanden' : 'FEHLGESCHLAGEN';
-  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${ergebnis}`);
+  const warn = (e.warnungen || []).length;
+  console.log(`${e.name.padEnd(12)} ${zahl.padStart(10)} ${(e.sekunden.toFixed(0) + ' s').padStart(7)}   ${ergebnis}${warn ? `, ${warn} WARNUNG` : ''}`);
+  for (const w of e.warnungen || []) console.log(`  ${w.trim().slice(0, 200)}`);
 }
 console.log(`\n${gelaufen - schlecht.length}/${gelaufen} Suiten bestanden${noch.length ? `, ${noch.length} kommt noch` : ''}, ${summeOk}/${summe} Prüfungen, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 process.exit(schlecht.length ? 1 : 0);

@@ -156,4 +156,15 @@ export function gut(e, art) {
   return e.mate != null ? e.mate > 0 : e.cp >= 400;
 }
 
+// Ein Kind-Lauf von r19-lektionen-besser, bei Ausgang 3 (ENGINE-TOT) einmal neu gerechnet. kind(id) -> { id, aus, code },
+// melde(text) schreibt die WARNUNG. Hier statt im Test selbst, damit tests/lektion-engine-tod.test.mjs (c) es pruefen kann.
+// Wiederholt wird nur ein Lauf ohne FEHLER-Zeile: hat er vor dem Engine-Tod schon FEHLER gedruckt, bleibt er das Ergebnis
+// (Ausgang 3, die Suite wird rot) und der Fehler steht in der Ausgabe (Kaltreview PR #282, W1).
+export async function mitWiederholung(kind, id, melde = console.log) {
+  const e = await kind(id);
+  if (e.code !== 3 || /^FEHLER /m.test(e.aus)) return e;
+  melde(`WARNUNG ${id}: ${(/^ENGINE-TOT .*$/m.exec(e.aus) || ['Engine tot'])[0]}, Lektion einmal neu gerechnet`);
+  return kind(id);
+}
+
 export { artVon, Chess };
