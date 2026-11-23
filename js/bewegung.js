@@ -174,14 +174,22 @@ export function anim(el, frames, o = {}) {
   return a;
 }
 
+export const STAFFEL_D = 300;
+export const STAFFEL_V = 60;
+export const STAFFEL_GESAMT = 500;
 export function staffel(els, o = {}) {
   const liste = Array.from(els || []);
-  const abstand = o.abstand ?? 45;
-  const d = o.d || 560;
+  // R27 Tempo (Flo 22.11.2026: "smooth, nicht zeitverzoegert"; gemessen bis 1,5 s Einblendung je Seite): ruhig und kurz wie
+  // bei Apple. Je Teil hoechstens STAFFEL_D ms, Vorlauf hoechstens STAFFEL_V, und alles steht nach STAFFEL_GESAMT ms, egal
+  // was ein Bildschirm verlangt; bei vielen Teilen wird der Abstand kleiner, die Reihenfolge bleibt (tests/r27-tempo-fix).
+  const d = Math.min(o.d || 560, STAFFEL_D);
+  const v = Math.min(o.v || 0, STAFFEL_V);
+  const spanne = Math.max(0, Math.min((liste.length - 1) * (o.abstand ?? 45), STAFFEL_GESAMT - v - d));
+  const abstand = liste.length > 1 ? spanne / (liste.length - 1) : 0;
   liste.forEach((el, i) => anim(el, [
     { opacity: 0, transform: o.von || 'translateY(16px)' }, { opacity: 1, transform: 'none' },
-  ], { d, v: (o.v || 0) + i * abstand, k: o.k || 'weich' }));
-  return warte((o.v || 0) + liste.length * abstand + d * 0.6);
+  ], { d, v: v + i * abstand, k: o.k || 'weich' }));
+  return warte(v + liste.length * abstand + d * 0.6);
 }
 
 // Druck-Rueckmeldung: jeder Knopf mit .dr wird beim Druecken kleiner (CSS .dr.gedrueckt) und federt zurueck

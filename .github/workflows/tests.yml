@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
 
+# Ueberholte Laeufe abbrechen (R28, 23.11.2026): am 22.11. blockierten alte Laeufe desselben Zweigs die Runner.
+# main wird nie abgebrochen und bekommt je Commit eine eigene Gruppe: sonst ersetzt GitHub einen
+# WARTENDEN main-Lauf, sobald ein weiterer kommt, und ein Live-Stand bliebe ungeprueft.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref == 'refs/heads/main' && github.sha || (github.head_ref || github.ref) }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   chromium:
     # Zeitgrenzen (19.11.2026, Auftrag fc-18:11): 1,5x die laengste Dauer aus den letzten 15 gruenen Laeufen
