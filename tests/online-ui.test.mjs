@@ -39,7 +39,7 @@ let ligaVerzug = 0;
 let erfinder = false, sonderVerzug = 0;
 // R2: Tageskontingent der Live-Bewertung (online_live_bewertung_frei/nutzen), Antwort wie supabase/zwei-ligen-schema.sql
 let liveFrei = { frei: true, rest: 1, unbegrenzt: false };
-const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
+const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [], karteKaputt = new Set(), karteSonder = new Map();
 // wie der Trigger setze_aktualisiert_am (now()): echte Zeit, streng steigend (Serveruhr fuer js/serverzeit.js, R19)
 const aktualisieren = p => { stamp = Math.max(Date.now(), stamp + 1); p.aktualisiert_am = new Date(stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234', gewertet = false } = {}) {
@@ -140,7 +140,9 @@ try {
     if (rpc === 'karte_melde_stufen' || rpc === 'karte_waehle') return antwort({ taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } });
     if (rpc === 'karte_der_partie') {
       karteFragen.push(body.partie);
-      const karte = (name, du) => ({ name, banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du });
+      // R28: die erste Anfrage fuer diese Partie scheitert (Netzwackler, Serverfehler), die naechste klappt
+      if (karteKaputt.delete(body.partie)) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'kurz weg' }) });
+      const karte = (name, du) => ({ name, banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du, ...(!du && karteSonder.get(body.partie)) });
       return antwort(p ? { w: karte(p.weiss === 'u1' ? 'Spieler_1' : 'Gegner_2', p.weiss === 'u1'), s: karte(p.schwarz === 'u1' ? 'Spieler_1' : 'Gegner_2', p.schwarz === 'u1') } : {});
     }
     // R19 Season (js/karte.js fragt parallel): ohne Abzeichen und Titel, die Karte bleibt wie bisher (Season prueft r19-saison)
@@ -482,10 +484,69 @@ try {
     const masse = await seite.evaluate(() => {
       const b = document.querySelector('.on-brett').getBoundingClientRect();
       return { quer: document.documentElement.scrollWidth <= innerWidth, brett: b.x >= 0 && b.right <= innerWidth + 1 && b.y >= 0 && b.bottom <= innerHeight + 1,
-        knoepfe: [...document.querySelectorAll('.online-screen button')].filter(b => b.getClientRects().length > 0).every(b => b.getBoundingClientRect().height >= 44), karten: document.querySelectorAll('.on-spieler > .av > :is(svg, img)').length === 2 };
+        knoepfe: [...document.querySelectorAll('.online-screen button')].filter(b => b.getClientRects().length > 0).every(b => b.getBoundingClientRect().height >= 44), karten: document.querySelectorAll('.on-spieler > .av > :is(svg, img)').length === 2,
+        // R28: der Gegner zeigt sein Bild vom Server (data-figur aus karte_der_partie), nicht den grauen Platzhalter
+        gegnerBild: document.querySelector('.on-oben > .av > svg')?.dataset.figur === 'Q' };
     });
     pruefe(`${width}x${height} ${modus}: Brett, Spielerkarten und Tippflaechen passen`, Object.values(masse).every(Boolean), masse);
     if (process.env.BILDER) { mkdirSync(process.env.BILDER, { recursive: true }); await seite.screenshot({ path: path.join(process.env.BILDER, `online-${width}-${modus}.png`) }); }
+  }
+  // R28 (Flo 22.11.2026 mit Opa: "kein Bild" beim Gegner): scheitert die erste Karte, holt die Partie sie nach, statt die
+  // ganze Partie mit grauem Platzhalter und ohne Namen zu bleiben
+  {
+    const nachholen = partie({ farbe: 'w' }); karteKaputt.add(nachholen.id);
+    await oeffne(nachholen);
+    await seite.waitForFunction(() => document.querySelector('.on-oben > .av > svg')?.dataset.figur === 'Q', null, { timeout: 9000 }).catch(() => {});
+    const nach = await seite.evaluate(() => ({ figur: document.querySelector('.on-oben > .av > svg')?.dataset.figur || null, name: document.querySelector('.on-oben b')?.textContent || '' }));
+    const fragen = karteFragen.filter((x) => x === nachholen.id).length;
+    pruefe('R28: erste Karte scheitert (500) -> nachgeholt, Gegner mit Bild und Namen vom Server', nach.figur === 'Q' && nach.name === 'Gegner_2' && fragen >= 2, { nach, fragen });
+    await seite.waitForTimeout(2500);
+    pruefe('R28: nach dem Nachholen keine weitere Kartenanfrage (nie dauerhaft fragen)', karteFragen.filter((x) => x === nachholen.id).length === fragen, { fragen, jetzt: karteFragen.filter((x) => x === nachholen.id).length });
+    // Flo 22.11. ~22:10: Opa sah Flos Bild nicht. Flos Karte (Erfinder: Motiv Koenig, Erfinder-Rahmen, Erfinder-Titel,
+    // Sonderbanner) kommt beim Gegner nie leer an: Bild mit Bauer, ohne Rahmen (KARTE_MOTIVE/KARTE_RAHMEN), Name da
+    const erfinder = partie({ farbe: 'w' }); karteSonder.set(erfinder.id, { motiv: 'K', rahmen: 'erfinder', titel: 'erfinder', banner: 'erfinder', grund: 'erfinder', name: 'Flo_Erfinder' });
+    await oeffne(erfinder);
+    await seite.waitForFunction(() => document.querySelector('.on-oben b')?.textContent === 'Flo_Erfinder', null, { timeout: 9000 }).catch(() => {});
+    const ef = await seite.evaluate(() => { const s = document.querySelector('.on-oben > .av > svg'); return { figur: s?.dataset.figur || null, rahmen: s?.dataset.rahmen || null, bild: !!s?.querySelector('image'), name: document.querySelector('.on-oben b')?.textContent || '' }; });
+    // Motiv und Rahmen des Besitzers zeigt erst so/R28-gegner-sieht-besitz (Flo-Regel 22.11.): hier nur "nie leer"
+    pruefe('R28: Erfinder-Karte des Gegners zeigt ein Bild und den Namen, nie leer', !!ef.figur && ef.bild && ef.name === 'Flo_Erfinder', ef);
+  }
+  // R28 Vorzuege online (Flo 22.11.2026 "Premoves gehen?"): wie gegen den Bot vormerken, solange der Gegner dran ist; der
+  // erste laeuft, sobald sein Zug da ist; ein Vorzug, der nicht mehr geht, faellt leise weg. Nie vorher an den Server.
+  {
+    const zugRufe = (id) => calls.filter((c) => c.pfad === '/functions/v1/online-zug' && c.body.partie === id).map((c) => c.body.zug);
+    const marken = () => seite.evaluate(() => ({ nummern: [...document.querySelectorAll('.on-brett .nummer')].map((n) => n.textContent),
+      springer: window.__online.brett().figurAuf('f3'), echt: window.__online.chess().get('f3')?.type || null }));
+    const vz = partie({ farbe: 'w', zuege: 'e2e4' }); await oeffne(vz);
+    await tippe('g1f3'); await tippe('f1c4'); await seite.waitForTimeout(150);
+    const gemerkt = await marken();
+    pruefe('R28 Vorzug: zwei vorgemerkt (Nummern 1 und 2, Springer gedacht auf f3, echt noch nicht), nichts an den Server',
+      gemerkt.nummern.join(',') === '1,2' && gemerkt.springer === 'wN' && gemerkt.echt === null && zugRufe(vz.id).length === 0, { gemerkt, rufe: zugRufe(vz.id) });
+    zug(vz, 'e7e5');
+    await seite.waitForFunction(() => window.__online.partie().zuege.endsWith('g1f3') && !window.__online.busy(), null, { timeout: 9000 }).catch(() => {});
+    const nach1 = await marken();
+    pruefe('R28 Vorzug: nach dem Gegnerzug laeuft genau der erste (g1f3) an den Server, der zweite bleibt mit Nummer 1',
+      zugRufe(vz.id).join(',') === 'g1f3' && vz.zuege === 'e2e4 e7e5 g1f3' && nach1.nummern.join(',') === '1', { rufe: zugRufe(vz.id), zuege: vz.zuege, nach1 });
+    zug(vz, 'b8c6');
+    await seite.waitForFunction(() => window.__online.partie().zuege.endsWith('f1c4') && !window.__online.busy(), null, { timeout: 9000 }).catch(() => {});
+    pruefe('R28 Vorzug: der zweite folgt nach dem naechsten Gegnerzug, danach keine Marken mehr',
+      zugRufe(vz.id).join(',') === 'g1f3,f1c4' && (await marken()).nummern.length === 0, { rufe: zugRufe(vz.id), zuege: vz.zuege });
+    // der Gegner verstellt den Weg: e4e5 geht nach e7e5 nicht mehr, faellt leise weg, du bleibst am Zug
+    const weg = partie({ farbe: 'w', zuege: 'e2e4' }); await oeffne(weg);
+    await tippe('e4e5'); await seite.waitForTimeout(150);
+    zug(weg, 'e7e5');
+    await seite.waitForFunction(() => window.__online.chess().history().length === 2 && !window.__online.busy(), null, { timeout: 9000 }).catch(() => {});
+    await seite.waitForTimeout(300);
+    const verworfen = await seite.evaluate(() => ({ nummern: document.querySelectorAll('.on-brett .nummer').length, e4: window.__online.brett().figurAuf('e4'), fehler: document.querySelector('.on-meldung')?.hidden !== false }));
+    pruefe('R28 Vorzug: ungueltig gewordener Vorzug faellt leise weg (kein Ruf, keine Marke, Bauer bleibt auf e4, keine Fehlermeldung)',
+      zugRufe(weg.id).length === 0 && verworfen.nummern === 0 && verworfen.e4 === 'wP' && verworfen.fehler, verworfen);
+    // Tipp auf ein leeres Feld ohne Zug loescht die Kette (wie gegen den Bot)
+    const leer = partie({ farbe: 'w', zuege: 'e2e4' }); await oeffne(leer);
+    await tippe('g1f3'); await seite.waitForTimeout(150);
+    const r = await seite.locator('.on-brett .feld[data-feld="a5"]').boundingBox();
+    await seite.touchscreen.tap(r.x + r.width / 2, r.y + r.height / 2); await seite.waitForTimeout(150);
+    const geloescht = await marken();
+    pruefe('R28 Vorzug: Tipp auf ein leeres Feld loescht die Kette, echte Stellung zurueck', geloescht.nummern.length === 0 && geloescht.springer === null, geloescht);
   }
   await seite.evaluate(() => window.__app.gehe('training'));
   await seite.getByRole('button', { name: 'Gegen Freunde spielen', exact: true }).click();

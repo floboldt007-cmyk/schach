@@ -53,6 +53,9 @@ const SITZUNG = { access_token: token(UID), refresh_token: 'test-r', expires_at:
 const NAMEN = { u1: 'Mira', u2: 'Jonas', u3: 'Lena' };
 const ELO = 1240;
 const iso = (ms) => new Date(ms).toISOString();
+// Kalendertag in Europe/Berlin: die Seite laeuft mit timezoneId Europe/Berlin und zaehlt die Season-Tage nach dem
+// Ortsdatum (js/ui/online.js ladeSaison); ein UTC-Tag waere zwischen 0 und 1 Uhr deutscher Zeit einen Tag zu frueh
+const BERLIN_TAG = (ms) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
 // fuenf beendete gewertete Partien, neueste zuerst: S (gegen Jonas), R, S, N (gegen Lena), S; dazu eine ungewertete
 function altePartien() {
   const m = new Map();
@@ -88,7 +91,7 @@ function bediener(z) {
         elo: u === UID ? ELO : 1310, du: u === UID });
       return antwort(p ? { w: karte(p.weiss), s: karte(p.schwarz) } : {});
     }
-    if (rpc === 'saison_mein_stand') return antwort({ saison: 1, start: '2026-11-02', wochen: 6, woche: 3, ende: new Date(Date.now() + 4 * 864e5).toISOString().slice(0, 10),
+    if (rpc === 'saison_mein_stand') return antwort({ saison: 1, start: '2026-11-02', wochen: 6, woche: 3, ende: BERLIN_TAG(Date.now() + 4 * 864e5),
       abzeichen: [], titel: [], gewaehlt: null, sichtbar: true });
     if (rpc === 'weltrang_liste') {
       if (!z.welt) return antwort({ message: 'fehlt' }, 404);

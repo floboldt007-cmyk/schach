@@ -153,6 +153,7 @@ import '../sprachen/allgemein.js';
 import '../sprachen/partie.js';
 import { meinName } from '../konto.js';
 import { neueUhr, restAusZeiten, laufAnteil, zeitErgebnis } from '../uhr.js';
+import { vorzugZiele as vorzugZieleVon, merkeVorzug as merkeInKette, naechsterVorzug } from '../vorzug.js';
 
 
 const SERIE = new Set(['bester', 'stark', 'brillant']);
@@ -1426,43 +1427,8 @@ export function zeige(root, params, app) {
   }
 
   // ---------- Eigener Zug ----------
-  function vorzugZiele() {
-    const karte = {};
-    const code = (f) => brett.figurAuf(f);
-    const feld = (x, y) => x >= 0 && x < 8 && y >= 1 && y <= 8 ? String.fromCharCode(97 + x) + y : null;
-    const fuege = (liste, x, y) => { const f = feld(x, y); if (f && (!code(f) || code(f)[0] !== farbe)) liste.push(f); return f; };
-    for (let y = 1; y <= 8; y++) for (let x = 0; x < 8; x++) {
-      const von = feld(x, y); const fig = code(von);
-      if (!fig || fig[0] !== farbe) continue;
-      const liste = [];
-      if (fig[1] === 'P') {
-        const dy = farbe === 'w' ? 1 : -1;
-        const eins = feld(x, y + dy);
-        if (eins && !code(eins)) {
-          liste.push(eins);
-          const zwei = feld(x, y + 2 * dy);
-          if (y === (farbe === 'w' ? 2 : 7) && zwei && !code(zwei)) liste.push(zwei);
-        }
-        fuege(liste, x - 1, y + dy); fuege(liste, x + 1, y + dy);
-      } else if (fig[1] === 'N') {
-        for (const [dx, dy] of [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]]) fuege(liste, x + dx, y + dy);
-      } else if (fig[1] === 'K') {
-        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) fuege(liste, x + dx, y + dy);
-      } else {
-        const gerade = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-        const diagonal = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-        const richtungen = fig[1] === 'B' ? diagonal : fig[1] === 'R' ? gerade : gerade.concat(diagonal);
-        for (const [dx, dy] of richtungen) for (let n = 1; n < 8; n++) {
-          const ziel = feld(x + dx * n, y + dy * n); if (!ziel) break;
-          const dort = code(ziel);
-          if (!dort || dort[0] !== farbe) liste.push(ziel);
-          if (dort) break;
-        }
-      }
-      if (liste.length) karte[von] = [...new Set(liste)];
-    }
-    return karte;
-  }
+  // R28: Logik in js/vorzug.js (gemeinsam mit der Online-Partie); Zielkarte auf der gedachten Stellung des Bretts
+  function vorzugZiele() { return vorzugZieleVon((f) => brett.figurAuf(f), farbe); }
 
   // U7: Flo ist am Zug: Zielkarte (mit Turm-auf-Koenig-Rochade nach Einstellung) und Zug bestaetigen
   function erlaubeFlo() {
@@ -1524,8 +1490,7 @@ export function zeige(root, params, app) {
   // Hoechstens 5: ein sechster springt leise zurueck, die Kette bleibt (ohne Zielkarte waere der Tipp aufs Ziel ein Tipp
   // ins Leere und loeschte alles)
   function merkeVorzug(von, nach, umwandlung) {
-    if (z.vorzuege.length >= 5) { try { klang.spiele('zurueck'); } catch (e) { /* still */ } return false; }
-    z.vorzuege.push({ von, nach, umwandlung: umwandlung || 'q' });
+    if (!merkeInKette(z.vorzuege, von, nach, umwandlung)) { try { klang.spiele('zurueck'); } catch (e) { /* still */ } return false; }
     zeichneVorzuege();
     klang.spiele('klick');
     brett.erlaubeZuege(vorzugZiele());
@@ -1563,18 +1528,16 @@ export function zeige(root, params, app) {
 
   function fuehreVorzugAus() {
     if (!z.vorzuege.length || weg || z.phase === 'ende' || zeitAus()) return false;
-    const v = z.vorzuege.shift();
-    let m = null;
-    try { m = z.chess.move({ from: v.von, to: v.nach, promotion: v.umwandlung || 'q' }); } catch (e) { m = null; }
+    const r = naechsterVorzug(z.vorzuege, z.chess);
     // Der Gegner hat etwas geaendert: dieser Vorzug und alle danach fallen leise weg (kein Fehlertext)
-    if (!m) {
+    if (r.verworfen) {
       loescheVorzuege();
       try { klang.spiele('zurueck'); } catch (e) { /* still */ }
-      melde({ typ: 'vorzug:verworfen', uci: v.von + v.nach });
+      melde({ typ: 'vorzug:verworfen', uci: r.verworfen });
       return false;
     }
     wischeVorzugMarken();
-    spieleEigenenZug(m, brett.gleitDauer());
+    spieleEigenenZug(r.zug, brett.gleitDauer());
     return true;
   }
 
