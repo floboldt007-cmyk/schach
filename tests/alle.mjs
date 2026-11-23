@@ -250,6 +250,7 @@ const SUITEN = [
   { name: 'r27-blatt-tempo', datei: 'r27-blatt-tempo.test.mjs', args: [], was: 'R27 Tempo: Blatt ohne Wartezeit, im ersten Bild trifft kein Tipp und keine Taste etwas hinter dem Blatt, auch keinen eigenen Tasten-Handler (Browser)' },
   { name: 'r27-tempo-befunde', datei: 'r27-tempo-befunde.test.mjs', args: [], was: 'R27 Tempo, Codex-Befunde: Shop-Vorschau schnell schliessen fuehrt zurueck in den Shop, Vorrat der Eroeffnungen nur auf der ruhigen Bots-Seite (Browser)' },
   { name: 'r25-leistung', datei: 'r25-leistung.test.mjs', args: [], was: 'Feinschliff R25 Leistung: Fokus und Messen beim Oeffnen im naechsten Bild, Pille nach dem Drehen, schnelles Enter oder Leerzeichen im ersten Bild gibt nicht auf (Browser)' },
+  { name: 'tempo-messung', datei: 'tempo-messung.test.mjs', args: [], was: 'Werkzeug tempo-messung: Auswertung (Median, Urteil, Rangliste, Last-Probe), ohne Browser' },
   { name: 'online-ende', datei: 'online-ende.test.mjs', args: [], was: 'Funktionsprobe Online-Ende: Revanche, Aufgeben, Remis, Neu laden (Browser)' },
   { name: 'r25-brett-fokus', datei: 'r25-brett-fokus.test.mjs', args: [], was: 'R25 Tastatur-Fokus auf dem Brett sichtbar, Rahmen und Koordinaten (Browser)' },
   { name: 'r25-brett-start', datei: 'r25-brett-start.test.mjs', args: [], was: 'R25 Brett beim Start der Partie sofort in voller Groesse (Browser)' },
