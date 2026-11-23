@@ -2,7 +2,7 @@
 // Lauf gegen die App (Bericht im Vault, R27-Kritik/tempo.md); hier steht, dass aus den Rohwerten die richtige Rangliste wird
 // und dass ein nicht erreichter Schritt nie still als schnell erscheint.
 //   node tests/tempo-messung.test.mjs
-import { median, urteil, fasseZusammen, rangliste, tabelle, schritte, GERAETE, lastText } from '../werkzeuge/tempo-messung.mjs';
+import { median, urteil, fasseZusammen, rangliste, tabelle, schritte, GERAETE, lastText, spanne, vergleiche, wechselfolge, vergleichTabelle } from '../werkzeuge/tempo-messung.mjs';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') {
@@ -45,6 +45,32 @@ pruefe('iPhone 13 mit 4x CPU-Drosselung, PC ohne', GERAETE.iphone13.cpu === 4 &&
 pruefe('Last-Probe: ruhige Runden heissen ohne fremde Last', /ohne fremde Last/.test(lastText([{ vor: { ruckler: 0 }, nach: { ruckler: 1 } }])));
 pruefe('Last-Probe: stockende leere Seite markiert die Runde als unter Last',
   /ACHTUNG: 1 von 2 Runden unter Last/.test(lastText([{ vor: { ruckler: 0 }, nach: { ruckler: 0 } }, { vor: { ruckler: 5 }, nach: { ruckler: 0 } }])));
+
+// R28 (23.11.2026, Auftrag AC): Spanne je Schritt und Vergleich zweier Staende. Anlass: Ein Lauf je Stand meldete
+// 1478 -> 1930 ms als Bremse, gleich oft gemessen lag derselbe Stand bei 1850 und 1317 (Vault: bremse-seit-2cdfc28c)
+pruefe('Zusammenfassung: Spanne fertig (kleinster bis groesster Wert)', a.fertigMin === 120 && a.fertigMax === 140, JSON.stringify(a));
+pruefe('nie erreicht: keine Spanne', c.fertigMin === null && c.fertigMax === null, JSON.stringify(c));
+pruefe('Tabelle zeigt Median und Spanne', /\| 130 \| 120-140 \|/.test(t), t);
+pruefe('Spanne: kleinster bis groesster Wert, fehlende Werte zaehlen nicht', JSON.stringify(spanne([1850, null, 1317, 1962])) === '{"min":1317,"max":1962,"breite":645}');
+
+const v1 = vergleiche([1850, 1317], [1349, 1930]);
+pruefe('Vergleich: der Fall vom 23.11. (1850/1317 gegen 1349/1930) ist im Rauschen', v1.urteil === 'im Rauschen', JSON.stringify(v1));
+pruefe('Vergleich: Mediane und Rauschen werden genannt', v1.a === 1583.5 && v1.b === 1639.5 && v1.abstand === 56 && v1.rauschen === 581, JSON.stringify(v1));
+const v2 = vergleiche([1300, 1350], [1900, 1950]);
+pruefe('Vergleich: Abstand groesser als die Spanne am selben Stand = Unterschied, B langsamer', v2.urteil === 'Unterschied: B langsamer', JSON.stringify(v2));
+pruefe('Vergleich: auch schneller wird erkannt', vergleiche([1900, 1950], [1300, 1350]).urteil === 'Unterschied: B schneller');
+pruefe('Vergleich: Abstand genau gleich der Spanne ist noch Rauschen', vergleiche([100, 200], [200, 300]).urteil === 'im Rauschen');
+pruefe('Vergleich: ein Lauf je Stand reicht nie fuer ein Urteil', vergleiche([1478], [1930]).urteil === 'zu wenig Laeufe');
+pruefe('Vergleich: nicht erreichte Laeufe zaehlen nicht mit', vergleiche([1300, null], [1900, 1950]).urteil === 'zu wenig Laeufe');
+// Probelauf 23.11. mit DEMSELBEN Stand als A und B: zwei Laeufe schaetzen das Rauschen zu klein (Shop 512/497 gegen 493/482,
+// Einstellungen zurueck 527/533 gegen 519/522). Ein Abstand unter 50 ms bzw. 10 % ist darum nie ein Unterschied
+pruefe('Vergleich: gleicher Stand, kleiner Abstand (Shop 17 ms) ist zu klein', vergleiche([512, 497], [493, 482]).urteil === 'zu klein (unter 50 ms bzw. 10 %)');
+pruefe('Vergleich: gleicher Stand, 10 ms bei Einstellungen ist zu klein', vergleiche([527, 533], [519, 522]).urteil === 'zu klein (unter 50 ms bzw. 10 %)');
+pruefe('Vergleich: 10 % zaehlt bei langen Schritten (1500 gegen 1640 ist 140 ms, unter 150)', vergleiche([1500, 1505], [1640, 1642]).urteil === 'zu klein (unter 50 ms bzw. 10 %)');
+pruefe('Wechselfolge A B A B', JSON.stringify(wechselfolge(2)) === '["A","B","A","B"]' && wechselfolge(3).join('') === 'ABABAB');
+const vt = vergleichTabelle('iphone13', { A: [[{ name: 'Kaltstart', fertig: 1850 }], [{ name: 'Kaltstart', fertig: 1317 }]],
+  B: [[{ name: 'Kaltstart', fertig: 1349 }], [{ name: 'Kaltstart', fertig: 1930 }]] });
+pruefe('Vergleichstabelle: Schritt, beide Laeufe, Urteil', /\| Kaltstart \| 1850 \/ 1317 \| 1349 \/ 1930 \| 1584 \| 1640 \| 56 \| 581 \| im Rauschen \|/.test(vt), vt);
 
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exitCode = ok === gesamt ? 0 : 1;

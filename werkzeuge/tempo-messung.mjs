@@ -12,7 +12,9 @@
 // Jeder Schritt hat eine Frist; was nicht erreicht wird, steht als "nicht erreicht" mit Grund im Ergebnis (nie still).
 //
 //   node werkzeuge/tempo-messung.mjs --wurzel=<app-ordner> --aus=<ordner> [--runden=3] [--nur=iphone13,pc] [--trace]
-//   Ausgabe: <aus>/tempo-<geraet>.json und <aus>/tempo.md (Tabelle je Geraet, Rangliste nach fertig)
+//   Ausgabe: <aus>/tempo-<geraet>.json und <aus>/tempo.md (Tabelle je Geraet, Rangliste nach fertig, Median und Spanne)
+//   Vergleich zweier Staende (R28): node werkzeuge/tempo-messung.mjs --a=<ordner> --b=<ordner> --aus=<ordner> [--laeufe=2]
+//     misst A B A B, Ergebnis <aus>/vergleich.md mit Urteil je Schritt ("Unterschied: B langsamer|schneller" / "im Rauschen")
 //   Ausgang 0 = alle Schritte gemessen, 1 = mindestens ein Schritt nicht erreicht, 2 = Werkzeugfehler
 import http from 'node:http';
 import { createRequire } from 'node:module';
@@ -47,14 +49,61 @@ export function fasseZusammen(runden) {
     const alle = runden.map((r) => r.find((s) => s.name === name)).filter(Boolean);
     const gut = alle.filter((s) => !s.fehler);
     const m = (k) => median(gut.map((s) => s[k]));
+    const sp = spanne(gut.map((s) => s.fertig));
     return {
       name, wie: alle[0]?.wie || '', runden: gut.length, von: alle.length,
-      erste: m('erste'), inp: m('inp'), fertig: m('fertig'), lang: m('lang'), langSumme: m('langSumme'), langMax: m('langMax'),
+      erste: m('erste'), inp: m('inp'), fertig: m('fertig'), fertigMin: sp ? sp.min : null, fertigMax: sp ? sp.max : null,
+      lang: m('lang'), langSumme: m('langSumme'), langMax: m('langMax'),
       ruckler: m('ruckler'), cls: m('cls'),
       anim: [...new Set(gut.flatMap((s) => s.anim || []))].slice(0, 6),
       fehler: gut.length ? '' : (alle.find((s) => s.fehler)?.fehler || 'nicht gemessen'),
     };
   });
+}
+
+// kleinster bis groesster Wert (fehlende zaehlen nicht); null ohne Werte
+export function spanne(werte) {
+  const w = werte.filter((x) => Number.isFinite(x));
+  if (!w.length) return null;
+  const min = Math.min(...w), max = Math.max(...w);
+  return { min, max, breite: max - min };
+}
+
+// ---------- Vergleich zweier Staende (R28, 23.11.2026, Auftrag AC) ----------
+// Anlass: Ein Lauf je Stand meldete 1478 -> 1930 ms Kaltstart als Bremse. Zweimal gemessen lag derselbe Stand bei 1850 und
+// 1317 (Vault: Schach-App/Feinschliff 2026-11-11/bremse-seit-2cdfc28c-2026-11-23.md). Darum: jeder Stand mindestens zweimal,
+// abwechselnd A B A B (damit eine Laststufe des PCs beide trifft), und ein Unterschied gilt nur, wenn die Mediane der Laeufe
+// weiter auseinander liegen als die groessere Spanne am selben Stand. Sonst heisst es "im Rauschen".
+export const MINDEST_MS = 50;
+export const MINDEST_ANTEIL = 0.1;
+export function wechselfolge(laeufe) { return Array.from({ length: laeufe * 2 }, (_, i) => (i % 2 ? 'B' : 'A')); }
+
+// a, b: je Lauf der Median eines Schritts (null = in dem Lauf nicht erreicht)
+export function vergleiche(a, b) {
+  const sa = spanne(a), sb = spanne(b);
+  const na = a.filter((x) => Number.isFinite(x)).length, nb = b.filter((x) => Number.isFinite(x)).length;
+  if (na < 2 || nb < 2) return { urteil: 'zu wenig Laeufe', a: median(a), b: median(b), abstand: null, rauschen: null };
+  const ma = median(a), mb = median(b);
+  const abstand = Math.abs(mb - ma), rauschen = Math.max(sa.breite, sb.breite);
+  // Mindestabstand: Probelauf 23.11. mit demselben Stand als A und B, zwei Laeufe schaetzten das Rauschen zu klein und meldeten
+  // 17 ms (Shop) und 10 ms (Einstellungen) als Unterschied. Unter 50 ms bzw. 10 % ist es fuer den Menschen ohnehin keiner
+  const klein = abstand < Math.max(MINDEST_MS, MINDEST_ANTEIL * Math.min(ma, mb));
+  const urteil = abstand <= rauschen ? 'im Rauschen' : klein ? 'zu klein (unter 50 ms bzw. 10 %)'
+    : `Unterschied: B ${mb > ma ? 'langsamer' : 'schneller'}`;
+  return { urteil, a: ma, b: mb, abstand, rauschen };
+}
+
+// laeufe: { A: [zusammen je Lauf], B: [...] }, Zeile je Schritt mit den Laufwerten beider Staende
+export function vergleichTabelle(geraet, laeufe) {
+  const namen = [...new Set([...laeufe.A, ...laeufe.B].flat().map((s) => s.name))];
+  const werte = (seite, name) => laeufe[seite].map((z) => { const s = z.find((x) => x.name === name); return s && !s.fehler ? s.fertig : null; });
+  const z = [`### ${geraet}`, '', '| Schritt | A je Lauf | B je Lauf | Median A | Median B | Abstand | Rauschen (groesste Spanne am selben Stand) | Urteil |',
+    '|---|---|---|---|---|---|---|---|'];
+  for (const name of namen) {
+    const a = werte('A', name), b = werte('B', name), v = vergleiche(a, b);
+    z.push(`| ${name} | ${a.map((x) => zahl(x)).join(' / ')} | ${b.map((x) => zahl(x)).join(' / ')} | ${zahl(v.a)} | ${zahl(v.b)} | ${zahl(v.abstand)} | ${zahl(v.rauschen)} | ${v.urteil} |`);
+  }
+  return z.join('\n');
 }
 
 export function rangliste(zusammen) {
@@ -63,10 +112,11 @@ export function rangliste(zusammen) {
 
 const zahl = (x, n = 0) => (Number.isFinite(x) ? x.toFixed(n) : '-');
 export function tabelle(geraet, zusammen) {
-  const z = [`### ${geraet}`, '', '| Schritt | erste Aenderung ms | INP ms | fertig ms | Urteil | lange Frames (Summe/max ms) | Ruckler | CLS | Animation |',
-    '|---|---|---|---|---|---|---|---|---|'];
+  const z = [`### ${geraet}`, '', '| Schritt | erste Aenderung ms | INP ms | fertig ms | Spanne fertig ms | Urteil | lange Frames (Summe/max ms) | Ruckler | CLS | Animation |',
+    '|---|---|---|---|---|---|---|---|---|---|'];
   for (const s of rangliste(zusammen)) {
-    z.push(`| ${s.name}${s.wie ? ' (' + s.wie + ')' : ''} | ${zahl(s.erste)} | ${zahl(s.inp)} | ${zahl(s.fertig)} | ${s.fehler ? 'nicht erreicht: ' + s.fehler : urteil(s.fertig)}`
+    const sp = Number.isFinite(s.fertigMin) ? `${zahl(s.fertigMin)}-${zahl(s.fertigMax)}` : '-';
+    z.push(`| ${s.name}${s.wie ? ' (' + s.wie + ')' : ''} | ${zahl(s.erste)} | ${zahl(s.inp)} | ${zahl(s.fertig)} | ${sp} | ${s.fehler ? 'nicht erreicht: ' + s.fehler : urteil(s.fertig)}`
       + ` | ${zahl(s.lang)} (${zahl(s.langSumme)}/${zahl(s.langMax)}) | ${zahl(s.ruckler)} | ${zahl(s.cls, 3)} | ${s.anim.length ? s.anim.join(', ') : 'keine'} |`);
   }
   return z.join('\n');
@@ -336,6 +386,28 @@ export async function miss({ wurzel, aus, runden = 3, geraete = Object.keys(GERA
   return { ok, bericht };
 }
 
+// Vergleich: misst A und B abwechselnd (A B A B ...), jeder Lauf in <aus>/<A|B>-<n>/, Ergebnis <aus>/vergleich.md
+export async function vergleichsLauf({ wurzelA, wurzelB, aus, laeufe = 2, runden = 3, geraete = Object.keys(GERAETE), playwright }) {
+  if (laeufe < 2) throw new Error('--laeufe: mindestens 2 je Stand, ein Lauf ist kein Vergleich');
+  const laeufeJe = { A: [], B: [] }; const zaehler = { A: 0, B: 0 };
+  for (const seite of wechselfolge(laeufe)) {
+    const n = ++zaehler[seite];
+    const e = await miss({ wurzel: seite === 'A' ? wurzelA : wurzelB, aus: path.join(aus, `${seite}-${n}`), runden, geraete, playwright });
+    laeufeJe[seite].push(e.bericht);
+  }
+  const md = geraete.map((g) => {
+    const tab = vergleichTabelle(g + (GERAETE[g].cpu > 1 ? ` (CPU ${GERAETE[g].cpu}x gedrosselt)` : ''),
+      { A: laeufeJe.A.map((b) => b[g].zusammen), B: laeufeJe.B.map((b) => b[g].zusammen) });
+    const last = ['A', 'B'].flatMap((s) => laeufeJe[s].map((b, i) => `- ${s}-${i + 1}: ${lastText(b[g].last)}`)).join('\n');
+    return `${tab}\n\nLast-Probe je Lauf:\n${last}`;
+  }).join('\n\n');
+  writeFileSync(path.join(aus, 'vergleich.md'), `# Tempo-Vergleich\n\nA = ${wurzelA}\nB = ${wurzelB}\n\n`
+    + `${laeufe} Laeufe je Stand, abwechselnd ${wechselfolge(laeufe).join(' ')}, je Lauf Median aus ${runden} Runden (fertig, ms).\n`
+    + 'Unterschied nur, wenn der Abstand der Mediane groesser ist als die groessere Spanne am selben Stand UND mindestens '
+    + `${MINDEST_MS} ms bzw. ${MINDEST_ANTEIL * 100} % betraegt.\n\n` + md + '\n');
+  return laeufeJe;
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const arg = (n) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : null; };
   const wurzel = arg('wurzel') || path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -343,7 +415,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   if (!aus) { console.error('--aus=<ordner> fehlt'); process.exit(2); }
   const nur = arg('nur') ? arg('nur').split(',') : Object.keys(GERAETE);
   if (nur.some((g) => !GERAETE[g])) { console.error('--nur: ' + Object.keys(GERAETE).join(',')); process.exit(2); }
-  try {
+  if (arg('a') || arg('b')) {
+    if (!arg('a') || !arg('b')) { console.error('Vergleich braucht --a=<ordner> und --b=<ordner>'); process.exit(2); }
+    try {
+      await vergleichsLauf({ wurzelA: arg('a'), wurzelB: arg('b'), aus, laeufe: Number(arg('laeufe') || 2), runden: Number(arg('runden') || 3), geraete: nur });
+      console.log(readFileSync(path.join(aus, 'vergleich.md'), 'utf8'));
+    } catch (e) { console.error('Werkzeugfehler: ' + (e.message || e)); process.exitCode = 2; }
+  } else try {
     const e = await miss({ wurzel, aus, runden: Number(arg('runden') || 3), geraete: nur, trace: process.argv.includes('--trace') });
     console.log(readFileSync(path.join(aus, 'tempo.md'), 'utf8'));
     process.exitCode = e.ok ? 0 : 1;
