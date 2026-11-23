@@ -57,6 +57,10 @@
     "raetsel-duell-schema.sql": {
       "pflicht": "jetzt"
     },
+    "raetsel-duell-ki-sofort-schema.sql": {
+      "pflicht": "warnung",
+      "pflicht_ab": "Fassung aus #279 eingespielt (Stand 23.11.2026: live ist die R26-Fassung ohne duell_ich_fertig, die #279-Fassung nicht)"
+    },
     "saison-schema.sql": {
       "pflicht": "jetzt"
     },
