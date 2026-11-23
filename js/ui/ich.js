@@ -131,10 +131,13 @@ function zeigeIch(root, params = {}, app) {
   ort.addEventListener('click', beiWahl);
   // Ein Bereich bittet um sein Blatt zurueck (Shop nach dem Anprobieren: sheet() zeigt nur ein Blatt zugleich, die Vorschau
   // hat das Shop-Blatt geschlossen und der Bereich liegt wieder hier in .sa-ort)
-  ort.addEventListener('sa:oeffne', (ev) => {
+  // Codex-Kaltreview 22.11. B3: schliesst die Vorschau, solange das Shop-Blatt noch wegfaehrt, liegt der Bereich noch in dessen
+  // Huelle (heim, unten). Darum hoert auch jede Huelle auf die Bitte (oeffne), nicht nur .sa-ort.
+  const bitteZurueck = (ev) => {
     const ber = ev.target.closest('.sa-bereich');
-    if (ber && !blatt) oeffne(ber.dataset.bereich);
-  });
+    if (ber && !blatt && s.isConnected) oeffne(ber.dataset.bereich);
+  };
+  ort.addEventListener('sa:oeffne', bitteZurueck);
 
   const stand = s.querySelector('.sa-stand');
   const zeigeStand = () => {
@@ -204,6 +207,7 @@ function zeigeIch(root, params = {}, app) {
   function holeHeim() {
     if (!heim) return;
     clearTimeout(heim.uhr);
+    if (heim.wache) heim.wache.disconnect();
     for (const y of heim.teile) if (y.parentNode !== ort) { y.hidden = true; ort.append(y); }
     heim = null;
   }
@@ -214,6 +218,7 @@ function zeigeIch(root, params = {}, app) {
     const huelle = document.createElement('div');
     huelle.className = 'sa-blatt-inhalt';
     huelle.addEventListener('click', beiWahl);
+    huelle.addEventListener('sa:oeffne', bitteZurueck);
     x.hidden = false;
     huelle.append(x);
     blatt = { id, huelle };
@@ -226,9 +231,18 @@ function zeigeIch(root, params = {}, app) {
         // falls vorher ein Blatt aufgeht. bereiche() zaehlt ihn solange mit (zeichnePlaetze, zeigeStand).
         const teile = [...huelle.querySelectorAll(':scope > .sa-bereich')];
         huelle.inert = true;
-        heim = { teile, uhr: 0 };
+        heim = { teile, uhr: 0, wache: null };
         if (tempo() === 0) holeHeim();
-        else heim.uhr = setTimeout(holeHeim, 300 * tempo());
+        else {
+          // B3: zurueck, sobald sheet() das Blatt aus dem Dokument nimmt, nicht erst nach einer festen Zeit. Sonst hing der Bereich
+          // dazwischen frei, und die Bitte der Vorschau (shop.js: nur wenn isConnected) fiel aus. Die Uhr bleibt als Rueckfall.
+          const blattOrt = huelle.closest('.sheet-ort');
+          if (blattOrt && blattOrt.parentNode && typeof MutationObserver === 'function') {
+            heim.wache = new MutationObserver(() => { if (!blattOrt.isConnected) holeHeim(); });
+            heim.wache.observe(blattOrt.parentNode, { childList: true });
+          }
+          heim.uhr = setTimeout(holeHeim, 400 * tempo());
+        }
         blatt = null;
         s.dataset.bereich = '';
         zeichnePlaetze();
