@@ -8,6 +8,7 @@
 //   uhrText(ms) -> 'm:ss'                      aufgerundete Sekunden
 //   normalisiereStand(roh) -> Stand | null     nur die bekannten Felder, nie eine Loesung
 //   phaseAus(stand, versatz, lokalMs) -> 'offen' | 'vorlauf' | 'laeuft' | 'zeit_um' | 'beendet' | 'abgebrochen'
+//       zeit_um auch, sobald der Server mich als fertig fuehrt (R27: alle geloest oder fertig gemeldet)
 //   anteil(geloest, anderer) -> 0..1          Balken: Anteil an max(10, beide)
 //   kronenText(delta) -> '+30' | '-15' (mit echtem Minuszeichen) | '0' | ''
 //   stellungAus(Chess, raetsel) -> { chess, letzterZug, seite } | null   Stellung nach den schon gespielten Zuegen
@@ -40,7 +41,8 @@ export function uhrText(ms) {
 
 function spieler(x) {
   if (!x || typeof x !== 'object') return null;
-  return { geloest: ganz(x.geloest), fehler: ganz(x.fehler), ende_am: typeof x.ende_am === 'string' ? x.ende_am : null };
+  // fertig (R27 Sofort-Ende, raetsel-duell-ki-sofort-schema.sql): nur true zaehlt; altes SQL schickt es nicht = false
+  return { geloest: ganz(x.geloest), fehler: ganz(x.fehler), ende_am: typeof x.ende_am === 'string' ? x.ende_am : null, fertig: x.fertig === true };
 }
 
 export function normalisiereStand(roh) {
@@ -68,6 +70,7 @@ export function phaseAus(st, versatz, lokalMs) {
   if (st.status !== 'laeuft') return st.status;
   const jetzt = lokalMs + (Number(versatz) || 0);
   if (!(jetzt >= zeit(st.start_am))) return 'vorlauf';
+  if (st.ich.fertig) return 'zeit_um';
   return restMs(st.ich.ende_am, versatz, lokalMs) > 0 ? 'laeuft' : 'zeit_um';
 }
 

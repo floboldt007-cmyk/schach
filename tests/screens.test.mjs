@@ -699,11 +699,20 @@ async function testeEinstellungen(browser) {
   const { kontext, seite, fehler } = await neueSeite(browser);
   await oeffne(seite);
   await seite.evaluate(async () => { testseite.leere(); await testseite.opernpartie({ mitReview: false }); });
+  const cfVorher = CLOUDFLARE.length;
   await oeffne(seite, 'screen=einstellungen');
-  // Bot-Schutz mit echtem Site-Key: Hinweis samt Link steht, das Skript kam aus dem Nachbau (kein echtes Cloudflare)
+  // Bot-Schutz mit echtem Site-Key: Hinweis samt Link steht schon, aber erst die Benutzung laedt Turnstile (#201/#277,
+  // Datenschutz: "die Anmeldung, die du selbst aufrufst"); das Skript kommt dann aus dem Nachbau, nie von Cloudflare
   const botschutz = await seite.waitForSelector('.konto-botschutz-hinweis a', { timeout: 8000 }).then(() => true, () => false);
-  pruefe('Bot-Schutz: Hinweis mit Link steht, Turnstile kommt aus dem Nachbau statt von Cloudflare',
-    botschutz && CLOUDFLARE.includes('/turnstile/v0/api.js'), { botschutz, CLOUDFLARE });
+  await warte(1500);   // laenger als der Sekundentakt der Konto-Gruppe
+  const cfOffen = CLOUDFLARE.slice(cfVorher);
+  pruefe('Bot-Schutz: Hinweis mit Link steht, blosses Oeffnen laedt nichts von Cloudflare',
+    botschutz && cfOffen.length === 0, JSON.stringify({ botschutz, cfOffen }));
+  await seite.locator('.konto-email').focus();
+  const geladen = await seite.waitForFunction(() => 'turnstile' in window, null, { timeout: 8000 }).then(() => true, () => false);
+  const cfFokus = CLOUDFLARE.slice(cfVorher);
+  pruefe('Bot-Schutz: Fokus im E-Mail-Feld laedt Turnstile genau einmal, aus dem Nachbau statt von Cloudflare',
+    geladen && cfFokus.length === 1 && cfFokus[0] === '/turnstile/v0/api.js', JSON.stringify({ geladen, cfFokus }));
   // Trefferpruefung (Kaltreview 14.11.): das Polster des Links darf nicht in den Apple-Knopf darueber ragen; an den
   // Raendern jedes Tippziels der Kontogruppe trifft elementFromPoint das eigene Element, auf Handy, SE, iPad quer, PC
   for (const [name, breite, hoehe] of [['iphone-13', 390, 844], ['iphone-se', 375, 667], ['ipad-quer', 1180, 820], ['pc', 1440, 900]]) {
