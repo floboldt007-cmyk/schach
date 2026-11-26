@@ -402,8 +402,10 @@ begin
       -- nichts zugeordnet. Die Zeile wird dabei gesperrt, damit ein gleichzeitiges Ereignis des echten Kunden (anderer
       -- Kunde, also andere Transaktions-Sperre) den Stand nicht zwischen Pruefung und Schreiben aendert.
       select * into v_alt from public.abos t where t.user_id = v_nutzer for update;
+      -- 'strittig' (offene Rueckbuchung, PR #79) zaehlt als laufend: Ein gewonnener Streit stellt das Abo wieder her und
+      -- braucht dafuer den eigenen kunde_id.
       if v_alt.kunde_id is not null and v_alt.kunde_id <> v_kunde
-        and v_alt.status in ('aktiv', 'gekuendigt') and v_alt.gueltig_bis > now() then
+        and v_alt.status in ('aktiv', 'gekuendigt', 'strittig') and v_alt.gueltig_bis > now() then
         v_ergebnis := 'konflikt';
       else
         -- Ein Stripe-Kunde gehoert genau einem Nutzer: Wer ihn bisher hatte, gibt ihn ab.

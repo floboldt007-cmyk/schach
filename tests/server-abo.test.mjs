@@ -378,7 +378,7 @@ const json = (r) => JSON.parse(r.koerper);
   const kaufTeil = schemaM4.slice(schemaM4.indexOf("if v_typ = 'checkout.session.completed' then"), schemaM4.indexOf("select t.user_id into v_ziel from public.abos t where t.kunde_id = v_kunde for update;"));
   pruefe('Schema: ein Kauf prueft VOR dem Zuordnen, ob das Konto ein laufendes Abo eines anderen Stripe-Kunden hat (konflikt)',
     /select \* into v_alt from public\.abos t where t\.user_id = v_nutzer for update;/.test(kaufTeil)
-    && /v_alt\.kunde_id <> v_kunde\s+and v_alt\.status in \('aktiv', 'gekuendigt'\) and v_alt\.gueltig_bis > now\(\) then\s+v_ergebnis := 'konflikt';/.test(kaufTeil)
+    && /v_alt\.kunde_id <> v_kunde\s+and v_alt\.status in \('aktiv', 'gekuendigt', 'strittig'\) and v_alt\.gueltig_bis > now\(\) then\s+v_ergebnis := 'konflikt';/.test(kaufTeil)
     && kaufTeil.indexOf("v_ergebnis := 'konflikt'") < kaufTeil.indexOf('insert into public.abos as t') && kaufTeil.indexOf("v_ergebnis := 'konflikt'") > 0);
   pruefe('abo-rls-test.sql: Kaper-Fall als Fall (fremder Kauf -> konflikt, Zeile unberuehrt, echte Ereignisse kommen an)',
     /'evt_k1'[\s\S]{0,400}'cus_KAPER'/.test(test) && test.includes("r <> 'konflikt'") && test.includes("'evt_k4', 'invoice.paid'")
@@ -390,7 +390,7 @@ const json = (r) => JSON.parse(r.koerper);
   pruefe('Erstattung/Rueckbuchung: Schema erlaubt alle Typen, Streit ist nicht Premium und die RLS-Probe prueft den Ablauf',
     ['charge.refunded', 'charge.dispute.created', 'charge.dispute.closed'].every((typ) => sql.includes(`'${typ}'`) && test.includes(`'${typ}'`))
     && /status in \('aktiv', 'gekuendigt', 'abgelaufen', 'strittig'\)/.test(sql)
-    && !/t\.status in \([^)]*strittig/.test(ohneKommentar));
+    && !/(?<![\w.])t\.status in \([^)]*strittig/.test(ohneKommentar));   // Premium (Alias t) nie bei Streit; v_alt im Kaper-Schutz schon
   pruefe('Konto-Loeschung: Before-Delete-Trigger entfernt Ereignisse samt Stripe-Kennungen, RLS-Probe loescht den Nutzer',
     /before delete on public\.abos\s+for each row execute function public\.loesche_stripe_kennungen_vor_abo\(\);/.test(ohneKommentar)
     && /delete from public\.stripe_ereignisse/.test(ohneKommentar)

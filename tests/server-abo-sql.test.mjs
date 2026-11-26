@@ -91,6 +91,35 @@ for (const d of ['supabase/schema.sql', 'supabase/abo-schema.sql']) {
     !r.fehler && r.letzte.includes('Abo-Beenden-RLS-Test erfolgreich'), r.fehler || r.letzte);
 }
 {
+  // Kaper-Schutz auch im offenen Zahlungsstreit (R31, Hauptfenster 26.11.2026): PR #79 fuehrt den Status 'strittig' ein.
+  // Ein fremder Kauf mit der Nutzer-ID eines Kontos im Streit darf dessen Zeile nicht uebernehmen, sonst faende ein
+  // spaeter gewonnener Streit (charge.dispute.closed) einen fremden kunde_id vor.
+  const r = await lauf(db, `
+begin;
+insert into auth.users (id, email) values ('e5555555-5555-4555-8555-555555555555', 'abo-e@example.invalid');
+insert into public.abos (user_id, status, plan, gueltig_bis, quelle, kunde_id, abo_id, stand_zeit, status_vor_streit, gueltig_bis_vor_streit)
+values ('e5555555-5555-4555-8555-555555555555', 'strittig', 'monat', now() + interval '20 days', 'stripe', 'cus_E1', 'sub_E1',
+  now() - interval '1 hour', 'aktiv', now() + interval '20 days');
+do $$
+declare
+  r text;
+  a public.abos;
+begin
+  r := public.abo_stripe_ereignis('evt_s1', 'checkout.session.completed', now(), 'cus_FREMD1', 'sub_FREMD1',
+    'e5555555-5555-4555-8555-555555555555', 'aktiv', now() + interval '1 day', null);
+  select * into a from public.abos where user_id = 'e5555555-5555-4555-8555-555555555555';
+  if r <> 'konflikt' or a.kunde_id <> 'cus_E1' or a.abo_id <> 'sub_E1' or a.status <> 'strittig'
+    or a.status_vor_streit <> 'aktiv' or exists (select 1 from public.abos where kunde_id = 'cus_FREMD1') then
+    raise exception 'FEHLER: fremder Kauf hat das Konto im Streit uebernommen (%, %)', r, row_to_json(a);
+  end if;
+end;
+$$;
+select 'Streit-Fall ok' as ergebnis;
+rollback;`);
+  pruefe('fremder Kauf mit der Nutzer-ID eines Kontos im offenen Streit (strittig) wird abgewiesen (konflikt, Zeile unberuehrt)',
+    !r.fehler && r.letzte.includes('Streit-Fall ok'), r.fehler || r.letzte);
+}
+{
   // Die RLS-Tests rollen zurueck: Danach liegen keine Testzeilen in der Datenbank
   const r = await lauf(db, 'select (select count(*) from public.abos) as abos, (select count(*) from auth.users) as nutzer;');
   pruefe('nach den Tests keine Testzeilen uebrig (alles zurueckgerollt)', !r.fehler && r.letzte === '{"abos":0,"nutzer":0}', r.fehler || r.letzte);
