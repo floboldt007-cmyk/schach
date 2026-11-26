@@ -135,6 +135,15 @@ try {
     pruefe('Schalter nimmt nur saubere Namen (klein, a-z 0-9 -)', f.design === 'l2 ok', f);
     await kontext.close();
   }
+  // R28 Menue + Liga: die Probe-Stile laden nur mit r1, r2 oder r3, und dann genau einmal
+  const r28 = (s) => s.evaluate(() => document.querySelectorAll('link#probe-r28').length);
+  for (const [suche, soll, name] of [['', 0, 'ohne Schalter'], ['?test&design=r1', 1, 'mit r1'],
+    ['?test&design=brett-warm', 0, 'mit fremder Probe'], ['?design=r2', 0, 'r2 ohne ?test']]) {
+    const { s, kontext } = await seite(browser, suche ? { suche } : {});
+    const n = await r28(s);
+    pruefe(`R28-Stile ${name}: ${soll} Datei`, n === soll, n);
+    await kontext.close();
+  }
 } catch (e) {
   pruefe('Lauf ohne Ausnahme', false, String(e && e.stack || e));
 } finally {

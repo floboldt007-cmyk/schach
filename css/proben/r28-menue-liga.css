@@ -84,7 +84,7 @@ html[data-design~="r2"] .reiter-leiste[data-lage="seite"] .reiter { font-size: 1
 html[data-design~="r2"] .reiter-leiste[data-lage="seite"] .reiter-pille { left: 14px; right: auto; width: 3px; transform: none; }
 
 /* Liga: nur Platz, Name, Wert, gross; keine Muenzen am Rand (die Belohnung steht weiter in der eigenen Zeile) */
-html[data-design~="r2"] .lg-gr-buehne { background: none; box-shadow: none; padding-inline: 4px; grid-template-columns: auto minmax(0, 1fr); }
+html[data-design~="r2"] .lg-gr-buehne { background: none; color: var(--text); box-shadow: none; padding-inline: 4px; grid-template-columns: auto minmax(0, 1fr); }
 html[data-design~="r2"] .lg-gr-wappen { width: 44px; }
 html[data-design~="r2"] .lg-gr-titel h2 { font-size: 26px; }
 html[data-design~="r2"] .lg-gr-liste { background: none; box-shadow: none; border-radius: 0; }
