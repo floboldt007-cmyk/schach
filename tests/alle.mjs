@@ -54,6 +54,7 @@ const SUITEN = [
   { name: 'r19-bots-se', datei: 'r19-bots-se.test.mjs', args: [], was: 'Bots: klebender Spielen-Knopf verdeckt kein Fokusziel (7 Größen, in Ruhe bildgleich); Löschseite: Sprunglink zu "Selbst löschen" (Browser)' },
   { name: 'server-abo', datei: 'server-abo.test.mjs', args: [], was: 'Abo: Stripe-Webhook und Schema-Vertrag (Server)' },
   { name: 'server-abo-kasse', datei: 'server-abo-kasse.test.mjs', args: [], was: 'Abo: Kasse auf dem Server, Nutzer-ID nur aus der Anmeldung (Server)' },
+  { name: 'server-abo-beenden', datei: 'server-abo-beenden.test.mjs', args: [], was: 'Abo: Kündigen und Widerrufen, auch ohne Anmeldung (Server)' },
   { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Trainer“: Stand, Kauf, Blatt' },
   // server-verwaltung steht wie alle PGlite-Suiten (server-karte*, server-daten*) nicht hier: PGlite gibt es nur im CI-Job
   // sql (.github/workflows/tests.yml), im Browser-Job brach die Suite ab (R17-sammelfix2, Run 43587846003)
@@ -271,7 +272,7 @@ const SUITEN = [
 // bekommen den Median, damit sie ohne Aenderung an dieser Tabelle aufgenommen werden koennen.
 const DAUERN = new Map([
   ['zeitwaechter', 4], ['konto', 0], ['online', 2], ['online-ui', 13], ['zuzweit', 15],
-  ['daten', 12], ['server-abo', 0], ['server-abo-kasse', 0], ['abo', 33], ['server-coach', 29], ['coach-ki', 30],
+  ['daten', 12], ['server-abo', 0], ['server-abo-kasse', 0], ['server-abo-beenden', 0], ['abo', 33], ['server-coach', 29], ['coach-ki', 30],
   ['server-schule', 0], ['schule', 59], ['storage', 3], ['liga', 53], ['sicherung', 0],
   ['review', 2], ['ereignisse', 1], ['fairness', 1], ['spiel', 15], ['engine-bots', 104],
   ['board', 68], ['vorzuege', 17], ['sw', 0], ['sw-update', 40], ['brett-tastatur', 30], ['sw-cache', 0], ['sw-erstbesuch', 69], ['sw-erstbesuch-webkit', 145], ['sw-kern', 19], ['thema', 55], ['klang', 12],
