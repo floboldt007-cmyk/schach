@@ -50,7 +50,9 @@ const BISHER = ['supabase/schema.sql', 'supabase/abo-schema.sql', 'supabase/onli
 const ZUSATZ = ['supabase/freunde-schema.sql', 'supabase/werkstatt-schema.sql', 'supabase/verwaltung-schema.sql',
   'supabase/coach-schema.sql', 'supabase/schule-schema.sql', 'supabase/gegner-effekte-schema.sql',
   // R31: Kuendigen und Widerrufen (PR 142), braucht abo-schema.sql davor
-  'supabase/abo-beenden-schema.sql'];
+  'supabase/abo-beenden-schema.sql',
+  // T-068: Kuendigungserklaerung (Name, Zweitadresse), braucht abo-beenden-schema.sql davor
+  'supabase/abo-kuendigung-312k-schema.sql'];
 const GELADEN = [...BISHER, 'supabase/saison-schema.sql', 'supabase/weltrang-schema.sql', ...ZUSATZ];
 // Name der Gegenproben-Tabelle: darf nie eine echte Tabelle sein (sonst "already exists" statt einer Meldung)
 const PROBE = 'kr_probe_tabelle';

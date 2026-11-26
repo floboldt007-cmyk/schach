@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
   verarbeite, erstattungCent, sha256hex, WIDERRUF_MS, KULANZ_MS, TAG_MS, LINK_GUELTIG_MS,
+  pruefeEingabe, kuendigungsParameter, zeitText, datumText, ohneLinks,
 } from '../supabase/functions/_gemeinsam/abo-beenden.js';
 import { mailBereit, RESEND_API } from '../supabase/functions/_gemeinsam/mail.js';
 
@@ -32,7 +33,7 @@ const UMGEBUNG = Object.freeze({ SUPABASE_URL: BASIS, SUPABASE_SERVICE_ROLE_KEY:
 const T0 = Date.UTC(2026, 10, 5, 12);
 const START_S = Math.floor((T0 - 3 * TAG_MS) / 1000);          // Abo vor 3 Tagen abgeschlossen
 const ENDE_S = START_S + 30 * 86400;
-const ZEILE = [{ status: 'aktiv', abo_id: 'sub_Probe1', kunde_id: 'cus_Probe1', quelle: 'stripe' }];
+const ZEILE = [{ status: 'aktiv', abo_id: 'sub_Probe1', kunde_id: 'cus_Probe1', quelle: 'stripe', gueltig_bis: new Date((START_S + 30 * 86400) * 1000).toISOString() }];
 const SUB = { id: 'sub_Probe1', customer: 'cus_Probe1', status: 'active', start_date: START_S,
   items: { data: [{ current_period_start: START_S, current_period_end: ENDE_S }] } };
 const CHARGE = { id: 'ch_Probe1', paid: true, status: 'succeeded', refunded: false, amount: 3000, amount_refunded: 0, created: START_S + 5 };
@@ -49,7 +50,9 @@ function netz(o = {}) {
     aufrufe.push({ url, ...opt });
     if (url === `${BASIS}/auth/v1/user`) return antwort(s.userStatus, s.user);
     if (url.startsWith(`${BASIS}/rest/v1/abos?`)) return antwort(200, s.abo);
+    if (url.startsWith(`${BASIS}/rest/v1/abo_vorgaenge?`)) return antwort(s.zweitStatus ?? 200, s.zweitHeute ?? []);
     if (url === `${BASIS}/rest/v1/rpc/abo_vorgang_eintragen`) return antwort(204, null);
+    if (url === `${BASIS}/rest/v1/rpc/abo_kuendigung_eintragen`) return antwort(s.rpc312k ?? 404, null);
     if (url === `${BASIS}/rest/v1/rpc/abo_link_anlegen`) return antwort(200, s.linkAnlegen);
     if (url === `${BASIS}/rest/v1/rpc/abo_link_pruefen`) return antwort(200, s.linkPruefen);
     if (url === `${BASIS}/rest/v1/rpc/abo_link_verbrauchen`) return antwort(204, null);
@@ -124,6 +127,140 @@ const mails = (n) => zu(n, RESEND_API).map((a) => JSON.parse(a.body));
   const n5 = netz({ user: { id: UID, email: MAIL, email_confirmed_at: null } });
   const r5 = json(await lauf(n5, { aktion: 'kuendigen' }));
   pruefe('unbestaetigte Adresse: Kuendigung ja, aber keine Mail an sie', r5.art === 'kuendigung' && mails(n5).length === 0 && r5.mail === false);
+}
+
+// ---------------------------------------------------------------------------
+// Paragraf 312k (T-068): Art, Grund, Name, Zeitpunkt, Bestaetigungsadresse, gespeicherte Erklaerung
+// ---------------------------------------------------------------------------
+{
+  // Eingabe: alles freiwillig, Vorgabe ordentlich zum fruehestmoeglichen Zeitpunkt
+  const v = pruefeEingabe({}, T0);
+  pruefe('312k Eingabe: leer = ordentlich, fruehestmoeglich, ohne Grund und Name', v && v.art === 'ordentlich' && v.zeitpunkt === 'naechster'
+    && v.tag === null && v.grund === '' && v.name === '' && v.email === null);
+  const v2 = pruefeEingabe({ art: 'ausserordentlich', grund: ' Umzug\u0000ins Ausland ', name: '  Erika\nProbe ', zeitpunkt: '2026-12-24',
+    email: ' Zweit@Example.invalid ' }, T0);
+  pruefe('312k Eingabe: Steuerzeichen raus, getrimmt, Tag und Adresse uebernommen', v2 && v2.art === 'ausserordentlich'
+    && v2.grund === 'Umzug ins Ausland' && v2.name === 'Erika Probe' && v2.tag === '2026-12-24' && Number.isFinite(v2.zeitpunkt)
+    && v2.email === 'Zweit@Example.invalid', v2);
+  pruefe('312k Eingabe: Grund und Name werden gekuerzt (500 und 200 Zeichen)', pruefeEingabe({ grund: 'g'.repeat(900), name: 'n'.repeat(900) }, T0).grund.length === 500
+    && pruefeEingabe({ name: 'n'.repeat(900) }, T0).name.length === 200);
+  pruefe('312k Eingabe: kaputte Form -> null (400)', pruefeEingabe({ art: 'fristlos' }, T0) === null && pruefeEingabe({ grund: 5 }, T0) === null
+    && pruefeEingabe({ zeitpunkt: '2026-02-31' }, T0) === null && pruefeEingabe({ zeitpunkt: '2020-01-01' }, T0) === null
+    && pruefeEingabe({ zeitpunkt: '2031-01-01' }, T0) === null && pruefeEingabe({ email: 'kein-at' }, T0) === null && pruefeEingabe([], T0) === null);
+  // Stripe-Parameter
+  const bis = ENDE_S * 1000;
+  const spaeter = kuendigungsParameter({ art: 'ordentlich', grund: '', zeitpunkt: bis + 40 * TAG_MS, tag: '2027-01-15', laeuftBis: bis });
+  pruefe('312k Stripe: Tag nach dem bezahlten Zeitraum -> cancel_at, kein cancel_at_period_end', spaeter.get('cancel_at') === String(Math.floor((bis + 40 * TAG_MS) / 1000))
+    && !spaeter.has('cancel_at_period_end'));
+  const frueh = kuendigungsParameter({ art: 'ordentlich', grund: '', zeitpunkt: T0 + 2 * TAG_MS, tag: '2026-11-07', laeuftBis: bis });
+  pruefe('312k Stripe: frueherer Wunschtag -> cancel_at_period_end plus Wunschtermin in der Notiz', frueh.get('cancel_at_period_end') === 'true'
+    && /Wunschtermin 2026-11-07/.test(frueh.get('cancellation_details[comment]') || ''));
+  const ohneGrund = kuendigungsParameter({ art: 'ausserordentlich', grund: '', zeitpunkt: 'naechster', tag: null, laeuftBis: bis });
+  pruefe('312k Stripe: ausserordentlich ohne Grund -> Periodenende, Notiz "kein Grund angegeben"', ohneGrund.get('cancel_at_period_end') === 'true'
+    && /ausserordentlich: kein Grund angegeben/.test(ohneGrund.get('cancellation_details[comment]') || ''));
+
+  // Ganzer Ablauf angemeldet, mit neuer RPC
+  const n = netz({ rpc312k: 204 });
+  const e = await lauf(n, { aktion: 'kuendigen', art: 'ausserordentlich', grund: 'Umzug', name: 'Erika Probe', zeitpunkt: 'naechster', email: 'zweit@example.invalid' });
+  const d = json(e);
+  pruefe('312k ausserordentlich: 200 mit pruefung true, wirksam zum Periodenende, Erklaerung in der Antwort', e.status === 200 && d.pruefung === true
+    && d.wirksam_zum === new Date(ENDE_S * 1000).toISOString() && typeof d.erklaerung === 'string', d);
+  const erk = d.erklaerung || '';
+  pruefe('312k Erklaerung: Vertrag, Art, Grund, Name, Zeitpunkt, Eingang mit Uhrzeit, Pflichtsatz Schaltflaeche', /Crownmate/.test(erk)
+    && /außerordentliche Kündigung/.test(erk) && /Grund: Umzug/.test(erk) && /Name: Erika Probe/.test(erk) && /frühestmöglich/.test(erk)
+    && erk.includes(zeitText(T0)) && erk.includes('abgegeben über die Schaltfläche ‚jetzt kündigen‘') && erk.includes(datumText(ENDE_S * 1000)), erk);
+  pruefe('312k Antwort: ohne Adresse, Nutzer-ID und Stripe-Kennung', !/sub_|cus_|@|0f8b6c1e/.test(e.koerper));
+  const m = mails(n);
+  pruefe('312k Mail: an die eingetragene UND die Kontoadresse, beide mit der vollen Erklaerung', m.length === 2
+    && m.map((x) => x.to[0]).sort().join() === [MAIL, 'zweit@example.invalid'].sort().join() && m.every((x) => x.text.includes(erk.trim())), m.map((x) => x.to));
+  const k = zu(n, 'api.stripe.com/v1/subscriptions/sub_Probe1')[0];
+  const kp = new URLSearchParams(k.body);
+  pruefe('312k Stripe: Notiz mit Art und Grund, Idempotency-Key haengt an den Parametern', /ausserordentlich: Umzug/.test(kp.get('cancellation_details[comment]') || '')
+    && /^crownmate-kuendigen-sub_Probe1-[0-9a-f]{12,}$/.test(k.headers['Idempotency-Key']));
+  const r = rpcDaten(n, 'abo_kuendigung_eintragen')[0];
+  pruefe('312k Nachweis: neue RPC mit allen Angaben und der Erklaerung, alte RPC nicht', r && r.p_user === UID && r.p_weg === 'angemeldet'
+    && r.p_kuendigung_art === 'ausserordentlich' && r.p_grund === 'Umzug' && r.p_name === 'Erika Probe' && r.p_wunsch_zum === null
+    && r.p_bestaetigung_an === 'zweit@example.invalid' && r.p_pruefung === true && r.p_erklaerung === erk && r.p_mail === true
+    && rpcDaten(n, 'abo_vorgang_eintragen').length === 0, r);
+
+  // E3: ausserordentlich OHNE Grund wird nie abgelehnt
+  const n2 = netz({ rpc312k: 204 });
+  const e2 = await lauf(n2, { aktion: 'kuendigen', art: 'ausserordentlich' });
+  const d2 = json(e2);
+  pruefe('312k ausserordentlich ohne Grund: 200, pruefung true, Wirkungszeitpunkt da', e2.status === 200 && d2.pruefung === true && !!d2.wirksam_zum, d2);
+  pruefe('312k ohne Grund: Erklaerung und Mail sagen "kein Grund angegeben" und "mindestens ordentlich"', /Grund: kein Grund angegeben/.test(d2.erklaerung || '')
+    && /mindestens ordentlich/.test(d2.erklaerung || '') && mails(n2)[0].text.includes('kein Grund angegeben'));
+  pruefe('312k ohne Grund: Nachweis mit leerem Grund', rpcDaten(n2, 'abo_kuendigung_eintragen')[0].p_grund === null);
+
+  // Ordentlich ohne Angaben: gleiche Adresse nur einmal, pruefung false
+  const n3 = netz({ rpc312k: 204 });
+  const d3 = json(await lauf(n3, { aktion: 'kuendigen', email: MAIL.toUpperCase() }));
+  pruefe('312k ordentlich: pruefung false, Kontoadresse nur EINE Mail (auch in anderer Schreibweise)', d3.pruefung === false && mails(n3).length === 1);
+  pruefe('312k ordentlich: Erklaerung ohne Grund- und Namenszeile', !/Grund:|Name:/.test(d3.erklaerung || '') && /ordentliche Kündigung/.test(d3.erklaerung || ''));
+
+  // Kaltreview #296 (D): freie Zweitadresse plus freier Text war ein Mail-Relais. Bremse im eigenen Code, nie eine Ablehnung.
+  const LINKS = 'Umzug, siehe https://boese.example/a?b=1 oder www.boese.example und boese.ru/pfad sowie HTTP://X.example';
+  const vl = pruefeEingabe({ art: 'ausserordentlich', grund: LINKS, name: 'Erika www.boese.de' }, T0);
+  pruefe('Erklaerung woertlich (§ 312k Abs. 4): Grund und Name bleiben im Original, auch mit Link', vl && vl.grund === LINKS && vl.name === 'Erika www.boese.de', vl);
+  pruefe('Relais: ohneLinks ersetzt http(s)://, www., domain.tld/pfad und domain.tld', ohneLinks(LINKS) === 'Umzug, siehe [Link entfernt] oder [Link entfernt] und [Link entfernt] sowie [Link entfernt]', ohneLinks(LINKS));
+  const normal = 'Umzug ins Ausland, z. B. nach Wien. Danach 3.5 Monate weg';
+  pruefe('Relais: ohneLinks laesst normalen Text stehen (Abkuerzung, Zahl, Satzende)', ohneLinks(normal) === normal);
+  const nl = netz({ rpc312k: 204 });
+  const dl = json(await lauf(nl, { aktion: 'kuendigen', art: 'ausserordentlich', grund: LINKS, email: 'zweit@example.invalid' }));
+  const anKonto = mails(nl).find((x) => x.to[0] === MAIL);
+  const anZweit = mails(nl).find((x) => x.to[0] === 'zweit@example.invalid');
+  pruefe('Erklaerung, Seite, Nachweis und Stripe-Notiz mit dem Grund im Original', (dl.erklaerung || '').includes(`Grund: ${LINKS}`)
+    && rpcDaten(nl, 'abo_kuendigung_eintragen')[0].p_grund === LINKS && rpcDaten(nl, 'abo_kuendigung_eintragen')[0].p_erklaerung === dl.erklaerung
+    && (new URLSearchParams(zu(nl, 'api.stripe.com/v1/subscriptions/sub_Probe1')[0].body).get('cancellation_details[comment]') || '').includes('https://boese.example/a'), dl.erklaerung);
+  pruefe('Kontoadress-Mail: volle Erklaerung mit Link (der Kunde selbst, kein Relais)', !!anKonto && anKonto.text.includes(`Grund: ${LINKS}`));
+  pruefe('Relais: Zweitadress-Mail ohne jeden Link, sonst gleich', !!anZweit && !/boese|https?:|www\./i.test(anZweit.text + anZweit.subject)
+    && anZweit.text.includes(`Grund: ${ohneLinks(LINKS)}`) && anZweit.subject === anKonto.subject, anZweit && anZweit.text);
+  const zaehl = zu(nl, '/rest/v1/abo_vorgaenge?')[0];
+  pruefe('Relais: Zaehlung je Konto ueber abo_vorgaenge.bestaetigung_an der letzten 24 Stunden', !!zaehl && zaehl.url.includes(`user_id=eq.${UID}`)
+    && zaehl.url.includes('bestaetigung_an=not.is.null') && zaehl.url.includes(`erstellt_am=gte.${encodeURIComponent(new Date(T0 - TAG_MS).toISOString())}`), zaehl && zaehl.url);
+  // 1. Nur die ERSTE Kuendigung eines Abos schreibt an die Zweitadresse
+  const ng = netz({ rpc312k: 204, abo: [{ ...ZEILE[0], status: 'gekuendigt' }] });
+  const eg = await lauf(ng, { aktion: 'kuendigen', art: 'ausserordentlich', grund: 'nochmal', email: 'zweit@example.invalid' });
+  pruefe('Relais: Abo schon gekuendigt -> 200, Bestaetigung NUR an die Kontoadresse, keine Zweitadresse im Nachweis', eg.status === 200
+    && mails(ng).length === 1 && mails(ng)[0].to[0] === MAIL && rpcDaten(ng, 'abo_kuendigung_eintragen')[0].p_bestaetigung_an === null, mails(ng).map((x) => x.to));
+  // 2. Hoechstens 3 Zweitadress-Mails je Konto und Tag; die Kuendigung wirkt trotzdem
+  const nz4 = netz({ rpc312k: 204, zweitHeute: [{ id: 1 }, { id: 2 }, { id: 3 }] });
+  const ez4 = await lauf(nz4, { aktion: 'kuendigen', email: 'zweit@example.invalid' });
+  pruefe('Relais: vierte Zweitadress-Mail am Tag -> keine, Kontoadresse ja, Kuendigung 200', ez4.status === 200 && json(ez4).wirksam_zum
+    && mails(nz4).length === 1 && mails(nz4)[0].to[0] === MAIL && rpcDaten(nz4, 'abo_kuendigung_eintragen')[0].p_bestaetigung_an === null
+    && zu(nz4, "api.stripe.com/v1/subscriptions/sub_Probe1").length === 1, mails(nz4).map((x) => x.to));
+  const n5b = netz({ rpc312k: 204, zweitHeute: [{ id: 1 }, { id: 2 }] });
+  await lauf(n5b, { aktion: 'kuendigen', email: 'zweit@example.invalid' });
+  pruefe('Relais: dritte Zweitadress-Mail am Tag geht noch raus', mails(n5b).length === 2);
+  const n6b = netz({ rpc312k: 204, zweitStatus: 400 });
+  const e6b = await lauf(n6b, { aktion: 'kuendigen', email: 'zweit@example.invalid' });
+  pruefe('Relais: Zaehlung nicht moeglich (Schema fehlt, Netz) -> keine Zweitadress-Mail, Kuendigung 200', e6b.status === 200
+    && mails(n6b).length === 1 && mails(n6b)[0].to[0] === MAIL);
+
+  // Spaeterer Tag: cancel_at, Zeitpunkt in Erklaerung und Nachweis
+  const tagMs = ENDE_S * 1000 + 45 * TAG_MS;
+  const tag = new Date(tagMs).toISOString().slice(0, 10);
+  const n4 = netz({ rpc312k: 204, kuendigen: { status: 200, daten: { ...SUB, cancel_at: Math.floor(Date.parse(tag + 'T23:00:00Z') / 1000) } } });
+  const d4 = json(await lauf(n4, { aktion: 'kuendigen', zeitpunkt: tag }));
+  pruefe('312k Wunschtag spaeter: cancel_at an Stripe, wunsch_zum im Nachweis, Tag in der Erklaerung', new URLSearchParams(zu(n4, 'sub_Probe1')[0].body).has('cancel_at')
+    && rpcDaten(n4, 'abo_kuendigung_eintragen')[0].p_wunsch_zum === tag && d4.pruefung === false
+    && (d4.erklaerung || '').includes(datumText(Date.parse(tag + 'T12:00:00Z'))), d4);
+
+  // Datei noch nicht eingespielt: Kuendigung geht trotzdem, alter Nachweis
+  const n5 = netz();
+  const p = [];
+  const e5 = await verarbeite({ methode: 'POST', koerper: JSON.stringify({ aktion: 'kuendigen', name: 'X' }), autorisierung: `Bearer ${JWT}` }, UMGEBUNG,
+    { fetch: n5.f, jetzt: T0, protokoll: (z) => p.push(z) });
+  pruefe('312k ohne neue RPC: 200, alter Nachweis, Protokoll nachweis_ohne_312k', e5.status === 200 && rpcDaten(n5, 'abo_vorgang_eintragen').length === 1
+    && p.some((z) => /nachweis_ohne_312k/.test(z)));
+
+  // Link-Weg (ohne Anmeldung) nimmt dieselben Angaben
+  const token = '7'.repeat(64);
+  const n6 = netz({ rpc312k: 204 });
+  const d6 = json(await lauf(n6, { aktion: 'link_kuendigen', token, art: 'ausserordentlich', grund: 'Krankheit', name: 'Max' }, { autorisierung: '' }));
+  pruefe('312k Link-Weg: Angaben kommen an, Erklaerung nennt den Link-Weg', d6.pruefung === true && rpcDaten(n6, 'abo_kuendigung_eintragen')[0].p_weg === 'link'
+    && rpcDaten(n6, 'abo_kuendigung_eintragen')[0].p_grund === 'Krankheit' && /Kündigungslink/.test(d6.erklaerung || ''), d6);
+  pruefe('312k Link-Weg: kaputte Angabe -> 400, Link bleibt gueltig', (await lauf(netz(), { aktion: 'link_kuendigen', token, zeitpunkt: 'morgen' }, { autorisierung: '' })).status === 400);
 }
 
 // ---------------------------------------------------------------------------

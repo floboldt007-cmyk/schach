@@ -1020,6 +1020,10 @@ Erst einrichten, wenn das Abo aus dem Abschnitt oben läuft. Reihenfolge:
    `ABO_STRIPE_RK` ist schon gesetzt. Fehlt etwas, antwortet die Function mit `nicht_eingerichtet` und tut nichts.
 5. **Schema einspielen:** Im SQL-Editor von Supabase den Inhalt von `abo-beenden-schema.sql` ausführen, danach
    `abo-beenden-rls-test.sql`. Erwartet: „Abo-Beenden-RLS-Test erfolgreich“ (der Test rollt am Ende alles zurück).
+   Danach `abo-kuendigung-312k-schema.sql` (seit T-068, 26.11.2026): speichert die Angaben der Kündigungsseite nach
+   § 312k Abs. 2 und den Text der abgegebenen Erklärung (Abs. 4). Rückweg: `abo-kuendigung-312k-zurueck.sql` (vorher
+   die Erklärungen sichern, siehe Kopf der Datei). Fehlt die Datei, kündigt die Function trotzdem und trägt den
+   Vorgang ohne diese Angaben ein (Protokoll `nachweis_ohne_312k`). Geprüft in PGlite: `tests/server-abo-sql.test.mjs`.
 6. **Bereitstellen:** `npx supabase functions deploy abo-beenden --no-verify-jwt` (die Function prüft die Anmeldung
    selbst, weil der Link-Weg ohne Anmeldung funktionieren muss).
 7. **Im Testmodus ausprobieren:** Testabo abschließen, „Vertrag widerrufen“ (Erstattung im Stripe-Dashboard sichtbar,

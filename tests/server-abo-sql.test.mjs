@@ -90,6 +90,71 @@ for (const d of ['supabase/schema.sql', 'supabase/abo-schema.sql']) {
   pruefe('abo-beenden-rls-test.sql meldet "Abo-Beenden-RLS-Test erfolgreich"',
     !r.fehler && r.letzte.includes('Abo-Beenden-RLS-Test erfolgreich'), r.fehler || r.letzte);
 }
+// T-068 (Paragraf 312k): Kuendigungserklaerung speichern, additive Datei nach abo-beenden-schema.sql
+for (const runde of [1, 2]) {
+  const r = await lauf(db, lies('supabase/abo-kuendigung-312k-schema.sql'));
+  pruefe(`abo-kuendigung-312k-schema.sql laeuft (${runde}. Mal, wiederholbar)`, !r.fehler, r.fehler);
+}
+{
+  const r = await lauf(db, `
+begin;
+insert into auth.users (id, email) values ('a7777777-7777-4777-8777-777777777777', 'k-a@example.invalid'),
+  ('b8888888-8888-4888-8888-888888888888', 'k-b@example.invalid');
+select public.abo_kuendigung_eintragen('a7777777-7777-4777-8777-777777777777', 'angemeldet', 'sub_K1', now() + interval '20 days',
+  true, 'ausserordentlich', 'Umzug zu Erika', 'Erika Probe', (now() + interval '3 days')::date, 'zweit@example.invalid', true,
+  E'Kuendigungserklaerung\\nGrund: Umzug zu Erika\\nName: Erika Probe\\nabgegeben ueber die Schaltflaeche');
+do $$
+declare v public.abo_vorgaenge;
+begin
+  select * into v from public.abo_vorgaenge where user_id = 'a7777777-7777-4777-8777-777777777777';
+  if v.art <> 'kuendigung' or v.kuendigung_art <> 'ausserordentlich' or v.grund <> 'Umzug zu Erika' or v.name <> 'Erika Probe'
+    or v.bestaetigung_an <> 'zweit@example.invalid' or not v.pruefung or v.erklaerung not like '%Schaltflaeche%'
+    or v.erstellt_am is null or v.mail_gesendet is not true then
+    raise exception 'FEHLER: Erklaerung falsch gespeichert %', row_to_json(v);
+  end if;
+end;
+$$;
+-- RLS: das eigene Konto liest seine Erklaerung, ein fremdes Konto und anon nicht
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"a7777777-7777-4777-8777-777777777777","role":"authenticated"}', true);
+do $$ begin
+  if (select count(*) from public.abo_vorgaenge where erklaerung is not null) <> 1 then raise exception 'FEHLER: eigene Erklaerung nicht lesbar'; end if;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"b8888888-8888-4888-8888-888888888888","role":"authenticated"}', true);
+do $$ begin
+  if (select count(*) from public.abo_vorgaenge) <> 0 then raise exception 'FEHLER: fremdes Konto liest die Erklaerung'; end if;
+end $$;
+do $$ begin
+  perform public.abo_kuendigung_eintragen('b8888888-8888-4888-8888-888888888888', 'angemeldet', null, null, false, 'ordentlich',
+    null, null, null, null, false, 'x');
+  raise exception 'FEHLER: Nutzer darf abo_kuendigung_eintragen aufrufen';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+set local role anon;
+do $$ begin
+  if (select count(*) from public.abo_vorgaenge) <> 0 then raise exception 'FEHLER: anon liest Erklaerungen'; end if;
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+-- Konto weg: Name und Zweitadresse gehen mit, der Nachweis bleibt pseudonym
+delete from auth.users where id = 'a7777777-7777-4777-8777-777777777777';
+do $$
+declare v public.abo_vorgaenge;
+begin
+  select * into v from public.abo_vorgaenge where abo_id = 'sub_K1';
+  if v.id is null or v.user_id is not null or v.name is not null or v.bestaetigung_an is not null or v.grund is not null
+    or v.erklaerung like '%Erika%' or v.erklaerung not like '%Name: (mit dem Konto gelöscht)%'
+    or v.erklaerung not like '%Grund: (mit dem Konto gelöscht)%' or v.kuendigung_art <> 'ausserordentlich' then
+    raise exception 'FEHLER: Kontoloeschen laesst Personendaten in der Erklaerung %', row_to_json(v);
+  end if;
+end;
+$$;
+select 'Erklaerung-312k ok' as ergebnis;
+rollback;`);
+  pruefe('312k: Erklaerung wird gespeichert, nur das eigene Konto liest sie, Kontoloeschen nimmt Name und Zweitadresse mit',
+    !r.fehler && r.letzte.includes('Erklaerung-312k ok'), r.fehler || r.letzte);
+}
 {
   // Kaper-Schutz auch im offenen Zahlungsstreit (R31, Hauptfenster 26.11.2026): PR #79 fuehrt den Status 'strittig' ein.
   // Ein fremder Kauf mit der Nutzer-ID eines Kontos im Streit darf dessen Zeile nicht uebernehmen, sonst faende ein
