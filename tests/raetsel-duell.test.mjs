@@ -58,6 +58,13 @@ pruefe('Phase: laeuft', phaseAus(st, v, T0) === 'laeuft');
 pruefe('Phase: eigene Zeit um, Gegner spielt noch', phaseAus(st, v, T0 + 170000) === 'zeit_um');
 pruefe('Phase: beendet', phaseAus({ ...st, status: 'beendet' }, v, T0) === 'beendet');
 pruefe('Phase: offen (Einladung)', phaseAus({ ...st, status: 'offen', start_am: null }, v, T0) === 'offen');
+// R27 Sofort-Ende: "fertig" vom Server kommt an (nur true zaehlt), altes SQL ohne das Feld = nicht fertig
+const stF = normalisiereStand({ ...roh, ich: { ...roh.ich, fertig: true }, gegner: { ...roh.gegner, fertig: false } });
+pruefe('Stand: fertig von mir und Gegner wird gelesen', stF.ich.fertig === true && stF.gegner.fertig === false);
+pruefe('Stand: ohne fertig (altes SQL) und mit Unsinn ist es false',
+  st.ich.fertig === false && st.gegner.fertig === false && normalisiereStand({ ...roh, ich: { ...roh.ich, fertig: 'ja' } }).ich.fertig === false);
+pruefe('Phase: selbst fertig gemeldet = zeit_um, auch wenn die Uhr noch laeuft', phaseAus(stF, v, T0) === 'zeit_um');
+pruefe('Phase: Vorlauf bleibt Vorlauf, auch mit fertig', phaseAus(stF, v, T0 - 10000 + 1000) === 'vorlauf');
 
 // ---------- Anzeige ----------
 pruefe('Balken: Anteil an mindestens 10', anteil(2, 3) === 0.2 && anteil(12, 15) === 0.8 && anteil(0, 0) === 0);

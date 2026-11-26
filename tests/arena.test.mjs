@@ -159,7 +159,7 @@ function nodeTeil() {
   pruefe('arena.js: Portraets ueber avatarVon, Flos Figur ueber floAvatar, Farbe als Segment, Duell ueber spieleDuell', /avatarVon\(/.test(arenaJs) && /floAvatar\(/.test(arenaJs) && /segment\(\{/.test(arenaJs) && /spieleDuell\(/.test(arenaJs));
   pruefe('arena.js: nach bereit app.gehe(\'partie\', ...)', /await duell\.bereit;[\s\S]{0,80}app\.gehe\('partie'/.test(arenaJs));
   pruefe('arena.js: laedt den Partie-Screen vorab (beim Vorwaermen und beim Tipp auf Spielen), damit er sich unter der Buehne schnell aufbaut',
-    /import\('\.\/partie\.js'\)/.test(arenaJs) && /async function spielen\(b\) \{\s*ladePartieScreen\(\);/.test(arenaJs) && /ladePartieScreen\(\); \}, 900\)/.test(arenaJs));
+    /import\('\.\/partie\.js'\)/.test(arenaJs) && /async function spielen\(b\) \{\s*ladePartieScreen\((vorrat)?\);/.test(arenaJs) && /ladePartieScreen\((vorrat)?\); \}, 900\)/.test(arenaJs));
   const duellJs = lies('js/ui/duell.js');
   pruefe('duell.js: Vertrag (html[data-duell="laeuft"], duell:fertig, aktivesDuell, app:screen partie, Ziele .spieler.gegner .av / .spieler.ich .av, Start-Klang)',
     /dataset\.duell = 'laeuft'/.test(duellJs) && /new CustomEvent\('duell:fertig'/.test(duellJs) && /export function aktivesDuell/.test(duellJs) && /hoere\('app:screen'/.test(duellJs)

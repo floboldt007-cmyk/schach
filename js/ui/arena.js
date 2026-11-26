@@ -159,8 +159,40 @@ function szeneVon(welt, modus) {
 // Partie-Screen vorab laden (dasselbe Modul, das app.js beim Wechsel importiert: danach kommt es aus dem Modul-Speicher).
 // Ein Fehler hier ist egal, app.js zeigt beim Wechsel selbst den Platzhalter.
 let partieVorab = null;
-function ladePartieScreen() {
+// Vorrat der Eroeffnungen (R27 Tempo, gemessen 22.11.: ueber 300 ms chess.js beim Oeffnen der Partie): Index und Namens-Tabelle
+// schon auf der Bots-Seite bauen, in kleinen Stuecken und nur in echter Ruhe (openings.js leerlauf). Codex-Kaltreview 22.11. B2:
+// Ruhe heisst auch keine Partie, kein Eingabefeld, kein frischer Tipp (ruheFuerVorrat); mit dem Verlassen der Seite hoert es auf,
+// beim naechsten Besuch geht es weiter. seite: { el, weg() } des Bildschirms, der vorlaedt.
+let vorratLaeuft = false;
+let letzteEingabe = 0;
+function merkeEingabe() { letzteEingabe = performance.now(); }
+function starteVorrat(seite) {
+  if (vorratLaeuft || !seite) return;
+  vorratLaeuft = true;
+  if (!letzteEingabe) {
+    for (const typ of ['pointerdown', 'keydown']) document.addEventListener(typ, merkeEingabe, { capture: true, passive: true });
+    letzteEingabe = performance.now();
+  }
+  const abbrechen = () => seite.weg() || !seite.el.isConnected;
+  const ruheAb = (f) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(f) : setTimeout(f, 1500));
+  // auch das Laden des Moduls erst in Ruhe; null = abgebrochen (dann darf der naechste Besuch neu anfangen), sonst bleibt es
+  // dabei: der Rest (Namens-Tabelle) laeuft im selben Lauf weiter oder baut sich in der Partie bei Bedarf
+  ruheAb(() => {
+    if (abbrechen()) { vorratLaeuft = false; return; }
+    import('../openings.js').then((o) => {
+      const ruhig = () => o.ruheFuerVorrat({
+        seiteDa: !abbrechen(),
+        partieOffen: !!document.querySelector('.screen.partie'),
+        eingabeAktiv: !!document.activeElement?.matches?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])'),
+        seitEingabeMs: performance.now() - letzteEingabe,
+      });
+      return o.eroeffnungVorbereiten({ leerlauf: true, ruhig, abbrechen });
+    }).then((r) => { if (r == null) vorratLaeuft = false; }, () => { vorratLaeuft = false; });
+  });
+}
+function ladePartieScreen(seite) {
   if (!partieVorab) partieVorab = import('./partie.js').catch(() => { partieVorab = null; });
+  starteVorrat(seite);
   return partieVorab;
 }
 
@@ -373,6 +405,7 @@ export function zeige(root, params, app) {
   // ---------- Aufbau ----------
   const s = document.createElement('section');
   s.className = 'screen arena';
+  const vorrat = { el: s, weg: () => weg };   // Vorrat der Eroeffnungen nur, solange diese Seite steht (ladePartieScreen)
   s.setAttribute('aria-label', t('arena.aria.leiter'));
   // Lage schon vor dem ersten Bild setzen (kein Umspringen): quer nur im Querformat mit genug Hoehe
   const querVorab = !window.matchMedia('(orientation: portrait), (max-width: 760px)').matches && window.innerHeight - 140 >= 420;
@@ -981,7 +1014,7 @@ export function zeige(root, params, app) {
 
   // Spielen: Rueckfrage bei offener Partie, dann das Duell-Intro (js/ui/duell.js) und nach dessen `bereit` die Partie
   async function spielen(b) {
-    ladePartieScreen();
+    ladePartieScreen(vorrat);
     // nie gegen einen Bot, der noch nicht frei ist (Vorschau-Welt, gesperrte Station); das Vorladen oben schadet nicht
     if (!istFreigeschaltet(b.stufe, fortschritt)) return;
     const laufend = ladeLaufendePartie();
@@ -1015,16 +1048,19 @@ export function zeige(root, params, app) {
   function eintritt() {
     if (tempo() === 0) return;
     kopfEintritt(s);
-    anim(karte, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { d: 640, v: 40, k: 'weich' });
+    anim(karte, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { d: 300, k: 'weich' });
+    // R27 Tempo (gemessen 22.11.: Bots stand erst nach 1,2 s): ruhig und kurz, der Abstand zwischen den Stationen schrumpft
+    // mit ihrer Zahl, alles steht nach rund 0,6 s
+    const schritt = Math.min(48, 200 / Math.max(1, knoten.length));
     if (!neuId) {
       // Stationen fallen gestaffelt (nur das Portraet und das Schild bewegen sich: die Station selbst bleibt messbar)
       knoten.forEach((el, i) => {
-        anim(el.querySelector('.avatar'), [{ opacity: 0, transform: 'translateY(-18px) scale(.6)' }, { opacity: 1, transform: 'none' }], { d: 560, v: 160 + i * 48, k: 'hupf' });
-        anim(el.querySelector('.k-schild'), [{ opacity: 0, transform: 'translateX(-50%) translateY(6px)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 420, v: 300 + i * 48, k: 'weich' });
+        anim(el.querySelector('.avatar'), [{ opacity: 0, transform: 'translateY(-18px) scale(.6)' }, { opacity: 1, transform: 'none' }], { d: 300, v: 40 + i * schritt, k: 'hupf' });
+        anim(el.querySelector('.k-schild'), [{ opacity: 0, transform: 'translateX(-50%) translateY(6px)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 240, v: 100 + i * schritt, k: 'weich' });
       });
       const fahne = s.querySelector('.knoten .fahne');
-      if (fahne) anim(fahne, [{ opacity: 0, transform: 'translateX(-50%) translateY(10px) scale(.6)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 560, v: 160 + knoten.length * 48, k: 'hupf' });
-      anim(floFigur, [{ opacity: 0, transform: 'translateY(-30px) scale(.5)' }, { opacity: 1, transform: 'none' }], { d: 600, v: 400 + aktuellIdx * 48, k: 'hupf' });
+      if (fahne) anim(fahne, [{ opacity: 0, transform: 'translateX(-50%) translateY(10px) scale(.6)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 300, v: 40 + knoten.length * schritt, k: 'hupf' });
+      anim(floFigur, [{ opacity: 0, transform: 'translateY(-30px) scale(.5)' }, { opacity: 1, transform: 'none' }], { d: 300, v: 80 + aktuellIdx * schritt, k: 'hupf' });
       // der Fortschritts-Pfad zeichnet sich
       const pfad = bild.querySelector('.w-fortschritt');
       if (pfad && pfad.getTotalLength) {
@@ -1032,11 +1068,11 @@ export function zeige(root, params, app) {
         try { laenge = pfad.getTotalLength(); } catch (e) { laenge = 0; }
         if (laenge > 0) {
           pfad.style.strokeDasharray = String(laenge);
-          anim(pfad, [{ strokeDashoffset: laenge }, { strokeDashoffset: 0 }], { d: 900, v: 260, k: 'gleiten' });
+          anim(pfad, [{ strokeDashoffset: laenge }, { strokeDashoffset: 0 }], { d: 420, v: 60, k: 'gleiten' });
         }
       }
     }
-    anim(detail, [{ opacity: 0, transform: 'translateY(22px) scale(.985)' }, { opacity: 1, transform: 'none' }], { d: 700, v: 140, k: 'weich' });
+    anim(detail, [{ opacity: 0, transform: 'translateY(22px) scale(.985)' }, { opacity: 1, transform: 'none' }], { d: 300, v: 40, k: 'weich' });
     staffel([...detail.querySelectorAll(':scope > :not([hidden]):not(.detail-links):not(.detail-rechts), .detail-links > *, .detail-rechts > :not([hidden])')],
       { d: 520, v: 240, abstand: 40, von: 'translateY(10px)' });
   }
@@ -1210,7 +1246,7 @@ export function zeige(root, params, app) {
 
   // Engines und den Partie-Screen im Hintergrund vorwaermen, damit die erste Partie sofort startet (der Partie-Screen
   // baut sich waehrend des Duell-Intros unter der Buehne auf; je schneller, desto laenger der Portraetflug)
-  spaeter(() => { app.engine('bot').catch(() => {}); app.engine('bewertung').catch(() => {}); ladePartieScreen(); }, 900);
+  spaeter(() => { app.engine('bot').catch(() => {}); app.engine('bewertung').catch(() => {}); ladePartieScreen(vorrat); }, 900);
   // Fehlende Analysen still nachholen (Stern 2); endet mit verlasse(), also auch beim Start einer Partie
   let nachholLauf = null;
   spaeter(() => { if (!weg) nachholLauf = starteNachholen(app, { beiPartie: sterneNeu }); }, ARENA_NACHHOLEN_MS + (neuId && !reduziert() ? 1000 : 0));
