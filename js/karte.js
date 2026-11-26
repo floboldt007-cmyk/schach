@@ -100,9 +100,15 @@ async function abgleichEinmal(titel) {
   merkeServer(uid, stand);
   // Wahl der Karte: erst so, wie der Spieler sie gewaehlt hat; lehnt der Server ab (z. B. ein Titel, den er nicht kennt),
   // ein zweites Mal nur mit dem, was er als Besitz kennt. Scheitert auch das, bleibt die alte Karte stehen.
+  // Mit Koenig, Kronli oder Erfinder-Rahmen kommt dazwischen die Wahl ohne diese Sonderwerte (R30, Server ohne
+  // karte-besitz-sicht-schema.sql oder Konto ohne Stueck): Titel, Banner und Vitrine bleiben wie vor R30 erhalten.
   const wahl = profilWahl();
   let ergebnis = stand;
-  for (const w of [wahlFuerServer(wahl, null, titel === undefined ? wahl.titel : titel), wahlFuerServer(wahl, stand)]) {
+  const erst = wahlFuerServer(wahl, null, titel === undefined ? wahl.titel : titel);
+  const sonder = NUR_ERFINDER.includes(erst.motiv) || KARTE_SONDER_RAHMEN.includes(erst.rahmen);
+  const ohneSonder = sonder ? { ...erst, motiv: NUR_ERFINDER.includes(erst.motiv) ? 'P' : erst.motiv,
+    rahmen: KARTE_SONDER_RAHMEN.includes(erst.rahmen) ? 'ohne' : erst.rahmen } : null;
+  for (const w of [erst, ...(ohneSonder ? [ohneSonder] : []), wahlFuerServer(wahl, stand)]) {
     try {
       const d = await rpc('karte_waehle', w);
       if (istStand(d)) { merkeServer(uid, d); ergebnis = d; break; }

@@ -132,6 +132,16 @@ pruefe('Rueckfall mit Stand: Koenig, Kronli zum Bauern, Erfinder-Rahmen zu ohne'
   const w = aufrufe.filter((a) => a.name === 'karte_waehle').map((a) => a.daten);
   pruefe('alter Server: erst K/erfinder-blatt-0, nach KARTE_PROFIL genau einmal P/ohne', w.length === 2 && w[0].motiv === 'K'
     && w[0].rahmen === 'erfinder-blatt-0' && w[1].motiv === 'P' && w[1].rahmen === 'ohne', w);
+  // Live ohne supabase/karte-besitz-sicht-schema.sql (CI-Befund T-003, 26.11.): der zweite Versuch nimmt nur die Sonderwerte
+  // heraus und behaelt Titel, Banner und Vitrine, sonst verloere der Erfinder dort seinen Titel, den er vor R30 behielt
+  setzeProfilWahl({ figur: 'K', rahmen: 'erfinder-blatt-0', banner: 'saison-bronze', titel: 'erfolg-feuertaufe', vitrine: ['stufe-raetsel'] });
+  aufrufe = [];
+  await K.abgleichKonto({ titel: 'erfolg-feuertaufe' });
+  const w2 = aufrufe.filter((a) => a.name === 'karte_waehle').map((a) => a.daten);
+  pruefe('alter Server: der zweite Versuch behaelt Titel, Banner und Vitrine (nur K und Erfinder-Rahmen fallen weg)',
+    w2.length === 2 && w2[1].motiv === 'P' && w2[1].rahmen === 'ohne' && w2[1].titel === 'erfolg-feuertaufe'
+    && w2[1].banner === 'saison-bronze' && JSON.stringify(w2[1].vitrine) === JSON.stringify(w2[0].vitrine), w2);
+  setzeProfilWahl({ figur: 'K', rahmen: 'erfinder-blatt-0', banner: 'start', titel: null, vitrine: [] });
   antworten = { karte_melde_stufen: stand(), karte_waehle: (d) => stand({ wahl: d }) };
   aufrufe = [];
   await K.abgleichKonto();
