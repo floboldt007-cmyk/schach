@@ -1,3 +1,6 @@
+-- ACHTUNG (R30, 26.11.2026): NICHT nach supabase/karte-besitz-sicht-schema.sql einspielen, solange diese Datei nur
+-- karte_in_liste prueft. Dort stehen Koenig, Kronli und erfinder-blatt-0 in den Listen, und die Weltrangliste zeigte sie
+-- dann OHNE Stueck. Vorher hier karte_bild statt karte_in_liste nehmen (Folgeauftrag zu #271, Plan v3 F2).
 -- VORSCHLAG (R27 Online Arena, Flo 21.11.2026: "in der Weltrangliste die Banner UND Profilbilder der anderen sehen"), NICHT
 -- eingespielt. Erweitert public.weltrang_liste (supabase/weltrang-schema.sql) je Zeile und im eigenen Stand um das Profilbild:
 -- motiv, grund, rahmen aus karte_wahl, genau wie karte_von sie jedem Gegner zeigt. Nur Werte aus den festen Listen von

@@ -3,7 +3,8 @@
 // - Status unbekannt (angemeldet, noch keine Antwort gemerkt): die gespeicherte Wahl bleibt sichtbar.
 // - Erst ein belegter Nicht-Besitz (Antwort ohne erfinder-titel) faellt auf den Bauern zurueck; abgemeldet ebenso.
 // - Neu waehlen darf den Koenig nur, wer belegt Erfinder ist (unbekannt reicht dafuer nicht).
-// - Der Gegner sieht nie den Koenig: die Karte fuer den Server kennt ihn nicht (js/karte.js KARTE_MOTIVE).
+// - Der Gegner sieht den Koenig nur mit Beleg (R30, Flo 22.11.2026): die Karte schickt die Wahl, der Server zeigt sie nur
+//   mit dem Stueck (supabase/karte-besitz-sicht-schema.sql); der Rueckfall nach einer Absage schickt den Bauern.
 // - Nach der Antwort zeigt ein offener Screen das eigene Bild neu (js/app.js), auch ein Spiel-Screen: jedes eigene Bild
 //   traegt dafuer data-eigen-avatar (js/thema.js floAvatar).
 // Reiner Node-Test mit nachgebautem localStorage.
@@ -37,7 +38,8 @@ pruefe('Erfinder mit Merker: Koenig', profilWahl().figur === 'K', profilWahl().f
 localStorage.removeItem(SONDER_SCHLUESSEL);
 pruefe('Status unbekannt (angemeldet, kein Merker): die gewaehlte Figur bleibt, kein Bauer', profilWahl().figur === 'K', profilWahl().figur);
 pruefe('Status unbekannt: das eigene Bild zeigt den Koenig', /\/[wb]?K\.svg|K\.svg/.test(floAvatar('w')) && !/P\.svg/.test(floAvatar('w')), floAvatar('w').slice(0, 300));
-pruefe('Status unbekannt: die Karte fuer den Server traegt nie den Koenig', wahlFuerServer().motiv === 'P', wahlFuerServer().motiv);
+pruefe('Status unbekannt: die Karte fuer den Server schickt den Koenig, der Server entscheidet (R30)', wahlFuerServer().motiv === 'K', wahlFuerServer().motiv);
+pruefe('Status unbekannt: der Rueckfall nach einer Absage schickt den Bauern', wahlFuerServer(undefined, { stufen: {}, banner: ['start'] }).motiv === 'P');
 setzeProfilWahl({ figur: 'K' });
 pruefe('Status unbekannt: neu waehlen darf den Koenig nicht (nur belegt Erfinder)', JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:sammeln') || '{}').profil?.figur === 'P',
   localStorage.getItem('schach-arena:v1:einstellungen:sammeln'));

@@ -2,9 +2,9 @@
 // Startbild traegt die eigene Wahl (Erfinder: Koenig mit Rahmen erfinder-blatt-0), auf frischem Geraet (Antwort der
 // Sonderstuecke kommt erst nach 2,5 s) und mit Merker. Gemessen am data-rahmen/data-figur des eigenen svg:
 //   Bot-Partie (Spielerleiste .av), Duell-Intro (.duell-av flo), Online-Partie (eigene Leiste unten), Raetsel-Duell (Start).
-// Ursache Online: die eigene Leiste nahm das Bild der Server-Karte, und die kennt Erfinder-Rahmen und Koenig mit Absicht
-// nicht (js/karte.js KARTE_RAHMEN/KARTE_MOTIVE). Die Karte, die der Gegner sieht, bleibt so: sie wird hier nicht geprueft
-// und nicht geaendert (karte_waehle traegt nie den Erfinder-Rahmen, letzte Pruefung).
+// Ursache Online: die eigene Leiste nahm das Bild der Server-Karte, und die kannte Erfinder-Rahmen und Koenig damals nicht.
+// Die Karte, die der Gegner sieht, wird hier nicht geprueft: seit R30 zeigt der Server beides nur mit Stueck
+// (supabase/karte-besitz-sicht-schema.sql, tests/server-karte-besitz-sicht.test.mjs).
 import http from 'node:http';
 import path from 'node:path';
 import { readFileSync, mkdirSync } from 'node:fs';

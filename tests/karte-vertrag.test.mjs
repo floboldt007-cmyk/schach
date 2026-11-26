@@ -9,8 +9,9 @@ import path from 'node:path';
 import { FAMILIEN, TALER_JE_STUFE, STUFEN } from '../js/pakete/sammlung/stufen.js';
 import { ERFOLGS_TITEL, KOENNEN_TITEL, titelListe } from '../js/pakete/sammlung/titel.js';
 import { MOTIVE, NUR_ERFINDER, GRUENDE, RAHMEN } from '../js/profil.js';
-import { KARTE_MOTIVE, KARTE_RAHMEN } from '../js/karte.js';
+import { KARTE_MOTIVE, KARTE_RAHMEN, KARTE_SONDER_RAHMEN } from '../js/karte.js';
 import { MENSCHEN_BANNER, BOT_BANNER } from '../js/ui/visitenkarte.js';
+import { ERFINDER } from '../js/sonderstuecke.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lies = (d) => readFileSync(path.join(WURZEL, d), 'utf8');
@@ -25,12 +26,18 @@ const sql = ohneKommentare(lies('supabase/karte-schema.sql'));
 const zurueck = ohneKommentare(lies('supabase/karte-zurueck.sql'));
 const gleich = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 
-const k = (sql.match(/function public\.karte_konstanten\(\)[\s\S]*?\$\$([\s\S]*?)\$\$;/) || [])[1] || '';
-const liste = (schluessel) => {
-  const m = k.match(new RegExp(`'${schluessel}',\\s*jsonb_build_array\\(([^)]*)\\)`));
+// karte_konstanten steht in mehreren Dateien; massgeblich ist die JUENGSTE Fassung (R30, supabase/karte-besitz-sicht-schema.sql,
+// Planreview v3 Auflage A1), sonst prueft der Vertrag die alte Liste ohne Koenig, Kronli und Erfinder-Rahmen
+const konstanten = (t) => (ohneKommentare(t).match(/function public\.karte_konstanten\(\)[\s\S]*?\$\$([\s\S]*?)\$\$;/) || [])[1] || '';
+const k = konstanten(lies('supabase/karte-besitz-sicht-schema.sql'));
+const kZurueck = konstanten(lies('supabase/karte-besitz-sicht-zurueck.sql'));
+const listeIn = (kk, schluessel) => {
+  const m = kk.match(new RegExp(`'${schluessel}',\\s*jsonb_build_array\\(([^)]*)\\)`));
   return m ? [...m[1].matchAll(/'([^']*)'|(-?\d+)/g)].map((x) => (x[1] !== undefined ? x[1] : Number(x[2]))) : null;
 };
-pruefe('karte_konstanten vorhanden', !!k);
+const liste = (schluessel) => listeIn(k, schluessel);
+pruefe('karte_konstanten vorhanden (juengste Fassung karte-besitz-sicht-schema.sql und Rueckweg)', !!k && !!kZurueck);
+pruefe('karte-schema.sql: Fassung gleich dem Rueckweg (die alte Liste)', konstanten(lies('supabase/karte-schema.sql')) === kZurueck);
 
 // ---------- Zahlen und Familien ----------
 {
@@ -56,11 +63,18 @@ pruefe('karte_konstanten vorhanden', !!k);
   pruefe('Titel: Server kennt genau die Level-, Erfolgs- und Koennen-Titel (kein Erfinder, kein Pionier, kein Freitext)',
     gleich(liste('titel'), jsTitel), { nurSql: liste('titel').filter((x) => !jsTitel.includes(x)), nurJs: jsTitel.filter((x) => !liste('titel').includes(x)) });
   pruefe('Gold-Titel stehen in der Titel-Liste', FAMILIEN.filter((f) => f.gold.titel).every((f) => liste('titel').includes(f.gold.titel)));
-  const motive = MOTIVE.filter((m) => !NUR_ERFINDER.includes(m));
-  pruefe('Motive gleich, ohne Koenig und Kronli', gleich(liste('motive'), motive) && gleich(KARTE_MOTIVE, motive), liste('motive'));
+  pruefe('Motive gleich, mit Koenig und Kronli (R30: nur mit Stueck, sonder)', gleich(liste('motive'), MOTIVE) && gleich(KARTE_MOTIVE, MOTIVE), liste('motive'));
+  pruefe('Rueckweg: Motive ohne Koenig und Kronli', gleich(listeIn(kZurueck, 'motive'), MOTIVE.filter((m) => !NUR_ERFINDER.includes(m))), listeIn(kZurueck, 'motive'));
   pruefe('Hintergruende gleich', gleich(liste('gruende'), GRUENDE), liste('gruende'));
-  const rahmen = Object.keys(RAHMEN).filter((r) => !r.startsWith('erfinder') && !['brett', 'drache', 'neon', 'pixel'].includes(r));
-  pruefe('Rahmen gleich, ohne Erfinder- und Labor-Rahmen', gleich(liste('rahmen'), rahmen) && gleich(KARTE_RAHMEN, rahmen), liste('rahmen'));
+  // Labor-Rahmen gehoeren nicht auf die Karte (Flo 30.10.2026: erst entscheiden, erspielbar oder Shop); der Erfinder-Rahmen schon
+  const rahmen = Object.keys(RAHMEN).filter((r) => !['brett', 'drache', 'neon', 'pixel'].includes(r));
+  pruefe('Rahmen gleich, mit Erfinder-Rahmen, ohne Labor-Rahmen', gleich(liste('rahmen'), rahmen) && gleich(KARTE_RAHMEN, rahmen), liste('rahmen'));
+  pruefe('Rueckweg: Rahmen ohne Erfinder-Rahmen', gleich(listeIn(kZurueck, 'rahmen'), rahmen.filter((r) => !KARTE_SONDER_RAHMEN.includes(r))), listeIn(kZurueck, 'rahmen'));
+  // Sonderwerte: Server-Zuordnung (sonder) = Client (NUR_ERFINDER, KARTE_SONDER_RAHMEN), Stueck-Ids wie js/sonderstuecke.js
+  const sonder = (art) => [...((k.match(new RegExp(`'${art}',\\s*jsonb_build_object\\(([^)]*)\\)`)) || [])[1] || '').matchAll(/'([^']+)',\s*'([^']+)'/g)]
+    .map((x) => [x[1], x[2]]);
+  pruefe('sonder.motiv = NUR_ERFINDER, je mit erfinder-titel', gleich(sonder('motiv').map((x) => x[0]), NUR_ERFINDER) && sonder('motiv').every((x) => x[1] === ERFINDER.titel), sonder('motiv'));
+  pruefe('sonder.rahmen = KARTE_SONDER_RAHMEN, je mit dem Erfinder-Banner', gleich(sonder('rahmen').map((x) => x[0]), KARTE_SONDER_RAHMEN) && sonder('rahmen').every((x) => x[1] === ERFINDER.banner), sonder('rahmen'));
   const liga = liste('liga_banner');
   const gold = FAMILIEN.filter((f) => f.gold.banner).map((f) => f.gold.banner);
   pruefe('Banner der Menschen = Start + Liga + Gold-Erfolge', gleich(MENSCHEN_BANNER, ['start', ...liga, ...gold]), MENSCHEN_BANNER);

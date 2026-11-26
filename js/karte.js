@@ -8,24 +8,28 @@
 //     der Karte, merkt den Server-Stand je Konto (besitz.merkeServer). Laufende Abgleiche werden geteilt, nie doppelt
 //     gesendet. Offline, abgemeldet oder bei einer Absage null ohne Fehler (beim naechsten Mal nachgeholt).
 //   wahlFuerServer(wahl, stand) -> { banner, titel, vitrine, motiv, grund, rahmen }   die lokale Wahl in Server-Form;
-//     mit stand nur, was der Server als Besitz kennt (Rueckfall nach einer Absage)
+//     Koenig, Kronli und Erfinder-Rahmen gehen ohne eigene Besitzpruefung mit, der Server entscheidet (R30); mit stand nur,
+//     was der Server sicher annimmt (Rueckfall nach einer Absage: Sonderwerte ausdruecklich auf P / ohne)
 //     Besitzt das Konto den Erfinder- oder Pionier-Titel, meldet der Abgleich ihn danach mit karte_sondertitel_waehle.
 //   karteDerPartie(partieId, { frist }) -> Promise<{ w, s } | null>   beide Karten; nach frist ms (Standard 1200) null;
 //     mit saison-schema.sql dazu je Karte saison: { abzeichen, titel } (saison_karte_der_partie, parallel, dieselbe Frist)
 import { rpc } from './online.js';
 import { sitzung, userId } from './konto.js';
-import { profilWahl } from './profil.js';
+import { profilWahl, NUR_ERFINDER } from './profil.js';
 import { ladeBesitz, merkeServer } from './besitz.js';
 import { FAMILIEN, familieVonAlt } from './pakete/sammlung/stufen.js';
 import { istErfinder, pionierNummer, sonderstueckeBekannt, ladeSonderstuecke } from './sonderstuecke.js';
 import { paket2Frei } from './freigaben.js';
 
 export const KARTE_FRIST_MS = 1200;
-// feste Liste wie karte_konstanten() -> motive (Koenig und Kronli nur fuer den Erfinder, nie auf der Server-Karte)
-export const KARTE_MOTIVE = Object.freeze(['Q', 'R', 'B', 'N', 'P', 'karo', 'stups', 'zinni', 'klippa', 'glimm']);
-// wie karte_konstanten() -> rahmen: ohne Erfinder- und Labor-Rahmen
+// feste Liste wie karte_konstanten() -> motive (supabase/karte-besitz-sicht-schema.sql, R30, Flo 22.11.2026: "Was du
+// besitzt und traegst, sieht auch dein Gegner"): Koenig und Kronli stehen drin, der Server zeigt sie nur mit dem Stueck
+export const KARTE_MOTIVE = Object.freeze(['Q', 'R', 'B', 'N', 'P', 'karo', 'stups', 'zinni', 'klippa', 'glimm', ...NUR_ERFINDER]);
+// Rahmen, die der Server nur mit Stueck annimmt und zeigt (karte_konstanten -> sonder -> rahmen, tests/karte-vertrag.test.mjs)
+export const KARTE_SONDER_RAHMEN = Object.freeze(['erfinder-blatt-0']);
+// wie karte_konstanten() -> rahmen: mit Erfinder-Rahmen, ohne Labor-Rahmen
 export const KARTE_RAHMEN = Object.freeze(['ohne', 'holz', 'liga-1', 'liga-2', 'liga-3', 'liga-4', 'liga-5', 'liga-6',
-  'welt-1', 'welt-2', 'welt-3', 'welt-4', 'welt-5', 'serie-7', 'serie-30', 'serie-100']);
+  'welt-1', 'welt-2', 'welt-3', 'welt-4', 'welt-5', 'serie-7', 'serie-30', 'serie-100', ...KARTE_SONDER_RAHMEN]);
 const MELDBAR = FAMILIEN.filter((f) => !f.server).map((f) => f.id);
 // wie karte_konstanten() -> titel: nur Level-, Erfolgs- und Koennen-Titel (tests/karte-vertrag.test.mjs). Erfinder und
 // Pionier zeigt nur die eigene Karte; an den Server gingen sie als sichere Absage KARTE_TITEL (live 11.11.2026 20:09)
@@ -51,14 +55,17 @@ export function wahlFuerServer(wahl = profilWahl(), stand = null, titel = wahl.t
   let vitrine = [...new Set((wahl.vitrine || []).map(vitrineId).filter(Boolean))].slice(0, 3);
   let banner = wahl.banner || 'start';
   let rahmen = wahl.rahmen || 'ohne';
+  let motiv = KARTE_MOTIVE.includes(wahl.figur) ? wahl.figur : 'P';
   if (stand) {
     vitrine = vitrine.filter((v) => (stand.stufen[v.slice(6)] || 0) >= 1);
     if (!(stand.banner || []).includes(banner)) banner = 'start';
-    if (!KARTE_RAHMEN.includes(rahmen)) rahmen = 'ohne';
+    // Rueckfall: ein alter Server (ohne R30) und ein Konto ohne Stueck lehnen Sonderwerte ab (KARTE_PROFIL)
+    if (!KARTE_RAHMEN.includes(rahmen) || KARTE_SONDER_RAHMEN.includes(rahmen)) rahmen = 'ohne';
+    if (NUR_ERFINDER.includes(motiv)) motiv = 'P';
     titel = null;
   }
   if (!SERVER_TITEL.test(titel || '')) titel = null;
-  return { banner, titel, vitrine, motiv: KARTE_MOTIVE.includes(wahl.figur) ? wahl.figur : 'P', grund: wahl.grund || 'standard', rahmen };
+  return { banner, titel, vitrine, motiv, grund: wahl.grund || 'standard', rahmen };
 }
 
 // Laeuft schon ein Abgleich, haengt ein weiterer Aufruf genau EINEN zweiten Lauf danach an (eine Wahl, die sich
@@ -93,9 +100,15 @@ async function abgleichEinmal(titel) {
   merkeServer(uid, stand);
   // Wahl der Karte: erst so, wie der Spieler sie gewaehlt hat; lehnt der Server ab (z. B. ein Titel, den er nicht kennt),
   // ein zweites Mal nur mit dem, was er als Besitz kennt. Scheitert auch das, bleibt die alte Karte stehen.
+  // Mit Koenig, Kronli oder Erfinder-Rahmen kommt dazwischen die Wahl ohne diese Sonderwerte (R30, Server ohne
+  // karte-besitz-sicht-schema.sql oder Konto ohne Stueck): Titel, Banner und Vitrine bleiben wie vor R30 erhalten.
   const wahl = profilWahl();
   let ergebnis = stand;
-  for (const w of [wahlFuerServer(wahl, null, titel === undefined ? wahl.titel : titel), wahlFuerServer(wahl, stand)]) {
+  const erst = wahlFuerServer(wahl, null, titel === undefined ? wahl.titel : titel);
+  const sonder = NUR_ERFINDER.includes(erst.motiv) || KARTE_SONDER_RAHMEN.includes(erst.rahmen);
+  const ohneSonder = sonder ? { ...erst, motiv: NUR_ERFINDER.includes(erst.motiv) ? 'P' : erst.motiv,
+    rahmen: KARTE_SONDER_RAHMEN.includes(erst.rahmen) ? 'ohne' : erst.rahmen } : null;
+  for (const w of [erst, ...(ohneSonder ? [ohneSonder] : []), wahlFuerServer(wahl, stand)]) {
     try {
       const d = await rpc('karte_waehle', w);
       if (istStand(d)) { merkeServer(uid, d); ergebnis = d; break; }

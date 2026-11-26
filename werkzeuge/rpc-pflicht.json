@@ -27,6 +27,10 @@
     "karte-besitz-schema.sql": {
       "pflicht": "jetzt"
     },
+    "karte-besitz-sicht-schema.sql": {
+      "pflicht": "warnung",
+      "pflicht_ab": "Gegner sieht Besitz (R30) eingespielt; danach jetzt (bis dahin fehlen karte_bild und karte_sonder_belegt)"
+    },
     "karte-elo-schema.sql": {
       "pflicht": "jetzt"
     },
