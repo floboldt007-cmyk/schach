@@ -4,7 +4,7 @@
 //   node tests/functions-probe.test.mjs
 import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -94,7 +94,12 @@ try {
   const rolle = (r) => Object.keys(p).filter((n) => p[n].rolle === r).sort();
   pruefeT('Pflicht heute: online-zug und raetsel-duell', JSON.stringify(rolle('pflicht')) === '["online-zug","raetsel-duell"]', JSON.stringify(rolle('pflicht')));
   pruefeT('Warnung: stripe-webhook (Pflicht vor dem Aboverkauf)', JSON.stringify(rolle('warnung')) === '["stripe-webhook"]' && !!p['stripe-webhook'].ab, JSON.stringify(rolle('warnung')));
-  pruefeT('Webhooks erwarten 400, die anderen 401', Object.keys(p).every((n) => p[n].da === (/-webhook$/.test(n) ? 400 : 401)), JSON.stringify(p));
+  // 400 heisst: ohne JWT-Pruefung bereitgestellt (Webhooks, und was die ANLEITUNG mit --no-verify-jwt bereitstellt,
+  // z. B. abo-beenden: Kuendigen ohne Anmeldung, die Function prueft die Anmeldung selbst). Alle anderen 401.
+  const ohneJwt = new Set(['abo-beenden']);
+  const anleitung = readFileSync(path.join(WURZEL, 'supabase/ANLEITUNG.md'), 'utf8');
+  pruefeT('Webhooks und --no-verify-jwt erwarten 400, die anderen 401', [...ohneJwt].every((n) => anleitung.includes(`functions deploy ${n} --no-verify-jwt`))
+    && Object.keys(p).every((n) => p[n].da === (/-webhook$/.test(n) || ohneJwt.has(n) ? 400 : 401)), JSON.stringify({ p, ohneJwt: [...ohneJwt] }));
   pruefeT('Wer fehlen darf, nennt pflicht_ab', Object.keys(p).filter((n) => p[n].rolle !== 'pflicht').every((n) => p[n].ab), JSON.stringify(p));
   // eine Liste ohne "da" wird abgelehnt, statt still jede Antwort als unklar zu deuten
   const tmp = path.join(mkdtempSync(path.join(tmpdir(), 'fp-')), 'p.json');

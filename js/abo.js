@@ -380,7 +380,7 @@ export async function beendeAbo(aktion) {
   if (aktion !== 'kuendigen' && aktion !== 'widerrufen') return { ok: false, grund: 'eingabe', text: '' };
   try {
     const sg = await gueltigeSitzung();
-    const d = await anfrage(BEENDEN_PFAD, { methode: 'POST', daten: { aktion }, token: sg.access_token });
+    const d = await anfrage(mitRegion(BEENDEN_PFAD), { methode: 'POST', daten: { aktion }, token: sg.access_token });
     istPremium({ neu: true }).catch(() => {});
     return { ok: true, daten: d || {} };
   } catch (e) {
@@ -389,7 +389,7 @@ export async function beendeAbo(aktion) {
 }
 export async function fordereKuendigungsLink(email) {
   try {
-    await anfrage(BEENDEN_PFAD, { methode: 'POST', daten: { aktion: 'link_anfordern', email: String(email || '').trim() } });
+    await anfrage(mitRegion(BEENDEN_PFAD), { methode: 'POST', daten: { aktion: 'link_anfordern', email: String(email || '').trim() } });
     return { ok: true };
   } catch (e) {
     return beendenFehler(e);
@@ -397,7 +397,7 @@ export async function fordereKuendigungsLink(email) {
 }
 export async function kuendigeMitLink(token) {
   try {
-    const d = await anfrage(BEENDEN_PFAD, { methode: 'POST', daten: { aktion: 'link_kuendigen', token: String(token || '') } });
+    const d = await anfrage(mitRegion(BEENDEN_PFAD), { methode: 'POST', daten: { aktion: 'link_kuendigen', token: String(token || '') } });
     if (nutzerId()) istPremium({ neu: true }).catch(() => {});
     return { ok: true, daten: d || {} };
   } catch (e) {

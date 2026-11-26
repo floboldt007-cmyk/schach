@@ -3,6 +3,9 @@
   "stand": "2026-11-23",
   "regeln": "pflicht jetzt = fehlt/unklar ist ein Fehler; warnung = wird gemeldet, kein Fehler, bis pflicht_ab erreicht ist; ohne pflicht darf die Datei bis pflicht_ab fehlen. jetzt nur fuer Dateien, die am 22.11. live vollstaendig gemessen wurden. Neue Schema-Datei: zuerst warnung, nach dem Einspielen jetzt.",
   "dateien": {
+    "abo-beenden-schema.sql": {
+      "pflicht_ab": "Abo-Start (Kasse frei)"
+    },
     "abo-schema.sql": {
       "pflicht": "jetzt"
     },

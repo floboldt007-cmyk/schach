@@ -6,6 +6,8 @@
     "online-zug": { "da": 401, "pflicht": "jetzt" },
     "raetsel-duell": { "da": 401, "pflicht": "jetzt" },
     "coach": { "da": 401, "pflicht_ab": "Coach-Paket an (Frag den Coach eingeschaltet)" },
+    "abo-kasse": { "da": 401, "pflicht_ab": "Abo-Start (Kasse frei)" },
+    "abo-beenden": { "da": 400, "pflicht_ab": "Abo-Start (Kasse frei)" },
     "stripe-webhook": { "da": 400, "pflicht": "warnung", "pflicht_ab": "vor dem Aboverkauf" },
     "werkstatt-kasse": { "da": 401, "pflicht_ab": "Kasse frei (Werkstatt-Kauf freigegeben)" },
     "werkstatt-webhook": { "da": 400, "pflicht_ab": "Kasse frei (Werkstatt-Kauf freigegeben)" }
