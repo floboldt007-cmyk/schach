@@ -136,7 +136,7 @@ async function aboZeile(holen, basis, schluessel, uid) {
     if (!z || z.quelle !== 'stripe' || z.status === 'abgelaufen' || !MUSTER.sub.test(String(z.abo_id || '')) || !MUSTER.cus.test(String(z.kunde_id || ''))) return { ok: true, zeile: null };
     // bis: Ende des bezahlten Zeitraums laut abos (unbekannt = null: dann wird kein Wunschtag als cancel_at gesetzt)
     const bis = Date.parse(String(z.gueltig_bis || ''));
-    return { ok: true, zeile: { abo: z.abo_id, kunde: z.kunde_id, bis: Number.isFinite(bis) ? bis : null } };
+    return { ok: true, zeile: { abo: z.abo_id, kunde: z.kunde_id, bis: Number.isFinite(bis) ? bis : null, status: z.status } };
   } catch (e) {
     return { ok: false };
   }
@@ -175,6 +175,12 @@ export const MAX_NAME = 200;
 export const MAX_VORAUS_TAGE = 730;
 export const ARTEN = Object.freeze(['ordentlich', 'ausserordentlich']);
 const ohneSteuer = (s, max) => String(s || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+// Kaltreview #296: Grund und Name landen woertlich in einer Mail, auch an eine frei eingetragene Adresse. Links darin
+// wuerden die Bestaetigung zum Werbe- oder Phishing-Traeger machen: http(s)://, www., domain.tld/pfad und domain.tld mit
+// gaengiger Endung werden vor dem Speichern ersetzt (dann sind Mail, Stripe-Notiz, Nachweis und Seite gleich).
+const LINK = /\b(?:https?:\/\/|www\.)\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/\S*|\b(?:[a-z0-9-]+\.)+(?:com|de|net|org|io|ru|info|xyz|me|co|app|link|ly|to|eu|uk|biz|online|site|top|shop|click|gg|tk|cn|at|ch|nl|fr|it|pl|su|ws|cc|tv)\b/gi;
+export const LINK_ERSATZ = '[Link entfernt]';
+const freitext = (s, max) => ohneSteuer(ohneSteuer(s, max).replace(LINK, LINK_ERSATZ), max);
 
 // Ende eines Kalendertags in deutscher Zeit (Mitternacht danach, Winter 23:00 UTC, Sommer 22:00 UTC). null bei einem
 // Tag, den es nicht gibt (31.02.).
@@ -213,7 +219,7 @@ export function pruefeEingabe(d, jetzt = Date.now()) {
     zeitpunkt = ms;
     tag = d.zeitpunkt;
   }
-  return { art, grund: ohneSteuer(d.grund, MAX_GRUND), name: ohneSteuer(d.name, MAX_NAME), email, zeitpunkt, tag };
+  return { art, grund: freitext(d.grund, MAX_GRUND), name: freitext(d.name, MAX_NAME), email, zeitpunkt, tag };
 }
 
 // Stripe: ein Tag NACH dem bezahlten Zeitraum wird cancel_at (Stripe rechnet den Rest anteilig ab), sonst
@@ -296,6 +302,22 @@ function mailWiderruf({ eingang, erstattet }) {
   };
 }
 
+// Zweitadress-Mails dieses Kontos in den letzten 24 Stunden (Nachweise mit bestaetigung_an). Nicht zaehlbar (Schema
+// abo-kuendigung-312k noch nicht eingespielt, Netz) = unbegrenzt viele, also keine weitere Mail an eine Zweitadresse.
+export const MAX_ZWEIT_TAG = 3;
+async function zweitMailsHeute(holen, basis, schluessel, uid, t) {
+  try {
+    const seit = encodeURIComponent(new Date(t - TAG_MS).toISOString());
+    const r = await holen(`${basis}/rest/v1/abo_vorgaenge?select=id&user_id=eq.${encodeURIComponent(uid)}&bestaetigung_an=not.is.null&erstellt_am=gte.${seit}`,
+      { method: 'GET', headers: dienstKopf(schluessel) });
+    if (!r || !r.ok) return Infinity;
+    const d = await r.json();
+    return Array.isArray(d) ? d.length : Infinity;
+  } catch (e) {
+    return Infinity;
+  }
+}
+
 async function kuendige(k, { uid, email, weg, eingabe }) {
   const { f, basis, dienst, rk, t, log, umgebung } = k;
   const z = await aboZeile(f, basis, dienst, uid);
@@ -322,9 +344,17 @@ async function kuendige(k, { uid, email, weg, eingabe }) {
   const bis = Number(d.cancel_at) || periode(d).ende;
   const wirksam = bis ? bis * 1000 : null;
   const erklaerung = erklaerungText({ art, grund, name: ein.name, tag: ein.tag, eingang: t, wirksam, pruefung, weg });
-  // Bestaetigung an die eingetragene Adresse UND an die Kontoadresse (Schutz vor einer fremden Kuendigung), jede einmal
+  // Bestaetigung an die eingetragene Adresse UND an die Kontoadresse (Schutz vor einer fremden Kuendigung), jede einmal.
+  // Kaltreview #296: Die Zweitadresse bekommt nur bei der ERSTEN Kuendigung eines Abos Post und hoechstens
+  // MAX_ZWEIT_TAG-mal je Konto in 24 Stunden; sonst geht die Bestaetigung nur an die Kontoadresse (nie eine Ablehnung).
+  let zweit = ein.email && (!email || ein.email.toLowerCase() !== email.toLowerCase()) ? ein.email : null;
+  if (zweit) {
+    const bremse = z.zeile.status === 'gekuendigt' ? 'schon_gekuendigt'
+      : (await zweitMailsHeute(f, basis, dienst, uid, t)) >= MAX_ZWEIT_TAG ? 'tageslimit' : null;
+    if (bremse) { log(`abo-beenden zweitadresse_gebremst ${bremse}`); zweit = null; }
+  }
   const an = [];
-  for (const a of [ein.email, email]) if (a && !an.some((x) => x.toLowerCase() === a.toLowerCase())) an.push(a);
+  for (const a of [zweit, email]) if (a && !an.some((x) => x.toLowerCase() === a.toLowerCase())) an.push(a);
   let mail = false;
   if (an.length) {
     const m = mailKuendigung({ erklaerung });
@@ -333,7 +363,6 @@ async function kuendige(k, { uid, email, weg, eingabe }) {
       mail = mail || r.ok;
     }
   }
-  const zweit = ein.email && (!email || ein.email.toLowerCase() !== email.toLowerCase()) ? ein.email : null;
   const wirksamIso = wirksam ? new Date(wirksam).toISOString() : null;
   const e = await rpc(f, basis, dienst, 'abo_kuendigung_eintragen', {
     p_user: uid, p_weg: weg, p_abo: z.zeile.abo, p_wirksam: wirksamIso, p_mail: mail,

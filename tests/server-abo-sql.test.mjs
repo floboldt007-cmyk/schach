@@ -101,13 +101,13 @@ begin;
 insert into auth.users (id, email) values ('a7777777-7777-4777-8777-777777777777', 'k-a@example.invalid'),
   ('b8888888-8888-4888-8888-888888888888', 'k-b@example.invalid');
 select public.abo_kuendigung_eintragen('a7777777-7777-4777-8777-777777777777', 'angemeldet', 'sub_K1', now() + interval '20 days',
-  true, 'ausserordentlich', '', 'Erika Probe', (now() + interval '3 days')::date, 'zweit@example.invalid', true,
-  E'Kuendigungserklaerung\\nName: Erika Probe\\nabgegeben ueber die Schaltflaeche');
+  true, 'ausserordentlich', 'Umzug zu Erika', 'Erika Probe', (now() + interval '3 days')::date, 'zweit@example.invalid', true,
+  E'Kuendigungserklaerung\\nGrund: Umzug zu Erika\\nName: Erika Probe\\nabgegeben ueber die Schaltflaeche');
 do $$
 declare v public.abo_vorgaenge;
 begin
   select * into v from public.abo_vorgaenge where user_id = 'a7777777-7777-4777-8777-777777777777';
-  if v.art <> 'kuendigung' or v.kuendigung_art <> 'ausserordentlich' or v.grund is not null or v.name <> 'Erika Probe'
+  if v.art <> 'kuendigung' or v.kuendigung_art <> 'ausserordentlich' or v.grund <> 'Umzug zu Erika' or v.name <> 'Erika Probe'
     or v.bestaetigung_an <> 'zweit@example.invalid' or not v.pruefung or v.erklaerung not like '%Schaltflaeche%'
     or v.erstellt_am is null or v.mail_gesendet is not true then
     raise exception 'FEHLER: Erklaerung falsch gespeichert %', row_to_json(v);
@@ -143,8 +143,9 @@ do $$
 declare v public.abo_vorgaenge;
 begin
   select * into v from public.abo_vorgaenge where abo_id = 'sub_K1';
-  if v.id is null or v.user_id is not null or v.name is not null or v.bestaetigung_an is not null
-    or v.erklaerung like '%Erika%' or v.erklaerung not like '%Name: (mit dem Konto gelöscht)%' or v.kuendigung_art <> 'ausserordentlich' then
+  if v.id is null or v.user_id is not null or v.name is not null or v.bestaetigung_an is not null or v.grund is not null
+    or v.erklaerung like '%Erika%' or v.erklaerung not like '%Name: (mit dem Konto gelöscht)%'
+    or v.erklaerung not like '%Grund: (mit dem Konto gelöscht)%' or v.kuendigung_art <> 'ausserordentlich' then
     raise exception 'FEHLER: Kontoloeschen laesst Personendaten in der Erklaerung %', row_to_json(v);
   end if;
 end;

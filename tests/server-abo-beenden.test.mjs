@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
   verarbeite, erstattungCent, sha256hex, WIDERRUF_MS, KULANZ_MS, TAG_MS, LINK_GUELTIG_MS,
-  pruefeEingabe, kuendigungsParameter, zeitText, datumText,
+  pruefeEingabe, kuendigungsParameter, zeitText, datumText, MAX_GRUND,
 } from '../supabase/functions/_gemeinsam/abo-beenden.js';
 import { mailBereit, RESEND_API } from '../supabase/functions/_gemeinsam/mail.js';
 
@@ -50,6 +50,7 @@ function netz(o = {}) {
     aufrufe.push({ url, ...opt });
     if (url === `${BASIS}/auth/v1/user`) return antwort(s.userStatus, s.user);
     if (url.startsWith(`${BASIS}/rest/v1/abos?`)) return antwort(200, s.abo);
+    if (url.startsWith(`${BASIS}/rest/v1/abo_vorgaenge?`)) return antwort(s.zweitStatus ?? 200, s.zweitHeute ?? []);
     if (url === `${BASIS}/rest/v1/rpc/abo_vorgang_eintragen`) return antwort(204, null);
     if (url === `${BASIS}/rest/v1/rpc/abo_kuendigung_eintragen`) return antwort(s.rpc312k ?? 404, null);
     if (url === `${BASIS}/rest/v1/rpc/abo_link_anlegen`) return antwort(200, s.linkAnlegen);
@@ -196,6 +197,41 @@ const mails = (n) => zu(n, RESEND_API).map((a) => JSON.parse(a.body));
   const d3 = json(await lauf(n3, { aktion: 'kuendigen', email: MAIL.toUpperCase() }));
   pruefe('312k ordentlich: pruefung false, Kontoadresse nur EINE Mail (auch in anderer Schreibweise)', d3.pruefung === false && mails(n3).length === 1);
   pruefe('312k ordentlich: Erklaerung ohne Grund- und Namenszeile', !/Grund:|Name:/.test(d3.erklaerung || '') && /ordentliche Kündigung/.test(d3.erklaerung || ''));
+
+  // Kaltreview #296 (D): freie Zweitadresse plus freier Text war ein Mail-Relais. Bremse im eigenen Code, nie eine Ablehnung.
+  const LINKS = 'Umzug, siehe https://boese.example/a?b=1 oder www.boese.example und boese.ru/pfad sowie HTTP://X.example';
+  const vl = pruefeEingabe({ art: 'ausserordentlich', grund: LINKS, name: 'Erika www.boese.de' }, T0);
+  pruefe('Relais: Links in Grund und Name werden vor dem Speichern zu "[Link entfernt]"', vl && !/https?:|www\.|boese|x\.example/i.test(vl.grund + vl.name)
+    && (vl.grund.match(/\[Link entfernt\]/g) || []).length === 4 && vl.name === 'Erika [Link entfernt]' && /^Umzug, siehe /.test(vl.grund), vl);
+  const normal = 'Umzug ins Ausland, z. B. nach Wien. Danach 3.5 Monate weg';
+  pruefe('Relais: normaler Text bleibt (Abkuerzung, Zahl, Satzende)', pruefeEingabe({ grund: normal }, T0).grund === normal);
+  pruefe('Relais: Laenge bleibt begrenzt, auch mit Ersatztext', pruefeEingabe({ grund: 'www.a.de '.repeat(200) }, T0).grund.length <= MAX_GRUND);
+  const nl = netz({ rpc312k: 204 });
+  const dl = json(await lauf(nl, { aktion: 'kuendigen', art: 'ausserordentlich', grund: LINKS, email: 'zweit@example.invalid' }));
+  pruefe('Relais: kein Link in Mail, Erklaerung, Stripe-Notiz und Nachweis', mails(nl).length === 2 && mails(nl).every((x) => !/boese|https?:|www\./i.test(x.text + x.subject))
+    && !/boese/.test(dl.erklaerung || '') && !/boese/.test(new URLSearchParams(zu(nl, 'api.stripe.com/v1/subscriptions/sub_Probe1')[0].body).get('cancellation_details[comment]') || '')
+    && !/boese/.test(rpcDaten(nl, 'abo_kuendigung_eintragen')[0].p_grund || ''), mails(nl).map((x) => x.text));
+  const zaehl = zu(nl, '/rest/v1/abo_vorgaenge?')[0];
+  pruefe('Relais: Zaehlung je Konto ueber abo_vorgaenge.bestaetigung_an der letzten 24 Stunden', !!zaehl && zaehl.url.includes(`user_id=eq.${UID}`)
+    && zaehl.url.includes('bestaetigung_an=not.is.null') && zaehl.url.includes(`erstellt_am=gte.${encodeURIComponent(new Date(T0 - TAG_MS).toISOString())}`), zaehl && zaehl.url);
+  // 1. Nur die ERSTE Kuendigung eines Abos schreibt an die Zweitadresse
+  const ng = netz({ rpc312k: 204, abo: [{ ...ZEILE[0], status: 'gekuendigt' }] });
+  const eg = await lauf(ng, { aktion: 'kuendigen', art: 'ausserordentlich', grund: 'nochmal', email: 'zweit@example.invalid' });
+  pruefe('Relais: Abo schon gekuendigt -> 200, Bestaetigung NUR an die Kontoadresse, keine Zweitadresse im Nachweis', eg.status === 200
+    && mails(ng).length === 1 && mails(ng)[0].to[0] === MAIL && rpcDaten(ng, 'abo_kuendigung_eintragen')[0].p_bestaetigung_an === null, mails(ng).map((x) => x.to));
+  // 2. Hoechstens 3 Zweitadress-Mails je Konto und Tag; die Kuendigung wirkt trotzdem
+  const nz4 = netz({ rpc312k: 204, zweitHeute: [{ id: 1 }, { id: 2 }, { id: 3 }] });
+  const ez4 = await lauf(nz4, { aktion: 'kuendigen', email: 'zweit@example.invalid' });
+  pruefe('Relais: vierte Zweitadress-Mail am Tag -> keine, Kontoadresse ja, Kuendigung 200', ez4.status === 200 && json(ez4).wirksam_zum
+    && mails(nz4).length === 1 && mails(nz4)[0].to[0] === MAIL && rpcDaten(nz4, 'abo_kuendigung_eintragen')[0].p_bestaetigung_an === null
+    && zu(nz4, "api.stripe.com/v1/subscriptions/sub_Probe1").length === 1, mails(nz4).map((x) => x.to));
+  const n5b = netz({ rpc312k: 204, zweitHeute: [{ id: 1 }, { id: 2 }] });
+  await lauf(n5b, { aktion: 'kuendigen', email: 'zweit@example.invalid' });
+  pruefe('Relais: dritte Zweitadress-Mail am Tag geht noch raus', mails(n5b).length === 2);
+  const n6b = netz({ rpc312k: 204, zweitStatus: 400 });
+  const e6b = await lauf(n6b, { aktion: 'kuendigen', email: 'zweit@example.invalid' });
+  pruefe('Relais: Zaehlung nicht moeglich (Schema fehlt, Netz) -> keine Zweitadress-Mail, Kuendigung 200', e6b.status === 200
+    && mails(n6b).length === 1 && mails(n6b)[0].to[0] === MAIL);
 
   // Spaeterer Tag: cancel_at, Zeitpunkt in Erklaerung und Nachweis
   const tagMs = ENDE_S * 1000 + 45 * TAG_MS;
