@@ -879,8 +879,10 @@ async function testeBrowser(browser) {
   gruppe = 'Ohne Netz';
   for (const fall of ['cache', 'leer', 'ohne-caches', 'match-wirft']) {
     let netzDa = fall === 'cache';
+    let zaehlen = false;
+    let anfragen = 0;
     const { kontext: k3, seite: s3 } = await neueSeite(browser, { routen: [
-      ['**/assets/klang/arcade/*.mp3', (r) => (netzDa ? r.continue() : r.abort('internetdisconnected'))],
+      ['**/assets/klang/arcade/*.mp3', (r) => { if (zaehlen) anfragen++; return netzDa ? r.continue() : r.abort('internetdisconnected'); }],
     ] });
     await k3.addInitScript((f) => {
       window.__netz = false;
@@ -894,15 +896,18 @@ async function testeBrowser(browser) {
       // wie der Cache des Service Workers: die 40 Dateien liegen im Cache Storage, dann laedt klang ohne Netz vor
       const mp3 = readdirSync(path.join(WURZEL, 'assets/klang/arcade')).filter((d) => d.endsWith('.mp3'));
       await s3.evaluate(async (namen) => {
-        const { klang } = await import('./js/sounds.js');
         const c = await caches.open('probe-klang');
         await Promise.all(namen.map((d) => fetch(`assets/klang/arcade/${d}`).then((a) => c.put(`assets/klang/arcade/${d}`, a)))); // INTENTIONAL-SLOP[F6]: Abruf beim eigenen Testserver; scheitert er, bricht die Probe rot ab
-        await klang.vorladen();
       }, mp3);
+      zaehlen = true;
+      await s3.evaluate(async () => { const { klang } = await import('./js/sounds.js'); await klang.vorladen(); });
     }
     const v3 = await warteDekodiert(s3, fall === 'cache' ? 40 : 1, fall === 'cache' ? 20000 : 3000);
     if (fall === 'cache') {
       pruefe('ohne Netz, alles im Cache: alle 40 Dateien dekodiert', v3.dekodiert === 40 && v3.fehlt === 0, v3);
+      // R30 Wettlauf (CI 26.11.2026, chromium): erst "liegt im Cache?", dann ein Abruf ueber den Service Worker liess einen
+      // Spalt, in dem die Datei verschwinden konnte. Ohne Netz liest vorladen den Cache direkt, es geht keine Anfrage raus.
+      pruefe('ohne Netz, alles im Cache: keine einzige mp3-Anfrage, gelesen wird direkt aus dem Cache', anfragen === 0, { anfragen });
     } else {
       const wie = { leer: 'nichts im Cache', 'ohne-caches': 'ohne Cache-Speicher', 'match-wirft': 'caches.match wirft' }[fall];
       pruefe(`ohne Netz, ${wie}: keine Datei als fehlend gemerkt`, v3.dekodiert === 0 && v3.fehlt === 0, v3);
@@ -955,6 +960,45 @@ async function testeBrowser(browser) {
     const v6 = await warteDekodiert(s5);
     pruefe('Netz faellt im Vorladen weg, wieder online: alle 40 Dateien nachgeladen', v6.dekodiert === 40 && v6.fehlt === 0, v6);
     await k5.close();
+  }
+
+  // R30 Kaltreview (26.11.2026): kommt das Netz zurueck, WAEHREND der Lauf noch laeuft, gab vorladen() nur den laufenden
+  // Lauf zurueck; die ohne Netz uebersprungenen Dateien kamen erst beim naechsten vorladen(). Ein Abruf bleibt hier
+  // festgehalten, damit der Lauf sicher noch laeuft, wenn 'online' kommt.
+  {
+    let netzDa = true;
+    let losgelassen = false;
+    const gehalten = [];
+    const { kontext: k7, seite: s7 } = await neueSeite(browser, { routen: [
+      ['**/assets/klang/arcade/*.mp3', (r) => {
+        if (!losgelassen) { gehalten.push(r); return; }
+        return netzDa ? r.continue() : r.abort('internetdisconnected');
+      }],
+    ] });
+    await k7.addInitScript(() => {
+      window.__netz = true;
+      Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => window.__netz === true });
+    });
+    await s7.goto(BASIS + '#arena');
+    await s7.waitForSelector('.screen.arena');
+    await s7.evaluate(async () => { const { klang } = await import('./js/sounds.js'); klang.vorladen(); });
+    const t0 = Date.now();
+    while (gehalten.length < 4 && Date.now() - t0 < 10000) await warte(50);
+    await warte(300);
+    netzDa = false;
+    await s7.evaluate(() => { window.__netz = false; window.dispatchEvent(new Event('offline')); });
+    losgelassen = true;
+    const letzter = gehalten.pop(); // der letzte Abruf bleibt haengen, der Lauf wartet auf ihn
+    for (const r of gehalten.splice(0)) await r.continue();
+    await warte(800); // die Dateien hinter ihm werden ohne Netz uebersprungen
+    const mitten = await vorrat(s7);
+    netzDa = true;
+    await s7.evaluate(() => { window.__netz = true; window.dispatchEvent(new Event('online')); });
+    await letzter.continue();
+    const v8 = await warteDekodiert(s7);
+    pruefe('Netz kommt zurueck, waehrend der Lauf noch laeuft: der Lauf lief noch', mitten.laedt === true, mitten);
+    pruefe('Netz kommt zurueck, waehrend der Lauf noch laeuft: alle 40 Dateien nachgeladen', v8.dekodiert === 40 && v8.fehlt === 0, v8);
+    await k7.close();
   }
 }
 
