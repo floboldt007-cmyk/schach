@@ -127,6 +127,7 @@ const SUITEN = [
   { name: 'r15-ergebnis-teilen', datei: 'r15-ergebnis-teilen.test.mjs', args: [], was: 'Feinschliff R15: Duell-Nochmal in Suchfarbe, Niederlage mit Liga-Verweis, ein Knopf "Teilen ..." nach dem Sieg (Browser)' },
   { name: 'r15-ich-lektion', datei: 'r15-ich-lektion.test.mjs', args: [], was: 'Feinschliff R15: Vitrine im Banner am PC, Spielerleisten in der Lektion, Zu-zweit-Brett wie die Bot-Partie (Browser)' },
   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
+  { name: 'r31-rechtsseiten', datei: 'r31-rechtsseiten.test.mjs', args: [], was: 'AGB und Widerruf (Entwurf): kein "Trainer", Platzhalter sichtbar, nirgends verlinkt' },
   { name: 'sheet-knoepfe', datei: 'sheet-knoepfe.test.mjs', args: [], was: 'Blaetter: ein Knopf volle Breite und mittig, zwei Knoepfe wie bisher (Browser)' },
   { name: 'sw-update', datei: 'sw-update.test.mjs', args: [], was: 'SW-Update laedt nur geaenderte Dateien (ETag/304)' },
   { name: 'offline-ladeprobe', datei: 'offline-ladeprobe.test.mjs', args: [], kommtMit: 'so/R20-offline', was: 'Offline: die App startet ohne Netz aus dem Service Worker (?test&sw, Browser)' },
