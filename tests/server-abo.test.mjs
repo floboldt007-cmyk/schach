@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import {
   TOLERANZ_S, MAX_KOERPER, VORLAEUFIG_S, TYPEN, leseSignaturKopf, hmacSha256Hex, gleichZeitkonstant, pruefeSignatur,
-  auswerten, planVon, dienstKopf, verarbeite,
+  auswerten, planVon, dienstKopf, verarbeite, META_ABO_NUTZER,
 } from '../supabase/functions/_gemeinsam/stripe.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -71,10 +71,11 @@ pruefe('HMAC-SHA256: RFC 4231 Testfall 2 ("Jefe")', await hmacSha256Hex('Jefe', 
 const iso = (s) => new Date(s * 1000).toISOString();
 const ereignis = (type, object, extra = {}) => ({ id: 'evt_1Test' + type.replace(/[^a-z]/g, '').slice(0, 20), object: 'event', type, created: T0, data: { object }, ...extra });
 const kauf = (o = {}) => ereignis('checkout.session.completed', { id: 'cs_test_1', object: 'checkout.session', mode: 'subscription', payment_status: 'paid',
-  status: 'complete', customer: 'cus_Probe1', subscription: 'sub_Probe1', client_reference_id: UID, customer_details: { email: 'privat@example.invalid' }, ...o });
+  status: 'complete', customer: 'cus_Probe1', subscription: 'sub_Probe1', client_reference_id: UID, metadata: { [META_ABO_NUTZER]: UID },
+  customer_details: { email: 'privat@example.invalid' }, ...o });
 {
   const a = auswerten(kauf());
-  pruefe('Kauf bezahlt: Nutzer aus client_reference_id, vorlaeufig 1 Tag aktiv', a.daten && a.daten.nutzer === UID && a.daten.status === 'aktiv'
+  pruefe('Kauf bezahlt: Nutzer aus den Metadaten der Kasse, vorlaeufig 1 Tag aktiv', a.daten && a.daten.nutzer === UID && a.daten.status === 'aktiv'
     && a.daten.gueltig_bis === iso(T0 + VORLAEUFIG_S) && VORLAEUFIG_S === 86400 && a.daten.kunde_id === 'cus_Probe1' && a.daten.abo_id === 'sub_Probe1'
     && a.daten.erstellt === iso(T0) && a.daten.typ === 'checkout.session.completed' && a.daten.plan === null, a);
   pruefe('Kauf: keine E-Mail und keine Kundendaten in den Daten fuer die Datenbank', !JSON.stringify(a).includes('example.invalid'));
@@ -82,9 +83,16 @@ const kauf = (o = {}) => ereignis('checkout.session.completed', { id: 'cs_test_1
   pruefe('Kauf noch nicht bezahlt (Lastschrift): Zuordnung ja, Premium erst mit der Rechnung', ohne.daten && ohne.daten.status === 'abgelaufen'
     && ohne.daten.gueltig_bis === iso(T0) && ohne.daten.nutzer === UID);
   pruefe('Kauf ohne Abo (Einmalzahlung) wird ignoriert', auswerten(kauf({ mode: 'payment' })).ignoriert === 'kein_abo');
-  pruefe('Kauf mit fremder oder fehlender client_reference_id: nutzer null (Server meldet ohne_nutzer)',
-    auswerten(kauf({ client_reference_id: 'flo' })).daten.nutzer === null && auswerten(kauf({ client_reference_id: null })).daten.nutzer === null
-    && auswerten(kauf({ client_reference_id: UID.toUpperCase() })).daten.nutzer === UID);
+  pruefe('Kauf mit kaputter oder fehlender Nutzer-ID in den Metadaten: nutzer null (Server meldet ohne_nutzer)',
+    auswerten(kauf({ metadata: { [META_ABO_NUTZER]: 'flo' } })).daten.nutzer === null && auswerten(kauf({ metadata: null })).daten.nutzer === null
+    && auswerten(kauf({ metadata: [UID] })).daten.nutzer === null
+    && auswerten(kauf({ metadata: { [META_ABO_NUTZER]: UID.toUpperCase() } })).daten.nutzer === UID);
+  // Code-Check 05.11.2026, Fund 1: client_reference_id haengt jeder an einen oeffentlichen Zahlungslink
+  const FREMD = '11111111-2222-4333-8444-555555555555';
+  pruefe('Angriff: nur client_reference_id (alter Zahlungslink, fremde ID) ordnet nichts zu',
+    auswerten(kauf({ client_reference_id: FREMD, metadata: {} })).daten.nutzer === null
+    && auswerten(kauf({ client_reference_id: FREMD, metadata: { [META_ABO_NUTZER]: UID } })).daten.nutzer === UID
+    && META_ABO_NUTZER === 'crownmate_abo_nutzer');
   pruefe('erweiterte Verweise (Objekte mit id) werden gelesen', auswerten(kauf({ customer: { id: 'cus_Obj1' }, subscription: { id: 'sub_Obj1' } })).daten.abo_id === 'sub_Obj1');
   pruefe('Kunde fehlt oder ist kaputt -> ignoriert', auswerten(kauf({ customer: null })).ignoriert === 'kein_kunde'
     && auswerten(kauf({ customer: 'cus_; drop table' })).ignoriert === 'kein_kunde');
@@ -295,7 +303,8 @@ const json = (r) => JSON.parse(r.koerper);
 {
   // Keine Geheimnisse und keine Preise in den Dateien des Abos (oeffentliches Repo)
   const dateien = ['supabase/abo-schema.sql', 'supabase/abo-rls-test.sql', 'supabase/functions/_gemeinsam/stripe.js', 'supabase/functions/stripe-webhook/index.ts',
-    'js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'css/pakete/abo.css', 'supabase/ANLEITUNG.md'];
+    'js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'css/pakete/abo.css', 'supabase/ANLEITUNG.md',
+    'supabase/functions/_gemeinsam/abo-kasse.js', 'supabase/functions/abo-kasse/index.ts'];
   const GEHEIM_RE = /(sk|rk)_(live|test)_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9]{12,}|sb_secret_[A-Za-z0-9_-]{12,}|eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}/;
   const PREIS_RE = /\d+(?:[.,]\d{1,2})?\s*(?:€|EUR\b|Euro\b)|€\s*\d/;
   const geheim = [];

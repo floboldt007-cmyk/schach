@@ -24,6 +24,7 @@
 .trainer-kuendbar { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .trainer-karte .trainer-stand { margin-top: 12px; font-size: 15px; font-weight: 700; color: var(--text); }
 .trainer-karte .trainer-stand:empty { display: none; }
+.trainer-karte .trainer-frage { margin-top: 16px; font-size: 15px; font-weight: 700; color: var(--text); }
 .trainer-listen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; align-items: start; }
 .trainer-liste { padding: 12px 14px; border-radius: var(--r-l); background: var(--flaeche-2); border: 1px solid var(--linie); }
 .trainer-liste h4 { margin: 0 0 8px; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber);

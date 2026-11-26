@@ -8,6 +8,7 @@
 //   TOLERANZ_S = 300        der Zeitstempel der Signatur darf hoechstens 5 Minuten von der Serverzeit abweichen
 //   MAX_KOERPER = 524288    groessere Anfragen werden abgelehnt (ein Stripe-Ereignis hat wenige KB)
 //   VORLAEUFIG_S = 86400    vorlaeufiger Stand nach einem bezahlten Kauf, bis das erste Abo-Ereignis den echten bringt
+//   META_ABO_NUTZER         Metadaten-Schluessel der Kasse fuer die Nutzer-ID (nur er ordnet einen Kauf einem Konto zu)
 //   TYPEN                   die verarbeiteten Ereignistypen (alles andere: 200 mit "ignoriert")
 //   leseSignaturKopf(kopf) -> { t: Zahl | null, v1: [hex] }
 //   hmacSha256Hex(geheimnis, text) -> Promise<hex>
@@ -28,6 +29,8 @@
 export const TOLERANZ_S = 300;
 export const MAX_KOERPER = 512 * 1024;
 export const VORLAEUFIG_S = 24 * 60 * 60;
+// Metadaten-Schluessel der Kasse (abo-kasse.js) fuer die Nutzer-ID; Metadaten setzt nur Flos Server, nie der Kaeufer
+export const META_ABO_NUTZER = 'crownmate_abo_nutzer';
 export const TYPEN = Object.freeze([
   'checkout.session.completed',
   'customer.subscription.created',
@@ -151,9 +154,11 @@ export function auswerten(e) {
   if (e.type === 'checkout.session.completed') {
     if (o.mode !== 'subscription') return { ignoriert: 'kein_abo' };
     abo = idVon(o.subscription);
-    // client_reference_id haengt die App an den Kauf-Link (js/abo.js kaufAdresse): die Supabase-Nutzer-ID
-    nutzer = typeof o.client_reference_id === 'string' && MUSTER.uuid.test(o.client_reference_id)
-      ? o.client_reference_id.toLowerCase() : null;
+    // Die Nutzer-ID steht NUR in den Metadaten, die die Edge Function abo-kasse aus der Anmeldung setzt
+    // (_gemeinsam/abo-kasse.js). client_reference_id zaehlt nicht: An einen oeffentlichen Zahlungslink haengt jeder
+    // jede ID (Code-Check 05.11.2026, Fund 1: so liess sich das Abo eines anderen Kontos umhaengen).
+    const meta = o.metadata && typeof o.metadata === 'object' && !Array.isArray(o.metadata) ? o.metadata[META_ABO_NUTZER] : null;
+    nutzer = typeof meta === 'string' && MUSTER.uuid.test(meta) ? meta.toLowerCase() : null;
     // Bezahlt (Karte): sofort Premium, vorlaeufig fuer einen Tag. Noch nicht bezahlt (z. B. Lastschrift): erst die
     // bezahlte Rechnung (invoice.paid) schaltet frei.
     const bezahlt = o.payment_status === 'paid' || o.payment_status === 'no_payment_required';
