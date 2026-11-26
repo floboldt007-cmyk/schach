@@ -115,7 +115,7 @@ export const FEHLER_TEXTE = Object.freeze({
   methode: 'Nur POST.',
   eingabe: 'Zu diesem Zug kann der Coach nichts sagen.',
   anmeldung: 'Melde dich an, dann kannst du den Coach fragen.',
-  premium: 'Frag den Coach gehört zu Crownmate Trainer.',
+  premium: 'Frag den Coach gehört zu Crownmate Premium.',
   limit: 'Für heute hast du alle Fragen an den Coach gestellt. Ab 4 Uhr morgens kannst du wieder fragen.',
   abgelehnt: 'Zu diesem Zug hat der Coach gerade keine Erklärung.',
   ki: 'Der Coach ist gerade nicht erreichbar. Versuch es gleich noch einmal.',

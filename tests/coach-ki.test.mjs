@@ -465,7 +465,7 @@ async function browserTeil(browser) {
     await seite.waitForSelector('.ck-karte[data-zustand="premium"]', { timeout: 10000 });
     const k = await karte(seite);
     pruefe('Tipp ohne Trainer: premiumHinweis aus B1 ("Frag den Coach"), keine Frage an die KI', k.karte && k.karte.hinweis && coach.length === 0
-      && /Crownmate Trainer/.test(k.karte.text) && /bleibt gratis/.test(k.karte.text), k);
+      && /Crownmate Premium/.test(k.karte.text) && /bleibt gratis/.test(k.karte.text), k);
     pruefe('Texte fair (kein Druck, kein Countdown, kein Prozent)', fair(await fairText(seite)), await fairText(seite));
     await warte(500);   // sanftes Rollen ins Bild abwarten (nur fuers Foto)
     await bild(seite, 'ohne-trainer');

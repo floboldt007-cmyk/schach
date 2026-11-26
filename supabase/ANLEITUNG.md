@@ -856,9 +856,11 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
    nur die eigenen Regeln ersetzen): bei genau diesen zwei Dateien bestätigen.
 2. **Stripe-Konto:** Auf stripe.com ein Konto anlegen und oben rechts den **Testmodus** (Sandbox) einschalten. Alle
    folgenden Stripe-Schritte zuerst im Testmodus machen.
-3. **Produkt und Preis:** **Produktkatalog > Produkt hinzufügen**: Name `Crownmate Trainer`, ein **wiederkehrender**
-   Preis (monatlich, auf Wunsch zusätzlich jährlich). Optional beim Preis einen **Lookup-Key** wie `trainer-monat`
-   setzen: Er erscheint dann in der Tabelle `abos` als Plan.
+3. **Produkt und Preis:** **Produktkatalog > Produkt hinzufügen**: Name `Crownmate Premium`, genau EIN
+   **wiederkehrender** Preis: **monatlich**, Abrechnung alle **1** Monat. **Keinen Jahrespreis** anlegen (Flo 26.11.2026,
+   kein Jahresabo; ein Jahresvertrag fällt unter § 309 Nr. 9 BGB). Die Kasse verkauft genau den Preis aus
+   `ABO_STRIPE_PREIS` und prüft sein Intervall nicht: Steht dort ein Jahrespreis, würde er verkauft. Optional beim Preis
+   einen **Lookup-Key** wie `trainer-monat` setzen: Er erscheint dann in der Tabelle `abos` als Plan.
 4. **Kasse vorbereiten (kein Zahlungslink mehr):** Die Bezahlseite legt die Function `abo-kasse` an, mit der
    Nutzer-ID aus der Anmeldung in den Metadaten (`crownmate_abo_nutzer`). Nur daran erkennt der Webhook, welches Konto
    bezahlt hat. **Warum kein Zahlungslink:** An einen öffentlichen Link kann jeder `?client_reference_id=<fremde ID>`
@@ -918,12 +920,14 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
    `aktiv` = `true` (Ausnahme: ein Link aus dem Testmodus, `https://buy.stripe.com/test_...`, für den Probekauf).
 10. **Testen (Testmodus):** Dafür in `produkte` kurz `aktiv` = `true` setzen (mit dem Testmodus-Schalter aus Schritt 9;
     das Paket `abo` muss in der App eingetragen sein, `js/erweiterungen.js`) und nach dem Test wieder `false`. In der App anmelden (Adresse mit `#konto` öffnen),
-    **Einstellungen > Crownmate Trainer > Mehr zum Trainer > Trainer abschließen**, die Altersfrage beantworten, mit
+    **Einstellungen > Crownmate Premium > Mehr zu Premium > Premium abschließen**, die Altersfrage beantworten, mit
     der Stripe-Testkarte `4242 4242 4242 4242` (beliebiges künftiges Datum, beliebige Prüfziffer) bezahlen und
     zurückkehren: Die App zeigt „Stripe bestätigt deine Zahlung“, fragt einige Male neu (sofort, nach 3, 10 und
-    30 Sekunden) und zeigt dann „Dein Trainer ist aktiv“. Kommt nichts, steht dort „Zahlung prüfen“. In Stripe unter
+    30 Sekunden) und zeigt dann „Dein Premium ist aktiv“. Kommt nichts, steht dort „Zahlung prüfen“. In Stripe unter
     **Webhooks > Endpunkt** müssen die Zustellungen mit 200 stehen, in Supabase unter
-    **Table Editor > abos** die Zeile. Danach über „Abo verwalten“ kündigen: Status „gekündigt“, gilt bis zum Ende
+    **Table Editor > abos** die Zeile. **Prüfpunkt Laufzeit:** Auf der Stripe-Bezahlseite und im Dashboard unter
+    **Abonnements** steht beim Testkauf **monatlich** ("pro Monat"), nirgends jährlich. Steht dort etwas anderes:
+    `ABO_STRIPE_PREIS` zeigt auf den falschen Preis, nicht live gehen. Danach über „Abo verwalten“ kündigen: Status „gekündigt“, gilt bis zum Ende
     der bezahlten Zeit.
 11. **Live gehen:** In Stripe den Testmodus verlassen und Produkt, Preis, eingeschränkten Schlüssel, AGB-Adresse,
     Kundenportal und Webhook **im Live-Modus neu** anlegen (Testobjekte gelten dort nicht), `whsec_...`, `rk_live_...`

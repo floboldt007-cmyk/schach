@@ -30,7 +30,7 @@ import { istPremium, premiumStand, kaufStand, bestaetigeKauf, aufraeumen, nutzer
 import { zeigeTrainer, standText } from './trainer.js';
 
 export { NACH_KAUF_MS };
-export const DANKE = 'Crownmate Trainer ist aktiv. Danke für deine Unterstützung!';
+export const DANKE = 'Crownmate Premium ist aktiv. Danke für deine Unterstützung!';
 
 // Text der Gruppe: eigener Stand, sonst die laufende Kauf-Pruefung, sonst "kein Abo" bzw. "Konto noetig"
 export function gruppenText(st = premiumStand(), ks = kaufStand()) {
@@ -47,7 +47,7 @@ export function aboGruppe({ app } = {}) {
   el.className = 'es-gruppe flaeche abo-gruppe';
   el.setAttribute('aria-labelledby', 'es-g-abo');
   // Einmal bauen, danach nur Texte aendern: so bleibt der Fokus auf dem Knopf (auch fuer die Rueckkehr aus dem Blatt)
-  el.innerHTML = `<h3 class="es-titel" id="es-g-abo">Crownmate Trainer</h3>
+  el.innerHTML = `<h3 class="es-titel" id="es-g-abo">Crownmate Premium</h3>
     <p class="abo-stand" aria-live="polite"></p>
     <p class="es-hilfe">${esc(A('gruppe'))}</p>
     <div class="es-knoepfe"><button class="knopf dr" type="button" data-abo="zeigen"></button>

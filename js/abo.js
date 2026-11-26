@@ -205,7 +205,7 @@ const text = (x, max) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, 
 export function pruefeProdukt(z) {
   if (!z || typeof z !== 'object' || typeof z.id !== 'string') return null;
   const link = (x) => (typeof x === 'string' && x.length <= 300 && LINK.test(x) ? x : null);
-  return { id: z.id, name: text(z.name, 60) || 'Crownmate Trainer', beschreibung: text(z.beschreibung, 400), preisText: text(z.preis_text, 80),
+  return { id: z.id, name: text(z.name, 60) || 'Crownmate Premium', beschreibung: text(z.beschreibung, 400), preisText: text(z.preis_text, 80),
     kaufLink: link(z.kauf_link), portalLink: link(z.portal_link) };
 }
 
@@ -450,7 +450,7 @@ export function aboHinweisZumLoeschen(st = premiumStand()) {
 
 // ---------- Oberflaeche fuer andere Pakete ----------
 export function oeffneTrainer({ app = null } = {}) {
-  return import('./pakete/abo/trainer.js').then((m) => m.zeigeTrainer({ app })).catch((e) => { console.error('Trainer-Blatt nicht geladen', e); });
+  return import('./pakete/abo/trainer.js').then((m) => m.zeigeTrainer({ app })).catch((e) => { console.error('Premium-Blatt nicht geladen', e); });
 }
 
 export function premiumHinweis(el, was = '', { app = null } = {}) {

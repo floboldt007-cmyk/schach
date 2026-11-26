@@ -317,6 +317,28 @@ async function nodeTeil() {
       pruefe(`${d}: Link "./#kuendigen" (Kuendigen ohne Anmeldung)`, readFileSync(path.join(WURZEL, d), 'utf8').includes('href="./#kuendigen"'));
     }
   }
+  {
+    // T-069 (Flo 26.11.2026): Das Abo heisst "Crownmate Premium", nie mehr "Trainer" in einem sichtbaren Text (de und en).
+    // Geprueft wird der Code OHNE Kommentare; "Trainerin" (Schule, eine Person) ist ein anderes Wort und bleibt.
+    const ohneKommentare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' ').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+    const SICHTBAR = ['js/pakete/abo/texte.js', 'js/pakete/abo/trainer.js', 'js/pakete/abo/index.js', 'js/pakete/abo/kuendigen.js', 'js/abo.js',
+      'js/sprachen/abo.js', 'js/sprachen/coach-ki.js', 'js/sprachen/premium.js', 'js/pakete/lernen/texte.js', 'js/ui/premium.js',
+      'supabase/functions/_gemeinsam/abo-beenden.js', 'supabase/functions/_gemeinsam/abo-kasse.js', 'supabase/functions/_gemeinsam/coach.js',
+      'impressum.html', 'impressum-en.html'];
+    const treffer = SICHTBAR.flatMap((d) => ohneKommentare(readFileSync(path.join(WURZEL, d), 'utf8')).split('\n')
+      .filter((z) => /\bTrainer\b/.test(z)).map((z) => `${d}: ${z.trim().slice(0, 90)}`));
+    pruefe('T-069: kein sichtbarer Text nennt das Abo "Trainer" (de/en, App, Server-Mails, Impressum)', treffer.length === 0, treffer.slice(0, 8));
+    const { DE, EN } = await import('../js/pakete/abo/texte.js');
+    pruefe('T-069: Produktname "Crownmate Premium" in Dank und Bestaetigung', /Crownmate Premium/.test(DE.danke) && /Crownmate Premium/.test(EN.danke), [DE.danke, EN.danke]);
+    for (const d of ['impressum.html', 'impressum-en.html']) {
+      pruefe(`T-069: ${d} nennt "Crownmate Premium" in der Kuendigen-Zeile`, /<h2>[^<]*Crownmate Premium[^<]*<\/h2>/.test(readFileSync(path.join(WURZEL, d), 'utf8')));
+    }
+    // Kein Jahresabo (Flo 26.11.2026): weder als Plan noch als Text im Angebot
+    const { PLAENE, EMPFOHLEN, PRODUKT_IDS } = await import('../js/ui/premium.js');
+    const premiumText = readFileSync(path.join(WURZEL, 'js/sprachen/premium.js'), 'utf8');
+    pruefe('T-069: kein Jahresplan (PLAENE, Empfehlung, Produkt-IDs, Texte plan.jahr/zeile.jahr)', !PLAENE.includes('jahr') && EMPFOHLEN !== 'jahr'
+      && PLAENE.includes(EMPFOHLEN) && !('jahr' in PRODUKT_IDS) && !/'(plan|zeile)\.jahr'/.test(premiumText), { PLAENE, EMPFOHLEN, PRODUKT_IDS });
+  }
   const sw = readFileSync(path.join(WURZEL, 'sw.js'), 'utf8');
   pruefe('Dateien des Pakets schon im Offline-Cache (sw.js), damit das Eintragen in PAKETE nur eine Zeile ist',
     ['js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'js/pakete/abo/kuendigen.js', 'css/pakete/abo.css'].every((d) => sw.includes(`'${d}'`)));
@@ -543,7 +565,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => ['abgemeldet', 'kaufbar'].includes(document.querySelector('.trainer-karte')?.dataset.zustand));
     const z = await blattZustand(seite);
     pruefe('Preis aus der Tabelle, Hinweis aufs Konto, Knopf "Zum Konto" statt Kauf', z.zustand === 'abgemeldet' && z.preis === PRODUKT.preis_text
-      && /brauchst du ein Konto/.test(z.stand) && z.knoepfe[0] === 'Zum Konto' && !z.knoepfe.includes('Trainer abschließen'), z);
+      && /brauchst du ein Konto/.test(z.stand) && z.knoepfe[0] === 'Zum Konto' && !z.knoepfe.includes('Premium abschließen'), z);
     // weit nach unten rollen, damit "Zum Konto" wirklich zur Gruppe Konto fuehren muss
     await seite.evaluate(() => document.querySelector('.es-info').scrollIntoView({ block: 'end' }));
     const kontoVorher = await seite.evaluate(() => document.querySelector('.konto-gruppe').getBoundingClientRect().top);
@@ -574,7 +596,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => ['vorschau', 'kaufbar'].includes(document.querySelector('.trainer-karte')?.dataset.zustand));
     const ohneVorteil = await blattZustand(seite);
     pruefe('aktives Produkt ohne gebauten Vorteil: "Bald verfügbar" statt Kauf, alle Vorteile "In Arbeit"', ohneVorteil.zustand === 'vorschau'
-      && !ohneVorteil.knoepfe.includes('Trainer abschließen') && ohneVorteil.knoepfe[0] === 'Bald verfügbar (aus)' && ohneVorteil.geplant === 9
+      && !ohneVorteil.knoepfe.includes('Premium abschließen') && ohneVorteil.knoepfe[0] === 'Bald verfügbar (aus)' && ohneVorteil.geplant === 9
       && ohneVorteil.vorteile === 0, ohneVorteil);
     await seite.keyboard.press('Escape');
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
@@ -582,7 +604,7 @@ async function browserTeil(browser) {
     await seite.click('.abo-gruppe [data-abo="zeigen"]');
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
     const z = await blattZustand(seite);
-    pruefe('kaufbar: "Trainer abschließen" zuerst, Preis aus der Tabelle', z.knoepfe[0] === 'Trainer abschließen' && z.preis === PRODUKT.preis_text, z);
+    pruefe('kaufbar: "Premium abschließen" zuerst, Preis aus der Tabelle', z.knoepfe[0] === 'Premium abschließen' && z.preis === PRODUKT.preis_text, z);
     pruefe('kaufbar: nur der gemeldete Vorteil unter "Im Trainer", die anderen 8 "In Arbeit"', z.vorteile === 1 && /Coach-Erklärungen/.test(z.imAbo[0])
       && z.geplant === 8, z);
     pruefe('kaufbar: ruhiger Satz zum Alter sichtbar (Web ab 18, keine Altersgrenze 16 fuers Spielen), kein Testmodus-Satz', /Web ab 18/.test(z.alter) && !/ab 16/.test(z.alter)
@@ -608,7 +630,7 @@ async function browserTeil(browser) {
     pruefe('Kauf gemerkt (fuer die Rueckkehr), Antwort "18 oder älter" gemerkt', !!(await seite.evaluate(() => localStorage.getItem('schach-arena:abo:kauf')))
       && JSON.parse(await seite.evaluate(() => localStorage.getItem('schach-arena:abo:alter'))).ab18 === true);
     const nachKauf = await blattZustand(seite);
-    pruefe('nach dem Kauf-Start kein zweites "Trainer abschließen": "Zahlung prüfen" zuerst, "Neu abschließen" daneben',
+    pruefe('nach dem Kauf-Start kein zweites "Premium abschließen": "Zahlung prüfen" zuerst, "Neu abschließen" daneben',
       nachKauf.zustand === 'wartet' && JSON.stringify(nachKauf.knoepfe) === JSON.stringify(['Zahlung prüfen', 'Neu abschließen', 'Schließen']), nachKauf);
     // Zahlung fertig: der Webhook hat das Abo eingetragen; Flo kommt in die App zurueck
     srv.premium = true;
@@ -616,17 +638,17 @@ async function browserTeil(browser) {
     await zurueck(seite);
     await seite.waitForSelector('.toast', { timeout: 5000 });
     const toast = await seite.locator('.toast').innerText();
-    pruefe('Rueckkehr: neu gefragt, einmal Danke', /Crownmate Trainer ist aktiv/.test(toast) && /Danke/.test(toast), toast);
+    pruefe('Rueckkehr: neu gefragt, einmal Danke', /Crownmate Premium ist aktiv/.test(toast) && /Danke/.test(toast), toast);
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium', null, { timeout: 3000 }).catch(() => {});
     const offen = await blattZustand(seite);
     pruefe('offenes Blatt zeichnet nach der Rueckkehr neu (aktiv, Meldung zum Kauf weg)', offen && offen.zustand === 'premium'
-      && /^Dein Trainer ist aktiv bis/.test(offen.stand) && offen.knoepfe[0] === 'Abo verwalten', offen);
+      && /^Dein Premium ist aktiv bis/.test(offen.stand) && offen.knoepfe[0] === 'Abo verwalten', offen);
     await seite.keyboard.press('Escape');
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
     await seite.waitForFunction(() => /aktiv bis/.test(document.querySelector('.abo-gruppe .abo-stand').textContent));
     pruefe('Gruppe zeichnet neu: aktiv bis, verlängert sich automatisch, Knopf "Mein Trainer"',
       /verlängert sich automatisch/.test(await seite.locator('.abo-gruppe .abo-stand').innerText())
-      && (await seite.locator('.abo-gruppe [data-abo="zeigen"]').innerText()) === 'Mein Trainer');
+      && (await seite.locator('.abo-gruppe [data-abo="zeigen"]').innerText()) === 'Mein Premium');
     pruefe('Kauf-Merker nach Erfolg weg', (await seite.evaluate(() => localStorage.getItem('schach-arena:abo:kauf'))) === null);
     // Tastatur: Fokus auf dem Knopf der Gruppe ueberlebt das Neuzeichnen und kommt aus dem Blatt zurueck
     await seite.focus('.abo-gruppe [data-abo="zeigen"]');
@@ -653,7 +675,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
     await seite.click('.trainer-knoepfe [data-trainer="kaufen"]');
     await seite.waitForFunction(() => window.__geoeffnet.length === 1);
-    pruefe('mit gemerkter Altersangabe oeffnet "Trainer abschließen" Stripe direkt', true);
+    pruefe('mit gemerkter Altersangabe oeffnet "Premium abschließen" Stripe direkt', true);
     const rpcZahl = () => anfragen.filter((a) => a.url.endsWith('/rest/v1/rpc/ist_premium')).length;
     await zurueck(seite);   // Rueckkehr, der Webhook ist noch nicht verbucht
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'bestaetigen', null, { timeout: 3000 }).catch(() => {});
@@ -769,7 +791,7 @@ async function browserTeil(browser) {
     const r = await seite.evaluate(() => ({ text: document.querySelector('.abo-gruppe .abo-stand').textContent, premium: document.querySelector('.abo-gruppe').dataset.premium,
       knopf: document.querySelector('.abo-gruppe [data-abo="zeigen"]').textContent, stand: localStorage.getItem('schach-arena:abo:stand') }));
     pruefe('nach dem Abmelden: Gruppe sagt "Konto nötig", kein "aktiv" mehr, Stand vom Geraet weg', /brauchst du ein Konto/.test(r.text) && r.premium === 'nein'
-      && r.knopf === 'Mehr zum Trainer' && r.stand === null, r);
+      && r.knopf === 'Mehr zu Premium' && r.stand === null, r);
     // Anmeldung in einem anderen Tab (storage-Ereignis): Gruppe fragt neu und zeigt das Abo
     await seite.evaluate((s) => { localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(s)); window.dispatchEvent(new StorageEvent('storage', { key: 'schach-arena:konto:sitzung' })); }, SITZUNG);
     await seite.waitForFunction(() => /aktiv bis/.test(document.querySelector('.abo-gruppe .abo-stand').textContent), null, { timeout: 3000 }).catch(() => {});
@@ -788,14 +810,14 @@ async function browserTeil(browser) {
     await seite.waitForSelector('.abo-gruppe');
     await seite.waitForFunction(() => /Gekündigt/.test(document.querySelector('.abo-gruppe .abo-stand').textContent));
     const text = await seite.locator('.abo-gruppe .abo-stand').innerText();
-    pruefe('Gruppe: gekündigt, gilt bis Datum (ohne Countdown)', text === `Gekündigt, dein Trainer gilt bis ${new Date(bis).toLocaleDateString('de-DE')}.`, text);
+    pruefe('Gruppe: gekündigt, gilt bis Datum (ohne Countdown)', text === `Gekündigt, dein Premium gilt bis ${new Date(bis).toLocaleDateString('de-DE')}.`, text);
     await seite.click('.abo-gruppe [data-abo="zeigen"]');
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium');
     // Das Blatt zeichnet neu, sobald das Produkt (mit dem Link zum Kundenportal) geladen ist; vorher steht "Preis folgt"
     await seite.waitForFunction(() => [...document.querySelectorAll('.trainer-knoepfe button')].some((b) => b.textContent.trim() === 'Abo verwalten'),
       null, { timeout: 5000 }).catch(() => {});
     const z = await blattZustand(seite);
-    pruefe('Blatt: "Abo verwalten" statt Kauf', z.knoepfe[0] === 'Abo verwalten' && !z.knoepfe.includes('Trainer abschließen'), z);
+    pruefe('Blatt: "Abo verwalten" statt Kauf', z.knoepfe[0] === 'Abo verwalten' && !z.knoepfe.includes('Premium abschließen'), z);
     pruefe('Premium: kein Satz zum Alter (nichts mehr abzuschließen)', z.alter === '', z.alter);
     pruefe('Premium (Stripe, schon gekündigt): "Vertrag widerrufen" da, "Verträge hier kündigen" nicht doppelt',
       z.knoepfe.includes('Vertrag widerrufen') && !z.knoepfe.includes('Verträge hier kündigen'), z.knoepfe);
@@ -911,7 +933,7 @@ async function browserTeil(browser) {
     await a.seite.waitForSelector('.abo-gruppe');
     await warte(800);
     const t1 = await a.seite.locator('.abo-gruppe .abo-stand').innerText();
-    pruefe('offline mit gueltigem Stand: aktiv (ohne "verlängert sich", Quelle manuell)', /^Dein Trainer ist aktiv bis/.test(t1) && !/verlängert/.test(t1), t1);
+    pruefe('offline mit gueltigem Stand: aktiv (ohne "verlängert sich", Quelle manuell)', /^Dein Premium ist aktiv bis/.test(t1) && !/verlängert/.test(t1), t1);
     await a.seite.click('.abo-gruppe [data-abo="zeigen"]');
     await a.seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium');
     pruefe('offline: Blatt zeigt den Stand, kein Produkt -> nur Schließen', JSON.stringify((await blattZustand(a.seite)).knoepfe) === '["Schließen"]');
@@ -943,7 +965,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'store');
     const z = await blattZustand(seite);
     pruefe('in der Huelle: kein Kauf-Knopf, "Bald verfügbar" aus, ruhiger Text', JSON.stringify(z.knoepfe) === JSON.stringify(['Bald verfügbar (aus)', 'Schließen'])
-      && /In dieser App ist der Trainer noch nicht verfügbar/.test(z.stand), z);
+      && /In dieser App ist Premium noch nicht verfügbar/.test(z.stand), z);
     pruefe('in der Huelle: kein Satz zum Alter (dort spaeter die Familienfreigabe des Stores)', z.alter === '', z.alter);
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
@@ -973,7 +995,7 @@ async function browserTeil(browser) {
     await meldeVorteil(seite);
     await seite.click('#ph-box .ph-mehr');
     await seite.waitForSelector('.trainer-karte');
-    pruefe('Knopf "Mehr zum Trainer" oeffnet das Blatt', (await seite.locator('.trainer-karte h3').innerText()) === 'Crownmate Trainer');
+    pruefe('Knopf "Mehr zum Trainer" oeffnet das Blatt', (await seite.locator('.trainer-karte h3').innerText()) === 'Crownmate Premium');
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand !== 'laedt');
     const ohneKonto = await blattZustand(seite);
     pruefe('Abo nicht freigeschaltet: kein "Zum Konto", sondern "in Vorbereitung"', ohneKonto.zustand === 'vorschau'
