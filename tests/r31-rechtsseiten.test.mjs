@@ -1,7 +1,7 @@
 // Rechtsseiten R31 (T-008): agb.html, agb-en.html und widerruf.html sind Entwuerfe fuer Crownmate Premium.
 //   node tests/r31-rechtsseiten.test.mjs
 // Prueft ohne Browser:
-//   - keine der drei Seiten sagt "Trainer" (Premium heisst jetzt Premium),
+//   - keine der drei Seiten und keine Datenschutzseite nennt das Abo "Trainer" (es heisst jetzt Premium),
 //   - die Seiten sind als Entwurf gekennzeichnet, offene Stellen stehen sichtbar in .platz, kein Preis, keine
 //     Anschrift, keine Telefonnummer, keine E-Mail-Adresse (die stehen nur im Impressum bzw. kommen spaeter),
 //   - solange Platzhalter drin sind, verlinkt keine andere Datei der App auf diese Seiten (sonst saehe ein Spieler
@@ -29,10 +29,18 @@ const text = (s) => s.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>
   .replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
 const platz = (s) => [...s.matchAll(/<span class="platz">([\s\S]*?)<\/span>/g)].map((m) => m[1].replace(/\s+/g, ' '));
 
-// 1. Kein "Trainer"
-const TRAINER = /Trainer/;
-pruefe('Positivkontrolle: das Muster findet "Trainer" in datenschutz.html', TRAINER.test(lies('datenschutz.html')));
-for (const d of SEITEN) pruefe(`${d}: sagt nirgends "Trainer"`, !TRAINER.test(html[d]), (html[d].match(/.{0,40}Trainer.{0,40}/) || [])[0]);
+// 1. Kein "Trainer" als Name des Abos, auch nicht in den Datenschutzseiten (T-069: das Abo heisst Crownmate Premium).
+//    "Trainerin" (Schule, eine Person) ist ein anderes Wort und bleibt erlaubt.
+const TRAINER = /\bTrainer\b/;
+pruefe('Positivkontrolle: das Muster trifft "Trainer-Abo", "Crownmate Trainer" und "Trainer subscription", nicht "Trainerin"',
+  TRAINER.test('7. Trainer-Abo und Stripe') && TRAINER.test('„Crownmate Trainer“') && TRAINER.test('Trainer subscription')
+  && !TRAINER.test('eine Trainerin im Verein'));
+pruefe('Positivkontrolle: datenschutz.html wird gelesen (enthaelt "Trainerin" und "Premium-Abo")',
+  /Trainerin/.test(lies('datenschutz.html')) && /Premium-Abo/.test(lies('datenschutz.html')));
+for (const d of [...SEITEN, 'datenschutz.html', 'datenschutz-en.html']) {
+  const s = d in html ? html[d] : lies(d);
+  pruefe(`${d}: nennt das Abo nirgends "Trainer"`, !TRAINER.test(s), (s.match(/.{0,40}\bTrainer\b.{0,40}/) || [])[0]);
+}
 
 // 2. Entwurf, Platzhalter, keine Preise und Kontaktdaten
 // Postleitzahl (fuenf Ziffern) steht fuer die Anschrift; Beispielwerte unten sind erfunden.
