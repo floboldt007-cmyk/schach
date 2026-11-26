@@ -47,15 +47,15 @@ const gruen = { STUB_BAEUME: `${A}=${T1} ${B}=${T1}`, STUB_LAEUFE: `${T1}=4711` 
 
 {
   const r = lauf({ EREIGNIS: 'pull_request', REF: 'refs/pull/9/merge', SHA: A, ...gruen });
-  pruefe('pull_request testet immer voll, auch mit gruenem Baum', r.laufen === 'true', r);
+  pruefe('pull_request testet immer voll, auch mit gruenem Baum', r.laufen === 'true' && /Ereignis pull_request testet immer/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/main', SHA: A, VORHER: B, ...gruen });
-  pruefe('push auf main testet immer, auch mit gruenem Baum', r.laufen === 'true', r);
+  pruefe('push auf main testet immer, auch mit gruenem Baum', r.laufen === 'true' && /push auf refs\/heads\/main testet immer/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/so/R30-testkette', SHA: A, VORHER: B, ...gruen });
-  pruefe('push auf einen Arbeitszweig testet immer', r.laufen === 'true', r);
+  pruefe('push auf einen Arbeitszweig testet immer', r.laufen === 'true' && /R30-testkette testet immer/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/stabil', SHA: A, VORHER: B, ...gruen });
@@ -64,7 +64,7 @@ const gruen = { STUB_BAEUME: `${A}=${T1} ${B}=${T1}`, STUB_LAEUFE: `${T1}=4711` 
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/stabil', SHA: A, VORHER: B, STUB_BAEUME: `${A}=${T1}`, STUB_LAEUFE: `${T2}=1` });
-  pruefe('push auf stabil ohne gruenen Lauf fuer diesen Baum: testet', r.laufen === 'true', r);
+  pruefe('push auf stabil ohne gruenen Lauf fuer diesen Baum: testet', r.laufen === 'true' && /keinen belegten gruenen PR-Lauf/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/claude/integration', SHA: A, VORHER: B, ...gruen });
@@ -73,27 +73,27 @@ const gruen = { STUB_BAEUME: `${A}=${T1} ${B}=${T1}`, STUB_LAEUFE: `${T1}=4711` 
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/claude/integration', SHA: A, VORHER: B,
     STUB_BAEUME: `${A}=${T1} ${B}=${T2}`, STUB_LAEUFE: `${T1}=4711` });
-  pruefe('integration mit geaenderten Dateien testet, auch wenn der neue Baum gruen belegt ist', r.laufen === 'true', r);
+  pruefe('integration mit geaenderten Dateien testet, auch wenn der neue Baum gruen belegt ist', r.laufen === 'true' && /aendert Dateien/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/claude/integration', SHA: A, VORHER: '0'.repeat(40), ...gruen });
-  pruefe('integration ohne Vorgaenger (neuer Zweig) testet', r.laufen === 'true', r);
+  pruefe('integration ohne Vorgaenger (neuer Zweig) testet', r.laufen === 'true' && /ohne Vorgaenger/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/claude/integration', SHA: A, VORHER: B, STUB_BAEUME: `${A}=${T1} ${B}=${T1}`, STUB_LAEUFE: '' });
-  pruefe('Gleichstand-Merge ohne gruenen Beleg testet', r.laufen === 'true', r);
+  pruefe('Gleichstand-Merge ohne gruenen Beleg testet', r.laufen === 'true' && /keinen belegten gruenen PR-Lauf/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/stabil', SHA: A, VORHER: B, ...gruen, STUB_FEHLER: '1' });
-  pruefe('API-Fehler: testet (Fehlerrichtung testen), Exit 0', r.laufen === 'true' && r.code === 0, r);
+  pruefe('API-Fehler: testet (Fehlerrichtung testen), Exit 0', r.laufen === 'true' && r.code === 0 && /nicht lesbar/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/stabil', SHA: A, VORHER: B, STUB_BAEUME: `${A}=kaputt`, STUB_LAEUFE: 'kaputt=1' });
-  pruefe('kein gueltiger Baum-Hash: testet', r.laufen === 'true', r);
+  pruefe('kein gueltiger Baum-Hash: testet', r.laufen === 'true' && /nicht lesbar/.test(r.text), r);
 }
 {
   const r = lauf({ EREIGNIS: 'push', REF: 'refs/heads/stabil', SHA: A, VORHER: B, STUB_BAEUME: `${A}=${T1}`, STUB_LAEUFE: `${T1}=abc` });
-  pruefe('Lauf-Nummer keine Zahl: testet', r.laufen === 'true', r);
+  pruefe('Lauf-Nummer keine Zahl: testet', r.laufen === 'true' && /keinen belegten gruenen PR-Lauf/.test(r.text), r);
 }
 
 rmSync(ORDNER, { recursive: true, force: true });
