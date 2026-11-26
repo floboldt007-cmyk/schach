@@ -52,7 +52,7 @@ const rahmenErlaubt = (x) => !!RAHMEN[x] && (x !== 'erfinder-blatt-0' || hatSond
 // R26 (Befund 9f, 21.11.2026): angemeldet, aber fuer dieses Konto noch keine Server-Antwort gemerkt (frisches Geraet,
 // langsames Netz): die gespeicherte Erfinder-Figur bleibt sichtbar, statt bis zur Antwort als Bauer zu erscheinen. Erst
 // ein belegter Nicht-Besitz oder die Abmeldung fallen zurueck. Nur fuer die eigene Ansicht: neu waehlen verlangt den
-// Beleg (motivErlaubt), und die Karte fuer andere kennt den Koenig nicht (js/karte.js KARTE_MOTIVE)
+// Beleg (motivErlaubt), und die Karte fuer andere zeigt den Koenig nur mit Stueck (Server, karte-besitz-sicht-schema.sql)
 // Konto-Trennung (22.11.2026, Auftrag claude-code-42): die gemerkte Wahl liegt beim Geraet (einstellungen:sammeln bleibt
 // beim Kontowechsel, js/konto.js GERAET_BLEIBT). Die Ausnahme gilt deshalb nur, solange nichts auf ein ANDERES Konto
 // zeigt: weder der Merker der Sonderstuecke (gehoert einem anderen Konto) noch der Besitzer des Geraets (geraetFremd).

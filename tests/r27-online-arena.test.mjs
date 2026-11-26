@@ -85,7 +85,8 @@ function bediener(z) {
     const p = z.partien.get(body.partie);
     if (rpc === 'online_meine') return antwort([]);
     if (rpc === 'karte_der_partie') {
-      // Lena (u3) schickt Erfinder-Werte: das Blatt "Letzte Partien" zeigt sie als Standard (Review 6e zu #271, Befund 3)
+      // Lena (u3) traegt Erfinder-Werte (Koenig, Erfinder-Rahmen). Seit R30 (Flo 22.11.: "Was du besitzt und traegst, sieht
+      // auch dein Gegner") gibt karte_der_partie sie nur mit Stueck heraus (karte_bild), die App zeigt, was der Server schickt
       const karte = (u) => ({ name: NAMEN[u], banner: 'saison-silber', titel: null, vitrine: [], motiv: u === 'u3' ? 'K' : 'Q', grund: 'standard',
         rahmen: u === 'u3' ? 'erfinder-blatt-0' : 'ohne', kronen_stufe: 7,
         elo: u === UID ? ELO : 1310, du: u === UID });
@@ -99,7 +100,7 @@ function bediener(z) {
       const liste = Array.from({ length: 50 }, (_, i) => ({ rang: i + 1, name: i === 40 ? NAMEN[UID] : namen[i % namen.length],
         elo: i === 40 ? ELO : 1980 - i * 18 - (i > 40 ? 20 : 0), banner: 'start', ich: i === 40,
         // mit supabase/weltrang-karte-schema.sql (Vorschlag): das Profilbild; ein kaputter Wert faellt in profilAvatar zurueck
-        // Platz 3 schickt Erfinder-Werte (Koenig, Erfinder-Rahmen), die ein fremder Spieler nie zeigen darf -> Standard
+        // Platz 3 schickt Erfinder-Werte (Koenig, Erfinder-Rahmen): seit R30 entscheidet der Server (Beleg), die App zeigt sie
         ...(z.bild ? { motiv: i === 1 ? '<img src=x onerror=alert(1)>' : i === 2 ? 'K' : 'karo', grund: 'standard', rahmen: i === 2 ? 'erfinder-blatt-0' : 'ohne' } : {}) }));
       return antwort({ ab: 15, ab_start: 30, teilnahme: true, ich: { status: 'dabei', rang: 41, elo: ELO, name: NAMEN[UID], banner: 'start' }, liste });
     }
@@ -169,7 +170,7 @@ async function voll(browser, [geraet, w, h], bild = false) {
       quer ? !!l.rang && l.rang.podest === '2,1,3' && /^41\s*Du\s*1240$/.test(l.rang.ich || '') && l.rang.koepfe === 6 : l.rang === null, l.rang);
     // ohne Profilbild vom Server: nur dein Kopf zeigt ein Bild, die anderen Banner und Anfangsbuchstabe; mit: alle sechs, ohne Fremd-HTML
     if (quer) pruefe(`${gruppe}: (c) Koepfe ${bild ? 'mit Profilbild vom Server, kaputter Wert ohne Fremd-HTML' : 'ohne Server-Profilbild: Banner und Buchstabe'}`,
-      bild ? l.rang.bilder === 6 && l.rang.img === 0 && !l.rang.erfinder : l.rang.bilder === 1, l.rang);
+      bild ? l.rang.bilder === 6 && l.rang.img === 0 && l.rang.erfinder : l.rang.bilder === 1, l.rang);
     const gold = l.knoepfe.filter((b) => b.gold).map((b) => b.a);
     const groesster = l.knoepfe.filter((b) => b.knopf).sort((a, b) => b.f - a.f)[0];
     pruefe(`${gruppe}: (d) genau ein goldener Knopf (Partie suchen), er ist der groesste Knopf`, gold.length === 1 && gold[0] === 'suchen'
@@ -192,9 +193,9 @@ async function voll(browser, [geraet, w, h], bild = false) {
       klein: [...document.querySelectorAll('.on-letzte-blatt button')].filter((b) => b.checkVisibility() && !b.classList.contains('on-letzte-name')
         && b.getBoundingClientRect().height < 44).map((b) => `${b.className} ${b.getBoundingClientRect().height}`),
       namenKlein: [...document.querySelectorAll('.on-letzte-name')].filter((b) => b.getBoundingClientRect().height < 24).length,
-      koepfe: document.querySelectorAll('.on-letzte-kopf[data-da] svg').length,
+      koepfe: [...document.querySelectorAll('.on-letzte-kopf[data-da]')].filter((k) => k.querySelector('svg')).length,
       erfinder: /wK\.svg|erfinder/.test(document.querySelector('.on-letzte')?.innerHTML || '') }));
-    pruefe(`${gruppe}: (g) fremde Erfinder-Werte (Koenig, Erfinder-Rahmen) erscheinen als Standard`, blatt.erfinder === false, blatt.erfinder);
+    pruefe(`${gruppe}: (g) Erfinder-Werte vom Server (Koenig, Erfinder-Rahmen) zeigt das Blatt (R30, Beleg beim Server)`, blatt.erfinder === true, blatt.erfinder);
     pruefe(`${gruppe}: (g) neben jedem Namen der Avatar des Gegners`, blatt.koepfe === 5, blatt.koepfe);
     pruefe(`${gruppe}: (g) fuenf Zeilen, neueste zuerst, Gegner aus karte_der_partie, Datum, nur gewertete`,
       blatt.zeilen.map((z) => z.erg).join('') === 'srsns' && blatt.zeilen.map((z) => z.name).join() === 'Jonas,Jonas,Jonas,Lena,Jonas'
