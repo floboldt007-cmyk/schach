@@ -17,7 +17,7 @@
 --   erklaerung       der Text der Erklaerung, wie ihn Seite und Mail zeigen, hoechstens 4000 Zeichen
 --
 -- Datenschutz: Beim Loeschen des Kontos setzt der Fremdschluessel user_id auf null (Nachweispflicht, wie bisher). Der
--- Ausloeser abo_vorgaenge_konto_weg leert dabei name und bestaetigung_an und ersetzt die Namenszeile der Erklaerung.
+-- Ausloeser abo_vorgaenge_konto_weg leert dabei name, grund und bestaetigung_an und ersetzt Namens- und Grundzeile der Erklaerung.
 
 alter table public.abo_vorgaenge
   add column if not exists kuendigung_art text,
@@ -59,7 +59,8 @@ revoke all on function public.abo_kuendigung_eintragen(uuid, text, text, timesta
 grant execute on function public.abo_kuendigung_eintragen(uuid, text, text, timestamptz, boolean, text, text, text, date, text,
   boolean, text) to service_role;
 
--- Konto weg (user_id wird null): Name und abweichende Adresse gehen mit, der Rest bleibt als pseudonymer Nachweis
+-- Konto weg (user_id wird null): Name, Grund (Freitext, kann Persoenliches enthalten) und abweichende Adresse gehen mit,
+-- der Rest bleibt als pseudonymer Nachweis
 create or replace function public.abo_vorgaenge_konto_weg()
 returns trigger
 language plpgsql
@@ -68,9 +69,11 @@ as $$
 begin
   if old.user_id is not null and new.user_id is null then
     new.name := null;
+    new.grund := null;
     new.bestaetigung_an := null;
     if new.erklaerung is not null then
       new.erklaerung := regexp_replace(new.erklaerung, '(^|\n)Name: [^\n]*', '\1Name: (mit dem Konto gelöscht)', 'g');
+      new.erklaerung := regexp_replace(new.erklaerung, '(^|\n)Grund: [^\n]*', '\1Grund: (mit dem Konto gelöscht)', 'g');
     end if;
   end if;
   return new;
