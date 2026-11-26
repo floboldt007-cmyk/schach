@@ -25,7 +25,7 @@ case "$pfad" in
   *artifacts?name=gruener-baum-*) baum="\${pfad##*gruener-baum-}"; for p in \${STUB_LAEUFE:-}; do [ "\${p%%=*}" = "$baum" ] && echo "\${p#*=}"; done ;;
 esac
 exit 0
-`);
+`, { mode: 0o755 }); // ausfuehrbar, sonst scheitert "$GH" unter Linux mit Permission denied (CI 26.11., unter Windows unsichtbar)
 
 const A = 'a'.repeat(40), B = 'b'.repeat(40), T1 = '1'.repeat(40), T2 = '2'.repeat(40);
 function lauf(env) {
