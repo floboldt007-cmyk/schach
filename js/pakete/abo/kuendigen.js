@@ -51,12 +51,12 @@ export function zeigeBeenden({ aktion = 'kuendigen', token = '' } = {}) {
   const wer = [A('b.wer'), modus === 'link' ? A('b.werLink') : (email || A('b.werKonto'))];
   const zeilen = modus === 'anfordern' ? [] : modus === 'widerrufen' ? [
     [A('b.art'), A('b.artWiderruf')],
-    [A('b.vertrag'), 'Crownmate Trainer'],
+    [A('b.vertrag'), 'Crownmate Premium'],
     [A('b.zeitpunkt'), A('b.sofort')],
     wer,
     [A('b.bestaetigung'), A('b.perMail')],
   ] : [
-    [A('b.vertrag'), 'Crownmate Trainer'],
+    [A('b.vertrag'), 'Crownmate Premium'],
     wer,
     [A('b.bestaetigung'), A('b.perMail')],
   ];

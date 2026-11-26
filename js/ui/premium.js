@@ -3,9 +3,9 @@
 // der Arena (js/ui/seite.js, hauptKopf({ premium: true })). Optik: css/premium.css.
 //
 //   zeige(root, params, app) -> { verlasse() }
-//   PLAENE        ['monat', 'jahr', 'immer'] (Jahr ist vorgewaehlt und als "Empfohlen" markiert, GESCHAEFT.md 30.10.)
+//   PLAENE        ['monat', 'immer'] (Monat ist vorgewaehlt und als "Empfohlen" markiert; kein Jahresabo, Flo 26.11.2026)
 //   VERGLEICH     Zeilen der Tabelle: [id, Standard, Premium], Wert true = Haken, false = Strich, sonst Text-Schluessel
-//   PRODUKT_IDS   Zeilen in Flos Tabelle produkte (supabase/abo-schema.sql) fuer die Preise: premium-monat, premium-jahr,
+//   PRODUKT_IDS   Zeilen in Flos Tabelle produkte (supabase/abo-schema.sql) fuer die Preise: premium-monat,
 //                 premium-immer. Preise stehen nie im Code; fehlt eine Zeile (oder die Tabelle), steht "Preis folgt".
 //   setzePremiumFetch(fn)   nur fuer Tests
 //
@@ -27,9 +27,9 @@ import '../sprachen/premium.js';
 const P = (k, w) => t('premium.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export const PLAENE = Object.freeze(['monat', 'jahr', 'immer']);
-export const EMPFOHLEN = 'jahr';
-export const PRODUKT_IDS = Object.freeze({ monat: 'premium-monat', jahr: 'premium-jahr', immer: 'premium-immer' });
+export const PLAENE = Object.freeze(['monat', 'immer']);
+export const EMPFOHLEN = 'monat';
+export const PRODUKT_IDS = Object.freeze({ monat: 'premium-monat', immer: 'premium-immer' });
 export const VERGLEICH = Object.freeze([
   ['spielen', true, true],
   ['live', 'wert.live.standard', 'wert.live.premium'],

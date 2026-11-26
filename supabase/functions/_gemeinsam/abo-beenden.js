@@ -1,4 +1,4 @@
-// Kuendigen und Widerrufen des Abos "Crownmate Trainer" (Kuendigungsknopf § 312k BGB, Widerrufsknopf § 356a BGB).
+// Kuendigen und Widerrufen des Abos "Crownmate Premium" (Kuendigungsknopf § 312k BGB, Widerrufsknopf § 356a BGB).
 // Rechtsgrundlagen und Bauplan: Rechtspruefung vom 05.11.2026 (Vault, Schach-App). Keine Rechtsberatung.
 //
 // Vier Aktionen (Koerper { aktion, ... }):
@@ -241,7 +241,7 @@ export function kuendigungsParameter({ art, grund, zeitpunkt, tag = null, laeuft
 export function erklaerungText({ art, grund, name, tag, eingang, wirksam, pruefung, weg }) {
   const z = [
     'Kündigungserklärung',
-    'Vertrag: Abo „Crownmate Trainer“',
+    'Vertrag: Abo „Crownmate Premium“',
     `Art: ${art === 'ausserordentlich' ? 'außerordentliche Kündigung' : 'ordentliche Kündigung'}`,
   ];
   if (art === 'ausserordentlich') z.push(`Grund: ${grund || 'kein Grund angegeben'}`);
@@ -261,7 +261,7 @@ export function erklaerungText({ art, grund, name, tag, eingang, wirksam, pruefu
 
 function mailKuendigung({ erklaerung }) {
   return {
-    betreff: 'Bestätigung deiner Kündigung: Crownmate Trainer',
+    betreff: 'Bestätigung deiner Kündigung: Crownmate Premium',
     text: [
       'Hallo,',
       '',
@@ -269,7 +269,7 @@ function mailKuendigung({ erklaerung }) {
       '',
       erklaerung.trim(),
       '',
-      'Bis dahin kannst du den Trainer weiter nutzen, danach wird nichts mehr abgebucht.',
+      'Bis dahin kannst du Premium weiter nutzen, danach wird nichts mehr abgebucht.',
       'Das Spiel selbst bleibt für dich gratis.',
       '',
       'Crownmate',
@@ -282,13 +282,13 @@ async function kurzHash(text) {
 }
 function mailWiderruf({ eingang, erstattet }) {
   return {
-    betreff: 'Eingangsbestätigung deines Widerrufs: Crownmate Trainer',
+    betreff: 'Eingangsbestätigung deines Widerrufs: Crownmate Premium',
     text: [
       'Hallo,',
       '',
       'dein Widerruf ist bei uns eingegangen.',
       '',
-      'Inhalt: Widerruf des Vertrags über das Abo „Crownmate Trainer“',
+      'Inhalt: Widerruf des Vertrags über das Abo „Crownmate Premium“',
       `Eingegangen am: ${zeitText(eingang)}`,
       'Das Abo ist beendet, es wird nichts mehr abgebucht.',
       erstattet != null
@@ -486,8 +486,8 @@ export async function verarbeite({ methode, koerper, autorisierung } = {}, umgeb
       const link = `${rueckkehr}#kuendigen=${token}`;
       const m = await sendeMail(f, umgebung, {
         an: email,
-        betreff: 'Dein Link zum Kündigen: Crownmate Trainer',
-        text: ['Hallo,', '', 'du hast einen Link zum Kündigen deines Abos „Crownmate Trainer“ angefordert.', '',
+        betreff: 'Dein Link zum Kündigen: Crownmate Premium',
+        text: ['Hallo,', '', 'du hast einen Link zum Kündigen deines Abos „Crownmate Premium“ angefordert.', '',
           `Hier kündigen: ${link}`, '', 'Der Link gilt 60 Minuten und nur einmal. Hast du ihn nicht angefordert, kannst du diese Mail ignorieren.', '', 'Crownmate'].join('\n'),
       });
       log('abo-beenden link mail=' + m.ok);

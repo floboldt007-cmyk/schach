@@ -642,8 +642,8 @@ async function gratisTeil(browser) {
   }
   await warteLz(p.s, "z.phase === 'ende'");
   await blattDa(p.s);
-  pruefe('Gratis: nach der letzten leichten Lektion „Weiter“ und „Nächste Lektion im Trainer“, kein Werbetext in der Meldung',
-    await p.s.locator('.ergebnis-overlay [data-a="weiter"]').count() === 1 && /Nächste Lektion im Trainer/.test(await p.s.locator('.ergebnis-overlay [data-a="trainer"]').innerText())
+  pruefe('Gratis: nach der letzten leichten Lektion „Weiter“ und „Nächste Lektion in Premium“, kein Werbetext in der Meldung',
+    await p.s.locator('.ergebnis-overlay [data-a="weiter"]').count() === 1 && /Nächste Lektion in Premium/.test(await p.s.locator('.ergebnis-overlay [data-a="trainer"]').innerText())
     && await p.s.locator('.ls-screen .premium-hinweis').count() === 0);
   await p.s.locator('.ergebnis-overlay [data-a="weiter"]').click();
   await warteLz(p.s, "z.id === 'legal-falle'");

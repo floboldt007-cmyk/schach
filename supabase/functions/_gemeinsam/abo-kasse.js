@@ -37,7 +37,7 @@ export const GUELTIG_MS = 45 * 60 * 1000;
 // damit mein Widerrufsrecht" war deshalb falsch. Richtig: Wer den sofortigen Beginn verlangt, schuldet bei einem
 // Widerruf anteiligen Wertersatz (§ 357a Abs. 2 BGB, Art. 246a § 1 Abs. 2 Satz 1 Nr. 3 EGBGB, EuGH C-641/19).
 // Aenderungen nur hier; die Widerrufsbelehrung selbst steht in den AGB.
-export const ZUSTIMMUNG_TEXT = 'Ich stimme den AGB zu und verlange ausdrücklich, dass Crownmate Trainer sofort beginnt. '
+export const ZUSTIMMUNG_TEXT = 'Ich stimme den AGB zu und verlange ausdrücklich, dass Crownmate Premium sofort beginnt. '
   + 'Mir ist bekannt, dass ich bei einem Widerruf innerhalb von 14 Tagen für die Zeit bis dahin einen anteiligen Betrag '
   + 'zahle (§ 357a Abs. 2 BGB).';
 
@@ -55,7 +55,7 @@ const TEXTE = Object.freeze({
   methode: { de: 'Nur POST.', en: 'POST only.' },
   anmeldung: { de: 'Bitte melde dich an.', en: 'Please sign in.' },
   eingabe: { de: 'Die Anfrage ist ungültig.', en: 'The request is invalid.' },
-  schon_premium: { de: 'Du hast den Trainer schon.', en: 'You already have the Trainer.' },
+  schon_premium: { de: 'Du hast Premium schon.', en: 'You already have Premium.' },
   kauf_laeuft: { de: 'Dein Kauf wird gerade verbucht.', en: 'Your purchase is being processed.' },
   nicht_eingerichtet: { de: 'Der Kauf ist noch nicht eingerichtet.', en: 'Purchasing is not set up yet.' },
   stripe: { de: 'Die Bezahlseite ist gerade nicht erreichbar.', en: 'The payment page is not available right now.' },

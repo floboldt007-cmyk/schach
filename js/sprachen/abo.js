@@ -6,9 +6,9 @@ export const DE = {
   "offline": "Keine Verbindung.",
   "funktion": "Diese Funktion",
   "server": "Serverfehler ({status})",
-  "loeschen": "Dein Abo „Crownmate Trainer“ läuft bei Stripe weiter, bis du es kündigst. Kündige es vorher unter Einstellungen, Crownmate Trainer, Abo verwalten.",
-  "teil": "Teil von Crownmate Trainer. Alles andere bleibt gratis.",
-  "mehr": "Mehr zum Trainer"
+  "loeschen": "Dein Abo „Crownmate Premium“ läuft bei Stripe weiter, bis du es kündigst. Kündige es vorher unter Einstellungen, Crownmate Premium, Abo verwalten.",
+  "teil": "Teil von Crownmate Premium. Alles andere bleibt gratis.",
+  "mehr": "Mehr zu Premium"
 };
 
 export const EN = {
@@ -16,9 +16,9 @@ export const EN = {
   "offline": "No connection.",
   "funktion": "This feature",
   "server": "Server error ({status})",
-  "loeschen": "Your Crownmate Trainer subscription continues with Stripe until you cancel it. Cancel it first under Settings, Crownmate Trainer, Manage subscription.",
-  "teil": "Part of Crownmate Trainer. Everything else stays free.",
-  "mehr": "About Trainer"
+  "loeschen": "Your Crownmate Premium subscription continues with Stripe until you cancel it. Cancel it first under Settings, Crownmate Premium, Manage subscription.",
+  "teil": "Part of Crownmate Premium. Everything else stays free.",
+  "mehr": "About Premium"
 };
 
 registriereTexte("abo", { de: DE, en: EN });

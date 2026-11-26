@@ -55,7 +55,7 @@ const SUITEN = [
   { name: 'server-abo', datei: 'server-abo.test.mjs', args: [], was: 'Abo: Stripe-Webhook und Schema-Vertrag (Server)' },
   { name: 'server-abo-kasse', datei: 'server-abo-kasse.test.mjs', args: [], was: 'Abo: Kasse auf dem Server, Nutzer-ID nur aus der Anmeldung (Server)' },
   { name: 'server-abo-beenden', datei: 'server-abo-beenden.test.mjs', args: [], was: 'Abo: Kündigen und Widerrufen, auch ohne Anmeldung (Server)' },
-  { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Trainer“: Stand, Kauf, Blatt' },
+  { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Premium“: Stand, Kauf, Blatt' },
   // server-verwaltung steht wie alle PGlite-Suiten (server-karte*, server-daten*) nicht hier: PGlite gibt es nur im CI-Job
   // sql (.github/workflows/tests.yml), im Browser-Job brach die Suite ab (R17-sammelfix2, Run 43587846003)
   { name: 'verwaltung', datei: 'verwaltung.test.mjs', args: [], was: 'Verwaltung fuer Flo: Recht still pruefen, Aufrufe, Fehlertexte, Ansichten (ohne Browser)' },
@@ -192,7 +192,7 @@ const SUITEN = [
   { name: 'bretter-v3', datei: 'bretter-v3.test.mjs', args: [], was: 'Motiv-Bretter Fassung 3 (Entwurf): 20 Motive, Helligkeitsbaender, Kontrast am echten Brett, Bewegung nur ohne weniger Bewegung' },
   { name: 'bretter-v4', datei: 'bretter-v4.test.mjs', args: [], was: 'Motiv-Bretter Fassung 4: 20 Motive, Textur je Feld, Feld 3,0, Textur 1,15, Koordinaten 3,0, Bewegung nur am Rahmen' },
   { name: 'bretter-v4-app', datei: 'bretter-v4-app.test.mjs', args: [], was: 'Motiv-Bretter in der App: Katalog nur Erfinder, Rahmen in Bot/Online/Zu zweit/Raetsel-Duell, Handy ohne Rahmen, Sammlung' },
-  { name: 'lernen', datei: 'lernen.test.mjs', args: [], was: 'Paket lernen: Meisterschule, leicht gratis, Rest im Trainer, Lektionen mit Engine-Verteidigung' },
+  { name: 'lernen', datei: 'lernen.test.mjs', args: [], was: 'Paket lernen: Meisterschule, leicht gratis, Rest in Premium, Lektionen mit Engine-Verteidigung' },
   { name: 'lobby', datei: 'lobby.test.mjs', args: [], was: 'Paket lobby: Online-Lobby als Vorschau im Labor (Umschalter, Bedenkzeiten, Suche, Partie mit Uhr)' },
   { name: 'finisher', datei: 'finisher.test.mjs', args: [], was: 'Paket Finisher: Freischaltung und sichere Standardwahl' },
   { name: 'boss', datei: 'boss.test.mjs', args: [], was: 'Wochen-Boss und Funken-Wochenende: Spielplan und Logik' },

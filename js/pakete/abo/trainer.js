@@ -83,20 +83,20 @@ const ZUSAGEN = Object.freeze([
   'Das Abo bringt nie mehr Funken, Punkte oder Wertung.',
   'Bezahlt wird über Stripe. Die App sieht keine Kartendaten.',
 ]);
-export const GEPLANT_HINWEIS = 'Noch nicht enthalten. Es kommt erst in den Trainer, wenn es fertig ist.';
+export const GEPLANT_HINWEIS = 'Noch nicht enthalten. Es kommt erst zu Premium, wenn es fertig ist.';
 // Ein Konto gibt es ab 13, Einwilligungen ab 16 (Flo 18.11.2026). Ein Abo ist ein Vertrag mit laufenden Kosten; Minderjaehrige
 // schliessen es nach Regel 22 nur ueber die Familienfreigabe der Stores ab. Im Web gibt es die nicht, also dort ab 18.
 // Ob es spaeter einen Weg mit Zustimmung der Eltern gibt, entscheidet Flo mit der Fachperson (ANLEITUNG, Abschnitt Abo).
-export const ALTER_HINWEIS = 'Den Trainer gibt es im Web ab 18. Spielen und Lernen in Crownmate bleiben frei.';
-export const ALTER_FRAGE = 'Eine Frage vorab: Bist du 18 oder älter? Ein Abo ist ein Vertrag mit laufenden Kosten, deshalb gibt es den Trainer im Web erst ab 18.';
-export const UNTER_18 = 'Den Trainer gibt es im Web erst ab 18. Alles andere in Crownmate bleibt für dich frei.';
+export const ALTER_HINWEIS = 'Premium gibt es im Web ab 18. Spielen und Lernen in Crownmate bleiben frei.';
+export const ALTER_FRAGE = 'Eine Frage vorab: Bist du 18 oder älter? Ein Abo ist ein Vertrag mit laufenden Kosten, deshalb gibt es Premium im Web erst ab 18.';
+export const UNTER_18 = 'Premium gibt es im Web erst ab 18. Alles andere in Crownmate bleibt für dich frei.';
 const TEST_HINWEIS = 'Stripe-Testmodus: Es fließt kein echtes Geld.';
 const TEXTE = Object.freeze({
   laedt: '',
-  vorschau: 'Der Trainer ist noch in Vorbereitung. Bis dahin ist alles frei.',
-  offline: 'Gerade keine Verbindung. Öffne den Trainer später noch einmal.',
+  vorschau: 'Premium ist noch in Vorbereitung. Bis dahin ist alles frei.',
+  offline: 'Gerade keine Verbindung. Öffne Premium später noch einmal.',
   abgemeldet: 'Zum Abschließen brauchst du ein Konto (Einstellungen, Konto).',
-  store: 'In dieser App ist der Trainer noch nicht verfügbar. Bis dahin ist alles frei.',
+  store: 'In dieser App ist Premium noch nicht verfügbar. Bis dahin ist alles frei.',
   bestaetigen: 'Stripe bestätigt deine Zahlung. Das dauert meist nur ein paar Sekunden.',
   wartet: 'Noch keine Bestätigung von Stripe. Hast du bezahlt, kommt sie meist in ein paar Minuten. Sonst kannst du neu abschließen.',
   alter: ALTER_FRAGE,
@@ -139,7 +139,7 @@ export function zeigeTrainer({ app = null } = {}) {
       <div class="sheet-griff" aria-hidden="true"></div>
       <div class="trainer-kopf">
         <span class="trainer-marke" aria-hidden="true">${icon('stern')}</span>
-        <div class="trainer-kopf-text"><h3 id="trainer-titel">Crownmate Trainer</h3>
+        <div class="trainer-kopf-text"><h3 id="trainer-titel">Crownmate Premium</h3>
           <p class="trainer-unter">${esc(A('untertitel'))}</p></div>
       </div>
       <p class="trainer-beschreibung" hidden></p>
@@ -166,7 +166,7 @@ export function zeigeTrainer({ app = null } = {}) {
   const vorherFokus = document.activeElement;
   let produkt;           // undefined: noch nicht geladen, null: kein aktives Produkt
   let meldung = '';
-  let frage = false;     // Altersfrage gerade offen (nach "Trainer abschließen" ohne Angabe)
+  let frage = false;     // Altersfrage gerade offen (nach "Premium abschließen" ohne Angabe)
   let fertig = false;
 
   function knopf(textInhalt, art, aktion, { aus = false } = {}) {
