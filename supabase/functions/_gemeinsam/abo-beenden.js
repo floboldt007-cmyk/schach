@@ -175,12 +175,12 @@ export const MAX_NAME = 200;
 export const MAX_VORAUS_TAGE = 730;
 export const ARTEN = Object.freeze(['ordentlich', 'ausserordentlich']);
 const ohneSteuer = (s, max) => String(s || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
-// Kaltreview #296: Grund und Name landen woertlich in einer Mail, auch an eine frei eingetragene Adresse. Links darin
-// wuerden die Bestaetigung zum Werbe- oder Phishing-Traeger machen: http(s)://, www., domain.tld/pfad und domain.tld mit
-// gaengiger Endung werden vor dem Speichern ersetzt (dann sind Mail, Stripe-Notiz, Nachweis und Seite gleich).
+// Kaltreview #296: Grund und Name landen woertlich in der Mail, auch an eine frei eingetragene Zweitadresse. Links darin
+// machten diese Mail zum Werbe- oder Phishing-Traeger. Ersetzt wird NUR im Text an die Zweitadresse: gespeichert, auf
+// der Seite, an Stripe und an die Kontoadresse (der Kunde selbst) geht die Erklaerung woertlich (§ 312k Abs. 4).
 const LINK = /\b(?:https?:\/\/|www\.)\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/\S*|\b(?:[a-z0-9-]+\.)+(?:com|de|net|org|io|ru|info|xyz|me|co|app|link|ly|to|eu|uk|biz|online|site|top|shop|click|gg|tk|cn|at|ch|nl|fr|it|pl|su|ws|cc|tv)\b/gi;
 export const LINK_ERSATZ = '[Link entfernt]';
-const freitext = (s, max) => ohneSteuer(ohneSteuer(s, max).replace(LINK, LINK_ERSATZ), max);
+export const ohneLinks = (s) => String(s || '').replace(LINK, LINK_ERSATZ);
 
 // Ende eines Kalendertags in deutscher Zeit (Mitternacht danach, Winter 23:00 UTC, Sommer 22:00 UTC). null bei einem
 // Tag, den es nicht gibt (31.02.).
@@ -219,7 +219,7 @@ export function pruefeEingabe(d, jetzt = Date.now()) {
     zeitpunkt = ms;
     tag = d.zeitpunkt;
   }
-  return { art, grund: freitext(d.grund, MAX_GRUND), name: freitext(d.name, MAX_NAME), email, zeitpunkt, tag };
+  return { art, grund: ohneSteuer(d.grund, MAX_GRUND), name: ohneSteuer(d.name, MAX_NAME), email, zeitpunkt, tag };
 }
 
 // Stripe: ein Tag NACH dem bezahlten Zeitraum wird cancel_at (Stripe rechnet den Rest anteilig ab), sonst
@@ -358,8 +358,10 @@ async function kuendige(k, { uid, email, weg, eingabe }) {
   let mail = false;
   if (an.length) {
     const m = mailKuendigung({ erklaerung });
+    const mZweit = mailKuendigung({ erklaerung: ohneLinks(erklaerung) });
     for (const [i, adresse] of an.entries()) {
-      const r = await sendeMail(f, umgebung, { an: adresse, betreff: m.betreff, text: m.text, idempotenz: `kuendigung-${z.zeile.abo}-${Math.floor(t / 60000)}-${i}` });
+      const text = adresse === zweit ? mZweit.text : m.text;
+      const r = await sendeMail(f, umgebung, { an: adresse, betreff: m.betreff, text, idempotenz: `kuendigung-${z.zeile.abo}-${Math.floor(t / 60000)}-${i}` });
       mail = mail || r.ok;
     }
   }

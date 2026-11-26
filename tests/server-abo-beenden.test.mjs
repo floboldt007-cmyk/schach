@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
   verarbeite, erstattungCent, sha256hex, WIDERRUF_MS, KULANZ_MS, TAG_MS, LINK_GUELTIG_MS,
-  pruefeEingabe, kuendigungsParameter, zeitText, datumText, MAX_GRUND,
+  pruefeEingabe, kuendigungsParameter, zeitText, datumText, ohneLinks,
 } from '../supabase/functions/_gemeinsam/abo-beenden.js';
 import { mailBereit, RESEND_API } from '../supabase/functions/_gemeinsam/mail.js';
 
@@ -201,16 +201,20 @@ const mails = (n) => zu(n, RESEND_API).map((a) => JSON.parse(a.body));
   // Kaltreview #296 (D): freie Zweitadresse plus freier Text war ein Mail-Relais. Bremse im eigenen Code, nie eine Ablehnung.
   const LINKS = 'Umzug, siehe https://boese.example/a?b=1 oder www.boese.example und boese.ru/pfad sowie HTTP://X.example';
   const vl = pruefeEingabe({ art: 'ausserordentlich', grund: LINKS, name: 'Erika www.boese.de' }, T0);
-  pruefe('Relais: Links in Grund und Name werden vor dem Speichern zu "[Link entfernt]"', vl && !/https?:|www\.|boese|x\.example/i.test(vl.grund + vl.name)
-    && (vl.grund.match(/\[Link entfernt\]/g) || []).length === 4 && vl.name === 'Erika [Link entfernt]' && /^Umzug, siehe /.test(vl.grund), vl);
+  pruefe('Erklaerung woertlich (§ 312k Abs. 4): Grund und Name bleiben im Original, auch mit Link', vl && vl.grund === LINKS && vl.name === 'Erika www.boese.de', vl);
+  pruefe('Relais: ohneLinks ersetzt http(s)://, www., domain.tld/pfad und domain.tld', ohneLinks(LINKS) === 'Umzug, siehe [Link entfernt] oder [Link entfernt] und [Link entfernt] sowie [Link entfernt]', ohneLinks(LINKS));
   const normal = 'Umzug ins Ausland, z. B. nach Wien. Danach 3.5 Monate weg';
-  pruefe('Relais: normaler Text bleibt (Abkuerzung, Zahl, Satzende)', pruefeEingabe({ grund: normal }, T0).grund === normal);
-  pruefe('Relais: Laenge bleibt begrenzt, auch mit Ersatztext', pruefeEingabe({ grund: 'www.a.de '.repeat(200) }, T0).grund.length <= MAX_GRUND);
+  pruefe('Relais: ohneLinks laesst normalen Text stehen (Abkuerzung, Zahl, Satzende)', ohneLinks(normal) === normal);
   const nl = netz({ rpc312k: 204 });
   const dl = json(await lauf(nl, { aktion: 'kuendigen', art: 'ausserordentlich', grund: LINKS, email: 'zweit@example.invalid' }));
-  pruefe('Relais: kein Link in Mail, Erklaerung, Stripe-Notiz und Nachweis', mails(nl).length === 2 && mails(nl).every((x) => !/boese|https?:|www\./i.test(x.text + x.subject))
-    && !/boese/.test(dl.erklaerung || '') && !/boese/.test(new URLSearchParams(zu(nl, 'api.stripe.com/v1/subscriptions/sub_Probe1')[0].body).get('cancellation_details[comment]') || '')
-    && !/boese/.test(rpcDaten(nl, 'abo_kuendigung_eintragen')[0].p_grund || ''), mails(nl).map((x) => x.text));
+  const anKonto = mails(nl).find((x) => x.to[0] === MAIL);
+  const anZweit = mails(nl).find((x) => x.to[0] === 'zweit@example.invalid');
+  pruefe('Erklaerung, Seite, Nachweis und Stripe-Notiz mit dem Grund im Original', (dl.erklaerung || '').includes(`Grund: ${LINKS}`)
+    && rpcDaten(nl, 'abo_kuendigung_eintragen')[0].p_grund === LINKS && rpcDaten(nl, 'abo_kuendigung_eintragen')[0].p_erklaerung === dl.erklaerung
+    && (new URLSearchParams(zu(nl, 'api.stripe.com/v1/subscriptions/sub_Probe1')[0].body).get('cancellation_details[comment]') || '').includes('https://boese.example/a'), dl.erklaerung);
+  pruefe('Kontoadress-Mail: volle Erklaerung mit Link (der Kunde selbst, kein Relais)', !!anKonto && anKonto.text.includes(`Grund: ${LINKS}`));
+  pruefe('Relais: Zweitadress-Mail ohne jeden Link, sonst gleich', !!anZweit && !/boese|https?:|www\./i.test(anZweit.text + anZweit.subject)
+    && anZweit.text.includes(`Grund: ${ohneLinks(LINKS)}`) && anZweit.subject === anKonto.subject, anZweit && anZweit.text);
   const zaehl = zu(nl, '/rest/v1/abo_vorgaenge?')[0];
   pruefe('Relais: Zaehlung je Konto ueber abo_vorgaenge.bestaetigung_an der letzten 24 Stunden', !!zaehl && zaehl.url.includes(`user_id=eq.${UID}`)
     && zaehl.url.includes('bestaetigung_an=not.is.null') && zaehl.url.includes(`erstellt_am=gte.${encodeURIComponent(new Date(T0 - TAG_MS).toISOString())}`), zaehl && zaehl.url);
