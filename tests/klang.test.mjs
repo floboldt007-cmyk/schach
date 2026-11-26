@@ -913,6 +913,49 @@ async function testeBrowser(browser) {
     }
     await k3.close();
   }
+
+  // R30 (26.11.2026): das Netz faellt MITTEN im Vorladen weg. Die Ohne-Netz-Pruefung lief nur am Anfang des Laufs, der mit
+  // Netz begonnene Lauf holte danach jede weitere Datei ins Leere (tests/offline-ladeprobe.test.mjs unter WebKit, 2 von 4
+  // gemessenen Laeufen rot, alle 25 Abrufe ohne Netz aus der vorladen-Schleife). Die ersten vier Abrufe werden festgehalten,
+  // bis das Netz weg ist; danach darf keine weitere Anfrage kommen, nichts gilt als fehlend, und wieder online laedt alles nach.
+  {
+    let netzDa = true;
+    let losgelassen = false;
+    const gehalten = [];
+    let nachAusfall = 0;
+    const { kontext: k5, seite: s5 } = await neueSeite(browser, { routen: [
+      ['**/assets/klang/arcade/*.mp3', (r) => {
+        if (!losgelassen) { gehalten.push(r); return; }
+        if (netzDa) return r.continue();
+        nachAusfall++;
+        return r.abort('internetdisconnected');
+      }],
+    ] });
+    await k5.addInitScript(() => {
+      window.__netz = true;
+      Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => window.__netz === true });
+    });
+    await s5.goto(BASIS + '#arena');
+    await s5.waitForSelector('.screen.arena');
+    await s5.evaluate(async () => { const { klang } = await import('./js/sounds.js'); klang.vorladen(); });
+    const t0 = Date.now();
+    while (gehalten.length < 4 && Date.now() - t0 < 10000) await warte(50);
+    await warte(300); // die Schleife startet vorab einen Abruf mehr als vier (starte(i + 4) vor dem ersten await)
+    netzDa = false;
+    await s5.evaluate(() => { window.__netz = false; window.dispatchEvent(new Event('offline')); });
+    losgelassen = true;
+    const vorAusfall = gehalten.length;
+    for (const r of gehalten.splice(0)) await r.continue();
+    const v5 = await warteDekodiert(s5, vorAusfall, 8000);
+    await warte(500);
+    pruefe('Netz faellt im Vorladen weg: danach keine Anfrage ins Leere', vorAusfall >= 4 && nachAusfall === 0, { nachAusfall, vorAusfall, v5 });
+    pruefe('Netz faellt im Vorladen weg: nichts als fehlend gemerkt', v5 && v5.fehlt === 0 && v5.dekodiert === vorAusfall, { vorAusfall, v5 });
+    netzDa = true;
+    await s5.evaluate(() => { window.__netz = true; window.dispatchEvent(new Event('online')); });
+    const v6 = await warteDekodiert(s5);
+    pruefe('Netz faellt im Vorladen weg, wieder online: alle 40 Dateien nachgeladen', v6.dekodiert === 40 && v6.fehlt === 0, v6);
+    await k5.close();
+  }
 }
 
 // =====================================================================

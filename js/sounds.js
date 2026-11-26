@@ -512,8 +512,18 @@ function vorladen() {
       offen = offen.filter((d, i) => da[i]);
     }
     const versprechen = [];
+    // R30 (26.11.2026): faellt das Netz MITTEN im Lauf weg, gilt ab da dieselbe Regel wie am Anfang (nur holen, was ein
+    // Cache hat). Sonst holte ein mit Netz begonnener Lauf jede weitere Datei ins Leere (offline-ladeprobe unter WebKit).
+    const holeHier = (adresse) => {
+      if (typeof navigator === 'undefined' || navigator.onLine !== false || typeof caches === 'undefined') return hole(adresse);
+      return imCache(adresse).then((da) => {
+        if (da) return hole(adresse);
+        ohneNetz(); // wieder online laedt nach; die Datei zaehlt unten nicht als fehlend
+        return null;
+      });
+    };
     const starte = (i) => {
-      if (i < offen.length && !versprechen[i]) versprechen[i] = hole(url(p, offen[i]));
+      if (i < offen.length && !versprechen[i]) versprechen[i] = holeHier(url(p, offen[i]));
     };
     for (let i = 0; i < 4; i++) starte(i);
     for (let i = 0; i < offen.length; i++) {
