@@ -1,0 +1,100 @@
+// Abo, Server-Seite (R31, 26.11.2026): fuehrt supabase/schema.sql, supabase/abo-schema.sql (zweimal: ein erneuter Lauf
+// ist erlaubt), supabase/abo-rls-test.sql, supabase/abo-beenden-schema.sql und supabase/abo-beenden-rls-test.sql
+// WIRKLICH aus, in PGlite (Postgres als WebAssembly, ohne Netz, ohne Supabase). Laeuft im CI-Job "sql"
+// (.github/workflows/tests.yml); lokal nur, wenn PGlite im Arbeitsbaum liegt (npm install --no-save --ignore-scripts)
+// oder PGLITE_PFAD auf eine installierte Fassung zeigt.
+//   node tests/server-abo-sql.test.mjs
+//
+// Anlass: Bis R31 fuehrte die CI die Abo-SQL nie aus (tests/server-abo.test.mjs prueft nur Text). Beim Sammeln von #203
+// und #79 hat git abo-schema.sql und abo-rls-test.sql still zusammengefuehrt, und der RLS-Test brach danach ab.
+//
+// WICHTIG: Die Auth-Attrappe bildet Supabase nur naeherungsweise nach (wie in tests/server-karte.test.mjs). service_role
+// bekommt bypassrls wie bei Supabase, sonst sieht ist_premium_von die Zeilen in abos nicht. Ein gruener Lauf hier
+// ersetzt NICHT den einmaligen Lauf von abo-rls-test.sql und abo-beenden-rls-test.sql im Supabase SQL Editor.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import path from 'node:path';
+
+const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const lies = (d) => readFileSync(path.join(WURZEL, d), 'utf8');
+let ok = 0;
+let gesamt = 0;
+function pruefe(name, bedingung, info) {
+  gesamt++;
+  if (bedingung) { ok++; console.log('ok     ' + name); } else console.log('FEHLER ' + name + (info !== undefined ? '  -> ' + info : ''));
+}
+
+let PGlite;
+try {
+  ({ PGlite } = await import(process.env.PGLITE_PFAD
+    ? pathToFileURL(path.join(process.env.PGLITE_PFAD, 'dist', 'index.js')).href
+    : '@electric-sql/pglite'));
+} catch (e) {
+  console.log('FEHLER PGlite fehlt (nur im CI-Job "sql" installiert): ' + e.message);
+  process.exit(1);
+}
+
+const ATTRAPPE = `
+create schema if not exists auth;
+create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb);
+create or replace function auth.uid() returns uuid language sql stable as $$
+  select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid;
+$$;
+create or replace function auth.role() returns text language sql stable as $$
+  select nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role';
+$$;
+create role anon nologin;
+create role authenticated nologin;
+create role service_role nologin bypassrls;
+grant usage on schema public, auth to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+`;
+
+// Fuehrt SQL aus; liefert { fehler } oder { letzte } (erste Zeile des letzten Ergebnisses mit Zeilen, als JSON)
+async function lauf(db, sql) {
+  try {
+    const r = await db.exec(sql);
+    const mitZeilen = r.filter((x) => x.rows && x.rows.length).pop();
+    return { letzte: mitZeilen ? JSON.stringify(mitZeilen.rows[0]) : '' };
+  } catch (e) {
+    // Ein abgebrochener RLS-Test laesst die Transaktion offen: zurueckrollen, damit die naechste Pruefung eigene Fehler meldet
+    try { await db.exec('rollback;'); } catch (f) { /* keine offene Transaktion */ }
+    return { fehler: e.message };
+  }
+}
+
+const db = new PGlite();
+pruefe('Auth-Attrappe angelegt', !(await lauf(db, ATTRAPPE)).fehler);
+for (const d of ['supabase/schema.sql', 'supabase/abo-schema.sql']) {
+  const r = await lauf(db, lies(d));
+  pruefe(d + ' laeuft', !r.fehler, r.fehler);
+}
+{
+  const r = await lauf(db, lies('supabase/abo-schema.sql'));
+  pruefe('abo-schema.sql laeuft ein zweites Mal (erneutes Einspielen ist erlaubt)', !r.fehler, r.fehler);
+}
+{
+  const r = await lauf(db, lies('supabase/abo-rls-test.sql'));
+  pruefe('abo-rls-test.sql meldet "Abo-RLS-Test erfolgreich" (Kaper-Fall, Erstattung, Rueckbuchung, RLS)',
+    !r.fehler && r.letzte.includes('Abo-RLS-Test erfolgreich'), r.fehler || r.letzte);
+}
+{
+  const r = await lauf(db, lies('supabase/abo-beenden-schema.sql'));
+  pruefe('abo-beenden-schema.sql laeuft (nach abo-schema.sql)', !r.fehler, r.fehler);
+}
+{
+  const r = await lauf(db, lies('supabase/abo-beenden-rls-test.sql'));
+  pruefe('abo-beenden-rls-test.sql meldet "Abo-Beenden-RLS-Test erfolgreich"',
+    !r.fehler && r.letzte.includes('Abo-Beenden-RLS-Test erfolgreich'), r.fehler || r.letzte);
+}
+{
+  // Die RLS-Tests rollen zurueck: Danach liegen keine Testzeilen in der Datenbank
+  const r = await lauf(db, 'select (select count(*) from public.abos) as abos, (select count(*) from auth.users) as nutzer;');
+  pruefe('nach den Tests keine Testzeilen uebrig (alles zurueckgerollt)', !r.fehler && r.letzte === '{"abos":0,"nutzer":0}', r.fehler || r.letzte);
+}
+
+console.log(`\n${ok}/${gesamt} bestanden`);
+process.exit(ok === gesamt ? 0 : 1);
