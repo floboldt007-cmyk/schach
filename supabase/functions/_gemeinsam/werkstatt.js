@@ -201,7 +201,7 @@ function fehler(status, kennung, extra = {}) {
   return antwort(status, { fehler: kennung, text: t.de, text_en: t.en, ...extra });
 }
 
-function bearer(kopf) {
+export function bearer(kopf) {
   const m = /^Bearer\s+([A-Za-z0-9._~+/=-]{20,4096})$/.exec(String(kopf || '').trim());
   return m ? m[1] : null;
 }
@@ -225,7 +225,7 @@ async function rpc(holen, basis, schluessel, name, daten) {
 
 // Ein Aufruf der Stripe-API (form-kodiert). wiederholen: Stripe hat nicht sicher geantwortet (Netz, 5xx, 429, 409 =
 // derselbe Key laeuft gerade, oder ein Idempotenz-Fehler), dann darf nichts freigegeben werden.
-async function stripeAufruf(holen, pfad, parameter, schluessel, idempotenz) {
+export async function stripeAufruf(holen, pfad, parameter, schluessel, idempotenz) {
   try {
     const r = await holen(`${STRIPE_API}${pfad}`, {
       method: 'POST',

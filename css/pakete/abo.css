@@ -24,6 +24,7 @@
 .trainer-kuendbar { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .trainer-karte .trainer-stand { margin-top: 12px; font-size: 15px; font-weight: 700; color: var(--text); }
 .trainer-karte .trainer-stand:empty { display: none; }
+.trainer-karte .trainer-frage { margin-top: 16px; font-size: 15px; font-weight: 700; color: var(--text); }
 .trainer-listen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; align-items: start; }
 .trainer-liste { padding: 12px 14px; border-radius: var(--r-l); background: var(--flaeche-2); border: 1px solid var(--linie); }
 .trainer-liste h4 { margin: 0 0 8px; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber);
@@ -76,3 +77,12 @@
   .premium-hinweis { flex-wrap: wrap; }
   .premium-hinweis .ph-mehr.knopf { width: 100%; }
 }
+
+/* Blatt "Verträge hier kündigen" / "Vertrag widerrufen" (js/pakete/abo/kuendigen.js) */
+.beenden-angaben { margin: 12px 0 0; padding: 12px 16px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px;
+  border-radius: var(--r-l); background: var(--flaeche-2); border: 1px solid var(--linie); }
+.beenden-angaben dt { font-size: 14px; color: var(--text-2); }
+.beenden-angaben dd { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.beenden-feld { display: grid; gap: 6px; margin-top: 12px; font-size: 14px; color: var(--text-2); }
+.beenden-feld input { font: inherit; font-size: 16px; padding: 10px 12px; border-radius: var(--r-l); color: var(--text);
+  background: var(--flaeche-2); border: 1px solid var(--linie-2); }

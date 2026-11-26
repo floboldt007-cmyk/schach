@@ -128,6 +128,8 @@ jobs:
         run: node tests/server-raetsel-duell-ki-sofort.test.mjs
       - name: Datenauskunft-SQL ausfuehren (alle Schemata, Vollstaendigkeit)
         run: node tests/server-daten.test.mjs
+      - name: Abo-SQL ausfuehren (Schema zweimal, Abo-RLS-Test mit Kaper-Fall und Erstattung, Kuendigen und Widerrufen)
+        run: node tests/server-abo-sql.test.mjs
       - run: node tests/server-saison.test.mjs
       - name: Zwei-Ligen-SQL ausfuehren (vorbereitet, nicht eingespielt; Umstieg, Paarung, Rueckweg)
         run: node tests/server-zwei-ligen.test.mjs

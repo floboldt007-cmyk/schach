@@ -7,6 +7,9 @@
 //                           Flo), weil man ohne Konto nichts abschliessen kann. Knopf oeffnet das Blatt. Sie zeichnet
 //                           neu bei "abo:stand" und wenn sich die Anmeldung aendert (Abmelden in der Gruppe Konto,
 //                           Anmelden, Abmelden in einem anderen Tab); nach dem Abmelden raeumt sie den Abo-Stand weg.
+//                           Zweiter Knopf "Verträge hier kündigen" oeffnet ./kuendigen.js (Pflichtknopf, § 312k BGB).
+//   #kuendigen[=Token]      Adresse beim Start (Impressum-Link bzw. Link aus der Kuendigungs-Mail): oeffnet bei
+//                           app:bereit das Kuendigen-Blatt, auch ohne Anmeldung.
 //   app:bereit, app:sichtbar   nach einem Kauf (Stripe im neuen Fenster) fragt das Paket beim Zurueckkommen und beim
 //                           naechsten Start neu nach dem Premium-Stand, und zwar als Serie mit Pausen (bestaetigeKauf in
 //                           js/abo.js: sofort, nach 3, 10 und 30 s), solange der Kauf hoechstens NACH_KAUF_MS alt ist.
@@ -47,7 +50,8 @@ export function aboGruppe({ app } = {}) {
   el.innerHTML = `<h3 class="es-titel" id="es-g-abo">Crownmate Trainer</h3>
     <p class="abo-stand" aria-live="polite"></p>
     <p class="es-hilfe">${esc(A('gruppe'))}</p>
-    <div class="es-knoepfe"><button class="knopf dr" type="button" data-abo="zeigen"></button></div>`;
+    <div class="es-knoepfe"><button class="knopf dr" type="button" data-abo="zeigen"></button>
+      <button class="knopf dr" type="button" data-abo="kuendigen">${esc(A('kuendigenKnopf'))}</button></div>`;
   let weg = false;
   const render = () => {
     if (weg) return;
@@ -56,7 +60,10 @@ export function aboGruppe({ app } = {}) {
     el.querySelector('[data-abo="zeigen"]').textContent = st.premium ? A('mein') : A('mehr');
     el.querySelector('.abo-stand').textContent = gruppenText(st);
   };
-  el.addEventListener('click', (e) => { if (e.target.closest('[data-abo="zeigen"]')) zeigeTrainer({ app }); });
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-abo="zeigen"]')) zeigeTrainer({ app });
+    else if (e.target.closest('[data-abo="kuendigen"]')) oeffneBeenden({ aktion: 'kuendigen' });
+  });
   const neu = () => render();
   document.addEventListener('abo:stand', neu);
   // Anmeldung geaendert (js/konto.js zeichnet nur die eigene Gruppe neu und meldet nichts): an jeder DOM-Aenderung
@@ -86,6 +93,20 @@ export function aboGruppe({ app } = {}) {
   };
 }
 
+// Blatt "Verträge hier kündigen" erst bei Bedarf laden (Pflichtknopf, § 312k BGB)
+export function oeffneBeenden(wunsch) {
+  return import('./kuendigen.js').then((m) => m.zeigeBeenden(wunsch)).catch((f) => { console.error('Kündigen-Blatt nicht geladen', f); return null; });
+}
+
+// Einstieg ueber die Adresse: "#kuendigen" (Impressum, ohne Anmeldung) oder "#kuendigen=<Token>" (Link aus der Mail).
+// Beim Laden des Pakets merken, weil das Routing die Adresse danach umschreiben kann; geoeffnet wird bei app:bereit.
+export function kuendigenAusAdresse(hash) {
+  const m = /^#kuendigen(?:=([0-9a-f]{64}))?$/.exec(String(hash || ''));
+  return m ? { aktion: 'kuendigen', token: m[1] || '' } : null;
+}
+let beendenWunsch = null;
+try { beendenWunsch = typeof location !== 'undefined' ? kuendigenAusAdresse(location.hash) : null; } catch (e) { beendenWunsch = null; }
+
 // Nach der Rueckkehr von Stripe (und beim naechsten Start): Serie von Nachfragen, siehe bestaetigeKauf in js/abo.js
 export function pruefeNachKauf() {
   try { return bestaetigeKauf(); } catch (e) { return Promise.resolve(false); }
@@ -94,7 +115,10 @@ export function pruefeNachKauf() {
 try {
   anbieten('einstellungen:gruppen', aboGruppe, { reihenfolge: 7, paket: 'abo' });
   if (typeof document !== 'undefined') document.addEventListener('abo:stand', (e) => { if (e.detail && e.detail.bestaetigt) toast(A('danke')); });
-  hoere('app:bereit', () => { aufraeumen(); pruefeNachKauf(); });
+  hoere('app:bereit', () => {
+    aufraeumen(); pruefeNachKauf();
+    if (beendenWunsch) { const w = beendenWunsch; beendenWunsch = null; oeffneBeenden(w); }
+  });
   hoere('app:sichtbar', (d) => { if (d && d.sichtbar) pruefeNachKauf(); });
 } catch (e) {
   console.error('Paket abo nicht eingehaengt', e);

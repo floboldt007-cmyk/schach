@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import {
   TOLERANZ_S, MAX_KOERPER, VORLAEUFIG_S, TYPEN, leseSignaturKopf, hmacSha256Hex, gleichZeitkonstant, pruefeSignatur,
-  auswerten, planVon, dienstKopf, verarbeite,
+  auswerten, planVon, dienstKopf, verarbeite, META_ABO_NUTZER, erlaubtePreise, preiseVonAbo, preiseVonRechnung,
 } from '../supabase/functions/_gemeinsam/stripe.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -71,10 +71,11 @@ pruefe('HMAC-SHA256: RFC 4231 Testfall 2 ("Jefe")', await hmacSha256Hex('Jefe', 
 const iso = (s) => new Date(s * 1000).toISOString();
 const ereignis = (type, object, extra = {}) => ({ id: 'evt_1Test' + type.replace(/[^a-z]/g, '').slice(0, 20), object: 'event', type, created: T0, data: { object }, ...extra });
 const kauf = (o = {}) => ereignis('checkout.session.completed', { id: 'cs_test_1', object: 'checkout.session', mode: 'subscription', payment_status: 'paid',
-  status: 'complete', customer: 'cus_Probe1', subscription: 'sub_Probe1', client_reference_id: UID, customer_details: { email: 'privat@example.invalid' }, ...o });
+  status: 'complete', customer: 'cus_Probe1', subscription: 'sub_Probe1', client_reference_id: UID, metadata: { [META_ABO_NUTZER]: UID },
+  customer_details: { email: 'privat@example.invalid' }, ...o });
 {
   const a = auswerten(kauf());
-  pruefe('Kauf bezahlt: Nutzer aus client_reference_id, vorlaeufig 1 Tag aktiv', a.daten && a.daten.nutzer === UID && a.daten.status === 'aktiv'
+  pruefe('Kauf bezahlt: Nutzer aus den Metadaten der Kasse, vorlaeufig 1 Tag aktiv', a.daten && a.daten.nutzer === UID && a.daten.status === 'aktiv'
     && a.daten.gueltig_bis === iso(T0 + VORLAEUFIG_S) && VORLAEUFIG_S === 86400 && a.daten.kunde_id === 'cus_Probe1' && a.daten.abo_id === 'sub_Probe1'
     && a.daten.erstellt === iso(T0) && a.daten.typ === 'checkout.session.completed' && a.daten.plan === null, a);
   pruefe('Kauf: keine E-Mail und keine Kundendaten in den Daten fuer die Datenbank', !JSON.stringify(a).includes('example.invalid'));
@@ -82,9 +83,16 @@ const kauf = (o = {}) => ereignis('checkout.session.completed', { id: 'cs_test_1
   pruefe('Kauf noch nicht bezahlt (Lastschrift): Zuordnung ja, Premium erst mit der Rechnung', ohne.daten && ohne.daten.status === 'abgelaufen'
     && ohne.daten.gueltig_bis === iso(T0) && ohne.daten.nutzer === UID);
   pruefe('Kauf ohne Abo (Einmalzahlung) wird ignoriert', auswerten(kauf({ mode: 'payment' })).ignoriert === 'kein_abo');
-  pruefe('Kauf mit fremder oder fehlender client_reference_id: nutzer null (Server meldet ohne_nutzer)',
-    auswerten(kauf({ client_reference_id: 'flo' })).daten.nutzer === null && auswerten(kauf({ client_reference_id: null })).daten.nutzer === null
-    && auswerten(kauf({ client_reference_id: UID.toUpperCase() })).daten.nutzer === UID);
+  pruefe('Kauf mit kaputter oder fehlender Nutzer-ID in den Metadaten: nutzer null (Server meldet ohne_nutzer)',
+    auswerten(kauf({ metadata: { [META_ABO_NUTZER]: 'flo' } })).daten.nutzer === null && auswerten(kauf({ metadata: null })).daten.nutzer === null
+    && auswerten(kauf({ metadata: [UID] })).daten.nutzer === null
+    && auswerten(kauf({ metadata: { [META_ABO_NUTZER]: UID.toUpperCase() } })).daten.nutzer === UID);
+  // Code-Check 05.11.2026, Fund 1: client_reference_id haengt jeder an einen oeffentlichen Zahlungslink
+  const FREMD = '11111111-2222-4333-8444-555555555555';
+  pruefe('Angriff: nur client_reference_id (alter Zahlungslink, fremde ID) ordnet nichts zu',
+    auswerten(kauf({ client_reference_id: FREMD, metadata: {} })).daten.nutzer === null
+    && auswerten(kauf({ client_reference_id: FREMD, metadata: { [META_ABO_NUTZER]: UID } })).daten.nutzer === UID
+    && META_ABO_NUTZER === 'crownmate_abo_nutzer');
   pruefe('erweiterte Verweise (Objekte mit id) werden gelesen', auswerten(kauf({ customer: { id: 'cus_Obj1' }, subscription: { id: 'sub_Obj1' } })).daten.abo_id === 'sub_Obj1');
   pruefe('Kunde fehlt oder ist kaputt -> ignoriert', auswerten(kauf({ customer: null })).ignoriert === 'kein_kunde'
     && auswerten(kauf({ customer: 'cus_; drop table' })).ignoriert === 'kein_kunde');
@@ -129,11 +137,87 @@ const abo = (o = {}) => ({ id: 'sub_Probe1', object: 'subscription', customer: '
   pruefe('Rechnung ohne Abo (Einzelrechnung) -> ignoriert', auswerten(ereignis('invoice.paid', { customer: 'cus_Probe1', lines: { data: zeilen } })).ignoriert === 'kein_abo');
   pruefe('Rechnung ohne Periode -> ignoriert', auswerten(ereignis('invoice.paid', { customer: 'cus_Probe1', subscription: 'sub_Probe1', lines: { data: [] } })).ignoriert === 'keine_periode');
 }
-pruefe('andere Typen, kaputte Ereignisse -> ignoriert', auswerten(ereignis('charge.refunded', {})).ignoriert === 'typ'
-  && auswerten(null).ignoriert === 'form' && auswerten([]).ignoriert === 'form' && auswerten({ ...kauf(), id: 'falsch' }).ignoriert === 'form'
+// ---------------------------------------------------------------------------
+// Produktpruefung (Audit 09.11.2026, Befund M4): nur der Trainer gibt Premium
+// ---------------------------------------------------------------------------
+{
+  const NUR = erlaubtePreise({ ABO_STRIPE_PLAN: 'trainer-monat, trainer-jahr', ABO_STRIPE_PREIS: 'price_Trainer1' });
+  pruefe('erlaubtePreise: Lookup-Keys und Preis-ID aus den Secrets, ohne Doppelte und ohne Unsinn',
+    JSON.stringify(NUR) === JSON.stringify(['trainer-monat', 'trainer-jahr', 'price_Trainer1'])
+    && erlaubtePreise({}).length === 0 && erlaubtePreise().length === 0 && erlaubtePreise({ ABO_STRIPE_PLAN: ' , ;' }).length === 0
+    && JSON.stringify(erlaubtePreise({ ABO_STRIPE_PLAN: 'a b;a', ABO_STRIPE_PREIS: 'boese<script>' })) === JSON.stringify(['a', 'b']));
+  const mitPreis = (price) => abo({ items: { data: [{ id: 'si_1', current_period_end: T0 + 30 * 86400, price }] } });
+  const trainer = mitPreis({ id: 'price_Anders', lookup_key: 'trainer-monat', recurring: { interval: 'month', interval_count: 1 } });
+  const perId = mitPreis({ id: 'price_Trainer1', lookup_key: null, recurring: { interval: 'month', interval_count: 1 } });
+  const fremd = mitPreis({ id: 'price_Fremd9', lookup_key: 'anderes-produkt', recurring: { interval: 'month', interval_count: 1 } });
+  pruefe('preiseVonAbo: ID und Lookup-Key je Position, auch aeltere Form (plan)', JSON.stringify(preiseVonAbo(trainer)) === JSON.stringify([{ id: 'price_Anders', schluessel: 'trainer-monat' }])
+    && JSON.stringify(preiseVonAbo({ plan: { id: 'price_Alt1' }, items: { data: [] } })) === JSON.stringify([{ id: 'price_Alt1', schluessel: null }])
+    && preiseVonAbo(null).length === 0);
+  pruefe('Trainer-Abo zaehlt: ueber den Lookup-Key und ueber die Preis-ID', auswerten(ereignis('customer.subscription.updated', trainer), NUR).daten.status === 'aktiv'
+    && auswerten(ereignis('customer.subscription.created', perId), NUR).daten.status === 'aktiv');
+  const f1 = auswerten(ereignis('customer.subscription.updated', fremd), NUR);
+  const f2 = auswerten(ereignis('customer.subscription.created', fremd), NUR);
+  const f3 = auswerten(ereignis('customer.subscription.deleted', { ...fremd, status: 'canceled' }), NUR);
+  pruefe('Falsches Produkt: ein anderes Abo im selben Stripe-Konto gibt kein Premium (und nimmt keins weg)',
+    f1.ignoriert === 'fremdes_produkt' && f2.ignoriert === 'fremdes_produkt' && f3.ignoriert === 'fremdes_produkt' && !f1.daten, { f1, f2, f3 });
+  pruefe('Falsches Produkt: Abo ohne erkennbaren Preis zaehlt mit Pruefung als fremd', auswerten(ereignis('customer.subscription.updated',
+    abo({ current_period_end: T0 + 86400, items: { data: [] } })), NUR).ignoriert === 'fremdes_produkt');
+  pruefe('ohne Secrets keine Pruefung (Stand vor dem Einspielen): das fremde Abo wird wie bisher verbucht',
+    auswerten(ereignis('customer.subscription.updated', fremd)).daten.status === 'aktiv'
+    && auswerten(ereignis('customer.subscription.updated', fremd), []).daten.status === 'aktiv');
+  const rechnung = (zeile) => ereignis('invoice.paid', { id: 'in_9', object: 'invoice', customer: 'cus_Probe1', subscription: 'sub_Probe1',
+    lines: { data: [{ period: { start: T0, end: T0 + 30 * 86400 }, ...zeile }] } });
+  pruefe('preiseVonRechnung: alte Form (price an der Zeile) und neue Form (pricing.price_details.price)',
+    JSON.stringify(preiseVonRechnung(rechnung({ price: { id: 'price_Trainer1', lookup_key: 'trainer-monat' } }).data.object)) === JSON.stringify([{ id: 'price_Trainer1', schluessel: 'trainer-monat' }])
+    && JSON.stringify(preiseVonRechnung(rechnung({ pricing: { price_details: { price: 'price_Trainer1', product: 'prod_1' } } }).data.object)) === JSON.stringify([{ id: 'price_Trainer1', schluessel: null }]));
+  pruefe('Rechnung des Trainers verlaengert (alte und neue Form), Rechnung eines fremden Produkts nicht',
+    auswerten(rechnung({ price: { id: 'price_X', lookup_key: 'trainer-jahr' } }), NUR).daten.status === 'aktiv'
+    && auswerten(rechnung({ pricing: { price_details: { price: 'price_Trainer1' } } }), NUR).daten.status === 'aktiv'
+    && auswerten(rechnung({ price: { id: 'price_Fremd9', lookup_key: 'anderes-produkt' } }), NUR).ignoriert === 'fremdes_produkt'
+    && auswerten(rechnung({ pricing: { price_details: { price: 'price_Fremd9' } } }), NUR).ignoriert === 'fremdes_produkt'
+    && auswerten(rechnung({}), NUR).ignoriert === 'fremdes_produkt' && auswerten(rechnung({})).daten.status === 'aktiv');
+  pruefe('der Kauf selbst traegt keinen Preis: Er ordnet nur zu, Premium ueber den Tag hinaus bringt erst das gepruefte Abo-Ereignis',
+    auswerten(kauf(), NUR).daten.nutzer === UID && VORLAEUFIG_S === 86400);
+  // Ende zu Ende durch verarbeite(): mit Secret keine Datenbank fuer das fremde Abo, ohne Secret wie bisher
+  const UMG = { STRIPE_WEBHOOK_SECRET: GEHEIM, SUPABASE_URL: 'https://probe.supabase.example', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_probe' };
+  const aufrufe = [];
+  const f = async (url, opt) => { aufrufe.push({ url, ...opt }); return { ok: true, status: 200, async json() { return 'neu'; } }; };
+  const sende = (e, umg) => { const k = JSON.stringify(e); return verarbeite({ methode: 'POST', koerper: k, signatur: signiere(k, T0, GEHEIM) }, umg, { fetch: f, jetzt: T0 }); };
+  const r1 = await sende(ereignis('customer.subscription.updated', fremd), { ...UMG, ABO_STRIPE_PLAN: 'trainer-monat' });
+  const nachFremd = aufrufe.length;
+  const r2 = await sende(ereignis('customer.subscription.updated', trainer), { ...UMG, ABO_STRIPE_PLAN: 'trainer-monat' });
+  const nachTrainer = aufrufe.length;
+  await sende(ereignis('customer.subscription.updated', fremd), UMG);
+  pruefe('verarbeite: fremdes Produkt -> 200 "fremdes_produkt" ohne Datenbank; Trainer -> verbucht; ohne Secret unveraendert',
+    r1.status === 200 && JSON.parse(r1.koerper).ignoriert === 'fremdes_produkt' && nachFremd === 0
+    && r2.status === 200 && nachTrainer === 1 && JSON.parse(aufrufe[0].body).plan === 'trainer-monat' && aufrufe.length === 2, { r1, nachFremd, nachTrainer });
+}
+
+{
+  const charge = (o = {}) => ({ id: 'ch_Probe1', object: 'charge', customer: 'cus_Probe1', amount: 1000,
+    amount_refunded: 1000, refunded: true, metadata: { subscription_id: 'sub_Probe1' }, ...o });
+  const erstattung = auswerten(ereignis('charge.refunded', charge()));
+  pruefe('volle Erstattung beendet Premium sofort und ordnet Kunde sowie Abo zu', erstattung.daten
+    && erstattung.daten.status === 'abgelaufen' && erstattung.daten.gueltig_bis === iso(T0)
+    && erstattung.daten.kunde_id === 'cus_Probe1' && erstattung.daten.abo_id === 'sub_Probe1', erstattung);
+  pruefe('Teil-Erstattung entzieht Premium nicht', auswerten(ereignis('charge.refunded', charge({ refunded: false, amount_refunded: 400 }))).ignoriert === 'teil_erstattung');
+  const offen = auswerten(ereignis('charge.dispute.created', { id: 'dp_1', object: 'dispute', charge: charge() }));
+  const gewonnen = auswerten(ereignis('charge.dispute.closed', { id: 'dp_1', object: 'dispute', status: 'won', charge: charge() }));
+  const verloren = auswerten(ereignis('charge.dispute.closed', { id: 'dp_1', object: 'dispute', status: 'lost', charge: charge() }));
+  pruefe('Rueckbuchung offen, gewonnen und verloren werden getrennt abgebildet', offen.daten.status === 'strittig'
+    && gewonnen.daten.status === 'wiederherstellen' && verloren.daten.status === 'abgelaufen'
+    && [offen, gewonnen, verloren].every((x) => x.daten.abo_id === 'sub_Probe1'));
+  pruefe('Rueckbuchung ohne sicheren Abo-Bezug wird abgelehnt', auswerten(ereignis('charge.dispute.created', {
+    id: 'dp_2', object: 'dispute', charge: charge({ metadata: {} }),
+  })).ignoriert === 'kein_abo');
+  pruefe('fremder oder ungueltiger Kunde wird abgelehnt', auswerten(ereignis('charge.refunded', charge({ customer: 'cus fremd' }))).ignoriert === 'kein_kunde');
+}
+pruefe('kaputte Ereignisse -> ignoriert',
+  auswerten(null).ignoriert === 'form' && auswerten([]).ignoriert === 'form' && auswerten({ ...kauf(), id: 'falsch' }).ignoriert === 'form'
   && auswerten({ ...kauf(), created: 'gestern' }).ignoriert === 'form' && auswerten({ ...kauf(), data: null }).ignoriert === 'form');
-pruefe('TYPEN: genau die fuenf aus dem Auftrag (plus subscription.created)', JSON.stringify(TYPEN) === JSON.stringify(['checkout.session.completed',
-  'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid']) && Object.isFrozen(TYPEN));
+pruefe('TYPEN: Abo-, Erstattungs- und Rueckbuchungsereignisse', JSON.stringify(TYPEN) === JSON.stringify(['checkout.session.completed',
+  'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid',
+  'charge.refunded', 'charge.dispute.created', 'charge.dispute.closed']) && Object.isFrozen(TYPEN));
 
 // ---------------------------------------------------------------------------
 // verarbeite() mit gefaelschtem fetch
@@ -179,7 +263,7 @@ const json = (r) => JSON.parse(r.koerper);
   const r4 = await verarbeite(anfrage(null, { koerper: '{kaputt' }), UMGEBUNG, { fetch: f, jetzt: T0 });
   pruefe('signiert, aber kein JSON: 400', r4.status === 400 && f.aufrufe.length === 0);
   const r5 = await verarbeite(anfrage(ereignis('charge.refunded', { customer: 'cus_Probe1' })), UMGEBUNG, { fetch: f, jetzt: T0 });
-  pruefe('anderer Ereignistyp: 200 ignoriert (Stripe soll nicht wiederholen), keine Datenbank', r5.status === 200 && json(r5).ignoriert === 'typ' && f.aufrufe.length === 0);
+  pruefe('unvollstaendige Erstattung: 200 ignoriert (Stripe soll nicht wiederholen), keine Datenbank', r5.status === 200 && json(r5).ignoriert === 'teil_erstattung' && f.aufrufe.length === 0);
   const r6 = await verarbeite({ ...anfrage(kauf()), methode: 'GET' }, UMGEBUNG, { fetch: f, jetzt: T0 });
   pruefe('GET: 405', r6.status === 405);
   const r7 = await verarbeite(anfrage(kauf()), { ...UMGEBUNG, STRIPE_WEBHOOK_SECRET: '' }, { fetch: f, jetzt: T0 });
@@ -209,7 +293,7 @@ const json = (r) => JSON.parse(r.koerper);
   const ts = lies('supabase/functions/stripe-webhook/index.ts');
   pruefe('index.ts: nur die Huelle (importiert verarbeite aus _gemeinsam, liest stripe-signature und die drei Secrets aus Deno.env)',
     /import \{ verarbeite \} from '\.\.\/_gemeinsam\/stripe\.js';/.test(ts) && /headers\.get\('stripe-signature'\)/.test(ts)
-    && ['STRIPE_WEBHOOK_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'].every((k) => ts.includes(`Deno.env.get('${k}')`))
+    && ['STRIPE_WEBHOOK_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'ABO_STRIPE_PLAN', 'ABO_STRIPE_PREIS'].every((k) => ts.includes(`Deno.env.get('${k}')`))
     && (ts.match(/^import /gm) || []).length === 1 && ts.split('\n').length < 40);
   if (process.features && process.features.typescript) {
     const env = { STRIPE_WEBHOOK_SECRET: GEHEIM, SUPABASE_URL: 'https://probe.supabase.example', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_probe' };
@@ -289,13 +373,37 @@ const json = (r) => JSON.parse(r.koerper);
     && !/grant execute on function public\.abo_hole_nach/.test(ohneKommentar)
     && !/function public\.abo_hole_nach[^$]*security definer/.test(ohneKommentar));
   const test = lies('supabase/abo-rls-test.sql');
+  // Kaper-Fall (Audit 09.11.2026, Befund M4): Vertrag zwischen Schema, SQL-Test und Anleitung
+  const schemaM4 = lies('supabase/abo-schema.sql');
+  const kaufTeil = schemaM4.slice(schemaM4.indexOf("if v_typ = 'checkout.session.completed' then"), schemaM4.indexOf("select t.user_id into v_ziel from public.abos t where t.kunde_id = v_kunde for update;"));
+  pruefe('Schema: ein Kauf prueft VOR dem Zuordnen, ob das Konto ein laufendes Abo eines anderen Stripe-Kunden hat (konflikt)',
+    /select \* into v_alt from public\.abos t where t\.user_id = v_nutzer for update;/.test(kaufTeil)
+    && /v_alt\.kunde_id <> v_kunde\s+and \(v_alt\.status = 'strittig' or \(v_alt\.status in \('aktiv', 'gekuendigt'\) and v_alt\.gueltig_bis > now\(\)\)\) then\s+v_ergebnis := 'konflikt';/.test(kaufTeil)
+    && kaufTeil.indexOf("v_ergebnis := 'konflikt'") < kaufTeil.indexOf('insert into public.abos as t') && kaufTeil.indexOf("v_ergebnis := 'konflikt'") > 0);
+  pruefe('abo-rls-test.sql: Kaper-Fall als Fall (fremder Kauf -> konflikt, Zeile unberuehrt, echte Ereignisse kommen an)',
+    /'evt_k1'[\s\S]{0,400}'cus_KAPER'/.test(test) && test.includes("r <> 'konflikt'") && test.includes("'evt_k4', 'invoice.paid'")
+    && test.includes('zweiter Kauf desselben Kunden als Konflikt behandelt') && test.includes('Neukauf nach dem Ende des alten Abos nicht zugeordnet'));
+  const anl = lies('supabase/ANLEITUNG.md');
+  pruefe('ANLEITUNG: Block zum Einspielen mit Rueckweg (konflikt, ABO_STRIPE_PLAN), Kuendigen ueber abo-beenden', anl.includes('ABO_STRIPE_PLAN') && anl.includes("'konflikt'")
+    && /Rückweg/.test(anl) && anl.includes('abo-beenden') && !anl.includes('abo-kuendigen'));
   pruefe('abo-rls-test.sql: Kauf ohne Nutzer, Handzeile und abo_hole_nach als Fall', /abo_hole_nach\('cus_X1'\)/.test(test) && test.includes('ABO_KUNDE_UNBEKANNT'));
+  pruefe('Erstattung/Rueckbuchung: Schema erlaubt alle Typen, Streit ist nicht Premium und die RLS-Probe prueft den Ablauf',
+    ['charge.refunded', 'charge.dispute.created', 'charge.dispute.closed'].every((typ) => sql.includes(`'${typ}'`) && test.includes(`'${typ}'`))
+    && /status in \('aktiv', 'gekuendigt', 'abgelaufen', 'strittig'\)/.test(sql)
+    && !/(?<![\w.])t\.status in \([^)]*strittig/.test(ohneKommentar));   // Premium (Alias t) nie bei Streit; v_alt im Kaper-Schutz schon
+  pruefe('Konto-Loeschung: Before-Delete-Trigger entfernt Ereignisse samt Stripe-Kennungen, RLS-Probe loescht den Nutzer',
+    /before delete on public\.abos\s+for each row execute function public\.loesche_stripe_kennungen_vor_abo\(\);/.test(ohneKommentar)
+    && /delete from public\.stripe_ereignisse/.test(ohneKommentar)
+    && /delete from auth\.users where id = 'c3333333/.test(test)
+    && test.includes('Stripe-Kennungen des geloeschten Kontos sind geblieben'));
   pruefe('abo-rls-test.sql: in einer Transaktion, rollt zurueck, meldet Erfolg', /^begin;/m.test(test) && /rollback;\s*$/.test(test) && test.includes("'Abo-RLS-Test erfolgreich'"));
 }
 {
   // Keine Geheimnisse und keine Preise in den Dateien des Abos (oeffentliches Repo)
   const dateien = ['supabase/abo-schema.sql', 'supabase/abo-rls-test.sql', 'supabase/functions/_gemeinsam/stripe.js', 'supabase/functions/stripe-webhook/index.ts',
-    'js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'css/pakete/abo.css', 'supabase/ANLEITUNG.md'];
+    'js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'css/pakete/abo.css', 'supabase/ANLEITUNG.md',
+    'supabase/functions/_gemeinsam/abo-kasse.js', 'supabase/functions/abo-kasse/index.ts',
+    'js/pakete/abo/kuendigen.js', 'js/pakete/abo/texte.js', 'supabase/functions/_gemeinsam/abo-beenden.js', 'supabase/functions/abo-beenden/index.ts'];
   const GEHEIM_RE = /(sk|rk)_(live|test)_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9]{12,}|sb_secret_[A-Za-z0-9_-]{12,}|eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}/;
   const PREIS_RE = /\d+(?:[.,]\d{1,2})?\s*(?:€|EUR\b|Euro\b)|€\s*\d/;
   const geheim = [];

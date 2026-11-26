@@ -2157,7 +2157,9 @@ wer Premium hat, wie man abschließt und kündigt. Was Premium freischaltet, ent
 „Frag den Coach“) über `istPremium()` bzw. auf dem Server über `ist_premium_von(uid)`. Einrichtung für Flo:
 `supabase/ANLEITUNG.md`, Abschnitt „Abo mit Stripe“.
 
-**Datenfluss:** App `kaufen()` öffnet Flos Stripe-Zahlungslink mit `client_reference_id=<Supabase-Nutzer-ID>` →
+**Datenfluss:** App `kaufen()` ruft mit dem Anmelde-Token die Edge Function `abo-kasse` auf; die legt die
+Stripe-Bezahlseite an und schreibt die Nutzer-ID aus der Anmeldung in `metadata.crownmate_abo_nutzer`
+(`client_reference_id` wird nicht mehr gelesen, seit November 2026) → die App öffnet diese Seite →
 Stripe ruft die Edge Function `stripe-webhook` auf → sie prüft die Signatur und ruft mit dem Service-Schlüssel
 `rpc/abo_stripe_ereignis` → Tabelle `abos`. Die App fragt `rpc/ist_premium` und die eigene `abos`-Zeile.
 
@@ -2183,6 +2185,12 @@ mehrere Ereignisse mit demselben `created` in zufälliger Reihenfolge); der Kauf
   Funktion `pg_advisory_xact_lock(hashtextextended('abo:' || kunde_id, 0))`, alle Ereignisse eines Kunden laufen also
   nacheinander (sonst blieb ein Abo-Ereignis, das parallel zum Kauf ankam, für immer auf 'wartet'; nachgestellt mit zwei
   psql-Sitzungen gegen Postgres 16).
+- **Kein Umhängen (Audit 09.11.2026, M4, aus PR #203):** Ein Kauf für ein Konto, dessen Abo läuft (`aktiv`/`gekuendigt`,
+  `gueltig_bis` in der Zukunft) und an einem **anderen** `kunde_id` hängt, liefert `'konflikt'` und ändert `abos` nicht;
+  die Ereignisse des fremden Kunden bleiben `wartet`. Handzeilen ohne `kunde_id` und abgelaufene Abos übernimmt ein Kauf
+  wie bisher. **Produktprüfung:** `auswerten(ereignis, erlaubt)` verwirft Abo-Ereignisse und Rechnungen, deren Preis
+  nicht in `erlaubtePreise(umgebung)` steht (`ABO_STRIPE_PLAN` = Lookup-Keys, `ABO_STRIPE_PREIS` = Preis-ID; leer =
+  keine Prüfung), mit `{ ignoriert: 'fremdes_produkt' }`.
 - `abo_hole_nach(kunde, abo)` (nur Besitzer: der Kauf ruft es, Flo im SQL Editor nach einer Handzeile für einen Kauf
   `ohne_nutzer`) wendet wartende Ereignisse des Kunden an und liefert ihre Anzahl; Fehler `ABO_KUNDE_UNBEKANNT`, wenn
   keine Zeile in `abos` diese `kunde_id` trägt.
@@ -2200,8 +2208,8 @@ incomplete, paused …) → abgelaufen ab dem Ereignis, deleted → abgelaufen. 
 
 **Client** `js/abo.js` (Muster `js/konto.js`, nur fetch, `setzeAboFetch`/`setzeAboUhr` für Tests):
 `istPremium({ neu })` (Abgleich höchstens alle 10 min, offline der letzte Stand bis `gueltig_bis`, nur für dieselbe
-Nutzer-ID), `premiumStand()` (synchron), `ladeProdukt()` (öffentlich, 1 h Zwischenspeicher), `kaufAdresse`, `kaufen()`
-(öffnet das Fenster ohne vorheriges await, merkt den Kauf; Grund `'alter'`, solange die Altersfrage nicht mit „18 oder
+Nutzer-ID), `premiumStand()` (synchron), `ladeProdukt()` (öffentlich, 1 h Zwischenspeicher), `kaufen()`
+(öffnet das Fenster ohne vorheriges await, holt die Bezahlseite von `abo-kasse`, merkt den Kauf; Grund `'alter'`, solange die Altersfrage nicht mit „18 oder
 älter“ beantwortet ist), `verwalten()` (Kundenportal), `inStoreHuelle()` (Capacitor: kein Kauf und kein Portal über
 Stripe, Apple 3.1.1), `oeffneTrainer()`, **`premiumHinweis(el, was, { app })`** für andere Pakete: ruhige Karte
 `div.premium-hinweis[data-premium]` mit „Mehr zum Trainer“; auf den Screens `OHNE_HINWEIS_SCREENS` (`partie`, also auch

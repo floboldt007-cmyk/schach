@@ -157,6 +157,7 @@ export function zeigeTrainer({ app = null } = {}) {
       <ul class="trainer-zusagen">${ZUSAGEN.map((_, i) => li(A('zusagen.' + i))).join('')}</ul>
       <p class="trainer-alter">${esc(A('alterHinweis'))}</p>
       <p class="trainer-test" hidden>${esc(A('test'))}</p>
+      <p class="trainer-frage" aria-live="polite" hidden></p>
       <div class="trainer-knoepfe"></div>
     </div>`;
   const karte = ort.querySelector('.trainer-karte');
@@ -206,12 +207,22 @@ export function zeigeTrainer({ app = null } = {}) {
     karte.dataset.zustand = zustand;
     ort.querySelector('.trainer-alter').hidden = ['premium', 'store', 'alter', 'unter18'].includes(zustand);
     ort.querySelector('.trainer-test').hidden = !(istTestLink(p) && ['kaufbar', 'alter', 'wartet', 'bestaetigen'].includes(zustand));
+    // Die Altersfrage steht direkt ueber ihren Knoepfen (Rechtspruefung 09.11.2026), nicht oben im Stand
+    const frageText = ort.querySelector('.trainer-frage');
+    frageText.hidden = zustand !== 'alter';
+    frageText.textContent = zustand === 'alter' ? zustandText('alter') : '';
     // Zustandstexte, die eine Antwort brauchen, gehen vor; sonst Meldung zum letzten Klick, eigener Stand, Zustand
-    const stand = ['bestaetigen', 'alter', 'unter18', 'offline'].includes(zustand) ? zustandText(zustand) : (meldung || standText(st) || zustandText(zustand) || '');
+    const stand = zustand === 'alter' ? '' : ['bestaetigen', 'unter18', 'offline'].includes(zustand) ? zustandText(zustand) : (meldung || standText(st) || zustandText(zustand) || '');
     ort.querySelector('.trainer-stand').textContent = stand;
     const knoepfe = [];
     if (zustand === 'premium') {
       if (p && p.portalLink && !huelle) knoepfe.push(knopf(A('verwalten'), 'primaer', 'verwalten'));
+      // Pflichtknoepfe (§ 312k, § 356a BGB): immer sichtbar, solange ein Stripe-Abo laeuft. Ob die Widerrufsfrist noch
+      // laeuft, entscheidet der Server (abo-beenden, 409 frist_vorbei mit Hinweis aufs Kuendigen).
+      if (!huelle && st.quelle === 'stripe') {
+        if (st.status !== 'gekuendigt') knoepfe.push(knopf(A('kuendigenKnopf'), '', 'abo-kuendigen'));
+        knoepfe.push(knopf(A('widerrufenKnopf'), '', 'abo-widerrufen'));
+      }
     } else if (zustand === 'kaufbar') {
       knoepfe.push(knopf(A('kaufen'), 'primaer', 'kaufen'));
     } else if (zustand === 'alter') {
@@ -238,14 +249,23 @@ export function zeigeTrainer({ app = null } = {}) {
     }
   }
 
-  // Kauf: ohne await bis zum Oeffnen (Nutzergeste), auch direkt aus "Ja, 18 oder älter"
+  // Kauf: kaufen() oeffnet das Fenster noch im Klick (Nutzergeste), auch direkt aus "Ja, 18 oder älter"
+  // Doppelklick: nur ein Kauf zur Zeit (sonst zwei Fenster und eine falsche Fehlermeldung)
+  let kaufLaeuft = false;
   function kaufe() {
-    kaufen({ produkt: produkt || null }).then((r) => {
+    if (kaufLaeuft) return;
+    kaufLaeuft = true;
+    kaufen({ produkt: produkt || null }).finally(() => { kaufLaeuft = false; }).then((r) => {
       meldung = r.ok ? A('stripe')
         : r.grund === 'abgemeldet' ? zustandText('abgemeldet')
           : r.grund === 'alter' ? ''
-            : A('kaufFehler');
+            : r.grund === 'schon_premium' ? A('schonPremium')
+              : r.grund === 'kauf_laeuft' ? A('kaufLaeuft')
+                : r.grund === 'offline' ? A('kaufOffline')
+                  : A('kaufFehler');
       aktualisiere();
+      // Der Server kennt ein Abo, das die App noch nicht kannte: Stand sofort neu holen
+      if (r.grund === 'schon_premium') istPremium({ neu: true }).then(() => aktualisiere()).catch(() => {});
     });
   }
 
@@ -276,6 +296,12 @@ export function zeigeTrainer({ app = null } = {}) {
       meldung = '';
       bestaetigeKauf().then(() => aktualisiere()).catch(() => {});
       aktualisiere();
+      return;
+    }
+    if (a === 'abo-kuendigen' || a === 'abo-widerrufen') {
+      ende();
+      import('./kuendigen.js').then((m) => m.zeigeBeenden({ aktion: a === 'abo-widerrufen' ? 'widerrufen' : 'kuendigen' }))
+        .catch((f) => console.error('Kündigen-Blatt nicht geladen', f));
       return;
     }
     if (a === 'verwalten') {

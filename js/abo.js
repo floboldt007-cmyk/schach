@@ -21,8 +21,8 @@
 //   produktOffline() -> boolean   true, wenn der letzte ladeProdukt() am Netz scheiterte und nichts zwischengespeichert war
 //       (dann ist null kein "Flo hat nichts eingetragen", sondern "gerade keine Verbindung")
 //   istTestLink(produkt) -> boolean   kauf_link aus dem Stripe-Testmodus (https://buy.stripe.com/test_...): kein echtes Geld
-//   kaufAdresse(produkt, sitzung) -> string | null   kauf_link + ?client_reference_id=<Nutzer-ID>&prefilled_email=...,
-//       nur mit Anmeldung (der Webhook ordnet den Kauf ueber client_reference_id dem Konto zu)
+//   KASSE_PFAD = '/functions/v1/abo-kasse'   die Bezahlseite legt der Server an (Nutzer-ID nur aus der Anmeldung);
+//       kauf_link ist nur noch Flos Schalter "Kauf eingerichtet" und Merkmal fuer den Testmodus, geoeffnet wird er nicht
 //
 //   Vorteile, die schon gebaut sind (Verkauft wird nur, was es gibt; Pruefer-Befund B1, Paragraf 5 UWG):
 //   registriereVorteil(id)   das Paket, das einen Vorteil des Trainers umsetzt, meldet ihn beim Laden an, z. B. B2 mit
@@ -40,8 +40,10 @@
 //       (grund 'store'), das Blatt zeigt keinen Kauf- und keinen Verwalten-Knopf. Der Premium-Stand gilt trotzdem.
 //   kaufen({ produkt, oeffne } = {}) -> Promise<{ ok, url? , grund? }>
 //       grund: 'store' | 'abgemeldet' | 'alter' (Altersfrage nicht mit "18 oder aelter" beantwortet) | 'kein_produkt' | 'kein_link'
-//       Mit produkt (schon geladen) laeuft alles bis zum Oeffnen ohne await: so bleibt der Klick eine Nutzergeste
-//       und Safari blockiert das neue Fenster nicht. Merkt sich den Kauf (kaufGestartet), damit das Paket nach der
+//         | 'schon_premium' (Server: das Konto hat den Trainer schon) | 'offline' | 'kasse' (Server oder Stripe gerade nicht)
+//       Ohne eigenes oeffne oeffnet kaufen() noch im Klick (vor dem ersten await) ein leeres Fenster, damit Safari es nicht
+//       blockiert, fragt dann POST KASSE_PFAD und laedt die Bezahlseite (nur https://checkout.stripe.com/...) hinein; bei
+//       einem Fehler schliesst es das Fenster wieder. Merkt sich den Kauf (kaufGestartet), damit das Paket nach der
 //       Rueckkehr neu fragt.
 //   verwalten({ produkt, oeffne } = {}) -> Promise<{ ok, url?, grund? }>   portal_link (+ prefilled_email); grund 'store' in der Huelle
 //   kaufGestartet() -> ms | null, vergissKauf()
@@ -80,7 +82,7 @@
 //   schach-arena:abo:produkt  { id, produkt, geholtAm }
 //   schach-arena:abo:kauf     Zeitpunkt (ms) des letzten Kauf-Starts
 //   schach-arena:abo:alter    { uid, ab18 }   Antwort auf die Altersfrage (nur ja/nein, kein Geburtsdatum)
-import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { SUPABASE_URL, SUPABASE_KEY, mitRegion } from './konto-config.js';
 import { t } from './sprache.js';
 import './sprachen/abo.js';
 const A = (k, w) => t('abo.' + k, w);
@@ -141,7 +143,12 @@ async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
   }
   let d = null;
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leer */ } }
-  if (!r.ok) { const f = new Error((d && (d.message || d.msg)) || A('server', { status: r.status })); f.status = r.status; throw f; }
+  if (!r.ok) {
+    const f = new Error((d && (d.message || d.msg)) || A('server', { status: r.status }));
+    f.status = r.status;
+    f.kennung = d && typeof d.fehler === 'string' ? d.fehler : undefined;
+    throw f;
+  }
   return d;
 }
 
@@ -239,16 +246,19 @@ export function setzeAlterAngabe(ab18) {
 
 // ---------- Kauf und Verwaltung ----------
 const mailVon = (s) => (s && (s.email || (s.user && s.user.email))) || '';
-export function kaufAdresse(produkt, s = sitzung()) {
-  const uid = nutzerId(s);
-  if (!uid || !produkt || !produkt.kaufLink || !LINK.test(produkt.kaufLink)) return null;
-  let u;
-  try { u = new URL(produkt.kaufLink); } catch (e) { return null; }
-  u.searchParams.set('client_reference_id', uid);
-  const mail = mailVon(s);
-  if (mail) u.searchParams.set('prefilled_email', mail);
-  return u.toString();
+// Die Bezahlseite legt die Edge Function abo-kasse an (supabase/functions/_gemeinsam/abo-kasse.js): Nur so kommt die
+// Nutzer-ID aus der Anmeldung und nicht aus einer Adresse, an die jeder jede ID haengen kann (Code-Check 05.11.2026).
+export const KASSE_PFAD = '/functions/v1/abo-kasse';
+const KASSE = /^https:\/\/checkout\.stripe\.com\/[^\s<>"'`]+$/;
+// Leeres Fenster noch im Klick, damit Safari es nicht blockiert; die Bezahlseite kommt nach der Antwort des Servers
+function leeresFenster() {
+  try {
+    const w = globalThis.open ? globalThis.open('', '_blank') : null;
+    if (w) { try { w.opener = null; } catch (e) { /* egal */ } }
+    return w || null;
+  } catch (e) { return null; }
 }
+function schliesse(w) { try { if (w && typeof w.close === 'function') w.close(); } catch (e) { /* egal */ } }
 function portalAdresse(produkt, s = sitzung()) {
   if (!produkt || !produkt.portalLink || !LINK.test(produkt.portalLink)) return null;
   let u;
@@ -322,18 +332,77 @@ export function inStoreHuelle() {
   } catch (e) { return false; }
 }
 
-export async function kaufen({ produkt, oeffne = oeffneAdresse } = {}) {
+export async function kaufen({ produkt, oeffne } = {}) {
   if (inStoreHuelle()) return { ok: false, grund: 'store' };
   const s = sitzung();
   if (!nutzerId(s)) return { ok: false, grund: 'abgemeldet' };
   if (alterAngabe() !== true) return { ok: false, grund: 'alter' };
+  // Ohne eigenes oeffne (Tests): leeres Fenster jetzt, vor dem ersten await (Nutzergeste)
+  const fenster = oeffne ? null : leeresFenster();
+  const zeige = oeffne || ((url) => {
+    if (fenster) { try { fenster.location.href = url; return; } catch (e) { schliesse(fenster); } }
+    oeffneAdresse(url);
+  });
+  const abbruch = (grund) => { schliesse(fenster); return { ok: false, grund }; };
   const p = produkt === undefined ? await ladeProdukt() : produkt;
-  if (!p) return { ok: false, grund: 'kein_produkt' };
-  const url = kaufAdresse(p, s);
-  if (!url) return { ok: false, grund: 'kein_link' };
+  if (!p) return abbruch('kein_produkt');
+  // kauf_link bleibt Flos Schalter "Kauf ist eingerichtet" (und zeigt den Testmodus), geoeffnet wird er nicht mehr
+  if (!p.kaufLink) return abbruch('kein_link');
+  let d = null;
+  try {
+    const sg = await gueltigeSitzung();
+    d = await anfrage(mitRegion(KASSE_PFAD), { methode: 'POST', daten: {}, token: sg.access_token });
+  } catch (e) {
+    if (e && e.status === 409) return abbruch(e.kennung === 'kauf_laeuft' ? 'kauf_laeuft' : 'schon_premium');
+    if (e && e.status === 401) return abbruch('abgemeldet');
+    return abbruch(e && e.offline ? 'offline' : 'kasse');
+  }
+  const url = d && typeof d.kassen_url === 'string' && KASSE.test(d.kassen_url) ? d.kassen_url : null;
+  if (!url) return abbruch('kasse');
+  // Fenster in der Wartezeit geschlossen: kein Kauf-Merker, sonst stuende "Bezahlseite offen" 30 Minuten lang da
+  if (fenster && fenster.closed) return abbruch('kasse');
   try { lager().setItem(KAUF_SCHLUESSEL, String(uhr())); } catch (e) { /* egal */ }
-  oeffne(url);
+  zeige(url);
   return { ok: true, url };
+}
+
+// ---------- Kuendigen und Widerrufen (Edge Function abo-beenden, supabase/functions/_gemeinsam/abo-beenden.js) ----------
+// Pflichtknoepfe nach § 312k BGB (Kuendigen, auch ohne Anmeldung per Link aus der Mail) und § 356a BGB (Widerrufen).
+//   beendeAbo('kuendigen' | 'widerrufen') -> { ok, daten } | { ok: false, grund, text }   angemeldet
+//   fordereKuendigungsLink(email)         -> { ok } | { ok: false, grund, text }           ohne Anmeldung
+//   kuendigeMitLink(token)                -> wie beendeAbo                                 ohne Anmeldung
+export const BEENDEN_PFAD = '/functions/v1/abo-beenden';
+function beendenFehler(e) {
+  if (e && e.offline) return { ok: false, grund: 'offline', text: A('offline') };
+  return { ok: false, grund: (e && e.kennung) || (e && e.status === 401 ? 'anmeldung' : 'server'), text: (e && e.message) || '' };
+}
+export async function beendeAbo(aktion) {
+  if (aktion !== 'kuendigen' && aktion !== 'widerrufen') return { ok: false, grund: 'eingabe', text: '' };
+  try {
+    const sg = await gueltigeSitzung();
+    const d = await anfrage(mitRegion(BEENDEN_PFAD), { methode: 'POST', daten: { aktion }, token: sg.access_token });
+    istPremium({ neu: true }).catch(() => {});
+    return { ok: true, daten: d || {} };
+  } catch (e) {
+    return beendenFehler(e);
+  }
+}
+export async function fordereKuendigungsLink(email) {
+  try {
+    await anfrage(mitRegion(BEENDEN_PFAD), { methode: 'POST', daten: { aktion: 'link_anfordern', email: String(email || '').trim() } });
+    return { ok: true };
+  } catch (e) {
+    return beendenFehler(e);
+  }
+}
+export async function kuendigeMitLink(token) {
+  try {
+    const d = await anfrage(mitRegion(BEENDEN_PFAD), { methode: 'POST', daten: { aktion: 'link_kuendigen', token: String(token || '') } });
+    if (nutzerId()) istPremium({ neu: true }).catch(() => {});
+    return { ok: true, daten: d || {} };
+  } catch (e) {
+    return beendenFehler(e);
+  }
 }
 
 export async function verwalten({ produkt, oeffne = oeffneAdresse } = {}) {

@@ -22,6 +22,8 @@
 --   abo_stripe_ereignis(...)      nur Service-Rolle: ein ausgewertetes Stripe-Ereignis verbuchen. Die Auswertung macht
 --                                 supabase/functions/_gemeinsam/stripe.js; Rueckgabe ist ein kurzes Ergebnis:
 --                                 'neu' | 'doppelt' | 'wartet' | 'veraltet' | 'fremdes_abo' | 'zugeordnet' | 'ohne_nutzer'
+--                                 | 'konflikt' (Kauf fuer ein Konto, dessen laufendes Abo an einem ANDEREN Stripe-Kunden
+--                                 haengt: nichts wird zugeordnet, Flo klaert von Hand, siehe ANLEITUNG)
 --   abo_wende_an(...)             intern (kein Recht fuer irgendwen ausser dem Besitzer)
 --   abo_hole_nach(kunde, abo)     wartende Ereignisse eines Stripe-Kunden auf seine Zeile in abos anwenden. Ruft der Kauf
 --                                 selbst auf; Flo ruft es im SQL Editor (als Besitzer) nach einer von Hand angelegten
@@ -38,6 +40,15 @@
 -- (checkout.session.completed) setzt nur die Zuordnung Nutzer <-> Stripe-Kunde und einen vorlaeufigen Stand
 -- (stand_zeit null), den das naechste Abo-Ereignis immer ueberschreibt. Dabei werden die Ereignisse nachgeholt, die vor
 -- dem Kauf ankamen ('wartet', und bei einem zweiten Abo desselben Kunden die 'fremdes_abo' dieses neuen Abos).
+--
+-- Kein Umhaengen (Audit 09.11.2026, Befund M4): Die Nutzer-ID eines Kaufs ist nur so vertrauenswuerdig wie ihr Weg
+-- hierher. Solange sie aus der Adresse eines oeffentlichen Zahlungslinks stammt (client_reference_id), kann jeder mit
+-- einer fremden Nutzer-ID bezahlen. Deshalb ueberschreibt ein Kauf NIE die Stripe-Zuordnung eines Kontos, dessen Abo
+-- gerade laeuft (status aktiv oder gekuendigt, gueltig_bis in der Zukunft) und an einem anderen Stripe-Kunden haengt:
+-- Das Ereignis bekommt das Ergebnis 'konflikt', die Zeile in abos bleibt unberuehrt, die echten Ereignisse des Kontos
+-- kommen weiter an. Die folgenden Ereignisse des fremden Kunden bleiben 'wartet'. Das gilt auch fuer einen ehrlichen
+-- Doppelkauf (zwei laufende Abos fuer ein Konto): Auch den soll Flo sehen statt eines der beiden still zu verlieren.
+-- Handzeilen ohne kunde_id (quelle 'manuell') und abgelaufene Abos darf ein Kauf wie bisher uebernehmen.
 --
 -- Fehler melden die Funktionen als Kennungen (ABO_EREIGNIS_UNGUELTIG); die Edge Function antwortet dann mit 500 und
 -- Stripe wiederholt die Zustellung. Die Kennungen sind ein Vertrag mit supabase/functions/_gemeinsam/stripe.js.
@@ -74,9 +85,12 @@ create table if not exists public.abos (
   kunde_id text unique,
   abo_id text,
   stand_zeit timestamptz,
+  status_vor_streit text,
+  gueltig_bis_vor_streit timestamptz,
   erstellt_am timestamptz not null default now(),
   aktualisiert_am timestamptz not null default now(),
-  constraint abos_status check (status in ('aktiv', 'gekuendigt', 'abgelaufen')),
+  constraint abos_status check (status in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig')),
+  constraint abos_status_vor_streit check (status_vor_streit is null or status_vor_streit in ('aktiv', 'gekuendigt', 'abgelaufen')),
   constraint abos_quelle check (quelle in ('stripe', 'manuell')),
   constraint abos_plan_laenge check (plan is null or char_length(plan) <= 60),
   constraint abos_kunde_form check (kunde_id is null or kunde_id ~ '^cus_[A-Za-z0-9]{1,200}$'),
@@ -97,12 +111,30 @@ create table if not exists public.stripe_ereignisse (
   eingegangen_am timestamptz not null default now(),
   constraint stripe_ereignisse_id_form check (id ~ '^evt_[A-Za-z0-9]{1,200}$'),
   constraint stripe_ereignisse_typ check (typ in ('checkout.session.completed', 'customer.subscription.created',
-    'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid')),
+    'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid', 'charge.refunded',
+    'charge.dispute.created', 'charge.dispute.closed')),
   constraint stripe_ereignisse_kunde_form check (kunde_id ~ '^cus_[A-Za-z0-9]{1,200}$'),
   constraint stripe_ereignisse_abo_form check (abo_id is null or abo_id ~ '^sub_[A-Za-z0-9]{1,200}$'),
-  constraint stripe_ereignisse_status check (status is null or status in ('aktiv', 'gekuendigt', 'abgelaufen')),
+  constraint stripe_ereignisse_status check (status is null or status in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig', 'wiederherstellen')),
   constraint stripe_ereignisse_plan_laenge check (plan is null or char_length(plan) <= 60)
 );
+
+-- Wiederholbare Erweiterung bestehender Installationen. Constraints werden ersetzt, weil Postgres
+-- CREATE OR REPLACE fuer Tabellen-Checks nicht anbietet.
+alter table public.abos add column if not exists status_vor_streit text;
+alter table public.abos add column if not exists gueltig_bis_vor_streit timestamptz;
+alter table public.abos drop constraint if exists abos_status;
+alter table public.abos add constraint abos_status check (status in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig'));
+alter table public.abos drop constraint if exists abos_status_vor_streit;
+alter table public.abos add constraint abos_status_vor_streit
+  check (status_vor_streit is null or status_vor_streit in ('aktiv', 'gekuendigt', 'abgelaufen'));
+alter table public.stripe_ereignisse drop constraint if exists stripe_ereignisse_typ;
+alter table public.stripe_ereignisse add constraint stripe_ereignisse_typ check (typ in ('checkout.session.completed',
+  'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid',
+  'charge.refunded', 'charge.dispute.created', 'charge.dispute.closed'));
+alter table public.stripe_ereignisse drop constraint if exists stripe_ereignisse_status;
+alter table public.stripe_ereignisse add constraint stripe_ereignisse_status
+  check (status is null or status in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig', 'wiederherstellen'));
 
 create index if not exists stripe_ereignisse_kunde on public.stripe_ereignisse (kunde_id, erstellt);
 create index if not exists stripe_ereignisse_eingang on public.stripe_ereignisse (eingegangen_am);
@@ -128,6 +160,26 @@ drop trigger if exists abos_setze_aktualisiert_am on public.abos;
 create trigger abos_setze_aktualisiert_am
 before update on public.abos
 for each row execute function public.setze_aktualisiert_am();
+
+-- Buchungsbelege bleiben bei Stripe. Lokal werden beim Entfernen der Abo-Zeile alle Stripe-Kennungen des Kontos
+-- vor dem ON DELETE SET NULL der Ereignistabelle vollstaendig geloescht. Das laufende Stripe-Abo wird nicht gekuendigt.
+create or replace function public.loesche_stripe_kennungen_vor_abo()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.stripe_ereignisse t
+  where t.user_id = old.user_id or t.kunde_id = old.kunde_id or (old.abo_id is not null and t.abo_id = old.abo_id);
+  return old;
+end;
+$$;
+
+drop trigger if exists abos_loesche_stripe_kennungen on public.abos;
+create trigger abos_loesche_stripe_kennungen
+before delete on public.abos
+for each row execute function public.loesche_stripe_kennungen_vor_abo();
 
 -- Premium fuer den Aufrufer. Laeuft mit den Rechten des Aufrufers (RLS: nur die eigene Zeile).
 create or replace function public.ist_premium()
@@ -186,11 +238,34 @@ begin
   -- Gleiche Sekunde: Stripe schickt beim Abschluss mehrere Ereignisse mit demselben created (z. B. subscription.created
   -- noch "incomplete" und subscription.updated schon "active"), die Zustellreihenfolge ist zufaellig. Bei Gleichstand
   -- nimmt deshalb nur das Ende des Abos (deleted) ein laufendes Premium weg.
-  if a.stand_zeit is not null and zeit = a.stand_zeit and art <> 'customer.subscription.deleted'
+  if a.stand_zeit is not null and zeit = a.stand_zeit
+    and art not in ('customer.subscription.deleted', 'charge.refunded', 'charge.dispute.closed')
     and neu_status = 'abgelaufen' and a.status in ('aktiv', 'gekuendigt') then
     return 'veraltet';
   end if;
-  if art = 'invoice.paid' then
+  if art = 'charge.dispute.created' then
+    update public.abos t
+    set status_vor_streit = case when a.status = 'strittig' then a.status_vor_streit else a.status end,
+        gueltig_bis_vor_streit = case when a.status = 'strittig' then a.gueltig_bis_vor_streit else a.gueltig_bis end,
+        status = 'strittig', quelle = 'stripe', stand_zeit = zeit
+    where t.user_id = ziel;
+  elsif art = 'charge.dispute.closed' and neu_status = 'wiederherstellen' then
+    if a.status <> 'strittig' or a.status_vor_streit is null or a.gueltig_bis_vor_streit is null then
+      return 'veraltet';
+    end if;
+    update public.abos t
+    set status = a.status_vor_streit, gueltig_bis = a.gueltig_bis_vor_streit,
+        status_vor_streit = null, gueltig_bis_vor_streit = null, quelle = 'stripe', stand_zeit = zeit
+    where t.user_id = ziel;
+  elsif a.status = 'strittig' and art not in ('charge.refunded', 'charge.dispute.closed') then
+    -- Laufzeitereignisse waehrend eines offenen Streits aktualisieren nur den Stand, der bei einem Sieg zurueckkommt.
+    update public.abos t
+    set status_vor_streit = case when art = 'invoice.paid' and a.status_vor_streit = 'gekuendigt'
+                                  then 'gekuendigt' else neu_status end,
+        gueltig_bis_vor_streit = case when art = 'invoice.paid' then greatest(a.gueltig_bis_vor_streit, neu_bis) else neu_bis end,
+        plan = coalesce(neu_plan, a.plan), abo_id = coalesce(a.abo_id, abo), quelle = 'stripe', stand_zeit = zeit
+    where t.user_id = ziel;
+  elsif art = 'invoice.paid' then
     update public.abos t
     set status = case when a.status = 'gekuendigt' then 'gekuendigt' else 'aktiv' end,
         gueltig_bis = greatest(a.gueltig_bis, neu_bis),
@@ -203,6 +278,8 @@ begin
     update public.abos t
     set status = neu_status,
         gueltig_bis = neu_bis,
+        status_vor_streit = null,
+        gueltig_bis_vor_streit = null,
         plan = coalesce(neu_plan, a.plan),
         abo_id = coalesce(a.abo_id, abo),
         quelle = 'stripe',
@@ -255,7 +332,8 @@ end;
 $$;
 
 -- Ein ausgewertetes Stripe-Ereignis verbuchen (nur Service-Rolle). Die Parameter liefert
--- supabase/functions/_gemeinsam/stripe.js (auswerten): bei checkout.session.completed nutzer (client_reference_id) und
+-- supabase/functions/_gemeinsam/stripe.js (auswerten): bei checkout.session.completed nutzer (nur aus
+-- metadata.crownmate_abo_nutzer, gesetzt von der Edge Function abo-kasse; client_reference_id zaehlt nicht) und
 -- der vorlaeufige Stand (status, gueltig_bis), bei den uebrigen der Stand aus dem Abo bzw. der Rechnung.
 create or replace function public.abo_stripe_ereignis(
   ereignis_id text,
@@ -284,16 +362,18 @@ declare
   v_plan text := left(plan, 60);
   v_ziel uuid;
   v_ergebnis text;
+  v_alt record;
   n integer;
 begin
   -- Form pruefen (die Auswertung im Modul prueft dasselbe; hier zur Sicherheit noch einmal)
   if v_id is null or v_id !~ '^evt_[A-Za-z0-9]{1,200}$'
     or v_typ is null or v_typ not in ('checkout.session.completed', 'customer.subscription.created',
-      'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid')
+      'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid', 'charge.refunded',
+      'charge.dispute.created', 'charge.dispute.closed')
     or v_zeit is null
     or v_kunde is null or v_kunde !~ '^cus_[A-Za-z0-9]{1,200}$'
     or (v_abo is not null and v_abo !~ '^sub_[A-Za-z0-9]{1,200}$')
-    or v_status is null or v_status not in ('aktiv', 'gekuendigt', 'abgelaufen')
+    or v_status is null or v_status not in ('aktiv', 'gekuendigt', 'abgelaufen', 'strittig', 'wiederherstellen')
     or v_bis is null then
     raise exception 'ABO_EREIGNIS_UNGUELTIG';
   end if;
@@ -318,25 +398,36 @@ begin
       v_ergebnis := 'ohne_nutzer';
     else
       update public.stripe_ereignisse t set user_id = v_nutzer where t.id = v_id;
-      -- Ein Stripe-Kunde gehoert genau einem Nutzer: Wer ihn bisher hatte, gibt ihn ab.
-      update public.abos t set kunde_id = null where t.kunde_id = v_kunde and t.user_id <> v_nutzer;
-      insert into public.abos as t (user_id, status, gueltig_bis, quelle, kunde_id, abo_id, stand_zeit)
-      values (v_nutzer, v_status, v_bis, 'stripe', v_kunde, v_abo, null)
-      on conflict (user_id) do update
-      set kunde_id = excluded.kunde_id,
-          abo_id = excluded.abo_id,
-          quelle = 'stripe',
-          stand_zeit = null,
-          -- Ein neuer Kauf nimmt nichts weg: ein noch gueltiges Abo behaelt sein spaeteres Datum
-          status = case when t.status in ('aktiv', 'gekuendigt') and t.gueltig_bis > excluded.gueltig_bis
-                        then t.status else excluded.status end,
-          gueltig_bis = case when t.status in ('aktiv', 'gekuendigt')
-                             then greatest(t.gueltig_bis, excluded.gueltig_bis) else excluded.gueltig_bis end;
-      -- Ereignisse, die vor dem Kauf ankamen, jetzt in ihrer Reihenfolge anwenden: wartende (Kunde noch unbekannt) und,
-      -- wenn ein bekannter Kunde ein zweites Mal abschliesst, die schon als 'fremdes_abo' abgelegten Ereignisse genau
-      -- dieses neuen Abos (sonst gaelte nur der vorlaeufige Tag bis zur naechsten Verlaengerung)
-      perform public.abo_hole_nach(v_kunde, v_abo);
-      v_ergebnis := 'zugeordnet';
+      -- Kein Umhaengen (Befund M4, siehe Kopf): Laeuft das Abo dieses Kontos ueber einen ANDEREN Stripe-Kunden, wird
+      -- nichts zugeordnet. Die Zeile wird dabei gesperrt, damit ein gleichzeitiges Ereignis des echten Kunden (anderer
+      -- Kunde, also andere Transaktions-Sperre) den Stand nicht zwischen Pruefung und Schreiben aendert.
+      select * into v_alt from public.abos t where t.user_id = v_nutzer for update;
+      -- 'strittig' (offene Rueckbuchung, PR #79) schuetzt IMMER, ohne Blick auf gueltig_bis: abo_wende_an friert das
+      -- Datum im Streit ein, und ein gewonnener Streit stellt das Abo wieder her und braucht dafuer den eigenen kunde_id.
+      if v_alt.kunde_id is not null and v_alt.kunde_id <> v_kunde
+        and (v_alt.status = 'strittig' or (v_alt.status in ('aktiv', 'gekuendigt') and v_alt.gueltig_bis > now())) then
+        v_ergebnis := 'konflikt';
+      else
+        -- Ein Stripe-Kunde gehoert genau einem Nutzer: Wer ihn bisher hatte, gibt ihn ab.
+        update public.abos t set kunde_id = null where t.kunde_id = v_kunde and t.user_id <> v_nutzer;
+        insert into public.abos as t (user_id, status, gueltig_bis, quelle, kunde_id, abo_id, stand_zeit)
+        values (v_nutzer, v_status, v_bis, 'stripe', v_kunde, v_abo, null)
+        on conflict (user_id) do update
+        set kunde_id = excluded.kunde_id,
+            abo_id = excluded.abo_id,
+            quelle = 'stripe',
+            stand_zeit = null,
+            -- Ein neuer Kauf nimmt nichts weg: ein noch gueltiges Abo behaelt sein spaeteres Datum
+            status = case when t.status in ('aktiv', 'gekuendigt') and t.gueltig_bis > excluded.gueltig_bis
+                          then t.status else excluded.status end,
+            gueltig_bis = case when t.status in ('aktiv', 'gekuendigt')
+                               then greatest(t.gueltig_bis, excluded.gueltig_bis) else excluded.gueltig_bis end;
+        -- Ereignisse, die vor dem Kauf ankamen, jetzt in ihrer Reihenfolge anwenden: wartende (Kunde noch unbekannt) und,
+        -- wenn ein bekannter Kunde ein zweites Mal abschliesst, die schon als 'fremdes_abo' abgelegten Ereignisse genau
+        -- dieses neuen Abos (sonst gaelte nur der vorlaeufige Tag bis zur naechsten Verlaengerung)
+        perform public.abo_hole_nach(v_kunde, v_abo);
+        v_ergebnis := 'zugeordnet';
+      end if;
     end if;
   else
     select t.user_id into v_ziel from public.abos t where t.kunde_id = v_kunde for update;
@@ -382,6 +473,7 @@ grant select, insert, update, delete on table public.produkte, public.abos, publ
 
 -- Funktionen: nie fuer anon oder public. ist_premium fuer angemeldete Nutzer, der Rest nur Service-Rolle.
 revoke all on function public.ist_premium() from anon, public;
+revoke all on function public.loesche_stripe_kennungen_vor_abo() from anon, authenticated, public, service_role;
 revoke all on function public.ist_premium_von(uuid) from anon, authenticated, public;
 revoke all on function public.abo_wende_an(uuid, text, timestamptz, text, text, timestamptz, text) from anon, authenticated, public, service_role;
 revoke all on function public.abo_hole_nach(text, text) from anon, authenticated, public, service_role;
