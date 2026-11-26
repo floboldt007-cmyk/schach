@@ -108,9 +108,38 @@ antworten = { karte_der_partie: { __status: 400, message: 'KARTE_KEINE_PARTIE' }
 pruefe('Karte der Partie: Absage gibt null', (await K.karteDerPartie('p-3')) === null);
 
 // feste Listen im Client
-pruefe('Kein Erfinder-Motiv und kein Labor-Rahmen auf der Server-Karte', !K.KARTE_MOTIVE.includes('K') && !K.KARTE_MOTIVE.includes('kronli')
-  && !K.KARTE_RAHMEN.includes('neon') && !K.KARTE_RAHMEN.some((x) => x.startsWith('erfinder')));
-pruefe('Erfinder-Koenig wird auf der Karte zum Bauern', K.wahlFuerServer({ figur: 'K', vitrine: [] }).motiv === 'P');
+// R30 (Flo 22.11.2026 "Was du besitzt und traegst, sieht auch dein Gegner"): Koenig, Kronli und Erfinder-Rahmen gehen an den
+// Server, der sie nur mit Stueck annimmt (supabase/karte-besitz-sicht-schema.sql); Labor-Rahmen nie
+pruefe('Erfinder-Motive und Erfinder-Rahmen in der Server-Liste, Labor-Rahmen nicht', ['K', 'kronli'].every((m) => K.KARTE_MOTIVE.includes(m))
+  && K.KARTE_RAHMEN.includes('erfinder-blatt-0') && !['neon', 'brett', 'drache', 'pixel'].some((x) => K.KARTE_RAHMEN.includes(x)));
+pruefe('Erste Wahl: Koenig und Erfinder-Rahmen gehen ohne eigene Besitzpruefung mit (der Server entscheidet)',
+  K.wahlFuerServer({ figur: 'K', rahmen: 'erfinder-blatt-0', vitrine: [] }).motiv === 'K'
+  && K.wahlFuerServer({ figur: 'kronli', rahmen: 'erfinder-blatt-0', vitrine: [] }).rahmen === 'erfinder-blatt-0');
+pruefe('Rueckfall mit Stand: Koenig, Kronli zum Bauern, Erfinder-Rahmen zu ohne',
+  ['K', 'kronli'].every((m) => K.wahlFuerServer({ figur: m, rahmen: 'erfinder-blatt-0', vitrine: [] }, stand()).motiv === 'P')
+  && K.wahlFuerServer({ figur: 'Q', rahmen: 'erfinder-blatt-0', vitrine: [] }, stand()).rahmen === 'ohne'
+  && K.wahlFuerServer({ figur: 'Q', rahmen: 'holz', vitrine: [] }, stand()).motiv === 'Q');
+{
+  // Erfinder (Merker mit beiden Stuecken), alter Server oder Konto ohne Stueck: KARTE_PROFIL, dann GENAU EIN zweiter Versuch
+  // mit P / ohne; ein Server mit R30 und Stueck nimmt die erste Wahl
+  const { SONDER_SCHLUESSEL, ERFINDER } = await import('../js/sonderstuecke.js');
+  speicher.set(SONDER_SCHLUESSEL, JSON.stringify({ konto: UID, ids: [ERFINDER.titel, ERFINDER.banner] }));
+  setzeProfilWahl({ figur: 'K', rahmen: 'erfinder-blatt-0', banner: 'start' });
+  const sonderAbgelehnt = (d) => (d.motiv === 'K' || d.rahmen === 'erfinder-blatt-0' ? { __status: 400, message: 'KARTE_PROFIL' } : stand({ wahl: d }));
+  antworten = { karte_melde_stufen: stand(), karte_waehle: sonderAbgelehnt };
+  aufrufe = [];
+  await K.abgleichKonto();
+  const w = aufrufe.filter((a) => a.name === 'karte_waehle').map((a) => a.daten);
+  pruefe('alter Server: erst K/erfinder-blatt-0, nach KARTE_PROFIL genau einmal P/ohne', w.length === 2 && w[0].motiv === 'K'
+    && w[0].rahmen === 'erfinder-blatt-0' && w[1].motiv === 'P' && w[1].rahmen === 'ohne', w);
+  antworten = { karte_melde_stufen: stand(), karte_waehle: (d) => stand({ wahl: d }) };
+  aufrufe = [];
+  await K.abgleichKonto();
+  const w3 = aufrufe.filter((a) => a.name === 'karte_waehle').map((a) => a.daten);
+  pruefe('Server mit R30 und Stueck: eine Wahl, K/erfinder-blatt-0', w3.length === 1 && w3[0].motiv === 'K' && w3[0].rahmen === 'erfinder-blatt-0', w3);
+  setzeProfilWahl({ figur: 'Q', rahmen: 'ohne' });
+  speicher.delete(SONDER_SCHLUESSEL);
+}
 // fremde Karte: ohne Paket sammlung nur die geprueften Rohwerte, mit Paket Titel und Liga-Name
 const { fremdeKarte, kronenText, LIGA_NAMEN } = await import('../js/ui/visitenkarte.js');
 const roh = { name: 'Gegner_2', titel: 'erfolg-feuertaufe', banner: 'saison-silber', kronen_stufe: 7 };

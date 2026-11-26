@@ -1168,8 +1168,8 @@ export function zeige(root, params, app) {
       const haken = echt && hatHaken(name) ? hakenHtml() : '';
       const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
       // R26 (Flo 21.11.2026: "Mein Rahmen wird nicht angezeigt, wenn die Runde gestartet wird"): die eigene Leiste zeigt
-      // das eigene Bild (Wahl mit Erfinder-Rahmen und Koenig), nicht das der Server-Karte; die kennt beides mit Absicht
-      // nicht (js/karte.js KARTE_RAHMEN/KARTE_MOTIVE). Was der Gegner sieht, bleibt die Server-Karte.
+      // das eigene Bild (Wahl mit Erfinder-Rahmen und Koenig), nicht das der Server-Karte; die zeigt beides nur mit Stueck
+      // und erst mit supabase/karte-besitz-sicht-schema.sql (R30). Was der Gegner sieht, bleibt die Server-Karte.
       // Gegner ohne Karte (noch nicht geladen oder kein Profil): neutrales Bild statt kurz des eigenen (Altbefund 6e, 21.11.)
       const avatar = ort === 'oben' ? (k?.avatar || GEGNER_STANDARD) : floAvatar(f);
       // R19 online ruhig (Flos Wahl A): die Leiste zeigt den Namen, ohne Titel; unter dem Namen die geschlagenen Figuren.
