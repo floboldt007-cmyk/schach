@@ -11,8 +11,36 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref == 'refs/heads/main' && github.sha || (github.head_ref || github.ref) }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# Lesen reicht: die Vorpruefung fragt nur Commits und Artefakte ab (actions: read).
+permissions:
+  contents: read
+  actions: read
+
 jobs:
+  # Vorpruefung (R30, 26.11.2026, Flo 23.11.): push auf stabil und der Gleichstand-Merge in claude/integration
+  # ueberspringen die Kette, wenn ihr Baum schon in einem VOLL gruenen PR-Lauf war (Artefakt gruener-baum-<baum>,
+  # gesetzt vom Job gruen-merken). pull_request und main testen immer. Regeln und Fehlerrichtung: werkzeuge/ci-vorpruefung.sh.
+  vorpruefung:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      laufen: ${{ steps.pruefen.outputs.laufen }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Muss die Kette laufen?
+        id: pruefen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EREIGNIS: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          VORHER: ${{ github.event.before }}
+          REPO: ${{ github.repository }}
+        run: bash werkzeuge/ci-vorpruefung.sh
+
   chromium:
+    needs: vorpruefung
+    if: needs.vorpruefung.outputs.laufen != 'false'
     # Zeitgrenzen (19.11.2026, Auftrag fc-18:11): 1,5x die laengste Dauer aus den letzten 15 gruenen Laeufen
     # (chromium 50 min, webkit 25 min, sql 2 min; Playwright installieren hoechstens 17 min). Ohne Grenze hing
     # webkit in Lauf 44531912225 ueber 3 Stunden an apt; die Vorgabe von GitHub waere 360 min.
@@ -54,6 +82,8 @@ jobs:
           if-no-files-found: ignore
 
   sql:
+    needs: vorpruefung
+    if: needs.vorpruefung.outputs.laufen != 'false'
     # Fuehrt die Kronen-SQL wirklich aus (PGlite = Postgres als WebAssembly, ohne Netz zu einer Datenbank).
     # Ersetzt nicht den einmaligen Lauf von supabase/kronen-rls-test.sql im Supabase SQL Editor vor dem Einspielen.
     runs-on: ubuntu-latest
@@ -113,10 +143,14 @@ jobs:
         run: node tests/server-paket2-loeschen.test.mjs
       - name: Eigene Online-Elo pruefen (vorbereitet, nicht eingespielt; nur die eigene, null ohne Elo, Rueckweg, Gegenprobe)
         run: node tests/server-online-elo.test.mjs
+      - name: CI-Vorpruefung pruefen (wer die Kette ueberspringen darf, Fehlerrichtung testen)
+        run: node tests/ci-vorpruefung.test.mjs
 
   webkit:
     # Fest auf 24.04: Mit dem Wechsel von ubuntu-latest auf 26.04 (29.10.2026) kam die Figur im Brett-Test
     # (setzeDauer 400) unter WebKit nicht mehr nach 520 ms an (gleiche Playwright-WebKit v2370, aber deren Build fuer 26.04). Offen: Ursache klaeren.
+    needs: vorpruefung
+    if: needs.vorpruefung.outputs.laufen != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -142,3 +176,24 @@ jobs:
           name: webkit-fehler
           path: artifacts/
           if-no-files-found: ignore
+
+  # Merkt sich einen VOLL gruenen PR-Baum (chromium 1-3, webkit, sql), damit stabil und der Gleichstand-Merge ihn nicht
+  # noch einmal testen. Laeuft nur, wenn alle drei Jobs gruen sind (needs ohne always). Ein abgelaufenes Artefakt heisst testen.
+  gruen-merken:
+    needs: [chromium, webkit, sql]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Baum bestimmen
+        id: baum
+        run: |
+          BAUM=$(git rev-parse HEAD^{tree})
+          echo "baum=$BAUM" >> "$GITHUB_OUTPUT"
+          mkdir -p gruen && echo "$BAUM $GITHUB_SHA $GITHUB_RUN_ID" > gruen/baum.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gruener-baum-${{ steps.baum.outputs.baum }}
+          path: gruen/baum.txt
+          retention-days: 90
