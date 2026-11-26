@@ -6,6 +6,9 @@
     "abo-beenden-schema.sql": {
       "pflicht_ab": "Abo-Start (Kasse frei)"
     },
+    "abo-kuendigung-312k-schema.sql": {
+      "pflicht_ab": "Abo-Start (Kasse frei)"
+    },
     "abo-schema.sql": {
       "pflicht": "jetzt"
     },
