@@ -106,7 +106,21 @@ export const DE = {
   "b.erstattet": "{betrag} € kommen über deine Zahlungsart zurück.",
   "b.mailOk": "Die Bestätigung ist per E-Mail unterwegs.",
   "b.mailFehlt": "Die Bestätigungs-Mail ging nicht raus. Mach bitte ein Bildschirmfoto dieser Seite als Nachweis, wir schicken sie nach.",
-  "b.fehler": "Das hat gerade nicht geklappt. Versuch es bitte gleich noch einmal oder schreib an die Adresse im Impressum."
+  "b.fehler": "Das hat gerade nicht geklappt. Versuch es bitte gleich noch einmal oder schreib an die Adresse im Impressum.",
+  "b.artWahl": "Art der Kündigung",
+  "b.ausserordentlich": "Außerordentliche Kündigung (aus wichtigem Grund)",
+  "b.grund": "Grund der außerordentlichen Kündigung",
+  "b.grundFehlt": "Bitte nenne den Grund für die außerordentliche Kündigung. Ohne wichtigen Grund wähle bitte die ordentliche Kündigung.",
+  "b.name": "Name (freiwillig)",
+  "b.fruehest": "Zum frühestmöglichen Zeitpunkt (Ende des laufenden Abrechnungszeitraums)",
+  "b.datumWahl": "Zu einem bestimmten Tag",
+  "b.datumFehlt": "Bitte wähle einen Tag ab morgen.",
+  "b.emailExtra": "Bestätigung zusätzlich an (freiwillig)",
+  "b.emailExtraHinweis": "Die Adresse deines Kontos bekommt die Bestätigung immer.",
+  "b.erklaerung": "Deine Kündigungserklärung, so bei uns gespeichert",
+  "b.herunterladen": "Herunterladen",
+  "b.drucken": "Drucken",
+  "b.datei": "kuendigung-crownmate"
 };
 
 export const EN = {
@@ -214,7 +228,21 @@ export const EN = {
   "b.erstattet": "€{betrag} will be refunded to your payment method.",
   "b.mailOk": "The confirmation is on its way by email.",
   "b.mailFehlt": "The confirmation email could not be sent. Please take a screenshot of this page as proof, we will send it later.",
-  "b.fehler": "That did not work just now. Please try again shortly or write to the address in the legal notice."
+  "b.fehler": "That did not work just now. Please try again shortly or write to the address in the legal notice.",
+  "b.artWahl": "Type of cancellation",
+  "b.ausserordentlich": "Extraordinary cancellation (for good cause)",
+  "b.grund": "Reason for the extraordinary cancellation",
+  "b.grundFehlt": "Please give the reason for the extraordinary cancellation. Without good cause, please choose the regular cancellation.",
+  "b.name": "Name (optional)",
+  "b.fruehest": "At the earliest possible date (end of the current billing period)",
+  "b.datumWahl": "On a specific date",
+  "b.datumFehlt": "Please choose a date from tomorrow on.",
+  "b.emailExtra": "Also send the confirmation to (optional)",
+  "b.emailExtraHinweis": "Your account's address always receives the confirmation.",
+  "b.erklaerung": "Your cancellation statement, as stored by us",
+  "b.herunterladen": "Download",
+  "b.drucken": "Print",
+  "b.datei": "cancellation-crownmate"
 };
 
 registriereTexte("p-abo", { de: DE, en: EN });

@@ -11,6 +11,12 @@
 //                   raus. In der Datenbank steht nur der SHA-256 des Tokens (abo-beenden-schema.sql), dort auch die
 //                   Begrenzung auf 3 Links je Adresse und Stunde.
 //   link_kuendigen  OHNE Anmeldung, { token }. Wie kuendigen, die Identitaet belegt der Link aus der Mail.
+// kuendigen und link_kuendigen nehmen seit T-068 (§ 312k Abs. 2) freiwillig { art, grund, name, zeitpunkt, email }:
+//   art 'ordentlich' (Vorgabe) | 'ausserordentlich', grund (bis 500 Zeichen), name (bis 200), zeitpunkt 'naechster'
+//   (Vorgabe, fruehestmoeglich) | 'JJJJ-MM-TT', email = weitere Adresse fuer die Bestaetigung (die Kontoadresse bekommt
+//   sie immer auch). Ein fehlender Grund fuehrt NIE zur Ablehnung (pruefung: true, wirkt mindestens ordentlich).
+//   Die Antwort traegt dazu { pruefung, erklaerung }: der Text der abgegebenen Erklaerung, gespeichert ueber
+//   abo_kuendigung_eintragen (abo-kuendigung-312k-schema.sql; fehlt sie, Nachweis wie bisher ohne die Angaben).
 // Nach jedem Vorgang: Eintrag in abo_vorgaenge (Nachweis) und Bestaetigung per Mail mit Inhalt, Datum und Uhrzeit.
 // Den Abo-Stand in abos setzt wie bisher der Stripe-Webhook (stripe.js wertet cancel_at_period_end und deleted aus).
 //
@@ -123,12 +129,14 @@ async function rpc(holen, basis, schluessel, name, daten) {
 
 async function aboZeile(holen, basis, schluessel, uid) {
   try {
-    const r = await holen(`${basis}/rest/v1/abos?select=status,abo_id,kunde_id,quelle&user_id=eq.${encodeURIComponent(uid)}`, { method: 'GET', headers: dienstKopf(schluessel) });
+    const r = await holen(`${basis}/rest/v1/abos?select=status,abo_id,kunde_id,quelle,gueltig_bis&user_id=eq.${encodeURIComponent(uid)}`, { method: 'GET', headers: dienstKopf(schluessel) });
     if (!r || !r.ok) return { ok: false };
     const d = await r.json();
     const z = Array.isArray(d) ? d[0] : null;
     if (!z || z.quelle !== 'stripe' || z.status === 'abgelaufen' || !MUSTER.sub.test(String(z.abo_id || '')) || !MUSTER.cus.test(String(z.kunde_id || ''))) return { ok: true, zeile: null };
-    return { ok: true, zeile: { abo: z.abo_id, kunde: z.kunde_id } };
+    // bis: Ende des bezahlten Zeitraums laut abos (unbekannt = null: dann wird kein Wunschtag als cancel_at gesetzt)
+    const bis = Date.parse(String(z.gueltig_bis || ''));
+    return { ok: true, zeile: { abo: z.abo_id, kunde: z.kunde_id, bis: Number.isFinite(bis) ? bis : null } };
   } catch (e) {
     return { ok: false };
   }
@@ -158,23 +166,113 @@ const periode = (s) => {
   };
 };
 
-function mailKuendigung({ eingang, wirksam, weg }) {
+// ---------- Paragraf 312k: Angaben der Bestaetigungsseite (T-068, Vorlage PR #203) ----------
+// Alles freiwillig; Vorgabe ist die ordentliche Kuendigung zum fruehestmoeglichen Zeitpunkt. Eine Kuendigung wird NIE
+// wegen eines fehlenden Grundes abgelehnt (Abs. 2 verlangt nur, dass die Seite die Angabe ermoeglicht; eine abgelehnte
+// Kuendigung riskiert Abs. 6). null heisst kaputte Form (nur ein Aufrufer ausser der App schickt so etwas) -> 400.
+export const MAX_GRUND = 500;
+export const MAX_NAME = 200;
+export const MAX_VORAUS_TAGE = 730;
+export const ARTEN = Object.freeze(['ordentlich', 'ausserordentlich']);
+const ohneSteuer = (s, max) => String(s || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+
+// Ende eines Kalendertags in deutscher Zeit (Mitternacht danach, Winter 23:00 UTC, Sommer 22:00 UTC). null bei einem
+// Tag, den es nicht gibt (31.02.).
+function tagesEnde(text) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text || ''));
+  if (!m) return null;
+  const [j, mo, t] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const d = new Date(Date.UTC(j, mo - 1, t));
+  if (d.getUTCFullYear() !== j || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== t) return null;
+  for (const h of [22, 23]) {
+    const ms = Date.UTC(j, mo - 1, t, h);
+    const stunde = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).find((x) => x.type === 'hour')?.value;
+    if (stunde === '00') return ms;
+  }
+  return null;
+}
+const tagText = (tag) => tag.split('-').reverse().join('.');
+
+export function pruefeEingabe(d, jetzt = Date.now()) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
+  const art = d.art === undefined || d.art === null ? 'ordentlich' : d.art;
+  if (!ARTEN.includes(art)) return null;
+  for (const feld of ['grund', 'name', 'email', 'zeitpunkt']) {
+    if (d[feld] !== undefined && d[feld] !== null && typeof d[feld] !== 'string') return null;
+  }
+  let email = null;
+  if (d.email && d.email.trim()) {
+    email = d.email.trim();
+    if (!MUSTER.email.test(email)) return null;
+  }
+  let zeitpunkt = 'naechster';
+  let tag = null;
+  if (d.zeitpunkt && d.zeitpunkt !== 'naechster') {
+    const ms = tagesEnde(d.zeitpunkt);
+    if (ms === null || ms <= jetzt || ms > jetzt + MAX_VORAUS_TAGE * TAG_MS) return null;
+    zeitpunkt = ms;
+    tag = d.zeitpunkt;
+  }
+  return { art, grund: ohneSteuer(d.grund, MAX_GRUND), name: ohneSteuer(d.name, MAX_NAME), email, zeitpunkt, tag };
+}
+
+// Stripe: ein Tag NACH dem bezahlten Zeitraum wird cancel_at (Stripe rechnet den Rest anteilig ab), sonst
+// cancel_at_period_end. Ein frueherer Wunschtag und jede ausserordentliche Kuendigung stehen als Notiz an Stripe, Flo
+// entscheidet von Hand; gekuendigt ist dann in jedem Fall ordentlich zum fruehestmoeglichen Zeitpunkt.
+export function kuendigungsParameter({ art, grund, zeitpunkt, tag = null, laeuftBis = null }) {
+  const p = new URLSearchParams();
+  const spaeter = Number.isFinite(zeitpunkt) && Number.isFinite(laeuftBis) && zeitpunkt > laeuftBis;
+  if (spaeter) p.append('cancel_at', String(Math.floor(zeitpunkt / 1000)));
+  else p.append('cancel_at_period_end', 'true');
+  const notiz = [];
+  if (art === 'ausserordentlich') notiz.push(`ausserordentlich: ${grund || 'kein Grund angegeben'}`);
+  if (!spaeter && tag) notiz.push(`Wunschtermin ${tag}`);
+  if (notiz.length) p.append('cancellation_details[comment]', notiz.join('; ').slice(0, 500));
+  return p;
+}
+
+// Text der abgegebenen Erklaerung (Abs. 4): so gespeichert, so auf der Seite, so in der Mail
+export function erklaerungText({ art, grund, name, tag, eingang, wirksam, pruefung, weg }) {
+  const z = [
+    'Kündigungserklärung',
+    'Vertrag: Abo „Crownmate Trainer“',
+    `Art: ${art === 'ausserordentlich' ? 'außerordentliche Kündigung' : 'ordentliche Kündigung'}`,
+  ];
+  if (art === 'ausserordentlich') z.push(`Grund: ${grund || 'kein Grund angegeben'}`);
+  if (name) z.push(`Name: ${name}`);
+  z.push(`Gewünschter Zeitpunkt: ${tag ? tagText(tag) : 'frühestmöglich'}`);
+  z.push(`Eingegangen am: ${zeitText(eingang)}, abgegeben über die Schaltfläche ‚jetzt kündigen‘`
+    + (weg === 'link' ? ' (über den Kündigungslink aus unserer E-Mail)' : ' (angemeldet in der App)'));
+  // -1 s: ein Ende um Mitternacht gehoert zum Tag davor
+  z.push(wirksam ? `Wirksam zum: ${datumText(wirksam - 1000)}` : 'Wirksam zum: Ende des laufenden Abrechnungszeitraums');
+  if (pruefung) {
+    z.push(`Hinweis: ${art === 'ausserordentlich' ? 'Über die außerordentliche Kündigung' : 'Über den früheren Zeitpunkt'} entscheiden wir`
+      + ' und melden uns per E-Mail. Die Kündigung wirkt mindestens ordentlich zum frühestmöglichen Zeitpunkt'
+      + (wirksam ? `, also spätestens zum ${datumText(wirksam - 1000)}.` : '.'));
+  }
+  return z.join('\n') + '\n';
+}
+
+function mailKuendigung({ erklaerung }) {
   return {
     betreff: 'Bestätigung deiner Kündigung: Crownmate Trainer',
     text: [
       'Hallo,',
       '',
-      'deine Kündigung ist bei uns eingegangen.',
+      'deine Kündigung ist bei uns eingegangen. So haben wir deine Erklärung gespeichert:',
       '',
-      `Inhalt: ordentliche Kündigung des Abos „Crownmate Trainer“${weg === 'link' ? ' (über den Kündigungslink aus unserer E-Mail)' : ''}`,
-      `Eingegangen am: ${zeitText(eingang)}`,
-      wirksam ? `Wirksam zum: ${datumText(wirksam)}. Bis dahin kannst du den Trainer weiter nutzen, danach wird nichts mehr abgebucht.` : 'Wirksam zum Ende des laufenden Abrechnungszeitraums. Danach wird nichts mehr abgebucht.',
+      erklaerung.trim(),
       '',
+      'Bis dahin kannst du den Trainer weiter nutzen, danach wird nichts mehr abgebucht.',
       'Das Spiel selbst bleibt für dich gratis.',
       '',
       'Crownmate',
     ].join('\n'),
   };
+}
+
+async function kurzHash(text) {
+  return (await sha256hex(text)).slice(0, 16);
 }
 function mailWiderruf({ eingang, erstattet }) {
   return {
@@ -198,15 +296,21 @@ function mailWiderruf({ eingang, erstattet }) {
   };
 }
 
-async function kuendige(k, { uid, email, weg }) {
+async function kuendige(k, { uid, email, weg, eingabe }) {
   const { f, basis, dienst, rk, t, log, umgebung } = k;
   const z = await aboZeile(f, basis, dienst, uid);
   if (!z.ok) return fehler(503, 'server');
   if (!z.zeile) return fehler(409, 'kein_abo');
-  const p = new URLSearchParams();
-  p.append('cancel_at_period_end', 'true');
-  let s = await stripe(f, 'POST', `/subscriptions/${z.zeile.abo}`, p, rk, `crownmate-kuendigen-${z.zeile.abo}`);
-  if (!s.ok && s.wiederholen) s = await stripe(f, 'POST', `/subscriptions/${z.zeile.abo}`, p, rk, `crownmate-kuendigen-${z.zeile.abo}`);
+  const ein = eingabe || pruefeEingabe({}, t);
+  const art = ein.art;
+  const grund = art === 'ausserordentlich' ? ein.grund : '';
+  const p = kuendigungsParameter({ art, grund, zeitpunkt: ein.zeitpunkt, tag: ein.tag, laeuftBis: z.zeile.bis });
+  const spaeter = p.has('cancel_at');
+  const pruefung = art === 'ausserordentlich' || (!!ein.tag && !spaeter);
+  // Schluessel haengt an den Parametern: ein Doppelklick ist EINE Kuendigung, eine geaenderte Angabe ein neuer Aufruf
+  const schluessel = `crownmate-kuendigen-${z.zeile.abo}-${await kurzHash(p.toString())}`;
+  let s = await stripe(f, 'POST', `/subscriptions/${z.zeile.abo}`, p, rk, schluessel);
+  if (!s.ok && s.wiederholen) s = await stripe(f, 'POST', `/subscriptions/${z.zeile.abo}`, p, rk, schluessel);
   if (!s.ok) {
     if (s.status === 401 || s.status === 403) { log('abo-beenden nicht_eingerichtet stripe ' + s.status); return fehler(503, 'nicht_eingerichtet'); }
     if (s.status === 404 || (s.status === 400 && /resource_missing|subscription/.test(s.code || ''))) return fehler(409, 'kein_abo');
@@ -217,18 +321,35 @@ async function kuendige(k, { uid, email, weg }) {
   if (d.customer !== z.zeile.kunde) { log('abo-beenden fremdes_abo'); return fehler(409, 'kein_abo'); }
   const bis = Number(d.cancel_at) || periode(d).ende;
   const wirksam = bis ? bis * 1000 : null;
+  const erklaerung = erklaerungText({ art, grund, name: ein.name, tag: ein.tag, eingang: t, wirksam, pruefung, weg });
+  // Bestaetigung an die eingetragene Adresse UND an die Kontoadresse (Schutz vor einer fremden Kuendigung), jede einmal
+  const an = [];
+  for (const a of [ein.email, email]) if (a && !an.some((x) => x.toLowerCase() === a.toLowerCase())) an.push(a);
   let mail = false;
-  if (email) {
-    const m = mailKuendigung({ eingang: t, wirksam, weg });
-    mail = (await sendeMail(f, umgebung, { an: email, betreff: m.betreff, text: m.text, idempotenz: `kuendigung-${z.zeile.abo}-${Math.floor(t / 60000)}` })).ok;
+  if (an.length) {
+    const m = mailKuendigung({ erklaerung });
+    for (const [i, adresse] of an.entries()) {
+      const r = await sendeMail(f, umgebung, { an: adresse, betreff: m.betreff, text: m.text, idempotenz: `kuendigung-${z.zeile.abo}-${Math.floor(t / 60000)}-${i}` });
+      mail = mail || r.ok;
+    }
   }
-  const e = await rpc(f, basis, dienst, 'abo_vorgang_eintragen', {
-    p_user: uid, p_art: 'kuendigung', p_weg: weg, p_abo: z.zeile.abo,
-    p_wirksam: wirksam ? new Date(wirksam).toISOString() : null, p_erstattet: null, p_mail: mail,
+  const zweit = ein.email && (!email || ein.email.toLowerCase() !== email.toLowerCase()) ? ein.email : null;
+  const wirksamIso = wirksam ? new Date(wirksam).toISOString() : null;
+  const e = await rpc(f, basis, dienst, 'abo_kuendigung_eintragen', {
+    p_user: uid, p_weg: weg, p_abo: z.zeile.abo, p_wirksam: wirksamIso, p_mail: mail,
+    p_kuendigung_art: art, p_grund: grund || null, p_name: ein.name || null, p_wunsch_zum: ein.tag, p_bestaetigung_an: zweit,
+    p_pruefung: pruefung, p_erklaerung: erklaerung,
   });
-  if (!e.ok) log('abo-beenden nachweis_fehlt kuendigung');
-  log(`abo-beenden kuendigung ${weg} mail=${mail}`);
-  return antwort(200, { art: 'kuendigung', eingang: new Date(t).toISOString(), wirksam_zum: wirksam ? new Date(wirksam).toISOString() : null, mail });
+  if (!e.ok) {
+    // abo-kuendigung-312k-schema.sql noch nicht eingespielt: Nachweis wie bisher, ohne die neuen Angaben
+    log('abo-beenden nachweis_ohne_312k');
+    const alt = await rpc(f, basis, dienst, 'abo_vorgang_eintragen', {
+      p_user: uid, p_art: 'kuendigung', p_weg: weg, p_abo: z.zeile.abo, p_wirksam: wirksamIso, p_erstattet: null, p_mail: mail,
+    });
+    if (!alt.ok) log('abo-beenden nachweis_fehlt kuendigung');
+  }
+  log(`abo-beenden kuendigung ${weg} ${art} pruefung=${pruefung} mail=${mail}`);
+  return antwort(200, { art: 'kuendigung', eingang: new Date(t).toISOString(), wirksam_zum: wirksamIso, mail, pruefung, erklaerung });
 }
 
 async function widerrufe(k, { uid, email }) {
@@ -344,6 +465,10 @@ export async function verarbeite({ methode, koerper, autorisierung } = {}, umgeb
     return antwort(200, { ok: true });
   }
 
+  // Angaben der Bestaetigungsseite (Paragraf 312k), vor jedem Netzaufruf geprueft
+  const eingabe = d.aktion === 'kuendigen' || d.aktion === 'link_kuendigen' ? pruefeEingabe(d, t) : null;
+  if ((d.aktion === 'kuendigen' || d.aktion === 'link_kuendigen') && !eingabe) return fehler(400, 'eingabe');
+
   if (d.aktion === 'link_kuendigen') {
     const token = typeof d.token === 'string' ? d.token.trim().toLowerCase() : '';
     if (!MUSTER.token.test(token)) return fehler(400, 'eingabe');
@@ -354,7 +479,7 @@ export async function verarbeite({ methode, koerper, autorisierung } = {}, umgeb
     const uid = z && typeof z.user_id === 'string' && MUSTER.uuid.test(z.user_id) ? z.user_id.toLowerCase() : null;
     const email = z && typeof z.email === 'string' && MUSTER.email.test(z.email) ? z.email : null;
     if (!uid) return fehler(410, 'link_ungueltig');
-    const a = await kuendige(k, { uid, email, weg: 'link' });
+    const a = await kuendige(k, { uid, email, weg: 'link', eingabe });
     if (a.status === 200) {
       const v = await rpc(f, basis, dienst, 'abo_link_verbrauchen', { p_hash: hash });
       if (!v.ok) log('abo-beenden link_nicht_verbraucht');
@@ -366,6 +491,6 @@ export async function verarbeite({ methode, koerper, autorisierung } = {}, umgeb
   if (!jwt) return fehler(401, 'anmeldung');
   const u = await angemeldet(f, basis, oeffentlich, jwt);
   if (!u.ok) return u.status === 401 ? fehler(401, 'anmeldung') : fehler(503, 'server');
-  if (d.aktion === 'kuendigen') return kuendige(k, { uid: u.uid, email: u.email, weg: 'angemeldet' });
+  if (d.aktion === 'kuendigen') return kuendige(k, { uid: u.uid, email: u.email, weg: 'angemeldet', eingabe });
   return widerrufe(k, { uid: u.uid, email: u.email });
 }

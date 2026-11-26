@@ -86,3 +86,24 @@
 .beenden-feld { display: grid; gap: 6px; margin-top: 12px; font-size: 14px; color: var(--text-2); }
 .beenden-feld input { font: inherit; font-size: 16px; padding: 10px 12px; border-radius: var(--r-l); color: var(--text);
   background: var(--flaeche-2); border: 1px solid var(--linie-2); }
+.beenden-feld[hidden] { display: none !important; }
+.beenden-feld textarea { font: inherit; font-size: 16px; padding: 10px 12px; border-radius: var(--r-l); color: var(--text); resize: vertical;
+  background: var(--flaeche-2); border: 1px solid var(--linie-2); }
+.beenden-feld small { font-size: 13px; color: var(--text-2); }
+.beenden-wahl { margin: 12px 0 0; padding: 0; border: 0; display: grid; gap: 8px; min-width: 0; }
+.beenden-wahl legend { padding: 0; margin-bottom: 6px; font-size: 14px; color: var(--text-2); }
+.beenden-wahl label { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--text); min-height: 32px; }
+.beenden-wahl input[type="radio"] { width: 20px; height: 20px; margin: 2px 0 0; flex: none; }
+.beenden-tag { font: inherit; font-size: 16px; padding: 8px 12px; border-radius: var(--r-l); color: var(--text); max-width: 100%;
+  background: var(--flaeche-2); border: 1px solid var(--linie-2); }
+.beenden-erklaerung-box { margin-top: 14px; }
+.beenden-erklaerung-titel { margin: 0 0 6px; font-size: 14px; color: var(--text-2); }
+.beenden-erklaerung { margin: 0; padding: 12px 16px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 14px;
+  color: var(--text); background: var(--flaeche-2); border: 1px solid var(--linie); border-radius: var(--r-l); }
+/* Drucken: nur die Kuendigungskarte (kuendigen.js, drucken()) */
+@media print {
+  body.beenden-druck > :not(.beenden-ort) { display: none !important; }
+  body.beenden-druck .beenden-ort .sheet-schleier, body.beenden-druck .beenden-knoepfe, body.beenden-druck .sheet-griff { display: none !important; }
+  body.beenden-druck .beenden-ort, body.beenden-druck .beenden-karte { position: static !important; transform: none !important;
+    max-height: none !important; overflow: visible !important; }
+}

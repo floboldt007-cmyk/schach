@@ -382,10 +382,10 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
   });
   await seite.route(SUPA + '/**', async (r) => {
     const u = r.request().url();
-    anfragen.push({ url: u, methode: r.request().method(), kopf: r.request().headers() });
+    anfragen.push({ url: u, methode: r.request().method(), kopf: r.request().headers(), daten: r.request().postData() });
     if (srv.offline) return r.abort('internetdisconnected');
     const body = u.includes('/rpc/ist_premium') ? srv.premium : u.includes('/rest/v1/abos?') ? srv.abo : u.includes('/rest/v1/produkte?') ? srv.produkt
-      : u.includes('/functions/v1/abo-kasse') ? { kassen_url: KASSE_URL } : {};
+      : u.includes('/functions/v1/abo-kasse') ? { kassen_url: KASSE_URL } : u.includes('/functions/v1/abo-beenden') ? (srv.beenden || {}) : {};
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await seite.addInitScript(({ konto, sitzung, vorher }) => {
@@ -782,7 +782,7 @@ async function browserTeil(browser) {
   gruppe = 'Premium';
   {
     const bis = Date.now() + 12 * 86400000;
-    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, schema: 'dark', handy: true, sitzung: SITZUNG,
+    const { kontext, seite, fehler, anfragen, srv } = await neueSeite(browser, { w: 390, h: 844, schema: 'dark', handy: true, sitzung: SITZUNG,
       server: { produkt: [PRODUKT], premium: true, abo: [{ status: 'gekuendigt', plan: 'jahr', gueltig_bis: new Date(bis).toISOString(), quelle: 'stripe' }] } });
     await zuEinstellungen(seite);
     await seite.waitForSelector('.abo-gruppe');
@@ -830,6 +830,43 @@ async function browserTeil(browser) {
     await seite.waitForSelector('.beenden-karte[data-modus="kuendigen"]');
     const k = await seite.evaluate(() => [...document.querySelectorAll('.beenden-knoepfe button')].map((x) => x.textContent.trim()));
     pruefe('Gruppe: "Verträge hier kündigen" fuehrt zur Bestaetigung mit "jetzt kündigen"', k[0] === 'jetzt kündigen', k);
+    // § 312k Abs. 2 (T-068): Art, Grund, Name, Zeitpunkt (Vorgabe fruehestmoeglich), Bestaetigungsadresse
+    const felder = await seite.evaluate(() => {
+      const q = (s) => document.querySelector('.beenden-karte ' + s);
+      return { ordentlich: q('input[name="beenden-art"][value="ordentlich"]')?.checked, ausser: !!q('input[name="beenden-art"][value="ausserordentlich"]'),
+        grundVersteckt: !!q('.beenden-grund')?.closest('[hidden]'), name: !!q('input.beenden-name'), naechster: q('input[name="beenden-zeit"][value="naechster"]')?.checked,
+        tag: q('input.beenden-tag')?.type, mail: q('input.beenden-email-extra')?.type, nameErforderlich: !!q('input.beenden-name')?.required };
+    });
+    pruefe('312k Blatt: Art (ordentlich vorgewaehlt), Grund versteckt, Name freiwillig, fruehestmoeglich vorgewaehlt, Tag, Adresse', felder.ordentlich === true
+      && felder.ausser && felder.grundVersteckt && felder.name && !felder.nameErforderlich && felder.naechster === true && felder.tag === 'date' && felder.mail === 'email', felder);
+    const vorher = anfragen.filter((a) => a.url.includes('/functions/v1/abo-beenden')).length;
+    await seite.check('input[name="beenden-art"][value="ausserordentlich"]');
+    pruefe('312k Blatt: bei ausserordentlich erscheint das Grund-Feld', await seite.isVisible('.beenden-grund'));
+    await bild(seite, 'abo-kuendigen-formular');
+    await seite.click('.beenden-knoepfe [data-beenden="los"]');
+    await warte(300);
+    pruefe('312k Blatt: ausserordentlich ohne Grund -> klarer Hinweis, nichts gesendet', /Grund/.test(await seite.locator('.beenden-stand').innerText())
+      && anfragen.filter((a) => a.url.includes('/functions/v1/abo-beenden')).length === vorher);
+    const erkl = ['Kündigungserklärung', 'Art: außerordentliche Kündigung', 'Grund: Umzug',
+      'Eingegangen am: 26.11.2026, 12:00 Uhr, abgegeben über die Schaltfläche ‚jetzt kündigen‘', ''].join('\n');
+    srv.beenden = { art: 'kuendigung', eingang: new Date().toISOString(), wirksam_zum: new Date(bis).toISOString(), mail: true, pruefung: true, erklaerung: erkl };
+    await seite.fill('.beenden-grund', 'Umzug');
+    await seite.fill('input.beenden-name', 'Erika Probe');
+    await seite.fill('input.beenden-email-extra', 'zweit@example.invalid');
+    await seite.click('.beenden-knoepfe [data-beenden="los"]');
+    await seite.waitForSelector('.beenden-erklaerung', { timeout: 5000 }).catch(() => {});
+    const gesendet = anfragen.filter((a) => a.url.includes('/functions/v1/abo-beenden')).map((a) => { try { return JSON.parse(a.daten); } catch (e) { return null; } }).pop() || {};
+    pruefe('312k Blatt: Anfrage traegt art, grund, name, zeitpunkt und email', gesendet.aktion === 'kuendigen' && gesendet.art === 'ausserordentlich'
+      && gesendet.grund === 'Umzug' && gesendet.name === 'Erika Probe' && gesendet.zeitpunkt === 'naechster' && gesendet.email === 'zweit@example.invalid', gesendet);
+    const erklText = await seite.locator('.beenden-erklaerung').innerText().catch(() => '');
+    const knoepfeDanach = await seite.evaluate(() => [...document.querySelectorAll('.beenden-knoepfe button')].map((x) => x.dataset.beenden));
+    pruefe('312k Blatt: gespeicherte Erklaerung sichtbar, Herunterladen und Drucken da, kein zweites Kuendigen', erklText.includes('abgegeben über die Schaltfläche ‚jetzt kündigen‘')
+      && knoepfeDanach.includes('herunterladen') && knoepfeDanach.includes('drucken') && !knoepfeDanach.includes('los'), { erklText, knoepfeDanach });
+    const [laden] = await Promise.all([seite.waitForEvent('download', { timeout: 5000 }).catch(() => null), seite.click('.beenden-knoepfe [data-beenden="herunterladen"]')]);
+    let ladeText = '';
+    if (laden) { const p = await laden.path().catch(() => null); if (p) ladeText = readFileSync(p, 'utf8'); }
+    pruefe('312k Blatt: Herunterladen liefert die Erklaerung als Textdatei', !!laden && /\.txt$/.test(laden.suggestedFilename()) && ladeText === erkl, laden && laden.suggestedFilename());
+    await bild(seite, 'abo-kuendigen-erklaerung');
     await seite.keyboard.press('Escape');
     await seite.waitForSelector('.beenden-ort', { state: 'detached', timeout: 3000 });
     await seite.click('.abo-gruppe [data-abo="zeigen"]');
@@ -838,6 +875,28 @@ async function browserTeil(browser) {
     await seite.evaluate(() => { location.hash = '#arena'; });
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
     pruefe('Screen-Wechsel schliesst das Blatt', true);
+    pruefe('keine Fehler', fehler.length === 0, fehler);
+    await kontext.close();
+  }
+
+  // ---------- § 312k: Kuendigen ohne Anmeldung per Link, gleiche Angaben (T-068) ----------
+  gruppe = 'Kuendigen per Link';
+  {
+    const tok = 'a'.repeat(64);
+    const { kontext, seite, fehler, anfragen, srv } = await neueSeite(browser, { konto: false, server: { produkt: [PRODUKT] } });
+    srv.beenden = { art: 'kuendigung', eingang: new Date().toISOString(), wirksam_zum: null, mail: true, pruefung: false,
+      erklaerung: 'Kündigungserklärung\nArt: ordentliche Kündigung\nabgegeben über die Schaltfläche ‚jetzt kündigen‘\n' };
+    await seite.goto(BASIS + '#kuendigen=' + tok);
+    await seite.waitForSelector('.beenden-karte[data-modus="link"]', { timeout: 15000 });
+    const da = await seite.evaluate(() => ['input[name="beenden-art"]', 'input.beenden-name', 'input[name="beenden-zeit"]', 'input.beenden-email-extra']
+      .every((s) => document.querySelector('.beenden-karte ' + s)));
+    pruefe('Link-Weg: Blatt mit Art, Name, Zeitpunkt und Adresse', da);
+    await seite.click('.beenden-knoepfe [data-beenden="los"]');
+    await seite.waitForSelector('.beenden-erklaerung', { timeout: 5000 }).catch(() => {});
+    const g = anfragen.filter((a) => a.url.includes('/functions/v1/abo-beenden')).map((a) => { try { return JSON.parse(a.daten); } catch (e) { return null; } }).pop() || {};
+    pruefe('Link-Weg: Anfrage mit Token, ordentlich, fruehestmoeglich, ohne Anmeldung', g.aktion === 'link_kuendigen' && g.token === tok && g.art === 'ordentlich'
+      && g.zeitpunkt === 'naechster', g);
+    pruefe('Link-Weg: Erklaerung sichtbar', /jetzt kündigen/.test(await seite.locator('.beenden-erklaerung').innerText().catch(() => '')));
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
