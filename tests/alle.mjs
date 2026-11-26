@@ -133,6 +133,7 @@ const SUITEN = [
   { name: 'sw-wechsel', datei: 'sw-wechsel.test.mjs', args: [], was: 'Wechsel des Service Workers: hoechstens einmal neu laden, nie im Spiel' },
   { name: 'brett-tastatur', datei: 'brett-tastatur.test.mjs', args: [], was: 'Brett per Tastatur, Feldnamen, Bot-Zug in der Zugansage' },
   { name: 'siegblatt-tastatur', datei: 'siegblatt-tastatur.test.mjs', args: [], was: 'Sieg-Blatt per Tastatur: Fokus-Halt, Escape' },
+  { name: 'scroll-zurueck', datei: 'scroll-zurueck.test.mjs', args: [], was: 'Scrollposition nach Zurueck, neuer Aufruf und Neuladen oben (Browser)' },
   { name: 'sw-cache', datei: 'sw-cache.test.mjs', args: [], was: 'Versionswechsel: alter Cache kommt nicht wieder' },
   // R23-erstbesuch (fc-06:00, 20.11.2026): install legt nur den KERN ab, der Rest kommt in Haeppchen; WebKit beendet install nach etwa 30 s
   { name: 'sw-erstbesuch', datei: 'sw-erstbesuch.test.mjs', args: [], exklusiv: 'Zeitgrenze der Installation', was: 'Erstbesuch Slow 4G (Chromium): Worker aktiv, Kern im Cache, Nachladen setzt fort' },
