@@ -929,6 +929,37 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
     und die Live-`price_...` wie in Schritt 8 setzen und in `produkte` den Live-Schalter und den Live-Portal-Link
     eintragen.
 
+### Abo-Zuordnung absichern (Stand 09.11.2026, aus PR #203): bitte einspielen
+
+Zwei Dinge, beide **bevor** das Abo verkauft wird. Die App funktioniert vor und nach jedem Schritt; die Reihenfolge ist
+frei. Nichts davon ändert Preise, `produkte.aktiv` oder schaltet das Abo frei. Den Kündigungsknopf aus PR #203 gibt es
+hier nicht: Kündigen und Widerrufen laufen über die Edge Function `abo-beenden` (Abschnitt „Kündigen und Widerrufen“).
+
+**Warum (Audit 09.11.2026, Befund M4):** Wer mit der Nutzer-ID eines anderen Kontos bezahlte, hängte dessen laufendes
+Abo auf den eigenen Stripe-Kunden um. Außerdem gab **jedes** Abo im selben Stripe-Konto Premium, nicht nur der Trainer.
+Die Kasse auf dem Server nimmt die Nutzer-ID aus der Anmeldung; die Schritte hier bleiben als zweite Sicherung.
+
+1. **Schema neu einspielen** (kein Umhängen mehr): Im **SQL Editor** den Inhalt von `supabase/abo-schema.sql`
+   ausführen (ein erneuter Lauf ist erlaubt, es ändert sich nur die Funktion `abo_stripe_ereignis`; Tabellen und Daten
+   bleiben). Danach `supabase/abo-rls-test.sql` ausführen: Am Ende muss `Abo-RLS-Test erfolgreich` stehen (der Test
+   enthält den Kaper-Fall und rollt alles zurück). Neu ist das Ergebnis `'konflikt'`: Ein Kauf für ein Konto, dessen
+   Abo gerade läuft und an einem **anderen** Stripe-Kunden hängt, wird nicht zugeordnet. Die Zeile in `abos` bleibt.
+   **Rückweg:** die vorige Fassung der Datei einspielen (GitHub, `supabase/abo-schema.sql`, History, Stand vor diesem
+   Block). Daten gehen dabei nicht verloren; Ereignisse mit `'konflikt'` bleiben einfach stehen.
+2. **Produktprüfung im Webhook** (nur der Trainer gibt Premium): Im Terminal
+   `npx supabase secrets set ABO_STRIPE_PLAN=trainer-monat` (der **Lookup-Key** des Preises; mehrere mit Komma) und,
+   wenn du magst, zusätzlich `npx supabase secrets set ABO_STRIPE_PREIS=price_...` (die Preis-ID, derselbe Name wie für
+   die Kasse). Dann `npx supabase functions deploy stripe-webhook --no-verify-jwt`. **Wichtig:** Der Preis in Stripe
+   muss den Lookup-Key wirklich tragen, sonst erkennt der Webhook den Trainer nicht und verbucht nichts (im Protokoll
+   der Function steht dann `fremdes_produkt`). Solange beide Secrets fehlen, prüft der Webhook wie bisher nichts.
+   **Rückweg:** `npx supabase secrets unset ABO_STRIPE_PLAN ABO_STRIPE_PREIS` und die Function neu hochladen.
+
+**Wenn ein `'konflikt'` auftaucht** (im Protokoll der Function `stripe-webhook`, oder mit
+`select id, kunde_id, abo_id, user_id, erstellt from public.stripe_ereignisse where ergebnis = 'konflikt';`):
+Jemand hat für ein Konto bezahlt, das schon ein laufendes Abo über einen anderen Stripe-Kunden hat. Das Konto behält
+sein Abo. In Stripe den **neuen** Kunden ansehen: Doppelkauf derselben Person oder jemand Fremdes, in beiden Fällen das
+zweite Abo kündigen und erstatten. Nichts in `abos` von Hand umhängen.
+
 **Von Hand freischalten** (z. B. für Testerinnen): **Table Editor > abos > Insert row** mit `user_id` (aus
 **Authentication > Users**), `status` = `aktiv`, `gueltig_bis` = Datum, `quelle` = `manuell`. Ein späterer Kauf
 derselben Person verkürzt das nie.
@@ -947,8 +978,9 @@ Kommt ein Kauf ohne Nutzer-ID an (z. B. über einen alten, nicht deaktivierten Z
    Spätere Ereignisse kommen danach von selbst an. Ohne diesen Schritt bliebe es beim Datum aus Schritt 1.
 
 **Hängende Ereignisse finden** (z. B. einmal im Monat im SQL Editor):
-`select * from public.stripe_ereignisse where ergebnis in ('wartet', 'ohne_nutzer') and eingegangen_am < now() - interval '1 hour';`
-Normal ist eine leere Liste. Steht dort etwas, gehört der Kauf keinem Konto: wie oben zuordnen.
+`select * from public.stripe_ereignisse where ergebnis in ('wartet', 'ohne_nutzer', 'konflikt') and eingegangen_am < now() - interval '1 hour';`
+Normal ist eine leere Liste. Steht dort etwas, gehört der Kauf keinem Konto: wie oben zuordnen (bei `konflikt` und den
+wartenden Ereignissen desselben Kunden nicht zuordnen, sondern wie im Block „Abo-Zuordnung absichern“ vorgehen).
 **Konto löschen** entfernt die Zeile in `abos`, kündigt aber **nicht** das Stripe-Abo: vorher im Kundenportal kündigen.
 
 **App Store und Google Play:** In einer iOS-App aus dem App Store müssen digitale Abos über Apples In-App-Kauf laufen

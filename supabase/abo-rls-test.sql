@@ -328,6 +328,54 @@ begin
     raise exception 'FEHLER: Kauf hat ein laengeres Abo verkuerzt (%, %)', r, row_to_json(a);
   end if;
 
+  -- 12b. Kaper-Fall (Audit 09.11.2026, Befund M4): Jemand bezahlt ueber den oeffentlichen Zahlungslink mit der
+  -- Nutzer-ID von B. B hat ein laufendes Abo ueber cus_B1 (Schritt 9): Der fremde Kauf wird NICHT zugeordnet.
+  r := public.abo_stripe_ereignis('evt_k1', 'checkout.session.completed', t0 + interval '70 seconds', 'cus_KAPER', 'sub_KAPER',
+    'b2222222-2222-4222-8222-222222222222', 'aktiv', t0 + interval '70 seconds' + interval '1 day', null);
+  select * into a from public.abos where user_id = 'b2222222-2222-4222-8222-222222222222';
+  if r <> 'konflikt' or a.kunde_id <> 'cus_B1' or a.abo_id <> 'sub_B1' or a.gueltig_bis <> t0 + interval '60 days'
+    or a.status <> 'aktiv' or a.stand_zeit <> t0 + interval '50 seconds'
+    or exists (select 1 from public.abos where kunde_id = 'cus_KAPER')
+    or (select ergebnis from public.stripe_ereignisse where id = 'evt_k1') <> 'konflikt'
+    or (select user_id from public.stripe_ereignisse where id = 'evt_k1') <> 'b2222222-2222-4222-8222-222222222222' then
+    raise exception 'FEHLER: fremder Kauf hat das laufende Abo von B umgehaengt (%, %)', r, row_to_json(a);
+  end if;
+  -- ... die Ereignisse des fremden Kunden warten, auch seine Kuendigung nimmt B nichts weg
+  r := public.abo_stripe_ereignis('evt_k2', 'customer.subscription.updated', t0 + interval '71 seconds', 'cus_KAPER', 'sub_KAPER',
+    null, 'aktiv', t0 + interval '30 days', 'monat');
+  if r <> 'wartet' then
+    raise exception 'FEHLER: Abo-Ereignis des fremden Kunden wartet nicht (%)', r;
+  end if;
+  r := public.abo_stripe_ereignis('evt_k3', 'customer.subscription.deleted', t0 + interval '72 seconds', 'cus_KAPER', 'sub_KAPER',
+    null, 'abgelaufen', t0 + interval '72 seconds', null);
+  if r <> 'wartet' or not public.ist_premium_von('b2222222-2222-4222-8222-222222222222') then
+    raise exception 'FEHLER: Kuendigung des fremden Kunden hat B das Premium genommen (%)', r;
+  end if;
+  -- ... und die echten Ereignisse von B finden ihr Konto weiter
+  r := public.abo_stripe_ereignis('evt_k4', 'invoice.paid', t0 + interval '73 seconds', 'cus_B1', 'sub_B1',
+    null, 'aktiv', t0 + interval '90 days', null);
+  select * into a from public.abos where user_id = 'b2222222-2222-4222-8222-222222222222';
+  if r <> 'neu' or a.gueltig_bis <> t0 + interval '90 days' or a.kunde_id <> 'cus_B1' then
+    raise exception 'FEHLER: echtes Ereignis von B kommt nach dem Kaper-Versuch nicht mehr an (%, %)', r, row_to_json(a);
+  end if;
+  -- 12c. Derselbe Kunde schliesst waehrend der Laufzeit noch einmal ab (C: cus_C1 laeuft mit sub_C2): kein Konflikt
+  r := public.abo_stripe_ereignis('evt_k5', 'checkout.session.completed', t0 + interval '74 seconds', 'cus_C1', 'sub_C4',
+    'c3333333-3333-4333-8333-333333333333', 'aktiv', t0 + interval '1 day', null);
+  select * into a from public.abos where user_id = 'c3333333-3333-4333-8333-333333333333';
+  if r <> 'zugeordnet' or a.abo_id <> 'sub_C4' or a.kunde_id <> 'cus_C1' or a.gueltig_bis <> t0 + interval '30 days' then
+    raise exception 'FEHLER: zweiter Kauf desselben Kunden als Konflikt behandelt (%, %)', r, row_to_json(a);
+  end if;
+  -- 12d. Nach dem echten Ende darf ein neuer Stripe-Kunde das Konto uebernehmen (C kauft spaeter neu, der Zahlungslink
+  -- legt dabei einen neuen Kunden an): erst das Ende von sub_C4, dann der neue Kauf
+  r := public.abo_stripe_ereignis('evt_k6', 'customer.subscription.deleted', t0 + interval '75 seconds', 'cus_C1', 'sub_C4',
+    null, 'abgelaufen', t0 + interval '75 seconds', null);
+  r := public.abo_stripe_ereignis('evt_k7', 'checkout.session.completed', t0 + interval '76 seconds', 'cus_C9', 'sub_C9',
+    'c3333333-3333-4333-8333-333333333333', 'aktiv', t0 + interval '76 seconds' + interval '1 day', null);
+  select * into a from public.abos where user_id = 'c3333333-3333-4333-8333-333333333333';
+  if r <> 'zugeordnet' or a.kunde_id <> 'cus_C9' or a.abo_id <> 'sub_C9' or not public.ist_premium_von('c3333333-3333-4333-8333-333333333333') then
+    raise exception 'FEHLER: Neukauf nach dem Ende des alten Abos nicht zugeordnet (%, %)', r, row_to_json(a);
+  end if;
+
   -- 13. Unfertige Eingaben werden abgelehnt (Stripe wiederholt dann)
   begin
     perform public.abo_stripe_ereignis('kein-evt', 'invoice.paid', t0, 'cus_B1', 'sub_B1', null, 'aktiv', t0 + interval '1 day', null);
