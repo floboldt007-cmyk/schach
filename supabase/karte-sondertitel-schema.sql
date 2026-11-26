@@ -1,3 +1,6 @@
+-- ACHTUNG (R30, 26.11.2026): supabase/karte-besitz-sicht-schema.sql ersetzt Funktionen aus dieser Datei (karte_von).
+-- Wer DIESE Datei erneut einspielt, setzt sie still auf eine aeltere Fassung zurueck (Motiv/Rahmen wieder ohne Beleg).
+-- Danach IMMER karte-besitz-sicht-schema.sql erneut einspielen und dort die Fassungs-Probe fahren.
 -- VORSCHLAG (13.11.2026, Feinschliff R15), NOCH NICHT EINGESPIELT: der Gegner einer Online-Partie sieht die Sondertitel
 -- "Der Erfinder" und "Pionier Nr. <n>" auf der Visitenkarte, aber nur, wenn der Server den Besitz bestaetigt. Die feste
 -- Titelliste von karte_waehle bleibt unberuehrt (Erfinder und Pionier stehen dort bewusst nicht); der Besitzer meldet

@@ -1,3 +1,6 @@
+-- ACHTUNG (R30, 26.11.2026): supabase/karte-besitz-sicht-schema.sql ersetzt Funktionen aus dieser Datei (karte_waehle, karte_von).
+-- Wer DIESE Datei erneut einspielt, setzt sie still auf eine aeltere Fassung zurueck (Motiv/Rahmen wieder ohne Beleg).
+-- Danach IMMER karte-besitz-sicht-schema.sql erneut einspielen und dort die Fassungs-Probe fahren.
 -- VORSCHLAG (R27, 21.11.2026, Kaltreview von PR #271 Befund 2), NICHT EINGESPIELT: verdiente Rahmen der Visitenkarte nur
 -- mit Beleg auf dem Server. Bisher prueft karte_waehle motiv/grund/rahmen nur gegen die feste Liste (karte_konstanten);
 -- ein direkter Aufruf setzt so z. B. 'serie-100' ohne Serie, und der Gegner sieht es (karte_von / karte_der_partie).

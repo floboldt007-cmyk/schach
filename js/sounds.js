@@ -483,17 +483,27 @@ function spaeter(fn, ms) {
 // (sonst bliebe sie bis zum Neustart in fehlt), und wieder online laedt es nach. Vorab sperren darf das nicht: wer alles
 // im Cache hat, bekommt die Dateien auch ohne Netz (Kaltreview fc-08:50). Ohne Netz wird nur geholt, was ein Cache hat: jeder
 // Abruf ins Leere waere eine Fehlermeldung in der Konsole (tests/offline-ladeprobe.test.mjs).
-async function imCache(adresse) {
-  try { return !!(await caches.match(adresse)); } catch (e) { return true; } // INTENTIONAL-SLOP[E5]: Cache nicht lesbar heisst: wie bisher abrufen
-}
 let wartetAufNetz = false;
 function ohneNetz() {
   if (typeof navigator === 'undefined' || navigator.onLine !== false) return false;
   if (!wartetAufNetz && typeof addEventListener === 'function') {
     wartetAufNetz = true;
-    addEventListener('online', () => { wartetAufNetz = false; try { vorladen(); } catch (f) { /* egal */ } }, { once: true }); // INTENTIONAL-SLOP[F1]: ein Fehler beim Nachladen der Klaenge bleibt still, wie beim Vorladen in einstellen()
+    // R30 Kaltreview: laeuft beim Wiederkommen des Netzes noch ein Lauf, gaebe vorladen() nur ihn zurueck und die ohne Netz
+    // uebersprungenen Dateien kaemen erst beim naechsten Aufruf. Darum nach dem laufenden Lauf noch einmal.
+    const nach = () => { try { vorladen(); } catch (f) { /* egal */ } }; // INTENTIONAL-SLOP[F1]: ein Fehler beim Nachladen der Klaenge bleibt still, wie beim Vorladen in einstellen()
+    addEventListener('online', () => { wartetAufNetz = false; if (ladeLauf) ladeLauf.promise.then(nach, nach); else nach(); }, { once: true });
   }
   return true;
+}
+// Rueckgabe des Abrufs ohne Netz, wenn kein Cache die Datei hat: nicht fehlend, wieder online wird nachgeladen
+const OHNE_NETZ = Symbol('ohne-netz');
+// Ohne Netz direkt aus dem Cache lesen, nicht "liegt im Cache?" fragen und danach ueber den Service Worker abrufen: dazwischen
+// konnte die Datei verschwinden, der Abruf scheiterte dann doch (R30, CI 26.11.2026, offline-ladeprobe chromium).
+async function holeOhneNetz(adresse) {
+  let treffer;
+  try { treffer = await caches.match(adresse); } catch (e) { return hole(adresse); } // INTENTIONAL-SLOP[E5]: Cache nicht lesbar heisst: wie bisher abrufen
+  if (!treffer) { ohneNetz(); return OHNE_NETZ; }
+  try { return treffer.ok ? await treffer.arrayBuffer() : null; } catch (e) { return null; }
 }
 
 function vorladen() {
@@ -502,18 +512,18 @@ function vorladen() {
   if (ladeLauf && ladeLauf.gen === generation) return ladeLauf.promise;
   const gen = generation;
   const p = paket;
-  let offen = DATEIEN.filter((d) => !puffer.has(d) && !fehlt.has(d));
+  const offen = DATEIEN.filter((d) => !puffer.has(d) && !fehlt.has(d));
   const lauf = { gen, promise: null };
   lauf.promise = (async () => {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false && typeof caches !== 'undefined') {
-      const da = await Promise.all(offen.map((d) => imCache(url(p, d))));
-      if (gen !== generation) return vorrat();
-      if (da.includes(false)) ohneNetz();
-      offen = offen.filter((d, i) => da[i]);
-    }
     const versprechen = [];
+    // Ohne Netz gilt die Regel JE DATEI, nicht nur beim Start des Laufs (R30, 26.11.2026): ein mit Netz begonnener Lauf holte
+    // nach dem Wegfall jede weitere Datei ins Leere (offline-ladeprobe unter WebKit, alle 25 gemessenen Abrufe aus dieser Schleife).
+    const holeHier = (adresse) => {
+      if (typeof navigator === 'undefined' || navigator.onLine !== false || typeof caches === 'undefined') return hole(adresse);
+      return holeOhneNetz(adresse);
+    };
     const starte = (i) => {
-      if (i < offen.length && !versprechen[i]) versprechen[i] = hole(url(p, offen[i]));
+      if (i < offen.length && !versprechen[i]) versprechen[i] = holeHier(url(p, offen[i]));
     };
     for (let i = 0; i < 4; i++) starte(i);
     for (let i = 0; i < offen.length; i++) {
@@ -521,6 +531,7 @@ function vorladen() {
       const daten = await versprechen[i];
       versprechen[i] = null;
       if (gen !== generation) return vorrat();
+      if (daten === OHNE_NETZ) continue; // nicht im Cache, kein Netz: nicht fehlend, wieder online laedt nach
       const b = daten ? await dekodiere(daten) : null;
       if (gen !== generation) return vorrat();
       if (b) puffer.set(offen[i], b);
