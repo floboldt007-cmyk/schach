@@ -120,6 +120,42 @@ rollback;`);
     !r.fehler && r.letzte.includes('Streit-Fall ok'), r.fehler || r.letzte);
 }
 {
+  // Streit schuetzt IMMER, auch wenn der Zeitraum im Streit abgelaufen ist (Kaltreview D, 26.11.2026): abo_wende_an friert
+  // gueltig_bis waehrend des Streits ein. Hinge der Schutz an gueltig_bis > now(), uebernaehme ein fremder Kauf die Zeile,
+  // und der spaeter gewonnene Streit kaeme nie an (wartet).
+  const r = await lauf(db, `
+begin;
+insert into auth.users (id, email) values ('f6666666-6666-4666-8666-666666666666', 'abo-f@example.invalid');
+insert into public.abos (user_id, status, plan, gueltig_bis, quelle, kunde_id, abo_id, stand_zeit, status_vor_streit, gueltig_bis_vor_streit)
+values ('f6666666-6666-4666-8666-666666666666', 'strittig', 'monat', now() - interval '5 days', 'stripe', 'cus_F1', 'sub_F1',
+  now() - interval '40 days', 'aktiv', now() + interval '25 days');
+do $$
+declare
+  r text;
+  a public.abos;
+begin
+  r := public.abo_stripe_ereignis('evt_s2', 'checkout.session.completed', now() - interval '2 seconds', 'cus_FREMD2', 'sub_FREMD2',
+    'f6666666-6666-4666-8666-666666666666', 'aktiv', now() + interval '1 day', null);
+  select * into a from public.abos where user_id = 'f6666666-6666-4666-8666-666666666666';
+  if r <> 'konflikt' or a.kunde_id <> 'cus_F1' or a.abo_id <> 'sub_F1' or a.status <> 'strittig'
+    or exists (select 1 from public.abos where kunde_id = 'cus_FREMD2') then
+    raise exception 'FEHLER: fremder Kauf hat das Konto im abgelaufenen Streit uebernommen (%, %)', r, row_to_json(a);
+  end if;
+  r := public.abo_stripe_ereignis('evt_s3', 'charge.dispute.closed', now() - interval '1 second', 'cus_F1', 'sub_F1',
+    null, 'wiederherstellen', now() - interval '1 second', null);
+  select * into a from public.abos where user_id = 'f6666666-6666-4666-8666-666666666666';
+  if r <> 'neu' or a.status <> 'aktiv' or a.kunde_id <> 'cus_F1' or a.gueltig_bis < now() + interval '24 days'
+    or not public.ist_premium_von('f6666666-6666-4666-8666-666666666666') then
+    raise exception 'FEHLER: gewonnener Streit hat das eigene Konto nicht wiederhergestellt (%, %)', r, row_to_json(a);
+  end if;
+end;
+$$;
+select 'Streit-abgelaufen-Fall ok' as ergebnis;
+rollback;`);
+  pruefe('Streit mit abgelaufenem Zeitraum: fremder Kauf -> konflikt, gewonnener Streit stellt das eigene Konto wieder her',
+    !r.fehler && r.letzte.includes('Streit-abgelaufen-Fall ok'), r.fehler || r.letzte);
+}
+{
   // Die RLS-Tests rollen zurueck: Danach liegen keine Testzeilen in der Datenbank
   const r = await lauf(db, 'select (select count(*) from public.abos) as abos, (select count(*) from auth.users) as nutzer;');
   pruefe('nach den Tests keine Testzeilen uebrig (alles zurueckgerollt)', !r.fehler && r.letzte === '{"abos":0,"nutzer":0}', r.fehler || r.letzte);
