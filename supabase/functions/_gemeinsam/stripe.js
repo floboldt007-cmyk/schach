@@ -34,6 +34,9 @@ export const TYPEN = Object.freeze([
   'customer.subscription.updated',
   'customer.subscription.deleted',
   'invoice.paid',
+  'charge.refunded',
+  'charge.dispute.created',
+  'charge.dispute.closed',
 ]);
 
 const MUSTER = Object.freeze({
@@ -133,6 +136,18 @@ function aboDerRechnung(r) {
     || ausZeile || null;
 }
 
+// Erstattungen und Rueckbuchungen verweisen auf eine Charge. Stripe kann Charge und Rechnung im Ereignis erweitert
+// mitsenden; fuer nicht erweiterte Objekte wird zusaetzlich unsere subscription_id-Metadatenkonvention gelesen.
+function zahlungsBezug(o) {
+  const charge = o.object === 'charge' ? o : (o.charge && typeof o.charge === 'object' ? o.charge : o);
+  const rechnung = charge.invoice && typeof charge.invoice === 'object' ? charge.invoice : null;
+  const kunde = idVon(charge.customer) || idVon(o.customer) || (rechnung && idVon(rechnung.customer));
+  const abo = idVon(charge.subscription) || idVon(o.subscription) || (rechnung && aboDerRechnung(rechnung))
+    || idVon(charge.metadata && charge.metadata.subscription_id)
+    || idVon(o.metadata && o.metadata.subscription_id);
+  return { kunde, abo };
+}
+
 export function auswerten(e) {
   if (!e || typeof e !== 'object' || Array.isArray(e)) return { ignoriert: 'form' };
   if (!TYPEN.includes(e.type)) return { ignoriert: 'typ' };
@@ -140,7 +155,8 @@ export function auswerten(e) {
   const erstellt = zeitstempel(e.created);
   const o = e.data && e.data.object;
   if (!erstellt || !o || typeof o !== 'object') return { ignoriert: 'form' };
-  const kunde = idVon(o.customer);
+  const zahlung = e.type.startsWith('charge.') ? zahlungsBezug(o) : null;
+  const kunde = zahlung ? zahlung.kunde : idVon(o.customer);
   if (!kunde || !MUSTER.cus.test(kunde)) return { ignoriert: 'kein_kunde' };
 
   let abo = null;
@@ -148,7 +164,23 @@ export function auswerten(e) {
   let status = null;
   let bis = null;
   let plan = null;
-  if (e.type === 'checkout.session.completed') {
+  if (e.type === 'charge.refunded') {
+    if (o.refunded !== true && !(Number.isFinite(o.amount) && o.amount > 0 && o.amount_refunded >= o.amount))
+      return { ignoriert: 'teil_erstattung' };
+    abo = zahlung.abo;
+    status = 'abgelaufen';
+    bis = erstellt;
+  } else if (e.type === 'charge.dispute.created') {
+    abo = zahlung.abo;
+    status = 'strittig';
+    bis = erstellt;
+  } else if (e.type === 'charge.dispute.closed') {
+    abo = zahlung.abo;
+    if (o.status === 'won') status = 'wiederherstellen';
+    else if (o.status === 'lost') status = 'abgelaufen';
+    else return { ignoriert: 'streit_offen' };
+    bis = erstellt;
+  } else if (e.type === 'checkout.session.completed') {
     if (o.mode !== 'subscription') return { ignoriert: 'kein_abo' };
     abo = idVon(o.subscription);
     // client_reference_id haengt die App an den Kauf-Link (js/abo.js kaufAdresse): die Supabase-Nutzer-ID
@@ -190,6 +222,7 @@ export function auswerten(e) {
       bis = erstellt;
     }
   }
+  if (e.type.startsWith('charge.') && !abo) return { ignoriert: 'kein_abo' };
   if (abo != null && !MUSTER.sub.test(abo)) return { ignoriert: 'form' };
   if (!bis) return { ignoriert: 'keine_periode' };
   return {

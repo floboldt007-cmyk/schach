@@ -129,11 +129,31 @@ const abo = (o = {}) => ({ id: 'sub_Probe1', object: 'subscription', customer: '
   pruefe('Rechnung ohne Abo (Einzelrechnung) -> ignoriert', auswerten(ereignis('invoice.paid', { customer: 'cus_Probe1', lines: { data: zeilen } })).ignoriert === 'kein_abo');
   pruefe('Rechnung ohne Periode -> ignoriert', auswerten(ereignis('invoice.paid', { customer: 'cus_Probe1', subscription: 'sub_Probe1', lines: { data: [] } })).ignoriert === 'keine_periode');
 }
-pruefe('andere Typen, kaputte Ereignisse -> ignoriert', auswerten(ereignis('charge.refunded', {})).ignoriert === 'typ'
-  && auswerten(null).ignoriert === 'form' && auswerten([]).ignoriert === 'form' && auswerten({ ...kauf(), id: 'falsch' }).ignoriert === 'form'
+{
+  const charge = (o = {}) => ({ id: 'ch_Probe1', object: 'charge', customer: 'cus_Probe1', amount: 1000,
+    amount_refunded: 1000, refunded: true, metadata: { subscription_id: 'sub_Probe1' }, ...o });
+  const erstattung = auswerten(ereignis('charge.refunded', charge()));
+  pruefe('volle Erstattung beendet Premium sofort und ordnet Kunde sowie Abo zu', erstattung.daten
+    && erstattung.daten.status === 'abgelaufen' && erstattung.daten.gueltig_bis === iso(T0)
+    && erstattung.daten.kunde_id === 'cus_Probe1' && erstattung.daten.abo_id === 'sub_Probe1', erstattung);
+  pruefe('Teil-Erstattung entzieht Premium nicht', auswerten(ereignis('charge.refunded', charge({ refunded: false, amount_refunded: 400 }))).ignoriert === 'teil_erstattung');
+  const offen = auswerten(ereignis('charge.dispute.created', { id: 'dp_1', object: 'dispute', charge: charge() }));
+  const gewonnen = auswerten(ereignis('charge.dispute.closed', { id: 'dp_1', object: 'dispute', status: 'won', charge: charge() }));
+  const verloren = auswerten(ereignis('charge.dispute.closed', { id: 'dp_1', object: 'dispute', status: 'lost', charge: charge() }));
+  pruefe('Rueckbuchung offen, gewonnen und verloren werden getrennt abgebildet', offen.daten.status === 'strittig'
+    && gewonnen.daten.status === 'wiederherstellen' && verloren.daten.status === 'abgelaufen'
+    && [offen, gewonnen, verloren].every((x) => x.daten.abo_id === 'sub_Probe1'));
+  pruefe('Rueckbuchung ohne sicheren Abo-Bezug wird abgelehnt', auswerten(ereignis('charge.dispute.created', {
+    id: 'dp_2', object: 'dispute', charge: charge({ metadata: {} }),
+  })).ignoriert === 'kein_abo');
+  pruefe('fremder oder ungueltiger Kunde wird abgelehnt', auswerten(ereignis('charge.refunded', charge({ customer: 'cus fremd' }))).ignoriert === 'kein_kunde');
+}
+pruefe('kaputte Ereignisse -> ignoriert',
+  auswerten(null).ignoriert === 'form' && auswerten([]).ignoriert === 'form' && auswerten({ ...kauf(), id: 'falsch' }).ignoriert === 'form'
   && auswerten({ ...kauf(), created: 'gestern' }).ignoriert === 'form' && auswerten({ ...kauf(), data: null }).ignoriert === 'form');
-pruefe('TYPEN: genau die fuenf aus dem Auftrag (plus subscription.created)', JSON.stringify(TYPEN) === JSON.stringify(['checkout.session.completed',
-  'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid']) && Object.isFrozen(TYPEN));
+pruefe('TYPEN: Abo-, Erstattungs- und Rueckbuchungsereignisse', JSON.stringify(TYPEN) === JSON.stringify(['checkout.session.completed',
+  'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid',
+  'charge.refunded', 'charge.dispute.created', 'charge.dispute.closed']) && Object.isFrozen(TYPEN));
 
 // ---------------------------------------------------------------------------
 // verarbeite() mit gefaelschtem fetch
@@ -179,7 +199,7 @@ const json = (r) => JSON.parse(r.koerper);
   const r4 = await verarbeite(anfrage(null, { koerper: '{kaputt' }), UMGEBUNG, { fetch: f, jetzt: T0 });
   pruefe('signiert, aber kein JSON: 400', r4.status === 400 && f.aufrufe.length === 0);
   const r5 = await verarbeite(anfrage(ereignis('charge.refunded', { customer: 'cus_Probe1' })), UMGEBUNG, { fetch: f, jetzt: T0 });
-  pruefe('anderer Ereignistyp: 200 ignoriert (Stripe soll nicht wiederholen), keine Datenbank', r5.status === 200 && json(r5).ignoriert === 'typ' && f.aufrufe.length === 0);
+  pruefe('unvollstaendige Erstattung: 200 ignoriert (Stripe soll nicht wiederholen), keine Datenbank', r5.status === 200 && json(r5).ignoriert === 'teil_erstattung' && f.aufrufe.length === 0);
   const r6 = await verarbeite({ ...anfrage(kauf()), methode: 'GET' }, UMGEBUNG, { fetch: f, jetzt: T0 });
   pruefe('GET: 405', r6.status === 405);
   const r7 = await verarbeite(anfrage(kauf()), { ...UMGEBUNG, STRIPE_WEBHOOK_SECRET: '' }, { fetch: f, jetzt: T0 });
@@ -290,6 +310,15 @@ const json = (r) => JSON.parse(r.koerper);
     && !/function public\.abo_hole_nach[^$]*security definer/.test(ohneKommentar));
   const test = lies('supabase/abo-rls-test.sql');
   pruefe('abo-rls-test.sql: Kauf ohne Nutzer, Handzeile und abo_hole_nach als Fall', /abo_hole_nach\('cus_X1'\)/.test(test) && test.includes('ABO_KUNDE_UNBEKANNT'));
+  pruefe('Erstattung/Rueckbuchung: Schema erlaubt alle Typen, Streit ist nicht Premium und die RLS-Probe prueft den Ablauf',
+    ['charge.refunded', 'charge.dispute.created', 'charge.dispute.closed'].every((typ) => sql.includes(`'${typ}'`) && test.includes(`'${typ}'`))
+    && /status in \('aktiv', 'gekuendigt', 'abgelaufen', 'strittig'\)/.test(sql)
+    && !/t\.status in \([^)]*strittig/.test(ohneKommentar));
+  pruefe('Konto-Loeschung: Before-Delete-Trigger entfernt Ereignisse samt Stripe-Kennungen, RLS-Probe loescht den Nutzer',
+    /before delete on public\.abos\s+for each row execute function public\.loesche_stripe_kennungen_vor_abo\(\);/.test(ohneKommentar)
+    && /delete from public\.stripe_ereignisse/.test(ohneKommentar)
+    && /delete from auth\.users where id = 'c3333333/.test(test)
+    && test.includes('Stripe-Kennungen des geloeschten Kontos sind geblieben'));
   pruefe('abo-rls-test.sql: in einer Transaktion, rollt zurueck, meldet Erfolg', /^begin;/m.test(test) && /rollback;\s*$/.test(test) && test.includes("'Abo-RLS-Test erfolgreich'"));
 }
 {
