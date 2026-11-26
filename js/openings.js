@@ -384,6 +384,13 @@ export function eroeffnungBereit() {
   return !!INDEX;
 }
 
+// Ruhe fuer das Vorladen auf Vorrat (B2, Aufrufer js/ui/arena.js liest die Seite): die Bots-Seite steht, keine Partie ist offen,
+// kein Eingabefeld hat den Fokus und der letzte Tipp oder die letzte Taste liegt mindestens RUHE_NACH_EINGABE_MS zurueck
+export const RUHE_NACH_EINGABE_MS = 400;
+export function ruheFuerVorrat({ seiteDa, partieOffen, eingabeAktiv, seitEingabeMs }) {
+  return !!seiteDa && !partieOffen && !eingabeAktiv && seitEingabeMs >= RUHE_NACH_EINGABE_MS;
+}
+
 // Baut den Index in Stuecken von hoechstens ~30 ms (je ein setTimeout, dazwischen malt der Browser; unter der
 // Long-Task-Grenze von 50 ms), das erste Stueck erst nach dem Aufruf. Fragt eroeffnung() vorher, baut index() den Rest
 // sofort. -> Promise, erfuellt mit dem Index.
@@ -391,17 +398,43 @@ export function eroeffnungBereit() {
 // Leerlauf, und je Bild kam nur ein Stueck dran; bei 6x Drossel war der Index mit 8-ms-Stuecken nach 2,5 s noch nicht
 // fertig, und der erste Zug baute den Rest im Tipp.
 // beiStueck, stueckMs: nur fuer Tests (Stuecke zaehlen, kleinere Stuecke).
-export function eroeffnungVorbereiten({ beiStueck, stueckMs = 30 } = {}) {
-  if (INDEX) return Promise.resolve(INDEX);
+// leerlauf (R27 Tempo, gemessen 22.11.: ein 31-ms-Stueck lag im Tipp auf "Liga"): Vorladen auf Vorrat (Bots-Seite) laeuft nur
+// in echter Ruhezeit, je requestIdleCallback hoechstens LEER_MS und nie laenger, als der Browser Ruhe meldet; danach die
+// Namens-Tabelle genauso in Stuecken. Ein Tipp wartet so hoechstens LEER_MS.
+// Codex-Kaltreview 22.11. B2: Ruhezeit des Browsers gibt es auch mitten in einer Partie oder beim Tippen. Im Leerlauf fragt
+// deshalb jedes Stueck vorher ruhig() (false: nichts tun, spaeter wieder fragen) und abbrechen() (true: aufhoeren, nichts mehr
+// einplanen, das Versprechen erfuellt sich mit null; die Partie baut dann selbst, wie ohne Vorrat). Ohne requestIdleCallback
+// (Safari) gilt dasselbe mit einem Timer im Abstand LEER_PAUSE_MS und Stuecken von LEER_MS, nicht mehr 30 ms.
+export const LEER_MS = 8;
+export const LEER_PAUSE_MS = 50;
+export function eroeffnungVorbereiten({ beiStueck, stueckMs = 30, leerlauf = false, ruhig = () => true, abbrechen = () => false } = {}) {
+  if (INDEX && (!leerlauf || NAMEN_SCHLUESSEL)) return Promise.resolve(INDEX);
   const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  const spaeter = (f) => setTimeout(f, 0);
+  const leer = leerlauf && typeof requestIdleCallback === 'function';
+  const spaeter = leer ? (f) => requestIdleCallback(f) : leerlauf ? (f) => setTimeout(f, LEER_PAUSE_MS) : (f) => setTimeout(f, 0);
+  const frist = (d) => (leer ? Math.min(LEER_MS, d && d.timeRemaining ? d.timeRemaining() : LEER_MS) : leerlauf ? LEER_MS : stueckMs);
+  // im Leerlauf vor jedem Stueck: weg -> aufhoeren, keine Ruhe -> spaeter nochmal fragen; true = jetzt arbeiten
+  const darf = (f, fertig) => {
+    if (!leerlauf) return true;
+    if (abbrechen()) { if (fertig) fertig(null); return false; }
+    if (!ruhig()) { spaeter(f); return false; }
+    return true;
+  };
   return new Promise((fertig) => {
-    const stueck = () => {
-      if (INDEX) { fertig(INDEX); return; }
+    const namen = (d) => {
+      if (NAMEN_SCHLUESSEL || !darf(namen)) return;
+      const ende = jetzt() + frist(d);
+      namenBau ||= baueNamen();
+      while (jetzt() < ende) if (namenBau.next().done) return;
+      spaeter(namen);
+    };
+    const stueck = (d) => {
+      if (INDEX) { fertig(INDEX); spaeter(namen); return; }
+      if (!darf(stueck, fertig)) return;
       bau ||= baue();
       if (beiStueck) beiStueck();
-      const ende = jetzt() + stueckMs;
-      while (jetzt() < ende) if (bau.next().done) { fertig(INDEX); return; }
+      const ende = jetzt() + frist(d);
+      while (jetzt() < ende) if (bau.next().done) { fertig(INDEX); spaeter(namen); return; }
       spaeter(stueck);
     };
     spaeter(stueck);
@@ -446,15 +479,30 @@ export function eroeffnung(sanListe) {
 // oder einer der Zusatznamen ("Unbekannte Eröffnung", "Eröffnungstheorie"); auch ein englischer Name wird erkannt.
 // Auf Deutsch kommt ein deutscher Name unveraendert zurueck.
 let NAMEN_SCHLUESSEL = null;   // Name (jede Sprache) -> Schluessel im Woerterbuch
-export function eroeffnungsAnzeige(name) {
-  if (typeof name !== 'string' || !name) return name;
-  if (!NAMEN_SCHLUESSEL) {
-    NAMEN_SCHLUESSEL = new Map();
-    // Deutsch zuletzt: bei gleichem Text gewinnt der deutsche Eintrag
-    for (const s of [...SPRACHEN].reverse()) {
-      for (const [k, v] of Object.entries(texte(s))) if (k.startsWith('eroeffnungen.')) NAMEN_SCHLUESSEL.set(v, k);
+// R27 Tempo (gemessen 22.11.: 62 ms im ersten Zug am iPhone): die Tabelle entsteht nach dem Index in einem eigenen Stueck
+// (eroeffnungVorbereiten), sonst beim ersten Aufruf wie bisher
+let namenBau = null;
+function* baueNamen() {
+  const m = new Map();
+  // Deutsch zuletzt: bei gleichem Text gewinnt der deutsche Eintrag
+  for (const s of [...SPRACHEN].reverse()) {
+    let n = 0;
+    for (const [k, v] of Object.entries(texte(s))) {
+      if (k.startsWith('eroeffnungen.')) m.set(v, k);
+      if (++n % 200 === 0) yield;
     }
   }
-  const k = NAMEN_SCHLUESSEL.get(name);
+  NAMEN_SCHLUESSEL = m;
+}
+function namenTabelle() {
+  if (!NAMEN_SCHLUESSEL) {
+    namenBau ||= baueNamen();
+    for (let r = namenBau.next(); !r.done; r = namenBau.next()) { /* den Rest jetzt */ }
+  }
+  return NAMEN_SCHLUESSEL;
+}
+export function eroeffnungsAnzeige(name) {
+  if (typeof name !== 'string' || !name) return name;
+  const k = namenTabelle().get(name);
   return k ? t(k) : name;
 }

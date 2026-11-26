@@ -10,7 +10,7 @@
 // Aufruf: node tests/r19-lektionen-besser.test.mjs [ids]
 import * as M from '../js/pakete/lernen/mattbilder.js';
 import { pruefeLektion } from '../js/pakete/lernen/mattbilder.js';
-import { stockfish, spiele, mattIn, mattform, gut, artVon, Chess } from './lektion-engine.mjs';
+import { stockfish, spiele, mattIn, mattform, gut, artVon, Chess, mitWiederholung } from './lektion-engine.mjs';
 import { mattZuege } from './mattbilder-tablebase.mjs';
 import { setzeSprache, t } from '../js/sprache.js';
 import '../js/pakete/lernen/texte.js';
@@ -55,8 +55,13 @@ if (!NUR) {
   });
   const offen = [...SCHWERE_13];
   const ergebnisse = [];
+  // Ausgang 3 = die Engine des Kinds starb (ENGINE-TOT, kein Pruefergebnis): die Lektion wird EINMAL neu gerechnet, aber
+  // nur, wenn der erste Lauf bis dahin keine FEHLER-Zeile hatte. Hatte er eine, bleibt er das Ergebnis und die Suite rot.
+  // Ein Lauf mit Ausgang 1 (gewoehnlicher FEHLER) wird nie wiederholt, und stirbt die Engine zweimal, bleibt die Suite rot.
+  // Die Rechnung ist durch feste Knotenzahlen gleich, ein zweiter Lauf prueft also dasselbe. Jede Wiederholung steht als
+  // WARNUNG in der Ausgabe und in der Zusammenfassung von tests/alle.mjs (mitWiederholung in tests/lektion-engine.mjs).
   await Promise.all(Array.from({ length: PARALLEL }, async () => {
-    while (offen.length) ergebnisse.push(await kind(offen.shift()));
+    while (offen.length) ergebnisse.push(await mitWiederholung(kind, offen.shift()));
   }));
   for (const id of SCHWERE_13) {
     const e = ergebnisse.find((x) => x.id === id);
@@ -145,6 +150,11 @@ try {
       }
     }
   }
+} catch (e) {
+  // Engine tot (tests/lektion-engine-tod.test.mjs): laut melden, Ausgang 3; der Eltern-Lauf rechnet die Lektion einmal neu
+  if (!e?.engineTot) throw e;
+  console.log(`ENGINE-TOT ${NUR ? NUR.join(',') : '-'}: ${e.message}`);
+  process.exit(3);
 } finally { sf.ende(); }
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);

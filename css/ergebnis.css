@@ -11,7 +11,7 @@
 /* ---------- Schleier und zuruecktretender Screen ---------- */
 .ergebnis-overlay { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; overflow-y: auto;
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-  background: var(--schleier); animation: overlay-ein calc(420ms * var(--tempo)) var(--sanft) both; }
+  background: var(--schleier); animation: overlay-ein calc(200ms * var(--tempo)) var(--sanft) both; }
 .ergebnis-overlay[hidden] { display: none; }
 .partie > .kopf, .partie > .inhalt { transform-origin: 50% 40%; transition: transform var(--d-l) var(--gleiten); }
 .partie.mit-ergebnis > .kopf, .partie.mit-ergebnis > .inhalt { transform: scale(.975); }
@@ -22,7 +22,7 @@
 .ergebnis-karte { position: relative; width: min(100%, 540px); max-height: 100%; overflow: hidden;
   display: flex; flex-direction: column; gap: 14px; padding: 22px 28px 26px; border-radius: 32px; text-align: center;
   background-color: var(--flaeche); background-image: var(--textur-flaeche, none); color: var(--text); box-shadow: var(--s3), var(--kante);
-  animation: erg-karte calc(680ms * var(--tempo)) var(--feder-weich) both; }
+  animation: erg-karte calc(320ms * var(--tempo)) var(--feder-weich) both; }
 /* gap erbt die Abstaende der Karte (Handy kleiner); Rand innen, damit Fokusringe am Rand nicht abgeschnitten werden */
 /* Zeilen max-content: sonst schrumpft das Grid in der begrenzten Hoehe Zeilen mit overflow:hidden, und sie ruecken ineinander */
 .erg-rumpf { display: grid; gap: inherit; grid-auto-rows: max-content; align-content: start; flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none;
@@ -71,7 +71,7 @@
    Breite, darunter klein "Zur Analyse" (links) und "Zu den Bots" (rechts); die Knoepfe-Zeile loest sich ins Raster auf */
 .erg-aktionen.sieg-vorne { grid-template-columns: 1fr 1fr; align-items: start; }
 .erg-aktionen.sieg-vorne .erg-knoepfe { display: contents; }
-.erg-aktionen.sieg-vorne .erg-knoepfe > * { animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(990ms * var(--tempo)) both; }
+.erg-aktionen.sieg-vorne .erg-knoepfe > * { animation: erg-zeile calc(180ms * var(--tempo)) var(--feder-weich) both; }
 .erg-aktionen.sieg-vorne [data-ziel="weiter"] { grid-column: 1 / -1; }
 .erg-zu { position: absolute; z-index: 3; top: 12px; right: 12px; width: 44px; height: 44px; }
 @keyframes erg-karte { from { opacity: 0; transform: translateY(40px) scale(.96); } to { opacity: 1; transform: none; } }
@@ -79,7 +79,7 @@
 /* Titel sofort (Display-Schrift); Sieg mit goldenem Ausrufezeichen, Niederlage ruhig und kleiner, Remis gold-neutral */
 .erg-wort { margin: 0; padding: 0 48px; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(46px, 9vmin, 72px);
   letter-spacing: var(--lw-titel); line-height: 1; color: var(--text);
-  animation: erg-titel calc(700ms * var(--tempo)) var(--feder-hupf) calc(140ms * var(--tempo)) both; }
+  animation: erg-titel calc(380ms * var(--tempo)) var(--feder-hupf) calc(40ms * var(--tempo)) both; }
 /* --gold pur hatte hell 2,24:1 (Kritik R6, B25; grosse Schrift braucht 3:1): zur Textfarbe hin gemischt, bleibt golden */
 /* inline-block: als Inline-Spanne meldete das "!" die volle Schrift-Hoehe und ragte 3 px unter die Zeile (line-height 1)
    in den Untertitel (margin -4px); app.test U7 "Zeilen nicht ineinander". So ist seine Box genau 1em hoch, sichtbar gleich */
@@ -89,7 +89,7 @@
 .remis .erg-wort::after { content: ""; display: block; width: 44px; height: 4px; margin: 10px auto 0; border-radius: var(--r-pille); background: var(--gold); }
 /* Seitenabstand wie .erg-wort: beim kleinen Niederlage-Titel lag der Untertitel unter dem Auge-Knopf (R9-3, SE bis PC) */
 .erg-unter { margin: -4px 0 0; padding: 0 48px; font-size: 15px; font-weight: 650; color: var(--text-2);
-  animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(240ms * var(--tempo)) both; }
+  animation: erg-zeile calc(260ms * var(--tempo)) var(--feder-weich) calc(100ms * var(--tempo)) both; }
 @keyframes erg-titel { from { opacity: 0; transform: translateY(18px) scale(.92); } to { opacity: 1; transform: none; } }
 @keyframes erg-zeile { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
@@ -107,16 +107,16 @@
 .e-stern .ico { width: 100%; height: 100%; display: block; }
 .e-stern::after { content: ""; position: absolute; left: 24%; right: 24%; bottom: -4px; height: 6px; border-radius: 50%; background: var(--gold-weich); }
 .erg-stern.an .e-stern { color: var(--stern-an);
-  animation: erg-stern calc(720ms * var(--tempo)) var(--feder-hupf) calc((360ms + var(--i) * 250ms) * var(--tempo)) both; }
-.erg-stern.aus .e-stern { animation: overlay-ein calc(400ms * var(--tempo)) var(--sanft) calc((360ms + var(--i) * 250ms) * var(--tempo)) both; }
+  animation: erg-stern calc(320ms * var(--tempo)) var(--feder-hupf) calc((120ms + var(--i) * 80ms) * var(--tempo)) both; }
+.erg-stern.aus .e-stern { animation: overlay-ein calc(240ms * var(--tempo)) var(--sanft) calc((120ms + var(--i) * 80ms) * var(--tempo)) both; }
 .erg-stern.wartet .e-stern { opacity: .5; }
 .erg-stern b { font-size: 14px; font-weight: 800; color: var(--text); }
 .erg-stern small { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
 .erg-stern.aus b { color: var(--text-2); }
-.erg-stern > b, .erg-stern > small { animation: erg-zeile calc(420ms * var(--tempo)) var(--feder-weich) calc((540ms + var(--i) * 250ms) * var(--tempo)) both; }
+.erg-stern > b, .erg-stern > small { animation: erg-zeile calc(220ms * var(--tempo)) var(--feder-weich) calc((200ms + var(--i) * 80ms) * var(--tempo)) both; }
 .e-neu { position: absolute; top: -4px; left: calc(50% + 18px); padding: 2px 6px; border-radius: 7px; font-size: 12px; font-weight: 800; letter-spacing: .06em;
   color: var(--auf-akzent); background: var(--akzent);
-  animation: combo calc(400ms * var(--tempo)) var(--feder-hupf) calc((700ms + var(--i) * 250ms) * var(--tempo)) both; }
+  animation: combo calc(200ms * var(--tempo)) var(--feder-hupf) calc((240ms + var(--i) * 80ms) * var(--tempo)) both; }
 @keyframes erg-stern { from { opacity: 0; transform: translateY(46px) scale(.2) rotate(-60deg); } to { opacity: 1; transform: none; } }
 .erg-genau { font-size: 15px; font-weight: 650; color: var(--text-2); }
 .erg-genau b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -134,7 +134,7 @@
 .erg-tipp { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-2); }
 /* Lichtblick (Niederlage): Flos bester Zug der Partie, ruhig auf Gold */
 .erg-lichtblick { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-radius: 20px; text-align: left; background: var(--gold-weich);
-  animation: erg-zeile calc(600ms * var(--tempo)) var(--feder-weich) calc(160ms * var(--tempo)) both; }
+  animation: erg-zeile calc(280ms * var(--tempo)) var(--feder-weich) calc(80ms * var(--tempo)) both; }
 .erg-lichtblick .lb-sym { flex: none; width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; color: var(--gold);
   background: var(--flaeche); box-shadow: var(--s1); }
 .erg-lichtblick .lb-sym .ico { width: 22px; height: 22px; }
@@ -144,7 +144,7 @@
 
 /* ---------- Bot-Spruch als Karte, neu freigeschaltet, Knoepfe ---------- */
 .erg-bot { display: flex; align-items: center; gap: 12px; text-align: left;
-  animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(900ms * var(--tempo)) both; }
+  animation: erg-zeile calc(260ms * var(--tempo)) var(--feder-weich) calc(160ms * var(--tempo)) both; }
 .erg-bot[hidden] { display: none; }
 .erg-bot .av { flex: none; width: 48px; height: 48px; border-radius: 16px; overflow: hidden; display: grid; place-items: center;
   background: var(--flaeche-2); }
@@ -156,7 +156,7 @@
 .erg-bot .sprechblase:empty { display: none; }
 .erg-frei { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; padding: 12px 14px; border-radius: 18px; text-align: left;
   border: 1.5px dashed var(--linie-2); background: var(--flaeche-2);
-  animation: coach-ein calc(500ms * var(--tempo)) var(--feder-weich) calc(1200ms * var(--tempo)) both; }
+  animation: coach-ein calc(280ms * var(--tempo)) var(--feder-weich) calc(240ms * var(--tempo)) both; }
 .erg-frei .avatar { --g: 54px; }
 .erg-frei .schloss { position: absolute; right: -8px; bottom: -8px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
   background: var(--gut); color: var(--auf-akzent); }
@@ -165,7 +165,7 @@
 .ef-name { font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
 .ef-elo { margin-left: 4px; padding: 2px 7px; border-radius: 7px; vertical-align: 3px; font-size: 12px; font-weight: 800; color: var(--text); background: var(--flaeche-3); }
 .erg-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-  animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(990ms * var(--tempo)) both; }
+  animation: erg-zeile calc(180ms * var(--tempo)) var(--feder-weich) both; }
 .erg-knoepfe:empty { display: none; }
 .erg-knoepfe .knopf { min-height: 56px; font-size: 17px; padding: 0 12px; }
 

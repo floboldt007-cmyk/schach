@@ -110,7 +110,10 @@ function zeigeIch(root, params = {}, app) {
   try { kopfOrt = fuelle('ich:kopf', s.querySelector('.sa-kopf-ort'), { app }); } catch (e) { console.error(e); }
   s.querySelector('.sa-kopf-ort').hidden = !kopfOrt.anzahl;
   try { gefuellt = fuelle('sammlung:bereich', ort, { app }); } catch (e) { console.error(e); }
-  const bereiche = () => [...ort.querySelectorAll(':scope > .sa-bereich'), ...(blatt ? blatt.huelle.querySelectorAll(':scope > .sa-bereich') : [])];
+  // heim: Bereiche, die gerade mit einem geschlossenen Blatt wegfahren und gleich nach .sa-ort zurueckkommen (oeffne, holeHeim)
+  let heim = null;
+  const bereiche = () => [...ort.querySelectorAll(':scope > .sa-bereich'), ...(blatt ? blatt.huelle.querySelectorAll(':scope > .sa-bereich') : []),
+    ...(heim ? heim.teile.filter((y) => y.parentNode !== ort) : [])];
 
   // Ausruesten per Tipp: wahl() des Teils, dann Bereiche (und das Profil oben) an Ort und Stelle neu zeichnen; das offene
   // Blatt bekommt den neu gezeichneten Bereich
@@ -128,19 +131,25 @@ function zeigeIch(root, params = {}, app) {
   ort.addEventListener('click', beiWahl);
   // Ein Bereich bittet um sein Blatt zurueck (Shop nach dem Anprobieren: sheet() zeigt nur ein Blatt zugleich, die Vorschau
   // hat das Shop-Blatt geschlossen und der Bereich liegt wieder hier in .sa-ort)
-  ort.addEventListener('sa:oeffne', (ev) => {
+  // Codex-Kaltreview 22.11. B3: schliesst die Vorschau, solange das Shop-Blatt noch wegfaehrt, liegt der Bereich noch in dessen
+  // Huelle (heim, unten). Darum hoert auch jede Huelle auf die Bitte (oeffne), nicht nur .sa-ort.
+  const bitteZurueck = (ev) => {
     const ber = ev.target.closest('.sa-bereich');
-    if (ber && !blatt) oeffne(ber.dataset.bereich);
-  });
+    if (ber && !blatt && s.isConnected) oeffne(ber.dataset.bereich);
+  };
+  ort.addEventListener('sa:oeffne', bitteZurueck);
 
   const stand = s.querySelector('.sa-stand');
   const zeigeStand = () => {
     const alle = bereiche();
     const teile = alle.reduce((n, x) => n + x.querySelectorAll('.sa-teil').length, 0);
     const frei = alle.reduce((n, x) => n + x.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length, 0);
-    stand.textContent = teile ? t('rahmen.sammlung.stand', { frei, alle: teile }) : t('rahmen.sammlung.leer');
+    // unveraendert nicht neu schreiben (R27 Tempo: jedes Schreiben machte den Stil beim Schliessen des Blatts wieder ungueltig)
+    const text = teile ? t('rahmen.sammlung.stand', { frei, alle: teile }) : t('rahmen.sammlung.leer');
+    if (stand.textContent !== text) stand.textContent = text;
     // Fortschritt als Balken unter der Zeile (Flo 30.10.: "21 von 67" sichtbar machen)
-    stand.style.setProperty('--anteil', teile ? (frei / teile).toFixed(3) : '0');
+    const anteil = teile ? (frei / teile).toFixed(3) : '0';
+    if (stand.style.getPropertyValue('--anteil') !== anteil) stand.style.setProperty('--anteil', anteil);
   };
 
   // ein Platz: Bild und Name des Getragenen, "frei / alle", Pfeil
@@ -178,23 +187,38 @@ function zeigeIch(root, params = {}, app) {
     // Bereiche ohne festen Platz (z. B. Erfinder, Lobby-Musik): am Ende von "Am Brett"
     gruppen[1].liste.push(...alle.filter((x) => !vergeben.has(x.dataset.bereich)));
     const gross = GROSS.filter((id) => nachId.has(id)).map((id) => nachId.get(id));
-    platzOrt.innerHTML = gruppen.filter((g) => g.liste.length).map((g) => `<section class="sa-platz-gruppe" data-gruppe="${g.id}">
+    const html = gruppen.filter((g) => g.liste.length).map((g) => `<section class="sa-platz-gruppe" data-gruppe="${g.id}">
         <h3 class="sa-platz-titel">${esc(t('rahmen.sammlung.' + g.id))}</h3>
         <div class="sa-platz-liste">${g.liste.map((x) => platzHtml(x)).join('')}</div></section>`).join('')
       + (gross.length ? `<div class="sa-gross-reihe">${gross.map((x) => platzHtml(x, true)).join('')}</div>` : '');
+    // R27 Tempo (gemessen 22.11.: Schliessen des Shop-Blatts hielt die Taste rund 100 ms): unveraenderte Plaetze nicht neu
+    // bauen. Sonst ersetzte jedes Schliessen alle Kacheln samt Bildern, und der Knopf, der den Fokus zurueckbekam, war weg.
+    if (html === platzHtmlZuletzt && platzOrt.childElementCount) return;
+    platzHtmlZuletzt = html;
+    platzOrt.innerHTML = html;
   }
+  let platzHtmlZuletzt = null;
   platzOrt.addEventListener('click', (ev) => {
     const k = ev.target.closest('[data-bereich]');
     if (k) oeffne(k.dataset.bereich);
   });
 
   // Blatt eines Bereichs: der Bereich wandert hinein, beim Schliessen zurueck nach .sa-ort
+  function holeHeim() {
+    if (!heim) return;
+    clearTimeout(heim.uhr);
+    if (heim.wache) heim.wache.disconnect();
+    for (const y of heim.teile) if (y.parentNode !== ort) { y.hidden = true; ort.append(y); }
+    heim = null;
+  }
   function oeffne(id) {
+    holeHeim();
     const x = [...ort.querySelectorAll(':scope > .sa-bereich')].find((y) => y.dataset.bereich === id);
     if (!x) return;
     const huelle = document.createElement('div');
     huelle.className = 'sa-blatt-inhalt';
     huelle.addEventListener('click', beiWahl);
+    huelle.addEventListener('sa:oeffne', bitteZurueck);
     x.hidden = false;
     huelle.append(x);
     blatt = { id, huelle };
@@ -202,7 +226,23 @@ function zeigeIch(root, params = {}, app) {
     sheet({ titel: x.dataset.name || id, inhalt: huelle, klasse: 'sa-blatt', knoepfe: [{ text: t('rahmen.sammlung.fertig'), wert: true }], abbrechen: false })
       .then(() => {
         if (!blatt || blatt.huelle !== huelle) return;
-        for (const y of huelle.querySelectorAll(':scope > .sa-bereich')) { y.hidden = true; ort.append(y); }
+        // R27 Tempo (gemessen 22.11.: CLS 0,76 beim Schliessen): die Karte faehrt noch 260 ms weg. Nahm man ihr den Bereich sofort,
+        // schrumpfte sie mitten im Wegfahren. Er faehrt deshalb still mit (inert) und kommt danach zurueck nach .sa-ort, sofort,
+        // falls vorher ein Blatt aufgeht. bereiche() zaehlt ihn solange mit (zeichnePlaetze, zeigeStand).
+        const teile = [...huelle.querySelectorAll(':scope > .sa-bereich')];
+        huelle.inert = true;
+        heim = { teile, uhr: 0, wache: null };
+        if (tempo() === 0) holeHeim();
+        else {
+          // B3: zurueck, sobald sheet() das Blatt aus dem Dokument nimmt, nicht erst nach einer festen Zeit. Sonst hing der Bereich
+          // dazwischen frei, und die Bitte der Vorschau (shop.js: nur wenn isConnected) fiel aus. Die Uhr bleibt als Rueckfall.
+          const blattOrt = huelle.closest('.sheet-ort');
+          if (blattOrt && blattOrt.parentNode && typeof MutationObserver === 'function') {
+            heim.wache = new MutationObserver(() => { if (!blattOrt.isConnected) holeHeim(); });
+            heim.wache.observe(blattOrt.parentNode, { childList: true });
+          }
+          heim.uhr = setTimeout(holeHeim, 400 * tempo());
+        }
         blatt = null;
         s.dataset.bereich = '';
         zeichnePlaetze();
@@ -213,6 +253,9 @@ function zeigeIch(root, params = {}, app) {
         // (sheet() gibt ihn an seinem Ende weiter); messen und fokussieren hier rechnete nur das Layout mitten in dessen Aufbau
         if (sheetOffen()) return;
         const f = document.activeElement;
+        // R27 Tempo (Trace 22.11.: getClientRects erzwang hier 30 ms Stil mitten im Wegfahren): steht der Fokus schon auf
+        // einem Platz (zeichnePlaetze hat ihn nicht ersetzt), ist er sichtbar, nichts zu messen
+        if (f && f.isConnected && platzOrt.contains(f)) return;
         if (!f || f === document.body || !f.isConnected || !f.getClientRects().length || f.closest('.weg')) platzOrt.querySelector(`[data-bereich="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
       });
   }
