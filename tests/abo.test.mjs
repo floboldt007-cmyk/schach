@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { setzeSpeicher } from '../js/storage.js';
 import { setzeKontoFetch, SITZUNG_SCHLUESSEL, lokalerStand } from '../js/konto.js';
@@ -321,13 +321,24 @@ async function nodeTeil() {
     // T-069 (Flo 26.11.2026): Das Abo heisst "Crownmate Premium", nie mehr "Trainer" in einem sichtbaren Text (de und en).
     // Geprueft wird der Code OHNE Kommentare; "Trainerin" (Schule, eine Person) ist ein anderes Wort und bleibt.
     const ohneKommentare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' ').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
-    const SICHTBAR = ['js/pakete/abo/texte.js', 'js/pakete/abo/trainer.js', 'js/pakete/abo/index.js', 'js/pakete/abo/kuendigen.js', 'js/abo.js',
-      'js/sprachen/abo.js', 'js/sprachen/coach-ki.js', 'js/sprachen/premium.js', 'js/pakete/lernen/texte.js', 'js/ui/premium.js',
-      'supabase/functions/_gemeinsam/abo-beenden.js', 'supabase/functions/_gemeinsam/abo-kasse.js', 'supabase/functions/_gemeinsam/coach.js',
-      'impressum.html', 'impressum-en.html'];
+    // Kaltreview #297 (D): keine feste Liste, sondern ALLES Ausgelieferte: js/**/*.js, supabase/functions/**/*.js, die Seiten
+    // im Hauptordner und die Mailvorlagen unter supabase/. datenschutz*.html zieht #294 nach. Ausnahmen sind andere Woerter.
+    const sammle = (d, endung, liste = []) => {
+      for (const e of readdirSync(path.join(WURZEL, d), { withFileTypes: true })) {
+        const p = d ? `${d}/${e.name}` : e.name;
+        if (e.isDirectory()) { if (d) sammle(p, endung, liste); } else if (p.endsWith(endung)) liste.push(p);
+      }
+      return liste;
+    };
+    const SICHTBAR = [...sammle('js', '.js'), ...sammle('supabase/functions', '.js'),
+      ...readdirSync(WURZEL).filter((d) => d.endsWith('.html') && !/^datenschutz/.test(d)),
+      ...readdirSync(path.join(WURZEL, 'supabase')).filter((d) => d.endsWith('.html')).map((d) => `supabase/${d}`)];
+    const AUSNAHMEN = [/Trainerin(nen)?/g, /Zugfolge-Trainer/g];
     const treffer = SICHTBAR.flatMap((d) => ohneKommentare(readFileSync(path.join(WURZEL, d), 'utf8')).split('\n')
-      .filter((z) => /\bTrainer\b/.test(z)).map((z) => `${d}: ${z.trim().slice(0, 90)}`));
-    pruefe('T-069: kein sichtbarer Text nennt das Abo "Trainer" (de/en, App, Server-Mails, Impressum)', treffer.length === 0, treffer.slice(0, 8));
+      .filter((z) => /\bTrainer\b/.test(AUSNAHMEN.reduce((s, a) => s.replace(a, ''), z))).map((z) => `${d}: ${z.trim().slice(0, 90)}`));
+    pruefe(`T-069: kein sichtbarer Text nennt das Abo "Trainer" (${SICHTBAR.length} Dateien: js, Functions, Seiten, Mailvorlagen)`, treffer.length === 0
+      && SICHTBAR.length > 100 && ['js/ui/lernen.js', 'js/pakete/abo/texte.js', 'supabase/functions/_gemeinsam/abo-beenden.js', 'impressum.html', 'index.html']
+        .every((d) => SICHTBAR.includes(d)) && !SICHTBAR.some((d) => /datenschutz/.test(d)), treffer.slice(0, 8));
     const { DE, EN } = await import('../js/pakete/abo/texte.js');
     pruefe('T-069: Produktname "Crownmate Premium" in Dank und Bestaetigung', /Crownmate Premium/.test(DE.danke) && /Crownmate Premium/.test(EN.danke), [DE.danke, EN.danke]);
     for (const d of ['impressum.html', 'impressum-en.html']) {
