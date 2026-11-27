@@ -899,7 +899,7 @@ async function zugOhneServer(browser) {
     srv.zug = () => ({ status: 200, roh: '{"richtig":tr' });
     await zieh(p.s, 'a1a8');
     await warteText('Verbindung');
-    pruefe('Abgeschnittene Antwort: Meldung "keine Verbindung, nochmal"', /Verbindung.*nochmal/.test(await meldung()), await meldung());
+    pruefe('Abgeschnittene Antwort: Meldung "Verbindung gestoert, Stand neu"', /Verbindung gestört/.test(await meldung()), await meldung());
     srv.zug = () => ({ status: 404, body: { code: 'NOT_FOUND', message: 'Requested function was not found' } });
     await zieh(p.s, 'a1a8');
     await warteText('eingerichtet');
@@ -907,12 +907,32 @@ async function zugOhneServer(browser) {
     srv.zug = () => ({ status: 503, body: { message: 'upstream down' } });
     await zieh(p.s, 'a1a8');
     await warteText('Verbindung');
-    pruefe('503: Meldung "keine Verbindung, nochmal"', /Verbindung.*nochmal/.test(await meldung()), await meldung());
+    pruefe('503: Meldung "Verbindung gestoert, Stand neu"', /Verbindung gestört/.test(await meldung()), await meldung());
+    // Kaltreview T-061: Kennungen des Duells und Anmelde-/Drossel-Antworten. Still heisst: nach Antwort und Neuladen des
+    // Stands steht keine Meldung (vorher geleert); DUELL_NICHT_EINGERICHTET ist die Einrichtungs-Meldung, nicht das Netz
+    const leere = () => p.s.evaluate(() => { const el = document.querySelector('.rd-meldung'); if (el) el.textContent = ''; });
+    const stillNach = async (status, body, name) => {
+      await leere();
+      let gerufen = false;
+      srv.zug = () => { gerufen = true; return { status, body }; };
+      await zieh(p.s, 'a1a8');
+      for (let i = 0; i < 50 && !gerufen; i++) await p.s.waitForTimeout(100);
+      await p.s.waitForTimeout(800);
+      pruefe(`${name}: still, keine Meldung`, gerufen && (await meldung()) === '', `gerufen=${gerufen} meldung="${await meldung()}"`);
+    };
+    await stillNach(404, { fehler: 'DUELL_UNBEKANNT', text: 'Dieses Duell wurde nicht gefunden.' }, '404 DUELL_UNBEKANNT');
+    await leere();
+    srv.zug = () => ({ status: 503, body: { fehler: 'DUELL_NICHT_EINGERICHTET', text: 'Das Rätsel-Duell ist auf dem Server noch nicht eingerichtet.' } });
+    await zieh(p.s, 'a1a8');
+    await warteText('eingerichtet');
+    pruefe('503 DUELL_NICHT_EINGERICHTET: Meldung "noch nicht eingerichtet"', /noch nicht eingerichtet/.test(await meldung()), await meldung());
+    await stillNach(429, { message: 'Too Many Requests' }, '429 ohne Kennung');
+    await stillNach(401, { msg: 'Invalid JWT' }, '401 ohne Kennung');
     srv.zug = echt;
     await zieh(p.s, 'a1a8');
     await warteBis(p.s, () => /^1 /.test(document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent), null, 5000).catch(() => {});
     pruefe('Danach zaehlt der naechste Zug wieder', /^1 /.test(await p.s.evaluate(() => document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent)));
-    pruefe('Keine Seitenfehler', p.fehlerListe.filter((f) => !/status of (404|503)/.test(f)).length === 0, p.fehlerListe.join(' | '));
+    pruefe('Keine Seitenfehler', p.fehlerListe.filter((f) => !/status of (401|404|429|503)/.test(f)).length === 0, p.fehlerListe.join(' | '));
   } finally { await p.k.close(); }
 }
 
