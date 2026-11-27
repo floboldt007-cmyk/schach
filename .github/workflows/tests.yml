@@ -120,6 +120,8 @@ jobs:
         run: node tests/server-benutzername-sperre.test.mjs
       - name: Benutzername-Haken pruefen (nicht eingespielt; Haken + Frist beim Bestaetigen, name_frei, Verwaltung, RLS-Test, Rueckweg)
         run: node tests/server-benutzername-bestaetigt.test.mjs
+      - name: Wochenwertung-Obergrenze pruefen (nicht eingespielt; 50.000 je Partie, Zahl aus der Formel, Rechte, Rueckweg)
+        run: node tests/server-freunde-grenze.test.mjs
       - name: Liga-Bild-SQL ausfuehren (vorbereitet, nicht eingespielt)
         run: node tests/server-liga-bild.test.mjs
       - name: Raetsel-Duell-SQL ausfuehren
