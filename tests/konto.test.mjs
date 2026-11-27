@@ -58,6 +58,26 @@ pruefe('Hochladen mit Auth und Prefer', calls.at(-1).headers.Authorization.start
 antworten.push({ status: 200, body: [{ stand: {}, format_version: 1 }] }); const cloud = await ladeCloudStand(); pruefe('Cloud laden', cloud.format_version === 1);
 antworten.push({ status: 409, body: { code: '23505' } }); let nameFehler = ''; try { await speichereBenutzername('Flo_1'); } catch(e) { nameFehler=e.message; } pruefe('belegter Benutzername freundlich', /vergeben/.test(nameFehler));
 {
+  // Namensfilter (T-012, js/namen.js): gesperrte Namen gehen gar nicht erst zum Server; der Server hat das letzte Wort
+  const fehlerVon = async (name) => { try { await speichereBenutzername(name); return ''; } catch (e) { return e.message; } };
+  let n = calls.length;
+  pruefe('Namensfilter: reservierter Name ("Adm1n") freundlich und ohne Anfrage', /Crownmate oder dem Hilfe-Team/.test(await fehlerVon('Adm1n')) && calls.length === n);
+  pruefe('Namensfilter: anstoessiger Name freundlich und ohne Anfrage', /geht leider nicht/.test(await fehlerVon('xX_H1tl3r_Xx')) && calls.length === n);
+  antworten.push({ status: 400, body: { code: 'P0001', message: 'NAME_UNZULAESSIG', hint: 'anstoessig', details: null } });
+  pruefe('Namensfilter: Server-Kennung NAME_UNZULAESSIG (anstoessig) wird derselbe Hinweis', /geht leider nicht/.test(await fehlerVon('Hans_99')) && calls.length === n + 1);
+  antworten.push({ status: 400, body: { code: 'P0001', message: 'NAME_UNZULAESSIG', hint: 'reserviert', details: null } });
+  pruefe('Namensfilter: Server-Kennung NAME_UNZULAESSIG (reserviert) wird der Hinweis "Hilfe-Team"', /Hilfe-Team/.test(await fehlerVon('Hans_98')));
+  antworten.push({ status: 400, body: { code: 'P0001', message: 'NAME_GESPERRT', details: '2026-12-24T10:00:00Z' } });
+  pruefe('Monats-Sperre bleibt eigener Hinweis mit Datum (nicht mit dem Filter verwechselt)', /30 Tagen.*2026/.test(await fehlerVon('Hans_97')));
+  n = calls.length; antworten.push({ status: 201, body: null });
+  pruefe('Namensfilter: harmloser Name mit Sperrwort-Teil ("Scunthorpe") geht zum Server', (await fehlerVon('Scunthorpe')) === '' && calls.length === n + 1);
+  // ein Name, den das Konto schon traegt, bleibt (auch wenn er heute gesperrt waere): "Jetzt sichern" darf nicht scheitern
+  localStorage.setItem(NAME_SCHLUESSEL, JSON.stringify({ konto: 'u1', name: 'Admin_Alt' }));
+  n = calls.length; antworten.push({ status: 201, body: null });
+  pruefe('Namensfilter: der eigene bestehende Name geht weiter zum Server', (await fehlerVon('admin_alt')) === '' && calls.length === n + 1);
+  localStorage.removeItem(NAME_SCHLUESSEL);
+}
+{
   // eigener Benutzername (Flo 01.11.2026: ein Freund sah "Flo" als seinen Namen): Merker je Nutzer-ID, sonst "Du"
   localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(session));
   localStorage.removeItem(NAME_SCHLUESSEL);

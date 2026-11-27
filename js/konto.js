@@ -10,6 +10,7 @@
 // Abgleich ueberschrieb sonst beim Verlassen der Einstellungen den Cloud-Stand (Ultracode-Pruefung PR #76).
 import { SUPABASE_URL, SUPABASE_KEY, ANMELDEWEGE } from './konto-config.js';
 import { botschutz } from './botschutz.js';
+import { nameGesperrt } from './namen.js';
 import { aufgeloesterModus } from './thema.js';
 import { SPEICHER_VERSION, rohSpeicher } from './storage.js';
 import { hoere } from './ereignisse.js';
@@ -306,6 +307,10 @@ export async function speichereCloudStand(stand = cloudStand()) {
 export async function speichereBenutzername(benutzername) {
   benutzername = String(benutzername || '').trim();
   if (!NAME.test(benutzername)) throw new Error(K('nameRegel'));
+  // Namensfilter (T-012, js/namen.js, dieselbe Liste wie supabase/namen-filter-schema.sql): freundlich vor dem Absenden.
+  // Den Namen, den das Konto schon traegt, prueft weder die App noch der Server (bestehende Namen bleiben).
+  const sperre = String(eigenerName() || '').toLowerCase() === benutzername.toLowerCase() ? null : nameGesperrt(benutzername);
+  if (sperre) throw new Error(K(sperre === 'reserviert' ? 'nameReserviert' : 'nameAnstoessig'));
   const s = await aktiveSitzung();
   // Mit dem Haken-SQL zaehlt jede eigene Eingabe als Bestaetigen (Haken und 30-Tage-Frist setzt der Server); mitgeschickt
   // wird er, damit auch ein vom Server vergebener, gleicher Name bestaetigt werden kann
@@ -318,6 +323,10 @@ export async function speichereBenutzername(benutzername) {
     if (e.code === 'P0001' && e.serverDetails?.message === 'NAME_GESPERRT') {
       const bis = new Date(e.serverDetails.details);
       throw new Error(K('nameGesperrt', { datum: Number.isNaN(bis.getTime()) ? '?' : bis.toLocaleDateString(locale()) }));
+    }
+    // Namensfilter des Servers (Trigger profile_name_pruefen) hat das letzte Wort: hint ist der Grund
+    if (e.code === 'P0001' && e.serverDetails?.message === 'NAME_UNZULAESSIG') {
+      throw new Error(K(e.serverDetails.hint === 'reserviert' ? 'nameReserviert' : 'nameAnstoessig'));
     }
     throw e;
   }

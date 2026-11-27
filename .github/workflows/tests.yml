@@ -120,6 +120,8 @@ jobs:
         run: node tests/server-benutzername-sperre.test.mjs
       - name: Benutzername-Haken pruefen (nicht eingespielt; Haken + Frist beim Bestaetigen, name_frei, Verwaltung, RLS-Test, Rueckweg)
         run: node tests/server-benutzername-bestaetigt.test.mjs
+      - name: Namensfilter pruefen (nicht eingespielt; Liste wie die App, Trigger vor der Monats-Sperre, RLS-Test, Rueckweg)
+        run: node tests/server-namen-filter.test.mjs
       - name: Liga-Bild-SQL ausfuehren (vorbereitet, nicht eingespielt)
         run: node tests/server-liga-bild.test.mjs
       - name: Raetsel-Duell-SQL ausfuehren
