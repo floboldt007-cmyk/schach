@@ -164,6 +164,10 @@ export function zeige(root, params, app) {
   function sperre() {
     if (weg) return;
     for (const el of inhalt.querySelectorAll('button, input, select')) el.disabled = busy || blockiert;
+    // T-070: "Partie suchen" gibt nur pruefeSuche frei (Zustand 'bereit'). Sonst gab das Ende von "Meine Partien" den Knopf
+    // frei, waehrend die Liga-Pruefung noch lief, und deren spaete Antwort versteckte eine schon laufende Suche
+    const such = sucheKarte()?.querySelector('[data-online="suchen"]');
+    if (such) such.disabled = busy || blockiert || sucheKarte().dataset.zustand !== 'bereit';
     const angebot = inhalt.querySelector('[data-online="angeboten"]');
     if (angebot) angebot.disabled = true;
     netzStand();
@@ -476,6 +480,8 @@ export function zeige(root, params, app) {
     try { const d = await holeStand(); if (weg) return; zeigeLiga(d); } catch (e) { liga = false; }
     const lp = await laufend;
     if (weg) return;
+    // T-070: laeuft inzwischen eine Suche, gehoert die Karte ihr (sonst verschwaende sie, und `suche` liefe unsichtbar weiter)
+    if (suche) return;
     if (lp) {
       sucheZustand('laufend', O(online.binAmZug(lp) ? 'laufend.du' : 'laufend.gegner'));
       sucheKarte().querySelector('[data-online="fortsetzen"]').dataset.partie = lp.id;

@@ -637,6 +637,10 @@ try {
     await seite.setViewportSize({ width: 375, height: 667 });
     ligaVerzug = 700;
     await seite.evaluate(() => window.__app.gehe('heim'));
+    // T-070: erst wenn die Startseite wirklich steht. Der Wechsel ist asynchron; bis dahin steht noch die fertige Online-Karte
+    // des Schritts davor im DOM, und das Warten auf "bereit" unten waere sofort erfuellt (CI 26./27.11.2026, Laeufe 45889363946
+    // und 45906523012: Liga-Platzhalter noch da)
+    await seite.waitForFunction(() => document.documentElement.dataset.screen === 'heim' && !document.querySelector('.on-art'));
     await seite.evaluate(() => {
       window.__cls = 0; window.__clsQuellen = [];
       window.__clsBeob = new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) {
@@ -652,6 +656,32 @@ try {
     pruefe('iPhone SE: nach der Pruefung Suchknopf frei, Liga-Platzhalter ersetzt',await seite.evaluate(() =>
       [...document.querySelectorAll('[data-online="suchen"]')].every((b) => !b.disabled)
       && !document.querySelector('.on-liga').hasAttribute('data-laedt')));
+  }
+  // T-070: die Liga-Antwort kommt NACH "Meine Partien". Bis R31 gab das Ende von "Meine Partien" (aktion -> sperre) jeden Knopf
+  // frei, auch "Partie suchen", obwohl die Liga-Pruefung noch lief; wer dann tippte, startete eine Suche, und die spaete
+  // Liga-Antwort setzte die Karte auf "bereit" zurueck: Suche unsichtbar, Uhr stand, "Sofort gegen den Bot" weg (CI-Wackler
+  // online-ui 84/87). Jetzt: Suchknopf gesperrt bis zur Pruefung, danach laeuft eine Suche sichtbar weiter.
+  {
+    ligaVerzug = 1500;
+    await seite.evaluate(() => { window.__onlineBotMs = 60000; window.__app.gehe('heim'); });
+    await seite.waitForFunction(() => document.documentElement.dataset.screen === 'heim' && !document.querySelector('.on-art'));
+    await seite.evaluate(() => window.__app.gehe('online'));
+    // "Meine Partien" ist fertig (aktion hat "Duell suchen" wieder freigegeben), die Liga laedt noch
+    await seite.waitForFunction(() => document.querySelector('[data-online="duell"]')?.disabled === false);
+    const frueh = await seite.evaluate(() => ({ laedt: !!document.querySelector('.on-liga[data-laedt]'),
+      suchenGesperrt: document.querySelector('[data-online="suchen"]').disabled, zustand: document.querySelector('.on-art[data-art="partie"]').dataset.zustand || '' }));
+    pruefe('Liga-Antwort nach Meine Partien: solange die Liga laedt, ist "Partie suchen" gesperrt', frueh.laedt && frueh.suchenGesperrt, frueh);
+    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit');
+    ligaVerzug = 0;
+    await knopf('suchen').click();
+    await seite.waitForTimeout(1300);
+    const laeuft = await seite.evaluate(() => ({ zustand: document.querySelector('.on-art[data-art="partie"]').dataset.zustand,
+      sichtbar: !document.querySelector('.on-suche').hidden, rest: document.querySelector('.on-rest').textContent,
+      kiJetzt: document.querySelector('[data-online="ki-jetzt"]').getClientRects().length > 0 }));
+    pruefe('Liga-Antwort nach Meine Partien: die Suche danach bleibt sichtbar, die Uhr laeuft, "Sofort gegen den Bot" ist da',
+      laeuft.zustand === 'sucht' && laeuft.sichtbar && /^Noch 5[89] s/.test(laeuft.rest) && laeuft.kiJetzt, laeuft);
+    await knopf('suche-stopp').click();
+    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit');
   }
   // Gegnersuche Partie (Konzept 3 A), altes SQL: Ring mit Restzeit, "Jetzt gegen KI" startet ohne Server eine Uebungspartie
   await seite.evaluate(() => { window.__onlineBotMs = 60000; });
