@@ -547,7 +547,19 @@ export function zeige(root, params, app) {
       if (weg || d.id !== id) return false;
       d.wartet = false;
       if (e && e.kennung === 'DUELL_ZEIT_UM') { brett.erlaubeZuege(null); zeigeMeldung('', D('zeit.um')); }
-      else { d.schritt = -1; hole(); }
+      else {
+        // T-061: ohne Edge Function (404), ohne Verbindung (Netz, 5xx) oder mit abgeschnittener Antwort ging der Zug still
+        // zurueck. Jetzt eine Meldung. Zuerst die Kennung: DUELL_NICHT_EINGERICHTET (503) ist die Einrichtung, DUELL_SERVER
+        // (503 oder Antwort ohne Ergebnis, z. B. abgeschnittenes JSON) das Netz, alle anderen Duell-Kennungen (unbekannt,
+        // veraltet, illegal) bleiben still, dort holt hole() nur den Stand. Ohne Kennung: 404 = Edge Function fehlt, kein
+        // Status (fetch warf) oder 5xx = Netz; 401/403/429 und andere 4xx bleiben still wie vor T-061 (die Anmeldung
+        // erneuert js/konto.js)
+        const status = Number(e?.status) || 0;
+        const k = e?.kennung || '';
+        if (k === 'DUELL_NICHT_EINGERICHTET' || (!k && status === 404)) zeigeMeldung('', D('zug.einrichtung'));
+        else if (k === 'DUELL_SERVER' || (!k && (status === 0 || status >= 500))) zeigeMeldung('', D('zug.netz'));
+        d.schritt = -1; hole();
+      }
       return false;
     });
   }
