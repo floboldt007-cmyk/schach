@@ -46,6 +46,8 @@ export const DE = {
   weiter: 'Gut, weiter so',
   falsch: 'Nicht ganz. 5 Sekunden Abzug, nächstes Rätsel',
   'zeit.um': 'Deine Zeit ist um. Dein Gegner spielt noch.',
+  'zug.einrichtung': 'Das Rätsel-Duell ist auf dem Server noch nicht eingerichtet. Dein Zug zählt nicht.',
+  'zug.netz': 'Verbindung gestört. Der Stand wird neu geladen.',
   // R27 Sofort-Ende: eigenes Ergebnis sofort, der Gegner spielt mit seiner Restzeit weiter
   'fertig.warten': 'Fertig: {n} gelöst. Dein Gegner spielt noch.',
   'uhr.gegner.aria': 'Zeit deines Gegners: {zeit}',
@@ -125,6 +127,8 @@ export const EN = {
   weiter: 'Good, keep going',
   falsch: 'Not quite. 5 seconds off, next puzzle',
   'zeit.um': 'Your time is up. Your opponent is still playing.',
+  'zug.einrichtung': 'The puzzle duel is not set up on the server yet. Your move does not count.',
+  'zug.netz': 'Connection problem. Reloading the current state.',
   'fertig.warten': 'Done: {n} solved. Your opponent is still playing.',
   'uhr.gegner.aria': 'Your opponent’s time: {zeit}',
   'alle': 'You have played all the puzzles.',
