@@ -135,7 +135,7 @@ export function zeige(root, params, app) {
   let introGelaufen = false, introUhr = null, neuerGeprueft = null, layoutRo = null, layoutBild = 0;
   // R19: wann diese Ansicht den jetzigen letzter_zug_am zuerst sah (Schranke fuer die Erstzug-Frist)
   let ersteSicht = { stand: null, am: 0 };
-  let live = null, liveFuer = null;
+  let live = null, liveFuer = null, liveFehlt = null, liveNochmal = null;
   // R7 Ergebnisblatt: blattFuer = Partie, fuer die das Blatt gebaut ist; kronenVor/kronenNach = kronen_mein_stand waehrend
   // der laufenden Partie und nach dem gesehenen Ende (nur gewertet; daraus die Aenderung, sonst keine Kronen-Zeile)
   let blattFuer = null, kronenFuer = null, kronenVor = null, kronenNach = null;
@@ -818,8 +818,21 @@ export function zeige(root, params, app) {
     const test = app.test && typeof window.__onlineLiveEngine === 'function' ? { engine: window.__onlineLiveEngine } : {};
     import('../pakete/online/live-eigene.js')
       .then(({ erstelle }) => erstelle({ modus: p.gewertet ? 'ranked' : 'freund', partieId: id, meineFarbe: online.meineFarbe(p), app, ...test }))
-      .then((l) => { if (weg || !p || p.id !== id) { l.stop(); return; } live = l; zeigeLiveHinweis(); })
-      .catch(() => { /* ohne Modul keine Live-Bewertung, die Partie laeuft weiter */ });
+      .then((l) => {
+        if (weg || !p || p.id !== id) { l.stop(); return; }
+        live = l;
+        if (l.grund === 'server') liveFehler(id); else { liveFehlt = null; zeigeLiveHinweis(); }
+      })
+      // ohne Modul keine Live-Bewertung, die Partie laeuft weiter
+      .catch(() => { if (!weg && p && p.id === id) { live = null; liveFehler(id); } });
+  }
+  // T-022: Server nicht erreichbar (Funktion fehlt, Netz) oder Modul nicht geladen: Hinweis statt leerer Zeile und genau
+  // EIN neuer Versuch je Partie beim naechsten Stand (starteLive laeuft bei jedem Stand, ohne Deckel waere das eine
+  // Abfrage je Zug); bleibt der Server weg, bleibt es beim Hinweis
+  function liveFehler(id) {
+    liveFehlt = id;
+    if (liveNochmal !== id) { liveNochmal = id; liveFuer = null; }
+    zeigeLiveHinweis();
   }
   // Hinweis nur ohne Premium: "heute noch 1 frei" vor dem ersten Zug, danach "diese Partie ist deine freie",
   // aufgebraucht "morgen wieder". rest 0 bei freiem Stand heisst: diese Partie ist heute schon gebucht (Neuladen).
@@ -827,7 +840,10 @@ export function zeige(root, params, app) {
     const el = inhalt.querySelector('.on-live');
     if (!el) return;
     const k = live && live.kontingent;
-    const text = !k || k.unbegrenzt || !p || p.status !== 'laeuft' ? ''
+    // Buchung beim ersten Zug gescheitert (grund server) zaehlt wie ein Start ohne Server
+    const fehlt = !!p && (liveFehlt === p.id || (live && live.grund === 'server'));
+    const text = !p || p.status !== 'laeuft' ? '' : fehlt ? O('live.fehlt')
+      : !k || k.unbegrenzt ? ''
       : live.grund === 'kontingent' ? O('live.genutzt')
         : !live.an ? '' : k.gebucht || k.rest === 0 ? O('live.diese') : k.rest != null ? O('live.frei', { n: k.rest }) : '';
     el.textContent = text;

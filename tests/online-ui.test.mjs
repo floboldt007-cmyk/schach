@@ -39,6 +39,8 @@ let ligaVerzug = 0;
 let erfinder = false, sonderVerzug = 0;
 // R2: Tageskontingent der Live-Bewertung (online_live_bewertung_frei/nutzen), Antwort wie supabase/zwei-ligen-schema.sql
 let liveFrei = { frei: true, rest: 1, unbegrenzt: false };
+// T-022: so viele Abfragen von online_live_bewertung_frei scheitern noch (404 wie eine fehlende Funktion)
+let liveFehlt = 0;
 const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [], karteKaputt = new Set(), karteSonder = new Map();
 // wie der Trigger setze_aktualisiert_am (now()): echte Zeit, streng steigend (Serveruhr fuer js/serverzeit.js, R19)
 const aktualisieren = p => { stamp = Math.max(Date.now(), stamp + 1); p.aktualisiert_am = new Date(stamp).toISOString(); return p; };
@@ -87,6 +89,8 @@ try {
     if (rpc === 'online_suche_ende') return antwort((neuesSql || altBeleg) && body.ki === true ? { ki_ref: '0b6c1e2d-3a4b-4c8d-9e0a-1b2c3d4e5f60' } : {});
     if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
+    if (rpc === 'online_live_bewertung_frei' && liveFehlt > 0) { liveFehlt--;
+      return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) }); }
     if (rpc === 'online_live_bewertung_frei') return antwort(liveFrei);
     if (rpc === 'bestaetigte_namen') return antwort([]); // R27 Haken fremder Namen (js/konto.js): hier ohne bestaetigten Namen
     if (rpc === 'online_live_bewertung_nutzen') return antwort(liveFrei.frei ? { ok: true, frei: true, rest: 0, unbegrenzt: liveFrei.unbegrenzt, gebucht: !liveFrei.unbegrenzt }
@@ -845,6 +849,25 @@ try {
   const freund = partie(), vorFreund = calls.length; await oeffne(freund);
   await tippe('e2e4'); await symbol('e4').waitFor();
   pruefe('Freundespartie: live wie in der Bot-Partie, ohne Kontingent-Abfrage und ohne Hinweis', liveRufe(vorFreund).length === 0 && await liveText() === '');
+  // T-022: antwortet der Server nicht (Funktion fehlt, Netz), war die Zeile leer und die Partie blieb ohne Bewertung.
+  // Jetzt ein Hinweis und genau ein neuer Versuch je Partie beim naechsten Stand (danach wie gewohnt)
+  liveFrei = { frei: true, rest: 1, unbegrenzt: false }; liveFehlt = 1;
+  const weg1 = partie({ gewertet: true }), vorWeg1 = calls.length; await oeffne(weg1);
+  await seite.waitForFunction(() => /nicht erreichbar/.test(document.querySelector('.on-live')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+  pruefe('Server fehlt: Hinweis "nicht erreichbar" statt leerer Zeile', /nicht erreichbar/.test(await liveText()), { text: await liveText(), rufe: liveRufe(vorWeg1) });
+  zug(weg1, 'e2e4'); await seite.waitForFunction(() => window.__online.chess().history().length === 1);
+  await seite.waitForFunction(() => /heute noch/.test(document.querySelector('.on-live')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+  pruefe('Nach dem Fehler: ein neuer Versuch beim naechsten Stand, Hinweis "heute noch 1 Partie frei"',
+    /heute noch 1 Partie frei/.test(await liveText()) && liveRufe(vorWeg1).join() === `frei:${weg1.id},frei:${weg1.id}`, { text: await liveText(), rufe: liveRufe(vorWeg1) });
+  liveFehlt = 99;
+  const weg2 = partie({ gewertet: true }), vorWeg2 = calls.length; await oeffne(weg2);
+  await seite.waitForFunction(() => /nicht erreichbar/.test(document.querySelector('.on-live')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+  zug(weg2, 'e2e4'); await seite.waitForFunction(() => window.__online.chess().history().length === 1);
+  zug(weg2, 'e7e5'); await seite.waitForFunction(() => window.__online.chess().history().length === 2);
+  await seite.waitForTimeout(400);
+  pruefe('Server bleibt weg: hoechstens zwei Abfragen je Partie, Hinweis bleibt', liveRufe(vorWeg2).length === 2 && /nicht erreichbar/.test(await liveText()),
+    { text: await liveText(), rufe: liveRufe(vorWeg2) });
+  liveFehlt = 0;
   // R2: die Probe sah beim Fortsetzen ein Brett ohne Zuege. Gemessen war es ein Tipp auf das 0 px breite Brett beim
   // Screen-Wechsel (Zug kam nie an); diese Pruefung haelt fest, dass das erste sichtbare Bild schon alle Figuren zeigt
   await seite.evaluate(() => sessionStorage.setItem('test:einstellungen', JSON.stringify({ bewegung: 'normal' })));
