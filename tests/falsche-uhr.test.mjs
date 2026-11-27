@@ -38,9 +38,17 @@ if (process.env.MIT_BROWSER) {
 }
 console.log(JSON.stringify(aus));
 `;
-function lauf(fake, mitBrowser = false) {
-  const env = { ...process.env, MIT_BROWSER: mitBrowser ? '1' : '' };
+// Saubere Umgebung fuer jedes Kind: laeuft dieser Test selbst unter dem Werkzeug (ganze Suite mit
+// NODE_OPTIONS=--import ... und FAKE_ZEIT), darf das Kind weder den geerbten Preload noch die geerbte FAKE_ZEIT haben.
+// Das Werkzeug bekommt es nur ueber das ausdrueckliche --import unten, FAKE_ZEIT nur, wo der Fall sie setzt.
+function sauber(extra = {}) {
+  const env = { ...process.env, ...extra };
+  delete env.NODE_OPTIONS;
   delete env.FAKE_ZEIT;
+  return env;
+}
+function lauf(fake, mitBrowser = false) {
+  const env = sauber({ MIT_BROWSER: mitBrowser ? '1' : '' });
   if (fake !== undefined) env.FAKE_ZEIT = fake;
   const r = spawnSync(process.execPath, ['--import', WERKZEUG, '--input-type=module', '-e', KIND], { cwd: WURZEL, env, encoding: 'utf8', timeout: 120000 });
   let daten = null;
@@ -48,6 +56,14 @@ function lauf(fake, mitBrowser = false) {
   return { code: r.status, stderr: r.stderr || '', daten };
 }
 const nah = (a, b) => Number.isFinite(a) && Math.abs(a - b) < 120000;
+// Bezug "echte Uhr" aus einem sauberen Kind ohne Werkzeug, nicht aus dem eigenen Date.now(): unter dem Preload
+// zeigt die eigene Uhr die falsche Zeit (Befund K, 27.11.: 13/15, nah() um ~9 h daneben)
+function echteZeit() {
+  const r = spawnSync(process.execPath, ['-e', 'console.log(Date.now())'], { env: sauber(), encoding: 'utf8', timeout: 30000 });
+  const ms = Number(r.stdout.trim());
+  if (r.status !== 0 || !Number.isFinite(ms)) throw new Error(`Bezugsuhr nicht lesbar: ${r.status} ${r.stderr}`);
+  return ms;
+}
 
 // gueltige Zeit: Node und Browser (beide Wege, auch nach der zweiten Navigation genau einmal verschoben)
 const ZIEL = '2026-11-27T00:30:00Z';
@@ -74,7 +90,7 @@ for (const gut of ['2026-11-27', '2026-11-27T00:30', '2026-11-27T01:30:00+01:00'
 
 // ohne FAKE_ZEIT (und leer): keine Wirkung, keine Meldung
 for (const ohne of [undefined, '']) {
-  const vorher = Date.now();
+  const vorher = echteZeit();
   r = lauf(ohne, ohne === undefined);
   pruefe(`ohne FAKE_ZEIT (${ohne === undefined ? 'nicht gesetzt' : 'leer'}): echte Uhr, stumm`, r.code === 0 && nah(r.daten?.node, vorher)
     && (ohne !== undefined || (nah(r.daten?.newContext, vorher) && nah(r.daten?.newPage, vorher))) && r.stderr.trim() === '', r);
