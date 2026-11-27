@@ -49,6 +49,10 @@
     "liga-bild-schema.sql": {
       "pflicht": "jetzt"
     },
+    "namen-filter-schema.sql": {
+      "pflicht": "warnung",
+      "pflicht_ab": "Namensfilter (T-012) eingespielt; danach jetzt (bis dahin fehlen namen_regeln, name_lesarten, name_gesperrt)"
+    },
     "online-elo-schema.sql": {
       "pflicht": "jetzt"
     },
