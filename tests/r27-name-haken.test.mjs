@@ -37,8 +37,9 @@ const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: ID })).
 const MERKER = 'schach-arena:konto:name';
 
 // profil: Antwort auf GET /rest/v1/profile (Liste); nach einem POST antwortet GET mit profilDanach. frei: Name -> boolean
-// fuer rpc/name_frei. modus: 'hell' oder 'dunkel'.
-async function seite(browser, { profil, profilDanach = null, frei = {}, modus = 'hell', breite = 390, hakenNamen = [] }) {
+// fuer rpc/name_frei. modus: 'hell' oder 'dunkel'. rpcFehlt: name_frei und bestaetigte_namen gibt es am Server nicht
+// (404 PGRST202, wie live vor dem Einspielen von supabase/benutzername-bestaetigt-schema.sql).
+async function seite(browser, { profil, profilDanach = null, frei = {}, modus = 'hell', breite = 390, hakenNamen = [], rpcFehlt = false }) {
   const k = await browser.newContext({ viewport: { width: breite, height: 844 }, serviceWorkers: 'block', timezoneId: 'Europe/Berlin',
     colorScheme: modus === 'dunkel' ? 'dark' : 'light', locale: 'de-DE' });
   const s = await k.newPage();
@@ -48,11 +49,14 @@ async function seite(browser, { profil, profilDanach = null, frei = {}, modus = 
   await s.route(SUPA + '/**', async (r) => {
     const u = r.request().url();
     const json = (body, status = 200) => r.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    const fehlt = () => json({ code: 'PGRST202', message: 'Could not find the function' }, 404);
     if (u.includes('/rest/v1/rpc/name_frei')) {
       const n = JSON.parse(r.request().postData() || '{}').name; freiFragen.push(n);
-      return json(n in frei ? frei[n] : true);
+      return rpcFehlt ? fehlt() : json(n in frei ? frei[n] : true);
     }
-    if (u.includes('/rest/v1/rpc/bestaetigte_namen')) { hakenFragen.push(JSON.parse(r.request().postData() || '{}').namen); return json(hakenNamen); }
+    if (u.includes('/rest/v1/rpc/bestaetigte_namen')) {
+      hakenFragen.push(JSON.parse(r.request().postData() || '{}').namen); return rpcFehlt ? fehlt() : json(hakenNamen);
+    }
     if (u.includes('/rest/v1/profile') && r.request().method() === 'POST') {
       posts.push(JSON.parse(r.request().postData() || '{}')); gepostet = true;
       return r.fulfill({ status: 201, contentType: 'application/json', body: '' });
@@ -176,6 +180,28 @@ async function browserTeil() {
     await p.s.evaluate(() => { const echt = Date.now; Date.now = () => echt() + 60 * 60 * 1000; });
     await frage();
     pruefe('Ein Haken bleibt ohne neue Frage', p.hakenFragen.length === vorher + 2, p.hakenFragen.length);
+    await p.k.close();
+
+    // 6c) live vor dem Einspielen: keine Spalte name_bestaetigt UND name_frei/bestaetigte_namen fehlen (404 PGRST202).
+    // Die App faellt still auf den alten Stand zurueck: kein Haken, kein "vergeben", der Knopf erscheint (der Server
+    // entscheidet beim Speichern), Speichern ohne name_bestaetigt, fremde Namen ohne Haken und ohne Fehler, kein Haenger.
+    p = await seite(browser, { profil: [{ user_id: ID, benutzername: 'alt_name' }], rpcFehlt: true });
+    z = await stand(p.s);
+    pruefe('Funktionen fehlen: kein Haken, kein Knopf beim eigenen Namen', !z.haken && !z.knopfDa, z);
+    await tippe(p.s, 'neu_ohne_rpc');
+    z = await stand(p.s);
+    pruefe('Funktionen fehlen: nach dem Tippen erscheint "Bestaetigen", nichts als vergeben gemeldet, kein "pruefe" stehen geblieben',
+      z.knopfDa && z.knopfAn && z.pruefArt !== 'fehler' && p.freiFragen.includes('neu_ohne_rpc'), { ...z, fragen: p.freiFragen });
+    await p.s.locator('[data-konto="name"]').click();
+    await p.s.locator('.dialog-knoepfe button', { hasText: 'Bestätigen' }).click({ timeout: 5000 });
+    await warte(1200);
+    pruefe('Funktionen fehlen: gespeichert, POST ohne name_bestaetigt', p.posts.length === 1 && p.posts[0].benutzername === 'neu_ohne_rpc'
+      && !('name_bestaetigt' in p.posts[0]), p.posts);
+    const fremde = await p.s.evaluate(async () => {
+      try { return { ok: true, namen: [...(await (await import('/js/konto.js')).bestaetigteNamen(['gegner_y']))] }; } catch (e) { return { ok: false, e: String(e) }; }
+    });
+    pruefe('Funktionen fehlen: fremde Namen ohne Haken, kein Fehler', fremde.ok && fremde.namen.length === 0 && p.hakenFragen.length >= 1, fremde);
+    pruefe('Funktionen fehlen: keine Seitenfehler', p.fehler.length === 0, p.fehler.join(' | '));
     await p.k.close();
 
     // 7) Bilder fuer den Bericht, hell und dunkel: gesperrt mit Haken
