@@ -823,8 +823,13 @@ export function zeige(root, params, app) {
         live = l;
         if (l.grund === 'server') liveFehler(id); else { liveFehlt = null; zeigeLiveHinweis(); }
       })
-      // ohne Modul keine Live-Bewertung, die Partie laeuft weiter
-      .catch(() => { if (!weg && p && p.id === id) { live = null; liveFehler(id); } });
+      // ohne Modul keine Live-Bewertung, die Partie laeuft weiter. Gemeldet wird nur, wo erstelle() den Server gefragt
+      // haette (gewertet, Einstellung an); Einstellung aus und Freundespartie bleiben wie dort ohne Hinweis (Kaltreview H)
+      .catch(() => {
+        if (weg || !p || p.id !== id) return;
+        live = null;
+        if (p.gewertet && app.einstellungen().liveBewertung !== false) liveFehler(id);
+      });
   }
   // T-022: Server nicht erreichbar (Funktion fehlt, Netz) oder Modul nicht geladen: Hinweis statt leerer Zeile und genau
   // EIN neuer Versuch je Partie beim naechsten Stand (starteLive laeuft bei jedem Stand, ohne Deckel waere das eine
