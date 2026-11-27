@@ -577,8 +577,13 @@ async function testeWege(browser, heute) {
 // "Als Naechstes" mit der letzten Partie und einem Knopf; taeglich und beim ersten Start nichts; nach dem Antippen weg
 const besuch = (tag, zurueck = null) => ({ [P + 'modul:besuch']: { tag, zurueck } });
 // Partie gegen Willi, gespielt vor `tage` Tagen (12:00 Uhr Ortszeit an diesem Tag nach js/tag.js, Grenze 4:00);
-// tage = null: ohne Datum (alter oder beschaedigter Eintrag)
-const partieWilli = (heute, tage = 3) => ({ id: 'pwilli1', ...(tage == null ? {} : { datum: new Date(beginnVon(addiereTage(heute, -tage)).getTime() + 8 * 36e5).toISOString() }),
+// tage = null: ohne Datum (alter oder beschaedigter Eintrag).
+// T-072: heute (tage 0) nicht 12:00, sondern eine Minute vor jetzt, frühestens am Beginn des Spieltags. 12:00 lag zwischen
+// 4 und 12 Uhr in der Zukunft, und die App zeigt fuer eine Zukunfts-Partie absichtlich keine Zeitangabe (heim.js
+// tageSeitPartie, Kaltreview 22): CI-Lauf 45912380727 lief um 06:58Z und scheiterte nur deshalb
+const partieZeit = (heute, tage) => (tage === 0 ? Math.max(beginnVon(heute).getTime(), Date.now() - 60e3)
+  : beginnVon(addiereTage(heute, -tage)).getTime() + 8 * 36e5);
+const partieWilli = (heute, tage = 3) => ({ id: 'pwilli1', ...(tage == null ? {} : { datum: new Date(partieZeit(heute, tage)).toISOString() }),
   botId: 'fridolin', spielerFarbe: 'w', startFen: null, zuege: ['e2e4'], san: ['e4'], ergebnis: 'sieg', grund: 'matt', hinweise: 0, zuruecknahmen: 0, modus: 'normal' });
 async function testeRueckkehr(browser, heute) {
   const PARTIE_WILLI = partieWilli(heute);
