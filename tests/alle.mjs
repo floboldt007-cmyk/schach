@@ -32,6 +32,7 @@ if (!Number.isInteger(PARALLEL) || PARALLEL < 1 || (teilArg && !TEIL)
 
 const SUITEN = [
   { name: 'zeitwaechter', datei: 'zeitwaechter.test.mjs', args: [], was: 'Zeitgrenzen, Fehler und Prozess-Aufraeumen' },
+  { name: 'falsche-uhr', datei: 'falsche-uhr.test.mjs', args: [], was: 'Werkzeug falsche Uhr: wirkt in Node und Seite genau einmal, unlesbare FAKE_ZEIT bricht laut ab (Browser)' },
   { name: 'testserver', datei: 'testserver.test.mjs', args: [], was: 'Gemeinsamer Test-Server der Browser-Suiten: MIME-Typen, 404/301/304, Last ohne Verweigerung' },
   { name: 'konto', datei: 'konto.test.mjs', args: [], was: 'Konto, Anmeldung und Cloud-Spielstand' },
   { name: 'konto-link', datei: 'konto-link.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster (Dialoge, Uhr)', was: 'Anmelde-Link: Rückkehr, Abgleich-Riegel, zwei Tabs (Browser)' },
@@ -249,6 +250,7 @@ const SUITEN = [
   { name: 'r20-erste-schritte', datei: 'r20-erste-schritte.test.mjs', args: [], was: 'Feinschliff R20: Kurs Erste Schritte fuer Anfaenger (Stufe A): Sterne sammeln mit Umwandlungs-Falle, gut anfangen, Einstieg ueber "Nein", 10 Funken je Aufgabe' },
   { name: 'r27-tempo-fix', datei: 'r27-tempo-fix.test.mjs', args: [], was: 'R27 Tempo: Ergebnisblatt-Knoepfe sofort, staffel kurz und gedeckelt, Kopf nur beim ersten Bildschirm, Bewegung aus ohne Animation, Vorrat der Eroeffnungen nur in Ruhe (ohne Browser)' },
   { name: 'r27-blatt-tempo', datei: 'r27-blatt-tempo.test.mjs', args: [], was: 'R27 Tempo: Blatt ohne Wartezeit, im ersten Bild trifft kein Tipp und keine Taste etwas hinter dem Blatt, auch keinen eigenen Tasten-Handler (Browser)' },
+  { name: 'shop-tempo', datei: 'shop-tempo.test.mjs', args: [], was: 'T-031: Kartenbilder im Shop-Blatt auf align-self start, erstes Layout mindestens 3x schneller als mit normal (relativ, lastfest), Klick-Zeit nur Messwert (Browser)' },
   { name: 'r27-tempo-befunde', datei: 'r27-tempo-befunde.test.mjs', args: [], was: 'R27 Tempo, Codex-Befunde: Shop-Vorschau schnell schliessen fuehrt zurueck in den Shop, Vorrat der Eroeffnungen nur auf der ruhigen Bots-Seite (Browser)' },
   { name: 'r25-leistung', datei: 'r25-leistung.test.mjs', args: [], was: 'Feinschliff R25 Leistung: Fokus und Messen beim Oeffnen im naechsten Bild, Pille nach dem Drehen, schnelles Enter oder Leerzeichen im ersten Bild gibt nicht auf (Browser)' },
   { name: 'tempo-messung', datei: 'tempo-messung.test.mjs', args: [], was: 'Werkzeug tempo-messung: Auswertung (Median, Urteil, Rangliste, Last-Probe), ohne Browser' },
