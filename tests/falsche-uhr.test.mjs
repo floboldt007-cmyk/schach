@@ -43,8 +43,8 @@ console.log(JSON.stringify(aus));
 // Das Werkzeug bekommt es nur ueber das ausdrueckliche --import unten, FAKE_ZEIT nur, wo der Fall sie setzt.
 function sauber(extra = {}) {
   const env = { ...process.env, ...extra };
-  delete env.NODE_OPTIONS;
-  delete env.FAKE_ZEIT;
+  // Windows reicht Namen in jeder Schreibweise weiter (node_options, fake_zeit): darum ohne Ruecksicht auf Gross/klein
+  for (const k of Object.keys(env)) if (/^(node_options|fake_zeit)$/i.test(k)) delete env[k];
   return env;
 }
 function lauf(fake, mitBrowser = false) {
