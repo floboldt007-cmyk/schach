@@ -60,7 +60,22 @@ jobs:
         run: |
           # Feste Version (Luecken-Check 7): ein Update kommt nur bewusst, nie still ueber Nacht
           npm install --no-save playwright@1.64.1
-          npx playwright install --with-deps chromium webkit
+          # T-071: Die Runner bringen packages.microsoft.com als apt-Quelle mit (Azure-CLI und Co.). Die Browser-Abhaengigkeiten
+          # kommen nur aus den Ubuntu-Quellen; die fremde Quelle lieferte 403 und brach apt-get update ab (exit 100, Laeufe
+          # 45902729941 und 45911100694). Deshalb vor dem Einrichten abschalten (verschoben, nicht geloescht).
+          mkdir -p "$RUNNER_TEMP/apt-aus"
+          for q in $(grep -rlsE 'packages\.microsoft\.com' /etc/apt/sources.list.d/ || true); do
+            echo "apt-Quelle abgeschaltet: $q"; sudo mv "$q" "$RUNNER_TEMP/apt-aus/"
+          done
+          echo "apt-Quellen mit packages.microsoft.com jetzt: $(grep -rlsE 'packages.microsoft.com' /etc/apt/sources.list.d/ | wc -l)"
+          # Nur dieser Einrichtungsschritt wird bei einem Aussetzer wiederholt (3 Versuche, Pause 30 und 90 s).
+          # Ein Test-Fehler in den Schritten danach bleibt rot, die haben keine Wiederholung.
+          for versuch in 1 2 3; do
+            if npx playwright install --with-deps chromium webkit; then echo "Playwright eingerichtet (Versuch $versuch)"; break; fi
+            if [ "$versuch" = 3 ]; then echo "::error::Playwright-Einrichtung 3-mal gescheitert"; exit 1; fi
+            pause=$([ "$versuch" = 1 ] && echo 30 || echo 90)
+            echo "::warning::Playwright-Einrichtung Versuch $versuch gescheitert, neuer Versuch in $pause s"; sleep "$pause"
+          done
       - name: Schnelle Tests bei Push
         if: github.event_name == 'push'
         run: |
@@ -167,7 +182,22 @@ jobs:
         run: |
           # Feste Version (Luecken-Check 7): ein Update kommt nur bewusst, nie still ueber Nacht
           npm install --no-save playwright@1.64.1
-          npx playwright install --with-deps chromium webkit
+          # T-071: Die Runner bringen packages.microsoft.com als apt-Quelle mit (Azure-CLI und Co.). Die Browser-Abhaengigkeiten
+          # kommen nur aus den Ubuntu-Quellen; die fremde Quelle lieferte 403 und brach apt-get update ab (exit 100, Laeufe
+          # 45902729941 und 45911100694). Deshalb vor dem Einrichten abschalten (verschoben, nicht geloescht).
+          mkdir -p "$RUNNER_TEMP/apt-aus"
+          for q in $(grep -rlsE 'packages\.microsoft\.com' /etc/apt/sources.list.d/ || true); do
+            echo "apt-Quelle abgeschaltet: $q"; sudo mv "$q" "$RUNNER_TEMP/apt-aus/"
+          done
+          echo "apt-Quellen mit packages.microsoft.com jetzt: $(grep -rlsE 'packages.microsoft.com' /etc/apt/sources.list.d/ | wc -l)"
+          # Nur dieser Einrichtungsschritt wird bei einem Aussetzer wiederholt (3 Versuche, Pause 30 und 90 s).
+          # Ein Test-Fehler in den Schritten danach bleibt rot, die haben keine Wiederholung.
+          for versuch in 1 2 3; do
+            if npx playwright install --with-deps chromium webkit; then echo "Playwright eingerichtet (Versuch $versuch)"; break; fi
+            if [ "$versuch" = 3 ]; then echo "::error::Playwright-Einrichtung 3-mal gescheitert"; exit 1; fi
+            pause=$([ "$versuch" = 1 ] && echo 30 || echo 90)
+            echo "::warning::Playwright-Einrichtung Versuch $versuch gescheitert, neuer Versuch in $pause s"; sleep "$pause"
+          done
       - name: Browser-Suiten mit WebKit
         run: |
           mkdir -p artifacts/screenshots

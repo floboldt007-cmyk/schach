@@ -6,6 +6,7 @@
 //   node tests/r24-koord-kontrast.test.mjs [--bilder <ordner>]     (PLAYWRIGHT_PFAD)
 // Mit --bilder: je Modus ein Bild der unteren linken Brettecke fuer nacht, holz, gruen, marmor (vorher/nachher).
 import http from 'node:http';
+import { appHeute } from './app-heute.mjs';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -59,9 +60,10 @@ const messen = () => {
   return o;
 };
 
-const HEUTE = new Date().toISOString().slice(0, 10);
 const zeilen = [];
 const browser = await browserTyp(pw).launch({ headless: true });
+// T-072: "heute" wie die App (js/tag.js, Tagesgrenze 4 Uhr), nicht das UTC-Datum
+const HEUTE = await appHeute(browser, `http://127.0.0.1:${PORT}/`);
 try {
   for (const modus of ['hell', 'dunkel']) {
     const k = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, serviceWorkers: 'block', hasTouch: true, locale: 'de-DE' });
