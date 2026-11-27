@@ -32,6 +32,7 @@ if (!Number.isInteger(PARALLEL) || PARALLEL < 1 || (teilArg && !TEIL)
 
 const SUITEN = [
   { name: 'zeitwaechter', datei: 'zeitwaechter.test.mjs', args: [], was: 'Zeitgrenzen, Fehler und Prozess-Aufraeumen' },
+  { name: 'falsche-uhr', datei: 'falsche-uhr.test.mjs', args: [], was: 'Werkzeug falsche Uhr: wirkt in Node und Seite genau einmal, unlesbare FAKE_ZEIT bricht laut ab (Browser)' },
   { name: 'testserver', datei: 'testserver.test.mjs', args: [], was: 'Gemeinsamer Test-Server der Browser-Suiten: MIME-Typen, 404/301/304, Last ohne Verweigerung' },
   { name: 'konto', datei: 'konto.test.mjs', args: [], was: 'Konto, Anmeldung und Cloud-Spielstand' },
   { name: 'konto-link', datei: 'konto-link.test.mjs', args: [], exklusiv: 'Browser-Zeitfenster (Dialoge, Uhr)', was: 'Anmelde-Link: Rückkehr, Abgleich-Riegel, zwei Tabs (Browser)' },
