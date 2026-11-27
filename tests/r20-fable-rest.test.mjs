@@ -14,6 +14,7 @@
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
 import http from 'node:http';
+import { appHeute } from './app-heute.mjs';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -46,7 +47,6 @@ const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs'
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 const HOST = `http://127.0.0.1:${PORT}/`;
 const P = 'schach-arena:v1:';
-const HEUTE = new Date().toISOString().slice(0, 10);
 const ZUZWEIT_PARTIE = { id: 'zz-fable', datum: new Date(Date.now() - 3600e3).toISOString(), botId: null, spielerFarbe: 'w', startFen: null,
   zuege: ['f2f3', 'e7e5', 'g2g4', 'd8h4'], san: ['f3', 'e5', 'g4', 'Qh4#'], ergebnis: 'niederlage', grund: 'matt', hinweise: 0,
   zuruecknahmen: 0, modus: 'zuzweit', zuzweit: { weiss: 'Weiß', schwarz: 'Schwarz', drehen: false } };
@@ -54,6 +54,8 @@ const laufend = (extra) => ({ spielerFarbe: 'w', startFen: null, zuege: ['e2e4',
   gestartet: new Date().toISOString(), extra: {}, ...extra });
 
 const browser = await pw.chromium.launch();
+// T-072: "heute" wie die App (js/tag.js, Tagesgrenze 4 Uhr), nicht das UTC-Datum
+const HEUTE = await appHeute(browser, HOST);
 const fehler = [];
 async function seite({ w = 390, h = 844, schema = 'light', speicher = {} } = {}) {
   const k = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: schema, hasTouch: w < 900 });

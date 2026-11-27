@@ -126,7 +126,8 @@ async function seite(browser, { breite, hoehe, schema = 'light', hash = 'raetsel
     if (url.includes('/functions/v1/raetsel-duell')) {
       aufrufe.push({ name: 'zug', daten, um: Date.now() });
       const a = srv.zug(daten && daten.zug);
-      return r.fulfill({ status: a.status, contentType: 'application/json', body: JSON.stringify(a.body) });
+      // a.roh: Rumpf woertlich (z. B. eine abgeschnittene Antwort), sonst JSON
+      return r.fulfill({ status: a.status, contentType: 'application/json', body: typeof a.roh === 'string' ? a.roh : JSON.stringify(a.body) });
     }
     const name = (url.match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1];
     if (name) {
@@ -881,6 +882,60 @@ async function fertigWiederholen(browser, stoerung) {
   } finally { await p.k.close(); }
 }
 
+// T-061: erreicht ein Zug den Server nicht (Antwort abgeschnitten, Edge Function fehlt = 404, Server weg = 5xx),
+// sprang er still zurueck. Jetzt eine verstaendliche Meldung in der vorhandenen Meldungszeile
+async function zugOhneServer(browser) {
+  gruppe = 'Zug ohne Server';
+  const srv = neuerServer({ art: 'freundschaft', vorlaufMs: 300 });
+  const p = await seite(browser, { breite: 390, hoehe: 844, hash: 'raetsel-duell/ABC234', srv, rpc: (name) => {
+    if (name === 'duell_beitreten') { srv.anlegen(); return { duell: DUELL }; }
+    return undefined;
+  } });
+  try {
+    await p.s.waitForSelector('.screen.raetsel-duell[data-phase="laeuft"]', { timeout: 30000 });
+    const echt = srv.zug;
+    const meldung = () => p.s.evaluate(() => document.querySelector('.rd-meldung')?.textContent || '');
+    const warteText = (q) => warteBis(p.s, (x) => new RegExp(x).test(document.querySelector('.rd-meldung')?.textContent || ''), q, 5000).catch(() => {});
+    srv.zug = () => ({ status: 200, roh: '{"richtig":tr' });
+    await zieh(p.s, 'a1a8');
+    await warteText('Verbindung');
+    pruefe('Abgeschnittene Antwort: Meldung "Verbindung gestoert, Stand neu"', /Verbindung gestört/.test(await meldung()), await meldung());
+    srv.zug = () => ({ status: 404, body: { code: 'NOT_FOUND', message: 'Requested function was not found' } });
+    await zieh(p.s, 'a1a8');
+    await warteText('eingerichtet');
+    pruefe('404: Meldung "noch nicht eingerichtet"', /noch nicht eingerichtet/.test(await meldung()), await meldung());
+    srv.zug = () => ({ status: 503, body: { message: 'upstream down' } });
+    await zieh(p.s, 'a1a8');
+    await warteText('Verbindung');
+    pruefe('503: Meldung "Verbindung gestoert, Stand neu"', /Verbindung gestört/.test(await meldung()), await meldung());
+    // Kaltreview T-061: Kennungen des Duells und Anmelde-/Drossel-Antworten. Still heisst: nach Antwort und Neuladen des
+    // Stands steht keine Meldung (vorher geleert); DUELL_NICHT_EINGERICHTET ist die Einrichtungs-Meldung, nicht das Netz
+    const leere = () => p.s.evaluate(() => { const el = document.querySelector('.rd-meldung'); if (el) el.textContent = ''; });
+    const stillNach = async (status, body, name) => {
+      await leere();
+      let gerufen = false;
+      srv.zug = () => { gerufen = true; return { status, body }; };
+      await zieh(p.s, 'a1a8');
+      for (let i = 0; i < 50 && !gerufen; i++) await p.s.waitForTimeout(100);
+      await p.s.waitForTimeout(800);
+      pruefe(`${name}: still, keine Meldung`, gerufen && (await meldung()) === '', `gerufen=${gerufen} meldung="${await meldung()}"`);
+    };
+    await stillNach(404, { fehler: 'DUELL_UNBEKANNT', text: 'Dieses Duell wurde nicht gefunden.' }, '404 DUELL_UNBEKANNT');
+    await leere();
+    srv.zug = () => ({ status: 503, body: { fehler: 'DUELL_NICHT_EINGERICHTET', text: 'Das Rätsel-Duell ist auf dem Server noch nicht eingerichtet.' } });
+    await zieh(p.s, 'a1a8');
+    await warteText('eingerichtet');
+    pruefe('503 DUELL_NICHT_EINGERICHTET: Meldung "noch nicht eingerichtet"', /noch nicht eingerichtet/.test(await meldung()), await meldung());
+    await stillNach(429, { message: 'Too Many Requests' }, '429 ohne Kennung');
+    await stillNach(401, { msg: 'Invalid JWT' }, '401 ohne Kennung');
+    srv.zug = echt;
+    await zieh(p.s, 'a1a8');
+    await warteBis(p.s, () => /^1 /.test(document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent), null, 5000).catch(() => {});
+    pruefe('Danach zaehlt der naechste Zug wieder', /^1 /.test(await p.s.evaluate(() => document.querySelector('.rd-seite[data-wer="ich"] .rd-geloest').textContent)));
+    pruefe('Keine Seitenfehler', p.fehlerListe.filter((f) => !/status of (401|404|429|503)/.test(f)).length === 0, p.fehlerListe.join(' | '));
+  } finally { await p.k.close(); }
+}
+
 const NUR = (process.argv.find((a) => a.startsWith('--nur=')) || '').slice(6) || null;
 const server = spawn(process.execPath, ['tests/testserver.mjs', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
 let browser;
@@ -907,6 +962,7 @@ try {
       for (const l of laeufe) await duellGegenKi(browser, l);
       await nebenwege(browser);
     }
+    if (!NUR || NUR === 'zugserver') await zugOhneServer(browser);
     if (!NUR || NUR === 'gross') await grosserSchirm(browser);
     if (!NUR || NUR === 'laden') await neuladen(browser);
     if (!NUR || NUR === 'sofort') {
