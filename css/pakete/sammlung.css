@@ -369,7 +369,10 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
    den Hinweis "Mit Konto" (shop-entwurf.js gastKarte, fable-check 19.11. Nr 6), darum der Zeiger wie bei den anderen Karten */
 .shf-karte[data-gast] { cursor: pointer; box-shadow: inset 0 0 0 2px var(--text-2); }
 .shf-karte[data-gast] .shf-name { color: var(--text-2); }
-.shf-bild { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+/* align-self: start (T-031, 27.11.2026): sieht gleich aus, die Zeile ist "auto" und richtet sich nach dem Bild selbst. Gestreckt
+   (Vorgabe) legte Chrome jedes Bild mit aspect-ratio in den verschachtelten Grids ein zweites Mal aus: das erste Layout des
+   Shop-Blatts kostete so rund 100 ms am PC, mit start rund 7 ms (Probe tests/shop-tempo.test.mjs) */
+.shf-bild { position: relative; display: grid; place-items: center; align-self: start; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
   background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--shf-farbe) 34%, #fff), color-mix(in srgb, var(--shf-farbe) 80%, #000)); }
 .shf-karte[data-folgt] .shf-bild { background: var(--flaeche-2); color: var(--text-2); }
 .shf-bild > svg:not(.shf-brettbild) { width: 72%; height: auto; }
