@@ -9,6 +9,7 @@
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
 import http from 'node:http';
+import { appHeute } from './app-heute.mjs';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -59,11 +60,12 @@ const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs'
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 const HOST = `http://127.0.0.1:${PORT}/`;
 const P = 'schach-arena:v1:';
-const HEUTE = new Date().toISOString().slice(0, 10);
 const PS = '.screen.partie:not(.online-screen)';
 const MATT = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
 
 const browser = await pw.chromium.launch();
+// T-072: "heute" wie die App (js/tag.js, Tagesgrenze 4 Uhr), nicht das UTC-Datum
+const HEUTE = await appHeute(browser, HOST);
 const fehler = [];
 async function seite(extra = {}) {
   const k = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });

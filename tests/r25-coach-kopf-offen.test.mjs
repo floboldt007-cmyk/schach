@@ -4,6 +4,7 @@
 // Pixel fuer Pixel von 13 px darueber bis 13 px darunter, die laengste Strecke, die den Kopf trifft.
 //   node tests/r25-coach-kopf-offen.test.mjs     (PLAYWRIGHT_PFAD, BROWSER=webkit fuer WebKit)
 import http from 'node:http';
+import { appHeute } from './app-heute.mjs';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -51,8 +52,9 @@ const tippHoehe = async () => {
   return { hoehe: lang, kopf: Math.round(r.height * 10) / 10, offen: kopf.getAttribute('aria-expanded'), unten };
 };
 
-const HEUTE = new Date().toISOString().slice(0, 10);
 const browser = await browserTyp(pw).launch({ headless: true });
+// T-072: "heute" wie die App (js/tag.js, Tagesgrenze 4 Uhr), nicht das UTC-Datum
+const HEUTE = await appHeute(browser, `http://127.0.0.1:${PORT}/`);
 try {
   for (const [w, h, geraet] of [[375, 667, 'iphonese'], [390, 844, 'iphone13']]) {
     const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, hasTouch: true, serviceWorkers: 'block', locale: 'de-DE' });
