@@ -4,9 +4,12 @@
 // Bild) ein zweites Mal aus. Mit align-self: start (css/pakete/sammlung.css) sieht es gleich aus, die Zeile ist "auto".
 // Geprueft:
 //   1. jedes Kartenbild im offenen Shop-Blatt steht auf align-self: start (gleichbleibend, unabhaengig von der Rechnerlast)
-//   2. Klick bis zum naechsten Bild (Event Timing, wie INP) am PC, Median aus 5 Oeffnungen, unter 100 ms (vorher rund 200 ms);
-//      in der CI (Umgebung CI gesetzt) nur als Messwert ausgegeben, weil fremde Last auf dem Runner die Wanduhr verschiebt
-//   3. das erste Layout des Shop-Inhalts im Blatt, Median aus 5, unter 30 ms (vorher 55 bis 100 ms, nachher rund 7 ms)
+//   2. Klick bis zum naechsten Bild (Event Timing, wie INP) am PC, Median aus 5 Oeffnungen: NUR Messwert, ueberall. Eine feste
+//      Wanduhr-Grenze kippt unter Last (Kaltreview 27.11.: 100 ms waren bei 3 parallelen Laeufen in 7 von 9 Laeufen rot)
+//   3. das erste Layout des Shop-Inhalts im Blatt, RELATIV im selben Lauf: abwechselnd mit dem alten Verhalten (align-self:
+//      normal per Stil-Einschub) und wie ausgeliefert, je 5 Mal; wie ausgeliefert muss es mindestens 3x schneller sein.
+//      Gemessen 27.11.: rund 7x ungedrosselt, rund 9x bei 2x CPU-Drossel. Ein Verhaeltnis auf demselben Rechner haelt unter Last,
+//      eine feste Zahl in ms nicht (30 ms waren bei 2x Drossel schon knapp, bei 4x rot)
 //   node tests/shop-tempo.test.mjs   (PC 1280 x 800, Chromium ungedrosselt, Netz nur simuliert)
 import http from 'node:http';
 import { createRequire } from 'node:module';
@@ -33,7 +36,7 @@ const PORT = Number(process.env.PORT) || await (await import('./freier-port.mjs'
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 
 const GRENZE_MS = 100;
-const LAYOUT_GRENZE_MS = 30;
+const FAKTOR = 3;
 const RUNDEN = 5;
 const median = (w) => { const a = [...w].sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; };
 
@@ -95,15 +98,18 @@ try {
     }
     pruefe(`jedes Kartenbild im Shop-Blatt steht auf align-self: start (${bilder ? bilder.length : 0} Bilder)`,
       bilder && bilder.length >= 10 && bilder.every((a) => a === 'start'), bilder);
-    const klickName = `PC: Klick bis zum naechsten Bild unter ${GRENZE_MS} ms (Median ${median(klickMs).toFixed(0)} ms aus ${klickMs.map((m) => m.toFixed(0)).join(' ')})`;
-    // In der CI (geteilte Runner, --parallel=3) haengt eine Wanduhr-Zeit an fremder Last: dort nur Messwert, sonst kaeme ein Wackel-Rot.
-    // Lastfest pruefen dort Punkt 1 (Stilwert) und Punkt 3 (Layout-Kosten, Abstand rund 3x zur Grenze).
-    if (process.env.CI) console.log(`info ${klickName} (Messwert, in der CI keine Pruefung)`);
-    else pruefe(klickName, median(klickMs) < GRENZE_MS, klickMs);
+    // Wanduhr-Zeit haengt an fremder Last (parallele Laeufe, geteilte Runner): nur Messwert, lastfest pruefen Punkt 1 und 3
+    const klickMed = median(klickMs);
+    console.log(`info PC: Klick bis zum naechsten Bild, Median ${klickMed.toFixed(0)} ms aus ${klickMs.map((m) => m.toFixed(0)).join(' ')}`
+      + ` (Messwert, Ziel unter ${GRENZE_MS} ms${klickMed < GRENZE_MS ? '' : ', hier darueber'})`);
 
-    // 3: erstes Layout des Shop-Inhalts in einem Blatt, ohne Klick und ohne Animation gemessen
-    const layoutMs = [];
-    for (let i = 0; i < RUNDEN; i++) layoutMs.push(await s.evaluate(() => {
+    // 3: erstes Layout des Shop-Inhalts in einem Blatt, ohne Klick und ohne Animation gemessen, abwechselnd alt und wie ausgeliefert
+    const layoutMs = { alt: [], neu: [] };
+    for (let i = 0; i < 2 * RUNDEN; i++) {
+      const art = i % 2 ? 'neu' : 'alt';
+      layoutMs[art].push(await s.evaluate((alt) => {
+      const einschub = alt ? document.head.appendChild(Object.assign(document.createElement('style'),
+        { textContent: '.shf-bild { align-self: normal !important; }' })) : null;
       const x = document.querySelector('.sa-bereich[data-bereich="shop"]');
       const heim = x.parentNode;
       const ort = document.createElement('div');
@@ -117,11 +123,16 @@ try {
       void document.body.offsetHeight;
       const d = performance.now() - t;
       x.hidden = true; heim.append(x); ort.remove();
+      einschub?.remove();
       void document.body.offsetHeight;
       return d;
-    }));
-    pruefe(`PC: erstes Layout des Shop-Inhalts im Blatt unter ${LAYOUT_GRENZE_MS} ms (Median ${median(layoutMs).toFixed(1)} ms aus ${layoutMs.map((m) => m.toFixed(0)).join(' ')})`,
-      median(layoutMs) < LAYOUT_GRENZE_MS, layoutMs);
+    }, art === 'alt'));
+    }
+    const mAlt = median(layoutMs.alt), mNeu = median(layoutMs.neu);
+    // Timer-Aufloesung: ein Median von 0 zaehlt als 0,1 ms, damit das Verhaeltnis endlich bleibt
+    const faktor = mAlt / Math.max(mNeu, 0.1);
+    pruefe(`PC: erstes Layout des Shop-Inhalts im Blatt mindestens ${FAKTOR}x schneller als mit align-self: normal`
+      + ` (${faktor.toFixed(1)}x; Median ${mNeu.toFixed(1)} ms gegen ${mAlt.toFixed(1)} ms)`, faktor >= FAKTOR, layoutMs);
   } finally { await k.close(); }
   pruefe('keine Seitenfehler', !seitenfehler.length, seitenfehler);
 } finally {
