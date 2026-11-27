@@ -88,7 +88,12 @@ async function aufgeben(s, finger) {
   const [x, y] = [r.x + r.width / 2, r.y + r.height / 2];
   if (finger) { const f = fingerTreiber(s); await f.runter(x, y); await warte(1400); await f.hoch(x, y); }
   else { await s.mouse.move(x, y); await s.mouse.down(); await warte(1400); await s.mouse.up(); }
-  return klappt(s.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 20000 }));
+  // Das Niederlage-Blatt zaehlt in beiden Zustaenden: "vorlaeufig" (der Coach wertet noch aus, Genauigkeit folgt) und
+  // "gefuellt". Bis R30 wartete die Probe nur auf "gefuellt", also auf die FERTIGE Auswertung; auf der ausgelasteten CI
+  // dauerte die laenger als 20 s und die Probe war rot, obwohl das Blatt stand (CI 26.11.2026, Lauf 45889370350, Bild
+  // iphone13-dunkel-aufgeben-zug10: "Partie verloren", "Coach wertet die Partie aus", Funken +18). Den Nachtrag der
+  // Auswertung (vorlaeufig -> gefuellt) prueft tests/app.test.mjs.
+  return klappt(s.waitForSelector('.ergebnis-overlay.niederlage.gefuellt, .ergebnis-overlay.niederlage.vorlaeufig', { timeout: 20000 }));
 }
 
 pruefe(`Regel: MIN_ZUEGE ist 10 (Grenze dieser Probe)`, MIN_ZUEGE === 10, { MIN_ZUEGE });
