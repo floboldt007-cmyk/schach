@@ -1,3 +1,6 @@
+-- ACHTUNG (R30, 26.11.2026): supabase/karte-besitz-sicht-schema.sql ersetzt Funktionen aus dieser Datei (karte_konstanten, karte_waehle, karte_von).
+-- Wer DIESE Datei erneut einspielt, setzt sie still auf eine aeltere Fassung zurueck (Motiv/Rahmen wieder ohne Beleg).
+-- Danach IMMER karte-besitz-sicht-schema.sql erneut einspielen und dort die Fassungs-Probe fahren.
 -- Visitenkarte, Erfolge in drei Stufen, Taler und Banner (Etappe 4b, Konzept 06.11.2026 Abschnitt 5b und 5c).
 -- Die Zahlen und festen Listen stehen gleich in js/pakete/sammlung/stufen.js, js/pakete/sammlung/titel.js und
 -- js/profil.js (Vertragstest tests/karte-vertrag.test.mjs).

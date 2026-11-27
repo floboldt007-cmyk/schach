@@ -1,3 +1,6 @@
+-- ACHTUNG (R30, 26.11.2026): supabase/karte-besitz-sicht-schema.sql ersetzt Funktionen aus dieser Datei (karte_waehle,
+-- karte_von bzw. liga_mitglieder_liste). Wer DIESE Datei erneut einspielt, setzt sie still zurueck (Motiv/Rahmen wieder ohne
+-- Beleg). Danach immer karte-besitz-sicht-schema.sql erneut einspielen und dort die Fassungs-Probe fahren.
 -- VORSCHLAG (R27 Schritt 1, 22.11.2026, Plan "Stufen am Server", von Flo am 22.11. freigegeben), NICHT EINGESPIELT:
 -- Gold- und Level-Titel der Visitenkarte nur mit Beleg auf dem Server. Bisher prueft karte_waehle den Titel nur gegen die
 -- feste Liste (karte-schema.sql:8-10, :341); ein direkter Aufruf setzt so z. B. 'erfolg-ewige-flamme' oder 'level-100' ganz

@@ -510,6 +510,15 @@ try {
     const ef = await seite.evaluate(() => { const s = document.querySelector('.on-oben > .av > svg'); return { figur: s?.dataset.figur || null, rahmen: s?.dataset.rahmen || null, bild: !!s?.querySelector('image'), name: document.querySelector('.on-oben b')?.textContent || '' }; });
     // Motiv und Rahmen des Besitzers zeigt erst so/R28-gegner-sieht-besitz (Flo-Regel 22.11.): hier nur "nie leer"
     pruefe('R28: Erfinder-Karte des Gegners zeigt ein Bild und den Namen, nie leer', !!ef.figur && ef.bild && ef.name === 'Flo_Erfinder', ef);
+    // R30 (Flo 22.11.2026 "Was du besitzt und traegst, sieht auch dein Gegner"): was der Server mit Beleg herausgibt
+    // (karte_bild, supabase/karte-besitz-sicht-schema.sql), zeigt die Gegnerleiste: Koenig mit Erfinder-Rahmen, Kronli
+    for (const [motiv, rahmen, name] of [['K', 'erfinder-blatt-0', 'Flo_Koenig'], ['kronli', 'ohne', 'Flo_Kronli']]) {
+      const p = partie({ farbe: 'w' }); karteSonder.set(p.id, { motiv, rahmen, name });
+      await oeffne(p);
+      await seite.waitForFunction((n) => document.querySelector('.on-oben b')?.textContent === n, name, { timeout: 9000 }).catch(() => {});
+      const b = await seite.evaluate(() => { const s = document.querySelector('.on-oben > .av > svg'); return { figur: s?.dataset.figur || null, rahmen: s?.dataset.rahmen || null }; });
+      pruefe(`R30: Gegnerleiste zeigt ${motiv} mit Rahmen ${rahmen} vom Server`, b.figur === motiv && (b.rahmen || 'ohne') === rahmen, b);
+    }
   }
   // R28 Vorzuege online (Flo 22.11.2026 "Premoves gehen?"): wie gegen den Bot vormerken, solange der Gegner dran ist; der
   // erste laeuft, sobald sein Zug da ist; ein Vorzug, der nicht mehr geht, faellt leise weg. Nie vorher an den Server.

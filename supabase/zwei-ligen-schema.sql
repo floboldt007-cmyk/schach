@@ -1,3 +1,6 @@
+-- ACHTUNG (R30, 26.11.2026): supabase/karte-besitz-sicht-schema.sql ersetzt Funktionen aus dieser Datei (karte_waehle,
+-- karte_von bzw. liga_mitglieder_liste). Wer DIESE Datei erneut einspielt, setzt sie still zurueck (Motiv/Rahmen wieder ohne
+-- Beleg). Danach immer karte-besitz-sicht-schema.sql erneut einspielen und dort die Fassungs-Probe fahren.
 -- EINSPIELEN DIESER FASSUNG (Stand 11.11.2026, Zweig so/R1-server; Flo, nie Claude):
 --   1. Supabase SQL Editor, diese ganze Datei ausfuehren (wiederholbar; ersetzt den Live-Stand von PR #213, aa6f036).
 --   2. supabase/zwei-ligen-rls-test.sql ausfuehren: muss ohne "FEHLER:" mit ROLLBACK enden (aendert nichts).

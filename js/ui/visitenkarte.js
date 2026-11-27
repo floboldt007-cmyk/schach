@@ -86,9 +86,10 @@ export function botKarte(bot) {
 
 // Server-Karte (supabase/karte-schema.sql karte_von): jeder Wert wird geprueft, bevor er ins Bild kommt.
 // orden(familie, stufe) -> { name, bild } liefert das Paket sammlung (Name und Abzeichen der Familie).
-// Profilbild eines FREMDEN Spielers aus Server-Werten (Karte, Weltrangliste): nur Motive und Rahmen, die die Server-Karte
-// kennen darf (js/karte.js, wie karte_konstanten), alles andere wird zum Standard. Koenig, Kronli, Erfinder- und Labor-Rahmen
-// gibt es nur im eigenen Bild (Review 6e zu #271, Befund 3: der Client verlaesst sich nicht allein auf den Server)
+// Profilbild eines FREMDEN Spielers aus Server-Werten (Karte, Liga, Weltrangliste): nur Motive und Rahmen, die die Server-Karte
+// kennen darf (js/karte.js, wie karte_konstanten), alles andere wird zum Standard (Review 6e zu #271, Befund 3: der Client
+// verlaesst sich nicht allein auf den Server). Koenig, Kronli und Erfinder-Rahmen gibt der Server seit R30 nur mit Stueck
+// heraus (karte_bild, supabase/karte-besitz-sicht-schema.sql); Labor-Rahmen gibt es nur im eigenen Bild
 export function fremderAvatar(o = {}) {
   return profilAvatar({ figur: KARTE_MOTIVE.includes(o.motiv) ? o.motiv : 'P', grund: o.grund,
     rahmen: KARTE_RAHMEN.includes(o.rahmen) ? o.rahmen : 'ohne' }, 'w');
