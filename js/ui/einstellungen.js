@@ -21,7 +21,7 @@ import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import { sitzung, istAbgeglichen } from '../konto.js';
-import { istErfinder } from '../sonderstuecke.js';
+import { istErfinder, erfinderStatus } from '../sonderstuecke.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 import '../sprachen/bericht.js';
@@ -227,7 +227,6 @@ export function zeige(root, params = {}, app) {
           <h3 class="es-titel" id="es-g-info">${E('gruppe.infoLizenzen')}</h3>
           <p>${E('info.frei', { app: '<b>Crownmate</b>', lizenz: `<a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>` })}</p>
           <p>${E('info.quellcode', { app: 'Crownmate', link: '<a href="https://github.com/floboldt007-cmyk/schach" target="_blank" rel="noopener">GitHub</a>' })}</p>
-          <p class="es-hilfe es-version" hidden></p>
           <p class="es-recht"><a href="${esc(pfad(sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'))}" target="_blank" rel="noopener">${E('info.datenschutz')}</a> · <a href="${esc(pfad(sprache() === 'en' ? 'impressum-en.html' : 'impressum.html'))}" target="_blank" rel="noopener">${E('info.impressum')}</a></p>
           <div class="es-bericht">
             <p class="es-hilfe" id="es-t-bericht">${t('bericht.eintragText')}</p>
@@ -246,6 +245,7 @@ export function zeige(root, params = {}, app) {
             <li><b>${E('info.lichess')}</b><span>${E('info.lichessText', { link: `<a href="https://database.lichess.org/" target="_blank" rel="noopener">${E('info.lichessDb')}</a>` })}</span></li>
             <li><b>${E('info.eroeffnungen')}</b><span>${E('info.eroeffnungenText', { link: `<a href="https://github.com/lichess-org/chess-openings" target="_blank" rel="noopener">lichess-org/chess-openings</a>` })}</span></li>
           </ul>
+          <p class="es-hilfe es-version" hidden></p>
         </section>
        </div>
       </div>`;
@@ -261,13 +261,25 @@ export function zeige(root, params = {}, app) {
     zeigeVersion();
   }
   // Versionsnummer unter Info (Flo 31.10.2026 abends: "Wann ist alles live?"): so sieht man, ob das Geraet den neuesten
-  // Stand hat; ohne Service Worker (Test, erster Start) bleibt die Zeile weg
+  // Stand hat; ohne Service Worker (Test, erster Start) fehlt die Nummer.
+  // R32 (T-018, Flo 28.11.2026): dahinter der Erfinder-Status des angemeldeten Kontos, ganz unten in "Info und Lizenzen"
+  // (Anlass: ein Altgeraet hing auf Version 239 und zeigte die Erfinder-Stuecke nicht). Abgemeldet ohne Status.
   function zeigeVersion() {
+    const el = sec.querySelector('.es-version');
+    const STATUS_TEXT = { aktiv: 'info.erfinderAktiv', fehlt: 'info.erfinderFehlt', offen: 'info.erfinderOffen' };
+    let version = '';
+    let status = '';
+    try { const s = erfinderStatus(); status = s ? E(STATUS_TEXT[s]) : ''; } catch (e) { /* ohne Status */ }
+    const male = () => {
+      if (beendet || !el) return;
+      const text = [version, status].filter(Boolean).join(' · ');
+      el.textContent = text;
+      el.hidden = !text;
+    };
+    male();
     import('../bericht.js').then((m) => m.swVersion()).then((v) => {
-      const el = sec.querySelector('.es-version');
-      if (beendet || !el || !v) return;
-      el.textContent = E('info.version', { version: v.version });
-      el.hidden = false;
+      if (v) version = E('info.version', { version: v.version });
+      male();
     }).catch(() => { /* ohne Version geht es auch */ });
   }
 

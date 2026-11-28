@@ -12,6 +12,7 @@
 //                                   Bretter, Klaenge, Figuren); Erfolge, Level und Wertung bleiben erspielt. Jede neue
 //                                   Sperre fuer Ausruestbares fragt hier nach.
 //   ladeSonderstuecke() -> Promise<string[]|null>   fragt den Server, merkt das Ergebnis; null ohne Anmeldung/bei Fehler
+//   erfinderStatus() -> null | 'offen' | 'aktiv' | 'fehlt'   fuer die Zeile unten in den Einstellungen (R32)
 //   sonderstueckeBekannt() -> boolean   fuer das angemeldete Konto liegt schon eine Server-Antwort im Merker
 //                                   (js/app.js fragt sonst beim Start und beim Seitenwechsel nach, nicht erst die Sammlung)
 //   setzeSonderFetch(fn)            nur fuer Tests
@@ -52,6 +53,14 @@ export function sonderstueckeBekannt() {
   return !!(uid && m && m.konto === uid);
 }
 export function istErfinder() { return hatSonderstueck(ERFINDER.titel); }
+// Zeile "Erfinder-Status" in den Einstellungen (R32, T-018): null abgemeldet, 'offen' noch keine Server-Antwort fuer
+// dieses Konto, sonst 'aktiv' oder 'fehlt' (Antwort ohne erfinder-titel)
+export function erfinderStatus() {
+  const s = sitzung();
+  if (!s || !userId(s)) return null;
+  if (!sonderstueckeBekannt()) return 'offen';
+  return istErfinder() ? 'aktiv' : 'fehlt';
+}
 // Pionier (Flo 01.11.2026: "die ersten 100 Spieler bekommen einen Titel"): Sonderstueck pionier-001 bis pionier-100,
 // vergeben nur vom Server (supabase/pionier-schema.sql); die Nummer steht im Namen
 export function pionierNummer() {
