@@ -18,6 +18,10 @@
     "daten-schema.sql": {
       "pflicht": "jetzt"
     },
+    "freunde-grenze-schema.sql": {
+      "pflicht": "warnung",
+      "pflicht_ab": "Obergrenze Wochenwertung (T-012, R31) eingespielt; danach jetzt (bis dahin fehlt wochenpunkte_je_partie_max)"
+    },
     "freunde-schema.sql": {
       "pflicht": "jetzt"
     },
